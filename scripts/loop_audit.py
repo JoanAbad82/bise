@@ -25,6 +25,7 @@ import os
 import re
 import statistics
 import sys
+import tempfile
 import time
 from datetime import datetime
 
@@ -431,6 +432,9 @@ def queued_at(hv, agent, s, e):
     return False
 
 
+GATE_CMD_RX = re.compile(r"gate\.sh (quick|land|full|rerun)\b")
+
+
 def heavy_waits(h, since):
     """heavy-run's log: a line when a job gets its slot, <submit> <start> -
     <slot> <cwd> <cmd>, and since flow-time one when it ends, <submit> <start>
@@ -447,14 +451,28 @@ def heavy_waits(h, since):
             if f[2].isdigit():
                 ends[key] = int(f[2])
                 continue
+            # gate: the gate mode, read from the whole command before its cut to 80 (an agent's
+            # quick gate is a 90+ char worktree path: review-gates m_37235)
+            g = GATE_CMD_RX.search(f[5])
             rows[key] = {"submit": int(f[0]), "start": int(f[1]), "end": None, "slot": f[3],
-                         "cwd": f[4], "cmd": f[5].strip()[:80]}
+                         "cwd": f[4], "cmd": f[5].strip()[:80], "gate": g.group(1) if g else None}
     out = sorted(rows.values(), key=lambda x: x["start"])
     nxt = {}
     for x in reversed(out):
         x["end"] = ends.get((str(x["submit"]), str(x["start"]), x["slot"])) or min(nxt.get(x["slot"], x["start"] + 3600), x["start"] + 3 * 3600)
         nxt[x["slot"]] = x["start"]
     return out
+
+
+def gate_queue(hv, mode, runs):
+    """A gate mode's queue waits, where they come from, and its light runs. Its queue is
+    heavy-run's wait for a slot (heavy.log, submit to start), where a gate through heavy-run
+    waits; the gate log's own queue line only sees gate.sh's lock (fast-loop: quick showed
+    'queue p50 0 s' while heavy.log said 409 s), so it is the fallback. light: the quick gates
+    heavy-run ran at once in its light lane, no slot. Pure."""
+    hq = [x["start"] - x["submit"] for x in hv if x.get("gate") == mode]
+    light = sum(1 for x in hv if x["slot"] == "light" and x.get("gate") == mode)
+    return (hq, "heavy.log", light) if hq else ([r["queue"] for r in runs], "gate logs", light)
 
 
 # ---- the report ------------------------------------------------------------
@@ -498,9 +516,11 @@ def audit(h, hub, since):
         for r in runs:
             for x in ([] if r["green"] else r.get("reds") or ["?"]):
                 why[x] = why.get(x, 0) + 1
+        queue, qfrom, light = gate_queue(hv, mode, runs)
         rep["gates"][mode] = {"runs": len(runs), "green": sum(r["green"] for r in runs), "reds": why,
                               "secs_p50": med(green), "secs_p90": pct(green, 0.9),
-                              "queue_p50": med([r["queue"] for r in runs]), "queue_max": max([r["queue"] for r in runs] or [0]),
+                              "queue_p50": med(queue), "queue_p90": pct(queue, 0.9), "queue_max": max(queue or [0]),
+                              "queue_from": qfrom, "light": light,
                               "steps_p50": {s: med([r["steps"][s] for r in runs if s in r["steps"]])
                                             for s in sorted({s for r in runs for s in r["steps"]})}}
     # tests: run_all.sh's timings.tsv (every e2e/tmux run, wherever its
@@ -661,9 +681,9 @@ def report(rep):
         w("- gate logs start %s: the agents' runs before are not counted (the nightly's and releases' are)" % (
             "now (none yet)" if st is None else datetime.fromtimestamp(st).strftime("%Y-%m-%d %H:%M")))
     for mode, g in rep["gates"].items():
-        w("- %s: %d runs, %d green; green p50 %s, p90 %s; queue p50 %s, max %s; steps p50 %s" % (
+        w("- %s: %d runs, %d green; green p50 %s, p90 %s; queue p50 %s, p90 %s, max %s (%s; %d light, no slot); steps p50 %s" % (
             mode, g["runs"], g["green"], fmt_s(g["secs_p50"]), fmt_s(g["secs_p90"]), fmt_s(g["queue_p50"]),
-            fmt_s(g["queue_max"]), ", ".join("%s %s" % (s, fmt_s(v)) for s, v in g["steps_p50"].items())))
+            fmt_s(g["queue_p90"]), fmt_s(g["queue_max"]), g["queue_from"], g["light"], ", ".join("%s %s" % (s, fmt_s(v)) for s, v in g["steps_p50"].items())))
         if g["reds"]:
             w("  - its red runs, by what was red: %s" % ", ".join(
                 "%s %d" % kv for kv in sorted(g["reds"].items(), key=lambda kv: -kv[1])))
@@ -738,6 +758,22 @@ def self_test():
     text = "ok   e2e (49s, cpu 120s): ok" + NL + "FAIL every_e2e (93s): x" + NL + "got the gate after 637s" + NL + "GATE full FAILED"
     r = gate_run(text)
     assert r["mode"] == "full" and not r["green"] and r["queue"] == 637, r
+    # heavy.log as heavy-run writes it, an agent's quick gate by its 90+ char worktree path
+    # (review-gates m_37235: cut to 80, 'gate.sh quick' fell off), its end line not counted twice
+    wt = "/Users/gabrielvergnaud/.bise/worktrees/harness-3abb2bd8/drop-card/harness"
+    with tempfile.TemporaryDirectory() as hd:
+        os.makedirs(os.path.join(hd, "run"))
+        with open(os.path.join(hd, "run", "heavy.log"), "w") as fh:
+            fh.write("100\t509\t-\theavy.lock\t%s\t%s/tests/gate.sh quick \n" % (wt, wt))
+            fh.write("100\t509\t700\theavy.lock\t%s\t%s/tests/gate.sh quick \trc=0\n" % (wt, wt))
+            fh.write("200\t200\t-\tlight\t%s\ttests/gate.sh quick \n" % wt)
+            fh.write("300\t900\t-\theavy2.lock\t%s\tbash tests/gate.sh full \n" % wt)
+        hv = heavy_waits(hd, 0)
+    long_q = [x for x in hv if x["slot"] == "heavy.lock"][0]
+    assert "gate.sh quick" not in long_q["cmd"] and long_q["gate"] == "quick", long_q
+    assert gate_queue(hv, "quick", [{"queue": 0}]) == ([0, 409], "heavy.log", 1), gate_queue(hv, "quick", [])
+    assert gate_queue(hv, "full", []) == ([600], "heavy.log", 0), gate_queue(hv, "full", [])
+    assert gate_queue([], "quick", [{"queue": 7}]) == ([7], "gate logs", 0)
     assert r["tests"] == {"e2e": (True, 49, 120), "every_e2e": (False, 93, None)}, r
     q = gate_run("ok   test-build (15s)" + NL + "ok   clippy (10s)" + NL + "GATE quick GREEN (35s): x")
     assert q["secs"] == 35 and q["steps"] == {"test-build": 15, "clippy": 10}, q
