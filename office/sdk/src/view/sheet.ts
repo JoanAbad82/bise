@@ -151,13 +151,25 @@ export function mountGrid(el: HTMLElement, data: UWorkbook, opts: { dark: boolea
       const ws = book.getActiveSheet();
       if (ws.getSheetName() !== sheet) return null;
       try {
+        // Univer's cell rects are in the sheet's own pixels (the headers in, the scroll and the
+        // zoom out), from the grid canvas's corner: never the container's, which has the
+        // formula bar above the canvas (the bar is a render canvas too: the grid's is the largest)
+        const area = (r: DOMRect) => r.width * r.height;
+        const boxes = Array.from(el.querySelectorAll<HTMLCanvasElement>('canvas[data-u-comp="render-canvas"]'), (c) => c.getBoundingClientRect());
+        const box = boxes.reduce<DOMRect | null>((m, r) => (!m || area(r) > area(m) ? r : m), null);
+        if (!box) return null;
         const [a, b = a] = range.split(":");
         const r0 = ws.getRange(a).getCellRect();
         const r1 = ws.getRange(b).getCellRect();
-        const box = el.getBoundingClientRect();
-        const left = Math.min(r0.left, r1.left) + box.left;
-        const top = Math.min(r0.top, r1.top) + box.top;
-        return new DOMRect(left, top, Math.max(r0.right, r1.right) + box.left - left, Math.max(r0.bottom, r1.bottom) + box.top - top);
+        const head = ws.getRange("A1").getCellRect();
+        const s = ws.getScrollState();
+        const first = ws.getRange(s.sheetViewStartRow, s.sheetViewStartColumn).getCellRect();
+        const zoom = ws.getZoom() || 1;
+        const x = (v: number) => box.left + (head.left + (v - first.left - s.offsetX) * zoom);
+        const y = (v: number) => box.top + (head.top + (v - first.top - s.offsetY) * zoom);
+        const left = x(Math.min(r0.left, r1.left));
+        const top = y(Math.min(r0.top, r1.top));
+        return new DOMRect(left, top, x(Math.max(r0.right, r1.right)) - left, y(Math.max(r0.bottom, r1.bottom)) - top);
       } catch {
         return null;
       }
