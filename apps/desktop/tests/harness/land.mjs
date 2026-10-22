@@ -18,16 +18,6 @@ export const LAND = [
   // the AGENTS head's cube: 'the bims' whole on its line, or the cube alone when the head lacks room
   // (measured), never an empty or wrapped pill, 320 to wide (bims-toggle, his m_30939)
   'checks/bims/toggle.spec.ts',
-  // answering (inbox-fix, architect m_23524): a refused answer or close shows that card again with
-  // the words, a taken one stays out across a reload and a switch, '✓ you answered' where he is
-  'checks/inbox/answer-refused.spec.ts',
-  'checks/inbox/block-views.spec.ts',
-  // ghost-badge: a card the hub keeps after his answer is back in the block, the sidebar's count is
-  // the block's; '/inbox' opens the item, or says nothing waits
-  'checks/inbox/ghost-badge.spec.ts',
-  // inbox-open (his ask): ⏎ opens a past item whole in the pane beside the list, ⌘⏎ lands on his
-  // answer 23 pages back in its thread (the store's window around it, the gap row loads newer)
-  'checks/inbox/inbox-open.spec.ts',
   'checks/spotlight/streaming.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',

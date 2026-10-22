@@ -8,8 +8,6 @@
 1 apps/desktop/tests/checks/gate/counts.spec.ts  # lint shape: a diff count, not panel.names_more
 1 apps/desktop/tests/checks/gate/images.spec.ts  # lint shape: a regex in a note, not the row
 1 apps/desktop/tests/checks/gate/right.spec.ts  # lint shape: a step's name, not the bar's word
-1 apps/desktop/tests/checks/inbox/block-views.spec.ts  # thread.card_line_q fits it, card_line matches the shape: thread to move it
-1 apps/desktop/tests/checks/inbox/inbox-zero.spec.ts  # lint shape: a fixture's words, not panel.tip_asks
 1 apps/desktop/tests/checks/native/fn.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
 2 apps/desktop/tests/checks/settings/keys.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
 1 apps/desktop/tests/checks/settings/sign-in-expired.spec.ts  # lint shape: a card option's label in the fixture, not settings.sign_in
