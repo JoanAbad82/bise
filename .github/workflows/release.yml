@@ -142,6 +142,15 @@ jobs:
           echo "$HOME/.bend/bin" >> "$GITHUB_PATH"
           uname -a; sw_vers 2>/dev/null || { cat /etc/os-release; ldd --version | head -n 1; }
 
+      # the xlsx grid (office/dist/office-sheet.js, never committed): versions.sh
+      # has bins.sh build it with pnpm and node (office/sdk's lockfile)
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: office/sdk/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       # Linux: clang >= 15 (Ubuntu 22.04's clang 14 crashes on sb-core on
       # arm64), zsh (test-install.sh's shell). bend -o calls `clang`.
       - name: Linux packages

@@ -29,7 +29,9 @@ if [ -n "$miss" ]; then
 fi
 # the xlsx grid's bundle (office-sheet.js) is built, never committed (architect
 # m_37322): it must be there and built from these sources (scripts/bins.sh writes
-# the key it was built from beside it)
+# the key it was built from beside it). Built here first, like the gate's sb-core
+# (a fresh tree, the tip gate's, has none): from bins.sh's cache, a copy on a hit
+"$root/scripts/bins.sh" office-sheet || { echo "FAIL office_check: scripts/bins.sh office-sheet failed"; exit 1; }
 want="$("$root/scripts/bins.sh" key office-sheet 2>/dev/null)"
 have="$(cat "$root/office/dist/office-sheet.js.key" 2>/dev/null)"
 if [ -z "$want" ] || [ ! -f "$root/office/dist/office-sheet.js" ] || [ "$want" != "$have" ]; then
