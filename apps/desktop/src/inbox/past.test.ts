@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { inbox } from '@/proto/words_inbox.gen';
 import { ALL, dayHead, endWords, headWords, jumpOf, lineTwo, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
+// at collect time: waiting.ts pulls ./Block (the inbox UI), too slow to transform inside a test's 5 s at load
+import { waitingCount } from './waiting';
 
 const NOW = new Date(2026, 9, 14, 15, 0).getTime();
 const at = (d: number, h: number, m: number) => new Date(2026, 9, 14 - d, h, m).getTime();
@@ -100,8 +102,7 @@ it('mergeRecords keeps one per card, newest first', () => {
 });
 
 describe('waitingCount: one number', () => {
-  it("counts the list, and a row's waits when it carries no cards", async () => {
-    const { waitingCount } = await import('./waiting');
+  it("counts the list, and a row's waits when it carries no cards", () => {
     const c = card(3, 'perf', 'which bench?');
     expect(waitingCount([c, c], [{ cards: [c], waits: 1 }, { cards: undefined, waits: 2 }])).toBe(4);
     expect(waitingCount([], [{ cards: [], waits: 0 }])).toBe(0);
