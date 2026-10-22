@@ -178,8 +178,8 @@ def needs_in(+st: S.St, i: GI.In) -> Needs():
       of_agent(name)
     case GI.IDrop{+name, _}:
       of_agent(name)
-    case GI.IConfirmDrop{+name}:
-      of_agent(name)
+    case GI.IConfirmOpen{+agent, _}:
+      of_agent(agent)
     case GI.IIsolate{+name}:
       of_agent(name)
     case GI.IPlaced{+name, _, _}:
