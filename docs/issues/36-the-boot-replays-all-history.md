@@ -254,3 +254,19 @@ tests/fixtures/bend-recv-repro/).
   100 % photo ~54 G (sb-core restore 26.6 + view_all 18.7, hub 8.8): 1.9x.
   Restore and view_all both scale with St (35 MB photo, 36 MB view): chunk
   5's target.
+- **agents-light, the app's first answer** (boot-photo, signed architect
+  m_37000/m_37151/m_37220): (a) 4a0af660c, initialize seeds the heads and
+  usage of live agents only; (b) 948318eac, the agents event carries the
+  archived ones as a light list (name, aliases, dir, status, since_ms,
+  about), sent on a connection's first event and when it changes; older
+  clients keep the full shape (shim agents-full-archived, out in
+  v2026.10.2-52); agent/get for one full row. Measured on a copy of his
+  state (148k events, 892 transcripts, 888 agents of which ~20 live,
+  symbolized release, macOS sample, `$TMPDIR/app_boot.py`): the hub loop
+  held on a client's initialize ~4.0 s -> ~0.16 s (the rest: seeding the
+  live agents' heads on the first connect, hub_state's git spawns);
+  initialize 1.49 MB -> 270 KB. Known sizes left, kept on purpose
+  (architect m_37382: a local socket): hub/agents 175 KB (the live rows in
+  full, each with its whole objective, + the light list), hub/scheduled
+  95 KB (the last week's ended timers included). The next measure starts
+  from these.
