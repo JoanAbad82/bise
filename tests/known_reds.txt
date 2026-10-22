@@ -2,4 +2,6 @@
 # One per line, tab-separated: <test>	<since>	<owner>	<why>. A red here is known: the full gate
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
 keep-all	d8e6d29ae	gate-reds	load flake, green alone 25/25 (5 runs of its 5 tests, load 41), red only at load >= 37: 'agents: Tune...' after a relaunch the model id's caret is not after his words (row-slide's test:land run 4 of 5, with 4 other reds); main m_33979
+badge	36ab4f688	badge-race	load flake: red in both 10.11 checks runs on 36ab4f688 ('a new card counts at once': expected 6, got 7, the start count read before a fresh home's notifications ask lands), green 3/3 alone; hardened in 909848e44, remove once a release run is green; main m_38005
+new	36ab4f688	agent-branch	flake: agents/new 'on a branch', the hub lists the new worktree agent with an empty branch; red in the 2nd 10.11 checks run on 36ab4f688, alone 1 green 1 red; main m_38005
 
