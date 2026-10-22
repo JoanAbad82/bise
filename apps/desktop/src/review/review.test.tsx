@@ -82,6 +82,13 @@ describe('the agents screen', () => {
     expect(cmds.at(-1)).toEqual({ cmd: 'stop', project: P, agent: 'perf' });
     fireEvent.click(v.getByTestId('agents.archive.perf'));
     expect(cmds.at(-1)).toEqual({ cmd: 'archive', project: P, agent: 'perf', force: true });
+    // agents/lifecycle (min-tests): once the hub has it archived, its /archived row restores it
+    act(() => {
+      store.apply({ ev: 'agents', project: P, agents: store.agents(P).map((a) => (a.name === 'perf' ? { ...a, status: 'idle' as const, archived: true } : a)) });
+    });
+    const arch = render(wrap(<AgentsScreen project={P} archived />));
+    fireEvent.click(arch.getByTestId('agents.restore.perf'));
+    expect(cmds.at(-1)).toEqual({ cmd: 'unarchive', project: P, agent: 'perf' });
     // A.1: '+ new agent' is live since amb-feed 6cb6c0ef's typed new
     expect((v.getByTestId('agents.new') as HTMLButtonElement).disabled).toBe(false);
   });

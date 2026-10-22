@@ -489,3 +489,16 @@ fn a_sign_in_shows_its_state_in_the_lists_and_never_a_token() {
     assert_eq!(auth_cli::statuses(&c, &keys, "", None).iter().find(|s| s.id == "chatgpt").unwrap().state, "expired");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// auth_events_e2e (min-tests): `--events` makes a browser sign-in speak JSON lines to a program
+/// (the desktop core's sign-in port): the first is {"ev":"open","url"}, a failure
+/// {"ev":"error","text"}; the field names are the interface, never renamed.
+#[test]
+fn events_lines_are_the_cores_interface() {
+    let o = auth_cli::parse_opts(&["chatgpt".to_string(), "--events".to_string(), "--no-browser".to_string()]).unwrap();
+    assert!(o.events && o.no_browser);
+    assert_eq!(o.provider.as_deref(), Some("chatgpt"));
+    assert!(!auth_cli::parse_opts(&["chatgpt".to_string()]).unwrap().events);
+    assert_eq!(auth_cli::open_ev("http://127.0.0.1:1455/auth?x=1").to_string(), r#"{"ev":"open","url":"http://127.0.0.1:1455/auth?x=1"}"#);
+    assert_eq!(auth_cli::error_ev("the sign-in wasn't finished.").to_string(), r#"{"ev":"error","text":"the sign-in wasn't finished."}"#);
+}

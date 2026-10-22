@@ -494,9 +494,19 @@ fn event(v: serde_json::Value) {
     let _ = std::io::stdout().flush();
 }
 
+/// `--events`' first line: the sign-in's link (the desktop core opens or shows it). Pure.
+pub(crate) fn open_ev(url: &str) -> serde_json::Value {
+    serde_json::json!({"ev": "open", "url": url})
+}
+
+/// `--events`' last line when the sign-in fails: his words, never the prose. Pure.
+pub(crate) fn error_ev(text: &str) -> serde_json::Value {
+    serde_json::json!({"ev": "error", "text": text})
+}
+
 /// `--events`' start: the link, then the browser (unless `--no-browser`).
 fn events_open(url: &str, no_browser: bool) {
-    event(serde_json::json!({"ev": "open", "url": url}));
+    event(open_ev(url));
     if !no_browser {
         let _ = open_url(url);
     }
@@ -528,7 +538,7 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
     let (out, err) = (Style::stdout(), Style::stderr());
     let fail = |text: &str| {
         if events {
-            event(serde_json::json!({"ev": "error", "text": text}));
+            event(error_ev(text));
         } else {
             eprintln!("{}", warn_line(&err, text));
         }
@@ -606,7 +616,7 @@ fn openrouter_login_main(paths: &Paths, no_browser: bool, events: bool) -> i32 {
     let (out, err) = (Style::stdout(), Style::stderr());
     let fail = |text: &str| {
         if events {
-            event(serde_json::json!({"ev": "error", "text": text}));
+            event(error_ev(text));
         } else {
             eprintln!("{}", warn_line(&err, text));
         }
