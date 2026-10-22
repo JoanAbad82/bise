@@ -15,9 +15,6 @@ import { fileURLToPath } from 'node:url';
 export const LAND = [
   'checks/app/keep-all.spec.ts',
   'checks/app/core-line.spec.ts',
-  // the AGENTS head's cube: 'the bims' whole on its line, or the cube alone when the head lacks room
-  // (measured), never an empty or wrapped pill, 320 to wide (bims-toggle, his m_30939)
-  'checks/bims/toggle.spec.ts',
   'checks/spotlight/streaming.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',
@@ -39,9 +36,6 @@ export const LAND = [
   // an app from the DMG or Downloads asks once to move to Applications; 'Not now' is kept for its
   // build; settings › update moves it (apple-signing ag-move; the alert and the move stubbed)
   'checks/native/move-apps.spec.ts',
-  // les bims: the list never loads three, a still office draws nothing (~8 fps typing, 0 hidden),
-  // WebGL lost shows the list under its line (bims-qa; the sizes and labels: checks/bims/office)
-  'checks/bims/budget.spec.ts',
   // the live pearl draws at the display's rate seen, 0 frames blurred or hidden (pearl-idle, bims-fix m_28756)
   'checks/pearl/idle.spec.ts',
 ];

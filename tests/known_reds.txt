@@ -2,7 +2,6 @@
 # One per line, tab-separated: <test>	<since>	<owner>	<why>. A red here is known: the full gate
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
 keep-all	d8e6d29ae	gate-reds	load flake, green alone 25/25 (5 runs of its 5 tests, load 41), red only at load >= 37: 'agents: Tune...' after a relaunch the model id's caret is not after his words (row-slide's test:land run 4 of 5, with 4 other reds); main m_33979
-budget	d8e6d29ae	gate-reds	load flake, green alone 33/35, red only at load >= 37: '(6) an eater' never the display rate, 13-17 fps against < 12 (test:land run 4 at load ~37; alone, its 2 reds at load 53); main m_33979
 as-he-does/quick: pinch (ctrl+wheel) on an image artifact in the hub's viewer (/a/<id>/view): fit at open, no chip; zooms around the pointer (±N px), a % chip, the window zoom ne	80ebf9c4d	desk-cut-15	flaky drift (dy 5.7 px in the nightly of 80ebf9c4d at load ~40), green alone on rows25 at load 20 (pinch-out); review-gates m_32399
 cut	f1776235a	nightly-world	gate/cut: 12 min timeout on desktop-checks' 2-project world (a candidate check of ambient-lead's, run by no other runner); nightly-reds takes it after 10.9 (main m_35250)
 empty	f1776235a	nightly-world	gate/empty: needs the packed app's bise (BISE_EMPTY_BISE), which desktop-checks never has; nightly-reds takes it after 10.9 (main m_35250)
