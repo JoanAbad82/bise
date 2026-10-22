@@ -417,6 +417,64 @@ with tempfile.TemporaryDirectory() as home:
     r = subprocess.run([HEAVY, "true"], env=envr, cwd=wt, capture_output=True, text=True, timeout=30)
     check("this cargo target was deleted at X" in r.stderr and not os.path.exists(os.path.join(wt, "rust", "target", "RECLAIMED.txt")),
           "the next job in that worktree prints RECLAIMED.txt and removes it: %r" % r.stderr[-300:])
+    # the light lane: a quick gate whose tree runs no heavy step ('gate.sh light' exits 0) runs at
+    # once with both slots held, its heavy.log lines on slot 'light'; a heavy one, or a quick gate
+    # with more in its command, queues (a stand-in gate.sh: 'light' answers $LIGHT_RC)
+    lw = os.path.join(home, "lw")
+    os.makedirs(os.path.join(lw, "tests"))
+    with open(os.path.join(lw, "tests", "gate.sh"), "w") as f:
+        f.write('[ "$1" = light ] && exit "${LIGHT_RC:-0}"\necho "quick ran in $HEAVY_SLOT"\n')
+    os.chmod(os.path.join(lw, "tests", "gate.sh"), 0o755)
+    go_l2 = os.path.join(home, "go_l2")
+    holds = [subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.2; done', go_l2], env=roomy) for _ in range(2)]
+    wait_for(lambda: len([f for f in os.listdir(os.path.join(run, "reserve")) if not f.startswith(".")]) >= 2, 30, "both slots held")
+    r = subprocess.run([HEAVY, "--land", "bash", "-c", "tests/gate.sh quick 2>&1 | tail -3"], env=roomy, cwd=lw,
+                       capture_output=True, text=True, timeout=30)
+    check(r.returncode == 0 and "quick ran in light " in r.stdout and "a light quick gate" in r.stderr,
+          "a light quick gate runs with every slot held, HEAVY_SLOT='light <pid>': %r %r" % (r.stdout, r.stderr[-200:]))
+    check([l.split("\t")[3] for l in lines() if "gate.sh quick" in l][-2:] == ["light", "light"] and lines()[-1].endswith("rc=0"),
+          "heavy.log: its start and end on slot 'light'")
+    for cmd, env_l, what in ((["tests/gate.sh", "quick"], dict(roomy, LIGHT_RC="1"), "a heavy tree"),
+                             (["bash", "-c", "tests/gate.sh quick; cargo test"], roomy, "more than the quick gate"),
+                             (["tests/gate.sh", "quick"], dict(roomy, HEAVY_NO_LIGHT="1"), "HEAVY_NO_LIGHT")):
+        p = subprocess.Popen([HEAVY] + (["bash"] if cmd[0].endswith("gate.sh") else []) + cmd, env=env_l, cwd=lw,
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        check(stays(lambda: p.poll() is None, 2, "it waits"), "%s: the quick gate waits for a slot" % what)
+        p.kill()
+        p.wait()
+    # the cap (review-gates m_37126): HEAVY_LIGHT_MAX light runs at once; the next waits, then runs
+    go_l3 = os.path.join(home, "go_l3")
+    lh = subprocess.Popen(["/usr/bin/lockf", "-k", os.path.join(run, "light1.lock"), "sh", "-c",
+                           'while [ ! -e "$0" ]; do sleep 0.1; done', go_l3])
+    wait_for(lambda: held(os.path.join(run, "light1.lock")), what="light1.lock held")
+    el = open(os.path.join(home, "errl"), "w+")
+    lp = subprocess.Popen([HEAVY, "bash", "tests/gate.sh", "quick"], env=dict(roomy, HEAVY_LIGHT_MAX="1"), cwd=lw,
+                          stdout=subprocess.PIPE, stderr=el, text=True)
+    check(stays(lambda: lp.poll() is None, 2, "it waits"), "the light cap held: the next light run waits")
+    check("1 light quick gates run already: waiting for one to end" in open(el.name).read(), "the wait says so")
+    open(go_l3, "w").close()
+    check(job_ends(lp, 30) == 0 and "quick ran in light " in lp.stdout.read(), "the cap frees: it runs")
+    job_ends(lh, 10)
+    open(go_l2, "w").close()
+    for j in holds:
+        job_ends(j, 30)
+    # a tree that turned heavy after the light check: gate.sh quick in a light run (HEAVY_SLOT 'light')
+    # refuses every heavy step and runs none (the real gate.sh, in a throwaway worktree of this repo)
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    lt = os.path.join(home, "lt")
+    if subprocess.run(["git", "-C", repo, "worktree", "add", "-q", "--detach", lt, "HEAD"], capture_output=True).returncode == 0:
+        try:
+            g = os.path.join(repo, "tests", "gate.sh")
+            open(os.path.join(lt, "tests", "gate.sh"), "w").write(open(g).read())  # this tree's gate.sh, uncommitted or not
+            with open(os.path.join(lt, "rust", "home", "src", "lib.rs"), "a") as f:
+                f.write("\n// a change after the light check\n")
+            envg = {k: v for k, v in roomy.items() if not k.startswith(("SB_", "GATE_", "CARGO_"))}
+            r = subprocess.run(["bash", "tests/gate.sh", "quick"], cwd=lt, env=dict(envg, HEAVY_SLOT="light 1"),
+                               capture_output=True, text=True, timeout=300)
+            check(r.returncode == 1 and "FAIL heavy step in a light run: rust(" in r.stdout and "clippy" not in r.stdout
+                  and "test-build" not in r.stdout, "a tree turned heavy: the light run refuses, no cargo: %r" % r.stdout[-400:])
+        finally:
+            subprocess.run(["git", "-C", repo, "worktree", "remove", "--force", lt], capture_output=True)
     # --install
     r = subprocess.run([HEAVY, "--install"], env=env, capture_output=True, text=True)
     dst = os.path.join(run, "heavy-run")

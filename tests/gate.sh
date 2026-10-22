@@ -331,7 +331,34 @@ PY
   echo "now: cd $wt && export CARGO_TARGET_DIR=$tgt   (end: gate.sh done $name)"
   exit 0
 fi
-case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
+# after map_paths $changed: the heavy steps a quick gate would run on $changed ('' when none):
+# cargo (pkgs), PROOF, sb-core, core_gen, proto_ts, office, crossterm, desktop. One answer for
+# `gate.sh light` and for a light run's own refusal below (review-gates m_37126)
+heavy_why() {
+  local why="" v
+  [ -n "$pkgs" ] && why="$why rust($pkgs )"
+  printf '%s\n' "$changed" | grep -qE '^bend/(core|hub|vendor|laws|proofs)/.*\.bend$' && why="$why PROOF"
+  printf '%s\n' "$changed" | grep -qE '^bend/(hub|vendor)/' && why="$why sb-core"
+  printf '%s\n' "$changed" | grep -qE '^(rust/proto/src/core/|rust/proto/tests/core_gen(\.rs|/)|bend/hub/gen/|bend/hub/state-hand\.bend)' && why="$why core_gen"
+  for v in proto_ts office office_skills crossterm_changed; do eval "[ \"\${$v:-0}\" = 1 ]" && why="$why $v"; done
+  [ -n "$changed" ] && [ -n "$(desktop_why $changed)" ] && why="$why desktop"
+  echo "$why"
+}
+# light: whether this tree's quick gate runs no heavy step (no cargo, PROOF, desktop, office or
+# proto step: map_paths and desktop_why, as quick decides them). Exit 0 and 'light', else 1 and
+# 'heavy: <why>'. heavy-run runs a light quick gate without a slot or a disk reserve (fast-loop:
+# a quick gate waited p50 409 s for a slot, its own run 32-41 s of python checks)
+if [ "$mode" = light ]; then
+  cd "$(dirname "$0")/.." || exit 2
+  root="$PWD"
+  base="${GATE_BASE:-HEAD}"
+  changed="$( { git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)" || { echo "heavy: git"; exit 1; }
+  map_paths $changed
+  why="$(heavy_why)"
+  if [ -z "$why" ]; then echo light; exit 0; fi
+  echo "heavy:$why"; exit 1
+fi
+case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|light|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
 cd "$(dirname "$0")/.."
 root="$PWD"
 # a linked worktree has a .git file (the shared checkout a directory); a
@@ -545,6 +572,12 @@ fi
 hub_changed=0 bend_changed=0
 printf '%s\n' "$changed" | grep -qE '^bend/(hub|vendor)/' && hub_changed=1
 printf '%s\n' "$changed" | grep -qE '^bend/(core|hub|vendor|laws|proofs)/.*\.bend$' && bend_changed=1
+# a light run (heavy-run's light lane: HEAVY_SLOT 'light <pid>', no slot, no disk reserve) runs
+# no heavy step, whatever changed since heavy-run asked `gate.sh light` (review-gates m_37126)
+if [ "$mode" = quick ] && [ "${HEAVY_SLOT%% *}" = light ]; then
+  lw="$(map_paths $changed; heavy_why)"
+  [ -n "$lw" ] && { echo "FAIL heavy step in a light run:$lw: rerun through heavy-run (HEAVY_NO_LIGHT=1)"; echo "GATE quick FAILED"; exit 1; }
+fi
 # ./sb-core (not in git, BISE-114): the build of this tree's hub/ vendor/,
 # from bins.sh's cache shared by every worktree (a copy; ~15 s on a miss).
 # quick with a hub/ change: bins.sh compiles it in the background (below)

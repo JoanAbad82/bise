@@ -320,6 +320,47 @@ while :; do
   esac
 done
 
+# the light lane (fast-loop, main's audit m_36983: a quick gate waited p50 409 s
+# for a slot and the disk reserve, its own run 32-41 s of python checks): a
+# command that is only a quick gate (`tests/gate.sh quick`, maybe after `bash` or in `bash -c`
+# with its output piped to tail/grep/head/tee) whose tree runs no heavy step
+# (`gate.sh light`: no cargo, PROOF, desktop, office or proto step) runs now,
+# with no slot, no disk reserve and no load wait; heavy.log gets its lines
+# with the slot 'light'. Anything else, or a light check that fails, queues as
+# before. HEAVY_NO_LIGHT=1: never.
+light_gate() {
+  local s="$*" re='^((bash|sh)( -c)? )?([^ ;&|]*gate\.sh) quick( *2>&1)?( *\| *(tail|grep|head|tee)[^;&]*)*$'
+  [ "$ALONE" = 0 ] && [ -z "${HEAVY_NO_LIGHT:-}" ] && [[ "$s" =~ $re ]] || return 1
+  local gs="${BASH_REMATCH[4]}"
+  [ -f "$gs" ] && bash "$gs" light >/dev/null 2>&1
+}
+# At most HEAVY_LIGHT_MAX (4) light runs at once, each holding one of
+# light<N>.lock (review-gates m_37126: 6 agents out of the disk wait at once
+# spawn ~300 processes/s, and the Mac's audit daemon melts at that); the next
+# one waits a moment. The run carries HEAVY_SLOT='light <pid>': gate.sh quick
+# then refuses any heavy step (a tree that changed after the light check),
+# and a nested heavy-run is refused as in a slot.
+LJOB='m="$1"; shift; : >"$m"; export HEAVY_SLOT="light $$"; nice -n 10 "$@"'
+if light_gate "$@"; then
+  echo "heavy-run: a light quick gate (no cargo, PROOF, desktop or office step): it runs now, no slot" >&2
+  L="$D/heavy.log" c=$(printf "%s " "$@" | cut -c1-160) sub=$(date +%s) mk="$D/light-started.$$" said=""
+  printf "%s\t%s\t-\tlight\t%s\t%s\n" "$sub" "$sub" "$PWD" "$c" >>"$L" 2>/dev/null
+  while :; do
+    for i in $(seq 1 "${HEAVY_LIGHT_MAX:-4}"); do
+      rm -f "$mk"
+      /usr/bin/lockf -k -t 0 "$D/light$i.lock" /bin/bash -c "$LJOB" _ "$mk" "$@" 2>/dev/null; rc=$?
+      # 75 and no mark: that lock was taken (lockf's own word), the job never started
+      if [ "$rc" != 75 ] || [ -e "$mk" ]; then
+        rm -f "$mk"
+        printf "%s\t%s\t%s\tlight\t%s\t%s\trc=%s\n" "$sub" "$sub" "$(date +%s)" "$PWD" "$c" "$rc" >>"$L" 2>/dev/null
+        return $rc
+      fi
+    done
+    [ -n "$said" ] || { echo "heavy-run: ${HEAVY_LIGHT_MAX:-4} light quick gates run already: waiting for one to end" >&2; said=1; }
+    sleep 1
+  done
+fi
+
 # the CPU (mac-budget, 2026-10-21): a slot gets HEAVY_THREADS (4) threads, so
 # 5 busy slots fit about 2 x the 12 cores. cargo builds were capped already
 # (CARGO_BUILD_JOBS above); each cargo test binary ran 12 test threads and a
