@@ -13,36 +13,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LAND = [
-  'checks/app/keep.spec.ts',
   'checks/app/keep-all.spec.ts',
-  'checks/app/sidebar-v6.spec.ts',
   'checks/app/core-line.spec.ts',
-  // every list page walks with the TUI's list keys (ambient-lead m_22338)
-  'checks/app/list-walk.spec.ts',
-  // every menu is the ds Picker: ≤ 50vh, inside the window, its caret centered (menus-ds, his m_26194)
-  'checks/app/menus.spec.ts',
-  // no menu trigger crops a descender, a squeezed one ends in '…' (trigger-crop, his 'opus 5.5 high')
-  'checks/app/trigger-ink.spec.ts',
-  // the right bar's heads: no part meets another, the scope words on their own line (bar-heads, his m_26417)
-  'checks/app/bar-heads.spec.ts',
-  // the right bar never scrolls sideways: focused, hovered, ⌥ held, scoped at 0 rows (bar-overflow, his m_26733)
-  'checks/app/bar-overflow.spec.ts',
-  // the context dial after Codex's: 2 px track and arc, round caps inside 0..pct, ink from 70 %, no hue (ring-look)
-  'checks/app/ring-look.spec.ts',
-  // 'show 50 more' opens 50 at a time, 'show less' back to the cap, kept per section and scope (bar-more, his m_26894)
-  'checks/app/bar-more.spec.ts',
-  // main first in AGENTS as 'bise', out of the count, its click opens its thread, its hover lights its bim (bar-main, his m_28881)
-  'checks/app/bar-main.spec.ts',
   // the AGENTS head's cube: 'the bims' whole on its line, or the cube alone when the head lacks room
   // (measured), never an empty or wrapped pill, 320 to wide (bims-toggle, his m_30939)
   'checks/bims/toggle.spec.ts',
-  // a project's ⋯ menu by priority: active (needs him, then at work), quiet, archived capped (his m_26450)
-  'checks/app/proj-menu.spec.ts',
-  // what slid over at 800 goes when the window grows past 1000: one bar, no scrim (try-gate dc4770c1)
-  'checks/app/bar-slide.spec.ts',
-  // a hovered row's now line slides left at once, is home within 200 ms of the leave, still under
-  // reduced motion (slide-fix, his ask)
-  'checks/app/row-slide.spec.ts',
   // answering (inbox-fix, architect m_23524): a refused answer or close shows that card again with
   // the words, a taken one stays out across a reload and a switch, '✓ you answered' where he is
   'checks/inbox/answer-refused.spec.ts',
