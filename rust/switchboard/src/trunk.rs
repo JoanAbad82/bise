@@ -154,7 +154,7 @@ mod tests {
             onto: None,
             checks: root.join("worktrees"),
         };
-        let o = crate::land::run(&job, &crate::land::Queue::default(), &mut || {}).unwrap();
+        let o = crate::land::run(&job, &crate::land_line::local::line(), &mut || {}).unwrap();
         assert_eq!((o.target.as_str(), o.commits), ("main", 1));
         assert_eq!(git(&ws, &["log", "--format=%s", "main"]).unwrap(), "mine\ninit");
         assert_eq!(git(&ws, &["rev-parse", "sb/other"]).unwrap(), other, "sb/other did not move");

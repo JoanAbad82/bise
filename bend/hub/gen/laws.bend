@@ -27,6 +27,36 @@ law in_speaks_bare:
 def in_speaks_bare():
   {==}
 
+law in_land_claim_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"land_claim"})])) == IN.ILandClaim{""} : IN.In}
+
+def in_land_claim_bare():
+  {==}
+
+law in_land_pick_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"land_pick"})])) == IN.ILandPick{J.JNull{}, J.JNull{}, J.JNull{}, J.JNull{}, J.JNull{}, False{}, False{}, False{}, False{}, ""} : IN.In}
+
+def in_land_pick_bare():
+  {==}
+
+law in_land_join_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"land_join"})])) == IN.ILandJoin{0n, "", "", "", "", J.JNull{}} : IN.In}
+
+def in_land_join_bare():
+  {==}
+
+law in_land_end_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"land_end"})])) == IN.ILandEnd{0n, ""} : IN.In}
+
+def in_land_end_bare():
+  {==}
+
+law in_land_live_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"land_live"})])) == IN.ILandLive{J.JNull{}, J.JNull{}} : IN.In}
+
+def in_land_live_bare():
+  {==}
+
 law in_tick_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"tick"})])) == IN.ITick{} : IN.In}
 
@@ -402,6 +432,57 @@ def in_ISpeaks_round(token, from, cmd, who, dir, sock):
       {==}
     case SCon{h_dir, t_dir} SCon{h_sock, t_sock}:
       {==}
+
+law in_ILandClaim_round:
+  for key: String
+  {IN.of(IN.json(IN.ILandClaim{key})) == IN.ILandClaim{key} : IN.In}
+
+def in_ILandClaim_round(key):
+  {==}
+
+law in_ILandPick_round:
+  for changes: J.Json
+  for files: J.Json
+  for add: J.Json
+  for others: J.Json
+  for conflicts: J.Json
+  for alone: Bool
+  for worktree: Bool
+  for here: Bool
+  for pr_mode: Bool
+  for message: String
+  {IN.of(IN.json(IN.ILandPick{changes, files, add, others, conflicts, alone, worktree, here, pr_mode, message})) == IN.ILandPick{changes, files, add, others, conflicts, alone, worktree, here, pr_mode, message} : IN.In}
+
+def in_ILandPick_round(changes, files, add, others, conflicts, alone, worktree, here, pr_mode, message):
+  {==}
+
+law in_ILandJoin_round:
+  for ticket: Nat
+  for target: String
+  for place: String
+  for agent: String
+  for trunk: String
+  for dirty: J.Json
+  {IN.of(IN.json(IN.ILandJoin{ticket, target, place, agent, trunk, dirty})) == IN.ILandJoin{ticket, target, place, agent, trunk, dirty} : IN.In}
+
+def in_ILandJoin_round(ticket, target, place, agent, trunk, dirty):
+  {==}
+
+law in_ILandEnd_round:
+  for ticket: Nat
+  for key: String
+  {IN.of(IN.json(IN.ILandEnd{ticket, key})) == IN.ILandEnd{ticket, key} : IN.In}
+
+def in_ILandEnd_round(ticket, key):
+  {==}
+
+law in_ILandLive_round:
+  for claims: J.Json
+  for line: J.Json
+  {IN.of(IN.json(IN.ILandLive{claims, line})) == IN.ILandLive{claims, line} : IN.In}
+
+def in_ILandLive_round(claims, line):
+  {==}
 
 law in_ITick_round:
   {IN.of(IN.json(IN.ITick{})) == IN.ITick{} : IN.In}
@@ -1214,6 +1295,36 @@ law fx_spoke_bare:
 def fx_spoke_bare():
   {==}
 
+law fx_land_claimed_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"land_claimed"})])) == FX.FLandClaimed{False{}, ""} : FX.Fx}
+
+def fx_land_claimed_bare():
+  {==}
+
+law fx_land_picked_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"land_picked"})])) == FX.FLandPicked{False{}, Nil{}, Nil{}, "", ""} : FX.Fx}
+
+def fx_land_picked_bare():
+  {==}
+
+law fx_land_joined_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"land_joined"})])) == FX.FLandJoined{0n, False{}, "", ""} : FX.Fx}
+
+def fx_land_joined_bare():
+  {==}
+
+law fx_land_go_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"land_go"})])) == FX.FLandGo{0n, ""} : FX.Fx}
+
+def fx_land_go_bare():
+  {==}
+
+law fx_land_ranks_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"land_ranks"})])) == FX.FLandRanks{J.JNull{}} : FX.Fx}
+
+def fx_land_ranks_bare():
+  {==}
+
 law fx_notice_bare:
   {FX.of(J.obj([J.kv("fx", J.JStr{"notice"})])) == FX.FNotice{""} : FX.Fx}
 
@@ -1428,6 +1539,74 @@ def fx_FSpoke_round(token, ok, why):
       {==}
     case SCon{h_why, t_why}:
       {==}
+
+law fx_FLandClaimed_round:
+  for ok: Bool
+  for why: String
+  {FX.of(FX.json(FX.FLandClaimed{ok, why})) == FX.FLandClaimed{ok, why} : FX.Fx}
+
+def fx_FLandClaimed_round(ok, why):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{h_why, t_why}:
+      {==}
+
+law fx_FLandPicked_round:
+  for ok: Bool
+  for mine: List<&2, String>
+  for left_out: List<&2, String>
+  for note: String
+  for why: String
+  {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, note, why})) == FX.FLandPicked{ok, mine, left_out, note, why} : FX.Fx}
+
+def fx_FLandPicked_round(ok, mine, left_out, note, why):
+  match note why:
+    case SNil{} SNil{}:
+      %K.strs_round(mine) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SNil{}, SNil{}})) == FX.FLandPicked{ok, _, left_out, SNil{}, SNil{}} : FX.Fx}
+      %K.strs_round(left_out) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SNil{}, SNil{}})) == FX.FLandPicked{ok, K.strs(K.jstrs(mine)), _, SNil{}, SNil{}} : FX.Fx}
+      {==}
+    case SNil{} SCon{h_why, t_why}:
+      %K.strs_round(mine) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SNil{}, SCon{h_why, t_why}})) == FX.FLandPicked{ok, _, left_out, SNil{}, SCon{h_why, t_why}} : FX.Fx}
+      %K.strs_round(left_out) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SNil{}, SCon{h_why, t_why}})) == FX.FLandPicked{ok, K.strs(K.jstrs(mine)), _, SNil{}, SCon{h_why, t_why}} : FX.Fx}
+      {==}
+    case SCon{h_note, t_note} SNil{}:
+      %K.strs_round(mine) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SCon{h_note, t_note}, SNil{}})) == FX.FLandPicked{ok, _, left_out, SCon{h_note, t_note}, SNil{}} : FX.Fx}
+      %K.strs_round(left_out) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SCon{h_note, t_note}, SNil{}})) == FX.FLandPicked{ok, K.strs(K.jstrs(mine)), _, SCon{h_note, t_note}, SNil{}} : FX.Fx}
+      {==}
+    case SCon{h_note, t_note} SCon{h_why, t_why}:
+      %K.strs_round(mine) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SCon{h_note, t_note}, SCon{h_why, t_why}})) == FX.FLandPicked{ok, _, left_out, SCon{h_note, t_note}, SCon{h_why, t_why}} : FX.Fx}
+      %K.strs_round(left_out) : {FX.of(FX.json(FX.FLandPicked{ok, mine, left_out, SCon{h_note, t_note}, SCon{h_why, t_why}})) == FX.FLandPicked{ok, K.strs(K.jstrs(mine)), _, SCon{h_note, t_note}, SCon{h_why, t_why}} : FX.Fx}
+      {==}
+
+law fx_FLandJoined_round:
+  for ticket: Nat
+  for ok: Bool
+  for target: String
+  for why: String
+  {FX.of(FX.json(FX.FLandJoined{ticket, ok, target, why})) == FX.FLandJoined{ticket, ok, target, why} : FX.Fx}
+
+def fx_FLandJoined_round(ticket, ok, target, why):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{h_why, t_why}:
+      {==}
+
+law fx_FLandGo_round:
+  for ticket: Nat
+  for target: String
+  {FX.of(FX.json(FX.FLandGo{ticket, target})) == FX.FLandGo{ticket, target} : FX.Fx}
+
+def fx_FLandGo_round(ticket, target):
+  {==}
+
+law fx_FLandRanks_round:
+  for ranks: J.Json
+  {FX.of(FX.json(FX.FLandRanks{ranks})) == FX.FLandRanks{ranks} : FX.Fx}
+
+def fx_FLandRanks_round(ranks):
+  {==}
 
 law fx_FNotice_round:
   for text: String

@@ -36,3 +36,8 @@
 {"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "input", "msg": 1, "text": "why does p99 rise", "context": "{\"app\":\"Safari\",\"url\":\"https://grafana.shop.test/d/p99\"}"}
 {"fx": "xreply", "hub": "home-1", "xid": 8, "text": "green"}
 {"fx": "feed", "agent": "t1", "rec": {"sb": "card-closed", "id": 4, "res": "accepted"}}
+{"fx": "land_claimed", "ok": false, "why": "a land of this place is in line or checking (since 12 min): its result comes to you. Changes you made after it started land with your next sb land, once it ends."}
+{"fx": "land_picked", "ok": true, "mine": ["a.rs"], "left_out": ["b.rs"], "note": "left out 1 file"}
+{"fx": "land_joined", "ticket": 1, "ok": true, "target": "refs/heads/main"}
+{"fx": "land_go", "ticket": 1, "target": "refs/heads/main"}
+{"fx": "land_ranks", "ranks": {"wt:a": 1}}

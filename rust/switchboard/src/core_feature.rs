@@ -142,11 +142,6 @@ impl Hub {
             .collect()
     }
 
-    /// Where agent `name` lands now ([`onto`]); None for an unknown one.
-    pub fn onto_now(&self, name: &str) -> Option<Option<String>> {
-        self.st.agents.get(name).map(|a| onto(&a.ws))
-    }
-
     /// `sb spawn --feature <f>` (dev-flow §5.1): the task's name as sb-core
     /// will pick it (the next free one, `fix-2`), then its worktree from
     /// the feature's tip, made now so sb-core takes it as the place to

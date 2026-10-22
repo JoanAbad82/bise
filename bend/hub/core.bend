@@ -46,6 +46,8 @@ import ./gone.bend as G
 import ./take.bend as TK
 import ./peer.bend as PR
 import ./stall.bend as SL
+import ./land.bend as LD
+import ./land-step.bend as LS
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -3084,7 +3086,7 @@ def Hub.r(x: Hub) -> X.R:
       r
 
 def hub_new(+workspace: String) -> Hub:
-  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}, Nil{}}, True{}}
+  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}, Nil{}, LD.NONE()}, True{}}
 
 # the context of one input over the hub
 def start(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
@@ -3127,23 +3129,6 @@ def steer_count(-o: S.St, +cx: X.Cx<o>, +agent: String, +injected: Bool) -> X.Cx
   +c2 = Bool.pick(X.Cnt, injected, X.Cnt{agent, X.Cnt.recv(c), 1n+X.Cnt.inj(c)}, X.Cnt{agent, 1n+X.Cnt.recv(c), X.Cnt.inj(c)})
   set_r(o, cx, X.R.with_counts(r, M.snoc(X.Cnt, KL.cnt_del(X.R.counts(r), agent), c2)))
 
-# an agent's steered list with `seen` set to `k` (the list itself kept)
-def steer_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Steer>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), n), X.Steer{n, X.Steer.ids(h), k, X.Steer.rx_seen(h)}, h) <> steer_mark(t, n, k)
-
-# an agent's steered list with `rx_seen` set to `k` (the list and `seen`
-# kept)
-def steer_rx_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Steer>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), n), X.Steer{n, X.Steer.ids(h), X.Steer.seen(h), k}, h) <> steer_rx_mark(t, n, k)
-
 # the receipt's ids: the steer-mode deliveries since the last receipt
 # (none: a second receipt with no new steer marks nothing)
 def steer_receipt.go(-o: S.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String, +total: Nat) -> X.Cx<o>:
@@ -3152,7 +3137,7 @@ def steer_receipt.go(-o: S.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String,
       cx
     case Con{+h, +t}:
       +r = rr(o, cx)
-      +cx2 = set_r(o, cx, X.R.with_steered(r, steer_mark(X.R.steered(r), agent, total)))
+      +cx2 = set_r(o, cx, X.R.with_steered(r, KL.steer_mark(X.R.steered(r), agent, total)))
       feed(o, cx2, agent, FD.steered(h <> t))
 
 # the runtime read the steering (ISteered): the feed line naming the
@@ -3171,7 +3156,7 @@ def steer_rx_receipt.go(-o: S.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: Stri
       cx
     case Con{+h, +t}:
       +r = rr(o, cx)
-      +cx2 = set_r(o, cx, X.R.with_steered(r, steer_rx_mark(X.R.steered(r), agent, total)))
+      +cx2 = set_r(o, cx, X.R.with_steered(r, KL.steer_rx_mark(X.R.steered(r), agent, total)))
       feed(o, cx2, agent, FD.steer_rx(h <> t))
 
 # the runtime received the steering (ISteerRx, before it reads it): the
@@ -3588,6 +3573,16 @@ def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       agent_req.by(o, PR.req_ok(st(o, cx), who, dir, sock, from), cx, token, from, req)
     case GI.ISpeaks{+token, +from, _, +who, +dir, +sock}:
       out(o, cx, PR.spoke(token, PR.req_ok(st(o, cx), who, dir, sock, from)))
+    case GI.ILandClaim{+key}:
+      LS.claim(o, cx, key)
+    case GI.ILandPick{+changes, +files, +add, +others, +conflicts, +alone, +worktree, +here, +pr_mode, +message}:
+      LS.pick(o, cx, LD.pick_input(changes, files, add, others, conflicts, alone, worktree, here, pr_mode, message))
+    case GI.ILandJoin{+ticket, +target, +place, +agent, +trunk, +dirty}:
+      LS.join(o, cx, ticket, target, place, agent, trunk, dirty)
+    case GI.ILandEnd{+ticket, +key}:
+      LS.end(o, cx, ticket, key)
+    case GI.ILandLive{+claims, +line}:
+      LS.live(o, cx, claims, line)
     case GI.ITick{}:
       replies_tick(o, wakes_tick(o, acts_tick(o, timers_tick(o, tick(o, cx)))))
     case GI.IIdle{+agent, +leftover, +held}:

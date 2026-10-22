@@ -293,6 +293,7 @@ impl Shell {
                 self.building.remove(&rev);
                 self.broadcast_versions();
             }
+            Msg::LandStep(s) => self.land_step(s),
             Msg::Land { line } => {
                 if let Some(rec) = line {
                     let landed = matches!(rec, Feed::Landed(_));

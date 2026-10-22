@@ -11,7 +11,7 @@ impl Hub {
     /// The held lines (the land queue's first, else `no PR yet`) and the
     /// stale PRs' ages, by place id, for the views.
     fn pr_views(&self, now: u64) -> (BTreeMap<String, String>, BTreeMap<String, u64>) {
-        let mut lids = crate::land_queue::lids(&self.landing);
+        let mut lids = crate::land_line::lids(&self.landing);
         // trunk flow: a branch lands on main, it never waits for a PR
         let no_pr = if self.flow == Some(crate::flow::FlowMode::Trunk) { &BTreeMap::new() } else { &self.pr_lids };
         for (id, l) in no_pr {

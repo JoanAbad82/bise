@@ -119,12 +119,12 @@ mod tests {
         let wts = root.join("worktrees");
         let one = git(&ws, &["rev-parse", "main~1"]).unwrap();
         // only in the trunk's land turn
-        let q = crate::land::Queue::default();
-        let other = q.wait_turn("refs/heads/sb/x", "wt:x", &mut || {});
+        let q = crate::land_line::local::line();
+        let other = q.wait_turn("refs/heads/sb/x", "wt:x", "x", "refs/heads/sb/x", &[], &mut || {}).unwrap();
         let e = CheckTree::at(&ws, &wts, &one, &other).err().unwrap();
         assert_eq!(e, "the land check tree is used in main's land turn only, not sb/x's");
         drop(other);
-        let turn = q.wait_turn("refs/heads/main", "wt:x", &mut || {});
+        let turn = q.wait_turn("refs/heads/main", "wt:x", "x", "refs/heads/main", &[], &mut || {}).unwrap();
         let t = CheckTree::at(&ws, &wts, &one, &turn).unwrap();
         // keyed by the workspace id: two repos named alike never share one
         let id = crate::paths::workspace_id(&ws);

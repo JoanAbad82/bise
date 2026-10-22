@@ -41,6 +41,19 @@ core_kinds! {
         /// to `speaks`, and a `req` refused before it runs (then nothing
         /// else); `why` the line `sb` prints when not `ok`
         Spoke = "spoke" => FSpoke { token: Nat, ok: Bool, why: StrOmit },
+        /// `sb land` (issue 37 #3): a claim's answer (`why`: the busy
+        /// refusal)
+        LandClaimed = "land_claimed" => FLandClaimed { ok: Bool, why: StrOmit },
+        /// what the land takes (`mine`), names (`left_out`, and `note`
+        /// its words), or why it is refused before its turn
+        LandPicked = "land_picked" => FLandPicked { ok: Bool, mine: Strs, left_out: Strs, note: StrOmit, why: StrOmit },
+        /// the answer to `land_join`: in line, or refused
+        LandJoined = "land_joined" => FLandJoined { ticket: Nat, ok: Bool, target: Str, why: StrOmit },
+        /// ticket `ticket` is first on `target`: it lands now
+        LandGo = "land_go" => FLandGo { ticket: Nat, target: Str },
+        /// the line changed: each place's rank in its target's line (the
+        /// views' `landing`)
+        LandRanks = "land_ranks" => FLandRanks { ranks: Json },
         /// a notice to the client that typed the input
         Notice = "notice" => FNotice { text: Str },
         /// messages for an agent: `mode` `say` (a new turn) or `steer`;
