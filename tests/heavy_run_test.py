@@ -231,6 +231,10 @@ with tempfile.TemporaryDirectory() as home:
     os.chmod(os.path.join(fbin, "sb"), 0o755)
     envd = dict(env, HEAVY_FREE_KB_FILE=freef, HEAVY_DISK_POLL="0.2", SB_AGENT="fake",
                 PATH=fbin + os.pathsep + env["PATH"])
+    # the disk cases count flat reserves: the test's own jobs so far each left
+    # a disk.tsv line ('other', ~0 written), and 5 of them make a learned 1 GB
+    fresh_measures = lambda: os.path.exists(os.path.join(run, "disk.tsv")) and os.remove(os.path.join(run, "disk.tsv"))  # noqa: E731
+    fresh_measures()
     open(freef, "w").write(str(11 * GB))
     ran = os.path.join(home, "disk_ran")
     errf = open(os.path.join(home, "disk_err"), "w+")
@@ -276,6 +280,7 @@ with tempfile.TemporaryDirectory() as home:
                    if os.path.isdir(os.path.join(run, "reserve")) else False),
           "a running job leaves its reserve in ~/.bise/run/reserve")
     ran2 = os.path.join(home, "ran2")
+    fresh_measures()
     e2 = open(os.path.join(home, "err2"), "w+")
     second = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran2], env=envr, stderr=e2)
     check(stays(lambda: not os.path.exists(ran2), 2, "the second job waits"),
@@ -361,15 +366,16 @@ with tempfile.TemporaryDirectory() as home:
             fh.writelines("1\t%s\t%s\t0\t0\t0\tx\n" % (kind, kb) for kb in rows)
         fn = 'eval "$(sed -n -e "/^reserve_gb()/,/^}/p" -e "/^p90_gb()/,/^}/p" "$0")"; reserve_gb "$1"'
         return subprocess.run(["bash", "-c", fn, HEAVY, kind], env=dict(env, HOME=home), capture_output=True, text=True).stdout.strip()
-    check(reserve("cargo-cold", [1 * GB] * 19) == "10" and reserve("cargo-cold", []) == "10",
-          "19 jobs of a kind, or none: the flat guess, 10")
+    check(reserve("cargo-cold", [1 * GB] * 4) == "10" and reserve("cargo-cold", []) == "10",
+          "4 jobs of a kind, or none: the flat guess, 10")
+    check(reserve("cargo-cold", [GB // 2] * 4 + [int(2.5 * GB)]) == "3", "5 jobs: the p90, 2.5 GB rounded up to 3")
     check(reserve("cargo-cold", [GB // 2] * 17 + [int(2.5 * GB)] * 3) == "3", "20 jobs: the p90, 2.5 GB rounded up to 3")
     check(reserve("cargo-warm", [9 * GB] * 20) == "3", "never over the flat guess (cargo-warm 3)")
     check(reserve("full", [0] * 20) == "1", "at least 1 GB")
     check(reserve("full", [9 * GB] * 20 + [0] * 20) == "1", "the last 20 of that kind only")
-    check(reserve("other", [9 * GB] * 20) == "2" and reserve("cargo-cold", [GB] * 19 + ["bad"] * 3) == "10",
-          "other 2; a bad line is skipped (19 left: flat)")
-    check(reserve("cargo-cold", [GB] * 19 + ["-"]) == "10", "a reclaimed job's '-' line: skipped, 19 left: flat")
+    check(reserve("other", [9 * GB] * 20) == "2" and reserve("cargo-cold", [GB] * 4 + ["bad"] * 3) == "10",
+          "other 2; a bad line is skipped (4 left: flat)")
+    check(reserve("cargo-cold", [GB] * 4 + ["-"]) == "10", "a '-' line: skipped, 4 left: flat")
     # a job that outgrows its learned reserve (1 GB here) is still stopped by
     # the floor: under HEAVY_DISK_STOP_GB (5) free, rc=28
     reserve("other", [0] * 20)

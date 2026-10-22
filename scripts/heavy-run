@@ -202,13 +202,15 @@ job_kind() {
 # that kind really wrote (fast-loop, main m_37136: 5 agents waited at 42 GB
 # free while 3 jobs reserved a flat 10 GB each): the p90 of the last 20 of
 # that kind in ~/.bise/run/disk.tsv, rounded up, at least 1, never over the
-# flat guess. Under 20 of them (review-gates m_37204), the flat guess: full and cargo-cold 10 (a
+# flat guess. Under 5 measured (review-gates m_37560: 20 before, when the
+# long jobs logged '-'; a cold cargo job asked its flat 10 and 3 agents sat
+# at 25-27 GB), the flat guess: full and cargo-cold 10 (a
 # cold target grew 8-11 GB on 2026-10-20), cargo-warm 3, other 2.
 # HEAVY_RESERVE_GB wins.
 reserve_gb() {
   [ -n "${HEAVY_RESERVE_GB:-}" ] && { echo "$HEAVY_RESERVE_GB"; return; }
   local flat; case "$1" in full|cargo-cold) flat=10 ;; cargo-warm) flat=3 ;; *) flat=2 ;; esac
-  p90_gb "$1" 20 "$flat" 1 "$flat"
+  p90_gb "$1" 5 "$flat" 1 "$flat"
 }
 # p90_gb <kind> <min runs> <under that: this> <at least> <at most>: the p90 GB
 # (rounded up) of the last 20 measured runs of that kind in disk.tsv
