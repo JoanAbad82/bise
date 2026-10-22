@@ -140,7 +140,8 @@ def main():
         tree = os.path.join(out, "tree")
         wt = os.path.join(tree, "harness")
         # never the caller's night (NIGHTLY_END, NIGHTLY_NOW...): the nightly's gate runs this test
-        env0 = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "FAKE_", "NIGHTLY_"))}
+        # (TIP_RUN too: the tip gate's slot run carries it, and its gate runs this test)
+        env0 = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "FAKE_", "NIGHTLY_", "TIP_"))}
         clock, args_log = os.path.join(t, "now"), os.path.join(t, "args")
         env0.update(BISE_HOME=home, NIGHTLY_HEAVY_RUN=heavy, NIGHTLY_NOW=clock, FAKE_ARGS=args_log,
                     HEAVY_LOG=os.path.join(t, "heavy.log"))

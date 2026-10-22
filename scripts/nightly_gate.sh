@@ -302,6 +302,10 @@ if [ "${1:-}" = --tip ]; then
 fi
 
 day="$(date +%F)" log="$out/$(date +%F).log" s=$SECONDS
+# a night is never a tip run: TIP_RUN is the tip branch's word to its own slot run, and a test run
+# under the tip gate (tests/nightly_gate_test.py) inherited it, so its fake nights skipped
+# desktop-full (tip 156b45461)
+unset TIP_RUN
 if [ -n "$night_until" ]; then
   NIGHTLY_END="$(night_end)" || { echo "NIGHTLY_UNTIL wants HH:MM, got $night_until" >&2; exit 2; }
   export NIGHTLY_END
