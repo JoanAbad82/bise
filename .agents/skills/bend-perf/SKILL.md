@@ -156,6 +156,8 @@ numbers. The next audit starts from there.
   new chunk and joins once: 25.0e9, 2.28 s user (small turn: 5.65e9,
   0.66 s), request body sha256 identical (2 MB and small).
   tests/repl_read_cost.py (run_all): x3.8 instructions for x4 the line,
-  x14.8 on the old path. Left: the rest is linear (wire escape_nl,
-  json escape, term_drop); persist.bend read_all's chunk append is the
+  x14.8 on the old path. Left (follow-up): the rest is linear, led by
+  the memory work (term_drop 213, rfc_wrap 149, span_fade 122 in the
+  2 MB after-sample), then wire escape_nl and json escape; persist.bend
+  read_all's chunk append is the
   same pattern on a fallback path (not measured).
