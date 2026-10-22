@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import os from 'node:os';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { adoptHome, breaches, harnessEnv, homeProblem, realHome, testHome } from '../isolation';
+import { adoptHome, breaches, harnessEnv, homeProblem, noteSeen, realHome, testHome } from '../isolation';
 import { launchDesktop } from '../launch';
 
 const REAL = realHome();
@@ -57,6 +57,26 @@ test('breaches: only the run is judged; his processes and other agents\' never a
   expect(lctl.some((b) => b.includes('pid 111:') && b.includes('launchctl outside'))).toBe(true);
   expect(breaches(table, new Set([50, 108, 110]), app, h, REAL)).toEqual([]); // there before the run
   rmSync(h.root, { recursive: true, force: true });
+});
+
+test('noteSeen: a REPL caught between fork and exec is still the run\'s once exec\'d (stop-leak, run 2 of the trace)', () => {
+  // the app 100, its core 101, the hub the core started 102 (a stopped project's), its REPL 103
+  const app = { pid: 100, ppid: 50, command: 'Electron .' };
+  const core = { pid: 101, ppid: 100, command: '/x/bise ambient-core --home' };
+  const hub = { pid: 102, ppid: 101, command: '/x/bise sbd --workspace /w/telemetry' };
+  const seen = new Map<number, string>();
+  // one scan in the REPL's pre_exec: it still shows its hub's command
+  noteSeen(seen, [app, core, hub, { pid: 103, ppid: 102, command: hub.command }], 100);
+  // the next scans: exec'd
+  const repl = { pid: 103, ppid: 102, command: '/t/repl-live' };
+  noteSeen(seen, [app, core, hub, repl], 100);
+  expect(seen.get(103)).toBe('/t/repl-live');
+  // the app and its core gone, the hub killed with them: the orphaned REPL keeps its command
+  noteSeen(seen, [{ ...repl, ppid: 1 }], 100);
+  expect(seen.get(103)).toBe('/t/repl-live');
+  // a pid reused outside the app by another command is never taken for the run's
+  noteSeen(seen, [{ pid: 102, ppid: 7, command: '/usr/bin/vim' }], 100);
+  expect(seen.get(102)).toBe(hub.command);
 });
 
 test('an adopted home (qa-flows m_9931): only a world\'s under ~/.bise/gate/ or a /tmp/bh-*; its hubs are the run\'s own', () => {

@@ -174,6 +174,20 @@ export function descendants(procs: Proc[], root: number): number[] {
   return out;
 }
 
+/**
+ * Notes every process under the app's pid now, with the command it runs now (pure but for `seen`,
+ * which it updates: self/isolation.spec.ts). A pid under the app is the run's whatever it ran
+ * before, so its command is always the latest: a child caught between fork and exec shows its
+ * parent's command (a hub's REPL in its pre_exec, `bise sbd --workspace ...`), and keeping that one
+ * made the REPL, once exec'd, 'not the run's' at close: never killed with the hub, then counted as
+ * left in the test home (stop-leak: inbox/answer-everywhere 'its hub stopped', 3 repl-live on
+ * 6a79da476). A pid no longer under the app keeps the command it had there.
+ */
+export function noteSeen(seen: Map<number, string>, procs: Proc[], appPid: number): void {
+  const cmd = new Map(procs.map((p) => [p.pid, p.command]));
+  for (const pid of descendants(procs, appPid)) seen.set(pid, cmd.get(pid) ?? '');
+}
+
 /** Reads the process table every second from launch to close; the first breach calls onBreach. */
 export class Sentinel {
   readonly breaches: string[] = [];
@@ -181,8 +195,8 @@ export class Sentinel {
   private baseline = new Set<number>();
   private appPid = -1;
   private busy = false;
-  /** every pid ever seen under the app's pid, with its command then: an orphan (ppid 1 once the
-   * app is gone) is still the run's, a pid reused since by another command is not */
+  /** every pid ever seen under the app's pid, with its last command there (noteSeen): an orphan
+   * (ppid 1 once the app is gone) is still the run's, a pid reused since by another command is not */
   private readonly seen = new Map<number, string>();
 
   constructor(private readonly h: TestHome, private readonly onBreach: (why: string) => void) {}
@@ -198,8 +212,7 @@ export class Sentinel {
   }
 
   private note(procs: Proc[]): void {
-    const cmd = new Map(procs.map((p) => [p.pid, p.command]));
-    for (const pid of descendants(procs, this.appPid)) if (!this.seen.has(pid)) this.seen.set(pid, cmd.get(pid) ?? '');
+    noteSeen(this.seen, procs, this.appPid);
   }
 
   async scan(): Promise<void> {
