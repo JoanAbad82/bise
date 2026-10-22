@@ -14,3 +14,32 @@ batch	line	test	file:fn broken	the break	red?	after revert
 1	thread/opens-at-end	apps/desktop src/thread/thread.test.tsx › firstItemIndex goes down by the rows added in front…	src/thread/ThreadList.tsx:nextFirstIndex	rows added in front don't move firstItemIndex	red	green again
 1	thread/route-hold	apps/desktop src/thread/routes.test.tsx › his pending row shows '→ bise · acme · 2 s to change'…	src/thread/rows-messages.tsx:HoldLine	the hold names the project id, not its name	red	green again
 1	agents/lifecycle	apps/desktop src/review/review.test.tsx › lists the live agents, opens one, stops and archives…	src/agents/AgentsScreen.tsx:restore button	restore sends archive, not unarchive	red	green again
+2	app/add-sheet	apps/desktop src/settings/settings.test.tsx › projects: remove asks once; rename; add a found repo with land	src/settings/AddSheet.tsx:look	the sheet never asks found_scan at open	red	green again
+2	app/agents-bar	apps/desktop src/app/barplaces.test.ts › the TUI's sign, no state word anywhere	src/app/barrows.ts:barSign	a failed agent's ✗ in text-3, not red	red	green again
+2	app/artifact-view	apps/desktop src/app/ArtifactView.test.ts › takes 55% by default	src/app/ArtifactView.tsx:artPct	the default share 60%, not 55%	red	green again
+2	app/bar-main	apps/desktop src/app/barrows.test.ts › AGENTS: main first as bise	src/app/barrows.ts:agentRows	the agents' order reversed (main not first)	red	green again
+2	app/bar-more	apps/desktop src/app/barrows.test.ts › 'show 50 more' opens 50 at a time	src/app/barrows.ts:pageRows	a page opens 40 rows, not 50	red	green again
+2	app/bar-scope	apps/desktop src/app/barscope.test.ts › a sub-agent's thread, review or log: only its own	src/app/barscope.ts:inScope	a sub-agent's bar shows every agent's rows	red	green again
+2	app/cmd-hints	apps/desktop src/app/keys.test.ts › ⌘0 bise, ⌘1-9 his projects in his order	src/app/keys.ts:keyAction	⌘1 opens his 2nd project	red	green again
+2	app/cmd-hints	apps/desktop src/app/held.test.tsx › is the terminal app's ctrl hint delay, 150 ms	src/app/held.ts:HINT_HOLD_MS	the ⌘-held hints wait 400 ms	red	green again
+2	app/confirm-bar	apps/desktop src/store/store.test.ts › keeps the hub's yes/no questions	src/store/store.ts:dropConfirm	an answer keeps its question and drops the others	red	green again
+2	app/crumb-nav	apps/desktop src/app/side.test.ts › the crumb: 'storefront › perf'	src/app/side.ts:crumbOf	a project's main crumb says 'storefront › main'	red	green again
+2	app/delight-marks	apps/desktop src/app/markstates.test.ts › the accent when anything waits anywhere	src/app/markstates.ts:biseMark	bise's mark never counts what waits	red	green again
+2	app/folders	apps/desktop src/app/barplaces.test.ts › wt-sign: a ψ says it is a worktree	src/app/barplaces.ts:tilde	home never shows as '~'	red	green again
+2	app/history	apps/desktop src/app/route.test.ts › go, back, forward; the same route twice is one step	src/app/router.ts:stepOf	the same route twice is two steps	red	green again
+2	app/hover-tips	apps/desktop src/ds/tip.test.ts › goes 8 px above its mark	src/ds/tip.ts:placeTip	the tip sits on its mark, no 8 px gap	red	green again
+2	app/hub-moments	apps/desktop src/app/hubmoments.test.ts › card_open opens that card in the inbox block	src/app/HubMoments.tsx:momentOf	card_open opens nothing	red	green again
+2	app/hub-refused	apps/desktop src/app/refused.test.tsx › shows '<name>'s hub refused bise	src/app/Refused.tsx:refusedLead	the lead drops 'bise'	red	green again
+2	app/proj-menu	apps/desktop src/app/projmenu.test.ts › asks him or failed first	src/app/projmenu.ts:menuGroupsOf	at work before what asks him	red	green again
+2	app/resize	apps/desktop src/app/side.test.ts › the sidebar: 200-400, folds under 160	src/app/resize.ts:sideWidthOf	the sidebar never folds	red	green again
+2	app/right-bar	apps/desktop src/app/barscope.test.ts › a sub-agent's thread, review or log: only its own	src/app/barscope.ts:barScope	an agent's thread never scopes the bar	red	green again
+2	app/theme	apps/desktop src/theme/theme.test.tsx › applies on the root	src/theme/index.ts:applyTheme	no color-scheme on <html>	red	green again
+2	app/theme	apps/desktop src/theme/theme.test.tsx › 'light' and 'dark' pick that theme	src/theme/index.ts:themeOf	'dark' follows the system	red	green again
+2	app/zen-hints	apps/desktop src/app/zen.test.ts › a hold key keeps it going, never starts it	src/app/zen.ts:zenStep	a hold key starts zen	red	green again
+2	app/archived-fold	apps/desktop src/app/side.test.ts › folds a done agent quiet for over an hour	src/app/side.ts:folds	a done agent folds at once	red	green again
+2	app/keep-scroll	apps/desktop src/app/keep.test.ts › a scroll, a focus or a mode lives 10 minutes	src/app/keep.ts:createKeep view()	a kept scroll reads back for an hour	red	green again
+2	app/list-walk	apps/desktop src/app/listkeys.test.tsx › the TUI's moves	src/app/listkeys.ts:stepOf	pgdn moves 9 rows	red	green again
+2	app/reload-line	apps/desktop src/app/ReloadLine.test.ts › 'up' and 'passed' show 3 s	src/app/ReloadLine.tsx:reloadView	'up' never folds	red	green again
+2	app/history-place	apps/desktop src/agents/keep-sel.test.tsx › the row he selected is selected again after a reload	src/app/listkeys.ts:useListKeys	the kept selection is never read back. The thread's scroll place (useKeptScroll on a real layout) has no unit: LOST	red	green again
+2	app/clicks	apps/desktop src/app/sidebar.test.tsx › a project's row opens its main's thread… (new)	src/app/Sidebar.tsx:ProjectRow onClick	a project's row opens its agents list, not its main's thread	red	green again
+2	app/sidebar-foot	apps/desktop src/app/sidebar.test.tsx › …the foot's settings opens settings (new)	src/app/Sidebar.tsx:foot settings onClick	the foot's settings opens the inbox. Its hover look and its uncovered centre are pixels: LOST	red	green again
