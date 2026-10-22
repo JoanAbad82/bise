@@ -102,8 +102,28 @@ def texts(root=ROOT):
     return out
 
 
+_WORD = re.compile(r"[\w-]+")
+_INDEX = {}
+
+
+def _index(txt):
+    """{word: stems whose file has it as a whole [\\w-]+ run}, built once per txt (fast-loop: the
+    regex per word over every file was 60 s of the quick gate's 100 s self-test at load 29)."""
+    k = id(txt)
+    if k not in _INDEX or _INDEX[k][0] is not txt:
+        idx = {}
+        for s, t in txt.items():
+            for w in set(_WORD.findall(t)):
+                idx.setdefault(w, set()).add(s)
+        _INDEX[k] = (txt, idx)
+    return _INDEX[k][1]
+
+
 def naming(word, txt):
     """The stems whose file names `word` (a whole word: e2e is not artifacts_e2e)."""
+    if _WORD.fullmatch(word):
+        # a maximal [\w-]+ run equal to the word is exactly the regex below's match
+        return set(_index(txt).get(word, ()))
     rx = re.compile(r"(?<![\w-])" + re.escape(word) + r"(?![\w-])")
     return {s for s, t in txt.items() if rx.search(t)}
 
