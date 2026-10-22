@@ -50,6 +50,19 @@ def laws():
     check(st(staged_id=None)["why"] == "the staged bundle is unreadable, not dev.bise.desktop.try", "no Info.plist: refused")
     r = st(staged_ok=False)
     check(r["state"] == "none" and "incomplete" in r["why"], "outputs missing: none (swap_staged would not swap)")
+    # the refusal names what is missing (keep-current m_30630: the try bise was gone, the words blamed processes)
+    r = st(staged_ok=False, missing=["/b/target/debug/bise"])
+    check(r["why"].endswith("nothing to swap to: missing /b/target/debug/bise"), "the missing output named: %s" % r["why"])
+    with tempfile.TemporaryDirectory() as d:
+        app = os.path.join(d, "bise try.app")
+        os.makedirs(os.path.join(app, "Contents", "Resources", "bin"))
+        open(T.packed_bise(app), "w").close()
+        open(os.path.join(d, "helper"), "w").close()
+        os.makedirs(os.path.join(d, "root", "repl-live"))
+        p = {"bise": os.path.join(d, "target", "debug", "bise"), "helper": os.path.join(d, "helper")}
+        check(T.missing_outputs(p, app, os.path.join(d, "root")) == [p["bise"]], "missing_outputs: the try bise alone")
+        check(not T.outputs_there(p, app, os.path.join(d, "root")), "outputs_there: false with it gone")
+        check(T.missing_outputs(p, app, None)[0].startswith("the snapshot root"), "no root: said")
     r = st(saved=dict(staged, promoted=A))
     check(r["state"] == "none" and r["none"] == "not_gated" and "isn't the promoted aaaaaaaa" in r["why"],
           "a stamp promoted for another head (a later plain --try staged over it): refused until the next promote: %s" % r)

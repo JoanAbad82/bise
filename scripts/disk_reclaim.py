@@ -30,6 +30,9 @@ The owner is told: the new empty target holds RECLAIMED.txt (what, when, why),
 and heavy-run prints it at the owner's next job in that worktree (its build
 is cold, that's why). Each deletion is a line in ~/.bise/run/reclaim.log:
 <epoch> <path> <idle min> <GB freed> <reason>.
+Never ~/.bise/dev/build (its target holds the try's own bise, which 'bise-ambient --real'
+swaps in; keep-current m_30630 found it gone, removed by hand), whatever the roots say:
+protected(), checked on each target's real path.
 One reclaim at a time (~/.bise/run/reclaim.lock): a second one returns at once.
 HEAVY_FREE_KB_FILE (tests): the free KB are read from that file, not statvfs.
 """
@@ -46,6 +49,22 @@ PROFILE_SUBDIRS = ("deps", ".fingerprint", "incremental", "build")
 
 
 # ---- pure part ------------------------------------------------------------
+
+# never deleted, whatever the roots: the dev build dir (~/.bise/dev/build, a link to
+# ~/.local/state/switchboard/build) and everything under it. HEAVY_RECLAIM_KEEP (tests): a
+# ':' list instead.
+def kept():
+    k = os.environ.get("HEAVY_RECLAIM_KEEP")
+    ks = [p for p in k.split(":") if p] if k is not None else [os.path.expanduser("~/.bise/dev/build"),
+                                                                  os.path.expanduser("~/.local/state/switchboard/build")]
+    return [os.path.realpath(p) for p in ks]
+
+
+def protected(path, keep):
+    """Whether `path` (resolved) is one of `keep` or under it. Pure but for realpath."""
+    p = os.path.realpath(path)
+    return any(p == k or p.startswith(k.rstrip(os.sep) + os.sep) for k in keep)
+
 
 def plan(targets, free_gb, want_gb, now, idle_h, min_idle_min):
     """The targets to delete, in order, with why.
@@ -74,6 +93,16 @@ def _self_test():
     assert plan(t, 10, 25, now, 6, 1) == [("/a", "idle"), ("/e", "low"), ("/b", "low"), ("/c", "low")]
     assert plan([], 1, 25, now, 6, 30) == []
     assert all(p != "/d" for p, _ in plan(t, 0, 99, now, 0, 0)), "a busy target is never planned"
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        build = os.path.join(d, "state", "build")
+        os.makedirs(os.path.join(build, "target"))
+        os.symlink(build, os.path.join(d, "build-link"))
+        keep = [os.path.realpath(os.path.join(d, "build-link"))]
+        assert protected(os.path.join(d, "build-link", "target"), keep), "the dev build target, by its link"
+        assert protected(os.path.join(build, "target"), keep) and protected(build, keep)
+        assert not protected(os.path.join(d, "state", "build2", "target"), keep), "a sibling with the same prefix"
+        assert not protected(os.path.join(d, "wt", "rust", "target"), keep)
     print("disk_reclaim self-test ok")
 
 
@@ -276,7 +305,8 @@ def main():
     exes = running_exes()
     now = time.time()
     cwds = job_cwds()
-    ts = [(t, last_used(t), busy(t, exes, r, cwds)) for r in roots() for t in find_targets(r)]
+    keep = kept()
+    ts = [(t, last_used(t), busy(t, exes, r, cwds)) for r in roots() for t in find_targets(r) if not protected(t, keep)]
     used = {t: u for t, u, _ in ts}
     todo = plan(ts, free_kb() / (GB / 1024), a.want, now, a.idle_h, a.min_idle_min)
     log = os.path.join(run, "reclaim.log")

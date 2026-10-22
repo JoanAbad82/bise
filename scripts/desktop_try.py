@@ -208,12 +208,21 @@ def packed_bise(app):
     return os.path.join(app, "Contents", "Resources", "bin", "bise")
 
 
+def missing_outputs(paths, app, root):
+    """The outputs of a try build packed at `app` with its snapshot app root `root` that are not
+    there, each by its path (the bundle, its bise inside, the try bise, the native helper, the
+    root's repl-live); 'the snapshot root (a stamp from before it)' when there is no root. The
+    refusals name them (keep-current m_30630: the try bise was gone and the swap's word blamed
+    running processes)."""
+    if not root:
+        return ["the snapshot root (a stamp from before it: it builds once)"]
+    return [p for p in (app, packed_bise(app), paths["bise"], paths["helper"], os.path.join(root, "repl-live"))
+            if not os.path.exists(p)]
+
+
 def outputs_there(paths, app, root):
-    """Every output of a try build packed at `app` with its snapshot app root `root`: the bundle
-    with its bise inside, the try bise, the native helper, the root's repl-live. A stamp from
-    before the snapshot (no root) never counts: it builds once."""
-    return bool(root) and all(os.path.exists(p) for p in (app, packed_bise(app), paths["bise"], paths["helper"],
-                                                           os.path.join(root, "repl-live")))
+    """Every output of a try build packed at `app` is there (missing_outputs is empty)."""
+    return not missing_outputs(paths, app, root)
 
 
 def same_source(stamp, saved):
@@ -361,7 +370,11 @@ def swap_staged(paths):
     new app's core answers (finish_swap), or None when there is nothing to swap or the try is open
     (then untouched: 'your try is open: quit it to get the new build')."""
     saved = read_stamp(paths)
-    if not saved or saved.get("where") != "staged" or not outputs_there(paths, paths["staged"], saved.get("root")):
+    if not saved or saved.get("where") != "staged":
+        return None
+    if not outputs_there(paths, paths["staged"], saved.get("root")):
+        gone = missing_outputs(paths, paths["staged"], saved.get("root"))
+        say("the staged build is incomplete, nothing to swap to: missing %s" % (", ".join(gone) or "?"))
         return None
     if bundle_pids(paths["app"]):
         say("your try is open: quit it to get the new build")

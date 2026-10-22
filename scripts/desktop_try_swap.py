@@ -39,7 +39,7 @@ import desktop_try as T
 from desktop_try_env import TryError, his_bise, his_env, homes, live_build  # noqa: F401 (TryError: reopen's)
 
 
-def swap_state(bundle, app, saved, staged_id, staged_ok, live, staged, last=None):
+def swap_state(bundle, app, saved, staged_id, staged_ok, live, staged, last=None, missing=None):
     """What the app's update row shows (pure): `bundle` the running app's, `app` the try's live
     bundle path, `saved` the try stamp (or None), `staged_id` the staged bundle's id, `staged_ok`
     every output of the staged build there, `live`/`staged` the two bundles' commits, `last` the
@@ -60,7 +60,8 @@ def swap_state(bundle, app, saved, staged_id, staged_ok, live, staged, last=None
     if staged_id != T.APP_ID:
         return out("none", "the staged bundle is %s, not %s" % (staged_id or "unreadable", T.APP_ID), none="not_gated")
     if not staged_ok:
-        return out("none", "the staged build %s is incomplete: nothing to swap to" % head, none="not_gated")
+        return out("none", "the staged build %s is incomplete: nothing to swap to%s" % (
+            head, (": missing " + ", ".join(missing)) if missing else ""), none="not_gated")
     r = out("staged", None, staged or saved.get("head"))
     to = (last or {}).get("to")
     if (last or {}).get("rc") not in (0, None) and to and to == r["staged"] and to != live:
@@ -91,9 +92,10 @@ def write_last(paths, rec):
 
 def state(bundle, paths):
     saved = T.read_stamp(paths)
-    staged_ok = bool(saved) and T.outputs_there(paths, paths["staged"], saved.get("root"))
+    missing = T.missing_outputs(paths, paths["staged"], saved.get("root")) if saved else []
+    staged_ok = bool(saved) and not missing
     r = swap_state(bundle, paths["app"], saved, T.bundle_id(paths["staged"]), staged_ok,
-                   live_build(bundle).get("commit"), live_build(paths["staged"]).get("commit"), read_last(paths))
+                   live_build(bundle).get("commit"), live_build(paths["staged"]).get("commit"), read_last(paths), missing)
     r["log"] = os.path.join(restart_dir(paths), "restart.log")
     return r
 
