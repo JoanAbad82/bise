@@ -142,6 +142,9 @@ function History({
   const [finding, setFinding] = useState(false);
   const [needle, setNeedle] = useState("");
   const [at, setAt] = useState(0);
+  // he went to a hit of this find already (the first ⏎ goes to the current one, the next move
+  // on), even when its page is still being read
+  const [went, setWent] = useState(false);
   // the hub's hits for the needle (row positions in the whole history, oldest first); null
   // while it is asked
   const [hitPos, setHitPos] = useState<readonly number[] | null>([]);
@@ -228,6 +231,7 @@ function History({
           if (finds.current.length === 0 && n !== undefined) {
             setHitPos(ev.hits);
             setAt(Math.max(0, ev.hits.length - 1));
+            setWent(false);
           }
           return;
         }
@@ -335,6 +339,7 @@ function History({
     const key = hits[n];
     if (key === undefined) return;
     setAt(n);
+    setWent(true);
     if (rows.some((r) => r.key === key)) {
       setCursor(key);
       setOpen((o) => new Set(o).add(key));
@@ -403,7 +408,9 @@ function History({
   const onKey = (e: KeyboardEvent) => {
     const mod = e.metaKey || e.ctrlKey;
     if (mod && (e.key === "]" || e.key === "[")) {
+      // the other tab; never the window's back / forward too (app/esc-up.ts on window)
       e.preventDefault();
+      e.stopPropagation();
       onTab();
       return;
     }
@@ -544,7 +551,7 @@ function History({
             }}
             onStep={(by) => {
               // the first ⏎ goes to the current hit (the newest), the next ones move on
-              goHit(stepHit(at, cursor === hits[at] ? by : 0, hits.length));
+              goHit(stepHit(at, went ? by : 0, hits.length));
             }}
             onClose={closeFind}
           />

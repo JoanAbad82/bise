@@ -168,7 +168,9 @@ export function Completion({
     const mod = e.metaKey || e.ctrlKey;
     const k = e.key;
     if (mod && (k === "]" || k === "[")) {
+      // the other tab; never the window's back / forward too (app/esc-up.ts on window)
       e.preventDefault();
+      e.stopPropagation();
       onTab();
       return;
     }

@@ -92,7 +92,7 @@ function answer(cmd) {
     // one when it has it
     case 'completion': {
       const all = of(['completion'], (ev) => (cmd.slot === undefined || ev.slot.slot === cmd.slot) && (ev.raw === true) === (cmd.raw === true));
-      return all.slice(-1).map((ev) => Object.fromEntries(Object.entries(ev).filter(([k]) => k !== 'raw')));
+      return [...all].sort((a, b) => a.slot.req - b.slot.req).slice(-1).map((ev) => Object.fromEntries(Object.entries(ev).filter(([k]) => k !== 'raw')));
     }
     default: return [];
   }
