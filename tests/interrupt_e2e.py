@@ -6,7 +6,7 @@ A real repl-live on the fake provider (anthropic family, streamed). The
 stop is what the hub's `fx interrupt` writes: the REPL's interrupt flag
 (run/bend-interrupt-<port>.txt) with who asked; the TUI's esc, the
 desktop app's stop and `sb interrupt` all end there. Each case measures
-from the flag write to `obs: turn_done: interrupted`:
+from the flag write to the turn_done record that says interrupted:
 
 A) a model call that has not answered yet ([[slow: 20]]: nothing for
    20 s, not even the head);
@@ -94,6 +94,11 @@ def main():
         with F.State.lock:
             return any(k[2] == text or text in k[2] for k in F.State.seen)
 
+    def interrupted(out):
+        # the turn's end record (obs_lines reads both forms: `obs turn_done
+        # :: {"end":"interrupted",...}` since issue 38 sha 2b, e27071cbd)
+        return any(obs_lines.turn_end(l) == "interrupted" for l in out)
+
     def turn(text, stop_when=None, who="main"):
         """one message; stop_when(): when true, the flag is written.
         Returns (lines, seconds from the flag to turn_done or None)."""
@@ -124,7 +129,7 @@ def main():
         # A) a model call with no answer yet
         out, took = turn("[[slow: 20]] tell me a long story", lambda: seen("tell me a long story"))
         times["model"] = took
-        check(took is not None and took < LIMIT and any("turn_done: interrupted" in l for l in out),
+        check(took is not None and took < LIMIT and interrupted(out),
               "A model call that has not answered: the turn ends %.2f s after the stop (< %.1f s)"
               % (took or -1, LIMIT))
 
@@ -132,7 +137,7 @@ def main():
         n0 = len(open(F.LOG).read().splitlines())
         out, took = turn("[[drip: 100 0.2]] think for a long time", lambda: seen("think for a long time"))
         times["stream"] = took
-        check(took is not None and took < LIMIT and any("turn_done: interrupted" in l for l in out),
+        check(took is not None and took < LIMIT and interrupted(out),
               "B a streaming model call: the turn ends %.2f s after the stop" % (took or -1))
 
         def drip_rec():
@@ -172,7 +177,7 @@ def main():
         out, took = turn("[[bash: sleep 37.125; echo never]] [[bash: echo second-call]]",
                          lambda: pids("sleep 37.125"))
         times["bash"] = took
-        check(took is not None and took < LIMIT and any("turn_done: interrupted" in l for l in out),
+        check(took is not None and took < LIMIT and interrupted(out),
               "C a running bash sleep: the turn ends %.2f s after the stop" % (took or -1))
         check(not pids("sleep 37.125"), "C the stopped sleep is gone (its process group got TERM)")
         check(bool(pids("sleep 41.25")), "C the background job of the earlier turn is still alive")

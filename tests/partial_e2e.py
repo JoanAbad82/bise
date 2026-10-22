@@ -19,6 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
@@ -215,7 +216,7 @@ def main():
         tr = transcript(E)
         kis = [i for i, l in enumerate(tr) if (e2e.feed_rec(l) or ("",))[0] == "kept"]
         check(kis, "an sb kept line in the transcript")
-        check("provider_retry:" in tr[kis[-1] + 1], "the kept line right before the retry: %r" % tr[kis[-1]:kis[-1] + 2])
+        check(obs_lines.kind(tr[kis[-1] + 1]) == "provider_retry", "the kept line right before the retry: %r" % tr[kis[-1]:kis[-1] + 2])
 
         # 4. text, a break, then a retry that answers with a tool call only
         # (architect m_13563 a): attempt 1's text is kept and cleared at the

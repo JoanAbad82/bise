@@ -17,6 +17,7 @@ import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 from bise_env import clean_env, drop_git_repo_vars, refuse_real_home, refuse_real_keys, refuse_real_run_dir, refuse_real_skills  # noqa: E402
 
@@ -136,10 +137,11 @@ def feed_rec(line):
 
 def line_has(line, needle):
     """`needle` in a transcript line as written, or in one of its hub
-    record's string fields (`"` is `\\"` in the record's JSON)."""
+    record's or obs record's string fields (`"` is `\\"` in the record's
+    JSON; the runtime writes `obs <kind> :: <json>` since issue 38 sha 2b)."""
     if needle in line:
         return True
-    rec = feed_rec(line)
+    rec = feed_rec(line) or obs_lines.read(line)
     return bool(rec) and any(isinstance(v, str) and needle in v for v in rec[1].values())
 
 class Env:
