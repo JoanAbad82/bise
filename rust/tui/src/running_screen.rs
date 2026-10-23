@@ -193,6 +193,9 @@ fn local_out(app: &App, p: &Proc) -> Option<std::path::PathBuf> {
 
 /// o: its port in the browser, when something answers there.
 fn open_port(app: &mut App, p: &Proc) {
+    if !p.running() {
+        return note(app, running::already_ended.to_string());
+    }
     let Some(port) = p.ports.first().copied().filter(|_| p.running()) else {
         return note(app, running::no_port.to_string());
     };

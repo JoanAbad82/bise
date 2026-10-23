@@ -178,6 +178,10 @@ fn o_on_a_port_nothing_answers_flashes_why() {
     app.running.as_mut().unwrap().sel = Some(("docs".into(), "p49012.1791100160".into()));
     press(&mut app, KeyCode::Char('o'));
     assert_eq!(app.running.as_ref().unwrap().note.as_ref().unwrap().0, running::no_port);
+    // an ended one: it has ended, not 'no port'
+    app.running.as_mut().unwrap().sel = Some(("docs".into(), "bg1.1791098000".into()));
+    press(&mut app, KeyCode::Char('o'));
+    assert_eq!(app.running.as_ref().unwrap().note.as_ref().unwrap().0, running::already_ended);
 }
 
 #[test]
