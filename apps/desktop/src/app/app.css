@@ -261,9 +261,9 @@ body:has(.app-shell) {
   gap: var(--gap-inline);
   min-width: 56px;
 }
-/* no end words, no count: the name takes the row up to its end; the box comes back only under the
-   ⋯ (hover, open, focus) so the name never runs under it */
-.app-r:not(:hover):not(:has(.app-more.on, .app-more:focus-within)) .app-tail:empty {
+/* at rest the end box is only as wide as its words: the name takes the row up to them; the kept
+   width comes back only under the ⋯ (hover, open, focus) so the name never runs under it */
+.app-r:not(:hover):not(:has(.app-more.on, .app-more:focus-within)) .app-tail {
   min-width: 0;
 }
 .app-r.ag {
