@@ -105,12 +105,15 @@ fn rows_fit_150_and_80_columns_with_the_command_cut_last() {
 }
 
 #[test]
-fn heads_count_the_running_and_the_listening() {
+fn heads_count_the_running_and_the_listening_short_only_when_it_must() {
     let items = fixture();
-    assert_eq!(head("acme", &items, true), format!("acme · {} · {}", running::count_running(3), running::count_listening(1)));
-    assert_eq!(head("acme", &items, false), format!("acme · 3 · {}", running::count_listening(1)));
+    let long = format!("acme · {} · {}", running::count_running(3), running::count_listening(1));
+    assert_eq!(head("acme", &items, 120), long);
+    // 80 columns hold the long words too (designer m_38541)
+    assert_eq!(head("acme", &items, 60), long);
+    assert_eq!(head("acme", &items, long.width() - 1), format!("acme · 3 · {}", running::count_listening(1)));
     let quiet: Vec<Proc> = items.iter().filter(|p| p.ports.is_empty()).cloned().collect();
-    assert_eq!(head("acme", &quiet, true), format!("acme · {}", running::count_running(2)));
+    assert_eq!(head("acme", &quiet, 120), format!("acme · {}", running::count_running(2)));
 }
 
 #[test]
@@ -121,7 +124,8 @@ fn the_tip_says_its_id_start_and_folder_and_a_detached_ones_origin() {
     assert_eq!(tip(dev).len(), 1);
     let watcher = &items[1];
     assert_eq!(tip(watcher)[1], running::tip_detached("perf"));
-    assert_eq!(tip(&items[2])[0], running::tip_no_cwd(&items[2].id, clock(items[2].started_ms)));
+    // a detached one by its pid, its start time left out
+    assert_eq!(tip(&items[2])[0], running::tip_no_cwd("p49012", clock(items[2].started_ms)));
     assert_eq!(short_home("/a/b/c/d/e/perf"), "/…/e/perf");
     assert_eq!(short_home("/tmp/x"), "/tmp/x");
 }
@@ -136,14 +140,38 @@ fn the_agents_panel_line_counts_and_names_the_port() {
 #[test]
 fn the_output_head_has_its_meta_and_usage_only_while_it_runs() {
     let items = fixture();
-    let h = out_head(&items[0], "acme", NOW, false);
-    assert!(h.starts_with("pnpm dev  "), "{h}");
+    let (cmd, h) = out_head(&items[0], "acme", NOW, false, 146);
+    assert_eq!(cmd, "pnpm dev");
     for part in [running::whose("perf", "acme"), format!("∿ {} · 14 min", running::state_running), "localhost:5173".into(), running::pid_of(48211), running::usage(13, 340)] {
         assert!(h.contains(&part), "{h} lacks {part}");
     }
-    let ended = out_head(&items[3], "acme", NOW, false);
+    let (_, ended) = out_head(&items[3], "acme", NOW, false, 146);
     assert!(!ended.contains("cpu") && ended.contains(&running::exit_rc(101)), "{ended}");
     assert_eq!(items[2].out, OutKind::None);
+}
+
+/// designer m_38541: short on room the command is cut first, then
+/// cpu/memory and the pid go; the state stays whole.
+#[test]
+fn the_output_head_cuts_the_command_then_drops_the_numbers_never_the_state() {
+    let mut items = fixture();
+    items[0].cmd = "pnpm exec playwright test --ui --project chromium --reporter list".into();
+    let state = format!("∿ {} · 14 min", running::state_running);
+    let fit = |p: &Proc, wd: usize| {
+        let (c, r) = out_head(p, "acme", NOW, false, wd);
+        assert!(c.width() + 2 + r.width() <= wd, "{wd}: {c}  {r}");
+        (c, r)
+    };
+    let (c, r) = fit(&items[0], 120);
+    assert!(c.ends_with('…') && r.contains(&running::usage(13, 340)), "{c}  {r}");
+    let (c, r) = fit(&items[0], 76);
+    assert!(c.starts_with("pnpm exec") && r.contains(&state) && !r.contains("cpu"), "{c}  {r}");
+    let (_, r) = fit(&items[0], 60);
+    assert!(r.contains(&state) && !r.contains(&running::pid_of(48211)), "{r}");
+    let failed = &items[3];
+    let ago = wait_len(NOW - failed.ended_ms.unwrap(), false);
+    let (_, r) = out_head(failed, "acme", NOW, false, 76);
+    assert!(r.contains(&format!("✗ {} · {}", running::ended_ago(&ago), running::exit_rc(101))), "{r}");
 }
 
 #[test]

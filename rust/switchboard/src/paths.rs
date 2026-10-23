@@ -1,8 +1,7 @@
 //! Where a workspace's hub keeps its state (RFC 0001 §5):
 //! `$SB_STATE_DIR`, else `<hubs dir>/<name>-<hash>` (`bise_home::Home::hub_dir`:
 //! `~/.bise/hubs/`, or `~/.local/state/switchboard/` in the old layout),
-//! and an agent's folders in it: `bise_home::hub_state`'s (one owner, the
-//! TUI reads an agent's bg output there too).
+//! and an agent's folders in it: `bise_home::hub_state`'s (one owner).
 //! Its task worktrees: `<home>/worktrees/<name>-<hash>/<task>/` (the
 //! `sweep` module), or `$SB_STATE_DIR/worktrees/<task>/`.
 
@@ -190,8 +189,8 @@ mod tests {
     }
 
     /// The hub and a client find an agent's files at the same place
-    /// (bise_home::hub_state, architect m_38397): the TUI's `/running`
-    /// reads a bg job's output where the agent's BEND_BG_DIR puts it.
+    /// (bise_home::hub_state, architect m_38397): where the agent's
+    /// BEND_BG_DIR puts its bg jobs.
     #[test]
     fn an_agents_bg_folder_is_bise_homes() {
         let p = Paths { workspace: "/w".into(), state: "/h/hubs/w-0a1b2c3d".into(), worktrees: "/h/wt".into() };
@@ -200,7 +199,6 @@ mod tests {
             let bg = crate::tools_env::temp_env(&tmp, &p.agent_run(dir)).into_iter().find(|(k, _)| *k == "BEND_BG_DIR").map(|(_, v)| v);
             assert_eq!(bg.as_deref(), Some(p.agent_bg(dir).as_path()), "{dir}");
             assert_eq!(p.agent_bg(dir), bise_home::hub_state::agent_bg(&p.state, dir));
-            assert_eq!(bise_home::hub_state::bg_out(&p.state, dir, 3), tmp.join("bg").join("3.out"));
         }
     }
 

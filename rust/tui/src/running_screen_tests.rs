@@ -181,16 +181,15 @@ fn o_on_a_port_nothing_answers_flashes_why() {
     // an ended one: it has ended, not 'no port'
     app.running.as_mut().unwrap().sel = Some(("docs".into(), "bg1.1791098000".into()));
     press(&mut app, KeyCode::Char('o'));
-    assert_eq!(app.running.as_ref().unwrap().note.as_ref().unwrap().0, running::already_ended);
+    assert_eq!(app.running.as_ref().unwrap().note.as_ref().unwrap().0, running::ended_no_open);
 }
 
 #[test]
-fn enter_without_a_local_file_reads_the_hub_and_follows() {
+fn enter_reads_the_output_from_the_hub_and_follows() {
     let (mut app, mut hub) = app_open();
-    // the detached watcher: its file is the hub's to read
+    // the detached watcher: its output read from the hub
     app.running.as_mut().unwrap().sel = Some(("perf".into(), "p48990.1791100150".into()));
     press(&mut app, KeyCode::Enter);
-    assert!(crate::running_less::take().is_none());
     let calls = sent(&mut hub);
     assert!(calls.iter().any(|(m, p)| m == "process/output" && p["id"] == "p48990.1791100150"));
     assert!(calls.iter().any(|(m, p)| m == "process/follow" && p["on"] == true));

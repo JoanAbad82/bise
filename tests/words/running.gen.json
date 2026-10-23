@@ -55,6 +55,11 @@
     "one": null,
     "text": "ended {ago} ago"
   },
+  "running.ended_no_open": {
+    "args": [],
+    "one": null,
+    "text": "it has ended: nothing to open."
+  },
   "running.ended_today": {
     "args": [],
     "one": null,
@@ -132,7 +137,7 @@
   "running.keys_head_ended": {
     "args": [],
     "one": null,
-    "text": "tab all   / search   esc back"
+    "text": "tab running   / search   esc back"
   },
   "running.keys_list": {
     "args": [],
@@ -162,7 +167,7 @@
   "running.none_match": {
     "args": [],
     "one": null,
-    "text": "nothing running matches."
+    "text": "nothing matches."
   },
   "running.not_answering": {
     "args": [

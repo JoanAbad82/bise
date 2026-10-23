@@ -1,8 +1,7 @@
 //! A workspace's hub state folder and its agents' folders in it: one
-//! owner for the hub (switchboard::paths::Paths calls these) and the
-//! clients that read an agent's files on this machine (the TUI's
-//! `/running` gives a background job's output to `less`). The hub's
-//! socket can live elsewhere (`socket`: a long path moves it to
+//! owner (switchboard::paths::Paths calls these; a client that reads an
+//! agent's files on this machine asks here too). The hub's socket can
+//! live elsewhere (`socket`: a long path moves it to
 //! `/tmp/bise-<uid>/<hash>`), so a client finds the state from the
 //! workspace, never from the socket's folder.
 
@@ -42,11 +41,6 @@ pub fn agent_bg(state: &Path, dir: &str) -> PathBuf {
     bg_dir_of_tmp(&agent_tmp(state, dir))
 }
 
-/// Background command `n`'s output file.
-pub fn bg_out(state: &Path, dir: &str, n: u32) -> PathBuf {
-    agent_bg(state, dir).join(format!("{n}.out"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -56,6 +50,6 @@ mod tests {
         let s = Path::new("/h/hubs/x-0a1b2c3d");
         assert_eq!(agent_tmp(s, "perf"), Path::new("/h/hubs/x-0a1b2c3d/agents/perf/tmp"));
         assert_eq!(agent_bg(s, "perf.2"), Path::new("/h/hubs/x-0a1b2c3d/agents/perf.2/tmp/bg"));
-        assert_eq!(bg_out(s, "my agent", 3), Path::new("/h/hubs/x-0a1b2c3d/agents/my agent/tmp/bg/3.out"));
+        assert_eq!(agent_bg(s, "my agent"), Path::new("/h/hubs/x-0a1b2c3d/agents/my agent/tmp/bg"));
     }
 }

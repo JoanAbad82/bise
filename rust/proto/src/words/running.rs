@@ -61,7 +61,7 @@ crate::words! { running:
     no_output = "no output kept: it doesn't write to a file bise can read.";
 
     // ---- keys
-    /// the TUI's full screen output's keys (no local file: read from the hub)
+    /// the TUI's full screen output's keys
     keys_output = "↓ follows the end   / find   o open   s stop   esc back";
     /// the TUI list's keys at 150 columns
     keys_list = "⏎ its output   o open   s stop   a its agent   esc back";
@@ -70,7 +70,7 @@ crate::words! { running:
     /// the TUI head's keys at 150 columns
     keys_head = "tab ended today   / search   esc back";
     /// the TUI head's keys while it shows only the ones ended today
-    keys_head_ended = "tab all   / search   esc back";
+    keys_head_ended = "tab running   / search   esc back";
 
     // ---- empty, and what a key could not do
     /// the list with nothing running
@@ -78,7 +78,7 @@ crate::words! { running:
     /// the list with nothing running nor ended today
     empty_ended = "nothing ran in the background today.";
     /// a search with no match
-    none_match = "nothing running matches.";
+    none_match = "nothing matches.";
     /// `o` on one that listens on no port
     no_port = "it listens on no port: nothing to open.";
     /// `o` when nothing answers on its port
@@ -87,6 +87,8 @@ crate::words! { running:
     opening(port) = "opening localhost:{port}";
     /// `s` on one that has ended
     already_ended = "it has ended already.";
+    /// `o` on one that has ended
+    ended_no_open = "it has ended: nothing to open.";
 
     // ---- the desktop (apps/desktop/src/running, the right bar, the sidebar)
     /// the right bar's section head

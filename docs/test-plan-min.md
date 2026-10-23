@@ -447,7 +447,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `tui_tabs_tmux` | TRANSFORM | TUI drawing or keys on a hub state: no process seam |
 | `tui_term_select_tmux` | TRANSFORM | TUI drawing or keys on a hub state: no process seam |
 | `tui_term_title_tmux` | TRANSFORM | TUI drawing or keys on a hub state: no process seam |
-| `tui_running_tmux` | KEEP | /running: bise steps aside for a real `less` in its PTY and comes back; the hub's scan finds a real server and its port |
+| `tui_running_tmux` | KEEP | /running: the hub's scan finds a real server and its port; its output follows a real file across the socket |
 | `tui_term_tmux` | KEEP | the embedded terminal: a real shell in a PTY |
 | `tui_text_layer_tmux` | TRANSFORM | TUI drawing or keys on a hub state: no process seam |
 | `tui_tmux` | KEEP | the TUI ↔ hub smoke on a real PTY: panel, checkout, esc, preview, cards |

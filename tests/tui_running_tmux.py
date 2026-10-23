@@ -2,16 +2,17 @@
 provider (running-procs, chunk C): main backgrounds a `python3 -m
 http.server` (BEND_BG_AFTER 2 s); the agents panel's faint line counts
 it with its port; /running lists it under main with localhost:<port>;
-⏎ suspends bise and `less +F` shows its output, q brings the list back
-whole; s stops it with no question and the row says `stopped by you`.
-The KEEP: bise steps aside for a real pager in a real PTY and comes back
-(suspend and resume of the terminal), and the hub's scan finds a real
-process with its port; render and keys are running_screen_tests.rs's.
+⏎ shows its output as it grows (process/output + process/follow from
+the real .out), esc brings the list back; s stops it with no question
+and the row says `stopped by you`. The KEEP: the hub's scan finds a real
+process and its port, and its output follows a real file across the
+socket; render and keys are running_screen_tests.rs's.
 
 python3 -u tests/tui_running_tmux.py
 """
 import os
 import socket
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -45,14 +46,13 @@ def main():
         t.keys("Enter")
         sc = t.wait_all([cmd, w("running.url", port=port).replace(" ↗", ""), w("running.keys_list")], 30)
         assert " › main" in sc, sc
-        # ⏎: less has the terminal and follows the output
+        # ⏎: its output from the hub, the head and the keys of the view
         t.keys("Enter")
-        t.wait("Serving HTTP on 127.0.0.1 port %d" % port, 30)
-        # ctrl+c stops less's follow (bise, behind it, ignores it): its
-        # prompt is the process's head; q quits: the list again
-        t.keys("C-c")
-        t.wait(w("running.state_running"), 20)
-        t.keys("q")
+        t.wait_all(["Serving HTTP on 127.0.0.1 port %d" % port, w("running.keys_output")], 30)
+        # a request it serves shows as it comes (follow)
+        subprocess.run(["curl", "-s", "-o", "/dev/null", "http://127.0.0.1:%d/followed" % port])
+        t.wait("GET /followed", 20)
+        t.keys("Escape")
         t.wait_all([cmd, w("running.keys_list")], 30)
         # s: no question, then stopped by you
         t.keys("s")

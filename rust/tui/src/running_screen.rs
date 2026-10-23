@@ -9,18 +9,17 @@
 //! question: `stopping…` until the hub's row says `stopped by you`), a
 //! goes to its agent, tab the ended ones only, / searches, esc back.
 //!
-//! The output: a bg job's `.out` on this machine goes to `less -R +F`
-//! with the TUI suspended (running_less.rs), back on q; else (a remote
-//! hub, a detached one's file, an ended one's kept copy) the hub's
-//! `process/output` and `process/follow` in a full screen view
-//! (running_out.rs): it follows the end until he scrolls up. One with no
-//! output says so in one dim line.
+//! The output, every kind alike (designer m_38541: one head, one key
+//! line): the hub's `process/output` and `process/follow` in a full
+//! screen view (running_out.rs) that follows the end until he scrolls
+//! up; its last 64 KB, then what it writes. One with no output says so
+//! in one dim line.
 
 use crate::app::App;
 use crate::running::{self as rows, Filter};
 use crate::running_out::{self as out, Text, View};
 use crate::theme::{dim, faint, text};
-use bise_proto::rows::{OutKind, Proc, ProcKind};
+use bise_proto::rows::{OutKind, Proc};
 use bise_proto::words::running;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
@@ -158,13 +157,8 @@ fn note(app: &mut App, s: String) {
 
 // ---- the actions ----
 
-/// ⏎: its output. A bg job's file on this machine: `less`; else the hub's.
+/// ⏎: its output, read from the hub and followed while it runs.
 fn open_output(app: &mut App, p: &Proc) {
-    if let Some(path) = local_out(app, p) {
-        let head = rows::out_head(p, &project(app), crate::when::now_ms(), false);
-        crate::running_less::ask(path, head);
-        return;
-    }
     let k = key(p);
     if let Some(sc) = app.running.as_mut() {
         sc.out = Some(Out { key: k.clone(), ..Default::default() });
@@ -178,23 +172,10 @@ fn open_output(app: &mut App, p: &Proc) {
     }
 }
 
-/// A running bg job's `.out` when it is on this machine (the hub's
-/// state folder from the workspace, bise_home::hub_state).
-fn local_out(app: &App, p: &Proc) -> Option<std::path::PathBuf> {
-    let ProcKind::Bg { n } = p.kind else { return None };
-    if !p.running() {
-        return None;
-    }
-    let ws = crate::sb::workspace(app)?;
-    let dir = app.sb.folder_of(&p.agent)?;
-    let state = bise_home::hub_state::state_dir(std::path::Path::new(&ws));
-    Some(bise_home::hub_state::bg_out(&state, &dir, n)).filter(|f| f.is_file())
-}
-
 /// o: its port in the browser, when something answers there.
 fn open_port(app: &mut App, p: &Proc) {
     if !p.running() {
-        return note(app, running::already_ended.to_string());
+        return note(app, running::ended_no_open.to_string());
     }
     let Some(port) = p.ports.first().copied().filter(|_| p.running()) else {
         return note(app, running::no_port.to_string());
@@ -265,7 +246,10 @@ pub(crate) fn list_lines(sc: &Screen, order: &[String], project: &str, wd: usize
 fn head_line(sc: &Screen, project: &str, wd: usize) -> Line<'static> {
     let wide = wd >= rows::WIDE_FROM;
     let items = sc.items.as_deref().unwrap_or(&[]);
-    let left = rows::head(project, items, wide);
+    // the keys on its right at 150 columns; at 80 the head has the row
+    let keys_w = if wide { running::keys_head.width().max(running::keys_head_ended.width()) + 3 } else { 0 };
+    let room = if wide { wd.saturating_sub(keys_w) } else { wd.saturating_sub(running::ended_today.width() + 3) };
+    let left = rows::head(project, items, room);
     let mut spans = vec![Span::styled(left.clone(), Style::default().fg(text()))];
     if sc.typing || !sc.query.is_empty() {
         spans.push(Span::styled(format!("   / {}", sc.query), Style::default().fg(text())));
@@ -293,7 +277,8 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     if full.width < 30 || full.height < 10 {
         return;
     }
-    let area = crate::artifacts_screen::draw_frame(app, frame, full, running::heading);
+    // narrow, the frame names the project's folder only (designer m_38541)
+    let area = crate::artifacts_screen::draw_frame_at(app, frame, full, running::heading, full.width < rows::WIDE_FROM as u16);
     let project = project(app);
     let now = crate::when::now_ms();
     if app.running.as_ref().is_some_and(|s| s.out.is_some()) {
@@ -331,11 +316,10 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
 /// The output's lines: its head, a rule, the window, the keys.
 pub(crate) fn out_lines(o: &Out, p: Option<&Proc>, project: &str, stopping: bool, wd: usize, h: usize, now: u64) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    let head = p.map(|p| rows::out_head(p, project, now, stopping)).unwrap_or_else(|| o.key.1.clone());
-    let (cmd, rest) = head.split_once("  ").unwrap_or((head.as_str(), ""));
+    let (cmd, rest) = p.map(|p| rows::out_head(p, project, now, stopping, wd)).unwrap_or_else(|| (o.key.1.clone(), String::new()));
     lines.push(Line::from(vec![
-        Span::styled(rows::clip(cmd, wd / 2), Style::default().fg(text()).add_modifier(Modifier::BOLD)),
-        Span::styled(format!("  {}", rows::clip(rest, wd.saturating_sub(cmd.width().min(wd / 2) + 2))), Style::default().fg(dim())),
+        Span::styled(cmd, Style::default().fg(text()).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("  {rest}"), Style::default().fg(dim())),
     ]));
     lines.push(Line::from(Span::styled("─".repeat(wd), Style::default().fg(faint()))));
     let room = h.saturating_sub(3);

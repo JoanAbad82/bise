@@ -653,10 +653,19 @@ pub(crate) fn lines(sc: &mut Screen, all: &[Artifact], width: usize, height: usi
 /// (the path as the main screen's top edge says it, topedge.rs: its last
 /// name when short, then nothing; the name always).
 pub(crate) fn draw_frame(app: &App, frame: &mut Frame, full: Rect, name: &str) -> Rect {
+    draw_frame_at(app, frame, full, name, false)
+}
+
+/// [`draw_frame`]; `folder`: the edge names the workspace's folder only
+/// (a narrow screen: /running at 80 columns).
+pub(crate) fn draw_frame_at(app: &App, frame: &mut Frame, full: Rect, name: &str, folder: bool) -> Rect {
     let cols = crate::layout::cols(full.width, full.height);
     let cols = crate::layout::Cols { panel: None, ..cols };
     let title = app.sb.title();
-    let paths = crate::topedge::paths(&crate::sb::workspace(app).unwrap_or_default(), "");
+    let mut paths = crate::topedge::paths(&crate::sb::workspace(app).unwrap_or_default(), "");
+    if folder {
+        paths = paths.split_off(paths.len().saturating_sub(1));
+    }
     let name = name.to_string();
     let edge = move |room: usize| (crate::topedge::screen_head(room, &paths, &name), Vec::new());
     if cols.framed {

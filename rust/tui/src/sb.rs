@@ -567,12 +567,6 @@ impl Sb {
         self.agent(&self.focus).filter(|a| !a.main).map(|a| a.name.clone())
     }
 
-    /// `name`'s folder when it is a live agent of this hub (/running
-    /// finds its bg output there).
-    pub(crate) fn folder_of(&self, name: &str) -> Option<String> {
-        self.agent(name).map(|a| a.dir.clone())
-    }
-
     /// `name`'s folder (its name but after a rename; its name when the
     /// hub didn't say): its computer-use key's second half.
     pub(super) fn dir_of(&self, name: &str) -> String {

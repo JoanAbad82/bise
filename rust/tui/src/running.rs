@@ -179,30 +179,29 @@ pub(crate) fn row(p: &Proc, now: u64, selected: bool, stopping: bool, wd: usize)
     Line::from(spans)
 }
 
-/// The head: `storefront · 3 running · 2 listening` (wide), `storefront
-/// · 3 · 2 listening` (80 columns); the listening part only when one
-/// listens.
-pub(crate) fn head(project: &str, items: &[Proc], wide: bool) -> String {
+/// The head in `room` columns: `storefront · 3 running · 2 listening`,
+/// or `storefront · 3 · 2 listening` when that does not fit; the
+/// listening part only when one listens.
+pub(crate) fn head(project: &str, items: &[Proc], room: usize) -> String {
     let n = items.iter().filter(|p| is_running(p)).count();
     let listening = items.iter().filter(|p| is_running(p) && !p.ports.is_empty()).count();
-    let mut out = match wide {
-        true => format!("{project} · {}", running::count_running(n)),
-        false => format!("{project} · {n}"),
-    };
-    if listening > 0 {
-        out.push_str(&format!(" · {}", running::count_listening(listening)));
+    let tail = if listening > 0 { format!(" · {}", running::count_listening(listening)) } else { String::new() };
+    let long = format!("{project} · {}{tail}", running::count_running(n));
+    if long.width() <= room {
+        return long;
     }
-    out
+    format!("{project} · {n}{tail}")
 }
 
 /// The tip of a row (its id, when it started, its folder; a detached one
 /// says where it came from), shown under the selected row.
 pub(crate) fn tip(p: &Proc) -> Vec<String> {
     let at = clock(p.started_ms);
-    // a bg job by its slot (`bg3`), as the agent's sb says it
+    // a bg job by its slot (`bg3`), as the agent's sb says it; a detached
+    // one by its pid (`p48990`), its start time left out
     let id = match p.kind {
         bise_proto::rows::ProcKind::Bg { n } => format!("bg{n}"),
-        _ => p.id.clone(),
+        _ => p.id.split('.').next().unwrap_or(&p.id).to_string(),
     };
     let first = match &p.cwd {
         Some(cwd) => running::tip(&id, &at, short_home(cwd)),
@@ -243,23 +242,37 @@ pub(crate) fn panel_line(procs: u16, port: Option<u16>) -> Option<String> {
     Some(s)
 }
 
-/// The output's head, one line: `pnpm dev  perf · storefront · ∿ running
-/// · 14 min · localhost:5173 · pid 48211 · cpu 12% · 340 MB`.
-pub(crate) fn out_head(p: &Proc, project: &str, now: u64, stopping: bool) -> String {
+/// The output's head in `wd` columns, as (its command, the rest):
+/// `pnpm dev`, `perf · storefront · ∿ running · 14 min · localhost:5173
+/// · pid 48211 · cpu 12% · 340 MB`. Short on room (designer m_38541) the
+/// command is cut first, then cpu/memory and the pid go, then the port;
+/// the state (`✗ ended 5 s ago · rc 1`) always stays whole.
+pub(crate) fn out_head(p: &Proc, project: &str, now: u64, stopping: bool, wd: usize) -> (String, String) {
+    const CMD_MIN: usize = 12;
     let (g, _) = glyph(p);
     let state = match is_running(p) && !stopping {
         true => format!("{g} {} · {}", running::state_running, status(p, now, false, true)),
         false => format!("{g} {}", status(p, now, stopping, true)),
     };
-    let mut parts = vec![running::whose(&p.agent, project), state];
+    let parts = [running::whose(&p.agent, project), state];
+    let mut extra = Vec::new();
     if let Some(port) = port_words(p, true) {
-        parts.push(port);
+        extra.push(port);
     }
-    parts.push(running::pid_of(p.pid));
+    extra.push(running::pid_of(p.pid));
     if is_running(p) {
-        parts.push(running::usage(p.cpu.round() as u32, p.rss_mb));
+        extra.push(running::usage(p.cpu.round() as u32, p.rss_mb));
     }
-    format!("{}  {}", one_line(&p.cmd), parts.join(" · "))
+    let cmd = one_line(&p.cmd);
+    let rest = |extra: &[String]| parts.iter().chain(extra).cloned().collect::<Vec<_>>().join(" · ");
+    // drop from the end (cpu/memory, the pid, the port) until the command
+    // keeps CMD_MIN columns
+    while !extra.is_empty() && rest(&extra).width() + 2 + cmd.width().min(CMD_MIN) > wd {
+        extra.pop();
+    }
+    let r = rest(&extra);
+    let cmd = clip(&cmd, wd.saturating_sub(r.width() + 2).max(CMD_MIN.min(cmd.width())));
+    (cmd, r)
 }
 
 /// The dim keys line of the list.
