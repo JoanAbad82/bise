@@ -604,7 +604,7 @@ pub(crate) fn page_port(url: &str) -> Option<u16> {
 }
 
 /// Does anything answer on 127.0.0.1:`port`? A connect, short.
-fn answers(port: u16) -> bool {
+pub(crate) fn answers(port: u16) -> bool {
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(800)).is_ok()
 }

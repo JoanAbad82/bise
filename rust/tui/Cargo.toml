@@ -49,7 +49,8 @@ memchr = "2.8.3"
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 cpal = "0.15"
 
-# find_tests.rs: a slice's cost in this thread's CPU time
-# (clock_gettime), not the wall clock a loaded machine stretches
-[target.'cfg(unix)'.dev-dependencies]
+# running_less.rs: `less` gets ctrl+c while bise, suspended, ignores it;
+# find_tests.rs: a slice's cost in this thread's CPU time (clock_gettime),
+# not the wall clock a loaded machine stretches
+[target.'cfg(unix)'.dependencies]
 libc = "0.2"

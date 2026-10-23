@@ -119,6 +119,11 @@ mod artifacts;
 mod artifacts_screen;
 mod scheduled;
 mod scheduled_screen;
+// running-procs: /running, its rows, its output and less
+mod running;
+mod running_less;
+mod running_out;
+mod running_screen;
 mod scheduled_watch;
 mod inbox_list;
 mod inbox_screen;

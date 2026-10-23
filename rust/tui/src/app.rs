@@ -24,6 +24,8 @@ pub(crate) struct App {
     pub(crate) inbox: Option<crate::inbox_screen::Screen>,
     /// `/usage`, the full screen of what the calls cost, when open
     pub(crate) usage: Option<crate::usage_screen::Screen>,
+    /// `/running`, the full screen of what the agents left running, when open
+    pub(crate) running: Option<crate::running_screen::Screen>,
     /// the diff panel (ctrl+g, `/diff`, `± 3 files`), when open
     pub(crate) diff: Option<crate::diffview::Panel>,
     // the /computer-use screen, when open (computer_use.rs)
@@ -300,6 +302,7 @@ impl App {
             scheduled: None,
             inbox: None,
             usage: None,
+            running: None,
             diff: None,
             computer_use: None,
             debug,

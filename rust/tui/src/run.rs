@@ -116,20 +116,33 @@ pub(crate) fn ingest_line(app: &mut App, line: String, ts: Option<u64>) {
 /// Fallible, unlike `ratatui::init` (which panics), and without its
 /// panic hook: `crash::install` restores every one of these modes.
 fn init_terminal() -> io::Result<(crate::links::Tui, bool)> {
-    use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
     let setup = || -> io::Result<(crate::links::Tui, bool)> {
-        enable_raw_mode()?;
+        crossterm::terminal::enable_raw_mode()?;
         // BISE-02: light or dark from the terminal background, before the alternate screen
         crate::theme_detect::init();
-        crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
-        let _ = crossterm::execute!(io::stdout(), EnableMouseCapture);
-        let _ = crossterm::execute!(io::stdout(), EnableBracketedPaste);
-        // BISE-107: the gust stops while the terminal is not focused
-        let _ = crossterm::execute!(io::stdout(), crossterm::event::EnableFocusChange);
-        let protocol = push_keyboard_flags();
+        let protocol = alternate_modes()?;
         Ok((ratatui::Terminal::new(crate::links::LinkBackend::new(io::stdout()))?, protocol))
     };
     setup().inspect_err(|_| crash::restore_terminal())
+}
+
+/// The UI modes again after a program had the terminal (`/running`'s
+/// less, running_less.rs): raw, the alternate screen, the mouse, paste,
+/// focus and the keyboard flags.
+pub(crate) fn enter_ui_modes() -> io::Result<()> {
+    crossterm::terminal::enable_raw_mode()?;
+    alternate_modes().map(|_| ())
+}
+
+/// The alternate screen and the reports the UI reads; true when the
+/// terminal speaks the kitty keyboard protocol.
+fn alternate_modes() -> io::Result<bool> {
+    crossterm::execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen)?;
+    let _ = crossterm::execute!(io::stdout(), EnableMouseCapture);
+    let _ = crossterm::execute!(io::stdout(), EnableBracketedPaste);
+    // BISE-107: the gust stops while the terminal is not focused
+    let _ = crossterm::execute!(io::stdout(), crossterm::event::EnableFocusChange);
+    Ok(push_keyboard_flags())
 }
 
 /// One push of the kitty keyboard flags (`crash::restore_terminal` pops
@@ -502,6 +515,10 @@ fn ui_loop(app: &mut App, terminal: &mut crate::links::Tui) -> io::Result<()> {
                 // the half-drawn buffer is dropped: the next frame repaints all
                 let _ = terminal.clear();
             }
+        }
+        // /running's ⏎: less has the terminal until q (running_less.rs)
+        if crate::running_less::run_if_asked(terminal)? {
+            continue;
         }
         // expired-ux: the ChatGPT sign-in again from the thread, its answer
         crate::resign::tick(app);

@@ -144,6 +144,7 @@ pub const COMMANDS: &[Cmd] = &[
     },
     Cmd { name: "/artifacts", desc: "what your agents made: pages, docs, files, links", args: &[], client: true },
     Cmd { name: "/scheduled", desc: "your scheduled tasks: list, open, run now, stop", args: &[], client: true },
+    Cmd { name: "/running", desc: "what your agents left running: its output, open, stop", args: &[], client: true },
     Cmd {
         name: "/diff",
         desc: "a branch's changes against main, in a panel on the right: /diff [<branch>]",
@@ -302,12 +303,12 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Law: 37 commands, each name once and a slash word; 20 the
+    /// Law: 38 commands, each name once and a slash word; 21 the
     /// client's own, the 17 others the hub's router parses.
     #[test]
-    fn the_catalog_holds_37_commands_20_of_them_the_clients() {
-        assert_eq!(COMMANDS.len(), 37);
-        assert_eq!(COMMANDS.iter().filter(|c| c.client).count(), 20);
+    fn the_catalog_holds_38_commands_21_of_them_the_clients() {
+        assert_eq!(COMMANDS.len(), 38);
+        assert_eq!(COMMANDS.iter().filter(|c| c.client).count(), 21);
         let hub: Vec<&str> = COMMANDS.iter().filter(|c| !c.client).map(|c| c.name).collect();
         assert_eq!(
             hub,

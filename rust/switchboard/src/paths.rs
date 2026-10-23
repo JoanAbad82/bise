@@ -1,6 +1,8 @@
 //! Where a workspace's hub keeps its state (RFC 0001 §5):
 //! `$SB_STATE_DIR`, else `<hubs dir>/<name>-<hash>` (`bise_home::Home::hub_dir`:
-//! `~/.bise/hubs/`, or `~/.local/state/switchboard/` in the old layout).
+//! `~/.bise/hubs/`, or `~/.local/state/switchboard/` in the old layout),
+//! and an agent's folders in it: `bise_home::hub_state`'s (one owner, the
+//! TUI reads an agent's bg output there too).
 //! Its task worktrees: `<home>/worktrees/<name>-<hash>/<task>/` (the
 //! `sweep` module), or `$SB_STATE_DIR/worktrees/<task>/`.
 
@@ -55,13 +57,11 @@ impl Paths {
         let workspace = workspace
             .canonicalize()
             .unwrap_or_else(|_| workspace.to_path_buf());
-        let (state, worktrees) = match bise_home::env::test_setting("SB_STATE_DIR") {
-            Some(d) => (PathBuf::from(&d), PathBuf::from(d).join("worktrees")),
-            None => {
-                let home = bise_home::Home::from_env();
-                let id = workspace_id(&workspace);
-                (home.hub_dir(&id), home.worktrees_dir().join(id))
-            }
+        // the state folder: bise_home's (one owner, the TUI reads it too)
+        let state = bise_home::hub_state::state_dir(&workspace);
+        let worktrees = match bise_home::env::test_setting("SB_STATE_DIR") {
+            Some(_) => state.join("worktrees"),
+            None => bise_home::Home::from_env().worktrees_dir().join(workspace_id(&workspace)),
         };
         Paths { workspace, state, worktrees }
     }
@@ -126,12 +126,16 @@ impl Paths {
         self.state.join("bin")
     }
     pub fn agent_dir(&self, name: &str) -> PathBuf {
-        self.state.join("agents").join(name)
+        bise_home::hub_state::agent_dir(&self.state, name)
     }
     /// The agent's temp folder (approvals-design.md §7.1): its `TMPDIR`,
-    /// created at spawn, deleted at its /drop.
+    /// created at spawn, deleted at its /drop (bise_home::hub_state).
     pub fn agent_tmp(&self, name: &str) -> PathBuf {
-        self.agent_dir(name).join("tmp")
+        bise_home::hub_state::agent_tmp(&self.state, name)
+    }
+    /// The agent's background commands' folder (`BEND_BG_DIR`).
+    pub fn agent_bg(&self, name: &str) -> PathBuf {
+        bise_home::hub_state::agent_bg(&self.state, name)
     }
     /// The harness's own files of the agent (bash wrappers, steer,
     /// interrupt, run_typescript files): `BEND_AGENT_RUN`, never deleted
@@ -178,6 +182,21 @@ mod tests {
         assert!(is_home(&home));
         assert!(is_home(&home.join(".")));
         assert!(!is_home(&home.join("projects")) && !is_home(Path::new("/")));
+    }
+
+    /// The hub and a client find an agent's files at the same place
+    /// (bise_home::hub_state, architect m_38397): the TUI's `/running`
+    /// reads a bg job's output where the agent's BEND_BG_DIR puts it.
+    #[test]
+    fn an_agents_bg_folder_is_bise_homes() {
+        let p = Paths { workspace: "/w".into(), state: "/h/hubs/w-0a1b2c3d".into(), worktrees: "/h/wt".into() };
+        for dir in ["perf", "perf.2", "x.2", "my agent"] {
+            let tmp = p.agent_tmp(dir);
+            let bg = crate::tools_env::temp_env(&tmp, &p.agent_run(dir)).into_iter().find(|(k, _)| *k == "BEND_BG_DIR").map(|(_, v)| v);
+            assert_eq!(bg.as_deref(), Some(p.agent_bg(dir).as_path()), "{dir}");
+            assert_eq!(p.agent_bg(dir), bise_home::hub_state::agent_bg(&p.state, dir));
+            assert_eq!(bise_home::hub_state::bg_out(&p.state, dir, 3), tmp.join("bg").join("3.out"));
+        }
     }
 
     #[test]

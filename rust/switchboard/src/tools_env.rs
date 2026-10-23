@@ -418,7 +418,7 @@ pub fn temp_env(tmp: &Path, run: &Path) -> Vec<(&'static str, PathBuf)> {
         keys.push("TMUX_TMPDIR");
     }
     let mut v: Vec<(&'static str, PathBuf)> = keys.into_iter().map(|k| (k, tmp.to_path_buf())).collect();
-    v.push(("BEND_BG_DIR", tmp.join("bg")));
+    v.push(("BEND_BG_DIR", bise_home::hub_state::bg_dir_of_tmp(tmp)));
     v.push(("BEND_AGENT_RUN", run.to_path_buf()));
     v
 }

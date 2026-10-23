@@ -203,6 +203,9 @@ fn apply(app: &mut App, n: &Notification) {
         // P4c-5: `/version`'s picker, a release run's steps, `/update`'s build
         HubEv::Versions { dev, items, .. } => versions::set(app, *dev, items),
         HubEv::Release(r) => release::event(app, r),
+        // /running open: the list every 2 s, its output as it grows
+        HubEv::Processes { items, .. } => crate::running_screen::listed(app, items),
+        HubEv::ProcOut { agent, id, at, data, .. } => crate::running_screen::output(app, agent, id, *at, data),
         HubEv::Update(u) => release::update_event(app, u),
         _ => {}
     }

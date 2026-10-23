@@ -42,6 +42,10 @@ pub(crate) enum Then {
     Shown,
     /// `usage/read` (`/usage`): the screen's numbers (usage_screen.rs)
     Usage,
+    /// `processes/list` (`/running`): the list (running_screen.rs)
+    Processes,
+    /// `process/output`: a range of the open output (running_screen.rs)
+    ProcOut,
     /// `/approvals`' read (approvals/set without a mode): the mode, the
     /// checker and the rules, and its screen opens
     Approvals,
@@ -182,6 +186,16 @@ fn run(app: &mut App, then: Then, r: Response) {
         (_, Err(e)) => refused(app, &e),
         (Then::HubRead, Ok(v)) => hub_reads::reread(app, v),
         (Then::Shown | Then::RuleRemoved, Ok(_)) => {}
+        (Then::Processes, Ok(v)) => {
+            if let Ok(Some(bise_proto::hub::HubEv::Processes { items, .. })) = bise_proto::rpc::ev_of_result("processes/list", v) {
+                crate::running_screen::listed(app, &items);
+            }
+        }
+        (Then::ProcOut, Ok(v)) => {
+            if let Ok(Some(bise_proto::hub::HubEv::ProcOut { agent, id, at, data, .. })) = bise_proto::rpc::ev_of_result("process/output", v) {
+                crate::running_screen::output(app, &agent, &id, at, &data);
+            }
+        }
         (Then::Usage, Ok(v)) => {
             if let Ok(Some(ev)) = bise_proto::rpc::ev_of_result("usage/read", v) {
                 crate::usage_screen::answered(app, ev);

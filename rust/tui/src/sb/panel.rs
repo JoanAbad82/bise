@@ -642,6 +642,11 @@ pub(crate) fn draw_panel(app: &App, frame: &mut Frame, area: Rect) {
                 owners.push((lines.len(), Hit::Agent(a.name.clone())));
                 lines.push(words);
             }
+            // running-procs: one faint line when it left something running
+            if let Some(t) = crate::running::panel_line(a.procs, a.procs_port).filter(|_| !a.archived()) {
+                owners.push((lines.len(), Hit::Agent(a.name.clone())));
+                lines.push(Line::from(Span::styled(format!("      {}", fit(&t, w.saturating_sub(7))), Style::default().fg(faint()))));
+            }
             // the selected agent: what it is for and its last note, under its row
             if sb.selected == Some(i) && !a.main {
                 for t in [&a.objective, &a.note].into_iter().filter(|t| !t.is_empty()) {

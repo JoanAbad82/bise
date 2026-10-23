@@ -541,3 +541,24 @@ fn a_working_agent_has_one_status_and_one_timer() {
     let state: String = status_state(&app)[0].spans.iter().map(|s| s.content.to_string()).collect();
     assert!(state.starts_with("blocked · 12m"), "{state:?}");
 }
+
+/// running-procs: an agent that left something running has one faint
+/// line under its row (`∿ 2 running · :5173`); none at 0.
+#[test]
+fn an_agent_running_something_has_a_faint_line_under_its_row() {
+    use bise_proto::words::running;
+    let mut app = with_main();
+    app.sb.agents.push(Agent { name: "perf".into(), status: "working".into(), procs: 2, procs_port: Some(5173), ..Agent::default() });
+    app.sb.agents.push(Agent { name: "checkout".into(), status: "working".into(), procs: 1, ..Agent::default() });
+    app.sb.agents.push(Agent { name: "search".into(), status: "waiting".into(), ..Agent::default() });
+    // under ~100 columns the panel is not drawn (layout.rs)
+    for width in [150u16, 110] {
+        let t = draw(&mut app, width, 24);
+        let at = |name: &str| t.iter().position(|r| r.contains(&format!(" {name} "))).unwrap_or_else(|| panic!("{name}: {t:#?}"));
+        // the panel's cell of the row: the text after the feed's rule
+        let line = |i: usize| t[i].trim_end_matches('│').rsplit('│').next().unwrap_or_default().trim().to_string();
+        assert_eq!(line(at("perf") + 1), format!("∿ {} · {}", running::count_running(2), running::port_short(5173)), "{width}: {t:#?}");
+        assert_eq!(line(at("checkout") + 1), format!("∿ {}", running::count_running(1)), "{width}: {t:#?}");
+        assert!(!line(at("search") + 1).contains('∿'), "{width}: {t:#?}");
+    }
+}

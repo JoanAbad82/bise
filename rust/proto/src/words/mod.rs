@@ -37,6 +37,7 @@ pub mod common;
 pub mod composer;
 pub mod inbox;
 pub mod panel;
+pub mod running;
 pub mod scheduled;
 pub mod settings;
 pub mod thread;
@@ -63,6 +64,7 @@ pub const ALL: &[(&str, &[Word])] = &[
     ("composer", composer::WORDS),
     ("inbox", inbox::WORDS),
     ("panel", panel::WORDS),
+    ("running", running::WORDS),
     ("scheduled", scheduled::WORDS),
     ("settings", settings::WORDS),
     ("thread", thread::WORDS),

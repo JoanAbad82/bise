@@ -8,6 +8,7 @@ export { common } from './words_common.gen';
 export { composer } from './words_composer.gen';
 export { inbox } from './words_inbox.gen';
 export { panel } from './words_panel.gen';
+export { running } from './words_running.gen';
 export { scheduled } from './words_scheduled.gen';
 export { settings } from './words_settings.gen';
 export { thread } from './words_thread.gen';

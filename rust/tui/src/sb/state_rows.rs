@@ -77,6 +77,8 @@ impl Agent {
             changes: a.changes.map(|c| (c.files, c.add, c.del)),
             usage: a.usage.clone(),
             watching: a.watching.clone(),
+            procs: a.procs,
+            procs_port: a.procs_port,
         }
     }
 }

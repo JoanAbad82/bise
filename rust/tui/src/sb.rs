@@ -186,6 +186,10 @@ pub(super) struct Agent {
     /// event-wake: the events it waits for now (the hub's row,
     /// `watching`), oldest first: the panel's `…`, the live line
     watching: Vec<bise_proto::rows::AgentWatch>,
+    /// running-procs: how many processes it left running, and the lowest
+    /// port they listen on (the panel's faint `∿ 2 running · :5173`)
+    procs: u16,
+    procs_port: Option<u16>,
 }
 
 impl Agent {
@@ -553,6 +557,22 @@ impl Sb {
         self.agents.iter().find(|a| a.name == name)
     }
 
+    /// The agents' names in the panel's order (/running's groups).
+    pub(crate) fn agent_names(&self) -> Vec<String> {
+        self.agents.iter().map(|a| a.name.clone()).collect()
+    }
+
+    /// The agent in view when it is not main (/running opens on its rows).
+    pub(crate) fn focused_task(&self) -> Option<String> {
+        self.agent(&self.focus).filter(|a| !a.main).map(|a| a.name.clone())
+    }
+
+    /// `name`'s folder when it is a live agent of this hub (/running
+    /// finds its bg output there).
+    pub(crate) fn folder_of(&self, name: &str) -> Option<String> {
+        self.agent(name).map(|a| a.dir.clone())
+    }
+
     /// `name`'s folder (its name but after a rename; its name when the
     /// hub didn't say): its computer-use key's second half.
     pub(super) fn dir_of(&self, name: &str) -> String {
@@ -826,6 +846,11 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         // site/m/timers: the scheduled tasks, full screen
         Some("/scheduled") => {
             crate::scheduled_screen::open(app);
+            return out;
+        }
+        // running-procs: what the agents left running, full screen
+        Some("/running") => {
+            crate::running_screen::open(app);
             return out;
         }
         // cost-pause: what the calls cost, full screen
