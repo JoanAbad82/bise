@@ -227,6 +227,19 @@ pub struct Agent {
     /// while its turn runs, none otherwise
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doing: Option<super::Doing>,
+    /// how many processes it left running (the `processes` rows of this
+    /// agent that run: the right bar's RUNNING · N, the panel's
+    /// `∿ 2 running`), from the hub's slow scan
+    #[serde(default, skip_serializing_if = "is_zero_u16")]
+    pub procs: u16,
+    /// the lowest port its running processes listen on (the panel's
+    /// `· :5173`), none when none listens
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub procs_port: Option<u16>,
+}
+
+fn is_zero_u16(n: &u16) -> bool {
+    *n == 0
 }
 
 /// What a watch looks at (event-wake).
@@ -340,6 +353,8 @@ impl Agent {
             turns: 0,
             watching: Vec::new(),
             doing: None,
+            procs: 0,
+            procs_port: None,
         }
     }
 }

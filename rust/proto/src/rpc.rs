@@ -85,6 +85,12 @@ pub const METHODS: &[MethodRow] = &[
     m("turn/steerQueued", "queued_steer", None),
     m("worktrees/list", "worktrees", Some("worktrees")),
     m("devServers/list", "dev_servers", Some("dev_servers")),
+    // running processes (docs/processes.md): the list, an output range,
+    // following it, stop (the user's authority)
+    m("processes/list", "processes", Some("processes")),
+    m("process/output", "proc_out", Some("proc_out")),
+    m("process/follow", "proc_follow", None),
+    m("process/stop", "proc_stop", None),
     m("merged/list", "merged", Some("merged")),
     m("features/list", "features", Some("features")),
     m("prs/list", "prs", Some("prs")),
@@ -203,6 +209,8 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/scheduled", "scheduled", Scope::Hub),
     n("hub/worktrees", "worktrees", Scope::Hub),
     n("hub/devServers", "dev_servers", Scope::Hub),
+    // a followed process's output as it grows (`process/follow`)
+    n("process/output", "proc_out", Scope::One),
     n("hub/merged", "merged", Scope::Hub),
     n("hub/features", "features", Scope::Hub),
     n("hub/prs", "prs", Scope::Hub),

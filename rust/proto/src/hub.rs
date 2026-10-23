@@ -8,7 +8,7 @@ use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult, DiffView};
 use crate::ops::{BranchRow, ReleaseEv, UpdateEv, VersionItem};
 use crate::parts::Part;
-use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, ScheduledTask, UsageRow, Worktree};
+use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, Proc, ScheduledTask, UsageRow, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -142,6 +142,24 @@ pub enum HubEv {
     /// the agents' background servers, with `worktrees` (same moments)
     /// and on `dev_servers`
     DevServers { project: Project, items: Vec<DevServer> },
+    /// the processes the project's agents left running, then the ones
+    /// that ended in the last 24 h (docs/processes.md): on `processes`,
+    /// every 2 s while a connection watches the list, and when a running
+    /// count changes
+    Processes { project: Project, items: Vec<Proc> },
+    /// a range of a process's output (the answer to `proc_out`, and its
+    /// notifications while `proc_follow` is on, this connection only):
+    /// `data` the bytes from offset `at`, base64; `end` the output's size
+    /// when read (`at` + the bytes < `end`: more to read). `at` past the
+    /// asked `from`: the start was no longer kept
+    ProcOut {
+        project: Project,
+        agent: String,
+        id: String,
+        at: u64,
+        data: String,
+        end: u64,
+    },
     /// the commits that reached the trunk today, newest first: at hello,
     /// after each land and on `merged`
     Merged { project: Project, items: Vec<Merged> },
@@ -460,7 +478,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -693,6 +711,43 @@ pub enum HubCmd {
     Worktrees { project: Project },
     /// the environments screen opened: `dev_servers` comes again
     DevServers { project: Project },
+    /// the processes list asked for: `processes` answers; `watch` true:
+    /// it comes again every 2 s (cpu, memory, ports) until `watch` false
+    /// or the connection goes; absent: once
+    Processes {
+        project: Project,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        watch: Option<bool>,
+    },
+    /// a range of process `id`'s output (`agent`'s): from byte `from`,
+    /// none for its last 64 KB; `proc_out` answers, at most 64 KB. The
+    /// user's authority: a client's only (issue 16)
+    ProcOut {
+        project: Project,
+        agent: String,
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        from: Option<u64>,
+    },
+    /// follow its output: while `on`, `proc_out` comes to this
+    /// connection as the output grows (every 200 ms at most, capped
+    /// chunks), from its end when it starts. The user's authority
+    ProcFollow { project: Project, agent: String, id: String, on: bool },
+    /// stop process `id` of `agent`, or `all` its running ones (exactly
+    /// one of the two): TERM, then KILL 5 s later; its row becomes
+    /// `stopped_by_you` and the agent gets a queued note. The user's
+    /// authority: a client's only, never an agent's op (issue 16)
+    ProcStop {
+        project: Project,
+        agent: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        id: Option<String>,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        all: bool,
+    },
     /// the changes tab opened: `merged` comes again
     Merged { project: Project },
     /// the features view opened: `features` comes again
@@ -870,7 +925,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -915,6 +970,10 @@ impl HubCmd {
             | HubCmd::ArtifactsSeen { project, .. }
             | HubCmd::Worktrees { project }
             | HubCmd::DevServers { project }
+            | HubCmd::Processes { project, .. }
+            | HubCmd::ProcOut { project, .. }
+            | HubCmd::ProcFollow { project, .. }
+            | HubCmd::ProcStop { project, .. }
             | HubCmd::Merged { project }
             | HubCmd::Features { project }
             | HubCmd::Prs { project }

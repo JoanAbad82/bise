@@ -96,6 +96,9 @@ export const TAGS = {
   // title bar, words from Rust's switch_line (amb-home draws it)
   switch: true,
   growth: true,
+  // running processes (procs-hub's proto, docs/processes.md): known; procs-desktop applies them
+  processes: true,
+  proc_out: true,
   // the core can't start any hub (its runtime is missing): Rust's words, drawn by CoreLine
   broken: true,
   // the core's capsule and agents-panel lines, typed in CoreEv (docs/issues/24): known, not

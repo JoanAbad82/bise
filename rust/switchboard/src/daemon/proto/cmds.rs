@@ -507,6 +507,12 @@ impl Shell {
                 }
                 self.proto_slash(id, &tag, agent, &line, cid)
             }
+            // running processes (docs/processes.md): the proto came first
+            // so the clients build on it; the scan, the output and the
+            // stop come with procs-hub's next land
+            HubCmd::Processes { .. } | HubCmd::ProcOut { .. } | HubCmd::ProcFollow { .. } | HubCmd::ProcStop { .. } => {
+                self.proto_error(id, &tag, "this hub doesn't list processes yet")
+            }
             HubCmd::Unknown { .. } => {}
         }
     }

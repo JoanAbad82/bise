@@ -247,6 +247,10 @@ fn agent(
         // issue 22: its ended turns from the same sb-core view as its
         // status (set_rt's count), never from its lines
         turns: a.turns,
+        // running processes: the scan's counts come with procs-hub's
+        // next land
+        procs: 0,
+        procs_port: None,
         name,
     }
 }

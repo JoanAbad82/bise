@@ -182,6 +182,8 @@ mod tests {
             changes: None,
             last_pos: None,
             turns: 0,
+            procs: 0,
+            procs_port: None,
         }
     }
 

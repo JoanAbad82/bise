@@ -187,7 +187,18 @@ watching: Array<AgentWatch>,
  * (think, a tool, an edit, a build...), from its live lines; only
  * while its turn runs, none otherwise
  */
-doing?: Doing | null, };
+doing?: Doing | null, 
+/**
+ * how many processes it left running (the `processes` rows of this
+ * agent that run: the right bar's RUNNING · N, the panel's
+ * `∿ 2 running`), from the hub's slow scan
+ */
+procs?: number, 
+/**
+ * the lowest port its running processes listen on (the panel's
+ * `· :5173`), none when none listens
+ */
+procs_port?: number | null, };
 
 /**
  * agents-light (issue 36, architect m_37000/m_37220): an archived agent
@@ -396,6 +407,67 @@ cmd: string,
  * its job runs
  */
 up: boolean, };
+
+/**
+ * How the process came to run.
+ */
+export type ProcKind = { "is": "bg", n: number, } | { "is": "detached" } | { "is": "unknown" };
+
+/**
+ * Whether it runs, and how it ended.
+ */
+export type ProcState = { "is": "running" } | { "is": "exited", rc: number, } | { "is": "stopped_by_you" } | { "is": "stopped_with" } | { "is": "unknown" };
+
+/**
+ * Where its output can be read (`proc_out`): the app never gets a path.
+ */
+export type OutKind = "bg" | "file" | "none" | "unknown";
+
+/**
+ * One process tree an agent left running, or one that ended in the last
+ * 24 h. Its key is (`agent`, `id`).
+ */
+export type Proc = { 
+/**
+ * `bg3` (the agent's bg job 3), `p<pid>.<start s>` (a detached one):
+ * stable while it runs, the key `proc_out` and `proc_stop` take
+ */
+id: string, agent: string, kind: ProcKind, 
+/**
+ * a bg job's command as the agent typed it; a detached one's root's
+ * command line
+ */
+cmd: string, 
+/**
+ * the root's working folder, when known
+ */
+cwd?: string | null, 
+/**
+ * the tree's root (a bg job: its process group)
+ */
+pid: number, started_ms: number, 
+/**
+ * the TCP ports the tree listens on, lowest first
+ */
+ports?: Array<number>, 
+/**
+ * `http://127.0.0.1:<first port>` once it listens
+ */
+url?: string | null, 
+/**
+ * what it is, for a known server command ("dev server", "http
+ * server")
+ */
+name?: string | null, state: ProcState, 
+/**
+ * when it ended (any state but running)
+ */
+ended_ms?: number | null, 
+/**
+ * the tree's sum, from the hub's last scan (0 once ended): cpu in
+ * percent of one core, resident memory in MB, how many processes
+ */
+cpu: number, rss_mb: number, procs: number, out: OutKind, };
 
 /**
  * A worktree of the project's repo: an agent's, or one of his own (the
