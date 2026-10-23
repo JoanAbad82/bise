@@ -239,6 +239,24 @@ pub struct Tree {
     pub cmd: String,
 }
 
+/// A bg job's own command from its `<n>.cmd`: without the guard the
+/// runtime puts first when the agent works in its own folder
+/// (`cd '<dir>' || exit 1`, bash-pure.bend `with_workdir`), trimmed.
+pub fn job_cmd(raw: &str) -> String {
+    let raw = raw.trim();
+    match raw.split_once('\n') {
+        Some((first, rest)) if first.starts_with("cd ") && first.trim_end().ends_with(" || exit 1") => rest.trim().to_string(),
+        _ => raw.to_string(),
+    }
+}
+
+/// One of bise's own bash wrappers for agent `dir`: the turn's command,
+/// a bg job's runner or its watch loop (`/bin/sh <agent>/run/bend-sh-*.sh`
+/// and its forks, which keep its command line).
+fn bise_wrapper(args: &str, dir: &str) -> bool {
+    args.contains(&format!("/agents/{dir}/run/bend-sh-"))
+}
+
 fn descendants(from: &[u32], kids: &BTreeMap<u32, Vec<u32>>) -> BTreeSet<u32> {
     let mut out = BTreeSet::new();
     let mut todo: Vec<u32> = from.to_vec();
@@ -271,8 +289,18 @@ pub fn trees(rows: &[Row], hub: &str, agents: &[AgentIn], me: u32) -> Vec<Tree> 
         let dirs: BTreeSet<String> = [a.dir.clone()].into();
         let want = crate::procs::Want::Dirs { dirs: &dirs, before: u64::MAX };
         let mine: BTreeSet<u32> = crate::procs::select(&peer, hub, &want, &a.sessions, me).into_iter().map(|p| p.pid).collect();
-        // the REPLs (their sessions' leaders) and what they run now
-        let repls: Vec<u32> = a.sessions.iter().copied().filter(|s| by_pid.get(s).is_some_and(|r| !r.zombie)).collect();
+        // the REPLs (their sessions' leaders, and the hub's own children:
+        // a REPL just spawned whose session isn't in repl.sids yet) and
+        // what they run now
+        let repls: Vec<u32> = a
+            .sessions
+            .iter()
+            .copied()
+            .chain(mine.iter().copied().filter(|p| by_pid.get(p).is_some_and(|r| r.ppid == me)))
+            .filter(|s| by_pid.get(s).is_some_and(|r| !r.zombie))
+            .collect::<BTreeSet<u32>>()
+            .into_iter()
+            .collect();
         let mut out_of_list = descendants(&repls, &kids);
         let mut taken: BTreeSet<u32> = BTreeSet::new();
         for j in &a.bg {
@@ -292,8 +320,13 @@ pub fn trees(rows: &[Row], hub: &str, agents: &[AgentIn], me: u32) -> Vec<Tree> 
             let mut pids: Vec<u32> = all.iter().copied().filter(|p| !taken.contains(p)).collect();
             pids.sort_by_key(|p| (*p != j.pgid, *p));
             taken.extend(pids.iter().copied());
-            out.push(Tree { agent: a.name.clone(), dir: a.dir.clone(), kind: ProcKind::Bg { n: j.n }, root: j.pgid, pids, cmd: j.cmd.trim().to_string() });
+            out.push(Tree { agent: a.name.clone(), dir: a.dir.clone(), kind: ProcKind::Bg { n: j.n }, root: j.pgid, pids, cmd: job_cmd(&j.cmd) });
         }
+        // bise's wrappers left after a handoff (a runner, its watch loop
+        // and its sleeps) are bise's, never the agent's: whatever its
+        // bg job's group or the session they sit in
+        let wrappers: Vec<u32> = rows.iter().filter(|r| !r.zombie && !taken.contains(&r.pid) && bise_wrapper(&r.args, &a.dir)).map(|r| r.pid).collect();
+        out_of_list.extend(descendants(&wrappers, &kids).into_iter().filter(|p| !taken.contains(p)));
         let left: BTreeSet<u32> = mine.iter().copied().filter(|p| !out_of_list.contains(p) && !taken.contains(p) && by_pid.get(p).is_some_and(|r| !r.zombie)).collect();
         for root in left.iter().copied().filter(|p| by_pid.get(p).is_some_and(|r| !left.contains(&r.ppid))) {
             let mut pids: Vec<u32> = descendants(&[root], &kids).into_iter().filter(|p| left.contains(p)).collect();

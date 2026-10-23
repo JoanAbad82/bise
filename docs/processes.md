@@ -40,6 +40,11 @@ Not listed: the REPL and what runs under it (the turn's own command, which
 the thread shows; MCP servers, the sandbox), bise's own job runner and its
 watch loop, the user's processes, the hub. Every bash command runs in a
 slot: one still under its REPL's wrapper is the turn's, not a bg job yet.
+A REPL is known by its session (`repl.sids`) or, just spawned, as the
+hub's own child; bise's wrappers by their script
+(`<agent>/run/bend-sh-*.sh`) and everything under them that is not a bg
+job's group. A bg job's `cmd` is the agent's command, without the
+`cd '<dir>' || exit 1` guard the runtime puts first.
 
 ## Who owns it
 

@@ -214,3 +214,38 @@ fn counts_are_the_running_ones_and_their_lowest_port() {
     let c = counts(&[proc_row("perf", "bg1.1", &[8000]), proc_row("perf", "p9.1", &[5173, 9000]), proc_row("perf", "bg2.1", &[]), stopped]);
     assert_eq!(c, [("perf".to_string(), (3, Some(5173)))].into());
 }
+
+#[test]
+fn a_bg_jobs_command_has_no_workdir_guard() {
+    assert_eq!(job_cmd("cd '/private/tmp/ws' || exit 1\npython3 -u -m http.server 8000\n"), "python3 -u -m http.server 8000");
+    assert_eq!(job_cmd("  pnpm dev\n"), "pnpm dev");
+    assert_eq!(job_cmd("cd sub && make\nmake test"), "cd sub && make\nmake test", "an agent's own cd stays");
+    assert_eq!(job_cmd("cd '/w' || exit 1\ncat <<EOF\nx\nEOF"), "cat <<EOF\nx\nEOF");
+}
+
+/// The shapes a real throwaway hub showed (procs-tui m_38502): a REPL
+/// just spawned whose session isn't in repl.sids yet (the hub's child),
+/// and a bg job's runner (the turn's wrapper, reparented to 1, in the
+/// REPL's group) with its watch loop and its sleep.
+#[test]
+fn a_new_repl_and_bises_wrappers_are_never_detached() {
+    let t = Some("aa.perf.1");
+    let rows = vec![
+        r(1, 0, 1, 1, None, "launchd"),
+        r(100, 1, 100, 100, None, "bise sbd"),
+        r(101, 100, 101, 101, t, "/w/harness/repl-live"),
+        r(190, 1, 101, 101, t, "/bin/sh /h/st/agents/perf/run/bend-sh-60287-1.sh"),
+        r(200, 190, 200, 101, t, "/bin/sh /h/st/agents/perf/tmp/bg/0.cmd"),
+        r(201, 200, 200, 101, t, "python3 -u -m http.server 8000"),
+        r(202, 190, 202, 202, t, "/bin/sh /h/st/agents/perf/run/bend-sh-60287-1.sh"),
+        r(203, 202, 202, 202, t, "sleep 2"),
+        r(300, 1, 300, 300, t, "sh -c while true; do date; sleep 2; done"),
+    ];
+    let got = trees(&rows, HUB, &[agent("perf", &[], &[(0, 200, "cd '/h/ws' || exit 1\npython3 -u -m http.server 8000")])], 100);
+    assert_eq!(
+        kinds(&got),
+        vec![("perf".into(), ProcKind::Bg { n: 0 }, 200, vec![200, 201]), ("perf".into(), ProcKind::Detached, 300, vec![300])],
+        "not the REPL (no sids yet), not the runner nor its watch loop in a group of its own"
+    );
+    assert_eq!(got[0].cmd, "python3 -u -m http.server 8000");
+}
