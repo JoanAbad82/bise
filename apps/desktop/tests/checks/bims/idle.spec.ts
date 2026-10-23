@@ -1,6 +1,6 @@
 // bims/idle · what the office costs when nothing changes (his Mac, main m_28475: two GPU helpers at
 // ~29% CPU for an hour while he worked elsewhere). On FakeCore rows, off screen. Passes when, over
-// 10 s each:
+// 3 s each:
 //   (1) the office open on a still world (asleep, failed, blocked, done, stopped, main idle) draws
 //       0 WebGL frames; its only motion is the sleepers' z's (a CSS loop, 7.5 fps at most);
 //   (2) the office closed: no renderer, no frame, no animation of the bims' left running;
@@ -16,7 +16,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { SHOTS, open, probe, setHidden, settle, showOffice, sleep } from './world';
 
-const IDLE_MS = 10_000;
+// 3 s a window, both tests under 30 s (Gabriel's pick on page e2e-desktop): at the display's
+// 60 fps a drawing office shows ~180 frames there, at the loop's 8 fps ~24: 0 still says it
+const IDLE_MS = 3_000;
 
 /** asleep, failed, blocked, done, stopped, main idle: no pose loops (model.ts Motion) */
 const STILL = snap([
@@ -62,13 +64,13 @@ test.afterAll(() => {
 
 test.describe.configure({ timeout: 180_000 });
 
-test('(1)(2) a still office draws nothing for 10 s; closed, nothing of the bims runs', async () => {
+test('(1)(2) a still office draws nothing for 3 s; closed, nothing of the bims runs', async () => {
   const { s } = await open(STILL);
   try {
     found['closed, before any open'] = await running(s);
     await showOffice(s);
     await settle(s);
-    expect(await framesIn(s, IDLE_MS), 'a still office: 0 WebGL frames in 10 s').toBe(0);
+    expect(await framesIn(s, IDLE_MS), 'a still office: 0 WebGL frames in 3 s').toBe(0);
     found['open, still world'] = await running(s);
     const mine = found['open, still world'].filter((a) => a.bims && !a.paused);
     expect(mine.every((a) => a.name === 'bims-z'), `the office's only motion is the z's: ${JSON.stringify(mine)}`).toBe(true);
@@ -95,7 +97,7 @@ test('(3)(4) typing bims loop at ~8 fps; hidden, 0 frames and the z\'s paused', 
 
     await setHidden(s.page, true);
     await sleep(500);
-    expect(await framesIn(s, IDLE_MS), 'hidden: 0 frames in 10 s').toBe(0);
+    expect(await framesIn(s, IDLE_MS), 'hidden: 0 frames in 3 s').toBe(0);
     const z = (await running(s)).filter((a) => a.bims && a.name === 'bims-z');
     expect(z.every((a) => a.paused), "hidden: the z's paused").toBe(true);
     found['open, hidden'] = await running(s);

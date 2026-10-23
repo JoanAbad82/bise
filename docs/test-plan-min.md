@@ -12,7 +12,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 
 | | KEEP | TRANSFORM | DELETE | total |
 |---|---|---|---|---|
-| Desktop Playwright specs (apps/desktop/tests/checks) | 29 | 257 | 57 | 343 |
+| Desktop Playwright specs (apps/desktop/tests/checks) | 22 | 257 | 64 | 343 |
 | TUI tmux tests (tests/*_tmux.py) | 12 | 68 | 3 | 83 |
 | Python e2e (tests/*_e2e.py) | 31 | 43 | 2 | 76 |
 | as-he-does rows (dev/plugins/ambient-qa/as-he-does) | 6 | 0 | 62 | 68 |
@@ -52,7 +52,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `app/clicks` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `app/cmd-hints` | TRANSFORM | renderer on a scripted core: no process seam |
 | `app/confirm-bar` | TRANSFORM | renderer on a scripted core: no process seam |
-| `app/core-line` | KEEP | a real core process panics and main restarts it (app↔core lifecycle) |
+| `app/core-line` | DELETE | a real core process panics and main restarts it (app↔core lifecycle); removed on Gabriel's pick (page e2e-desktop, 23 oct): covered by native/crash restarts the core the same way; core/report.test.ts; no test checks any more: a real Rust panic (exit 101) restarted by main; native/crash keeps the signal case |
 | `app/crumb-nav` | TRANSFORM | renderer on a scripted core: no process seam |
 | `app/delight-marks` | TRANSFORM | renderer on a scripted core: no process seam |
 | `app/design-base` | DELETE | visual only: a sign-off shot or one pixel fix, no logic (showme and the post-land shots see it) |
@@ -225,18 +225,18 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `native/setup-rows` | TRANSFORM | renderer on a scripted core: no process seam |
 | `native/setup` | TRANSFORM | renderer on a scripted core: no process seam |
 | `native/theme-source` | TRANSFORM | renderer on a scripted core: no process seam |
-| `native/update-moments` | KEEP | install at quit / quiet moment / his click (update path) |
+| `native/update-moments` | DELETE | install at quit / quiet moment / his click (update path); removed on Gabriel's pick (page e2e-desktop, 23 oct): covered by update/moment, plan, swap, tryswap .test.ts; no test checks any more: the install at quit in the packed app |
 | `native/update` | KEEP | a fake newer version on the update feed: download, install, relaunch (update path) |
 | `native/vm/vm-pass` | KEEP | the packaged, signed app shown with real keys in a macOS VM (release check) |
-| `pages/open` | KEEP | a page from the hub's page server framed in the window (real HTTP + CSP) |
+| `pages/open` | DELETE | a page from the hub's page server framed in the window (real HTTP + CSP); removed on Gabriel's pick (page e2e-desktop, 23 oct): covered by app/pages.test.ts; no test checks any more: the real HTTP page framed under the real CSP |
 | `pearl/frames` | DELETE | dup of pearl/still |
-| `pearl/idle` | KEEP | GPU/CPU cost of the pearl when nobody looks, measured on the real processes |
+| `pearl/idle` | DELETE | GPU/CPU cost of the pearl when nobody looks, measured on the real processes; removed on Gabriel's pick (page e2e-desktop, 23 oct): covered by pearl/away.test.ts, LivePearl.test.tsx; no test checks any more: GPU/CPU measured on the real processes |
 | `pearl/still` | TRANSFORM | renderer on a scripted core: no process seam |
 | `review/branch-real` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `review/feature-drop` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `review/feature-refused` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `review/feature-view` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
-| `review/feature` | KEEP | merge on his click: window → core → hub → git merge |
+| `review/feature` | DELETE | merge on his click: window → core → hub → git merge; removed on Gabriel's pick (page e2e-desktop, 23 oct): covered by review/feature.test.tsx, branch.test.ts; no test checks any more: the real git merge from his click through core and hub |
 | `review/prs-list` | TRANSFORM | renderer on a scripted core: no process seam |
 | `review/prs` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `review/quote-lines` | TRANSFORM | renderer on a scripted core: no process seam |
@@ -290,7 +290,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `thread/commands` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `thread/composer-sources` | TRANSFORM | renderer on a scripted core: no process seam |
 | `thread/computer-live` | TRANSFORM | renderer on a scripted core: no process seam |
-| `thread/computer-use` | KEEP | computer use rows on the real core; unsure whether it hits the real socket: KEEP with a note |
+| `thread/computer-use` | DELETE | computer use rows on the real core; unsure whether it hits the real socket: KEEP with a note; removed on Gabriel's pick (page e2e-desktop, 23 oct): covered by thread/ComputerLine.test.tsx; no test checks any more: the real computer-use socket |
 | `thread/ctrl-c-stop` | TRANSFORM | renderer on a scripted core: no process seam |
 | `thread/delivery` | TRANSFORM | renderer on a scripted core: no process seam |
 | `thread/demo-tour` | TRANSFORM | renderer on a scripted core: no process seam |
@@ -365,7 +365,15 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `voice/talk-still` | TRANSFORM | renderer on a scripted core: no process seam |
 | `voice/voice-crops` | DELETE | visual only: a sign-off shot or one pixel fix, no logic (showme and the post-land shots see it) |
 | `voice/voice-mode` | TRANSFORM | renderer on a scripted core: no process seam |
-| `voice/voice-real` | KEEP | voice mode on the real core: audio in/out across app, helper and core |
+| `voice/voice-real` | DELETE | voice mode on the real core: audio in/out across app, helper and core; removed on Gabriel's pick (page e2e-desktop, 23 oct): covered by voicemode.test.tsx, tests/tui_voice_tmux.py; no test checks any more: audio across helper and core in the window |
+
+- `pages/open`: a page published by the hub shows as '↗ <title>' v1 then v2 in the thread and opens its URL on click (removed on Gabriel's pick, page e2e-desktop, 23 oct; no test checks the real HTTP page framed under the real CSP any more) → `apps/desktop/src/app/pages.test.ts` (unit). — covered by apps/desktop src/app/pages.test.ts
+- `pearl/idle`: the live pearl draws while seen, 0 frames blurred or hidden (removed on Gabriel's pick, page e2e-desktop, 23 oct; no test measures GPU/CPU on the real processes any more) → `apps/desktop/src/pearl/*.test.ts` (unit). — covered by apps/desktop src/pearl/away.test.ts + pearl/LivePearl.test.tsx
+- `review/feature`: a feature with 2 agents shows, is tried, ⌘D lists checkout's branch and its review, a merge only on his click (removed on Gabriel's pick, page e2e-desktop, 23 oct; no test checks the real git merge from his click through core and hub any more) → `apps/desktop/src/review/*.test.ts*` (unit). — covered by apps/desktop src/review/feature.test.tsx + review/branch.test.ts
+- `voice/voice-real`: voice mode on the real core, ctrl+r twice on an agent (removed on Gabriel's pick, page e2e-desktop, 23 oct; no test checks audio across helper and core in the window any more) → `apps/desktop/src/voicemode/*.test.ts` (unit) + tests/tui_voice_tmux.py. — covered by apps/desktop src/voicemode/voicemode.test.tsx + tests/tui_voice_tmux.py
+- `thread/computer-use`: the computer-use live line, take, ⏎ gives it back, on the real core (removed on Gabriel's pick, page e2e-desktop, 23 oct; no test checks the real computer-use socket any more) → `apps/desktop/src/thread/ComputerLine.test.tsx` (unit). — covered by apps/desktop src/thread/ComputerLine.test.tsx
+- `native/update-moments`: the update installs at quit, at a quiet moment or on his click, stable and beta, paused (removed on Gabriel's pick, page e2e-desktop, 23 oct; no test checks the install at quit in the packed app any more) → `apps/desktop/src/main/update/*.test.ts` (unit). — covered by apps/desktop src/main/update/moment.test.ts + plan.test.ts + swap.test.ts + tryswap.test.ts
+- `inbox/answer-everywhere` (its 'hub stopped' case): his answer on a card whose hub is stopped and restarts closes it everywhere (removed on Gabriel's pick, page e2e-desktop, 23 oct; no test answers a card while its hub restarts any more; this case found the dropped-pick bug of 22 oct) → `apps/desktop/src/inbox/InboxCard.test.tsx` (unit). — covered by apps/desktop src/inbox/InboxCard.test.tsx (a card unmounted while its pick shows still sends it, once)
 
 ### TUI tmux tests (tests/*_tmux.py)
 

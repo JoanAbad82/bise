@@ -355,7 +355,7 @@ async function runChecks(argv) {
   // when a spec uses it, again before each fresh spec, down at the end, by real.sh's rules
   // (real.json); his keys never reach the run (2026-10-20: no world up, ~86 checks red in ms)
   const real = new RealWorld(specs);
-  const baseEnv = real.needed ? scrubKeys(process.env, real.rules.keys) : process.env;
+  const baseEnv = real.needed ? scrubKeys(process.env, real.rules.keys) : { ...process.env };
   // one playwright run per batch of specs: the end is checked between batches, never inside one
   const runBatch = (cov, specsOf, out) => {
     const [bin, args] = heavyArgv([playwright, 'test', '-c', path.join(here, '..', 'playwright.config.ts'), '--reporter=list,json', ...specsOf.map((s) => path.join('tests', s))]);
@@ -403,7 +403,8 @@ async function runChecks(argv) {
  * The ambient-qa world the real-core checks read (dev/plugins/ambient-qa/qa.py world up|down, as
  * tests/checks/real.sh: 2 projects, $QA_BISE when set: the nightly hands this tree's own,
  * scripts/tree_bise.sh). Needed only when one of `specs` uses it. A world that doesn't come up is
- * said once here; its checks then fail on their own ('no world up'), never hidden.
+ * said once here; its checks then fail on their own ('no world up'), at once (BISE_CHECKS_NO_WORLD
+ * in `env`, read by world.ts), never hidden.
  */
 class RealWorld {
   constructor(specs) {
@@ -422,8 +423,12 @@ class RealWorld {
     const t0 = Date.now();
     const r = this.qa(['up', '--projects', '2', ...(env.QA_BISE ? ['--bise', env.QA_BISE] : [])], env);
     const s = Math.round((Date.now() - t0) / 1000);
+    // a world that didn't come up: its checks fail at once on BISE_CHECKS_NO_WORLD (world.ts), never
+    // each one waiting out its qa.py call and its timeout (d39283a86's run: 24 reds in 4 h 40)
+    delete env.BISE_CHECKS_NO_WORLD;
     if (r.status === 0) console.log(`covmap checks: the real-core world is up (${s} s)`);
     else {
+      env.BISE_CHECKS_NO_WORLD = `qa.py world up exit ${r.status}`;
       const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split(os.EOL).slice(-20).join(os.EOL);
       console.log(`covmap checks: the real-core world didn't come up (exit ${r.status}, ${s} s): its checks fail 'no world up'`);
       console.log(tail);

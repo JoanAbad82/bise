@@ -4,5 +4,4 @@
 # lowers it in the same commit, at 0 its line goes. Only a change that adds keys may raise a count, by
 # literals the file already had. 'lint shape': the literal has a word's shape but is not that word
 # (a description, fixture data, a hub label); the others name the area that moves it. tests/word_lint.py.
-1 apps/desktop/tests/checks/thread/computer-use.spec.ts  # lint shape: 'driving again' is a test's words
 1 tests/tui_voice_tmux.py  # lint shape: the voice line, not thread.wake_ended

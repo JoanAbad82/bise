@@ -1,10 +1,9 @@
-// composer/dictation, 20+ takes back to back on the REAL core (ambient-lead m_22122, m_22131): his
+// composer/dictation, every kind of take back to back on the REAL core (ambient-lead m_22122, m_22131): his
 // ctrl+r dictation fails about one take in two on ad753852 and his words are lost. The new app on a
 // throwaway world's real core (tests/checks/real.sh), the core's fake voice (BISE_AMBIENT_FAKE_VOICE:
-// the words of a file, read and removed at each dictation's start), real keys only. Two launches:
-// the fake listener answering at once, then answering its flush after BISE_VOICE_FAKE_HEARD_MS
-// (default 3000 ms, slower than the core's FINAL_WAIT 1.5 s, like a batch listener).
-// The takes: a tap on / tap off, a hold (push-to-talk), a tap with ctrl let go late, a stop then a
+// the words of a file, read and removed at each dictation's start), real keys only. One launch,
+// the fake listener answering at once (the slow listener's flush after BISE_VOICE_FAKE_HEARD_MS is
+// the core's own tests'; run(heardMs) still takes it by hand). One take of each kind: a tap on / tap off, a hold (push-to-talk), a tap with ctrl let go late, a stop then a
 // new take at once (during the previous take's flush), a take during a fn talk. Passes when every
 // take's words reach the field, or (a take during a fn talk) the field says why on screen.
 // Each take's mic states, dictation events (id, final, cancelled, error, word count) and the field's
@@ -51,7 +50,6 @@ async function whyWithin(page: Page, t0: number, limitMs: number): Promise<Why> 
 const talk = async (p: Page, cmd: 'talk_start' | 'talk_cancel'): Promise<void> => {
   await p.evaluate((c) => { (window as unknown as { bise: { core: { send: (x: unknown) => void } } }).bise.core.send({ cmd: c }); }, cmd);
 };
-const SLOW_MS = Number(process.env['BISE_VOICE_FAKE_HEARD_MS'] ?? '3000');
 
 type Keys = {
   page: Page;
@@ -172,32 +170,6 @@ function takes(n0: number): Take[] {
       return why;
     } };
   };
-  // a fn talk whose talk_end never comes (his core.log: 'talk_start while a talk runs (listening):
-  // ignored'): the takes after it, until a talk_cancel at the end of the last one
-  const stuckTalk = (i: number, last: boolean): Take => {
-    const w = next();
-    return { name: `a take ${String(i)} after a fn talk whose talk_end never came`, words: [w], ends: i === 1, keys: async ({ page, words }) => {
-      if (i === 1) {
-        // the talk hears words, so the take that ends it must send them to main
-        words(`talk${String(n0)} kilo lima mike`);
-        await talk(page, 'talk_start');
-        await page.waitForTimeout(300);
-        await talk(page, 'talk_start');
-        await page.waitForTimeout(300);
-      }
-      words(w);
-      const t0 = Date.now();
-      await tap(page);
-      const why = await whyWithin(page, t0, 900);
-      await page.waitForTimeout(Math.max(0, 900 - (Date.now() - t0)));
-      if ((await page.locator(S.mic).getAttribute('data-state')) === 'recording') await tap(page);
-      if (last) {
-        await page.waitForTimeout(600);
-        await talk(page, 'talk_cancel');
-      }
-      return why;
-    } };
-  };
   // a fn talk through the capsule whose talk view the spotlight replaces before it ends (fn held:
   // talk_start, fn space, fn up; or fn fn hands-free, fn space, a tap), then a take: the talk
   // ended once in the core, the take gets the mic
@@ -246,8 +218,9 @@ function takes(n0: number): Take[] {
       return offer !== null && offer.includes(common.try_again) ? undefined : { ms: null, where: "no 'try again' line", text: offer ?? '' };
     } };
   };
-  t.push(tapTake(1200), holdTake(1200), tapTake(600), holdTake(700), lateCtrl(500), lateCtrl(900), restart(500), restart(1000), tapTake(2000), holdTake(2500), duringTalk(),
-    stuckTalk(1, false), stuckTalk(2, false), stuckTalk(3, true), tapTake(1200), capsuleTalk('held'), capsuleTalk('double'), tapTake(1200), retryTake(), tapTake(1200));
+  // one take of each kind, under 30 s in all (Gabriel's pick on page e2e-desktop): the repeats
+  // and the stuck-talk run are the core's dictation tests' (main/core/dictation.test.ts)
+  t.push(tapTake(1200), holdTake(1200), lateCtrl(500), restart(500), duringTalk(), capsuleTalk('held'), retryTake());
   return t;
 }
 
@@ -356,11 +329,9 @@ async function run(heardMs: number | null, n0: number): Promise<TakeOut[]> {
   return out;
 }
 
-test('composer/dictation (real core): 20+ takes back to back, every take’s words reach the field', async () => {
-  test.setTimeout(10 * 60_000);
-  const fast = await run(null, 1);
-  const slow = await run(SLOW_MS, 30);
-  const all = [...fast.map((t) => ({ listener: 'at once', ...t })), ...slow.map((t) => ({ listener: `${String(SLOW_MS)} ms`, ...t }))];
+test('composer/dictation (real core): every kind of take back to back, every take’s words reach the field', async () => {
+  test.setTimeout(90_000);
+  const all = (await run(null, 1)).map((t) => ({ listener: 'at once', ...t }));
   const file = process.env['DICTATION_TAKES_OUT'] ?? test.info().outputPath('takes.json');
   writeFileSync(file, JSON.stringify(all, null, 1));
   const lost = all.filter((t) => !t.ok).map((t) => `#${String(t.n)} (${t.listener}) ${t.name}: landed ${JSON.stringify(t.landed)}, field '${t.field}', note '${t.note ?? ''}', mic ${t.mic.join(' ')}`);

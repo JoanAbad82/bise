@@ -42,9 +42,12 @@ const parse = (out: string): World => JSON.parse(out.slice(out.indexOf('{'))) as
  * outside ~/.bise/gate, a dead hub, or a world whose bise build is gone.
  */
 export function realWorld(): World {
+  // the runner said the world didn't come up (covmap.mjs RealWorld): red at once, no wait
+  const none = process.env['BISE_CHECKS_NO_WORLD'];
+  if (none) throw new Error(`no world up: ${none} (covmap checks said why)`);
   let w: World;
   try {
-    w = parse(qa(['world', 'state'], 60_000));
+    w = parse(qa(['world', 'state'], 15_000));
   } catch (e) {
     throw new Error(`no world up: run the real-core checks through tests/checks/real.sh (${String(e).split('\n')[0] ?? ''})`);
   }

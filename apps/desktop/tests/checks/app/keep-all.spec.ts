@@ -1,10 +1,10 @@
 // app/keep-all · his ask (ambient-lead m_11756, m_11994): nothing he typed or opened is lost across
-// (1) a renderer reload, (2) a core restart, (3) a quit + relaunch on the same userData (the update
-// swap), on EVERY surface amb-win's keep wires (d666c9a3), not only perf's thread (app/keep).
+// a quit + relaunch on the same userData (the update swap; a reload or a core restart reads the same
+// keep files: app/keep.test.ts, store/keepOpen.test.ts), on EVERY surface amb-win's keep wires (d666c9a3), not only perf's thread (app/keep).
 // qa-type's pass, on the scripted core (fixture world: acme's main, perf, old-fix; its cards) and
-// the scripted helper, real keys and clicks only. One test per surface group, each through the
-// three cycles on one userData; after each, the relaunch opens with no start route (the kept one).
-// Passes when, after each cycle:
+// the scripted helper, real keys and clicks only. One test per surface group, each through one
+// relaunch on one userData, under 30 s (Gabriel's pick on page e2e-desktop); after each, the relaunch opens with no start route (the kept one).
+// Passes when, after the relaunch:
 //   - threads: two targets' drafts (acme main, perf), ⌘F's needle, a tools row opened and the
 //     terminal panel shown are back; his next key lands after his words (caret at the end);
 //   - agents: Tune open on perf with a half-typed rename and model id, then the new-agent sheet's
@@ -26,7 +26,7 @@ const FAKE_KEY = 'sk-qa-NOT-A-REAL-KEY-7f3a9c1e5b';
 /** shapes a secret would have in a keep file */
 const SECRETISH = /sk-[A-Za-z0-9-]{12,}|api[_-]?key|bearer\s+[A-Za-z0-9]/i;
 
-type Cycle = 'after a reload' | 'after a core restart' | 'after a relaunch';
+type Cycle = 'after a relaunch';
 
 /** The keep files of a userData, whole. */
 function keepFiles(userData: string): Record<string, string> {
@@ -52,7 +52,8 @@ async function caretAtEnd(page: Page, field: ReturnType<Page['locator']>, words:
 }
 
 /**
- * The three cycles on one userData: reload, core exit + restart, quit + relaunch (no start route).
+ * One cycle on one userData: quit + relaunch (no start route), the one that loses the renderer's
+ * memory and the core both; a reload and a core restart read the same keep files (app/keep.test.ts).
  * `check` reads everything back; returns the last session, still open.
  */
 async function cycles(o: { route: string; helper?: boolean; setup: (s: Session, h?: FakeHelper) => Promise<void>; check: (s: Session, c: Cycle, h?: FakeHelper) => Promise<void> }): Promise<{ s: Session; userData: string; dispose: () => Promise<void> }> {
@@ -63,15 +64,6 @@ async function cycles(o: { route: string; helper?: boolean; setup: (s: Session, 
   try {
     await o.setup(s, helper);
     await s.page.waitForTimeout(700); // past the keep's 300 ms write
-    await s.page.reload();
-    await o.check(s, 'after a reload', helper);
-    await core.exit(1);
-    // the stop line can come and go between two polls when the core restarts at once: not counted
-    const saw = await s.page.getByTestId('app.core').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
-    test.info().annotations.push({ type: 'core', description: `the stop line seen: ${String(saw)}` });
-    await expect(s.page.getByTestId('app.core'), 'and come back').toHaveCount(0, { timeout: 20_000 });
-    await o.check(s, 'after a core restart', helper);
-    await s.page.waitForTimeout(400);
     const gone = new Promise<void>((r) => s.app.process().once('exit', () => { r(); }));
     await s.app.evaluate(({ app }) => { app.quit(); }).catch(() => undefined);
     await Promise.race([gone, new Promise<void>((r) => setTimeout(r, 10_000))]);

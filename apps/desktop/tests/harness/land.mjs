@@ -14,14 +14,11 @@ import { fileURLToPath } from 'node:url';
 
 export const LAND = [
   'checks/app/keep-all.spec.ts',
-  'checks/app/core-line.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',
   // an app from the DMG or Downloads asks once to move to Applications; 'Not now' is kept for its
   // build; settings › update moves it (apple-signing ag-move; the alert and the move stubbed)
   'checks/native/move-apps.spec.ts',
-  // the live pearl draws at the display's rate seen, 0 frames blurred or hidden (pearl-idle, bims-fix m_28756)
-  'checks/pearl/idle.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));

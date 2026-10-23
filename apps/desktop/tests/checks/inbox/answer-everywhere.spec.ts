@@ -2,16 +2,16 @@
 // count (inbox-sync: the card stayed open in the project's thread, its [1] stayed next to the
 // project and next to the inbox). Owner: amb-home.
 // The new app on the REAL core over the throwaway world (../world.ts; tests/checks/real.sh runs it):
-// two projects. He answers shop's gift-ui card on the inbox screen, then opens shop. Passes when the
-// hub closed it and, there and after the window's own 60 s hold on what he answered is past
-// (store/acted.ts ACTED_STALE_MS), no view draws it: not in shop's thread, not on the inbox screen,
+// two projects. He visits shop's thread, answers its card on the inbox screen, then opens shop again.
+// Passes when the hub closed it and no view draws it: not in shop's thread, not on the inbox screen,
 // and the sidebar's counts are the hubs' own (shop's pink count = shop's open cards, the inbox's = every
-// hub's, bise's notifications ask aside).
+// hub's, bise's notifications ask aside). One case, under 30 s (Gabriel's pick on page e2e-desktop):
+// the window's 60 s hold on what he answered (store/acted.ts ACTED_STALE_MS) is acted.test.ts's, the
+// hub running or stopped is the same read of its cards (openCards), so neither is waited for here.
 import { test, expect, type Session } from '../../harness';
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { hubOf, hubState, launchOn, realWorld, worldEnv, type World } from '../world';
+import { hubOf, hubState, launchOn, realWorld, type World } from '../world';
 
 type HubCard = { id: number; project?: string; question?: string; text?: string };
 
@@ -65,12 +65,12 @@ const settled = (r: Record<string, unknown>): boolean =>
   r['strip'] === 0 && r['block'] === 0 && r['shopCount'] === r['shopTruth'] && r['inboxCount'] === r['inboxTruth'];
 
 /** What the case does before he answers. */
-type Before = 'none' | 'visit' | 'stopped';
+type Before = 'none' | 'visit';
 
 /**
  * He answers `name`'s card asking `question` (its option `n`) on the inbox screen, then opens
- * `name`'s thread from the sidebar: every surface reads the hubs, at once and 65 s on.
- * `visit`: he opened that project's thread first; `stopped`: its hub is stopped before the window opens.
+ * `name`'s thread from the sidebar: every surface reads the hubs.
+ * `visit`: he opened that project's thread first.
  */
 async function answerThenOpen(name: string, question: string, n: number, before: Before): Promise<void> {
   const w = realWorld();
@@ -81,9 +81,6 @@ async function answerThenOpen(name: string, question: string, n: number, before:
   const key = `${project}-${String(card?.id ?? 0)}`;
   // the inbox screen's waiting row (inbox/past.ts waitKey)
   const wkey = `w:${project}/${String(card?.id ?? 0)}`;
-  if (before === 'stopped') {
-    execFileSync(w.bise, ['switchboard', '--stop'], { cwd: hubOf(w, name).ws, env: { ...process.env, ...worldEnv(w) }, timeout: 30_000, stdio: 'ignore' });
-  }
 
   const s = await launchOn(w, before === 'visit' ? `project/${project}` : 'inbox/all', before === 'visit' ? '[data-testid="composer.field"]' : '[data-testid="inbox.screen"]');
   try {
@@ -104,7 +101,6 @@ async function answerThenOpen(name: string, question: string, n: number, before:
     const open = page.locator('[data-testid^="inbox.block.open."]', { hasText: question });
     await expect(open, 'the card opens to answer').toBeVisible({ timeout: 10_000 });
     await open.locator(`[data-testid$=".opt.${String(n)}"]`).first().click();
-    const answeredAt = Date.now();
     await expect.poll(async () => (await openCards(w, name)).some((c) => c.id === card?.id), { message: 'the hub closed it', timeout: 30_000 }).toBe(false);
     await expect(row, 'gone from the inbox screen').toHaveCount(0, { timeout: 10_000 });
 
@@ -117,12 +113,7 @@ async function answerThenOpen(name: string, question: string, n: number, before:
     if (ok !== '') throw new Error(`${ok}\nlast read: ${JSON.stringify(last)}\n${await why(s, w)}`);
     await page.screenshot({ path: test.info().outputPath(`${name}-${before}-after.png`) });
 
-    // 3. past the window's own hold on his answer: the rows alone say it
-    const left = answeredAt + 65_000 - Date.now();
-    if (left > 0) await page.waitForTimeout(left);
-    const late = await surfaces(s, w, name, project, key, ask);
-    await page.screenshot({ path: test.info().outputPath(`${name}-${before}-late.png`) });
-    if (!settled(late)) throw new Error(`every surface reads the hubs, 65 s on: ${JSON.stringify(late)}\n${await why(s, w)}`);
+    // 3. back on the inbox screen: not there again
     await page.locator('[data-testid="app.sidebar.inbox"]').click();
     await expect(page.locator(`[data-testid="inbox.row.${wkey}"]`), 'not back on the inbox screen').toHaveCount(0);
   } finally {
@@ -130,19 +121,7 @@ async function answerThenOpen(name: string, question: string, n: number, before:
   }
 }
 
-test.describe.configure({ mode: 'serial' });
-
-test('inbox/answer-everywhere: from the inbox screen, its hub running', async () => {
-  test.setTimeout(300_000);
-  await answerThenOpen('shop', 'gift cards', 2, 'none');
-});
-
 test('inbox/answer-everywhere: from the inbox screen after a visit to its thread', async () => {
-  test.setTimeout(300_000);
+  test.setTimeout(60_000);
   await answerThenOpen('shop', 'merge checkout into main', 2, 'visit');
-});
-
-test('inbox/answer-everywhere: from the inbox screen, its hub stopped', async () => {
-  test.setTimeout(300_000);
-  await answerThenOpen('telemetry', 'which window for the p99 alert', 1, 'stopped');
 });
