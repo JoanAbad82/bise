@@ -44,7 +44,9 @@ A REPL is known by its session (`repl.sids`) or, just spawned, as the
 hub's own child; bise's wrappers by their script
 (`<agent>/run/bend-sh-*.sh`) and everything under them that is not a bg
 job's group. A bg job's `cmd` is the agent's command, without the
-`cd '<dir>' || exit 1` guard the runtime puts first.
+`cd '<dir>' || exit 1` guard the runtime puts first. A detached one's is
+its root's argv (`bise_peer::table::argv`) joined with shell quoting
+(`sh -c 'while true; do date; done'`), else `ps`'s line.
 
 ## Who owns it
 

@@ -249,3 +249,12 @@ fn a_new_repl_and_bises_wrappers_are_never_detached() {
     );
     assert_eq!(got[0].cmd, "python3 -u -m http.server 8000");
 }
+
+#[test]
+fn a_detached_command_keeps_its_quoting() {
+    let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    assert_eq!(shell_join(&a(&["sh", "-c", "while true; do date; sleep 2; done"])), "sh -c 'while true; do date; sleep 2; done'");
+    assert_eq!(shell_join(&a(&["python3", "-u", "-m", "http.server", "8000", "--bind", "127.0.0.1"])), "python3 -u -m http.server 8000 --bind 127.0.0.1");
+    assert_eq!(shell_join(&a(&["echo", "it's", ""])), r"echo 'it'\''s' ''");
+    assert_eq!(shell_join(&a(&["node", "/w/my app/x.js", "$HOME"])), "node '/w/my app/x.js' '$HOME'");
+}

@@ -250,6 +250,18 @@ pub fn job_cmd(raw: &str) -> String {
     }
 }
 
+/// A detached process's command as a shell would read it back: its argv
+/// joined, an argument with a space or a shell character in single
+/// quotes (`sh -c 'while true; do date; done'`), never `ps`'s
+/// space-joined line that loses them.
+pub fn shell_join(argv: &[String]) -> String {
+    let safe = |c: char| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c);
+    argv.iter()
+        .map(|a| if !a.is_empty() && a.chars().all(safe) { a.clone() } else { format!("'{}'", a.replace('\'', r"'\''")) })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// One of bise's own bash wrappers for agent `dir`: the turn's command,
 /// a bg job's runner or its watch loop (`/bin/sh <agent>/run/bend-sh-*.sh`
 /// and its forks, which keep its command line).

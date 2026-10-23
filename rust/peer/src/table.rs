@@ -141,6 +141,12 @@ fn procargs(pid: u32) -> Option<(String, Vec<String>)> {
 
 /// The pure half of [`procargs`] (tested without a process).
 fn parse_procargs(buf: &[u8]) -> (String, Vec<String>) {
+    let (path, argv, env) = split_procargs(buf);
+    (argv.into_iter().next().filter(|a| !a.is_empty()).unwrap_or(path), env)
+}
+
+/// `KERN_PROCARGS2`'s parts: the exec path, argv, the environment.
+fn split_procargs(buf: &[u8]) -> (String, Vec<String>, Vec<String>) {
     let Some(head) = buf.get(..4) else { return Default::default() };
     let argc = i32::from_ne_bytes([head[0], head[1], head[2], head[3]]).max(0) as usize;
     let rest = &buf[4..];
@@ -154,7 +160,38 @@ fn parse_procargs(buf: &[u8]) -> (String, Vec<String>) {
     let mut words = rest[i.min(rest.len())..].split(|b| *b == 0).map(|w| String::from_utf8_lossy(w).to_string());
     let argv: Vec<String> = words.by_ref().take(argc).collect();
     let env = words.take_while(|w| !w.is_empty()).collect();
-    (argv.into_iter().next().filter(|a| !a.is_empty()).unwrap_or(path), env)
+    (path, argv, env)
+}
+
+/// `pid`'s argv, each argument whole (`ps -o args` joins them with
+/// spaces and loses their quoting); None when it is gone or unreadable.
+#[cfg(target_os = "macos")]
+pub fn argv(pid: u32) -> Option<Vec<String>> {
+    let mut mib = [libc::CTL_KERN, libc::KERN_PROCARGS2, pid as libc::c_int];
+    let mut len: libc::size_t = 0;
+    // SAFETY: a size query (null buffer), then a read of at most `len` bytes
+    if unsafe { libc::sysctl(mib.as_mut_ptr(), 3, std::ptr::null_mut(), &mut len, std::ptr::null_mut(), 0) } != 0 || len < 4 {
+        return None;
+    }
+    let mut buf = vec![0u8; len];
+    if unsafe { libc::sysctl(mib.as_mut_ptr(), 3, buf.as_mut_ptr() as *mut libc::c_void, &mut len, std::ptr::null_mut(), 0) } != 0 {
+        return None;
+    }
+    buf.truncate(len);
+    Some(split_procargs(&buf).1).filter(|a| !a.is_empty())
+}
+
+/// `pid`'s argv (`/proc/<pid>/cmdline`, NUL-separated).
+#[cfg(target_os = "linux")]
+pub fn argv(pid: u32) -> Option<Vec<String>> {
+    let b = std::fs::read(std::path::Path::new("/proc").join(pid.to_string()).join("cmdline")).ok()?;
+    let b = b.strip_suffix(&[0]).unwrap_or(&b);
+    Some(b.split(|c| *c == 0).map(|w| String::from_utf8_lossy(w).to_string()).collect::<Vec<_>>()).filter(|a| !a.is_empty() && !b.is_empty())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+pub fn argv(_: u32) -> Option<Vec<String>> {
+    None
 }
 
 #[cfg(target_os = "linux")]
@@ -242,6 +279,25 @@ mod tests {
         assert!(v[1].zombie && v[1].owners.as_deref() == Some("aa.t1.3"));
         assert_eq!(v[2].owners.as_deref(), Some(""));
         assert_eq!(v[3].owners, None);
+    }
+
+    #[test]
+    fn procargs_give_the_whole_argv() {
+        let mut b = 3i32.to_ne_bytes().to_vec();
+        b.extend_from_slice(b"/bin/sh\0\0\0sh\0-c\0while true; do date; done\0A=1\0\0");
+        let (path, argv, env) = split_procargs(&b);
+        assert_eq!((path.as_str(), env), ("/bin/sh", vec!["A=1".to_string()]));
+        assert_eq!(argv, ["sh", "-c", "while true; do date; done"]);
+    }
+
+    #[test]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn argv_reads_a_live_process() {
+        let mut c = std::process::Command::new("/bin/sh").args(["-c", "sleep 5; echo 'a b'"]).spawn().unwrap();
+        let got = argv(c.id());
+        let _ = c.kill();
+        let _ = c.wait();
+        assert_eq!(got.unwrap(), ["/bin/sh", "-c", "sleep 5; echo 'a b'"]);
     }
 
     #[test]

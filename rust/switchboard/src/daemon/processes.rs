@@ -335,7 +335,14 @@ impl State {
         self.next_scan = std::time::Instant::now() + self.period();
         let agents = self.agents_in();
         let rows = if agents.is_empty() { Vec::new() } else { table() };
-        let trees = pv::trees(&rows, &self.hub, &agents, std::process::id());
+        let mut trees = pv::trees(&rows, &self.hub, &agents, std::process::id());
+        // a detached root's command with its quoting (its argv; ps's line
+        // when the argv can't be read)
+        for t in trees.iter_mut().filter(|t| t.kind == ProcKind::Detached) {
+            if let Some(a) = bise_peer::table::argv(t.root) {
+                t.cmd = pv::shell_join(&a);
+            }
+        }
         let by: BTreeMap<u32, &Row> = rows.iter().map(|r| (r.pid, r)).collect();
         let key = |p: u32| by.get(&p).map(|r| (p, r.start.clone()));
         // ports: the pids never asked (all of them while watched)
