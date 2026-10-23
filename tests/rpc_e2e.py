@@ -129,9 +129,11 @@ def main():
         check(gone["error"]["code"] == HUB_REFUSED and "nobody" in gone["error"]["message"], "no such agent: %r" % gone)
 
         cmds = r.call("commands/list")["result"]["commands"]
-        # the 37 of the catalog (/pause, /resume, /usage: cost-pause), then
-        # /debug (a client screen, debug-cmd)
-        check(len(cmds) == 38 and any(c["name"] == "/new" and not c["client"] for c in cmds)
+        # the 38 of the catalog (/pause, /resume, /usage: cost-pause;
+        # /running: running-procs, a client screen), then /debug (a client
+        # screen, debug-cmd)
+        check(len(cmds) == 39 and any(c["name"] == "/new" and not c["client"] for c in cmds)
+              and any(c["name"] == "/running" and c["client"] for c in cmds)
               and cmds[-1]["name"] == "/debug" and cmds[-1]["client"], "commands/list: %d" % len(cmds))
         helped = r.call("command/run", {"project": project, "agent": "main", "line": "/help"})["result"]
         check(helped.get("notice"), "command/run /help: %r" % helped)
