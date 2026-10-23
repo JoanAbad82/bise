@@ -49,7 +49,15 @@ export function world(snap: Snapshot, theme: 'light' | 'dark' = 'light', growth:
     { ev: 'growth', project: P, growth },
     { ev: 'agents', project: HOME, agents: [{ name: 'main', main: true, status: 'idle', archived: false, title: '', purpose: '', since_ms: now, waits: 0, watching: [], dir: 'main' }] },
     cardsOf(snap),
-    { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: now - MIN, kind: 'agent', text: 'the office is open.' }], before: null, more: false },
+    // a project he used (his entry in main's thread): no new-project welcome, whose own office would
+    // hold the bar's closed and be the one these checks measure (welcome/rule.ts, bims/idle red on 57614595c)
+    {
+      ev: 'thread', project: P, agent: 'main', before: null, more: false,
+      entries: [
+        { pos: 1, at_ms: now - 2 * MIN, kind: 'you', text: 'open the office' },
+        { pos: 2, at_ms: now - MIN, kind: 'agent', text: 'the office is open.' },
+      ],
+    },
   ];
 }
 
@@ -85,10 +93,11 @@ export async function trackpad(cdp: CDPSession, x: number, y: number, o: { dx?: 
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: o.dx ?? 0, deltaY: o.dy ?? 0, modifiers: o.pinch === true ? 2 : 0 });
 }
 
-/** The office on, its renderer loaded and drawing. */
+/** The right bar's office on (never a welcome's in the thread), its renderer loaded and drawing. */
 export async function showOffice(s: Session): Promise<void> {
+  await expect(s.page.getByTestId('welcome'), 'the bar office is measured: no welcome office in the thread').toHaveCount(0);
   await s.page.getByTestId('app.right.agents.bims').click();
-  await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
+  await expect(s.page.getByTestId('app.right.bims.fold').getByTestId('app.right.bims')).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
   await expect.poll(async () => (await probe(s.page))?.frames ?? 0, { timeout: 10_000 }).toBeGreaterThan(0);
 }
 
