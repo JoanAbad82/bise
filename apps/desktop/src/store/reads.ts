@@ -8,7 +8,6 @@ import type {
   ComputerAgent,
   Agent,
   Artifact,
-  DevServer,
   Entry,
   Found,
   IndexRow,
@@ -30,6 +29,7 @@ import type {
   UpdateEv,
 } from "@/proto";
 import type { CoreState } from "@/shared/api";
+import type { Proc } from "@/proto";
 import {
   type Away,
   type BranchesList,
@@ -164,8 +164,9 @@ export class StoreReads extends StoreBase {
   scheduled(project: string): readonly ScheduledTask[] {
     return this.slice(`scheduled:${project}`, EMPTY);
   }
-  devServers(project: string): readonly DevServer[] {
-    return this.slice(`dev_servers:${project}`, EMPTY);
+  /** the processes its agents left running, then the ones that ended in the last 24 h; none until the hub said */
+  processes(project: string): readonly Proc[] {
+    return this.slice(`processes:${project}`, EMPTY);
   }
   merged(project: string): readonly Merged[] {
     return this.slice(`merged:${project}`, EMPTY);

@@ -87,4 +87,36 @@ crate::words! { running:
     opening(port) = "opening localhost:{port}";
     /// `s` on one that has ended
     already_ended = "it has ended already.";
+
+    // ---- the desktop (apps/desktop/src/running, the right bar, the sidebar)
+    /// the right bar's section head
+    bar = "RUNNING";
+    /// the right bar's scope line on an agent's thread: `by perf`
+    by(agent) = "by {agent}";
+    /// the sidebar row's count tip
+    tip_sidebar(n) = "{n} running, in all your projects";
+    /// the screen's head under its title: where and how many listen
+    running_in(n) = one "running in {n} project" | "running in {n} projects";
+    /// the screen's filter: the running ones
+    filter_running(n) = "running · {n}";
+    /// the screen's filter: the ones that ended today
+    filter_ended(n) = "ended today · {n}";
+    /// the search field's placeholder (`/` focuses it)
+    search = "search";
+    /// the output's head: open its address
+    open = "open ↗";
+    /// the output's head: stop it
+    stop = "stop";
+    /// the output's keys line, after ↓
+    key_follow = "follows the end";
+    /// the output's keys line, after ⌘F (and the find field's placeholder)
+    key_find = "find";
+    /// the output's keys line, after ⌘C
+    key_copy = "copy";
+    /// the output's keys line, after s
+    key_stop = "stop";
+    /// the output's keys line, after o
+    key_open = "open";
+    /// the output's keys line, after esc
+    key_back = "back";
 }

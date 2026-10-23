@@ -81,6 +81,8 @@ pub enum Cmd {
     /// The window: the projects it shows now (replaces the set; the core
     /// decides what it holds, core/hubs.rs).
     Shown { projects: Vec<String> },
+    /// The window's running screen shown or left (core/hubs.rs `processes_all`).
+    ProcessesAll { on: bool },
     /// The window: a command for a project's hub (bise-proto's `HubCmd`
     /// with its `project`), routed as is.
     Typed(Value),
@@ -152,6 +154,7 @@ impl Cmd {
             AppCmd::EveryStop { id } => Cmd::EveryStop { id },
             AppCmd::FakeWords { text } => Cmd::FakeWords { text },
             AppCmd::Shown { projects } => Cmd::Shown { projects },
+            AppCmd::ProcessesAll { on } => Cmd::ProcessesAll { on },
             AppCmd::AgentPreview { agent } => Cmd::AgentPreview { agent: agent_name(&cmd, &agent)? },
             AppCmd::AgentHistory { agent, before, limit } => Cmd::AgentHistory {
                 agent: agent_name(&cmd, &agent)?,

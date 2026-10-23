@@ -87,13 +87,18 @@ describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
     expect(countsOf([ag('main')])).toBe('');
   });
 
-  it('W5: agents grouped by where they work, a shared worktree first, the shared folder last, servers under their agent', () => {
+  it('W5: agents grouped by where they work, a shared worktree first, the shared folder last, what they run under their agent', () => {
+    const proc = (agent: string, id: string, running: boolean) => ({
+      id, agent, kind: { is: 'bg' as const, n: 1 }, cmd: 'pnpm dev', pid: 1, started_ms: 0, ports: [5173], out: 'bg' as const, cpu: 0, rss_mb: 0, procs: 1,
+      state: running ? { is: 'running' as const } : { is: 'exited' as const, rc: 0 },
+    });
     const places = placesOf(
       [ag('main'), ag('a', { worktree: '/w/x', branch: 'sb/x' }), ag('b', { worktree: '/w/x', branch: 'sb/x' }), ag('c', { worktree: '/w/c', branch: 'sb/c' })],
       [{ path: '/w/x', branch: 'sb/x', ahead: 2, behind: 0, dirty: false }],
-      [{ agent: 'c', cmd: 'pnpm dev', up: true, url: 'http://localhost:5173' }],
+      // an ended one is the running screen's, not a place's
+      [proc('c', 'bg1', true), proc('c', 'bg2', false)],
     );
-    expect(places.map((p) => [p.title, p.agents.map((a) => a.name).join(','), p.servers.length])).toEqual([
+    expect(places.map((p) => [p.title, p.agents.map((a) => a.name).join(','), p.procs.length])).toEqual([
       ['sb/x', 'a,b', 0],
       ['sb/c', 'c', 1],
       ['the shared folder', 'main', 0],

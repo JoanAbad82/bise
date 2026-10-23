@@ -832,6 +832,20 @@ body:has(.app-shell) {
   text-overflow: ellipsis;
   color: var(--c-text);
 }
+/* RUNNING's port at the row's end: underlined, it opens the address */
+.app-rb-end.app-rb-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.app-rb-end.app-rb-link:hover {
+  color: var(--c-text);
+}
+/* a command (RUNNING's rows): mono, a step smaller so it sits on the sans rows' line */
+.app-rb-name.mono {
+  max-width: 70%;
+  font: var(--t-12) var(--font-mono);
+}
 /* a browser-only artifact: '↗' 4 px after its title (designer m_21742) */
 .app-rb-out {
   flex: none;

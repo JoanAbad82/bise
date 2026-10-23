@@ -18,7 +18,8 @@ export const STATE_TAGS: ReadonlySet<string> = new Set([
   // a project's live scheduled tasks, whole each time (amb-feed 284bd5c6)
   'scheduled',
   'worktrees',
-  'dev_servers',
+  // a project's processes, whole each time (src/running): a reload shows them before the next list
+  'processes',
   'merged',
   'jobs',
   'plugins',

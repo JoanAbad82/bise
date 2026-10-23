@@ -27,7 +27,7 @@ pub use self::computer::{peer_hub, ComputerPorts};
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
-pub use self::hubs::{not_started, HUB_LACKS, LINGER, START};
+pub use self::hubs::{not_started, HUB_LACKS, LINGER, LISTS_LEASE, START};
 pub use self::dictate::DICTATE_MAX;
 #[cfg(test)]
 pub use self::shot::SHOT_GONE;
@@ -522,6 +522,7 @@ impl Core {
                 self.shown(projects);
                 self.app_start();
             }
+            Cmd::ProcessesAll { on } => self.processes_all(on),
             Cmd::Typed(v) => self.typed_cmd(v),
             Cmd::App(c) => self.app_cmd(c),
             Cmd::Computer { act, key, max_width } => self.computer_cmd(&act, &key, max_width, now),

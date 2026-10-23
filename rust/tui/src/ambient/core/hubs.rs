@@ -182,6 +182,20 @@ pub(super) struct Hubs {
     /// why bise's own (home) hub couldn't start, until it's up: the home
     /// row's `down` (its connection is the core's `hub`, not a `Conn`)
     pub(super) home_down: Option<String>,
+    /// the window's running screen holds every running hub until then
+    /// (`processes_all`): a lease the screen renews, so no hold outlives
+    /// its screen, its window or this core (architect m_38378)
+    lists: Option<Instant>,
+}
+
+/// How long the running screen's hold lasts after its window last said
+/// `processes_all {on: true}` (the screen says it again every 10 s).
+pub const LISTS_LEASE: Duration = Duration::from_secs(30);
+
+/// The rows the running screen holds: the projects whose hub runs, never
+/// one that would have to start (a stopped hub killed its processes).
+pub fn listed(rows: &[Row], running: impl Fn(&Path) -> bool) -> BTreeSet<String> {
+    rows.iter().filter(|r| running(&r.path)).map(|r| r.id.clone()).collect()
 }
 
 /// What a command to a refused project's hub answers (kind hub_refused).
@@ -532,6 +546,40 @@ impl Core {
         if close {
             self.hold_at(now);
         }
+        // the running screen's lease ran out (its window closed or went
+        // quiet): its holds and its hubs' watches go
+        if self.hubs.lists.is_some_and(|u| u <= now) {
+            self.processes_all_at(false, now);
+        }
+    }
+
+    /// `processes_all {on}`: the window's running screen shown (again,
+    /// renewing its lease) or left.
+    pub(super) fn processes_all(&mut self, on: bool) {
+        self.processes_all_at(on, Instant::now());
+    }
+
+    fn processes_all_at(&mut self, on: bool, now: Instant) {
+        // a lease set, run out or not: its end (the tick's) still lets go
+        let was = self.hubs.lists.is_some();
+        self.hubs.lists = on.then(|| now + LISTS_LEASE);
+        if on == was {
+            return;
+        }
+        // the hubs held for it now, then each welcomed one asked (or told
+        // to stop watching); one welcomed later is asked at its welcome
+        self.hold_at(now);
+        let ids: Vec<String> = self.hubs.conns.iter().filter(|(_, c)| c.welcomed).map(|(id, _)| id.clone()).collect();
+        for id in ids {
+            if let Some(c) = self.hubs.conns.get_mut(&id) {
+                c.send(&json!({"cmd": "processes", "project": id, "watch": on}), None);
+            }
+        }
+    }
+
+    /// Whether the running screen's lease holds.
+    fn listing(&self, now: Instant) -> bool {
+        self.hubs.lists.is_some_and(|u| u > now)
     }
 
     /// The window's subscriptions and voice mode's thread.
@@ -578,6 +626,12 @@ impl Core {
 
     fn hold_at(&mut self, now: Instant) {
         let mut want = held(&self.hubs.rows, self.hubs.shown.as_deref(), &self.all_subs());
+        // the running screen: every hub that runs, never one to start
+        if self.listing(now) && self.hubs.shown.is_some() {
+            if let Some(p) = self.hubs.ports.as_ref() {
+                want.extend(listed(&self.hubs.rows, |path| (p.facts.running)(path)));
+            }
+        }
         // a folder gone: never its hub (it would start on a missing
         // workspace), whatever holds it
         let gone_folders: BTreeSet<String> = self.hubs.rows.iter().filter(|r| !self.folder_exists(&r.path)).map(|r| r.id.clone()).collect();
@@ -757,6 +811,10 @@ impl Core {
                 let agents: Vec<String> = subs.into_iter().flatten().chain(voice.filter(|a| !subs.is_some_and(|s| s.contains(*a)))).cloned().collect();
                 for agent in agents {
                     c.send(&json!({"cmd": "subscribe", "project": id, "agent": agent}), None);
+                }
+                // the running screen is open: this hub's list too, watched
+                if self.hubs.lists.is_some_and(|u| u > Instant::now()) {
+                    c.send(&json!({"cmd": "processes", "project": id, "watch": true}), None);
                 }
                 // the commands that waited for it, in order; a hub
                 // held for them only stays a while for their answers

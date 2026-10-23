@@ -12,6 +12,18 @@
     "one": null,
     "text": "it has ended already."
   },
+  "running.bar": {
+    "args": [],
+    "one": null,
+    "text": "RUNNING"
+  },
+  "running.by": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "by {agent}"
+  },
   "running.count_listening": {
     "args": [
       "n"
@@ -55,6 +67,20 @@
     "one": null,
     "text": "rc {rc}"
   },
+  "running.filter_ended": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "ended today · {n}"
+  },
+  "running.filter_running": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "running · {n}"
+  },
   "running.group": {
     "args": [
       "project",
@@ -67,6 +93,36 @@
     "args": [],
     "one": null,
     "text": "running"
+  },
+  "running.key_back": {
+    "args": [],
+    "one": null,
+    "text": "back"
+  },
+  "running.key_copy": {
+    "args": [],
+    "one": null,
+    "text": "copy"
+  },
+  "running.key_find": {
+    "args": [],
+    "one": null,
+    "text": "find"
+  },
+  "running.key_follow": {
+    "args": [],
+    "one": null,
+    "text": "follows the end"
+  },
+  "running.key_open": {
+    "args": [],
+    "one": null,
+    "text": "open"
+  },
+  "running.key_stop": {
+    "args": [],
+    "one": null,
+    "text": "stop"
   },
   "running.keys_head": {
     "args": [],
@@ -115,6 +171,11 @@
     "one": null,
     "text": "not opened: nothing answers at localhost:{port} yet."
   },
+  "running.open": {
+    "args": [],
+    "one": null,
+    "text": "open ↗"
+  },
   "running.opening": {
     "args": [
       "port"
@@ -136,10 +197,27 @@
     "one": null,
     "text": ":{port}"
   },
+  "running.running_in": {
+    "args": [
+      "n"
+    ],
+    "one": "running in {n} project",
+    "text": "running in {n} projects"
+  },
+  "running.search": {
+    "args": [],
+    "one": null,
+    "text": "search"
+  },
   "running.state_running": {
     "args": [],
     "one": null,
     "text": "running"
+  },
+  "running.stop": {
+    "args": [],
+    "one": null,
+    "text": "stop"
   },
   "running.stopped_by_you": {
     "args": [],
@@ -188,6 +266,13 @@
     ],
     "one": null,
     "text": "{id} · started {at}"
+  },
+  "running.tip_sidebar": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} running, in all your projects"
   },
   "running.url": {
     "args": [

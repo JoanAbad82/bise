@@ -21,6 +21,8 @@ import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
+import { barProcs, isRunning, keyOf, stateOf, urlWords, useAllProcesses } from '@/running';
+import { running } from '@/proto/words_running.gen';
 import { useCards, useComputerLive, useGrowth, usePlaces, usePrefs, useProjects, useStore, type Store } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
@@ -31,7 +33,7 @@ import { useNowFor } from './clock';
 import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
-import { agentRows, archivedRows, artifactRows, pageRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, artifactRows, pageRows, procRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
@@ -111,7 +113,7 @@ function usePages(key: string): readonly [number, (n: number) => void] {
   ];
 }
 
-type SectionId = 'agents' | 'archived' | 'artifacts' | 'scheduled';
+type SectionId = 'agents' | 'running' | 'archived' | 'artifacts' | 'scheduled';
 
 function Section({
   id,
@@ -268,9 +270,11 @@ function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; 
   );
 }
 
-function Row({ r, onOpen, on, onOpenPr, lit, onLit }: {
+function Row({ r, onOpen, on, onOpenPr, lit, onLit, onEnd }: {
   r: BarRow;
   onOpen: () => void;
+  /** a click on its end alone (RUNNING's port): its own act */
+  onEnd?: (() => void) | undefined;
   on?: boolean;
   onOpenPr?: OpenPr;
   /** its bim hovered in the office (bims/focus.ts): the rows' hover tint */
@@ -306,7 +310,7 @@ function Row({ r, onOpen, on, onOpenPr, lit, onLit }: {
             r.glyph
           )}
         </span>
-        <span className="app-rb-name">{r.name}</span>
+        <span className={r.mono === true ? 'app-rb-name mono' : 'app-rb-name'}>{r.name}</span>
         {r.cu !== undefined && (
           <span className={`app-cu ${r.cu.tone}`} {...tipAttrs(r.cu.title)} data-testid={`${r.testId}.computer`}>
             {r.cu.g}
@@ -361,6 +365,19 @@ function Row({ r, onOpen, on, onOpenPr, lit, onLit }: {
           <span className="app-rb-new" {...tipAttrs(r.tips?.end)} data-testid={`${r.testId}.new`}>
             {panel.new_chip}
           </span>
+        </span>
+      ) : onEnd !== undefined && r.end !== '' ? (
+        // RUNNING's port: underlined, it opens the address, never the row (designer's running-procs)
+        <span
+          className={`app-rb-end app-rb-link ${r.endTone}`}
+          role="link"
+          data-testid={`${r.testId}.end`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEnd();
+          }}
+        >
+          {r.end}
         </span>
       ) : (
         <span className={`app-rb-end ${r.endTone}`} {...tipAttrs(r.tips?.end)} data-testid={`${r.testId}.end`}>
@@ -460,6 +477,12 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   // where '+ add' and a drop on ARTIFACTS put a file: this project's main, bise's home on bise's own
   const addHere = useAddPlace(project);
   const tasks = useAllScheduled(all ? undefined : project);
+  // RUNNING: the project's processes, asked once here; its hub sends them again when a count changes
+  const procItems = useAllProcesses(all ? undefined : project);
+  const askStore = useStore();
+  useEffect(() => {
+    if (!all) askStore.command({ cmd: 'processes', project });
+  }, [askStore, all, project]);
   const places = usePlaces(project);
   const cards = useCards(project);
   const growth = useGrowth(project);
@@ -490,6 +513,9 @@ export function RightBar({ project, name, over, column }: { project: string; nam
     scope.level === 'agent'
       ? [...scheduledRows(tasks.filter((x) => inScope(scope, x.t.agent)), now), ...watchRows(agents.filter((x) => inScope(scope, x.a.name)), now, all)]
       : allLater;
+  // RUNNING follows the bar's scope: an agent's thread, what it started; main, the project's
+  const runningAgent = scope.level === 'agent' ? scope.agent : null;
+  const runs = procRows(all ? procItems.filter((x) => isRunning(x.p)) : barProcs(procItems, project, runningAgent), runningAgent !== null);
   const store = useStore();
   // the alarm whose detail is open (one at a time; a click on its row again closes it)
   const [watchOpen, setWatchOpen] = useState<string | null>(null);
@@ -615,6 +641,43 @@ export function RightBar({ project, name, over, column }: { project: string; nam
             )
           }
         </Section>
+        {/* what the scope left running, under AGENTS (designer's running-procs): a row opens its
+            output on the running screen, its port its address; nothing at 0 */}
+        {runs.length > 0 && (
+          <Section
+            id="running"
+            title={running.bar}
+            rows={runs}
+            cap={5}
+            pageScope={inView}
+            scope={runningAgent === null ? null : { words: running.by({ agent: runningAgent }), tip: running.by({ agent: runningAgent }), empty: '' }}
+            summary={runs[0] === undefined ? '' : `∿ ${runs[0].name}`}
+            onAll={() => {
+              router.go({ screen: 'running' });
+            }}
+          >
+            {(r) => {
+              const x = procItems.find((y) => `p:${keyOf(y)}` === r.key);
+              const u = x === undefined ? null : urlWords(x.p, stateOf(x.p));
+              return (
+                <Row
+                  key={r.key}
+                  r={r}
+                  onOpen={() => {
+                    if (x !== undefined) router.go({ screen: 'running', open: { project: x.project, agent: x.p.agent, id: x.p.id } });
+                  }}
+                  onEnd={
+                    u === null
+                      ? undefined
+                      : () => {
+                          void (window as Partial<Window>).bise?.openExternal(u.url);
+                        }
+                  }
+                />
+              );
+            }}
+          </Section>
+        )}
         <Section
           id="archived"
           title={panel.bar_archived}

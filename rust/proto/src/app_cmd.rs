@@ -119,6 +119,12 @@ pub enum AppCmd {
     /// each route change): the core holds their hubs and sends their
     /// `projects`/`agents`/`cards` only after the first one (core/hubs.rs)
     Shown { projects: Vec<Project> },
+    /// the window's running screen (all of bise) is shown (`on`) or left:
+    /// while on, the core asks every project hub that runs for its
+    /// `processes` (watched: again every 2 s) and holds those hubs, never
+    /// starting one (a stopped hub killed its processes); off, the window
+    /// gone or a new core: the holds and the watches go (architect m_38378)
+    ProcessesAll { on: bool },
     /// fn held (the helper's talk): the core opens the mic and starts a
     /// talk to main; `page`: a note talk on that bise page instead, its
     /// words to the page, never to main (docs/ambient-pages.md §4.1)
@@ -356,6 +362,7 @@ impl AppCmd {
         "plugin_logout",
         "computer_use",
         "shown",
+        "processes_all",
         "talk_start",
         "talk_end",
         "talk_cancel",

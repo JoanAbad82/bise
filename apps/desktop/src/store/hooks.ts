@@ -4,8 +4,9 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
+import type { Proc } from '@/proto';
 import { keep } from '@/app/keep';
 import type { AnsweredFrom } from './answered';
 import type { AnswerJump } from './store';
@@ -100,7 +101,8 @@ export const usePlugins = (project?: string): readonly Plugin[] | null => useSli
 export const useArtifacts = (project: string): readonly Artifact[] => useSlice(`artifacts:${project}`, (s) => s.artifacts(project));
 export const useScheduled = (project: string): readonly ScheduledTask[] => useSlice(`scheduled:${project}`, (s) => s.scheduled(project));
 export const useWorktrees = (project: string): readonly Worktree[] => useSlice(`worktrees:${project}`, (s) => s.worktrees(project));
-export const useDevServers = (project: string): readonly DevServer[] => useSlice(`dev_servers:${project}`, (s) => s.devServers(project));
+/** a project's processes (HubEv processes): running, then ended in the last 24 h; none until its hub said */
+export const useProcesses = (project: string): readonly Proc[] => useSlice(`processes:${project}`, (s) => s.processes(project));
 export const useMerged = (project: string): readonly Merged[] => useSlice(`merged:${project}`, (s) => s.merged(project));
 /** a project's branches (ask with store.askBranches); null before the answer */
 export const useBranches = (project: string): BranchesList | null => useSlice(`branches:${project}`, (s) => s.branches(project));

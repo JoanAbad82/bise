@@ -46,6 +46,7 @@ export const SCREENS: Record<Screen, readonly Rule[]> = {
   environments: [{ project: { name: 'environments', words: ['worktrees', 'dev servers'], route: (p) => ({ screen: 'environments', project: p }) } }],
   inbox: [{ app: { name: 'inbox', glyph: '?', words: ['answered', 'history', 'questions'], route: { screen: 'inbox' } } }],
   scheduled: [{ app: { name: 'scheduled', glyph: '◷', words: ['timers', 'every'], route: { screen: 'scheduled' } } }],
+  running: [{ app: { name: 'running', glyph: '∿', words: ['processes', 'dev servers', 'background'], route: { screen: 'running' } } }],
   report: [{ no: 'the last crash report: only after a crash, from its line' }],
   settings: [{ app: { name: 'settings', glyph: '⚙', words: ['preferences'], key: '⌘,', route: { screen: 'settings' } } }, { settings: true }],
   onboarding: [{ no: "the first run's; settings › setup checks it again" }],

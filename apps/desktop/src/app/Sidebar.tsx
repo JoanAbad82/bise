@@ -27,6 +27,8 @@ import { LiveBiseMark, ProjectMark } from './Marks';
 import { whoOf } from './markstates';
 import { useModHeld } from './held';
 import { goneTip, newTip, projectTip, scheduledTip, waitsTip, workingTip } from './tipwords';
+import { runningCount } from '@/running/model';
+import { running } from '@/proto/words_running.gen';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
@@ -217,6 +219,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   // tui-parity R17: who made the new ones ('↗ 1 new · designer'), until he opens the artifacts
   const makers = useNewMakers(ids);
   const scheduled = useSum('scheduled', ids, (s, p) => s.scheduled(p).length);
+  const procs = runningCount(rows);
   const projects = projectsOf(rows);
   // ⌘ held alone: every place shows its ⌘ digit (bise 0, the projects 1-9 in keys.ts's order)
   const cmd = useModHeld('Meta');
@@ -260,6 +263,9 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
       <SRow kind="top" lead="◷" name={panel.scheduled} end={scheduled > 0 ? String(scheduled) : ''} endTip={scheduledTip(scheduled)} on={route.screen === 'scheduled'}
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
+      {/* what his agents left running, all of bise (designer's running-procs): the count of the hubs that run */}
+      <SRow kind="top" lead="∿" name={running.heading} end={procs > 0 ? String(procs) : ''} endTip={procs > 0 ? running.tip_sidebar({ n: procs }) : undefined} on={route.screen === 'running'}
+        onClick={() => { router.go({ screen: 'running' }); }} testId="app.sidebar.running" />
       <SectionHead>{panel.projects}</SectionHead>
       {projects.length === 0 && <SRow kind="more" lead="+" name={panel.add_project} end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
       {projects.map((p, i) => (

@@ -29,6 +29,11 @@ fn docs_card() -> Value {
 }
 
 pub(super) fn world(t: &mut T) -> World {
+    world_running(t, &[])
+}
+
+/// [`world`] with these projects' hubs running (facts.running).
+pub(super) fn world_running(t: &mut T, up: &'static [&'static str]) -> World {
     let gone = std::sync::Arc::new(std::sync::Mutex::new(vec![PathBuf::from("/p/docs")]));
     let gone2 = gone.clone();
     let (etx, ends) = mpsc::channel::<(String, HubEnd)>();
@@ -62,7 +67,7 @@ pub(super) fn world(t: &mut T) -> World {
             scheduled: vec![serde_json::from_value(json!({"id": 7, "agent": "main", "by": "main", "words": "check the docs build", "every": "every day 07:30", "done": 2, "next_ms": 5})).unwrap()],
             growth: Some(bise_proto::rows::Growth { jobs_done: 4, days_used: 2, artifacts_made: 0, since_ms: Some(1) }),
         })),
-        running: Box::new(|_| false),
+        running: Box::new(move |p| up.iter().any(|id| p == Path::new(&format!("/p/{id}")))),
         exists: Box::new(move |p| !gone2.lock().unwrap().iter().any(|g| g == p)),
         journal: Box::new(|id| (id == "mail").then(|| MAIL_JOURNAL.to_string())),
         git: Box::new(|p| {
@@ -510,6 +515,50 @@ fn the_history_of_a_project_not_held_is_its_journal() {
     assert_eq!(ev["items"][0]["line2"], "withdrawn: moot");
     assert_eq!((ev["answered"].as_u64(), ev["withdrawn"].as_u64()), (Some(1), Some(1)));
     assert!(!w.open.contains_key("mail"), "no hub started to read it");
+}
+
+/// The running screen (architect m_38378): `processes_all {on}` holds
+/// every hub that runs and asks each for its watched list, never starts a
+/// stopped one; `off`, or its lease run out (a window closed without a
+/// word), lets them go.
+#[test]
+fn the_running_screen_holds_the_running_hubs_only_and_never_past_its_lease() {
+    let mut t = T::new();
+    t.ready();
+    // mail's hub runs, shop's doesn't
+    let mut w = world_running(&mut t, &["mail"]);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    w.welcome(&mut t, "home");
+    typed(&mut t, json!({"cmd": "processes_all", "on": true}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}), "a welcomed hub is asked at once");
+    w.opened(&mut t, &["mail"]);
+    w.welcome(&mut t, "mail");
+    assert_eq!(w.end("mail").next(), json!({"cmd": "processes", "project": "mail", "watch": true}), "a hub held for it is asked at its welcome");
+    w.until(&mut t, |_| true);
+    assert!(!w.open.contains_key("shop"), "a stopped hub is never started for the list");
+    // left: mail is let go, home told to stop watching (and kept: bise's own)
+    typed(&mut t, json!({"cmd": "processes_all", "on": false}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}));
+    let mut l = String::new();
+    assert_eq!(w.end("mail").r.read_line(&mut l).unwrap(), 0, "mail let go: {l}");
+    // shown again, then the window says nothing more: the lease runs out
+    w.open.remove("mail");
+    typed(&mut t, json!({"cmd": "processes_all", "on": true}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}));
+    w.opened(&mut t, &["mail"]);
+    t.core.tick(Instant::now() + crate::ambient::core::LISTS_LEASE + Duration::from_secs(1));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}), "the lease ran out");
+    // never welcomed: its initialize, then its end
+    let mut l = String::new();
+    loop {
+        l.clear();
+        match w.end("mail").r.read_line(&mut l) {
+            Ok(0) => break,
+            Ok(_) if l.contains("\"initialize\"") => continue,
+            other => panic!("mail not let go at the lease's end: {other:?} {l}"),
+        }
+    }
 }
 
 #[test]

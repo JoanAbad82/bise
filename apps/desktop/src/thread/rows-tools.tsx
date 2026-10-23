@@ -1,10 +1,14 @@
 // A thread's tool rows (each call's state, time, error line, code and output on
 // open) and its thinking rows. Owner: amb-win. Split out of rows.tsx (pure move).
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { Fold, Tool } from '@/ds';
 import type { Entry } from '@/proto';
 import { thread } from '@/proto/words.gen';
-import { useStore, useToolOut } from '@/store';
+import { useProcesses, useStore, useToolOut } from '@/store';
+import { RouterContext } from '@/app/router';
+import { useNow } from '@/app/clock';
+import { shortAge } from '@/agents/model';
+import { isRunning, procOfCall } from '@/running/model';
 import { liveTime, useLiveStep, useSecondsSince } from './live-step';
 import { useFold } from './folds';
 import { useFoldHint } from './foldHint';
@@ -112,6 +116,32 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
   const out = full !== null && 'out' in full && full.out !== '' ? full.out : l.out;
   const id = `thread.tool.${String(l.pos)}`;
   const state = live ? 'run' : l.state;
+  // a command it left running in the background: '∿ 14 min' at its end, a click opens its output
+  // on the running screen (designer's running-procs)
+  // none where a row is drawn outside the app (a preview, a test): the row then opens nothing
+  const router = useContext(RouterContext);
+  const procs = useProcesses(project);
+  // the minute clock: its age as the bar's
+  const now = useNow();
+  const proc = !live && l.mark === '$' ? procOfCall(procs, agent, l.code) : null;
+  const bg = proc !== null && isRunning(proc) ? proc : null;
+  if (bg !== null && router !== null) {
+    const go = () => {
+      router.go({ screen: 'running', open: { project, agent, id: bg.id } });
+    };
+    return (
+      <div className="th-tool" data-state="run">
+        <div className="th-tool-line" data-testid={id} data-bg={bg.id} role="button" tabIndex={0} onClick={go} onKeyDown={(e) => {
+          if (e.key !== ' ' && e.key !== 'Enter') return;
+          e.preventDefault();
+          go();
+        }}>
+          <span className="th-tool-mark">{l.mark}</span> <span className={l.said ? 'th-tool-text said' : 'th-tool-text'}>{l.text}</span>
+          <span className="th-tool-time" data-testid={`${id}.bg`}>{`∿ ${shortAge(now - bg.started_ms)}`}</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="th-tool" data-state={state || undefined}>
       <div

@@ -64,9 +64,18 @@ export function applyTyped(s: Store, ev: Ev): void {
       // the hubs' facts several slices read (machine/types.ts HubFacts): one copy, as it came
       s.factsCame(ev, `artifacts:${ev.project}`);
       return;
+    case "processes":
+      // a project's processes, whole each time: running, then ended in the last 24 h (src/running)
+      s.put(`processes:${ev.project}`, ev.items);
+      return;
+    case "proc_out":
+      // a range of a process's output: read through onEvent by its terminal (running/Output.tsx), never kept
+      return;
+    case "dev_servers":
+      // an older hub's servers, read by nothing: the processes list replaced them. TODO(dev-servers), goes in a later release
+      return;
     case "scheduled":
     case "worktrees":
-    case "dev_servers":
     case "merged":
     case "features":
     case "models":

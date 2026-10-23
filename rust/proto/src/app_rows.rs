@@ -27,6 +27,11 @@ pub struct ProjectRow {
     /// its hub runs (the sidebar's dot)
     #[serde(default)]
     pub running: bool,
+    /// the processes its agents left running (the sum of their
+    /// `Agent.procs`): the sidebar's '∿ running N'; 0 when its hub doesn't
+    /// run, whatever its view.json says (a hub that quit killed them)
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub procs: u32,
     /// its folder is gone (moved or deleted)
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub missing: bool,

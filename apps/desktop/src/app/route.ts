@@ -44,6 +44,8 @@ export type Route =
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'scheduled' }
+  /** what his agents left running, every project's (designer's running-procs); `open`: that one's output beside the list */
+  | { screen: 'running'; open?: { project: string; agent: string; id: string } }
   /** every project's waiting items, then what he answered or what was withdrawn (inbox-history pick A) */
   | { screen: 'inbox' }
   /** the last crash report, opened in the window (designer's voice-window part 2); `log: 'restart'`
@@ -75,6 +77,8 @@ export function formatRoute(r: Route): string {
     case 'scheduled':
     case 'onboarding':
       return r.screen;
+    case 'running':
+      return r.open === undefined ? 'running' : `running/${r.open.project}/${r.open.agent}/${r.open.id}`;
     case 'report':
       return r.log === 'restart' ? 'report/restart' : 'report';
     case 'inbox':
@@ -128,6 +132,11 @@ export function parseRoute(path: string): Route {
     case 'scheduled':
     case 'onboarding':
       return args.length === 0 ? { screen: head } : nf;
+    case 'running': {
+      if (args.length === 0) return { screen: 'running' };
+      const [project, agent, id] = take(3) ?? [];
+      return project !== undefined && agent !== undefined && id !== undefined ? { screen: 'running', open: { project, agent, id } } : nf;
+    }
     case 'report':
       if (args.length === 0) return { screen: 'report' };
       return one === 'restart' ? { screen: 'report', log: 'restart' } : nf;

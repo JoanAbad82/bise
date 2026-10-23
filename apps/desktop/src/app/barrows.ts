@@ -6,6 +6,7 @@
 import type { Item } from '@/artifacts/model';
 import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
+import { keyOf, shortCmd, tipOf as procTip, type ProcItem } from '@/running/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge, shownName } from '@/agents/model';
 import { alarms, pauseLine, waitLen } from '@/thread/wake';
@@ -64,6 +65,8 @@ export interface BarRow {
   readonly leaves?: boolean;
   /** its sub cuts after a whole word with '…' (an alarm's note, agent-waiting-states A) */
   readonly fit?: boolean;
+  /** its name is a command: mono (RUNNING's rows) */
+  readonly mono?: boolean;
   /** an alarm: its watch's id; the row opens its detail (stop watching) */
   readonly watch?: number;
   /** the hover tips of its compact marks (tipwords.ts): its sign, its end, its time and % columns */
@@ -351,6 +354,33 @@ export function scheduledRows(tasks: readonly Task[], now: number): BarRow[] {
     testId: `app.right.scheduled.${x.project}.${String(x.t.id)}`,
     waits: false,
   }));
+}
+
+/**
+ * RUNNING (designer's running-procs): what the bar's scope left running, oldest first (barProcs):
+ * a dim '∿', its command short and mono, the agent's name dim on a project's thread (an agent's
+ * own thread: none), ':5173 ↗' at the end while it listens; the tip says its id, start and folder.
+ * A click opens its output on the running screen; the port its address. No numbers. Pure.
+ */
+export function procRows(items: readonly ProcItem[], agentScoped: boolean, home?: string): BarRow[] {
+  return items.map((x) => {
+    const port = x.p.ports?.[0];
+    return {
+      key: `p:${keyOf(x)}`,
+      project: x.project,
+      agent: x.p.agent,
+      glyph: '∿',
+      tone: 'dim',
+      name: shortCmd(x.p.cmd),
+      sub: agentScoped ? '' : x.p.agent,
+      end: port === undefined ? '' : `:${String(port)} ↗`,
+      endTone: 'dim',
+      title: procTip(x.p, home),
+      testId: `app.right.running.${keyOf(x)}`,
+      waits: false,
+      mono: true,
+    };
+  });
 }
 
 /**
