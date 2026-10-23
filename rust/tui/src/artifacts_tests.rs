@@ -225,3 +225,20 @@ fn his_about_lead_is_the_artifacts_chip() {
     assert_eq!(words(&spans), "about old deck: hm");
     assert!(urls.is_empty());
 }
+
+/// page-unreach (Benjamin's refused page): a page link is asked before the
+/// browser opens it; one whose server doesn't answer says so, no dead tab.
+#[test]
+fn a_page_whose_server_does_not_answer_is_not_opened() {
+    assert_eq!(page_port("http://127.0.0.1:47415/p/blokhus-own-deployment"), Some(47415));
+    assert_eq!(page_port("http://127.0.0.1:47415/a/x/view"), Some(47415));
+    assert_eq!(page_port("http://127.0.0.1:47415x/p"), None);
+    assert_eq!(page_port("https://github.com/o/r/pull/1"), None);
+    assert_eq!(page_port("http://localhost:47415/p/x"), None);
+    // a port nothing listens on: one free a moment ago
+    let port = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+    assert!(!answers(port));
+    let live = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    assert!(answers(live.local_addr().unwrap().port()));
+    assert!(no_answer_note(47415).starts_with("not opened: nothing answers at 127.0.0.1:47415"));
+}

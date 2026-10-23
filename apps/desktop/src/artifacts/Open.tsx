@@ -11,7 +11,8 @@ import { useFrameNote } from './useFrameNote';
 import { Button, IconButton, PickerPop, PickerTrigger, Press } from '@/ds';
 import type { ArtifactLive } from '@/proto';
 import { useRouter } from '@/app/router';
-import { useAgents, usePrefs, useStore } from '@/store';
+import { useAgents, usePrefs, useProjects, useStore } from '@/store';
+import { downWords, probed, useReach, type DownWords } from './reach';
 import { themeOf } from '@/theme';
 import { answerOf, ThreadComposer } from '@/thread/ThreadComposer';
 import { useTabPlace } from '@/thread/ComposerTab';
@@ -246,6 +247,51 @@ export function LiveStrip({ live, gone, onBack }: { live: ArtifactLive | null; g
   );
 }
 
+/**
+ * The page doesn't answer (page-unreach): in place of the frame, never a blank panel. 'checking':
+ * an empty box for the probe's few ms (no flash of words); else why (downWords) and 'try again',
+ * except while its hub starts (it asks again by itself). A log path opens in Finder.
+ */
+export function PageDown({ reach, words, onAgain, onReveal }: { reach: 'checking' | 'down'; words: DownWords; onAgain: () => void; onReveal?: (path: string) => void }) {
+  if (reach === 'checking') return <div className="art-down" data-testid="artifact.checking" />;
+  return (
+    <div className="art-down" data-testid="artifact.down" data-starting={words.starting} role="status">
+      <div className="art-down-title" data-testid="artifact.down.title">{words.title}</div>
+      <div className="art-down-line" data-testid="artifact.down.line">
+        {words.parts.map((p, i) => {
+          if ('t' in p) return <span key={i}>{p.t}</span>;
+          const to = p.reveal;
+          if (to === undefined || onReveal === undefined) return <code key={i} className="art-down-mono">{p.mono}</code>;
+          return (
+            <Press key={i} look="art-down-mono art-down-path" title="show in Finder" onClick={() => { onReveal(to); }} data-testid="artifact.down.log">
+              {p.mono}
+            </Press>
+          );
+        })}
+      </div>
+      {!words.starting && (
+        <Press look="art-down-again" onClick={onAgain} data-testid="artifact.down.again">try again</Press>
+      )}
+    </div>
+  );
+}
+
+/**
+ * '↗ browser' (page-unreach): a pages-server url is asked first; one that doesn't answer opens no
+ * dead tab: the panel asks again and says why. Anything else opens at once.
+ */
+export function openChecked(url: string, bise: (ArtBridge & { probePage?: (u: string) => Promise<'up' | 'down'> }) | undefined, again: () => void): void {
+  const probe = bise?.probePage;
+  if (!probed(url) || probe === undefined) {
+    void bise?.openExternal?.(url);
+    return;
+  }
+  void probe(url).then((r) => {
+    if (r === 'up') void bise?.openExternal?.(url);
+    else again();
+  });
+}
+
 export interface ArtifactOpenProps {
   project: string;
   id: string;
@@ -318,6 +364,9 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const frame = useRef<HTMLIFrameElement>(null);
   // a video's player asks for the height that holds it: the card hugs the screen and its bar (designer m_32762)
   const hug = useFrameNote(frame, src, project, id, it?.a.title ?? '');
+  // page-unreach: the page is framed once its server answers; meanwhile the panel says why (reach.ts)
+  const { reach, again } = useReach(src);
+  const row = useProjects().find((p) => p.project === project);
   const close = () => {
     // ✕ and esc as ‹: back to the place before (designer's desktop-history); opened straight (a link) the list
     if (onClose !== undefined) onClose();
@@ -384,7 +433,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
               onPick={(id) => { setV(Number(id)); setMenu(null); setGoneLine(a.live?.line ?? null); setSaved(null); }} />
           )}
           {out !== null && (
-            <Button kind="ghost" size="sm" onClick={() => { void bise?.openExternal?.(out); }} testId="artifact.browser" title="open in browser">
+            <Button kind="ghost" size="sm" onClick={() => { openChecked(out, bise, again); }} testId="artifact.browser" title="open in browser">
               ↗ browser
             </Button>
           )}
@@ -422,7 +471,15 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             (useFrameNote) for the maker's composer, not the frame's own note. An image zooms in
             the viewer itself (kit/office/image.js; image-pinch), its esc and ⌘0 lent by useFrameNote.
             A video's player goes full screen from its own button (kit/office/video.js): allow it */}
-        {src !== null && (
+        {src !== null && reach !== 'up' && (
+          <PageDown reach={reach} words={downWords(row === undefined ? undefined : { name: row.name, running: row.running, down: row.down ?? null }, src, bise?.home)}
+            {...(finder === undefined ? {} : { onReveal: (p: string) => { void finder(p); } })}
+            onAgain={() => {
+              if (store.hubRefused(project) !== null) store.hubRetry(project);
+              again();
+            }} />
+        )}
+        {src !== null && reach === 'up' && (
           <iframe ref={frame} name={APP_FRAME_NAME} className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             allow="fullscreen" style={hug === null ? undefined : { maxHeight: `${String(hug)}px` }}
             data-testid="artifact.page" />

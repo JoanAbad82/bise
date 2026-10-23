@@ -58,7 +58,10 @@ impl Shell {
     /// port per workspace; its notes come back to the loop.
     pub(super) fn start_pages(&mut self, paths: &Paths, tx: &Sender<Msg>) {
         match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), &self.opts.app_root, self.holds.clone()) {
-            Ok(p) => {
+            Ok((p, moved_from)) => {
+                if let Some(old) = moved_from {
+                    log_line(paths, &format!("pages: port {old} stayed busy {} s, moved to {}: links to {old} are dead", crate::pages::KEPT_WAIT.as_secs(), p.port));
+                }
                 let tx = std::sync::Mutex::new(tx.clone());
                 p.connect_hub(Box::new(move |m| {
                     if let Ok(t) = tx.lock() {

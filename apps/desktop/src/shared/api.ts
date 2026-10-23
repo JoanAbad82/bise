@@ -89,6 +89,12 @@ export interface BiseApi {
   /** The file selected in a Finder window; same fence; test mode prints REVEAL_LINE <path>. */
   readonly showInFinder: (path: string) => Promise<boolean>;
   /**
+   * Does a pages-server url answer (main/probe.ts, page-unreach)? A TCP connect to its
+   * 127.0.0.1 port: 'down' when refused or slow (its project's hub stopped or starting); any
+   * other url is 'up' (not probed).
+   */
+  readonly probePage: (url: string) => Promise<'up' | 'down'>;
+  /**
    * 'save a copy…' (art-save): macOS's save panel, attached to the asking window, named `name`
    * in the folder he last saved to (else Downloads); the file or folder at `path` (same fence)
    * copied where he says. `{to}` once copied, `{error}` when the copy failed, null when he
@@ -382,6 +388,7 @@ export const IPC = {
   quickLook: 'bise:quick-look',
   showInFinder: 'bise:show-in-finder',
   saveCopy: 'bise:save-copy',
+  probePage: 'bise:probe-page',
   fileIcon: 'bise:file-icon',
   fileFacts: 'bise:file-facts',
   saveImage: 'bise:save-image',

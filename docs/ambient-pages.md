@@ -64,7 +64,12 @@ refused (one owner per page; main may take over a page whose agent is gone).
 
 In sbd, one per hub, `127.0.0.1` only. Port: stable per workspace (the first free from a hash of
 the workspace id in 47100-47899, kept in `<state>/pages.port`), in `hello` and `state`
-(`pages_url`). Routes:
+(`pages_url`). The kept port is bound once, never probed then bound again; busy at a start (the
+previous hub still stopping), it is tried again for 5 s before the server moves, since a move
+kills every link to the old port in messages and tabs; a move says so in hub.log (`pages: port
+X stayed busy 5 s, moved to Y`). The server lives in the hub: a stopped hub (idle-exit) answers
+no page link. The desktop's artifact panel and '↗ browser', and the TUI's open, ask the port
+first and say so instead of a blank frame or a refused tab (page-unreach). Routes:
 
 | route | what |
 |---|---|

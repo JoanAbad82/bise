@@ -415,14 +415,39 @@ impl Pages {
     }
 }
 
-/// The page server's port of a workspace: the one kept in
-/// `<state>/pages.port` when it is free, else the first free one from a
-/// hash of the workspace id in 47100-47899 (ports-plan.md), kept.
-pub fn pick_port(state: &Path, workspace_id: &str, free: &dyn Fn(u16) -> bool) -> Option<u16> {
+/// How long a starting hub tries its kept port again while it is busy (the
+/// previous hub may still be stopping: `wait_previous_hub` gives up after
+/// 15 s) before it moves: a move kills every link to the old port, in the
+/// agents' messages and his browser tabs (page-unreach).
+pub const KEPT_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+/// The pause between two tries of the kept port.
+pub const KEPT_STEP: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// The page server's listener, bound: its port, and the kept port it left
+/// when that one stayed busy (None: it kept its port, or had none).
+pub struct Picked<L> {
+    pub listener: L,
+    pub port: u16,
+    pub moved_from: Option<u16>,
+}
+
+/// The page server's port of a workspace, bound once by `bind` (never a
+/// probe then a second bind: another hub could take it in between, and
+/// the hub ran without a page server while its rows named that port).
+/// The one kept in `<state>/pages.port` first, tried again while `again()`
+/// says so (it waits a step); else the first port `bind` takes from a hash
+/// of the workspace id in 47100-47899 (ports-plan.md), kept in the file.
+pub fn pick_port<L>(state: &Path, workspace_id: &str, bind: &mut dyn FnMut(u16) -> Option<L>, again: &mut dyn FnMut() -> bool) -> Option<Picked<L>> {
     let file = state.join("pages.port");
-    if let Some(p) = std::fs::read_to_string(&file).ok().and_then(|t| t.trim().parse::<u16>().ok()) {
-        if (47100..47900).contains(&p) && free(p) {
-            return Some(p);
+    let kept = std::fs::read_to_string(&file).ok().and_then(|t| t.trim().parse::<u16>().ok()).filter(|p| (47100..47900).contains(p));
+    if let Some(p) = kept {
+        loop {
+            if let Some(listener) = bind(p) {
+                return Some(Picked { listener, port: p, moved_from: None });
+            }
+            if !again() {
+                break;
+            }
         }
     }
     let mut h: u32 = 0x811c_9dc5;
@@ -430,9 +455,9 @@ pub fn pick_port(state: &Path, workspace_id: &str, free: &dyn Fn(u16) -> bool) -
         h = (h ^ b as u32).wrapping_mul(0x0100_0193);
     }
     let start = (h % 800) as u16;
-    let p = (0..800u16).map(|k| 47100 + (start + k) % 800).find(|p| free(*p))?;
-    let _ = std::fs::write(&file, p.to_string());
-    Some(p)
+    let (port, listener) = (0..800u16).map(|k| 47100 + (start + k) % 800).filter(|p| Some(*p) != kept).find_map(|p| bind(p).map(|l| (p, l)))?;
+    let _ = std::fs::write(&file, port.to_string());
+    Some(Picked { listener, port, moved_from: kept })
 }
 
 /// The hub's soft limit on open files up to `want` (never above the hard
@@ -460,14 +485,22 @@ pub fn raise_fd_limit(want: u64) -> u64 {
 
 /// Start the page server of a hub: the port, the listener, its thread.
 /// `holds`: the hub's idle-exit holds (an open event stream holds one).
-pub fn start(state: &Path, workspace_id: &str, app_root: &Path, holds: crate::idle::Holds) -> std::io::Result<Arc<Pages>> {
+/// Also the kept port it had to leave, for the hub's log (None: kept).
+pub fn start(state: &Path, workspace_id: &str, app_root: &Path, holds: crate::idle::Holds) -> std::io::Result<(Arc<Pages>, Option<u16>)> {
     raise_fd_limit(10240);
-    let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
-    let port = pick_port(state, workspace_id, &free).ok_or_else(|| std::io::Error::other("no free port in 47100-47899"))?;
-    let listener = std::net::TcpListener::bind(("127.0.0.1", port))?;
-    let pages = Arc::new(Pages { holds, ..Pages::new(state, port, app_root) });
-    server::serve(listener, pages.clone());
-    Ok(pages)
+    let mut bind = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).ok();
+    let t0 = std::time::Instant::now();
+    let mut again = || {
+        let more = t0.elapsed() < KEPT_WAIT;
+        if more {
+            std::thread::sleep(KEPT_STEP);
+        }
+        more
+    };
+    let picked = pick_port(state, workspace_id, &mut bind, &mut again).ok_or_else(|| std::io::Error::other("no free port in 47100-47899"))?;
+    let pages = Arc::new(Pages { holds, ..Pages::new(state, picked.port, app_root) });
+    server::serve(picked.listener, pages.clone());
+    Ok((pages, picked.moved_from))
 }
 
 #[cfg(test)]
@@ -486,18 +519,64 @@ mod tests {
         assert_eq!(untaken(crate::model::MAIN, PAGE_WAIT_MS), Untaken::Warn);
     }
 
+    /// `pick_port` over a fake bind: the ports `busy` refuses, each try
+    /// counted; `tries` kept-port retries allowed.
+    fn pick(d: &Path, ws: &str, busy: &dyn Fn(u16, usize) -> bool, tries: usize) -> Option<(u16, Option<u16>, usize)> {
+        let mut n = 0;
+        let mut bind = |p: u16| {
+            n += 1;
+            (!busy(p, n)).then_some(p)
+        };
+        let mut left = tries;
+        let mut again = || {
+            let more = left > 0;
+            left = left.saturating_sub(1);
+            more
+        };
+        let got = pick_port(d, ws, &mut bind, &mut again)?;
+        assert_eq!(got.listener, got.port, "the listener is the one bound on its port");
+        Some((got.port, got.moved_from, n))
+    }
+
     #[test]
     fn the_port_is_stable_and_kept() {
         let d = std::env::temp_dir().join(format!("sb-port-{}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
-        let p = pick_port(&d, "harness-1234abcd", &|_| true).unwrap();
+        let (p, moved, _) = pick(&d, "harness-1234abcd", &|_, _| false, 0).unwrap();
         assert!((47100..47900).contains(&p));
+        assert_eq!(moved, None, "no port kept yet: nothing moved");
         assert_eq!(std::fs::read_to_string(d.join("pages.port")).unwrap(), p.to_string());
         // kept, even when the hash would give another
-        assert_eq!(pick_port(&d, "other-ws", &|_| true), Some(p));
-        // taken: the next free one from the hash
-        let q = pick_port(&d, "harness-1234abcd", &|x| x != p).unwrap();
-        assert_ne!(q, p);
+        assert_eq!(pick(&d, "other-ws", &|_, _| false, 0).map(|x| x.0), Some(p));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// page-unreach (Benjamin's dead link): the kept port busy for a moment
+    /// at a start (the previous hub still stopping) is waited for, never
+    /// left: every link to it, in messages and tabs, keeps working.
+    #[test]
+    fn a_kept_port_busy_for_a_moment_is_kept() {
+        let d = std::env::temp_dir().join(format!("sb-port-busy-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("pages.port"), "47415").unwrap();
+        // busy for the first 3 tries, free at the 4th
+        let (p, moved, n) = pick(&d, "harness-1234abcd", &|p, n| p == 47415 && n <= 3, 100).unwrap();
+        assert_eq!((p, moved, n), (47415, None, 4), "the same port, bound once free");
+        assert_eq!(std::fs::read_to_string(d.join("pages.port")).unwrap(), "47415");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// Busy through the whole wait: the server moves (a hub without one is
+    /// worse), says which port it left, and the file names the new one.
+    #[test]
+    fn a_kept_port_busy_throughout_moves_and_says_so() {
+        let d = std::env::temp_dir().join(format!("sb-port-moved-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("pages.port"), "47415").unwrap();
+        let (q, moved, _) = pick(&d, "harness-1234abcd", &|p, _| p == 47415, 5).unwrap();
+        assert_ne!(q, 47415);
+        assert_eq!(moved, Some(47415), "the port it left, for the hub's log");
+        assert_eq!(std::fs::read_to_string(d.join("pages.port")).unwrap(), q.to_string(), "the rows read the new port at once");
         let _ = std::fs::remove_dir_all(d);
     }
 

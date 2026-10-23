@@ -592,9 +592,35 @@ pub(crate) fn how(a: &Artifact, v: Option<u32>, diff: bool) -> How {
 
 /// Opens `a` (version `v`): the note for the status row. A PR's diff is
 /// the caller's (it opens the panel).
+/// The port of a page server's url (`http://127.0.0.1:<port>/…`), else
+/// None: the one kind of link the TUI asks before opening (page-unreach).
+pub(crate) fn page_port(url: &str) -> Option<u16> {
+    let rest = url.strip_prefix("http://127.0.0.1:")?;
+    let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    if end == 0 || !matches!(rest[end..].chars().next(), None | Some('/')) {
+        return None;
+    }
+    rest[..end].parse().ok()
+}
+
+/// Does anything answer on 127.0.0.1:`port`? A connect, short.
+fn answers(port: u16) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(800)).is_ok()
+}
+
+/// The flash when a page's server doesn't answer: no dead tab opened.
+pub(crate) fn no_answer_note(port: u16) -> String {
+    format!("not opened: nothing answers at 127.0.0.1:{port}, the hub's page server. try again; the hub's log says why")
+}
+
 pub(crate) fn open(app: &mut crate::App, a: &Artifact, v: Option<u32>) -> String {
     match how(a, v, false) {
         How::Browser(url) => {
+            // page-unreach: a page whose server is down opened Chrome's 'refused' page, with no word
+            if let Some(p) = page_port(&url).filter(|p| !answers(*p)) {
+                return no_answer_note(p);
+            }
             if crate::links::open(&url) {
                 format!("opening {}", short_target(&url))
             } else {

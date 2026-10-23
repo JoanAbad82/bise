@@ -16,6 +16,7 @@ import { isOffscreen, noAsks, offscreenGrants } from './offscreen';
 import { imageDir, saveImage } from './images';
 import { pickedFilesInTest, pickedInTest } from './pick';
 import { allowedPath } from './reveal';
+import { probePage } from './probe';
 
 // the page's async clipboard API (navigator.clipboard): its permissions
 const CLIPBOARD_PERMS = new Set(['clipboard-read', 'clipboard-sanitized-write']);
@@ -137,6 +138,8 @@ export function installIpc(testMode: boolean): void {
   ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
   ipcMain.handle(IPC.quickLook, (e, raw: unknown): boolean => quickLook(BrowserWindow.fromWebContents(e.sender), raw, testMode));
   ipcMain.handle(IPC.showInFinder, (_e, raw: unknown): boolean => showInFinder(raw, testMode));
+  // page-unreach: does an artifact's page server answer, before the panel frames it (probe.ts)
+  ipcMain.handle(IPC.probePage, (_e, raw: unknown): Promise<'up' | 'down'> => probePage(raw));
   // art-save: an artifact's file copied where he says (savecopy.ts), behind the same fence
   ipcMain.handle(IPC.saveCopy, (e, raw: unknown, name: unknown): Promise<SaveResult> => {
     const p = lookable(raw);
