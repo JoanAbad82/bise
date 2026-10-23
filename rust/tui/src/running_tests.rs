@@ -145,3 +145,17 @@ fn the_output_head_has_its_meta_and_usage_only_while_it_runs() {
     assert!(!ended.contains("cpu") && ended.contains(&running::exit_rc(101)), "{ended}");
     assert_eq!(items[2].out, OutKind::None);
 }
+
+#[test]
+fn a_command_on_several_lines_keeps_the_columns() {
+    let mut items = fixture();
+    items[1].cmd = "cd '/w' || exit 1\npython3 -u -m\thttp.server 8000".into();
+    assert_eq!(one_line(&items[1].cmd), "cd '/w' || exit 1 python3 -u -m http.server 8000");
+    for wd in [146usize, 76] {
+        let col = |p: &Proc| {
+            let l = plain(&row(p, NOW, false, false, wd));
+            l.find(&status(p, NOW, false, wd >= WIDE_FROM)).map(|i| l[..i].width())
+        };
+        assert_eq!(col(&items[1]), col(&items[0]), "{wd}");
+    }
+}

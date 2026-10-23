@@ -125,6 +125,12 @@ pub(crate) fn port_words(p: &Proc, wide: bool) -> Option<String> {
     })
 }
 
+/// A command on one row: its newlines, tabs and runs of spaces as one
+/// space (a newline has no width and shifted the columns after it).
+pub(crate) fn one_line(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// `s` or `…` cut to `max` columns.
 pub(crate) fn clip(s: &str, max: usize) -> String {
     if s.width() <= max {
@@ -150,7 +156,7 @@ pub(crate) fn row(p: &Proc, now: u64, selected: bool, stopping: bool, wd: usize)
     let st = status(p, now, stopping, wide);
     let port_w = if wide { 18 } else { 8 };
     let cmd_w = wd.saturating_sub(4 + port_w + 2 + st.width().max(if wide { 22 } else { 6 }));
-    let cmd = clip(&p.cmd, cmd_w.max(8));
+    let cmd = clip(&one_line(&p.cmd), cmd_w.max(8));
     let base = match selected {
         true => Style::default().bg(selection_bg()),
         false => Style::default(),
@@ -253,7 +259,7 @@ pub(crate) fn out_head(p: &Proc, project: &str, now: u64, stopping: bool) -> Str
     if is_running(p) {
         parts.push(running::usage(p.cpu.round() as u32, p.rss_mb));
     }
-    format!("{}  {}", p.cmd, parts.join(" · "))
+    format!("{}  {}", one_line(&p.cmd), parts.join(" · "))
 }
 
 /// The dim keys line of the list.
