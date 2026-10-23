@@ -16,6 +16,7 @@ import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, REACH_S, awayOf
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { restAt, type NapRest } from './nap';
 import { skateRig } from './skate';
+import { climbRig } from './climb';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
 import { MAIN_HOODIE, WORLD, hash, outfitOf, paletteOf, type Outfit, type Palette } from './palette';
@@ -501,7 +502,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         // his easter egg on top of its pose (eggs.ts picks it, egg.ts plays it)
         // a skater in the park (skate.ts): its line's pose once it is there; on the way, the walk's
         const park = office.park;
-        const skater = park && !look.reduced ? skateRig(f.name, f.pose, park, b.outfit.phase) : null;
+        const gym = office.gym;
+        // or a climber on the gym's wall (climb.ts), the same way
+        const skater = look.reduced ? null : park ? skateRig(f.name, f.pose, park, b.outfit.phase) : gym ? climbRig(f.name, f.pose, gym) : null;
         const rig = eggRig(skater ?? rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt }), f.egg ?? null);
         b.apply(rig);
         if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) appearing.set(f.name, t);

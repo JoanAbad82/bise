@@ -50,6 +50,8 @@ export interface Props {
   readonly crateAt?: readonly [number, number];
   /** the fruit in hand eaten so far (snack): 0 whole .. 1 gone */
   readonly eaten: number;
+  /** a climber's fall onto the mat (render/climb.ts): its chalk's puff, 0..1 through it; absent: none */
+  readonly chalk?: number;
 }
 
 export interface Rig {
@@ -652,7 +654,7 @@ export function rigOf(inp: RigInput): Rig {
     opacity: place.opacity, motion, ...(back !== null && back > 1e-4 ? { seat: { back, turn: 0 } } : {}),
   };
   // to the park or back from it (skate.ts): its board in its hand; back, it kicks it up first
-  const carry = !arrived && !reduced && (seg.pastime !== undefined || seg.fromSkate === true);
+  const carry = !arrived && !reduced && (seg.pastime?.kind === 'skate' || seg.fromSkate === true);
   return carry ? carrying(rig, seg.fromSkate === true ? pose.since : Infinity) : rig;
 }
 

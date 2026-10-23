@@ -167,8 +167,10 @@ export const labelsOf: LabelsFn = (frames, o) => {
       else if (pill) at('pill', '');
     } else if (o.hover === b.name) {
       const row = rows.get(b.name);
-      // a skater (skate.ts): how long it has been idle, and what it does with it
-      const words = b.pose.seg.pastime && row ? bims.state_skating({ dur: shortAge(o.t * 1000 - row.since_ms) }) : stateWords(act, row?.watching[0]?.what ?? '');
+      // a skater (skate.ts) or a climber (climb.ts): how long it has been idle, and what it does with it
+      const p = b.pose.seg.pastime;
+      const dur = row ? shortAge(o.t * 1000 - row.since_ms) : '';
+      const words = p && row ? (p.kind === 'climb' ? bims.state_climbing({ dur }) : bims.state_skating({ dur })) : stateWords(act, row?.watching[0]?.what ?? '');
       at('hover', words, row?.title ?? '');
     } else if (events.has(b.name)) at('event', eventWords(act, from));
     else if (trick !== null) at('egg', trickWords(trick));

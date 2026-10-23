@@ -14,7 +14,10 @@ import { type Plugin, transformWithEsbuild } from 'vite';
 
 const src = resolve(__dirname, 'src');
 
-const BIMS_BUDGET = 800 * 1024;
+// 800 -> 860 KB with the climbing gym (809.7 KB minified, 230.0 KB gzip; architect m_38149). The last
+// raise for a map: the next map lazy-loads the looks first (render/maps/index.ts LOOKS split per map),
+// so the chunk stops growing with every map.
+const BIMS_BUDGET = 860 * 1024;
 
 // Source maps only in the nightly's coverage-map build (BISE_DESKTOP_SOURCEMAP=1, covmap.mjs run:
 // fast-try p2, architect m_29221 #3): V8 sees the bundles, the maps name the source files that ran.

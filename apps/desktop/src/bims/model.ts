@@ -206,6 +206,10 @@ export interface Office {
   readonly furniture: readonly Box[];
   /** a skatepark (the California map): where idle bims skate (skate.ts); absent on a map without one */
   readonly park?: Park;
+  /** a bouldering wall (the climbing gym map): where idle bims climb (climb.ts); absent on a map without one */
+  readonly gym?: Gym;
+  /** how high its building stands past the common 2.5 (the gym's hall): the camera's fit takes it in (render/camera.ts siteOf); absent: 2.5 */
+  readonly height?: number;
   /** its cozy pieces (cozy.ts placeCozy, maps/index.ts layoutOf): the coffee corner's spot is on `walks`; absent: a bare room */
   readonly cozy?: Cozy;
   /** where it hangs night lamps past the common pools (the workshop's pods): render/world.ts poolsOf lights them, within the town's cap there; absent: none */
@@ -257,6 +261,32 @@ export interface Park {
   /** the benches by the rest spots, and the floodlights' poles: what a skater rides round */
   readonly benches: readonly Box[];
   readonly poles: readonly Pt[];
+}
+
+/**
+ * A bouldering wall's numbers (pure, office units; climbwall.ts makes its surface, holds and
+ * problems from them, render/maps/climb.ts draws them). The wall is one folded surface along a
+ * polyline on the floor: each vertex has its way into the room (nx, nz) and how far the surface
+ * stands out from it at the wall's middle height and at its top (o1, o2: > 0 overhangs into the
+ * room, < 0 leans back as a slab). The mats lie along its foot; the rest spots are places of the
+ * walk graph, on the floor past the mats.
+ */
+export interface Gym {
+  /** the hall's floor */
+  readonly area: Box;
+  readonly line: readonly WallPt[];
+  /** the mats' footprints (their top at climbwall.ts MAT_H): nobody walks through one, a climber stands on it */
+  readonly mats: readonly Box[];
+  /** where a climber rests between two problems ([0], [1]) */
+  readonly spots: readonly Spot[];
+}
+
+/** a vertex of a climbing wall's foot line (Gym.line) */
+export interface WallPt extends Pt {
+  readonly nx: number;
+  readonly nz: number;
+  readonly o1: number;
+  readonly o2: number;
 }
 
 /** a land queue's places, apart (layout and the queue's overflow) */
@@ -322,13 +352,26 @@ export interface SitAt {
  * so the activity stays 'nap' or 'snack'. `slot`: its park spot; `pool`: the Sunday pool session
  * (the bowl only); `nine`: it tries the 900 on the vert (the 900th job); `stage`: what is built.
  */
-export interface Pastime {
+export interface SkatePastime {
   readonly kind: 'skate';
   readonly slot: number;
   readonly pool: boolean;
   readonly nine: boolean;
   readonly stage: number;
 }
+
+/**
+ * An idle bim climbing on a map with a gym (climb.ts, the climbing gym): a look like skating.
+ * `slot`: its rest spot on the gym's floor (Gym.spots); `stage`: what is built (the bell, the volumes).
+ */
+export interface ClimbPastime {
+  readonly kind: 'climb';
+  readonly slot: number;
+  readonly stage: number;
+}
+
+/** what an idle bim does on its map's own place (pastimes.ts: one row per kind) */
+export type Pastime = SkatePastime | ClimbPastime;
 
 /** What the pastimes read past the activities (timeline.update): the stage, the jobs' high-water mark, his local day, reduced motion. */
 export interface FunIn {

@@ -20,9 +20,10 @@ import { tropical } from './tropical';
 import { cyclades } from './cyclades';
 import { sahel } from './sahel';
 import { california } from './california';
+import { climb } from './climb';
 
 export const PLANS: Readonly<Record<MapId, Plan>> = {
-  loft, greenhouse, campus, workshop, kyoto, riad, nordic, patio, haveli, tropical, cyclades, sahel, california,
+  loft, greenhouse, campus, workshop, kyoto, riad, nordic, patio, haveli, tropical, cyclades, sahel, california, climb,
 };
 
 /** The plan that draws a map: its own when ready, else the loft's. */

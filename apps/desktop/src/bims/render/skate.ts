@@ -422,7 +422,7 @@ function seatOf(park: Park, stage: number, at: At, head: number): { base: number
 /** The skater's rig at t: its line's move, or at rest on its board at its spot. Null: no pastime or not arrived. */
 export function skateRig(name: string, pose: Pose, park: Park, phase: number): Rig | null {
   const p = pose.seg.pastime;
-  if (!p || pose.moving) return null;
+  if (p?.kind !== 'skate' || pose.moving) return null;
   const spot = park.spots[p.slot] ?? park.spots[0];
   if (!spot) return null;
   const now = skateAt(name, p, sinceArrived(pose), park);

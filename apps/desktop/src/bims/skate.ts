@@ -8,7 +8,7 @@
 // battery rule). The 900 on the vert at the 900th job (the jobs' high-water mark). Pure: the clock,
 // the stage and his local day are passed in. render/skate.ts poses a skater from a line. Owner: maps-d.
 import { hash } from './activity';
-import type { Activity, BimFrame, FunIn, Office, Park, Pastime, Pose, Pt } from './model';
+import type { Activity, BimFrame, FunIn, Office, Park, SkatePastime as Pastime, Pose, Pt } from './model';
 import { walkTime } from './avoid';
 import { type Feature, FEATURE_STAGE, enterLen, exitLen, lengthOf, portIn, portOut, route } from './parkpath';
 
@@ -247,7 +247,7 @@ export function sinceArrived(pose: Pose): number {
 /** the trick shown over a followed skater at its pose: the first TRICK_LABEL_S of each trick; null else */
 export function trickNow(name: string, pose: Pose, park: Park | undefined): TrickKey | null {
   const p = pose.seg.pastime;
-  if (!p || pose.moving || !park) return null;
+  if (p?.kind !== 'skate' || pose.moving || !park) return null;
   const now = skateAt(name, p, sinceArrived(pose), park);
   const m = now.move;
   if (!m || m.trick === 'roll' || now.into >= TRICK_LABEL_S) return null;
@@ -263,7 +263,7 @@ export function wakeIn(frames: readonly BimFrame[], park: Park | undefined): num
   let soon: number | null = null;
   for (const f of frames) {
     const p = f.pose.seg.pastime;
-    if (!p || f.pose.moving) continue;
+    if (p?.kind !== 'skate' || f.pose.moving) continue;
     const now = skateAt(f.name, p, sinceArrived(f.pose), park);
     if (now.move !== null) continue;
     soon = soon === null ? now.restLeft : Math.min(soon, now.restLeft);

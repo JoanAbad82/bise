@@ -154,6 +154,16 @@
     "one": null,
     "text": "map · /bims"
   },
+  "bims.map_climb": {
+    "args": [],
+    "one": null,
+    "text": "Climbing gym"
+  },
+  "bims.map_climb_mood": {
+    "args": [],
+    "one": null,
+    "text": "a café beside a bouldering wall, a Paris street"
+  },
   "bims.map_current_tip": {
     "args": [
       "map"
@@ -361,6 +371,76 @@
     "args": [],
     "one": null,
     "text": "the skate ramp"
+  },
+  "bims.stage_climb_1": {
+    "args": [],
+    "one": null,
+    "text": "the chalk bucket and brushes"
+  },
+  "bims.stage_climb_10": {
+    "args": [],
+    "one": null,
+    "text": "the yoga room"
+  },
+  "bims.stage_climb_11": {
+    "args": [],
+    "one": null,
+    "text": "the sauna"
+  },
+  "bims.stage_climb_12": {
+    "args": [],
+    "one": null,
+    "text": "the boulder"
+  },
+  "bims.stage_climb_13": {
+    "args": [],
+    "one": null,
+    "text": "the slackline"
+  },
+  "bims.stage_climb_14": {
+    "args": [],
+    "one": null,
+    "text": "the golden hold"
+  },
+  "bims.stage_climb_2": {
+    "args": [],
+    "one": null,
+    "text": "the smoothie corner"
+  },
+  "bims.stage_climb_3": {
+    "args": [],
+    "one": null,
+    "text": "the hangboard"
+  },
+  "bims.stage_climb_4": {
+    "args": [],
+    "one": null,
+    "text": "the hanging plants"
+  },
+  "bims.stage_climb_5": {
+    "args": [],
+    "one": null,
+    "text": "the chalk-up bench"
+  },
+  "bims.stage_climb_6": {
+    "args": [],
+    "one": null,
+    "text": "the kids' wall"
+  },
+  "bims.stage_climb_7": {
+    "args": [],
+    "one": null,
+    "text": "the bell on top"
+  },
+  "bims.stage_climb_8": {
+    "args": [],
+    "one": null,
+    "text": "the hold crates"
+  },
+  "bims.stage_climb_9": {
+    "args": [],
+    "one": null,
+    "text": "the planted terrace"
   },
   "bims.stage_fruit": {
     "args": [],
@@ -581,6 +661,13 @@
     "args": [],
     "one": null,
     "text": "the draughts table"
+  },
+  "bims.state_climbing": {
+    "args": [
+      "dur"
+    ],
+    "one": null,
+    "text": "idle {dur} · climbing"
   },
   "bims.state_hot": {
     "args": [],

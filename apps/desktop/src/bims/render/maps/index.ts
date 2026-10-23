@@ -16,9 +16,10 @@ import { tropical } from './tropical';
 import { cyclades } from './cyclades';
 import { sahel } from './sahel';
 import { california } from './california';
+import { climb } from './climb';
 
 export const LOOKS: Readonly<Record<MapId, MapLook>> = {
-  loft, greenhouse, campus, workshop, kyoto, riad, nordic, patio, haveli, tropical, cyclades, sahel, california,
+  loft, greenhouse, campus, workshop, kyoto, riad, nordic, patio, haveli, tropical, cyclades, sahel, california, climb,
 };
 
 export const lookOf = (id: MapId): MapLook => LOOKS[id];

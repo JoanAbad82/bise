@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { crowd } from './fixtures';
 import { californiaLayout } from './maps/california';
 import { loftLayout } from './maps/loft';
-import type { Activity, FunIn, Pastime, Pose, Segment } from './model';
+import type { Activity, FunIn, SkatePastime as Pastime, Pose, Segment } from './model';
 import {
   BAIL_S, LINE_MAX, LINE_MIN, MAX_SKATERS, SESSION_S, TRICK_LABEL_S, WINDOW_S, built, dayOf, lineOf, pastimes, poolDay, skateAt, trickNow, wakeIn,
 } from './skate';

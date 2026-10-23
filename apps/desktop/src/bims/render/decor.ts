@@ -58,6 +58,8 @@ const YARD_TERRACE: ReadonlySet<MapId> = new Set(['patio', 'haveli', 'tropical',
  */
 export function terraceSlab(o: Office): Box {
   if (o.map === 'california') return { x0: o.x0 + 0.4, x1: o.x0 + 5.2, z0: o.D + 0.3, z1: o.D + 4.4 };
+  // the climbing gym's pavement: the whole front, short of the street's kerb and cobbles
+  if (o.map === 'climb') return { x0: o.x0 + 0.2, x1: o.x0 + o.W - 0.2, z0: o.D + 0.2, z1: o.D + 4.1 };
   if (YARD_TERRACE.has(o.map)) {
     const xs = o.terrace.map((t) => t.x);
     const zs = o.terrace.map((t) => t.z);

@@ -17,7 +17,7 @@
 // at the next update (a walk that ended beside its spot too), never through anyone.
 import type { Built } from './growth';
 import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, type Pt, QUEUE_GAP, type Segment, type SitAt, type Sits, type Spot, type Timeline } from './model';
-import { pastimes } from './skate';
+import { pastimeSig, pastimeSpot, pastimesOf } from './pastimes';
 import { hash } from './activity';
 import { chairSpots, NAP_UP, seatedAct, seatWaits, SIT_S, sitWay, visitAt } from './sit';
 import { coffeeAtCorner } from './cozy';
@@ -147,9 +147,9 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
       for (const [name, b] of bims) if (b.key && !b.leaving) held.set(b.key, name);
       playEvents(bims, acts, events, t, seen);
       for (const b of bims.values()) if (b.over && t >= b.over.until) b.over = null;
-      // a map with a park: some idle bims skate there (skate.ts; a look over the activity, never one played over an event)
+      // a map with a park or a gym: some idle bims skate or climb there (pastimes.ts; a look over the activity, never one played over an event)
       const idleNow = new Map([...acts].filter(([name]) => bims.get(name)?.over == null));
-      const fun2 = pastimes(idleNow, next, t, fun);
+      const fun2 = pastimesOf(idleNow, next, t, fun);
       const later: Later[] = [];
       // what this update's searches may expand, all together (avoid.ts)
       const budget: Budget = { left: UPDATE_BUDGET };
@@ -158,12 +158,12 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
         let b = bims.get(name);
         const want = nookFor(name, coffeeFor(bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, built?.beds), next, fun?.stage), next);
         const pt = b?.over ? undefined : fun2.get(name);
-        const parkSpot = pt ? next.park?.spots[pt.slot] : undefined;
+        const parkSpot = pt ? pastimeSpot(next, pt) : undefined;
         const last = b?.segs.at(-1);
         // a done bim reclines only on a deck chair (chairFor): at the spot it holds now, then at the one it gets
         let act = chairFor(want, next, last?.spot, built?.chairs);
         // the stage too: a skater rides the park as built now, never one a stage behind (a new piece starts a new line)
-        const skate = pt && parkSpot ? `skate|${String(pt.slot)}|${pt.pool ? 'pool' : ''}|${pt.nine ? '900' : ''}|${String(pt.stage)}` : null;
+        const skate = pt && parkSpot ? pastimeSig(pt) : null;
         let sig = skate ?? sigOf(act);
         const fixed = opts.spotOf?.(name, next, act) ?? parkSpot ?? fixedSpot(next, name, act);
         // a napper at its desk goes to a bean bag built since (bedFor): the same sig, another place
@@ -300,7 +300,7 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
 function dress(seg: Segment, pt: Pastime | undefined, last: Segment | undefined): Segment {
   const sit = seg.sit ? keptSit(seg.sit, seg.path.len) : {};
   const plain: Segment = { t: seg.t, act: seg.act, sig: seg.sig, spot: seg.spot, path: seg.path, speed: seg.speed, from: seg.from, ...(seg.waits ? { waits: seg.waits } : {}), ...sit };
-  return { ...plain, ...(pt ? { pastime: pt } : {}), ...(!pt && last?.pastime ? { fromSkate: true } : {}) };
+  return { ...plain, ...(pt ? { pastime: pt } : {}), ...(!pt && last?.pastime?.kind === 'skate' ? { fromSkate: true } : {}) };
 }
 
 /** a sit's walk beats belong to its walk: a bim put at its spot (the world rebuilt) is there at once, standing with its chair out or seated */

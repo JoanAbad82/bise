@@ -208,7 +208,7 @@ export const MAIN_SEAT = '\u0000main';
 /** a skater on the flat or resting on its board `dt` s from now (never mid-trick, on a ramp or a bowl's wall). Pure. */
 export function skateFlat(f: BimFrame, park: Park, dt: number): boolean {
   const p = f.pose.seg.pastime;
-  if (p === undefined) return true;
+  if (p?.kind !== 'skate') return true;
   const m = skateAt(f.name, p, sinceArrived(f.pose) + dt, park).move;
   return m === null || (m.trick === 'roll' && (m.on === null || m.on === 'flat'));
 }
@@ -245,6 +245,8 @@ export function notePokes(log: PokeLog, clicks: readonly Click[], frames: readon
     const p = pokeOf(before, c, sit, room.spins(f.name, f.main));
     if (p === null) continue;
     let at = p.t;
+    // a climber (climb.ts) is on the wall or resting for its next problem: no reaction there
+    if (sit === 'skate' && f.pose.seg.pastime?.kind === 'climb') continue;
     if (sit === 'skate') {
       const wait = flatStart(f, room.park, POKES[p.kind].dur);
       if (wait === null) continue;

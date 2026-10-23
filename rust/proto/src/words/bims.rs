@@ -209,6 +209,34 @@ crate::words! { bims:
     stage_nordic_13 = "the midsummer pole";
     /// nordic, stage 14: the last one, in the garden
     stage_nordic_14 = "the golden Dala horse";
+    /// the climbing gym, stage 1: a bucket of chalk and the brushes by the wall
+    stage_climb_1 = "the chalk bucket and brushes";
+    /// the climbing gym, stage 2: fruit and a blender on the café bar
+    stage_climb_2 = "the smoothie corner";
+    /// the climbing gym, stage 3: a wooden board to hang from by the fingers
+    stage_climb_3 = "the hangboard";
+    /// the climbing gym, stage 4: plants hanging from the hall's beams
+    stage_climb_4 = "the hanging plants";
+    /// the climbing gym, stage 5: a long wooden bench by the mats, chalk bags and shoes on it
+    stage_climb_5 = "the chalk-up bench";
+    /// the climbing gym, stage 6: a small low wall with big holds for kids
+    stage_climb_6 = "the kids' wall";
+    /// the climbing gym, stage 7: a bell at the top of each problem, rung on a top-out
+    stage_climb_7 = "the bell on top";
+    /// the climbing gym, stage 8: the route setters' stacked crates of spare holds, a drill on top
+    stage_climb_8 = "the hold crates";
+    /// the climbing gym, stage 9: planters along the pavement out front
+    stage_climb_9 = "the planted terrace";
+    /// the climbing gym, stage 10: a glass room for yoga in the hall
+    stage_climb_10 = "the yoga room";
+    /// the climbing gym, stage 11: a small wooden sauna
+    stage_climb_11 = "the sauna";
+    /// the climbing gym, stage 12: a big freestanding boulder in the hall
+    stage_climb_12 = "the boulder";
+    /// the climbing gym, stage 13: a slackline between two posts
+    stage_climb_13 = "the slackline";
+    /// the climbing gym, stage 14: the last one, at the top of the big wall
+    stage_climb_14 = "the golden hold";
     /// the event label 3 s over the new piece as two bims carry it in
     grow_new(thing) = "new: {thing}";
     /// the tip on the ground's corner: the level, the jobs done, the next piece and when
@@ -269,6 +297,10 @@ crate::words! { bims:
     map_california = "California";
     /// California's mood, under its name in the /bims picker
     map_california_mood = "a stucco office and a concrete skatepark";
+    /// a map: a bouldering gym in a Paris hall
+    map_climb = "Climbing gym";
+    /// the climbing gym's mood, under its name in the /bims picker
+    map_climb_mood = "a café beside a bouldering wall, a Paris street";
     /// the /bims picker's tip on its row: what picking it does
     map_pick_tip(map) = "draw this project's office as the {map}";
     /// the tip on the row of the map it has now
@@ -297,6 +329,8 @@ crate::words! { bims:
     // ---- California's skatepark (apps/desktop/src/bims/skate.ts): an idle bim skates there
     /// the hover's state of a skater: how long it has been idle (`12 min`), then what it does
     state_skating(dur) = "idle {dur} · skating";
+    /// the hover's state of a climber (the climbing gym): how long it has been idle, then what it does
+    state_climbing(dur) = "idle {dur} · climbing";
     /// a trick's name, 1.5 s over the bim the office follows (the 2.2x zoom), never in the normal view
     trick_drop_in = "drop in";
     /// a trick's name: pumping through the bowl for speed

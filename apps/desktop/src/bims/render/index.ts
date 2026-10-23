@@ -167,7 +167,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     if (probe.trace.length > TRACE_MAX) probe.trace.splice(0, probe.trace.length - TRACE_MAX);
     const p = f.pose.seg.pastime;
     const park = office.office()?.park;
-    if (skating && p && park) {
+    if (skating && p?.kind === 'skate' && park) {
       const now = skateAt(f.name, p, sinceArrived(f.pose), park);
       probe.skate.push({ t, name: f.name, n: now.n, phase: now.move === null ? 'rest' : 'line' });
       if (probe.skate.length > TRACE_MAX) probe.skate.splice(0, probe.skate.length - TRACE_MAX);

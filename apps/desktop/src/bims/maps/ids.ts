@@ -17,6 +17,7 @@ export const MAP_IDS = [
   'cyclades',
   'sahel',
   'california',
+  'climb',
 ] as const;
 
 export type MapId = (typeof MAP_IDS)[number];

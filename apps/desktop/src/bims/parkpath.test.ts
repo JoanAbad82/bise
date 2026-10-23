@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { crowd } from './fixtures';
 import { californiaLayout } from './maps/california';
-import type { Pastime, Pose, Pt, Segment } from './model';
+import type { SkatePastime as Pastime, Pose, Pt, Segment } from './model';
 import { FEATURE_STAGE, type Feature, clearAt, has, portIn, portOut, route, routerBuilds, stairsEntry, surfaceAt } from './parkpath';
 import { makePath } from './paths';
 import { skateRig } from './render/skate';

@@ -243,6 +243,10 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   const fill = add(style.box(0.58, 0.06, 0.035), mat(WORLD.bar, 0.3), progress, 0, 0, 0.005);
   const sweat = [0, 1, 2].map(() => add(style.box(0.06, 0.09, 0.04), mat(WORLD.sweat, 0.3), head, 0, 0, 0));
   const steam = [0, 1, 2].map(() => add(style.ball(0.08), mat(WORLD.steam), g, 0, 0, 0));
+  // a climber's fall onto the mat (render/climb.ts): a puff of chalk round its seat, swelling, then gone
+  const puff = new Group();
+  g.add(puff);
+  for (const [px, pz] of [[-0.24, 0.05], [0.24, 0.05], [0, -0.22], [0.14, 0.22], [-0.14, 0.22]] as const) add(style.ball(0.07), mat(WORLD.paper), puff, px, 0.3, pz);
 
   const setRot = (obj: Object3D, r: Rot): void => { obj.rotation.set(r[0], r[1], r[2]); };
   let lastGrey = -1;
@@ -352,6 +356,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
         q.position.set(Math.sin(k * 6 + i) * 0.1, 1.28 * s + k * 0.9, 0);
         q.scale.setScalar(0.6 + k);
       });
+      puff.visible = p.chalk !== undefined;
+      if (p.chalk !== undefined) puff.scale.setScalar(0.6 + p.chalk * 1.4);
       if (rig.grey !== lastGrey) {
         lastGrey = rig.grey;
         for (const [m, c] of orig) m.color.copy(c).lerp(GREY, rig.grey * 0.85);

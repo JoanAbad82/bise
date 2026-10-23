@@ -23,7 +23,7 @@ import { useModHeld } from '@/app/held';
 import type { ActivitiesFn, ActivityKind, Label, LabelsFn, LayoutFn, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer } from './model';
 import { CHECK_MS, HOVER_MS, nextAfter } from './loop';
 import { awayNow, nightNow, testMode } from './room';
-import { wakeIn } from './skate';
+import { pastimeWake } from './pastimes';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type KeepRect, type TagIn } from './tags';
@@ -504,8 +504,8 @@ export function Office({
         lastLabels = sig;
         setLabels(shown);
       }
-      // a resting skater (skate.ts): no frame during its rest, a timer for its next line
-      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: step.moving, labels: shown, away: awayNow(), lost, wake: soonest(wakeIn(frames, office.park), step.wake) });
+      // a resting skater or climber (pastimes.ts): no frame during its rest, a timer for its next line
+      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: step.moving, labels: shown, away: awayNow(), lost, wake: soonest(pastimeWake(frames, office), step.wake) });
       if (next === 0) raf = requestAnimationFrame(draw);
       else if (next !== null) tick = setTimeout(draw, next);
     };

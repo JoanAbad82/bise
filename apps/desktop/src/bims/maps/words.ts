@@ -19,6 +19,7 @@ const WORDS: Readonly<Record<MapId, { readonly name: string; readonly mood: stri
   cyclades: { name: bims.map_cyclades, mood: bims.map_cyclades_mood },
   sahel: { name: bims.map_sahel, mood: bims.map_sahel_mood },
   california: { name: bims.map_california, mood: bims.map_california_mood },
+  climb: { name: bims.map_climb, mood: bims.map_climb_mood },
 };
 
 export const mapName = (id: MapId): string => WORDS[id].name;

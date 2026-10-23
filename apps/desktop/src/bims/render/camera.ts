@@ -36,14 +36,14 @@ export const SHADOW_BLUR = 0.55;
 
 /** the building's site: what the camera fits at 320 (the garden past it is cropped, a soft fade); its low end takes the cube's shadow in */
 export function siteOf(o: Office): Site {
-  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: SLAB_LOW - SHADOW_DROP, yHigh: 2.5 };
+  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: SLAB_LOW - SHADOW_DROP, yHigh: o.height ?? 2.5 };
 }
 
 /** The whole ground for this growth: the grass block world.ts builds (growth.ts groundMargin). */
 export function groundOf(o: Office, g: { readonly stage: number; readonly garden: number }): Site {
   const s = siteOf(o);
   const m = groundMargin(g);
-  return { x0: s.x0 - m, x1: s.x1 + m, z0: s.z0 - m / 2, z1: s.z1 + m / 2, yLow: s.yLow, yHigh: g.stage >= 13 ? 3.0 : s.yHigh };
+  return { x0: s.x0 - m, x1: s.x1 + m, z0: s.z0 - m / 2, z1: s.z1 + m / 2, yLow: s.yLow, yHigh: g.stage >= 13 ? Math.max(3.0, s.yHigh) : s.yHigh };
 }
 
 /**
