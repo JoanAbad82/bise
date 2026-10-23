@@ -91,6 +91,25 @@ function NewEnd({ words }: { words: string }) {
 }
 
 /** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count, each mark with its tip; ⌘ held: its number. */
+/** A row's name; cut ('…'), it carries the ds tip with the whole name (designer m_38093) */
+function CutName({ name }: { name: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || typeof name !== 'string') return undefined;
+    const sync = () => {
+      if (el.scrollWidth > el.clientWidth) el.setAttribute('data-tip', name);
+      else el.removeAttribute('data-tip');
+    };
+    sync();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => { ro.disconnect(); };
+  }, [name]);
+  return <span ref={ref} className="nm">{name}</span>;
+}
+
 function SRow({ kind, lead, name, end, endErr, endTip, count, countTip, hint, on, title, onClick, testId, children }: {
   kind: 'top' | 'pj' | 'ag' | 'more' | 'ft';
   lead: ReactNode;
@@ -134,7 +153,7 @@ function SRow({ kind, lead, name, end, endErr, endTip, count, countTip, hint, on
     <div className={`b-row app-r ${kind}${on === true ? ' on' : ''}`} role="button" tabIndex={-1} aria-current={on === true || undefined} title={title}
       onClick={onClick} data-testid={testId}>
       <span className="app-g">{lead}</span>
-      <span className="nm">{name}</span>
+      <CutName name={name} />
       {children}
       {children != null ? (
         // a row with a ⋯ (a project's): its end words in a box of a kept width at the row's end;
