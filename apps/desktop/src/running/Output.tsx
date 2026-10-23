@@ -39,7 +39,9 @@ export function Output({ project, agent, id, none, live, onTerm }: OutputProps) 
       cursorInactiveStyle: 'none',
       convertEol: true,
       scrollback: 5000,
-      theme: themeOf(el),
+      // its ground is the box's (--c-raised): xterm draws none of its own
+      allowTransparency: true,
+      theme: themeOf(),
     });
     const fitter = new FitAddon();
     term.loadAddon(fitter);
@@ -56,6 +58,14 @@ export function Output({ project, agent, id, none, live, onTerm }: OutputProps) 
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
+    // his theme changes while it is open (the system's, or the app's data-theme): its ink follows
+    const retheme = () => {
+      term.options.theme = themeOf();
+    };
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+    scheme.addEventListener('change', retheme);
+    const themed = new MutationObserver(retheme);
+    themed.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     let state = START;
     const off = store.onEvent((ev) => {
       if (ev.ev !== 'proc_out' || ev.project !== project || ev.agent !== agent || ev.id !== id) return;
@@ -70,6 +80,8 @@ export function Output({ project, agent, id, none, live, onTerm }: OutputProps) 
       if (live) store.command({ cmd: 'proc_follow', project, agent, id, on: false });
       off();
       ro.disconnect();
+      scheme.removeEventListener('change', retheme);
+      themed.disconnect();
       onTerm?.(null);
       term.dispose();
     };
@@ -91,9 +103,12 @@ function cssVar(name: string): string {
 /** The fewest columns: an output's long line scrolls sideways instead of wrapping. */
 const WIDE = 320;
 
-/** xterm's colors: its box's own fill (--c-raised, resolved: a color-mix xterm can't read), the palette's ink. */
-function themeOf(box: HTMLElement) {
-  const bg = getComputedStyle(box).backgroundColor || cssVar('--p-raised') || '#1f1c1a';
+/**
+ * xterm's colors: no ground of its own (the box's --c-raised shows through: a color-mix value xterm
+ * can't read fell back to black, the sign shot of m_38536), the palette's ink, the ds selection.
+ */
+function themeOf() {
+  const clear = 'rgba(0, 0, 0, 0)';
   const text = cssVar('--p-text') || '#ece6da';
-  return { background: bg, foreground: text, cursor: bg, cursorAccent: bg, selectionBackground: cssVar('--p-sel') || '#33292c' };
+  return { background: clear, foreground: text, cursor: clear, cursorAccent: clear, selectionBackground: cssVar('--p-sel') || '#33292c' };
 }
