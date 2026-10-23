@@ -59,7 +59,8 @@ def main():
         c.wait_idle("t1")
         nohup_out = os.path.join(E.tmp, "nohup.out")
         c.say("[[bash: nohup python3 -u -m http.server 0 --bind 127.0.0.1 > %s 2>&1 & echo started]]" % nohup_out, focus="t1")
-        c.wait(lambda: any(l.strip() == "started" for l in c.lines("t1")), 60, "the nohup'd server started")
+        # its tool row: `tool_result #<n> ok : started`
+        c.wait(lambda: any(l.startswith("tool_result #") and l.rstrip().endswith(" ok : started") for l in c.lines("t1")), 60, "the nohup'd server started")
         c.wait_idle("t1")
 
         def listed():
@@ -99,7 +100,11 @@ def main():
         # follow: a request to the server lands in its log, then in a notification
         r.call("process/follow", {"project": project, "agent": "t1", "id": bg["id"], "on": True})
         import urllib.request
-        urllib.request.urlopen(bg["url"] + "/followed-path", timeout=5).read()
+        import urllib.error
+        try:
+            urllib.request.urlopen(bg["url"] + "/followed-path", timeout=5).read()
+        except urllib.error.HTTPError:
+            pass  # a 404: the request is in its log all the same
         wait.until(lambda: any("followed-path" in base64.b64decode(n["params"]["data"]).decode(errors="replace")
                                for n in r.notes("process/output")), 20, "the followed output")
         r.call("process/follow", {"project": project, "agent": "t1", "id": bg["id"], "on": False})
