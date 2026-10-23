@@ -548,6 +548,16 @@ with tempfile.TemporaryDirectory() as home:
     eh.seek(0)
     said = eh.read()
     check("held by: heavy" in said and " holder-wt 0 min: sh -c while" in said, "the waiting line names the holders: %r" % said)
+    # HEAVY_DEADLINE (review-gates m_38056): still queued then, the job never starts; rc 75 and who
+    # held the slots
+    rand = os.path.join(home, "ran_deadline")
+    r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', rand], env=dict(roomy, HEAVY_DEADLINE=str(int(time.time()) + 2)),
+                       capture_output=True, text=True, timeout=60)
+    check(r.returncode == 75 and not os.path.exists(rand) and "heavy-run: no slot by " in r.stderr and " holder-wt " in r.stderr,
+          "the slots held past HEAVY_DEADLINE: rc 75, no job, the holders named: %r %r" % (r.returncode, r.stderr[-300:]))
+    r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', rand], env=dict(roomy, HEAVY_DEADLINE="06:00"), capture_output=True, text=True, timeout=30)
+    check(r.returncode == 2 and not os.path.exists(rand) and "HEAVY_DEADLINE wants an epoch" in r.stderr,
+          "HEAVY_DEADLINE not an epoch: refused, rc 2: %r %r" % (r.returncode, r.stderr[-200:]))
     open(go_h, "w").close()
     for j in hold2 + [wh]:
         job_ends(j, 30)

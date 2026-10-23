@@ -41,6 +41,9 @@ echo "lockf: $HOME/.bise/run/heavy.lock: already locked"
 [ "${1:-}" = --alone ] && { echo "heavy-run: both slots"; shift; }
 [ "${1:-}" = --land ] && { echo "heavy-run: rank 1, a land check"; shift; }
 [ -n "${HEAVY_MAX_MIN:-}" ] && echo "heavy-run: max ${HEAVY_MAX_MIN} min"
+[ -n "${HEAVY_DEADLINE:-}" ] && echo "heavy-run: deadline $HEAVY_DEADLINE"
+# still queued at the deadline: heavy-run's own words, exit 75, no job
+[ -n "${FAKE_NOSLOT:-}" ] && [ -n "${HEAVY_DEADLINE:-}" ] && { echo "heavy-run: no slot by 06:00: $FAKE_NOSLOT"; exit 75; }
 exec "$@"
 """
 
@@ -289,6 +292,19 @@ def main():
         rc, log, last, red = night(FAKE_COV_CHECKS="cut")
         check(rc == 0 and red is None, "a cut night after a whole one: not red: rc %s, red %r" % (rc, red))
         rc, log, last, red = night()
+        # still queued at the night's end (review-gates m_38056: 2026-10-23 queued 01:43, waiting at
+        # 09:31): heavy-run gets the end as HEAVY_DEADLINE and gives up with who held the slots; the
+        # night is a skip with that why, nothing ran, not red the first time
+        rc, log, last, red = night(FAKE_NOSLOT="heavy5 release-49 300 min: desktop_tag d39283a8")
+        check(rc == 3 and "fake gate" not in log and "START " not in log and "heavy-run: deadline " in log
+              and "SKIP no slot by 06:00: heavy5 release-49 300 min: desktop_tag d39283a8" in log
+              and last.split()[1:3] == ["?", "skip"] and "no slot by 06:00: heavy5 release-49" in last and red is None,
+              "no slot by the end: a skip naming the holders: rc %s, last %r, red %r, log %r" % (rc, last, red, log))
+        rc, log, last, red = night(FAKE_NOSLOT="heavy5 x")
+        check(rc == 1 and red is not None and "two nights in a row" in red and "no slot by 06:00" in red,
+              "a second no-slot night in a row: red: rc %s, red %r" % (rc, red))
+        rc, log, last, red = night()
+        check(rc == 0 and red is None, "a whole night after: green again: rc %s" % rc)
         # the slots come past the end (06:10): nothing runs, not even the gate; a none night, the
         # second in a row red
         rc, log, last, red = night(FAKE_SLOT_AT=at(6, 10))

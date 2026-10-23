@@ -346,6 +346,8 @@ day="$(date +%F)" log="$out/$(date +%F).log" s=$SECONDS
 unset TIP_RUN
 if [ -n "$night_until" ]; then
   NIGHTLY_END="$(night_end)" || { echo "NIGHTLY_UNTIL wants HH:MM, got $night_until" >&2; exit 2; }
+  # an epoch, or heavy-run's deadline (HEAVY_DEADLINE) and late() never fire (review-gates m_38064)
+  [[ "$NIGHTLY_END" =~ ^[0-9]+$ ]] || { echo "nightly: the night's end is not an epoch: '$NIGHTLY_END'" >&2; exit 2; }
   export NIGHTLY_END
 else
   # no end: never a caller's (2026-10-20: tests/nightly_gate_test.py, run by the night's own
@@ -370,9 +372,25 @@ fi
 echo "QUEUED $(date): waiting for a heavy slot${NIGHTLY_END:+, nothing new starts after $(date -r "$NIGHTLY_END" '+%F %H:%M')}" >"$log"
 # --alone: both heavy slots, never beside an agent's heavy job (2026-10-14:
 # beside one, at load 8-9, 5 long tests timed out that pass alone; issue 26)
-"${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --alone /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
+# HEAVY_DEADLINE: still queued at the night's end, the waiter gives up (review-gates m_38056: the
+# night queued at 01:43 on 2026-10-23 still waited at 09:31, the cutoff never applied in the queue)
+HEAVY_DEADLINE="${NIGHTLY_END:-}" "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --alone /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
 rc=$?
 sha="$(awk '/^START /{print $NF; exit}' "$log")"
+noslot="$(sed -n 's/^heavy-run: no slot by //p' "$log" | tail -1)"
+if [ -z "$sha" ] && [ -n "$noslot" ]; then
+  # no slot by the night's end: a skip, said with who held the slots; the second night in a row
+  # with nothing run is red
+  why="no slot by $noslot"
+  echo "SKIP $why" >>"$log"
+  prev="$(cut -d' ' -f3 "$out/last" 2>/dev/null)"
+  echo "$day ? skip $((SECONDS - s)) $why" >"$out/last"
+  case "$prev" in none|skip|nostart)
+    { echo "nightly full gate: nothing ran two nights in a row ($day: $why)"; echo "log: $log"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
+    exit 1 ;;
+  esac
+  exit 3
+fi
 late_why="$(sed -n 's/^LATE //p' "$log" | tail -1)"
 if [ -z "$sha" ] && [ -n "$late_why" ]; then
   # the slots came past the night's end: nothing ran, a night with no result (none), never green;

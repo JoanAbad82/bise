@@ -575,6 +575,8 @@ ahead() {
 # from submit to start could not be read): each round's time goes to the reason the round before
 # ended on (disk, battery, load, else a slot); tally adds it, and HEAVY_WAITED carries
 # "disk:<s> slot:<s> load:<s> batt:<s>" to the job's start line in heavy.log (waited=...)
+# HEAVY_DEADLINE must be an epoch: 'HH:MM' would make its -ge never fire, silently
+case "${HEAVY_DEADLINE:-}" in *[!0-9]*) echo "heavy-run: HEAVY_DEADLINE wants an epoch (seconds), got '$HEAVY_DEADLINE'" >&2; exit 2 ;; esac
 wd=0 ws=0 wl=0 wb=0 why="" prev=$(date +%s)
 tally() {
   local now; now=$(date +%s)
@@ -585,6 +587,14 @@ tally() {
 # lockf -t 0 exits 75 (EX_TEMPFAIL) when the slot is taken.
 while :; do
   tally
+  # HEAVY_DEADLINE (an epoch: the nightly's end, review-gates m_38056): a job still queued then
+  # never starts. On 2026-10-23 the night queued at 01:43 still waited at 09:31, and its --alone
+  # would have taken the 4 slots for hours in the day. It exits 75 with who held the slots.
+  if [ -n "${HEAVY_DEADLINE:-}" ] && [ "$(date +%s)" -ge "$HEAVY_DEADLINE" ] 2>/dev/null; then
+    h=$(holders)
+    echo "heavy-run: no slot by $(date -r "$HEAVY_DEADLINE" +%H:%M): ${h:-the slots were held (no holder left)}" >&2
+    exit 75
+  fi
   held=""
   # the disk: the floor (HEAVY_DISK_WAIT_GB, 10; 15 before 2026-10-22, main m_37463) + what the running jobs may
   # still write + this job's own reserve must be free; else reclaim, and wait
