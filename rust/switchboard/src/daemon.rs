@@ -1550,21 +1550,10 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     crate::client::jailed(&paths)?;
     // a state path too long for a unix socket: the short link first
     paths.prepare_socket()?;
-    // one hub per workspace
-    if UnixStream::connect(paths.socket()).is_ok() {
+    let Some(Claimed { listener, agent_listener, lease: _lease }) = claim(&paths, &opts.app_root)? else {
         eprintln!("a hub is already running for {}", paths.workspace.display());
         return Ok(());
-    }
-    wait_previous_hub(&paths);
-    if UnixStream::connect(paths.socket()).is_ok() {
-        eprintln!("a hub is already running for {}", paths.workspace.display());
-        return Ok(());
-    }
-    let _ = std::fs::remove_file(paths.socket());
-    let _ = std::fs::remove_file(paths.agent_socket());
-    let listener = UnixListener::bind(paths.socket())?;
-    let agent_listener = UnixListener::bind(paths.agent_socket())?;
-    std::fs::write(paths.pid_file(), std::process::id().to_string())?;
+    };
     // a hub one of its own agents relaunched is not that agent's: its
     // sb-core, builds and REPLs do not carry that tag (BISE-243)
     let proc_hub = paths.proc_hub();
@@ -1578,8 +1567,6 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     if let Err(e) = crate::tools_env::write_mktemp_shim(&paths.bin_dir()) {
         log_line(&paths, &format!("mktemp shim not written: {}", e));
     }
-    // where this hub runs from: said (the switcher comes back to it), leased
-    let _lease = crate::client::run_from(&paths, &opts.app_root);
     log_line(&paths, &format!("hub start pid={} workspace={}", std::process::id(), paths.workspace.display()));
     // no boot hangs silently: its steps and the replay's batches are its progress
     let boot = boot::Boot::start(&paths, "hub start (sb-core starting)");
@@ -1926,6 +1913,48 @@ fn wait_previous_hub(paths: &Paths) {
         std::thread::sleep(Duration::from_millis(50));
     }
     log_line(paths, &format!("waited {} ms for the previous hub (pid {}) to stop", t0.elapsed().as_millis(), pid));
+}
+
+/// What a hub that won its workspace holds: its two sockets and the lease
+/// on its app root.
+struct Claimed {
+    listener: UnixListener,
+    agent_listener: UnixListener,
+    lease: Option<bise_home::release::Lease>,
+}
+
+/// One hub per workspace: None when one already runs. Else this hub says
+/// where it runs from (`hub.root`, read by the switcher and the clients
+/// once the socket is up) and leases that root, then binds its sockets
+/// and writes its pid. All of it under an exclusive flock on
+/// `<state>/hub.bind.lock`, so two hubs that start at once never both
+/// write `hub.root`: the second one finds the first one's socket.
+fn claim(paths: &Paths, app_root: &Path) -> std::io::Result<Option<Claimed>> {
+    use std::os::fd::AsRawFd;
+    if UnixStream::connect(paths.socket()).is_ok() {
+        return Ok(None);
+    }
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(paths.state.join("hub.bind.lock"))?;
+    // SAFETY: flock on a descriptor this function owns, released when `lock` drops
+    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    wait_previous_hub(paths);
+    if UnixStream::connect(paths.socket()).is_ok() {
+        return Ok(None);
+    }
+    let lease = crate::client::run_from(paths, app_root);
+    let _ = std::fs::remove_file(paths.socket());
+    let _ = std::fs::remove_file(paths.agent_socket());
+    let listener = UnixListener::bind(paths.socket())?;
+    let agent_listener = UnixListener::bind(paths.agent_socket())?;
+    std::fs::write(paths.pid_file(), std::process::id().to_string())?;
+    drop(lock);
+    Ok(Some(Claimed { listener, agent_listener, lease }))
 }
 
 #[cfg(test)]

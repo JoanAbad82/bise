@@ -49,3 +49,25 @@ fn live_lines_carry_their_time() {
     );
     assert_eq!(lines::line_event("t1", 1, 0, "x"), json!({"ev": "line", "agent": "t1", "line": "x", "pos": 1}));
 }
+
+/// architect m_38142: two hubs of one workspace that start at once. The
+/// first one claims it (hub.root written before its socket is up, the
+/// tip red of older_tui_bundle_hub_tmux on 8c3644957: hub.root read once
+/// the socket appeared, 16 starts of 20 too early); the second one finds
+/// that socket and leaves the first one's hub.root as it was.
+#[test]
+fn a_second_hub_leaves_the_first_ones_hub_root() {
+    let t = std::env::temp_dir().join(format!("sb-claim-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&t);
+    let paths = Paths { workspace: t.join("ws"), state: t.join("st"), worktrees: t.join("wt") };
+    std::fs::create_dir_all(&paths.state).unwrap();
+    paths.prepare_socket().unwrap();
+    let first = claim(&paths, &t.join("v1")).unwrap().expect("the first hub claims the workspace");
+    assert!(UnixStream::connect(paths.socket()).is_ok());
+    let root = || std::fs::read_to_string(paths.state.join("hub.root")).unwrap();
+    assert_eq!(root(), t.join("v1").to_string_lossy());
+    assert!(claim(&paths, &t.join("v2")).unwrap().is_none(), "a second hub claimed it too");
+    assert_eq!(root(), t.join("v1").to_string_lossy(), "the second hub wrote its hub.root");
+    drop(first);
+    let _ = std::fs::remove_dir_all(&t);
+}
