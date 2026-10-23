@@ -254,10 +254,12 @@ pub(crate) fn list_lines(sc: &Screen, order: &[String], project: &str, wd: usize
 fn head_line(sc: &Screen, project: &str, wd: usize) -> Line<'static> {
     let wide = wd >= rows::WIDE_FROM;
     let items = sc.items.as_deref().unwrap_or(&[]);
+    // before the hub's first answer: no count yet (never '0 running')
+    let project_only = sc.items.is_none();
     // the keys on its right at 150 columns; at 80 the head has the row
     let keys_w = if wide { running::keys_head.width().max(running::keys_head_ended.width()) + 3 } else { 0 };
     let room = if wide { wd.saturating_sub(keys_w) } else { wd.saturating_sub(running::ended_today.width() + 3) };
-    let left = rows::head(project, items, room);
+    let left = if project_only { project.to_string() } else { rows::head(project, items, room) };
     let mut spans = vec![Span::styled(left.clone(), Style::default().fg(text()))];
     if sc.typing || !sc.query.is_empty() {
         spans.push(Span::styled(format!("   / {}", sc.query), Style::default().fg(text())));

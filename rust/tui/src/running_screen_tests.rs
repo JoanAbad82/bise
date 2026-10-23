@@ -256,3 +256,12 @@ fn a_row_that_ends_while_open_keeps_its_place_until_tab() {
     press(&mut app, KeyCode::Tab);
     assert!(!rows(&app).contains(&"p48990.1791100150".to_string()), "{:?}", rows(&app));
 }
+
+/// Before the hub's first answer the head has no count (it said '0 running').
+#[test]
+fn the_head_counts_only_once_the_hub_answered() {
+    let sc = Screen::default();
+    assert_eq!(texts(&[head_line(&sc, "acme", 146)])[0].split("   ").next().unwrap().trim(), "acme");
+    let sc = screen();
+    assert!(texts(&[head_line(&sc, "acme", 146)])[0].starts_with(&format!("acme · {}", running::count_running(3))));
+}
