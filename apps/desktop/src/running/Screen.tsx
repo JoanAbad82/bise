@@ -178,7 +178,7 @@ export function RunningView({
         <header className="run-head">
           <div className="run-h1">{running.heading}</div>
           <div className="run-h2" data-testid="running.sub">
-            {`${running.running_in({ n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}
+            {`${running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}
           </div>
         </header>
         <div className="run-bar">

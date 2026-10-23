@@ -199,10 +199,11 @@
   },
   "running.running_in": {
     "args": [
+      "count",
       "n"
     ],
-    "one": "running in {n} project",
-    "text": "running in {n} projects"
+    "one": "{count} running in {n} project",
+    "text": "{count} running in {n} projects"
   },
   "running.search": {
     "args": [],

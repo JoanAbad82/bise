@@ -78,8 +78,8 @@ export const running = {
   by: (a: { agent: string | number }): string => "by " + String(a.agent),
   /** the sidebar row's count tip */
   tip_sidebar: (a: { n: string | number }): string => String(a.n) + " running, in all your projects",
-  /** the screen's head under its title: where and how many listen */
-  running_in: (a: { n: number }): string => a.n === 1 ? "running in " + String(a.n) + " project" : "running in " + String(a.n) + " projects",
+  /** the screen's head under its title: how many run, in how many projects (`3 running in 1 project`) */
+  running_in: (a: { count: string | number; n: number }): string => a.n === 1 ? String(a.count) + " running in " + String(a.n) + " project" : String(a.count) + " running in " + String(a.n) + " projects",
   /** the screen's filter: the running ones */
   filter_running: (a: { n: string | number }): string => "running · " + String(a.n),
   /** the screen's filter: the ones that ended today */

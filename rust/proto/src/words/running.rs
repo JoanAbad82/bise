@@ -95,8 +95,8 @@ crate::words! { running:
     by(agent) = "by {agent}";
     /// the sidebar row's count tip
     tip_sidebar(n) = "{n} running, in all your projects";
-    /// the screen's head under its title: where and how many listen
-    running_in(n) = one "running in {n} project" | "running in {n} projects";
+    /// the screen's head under its title: how many run, in how many projects (`3 running in 1 project`)
+    running_in(count, n) = one "{count} running in {n} project" | "{count} running in {n} projects";
     /// the screen's filter: the running ones
     filter_running(n) = "running · {n}";
     /// the screen's filter: the ones that ended today

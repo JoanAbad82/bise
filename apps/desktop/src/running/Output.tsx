@@ -31,26 +31,27 @@ export function Output({ project, agent, id, none, live, onTerm }: OutputProps) 
     if (none || el === null) return;
     const term = new Xterm({
       fontFamily: cssVar('--font-mono') || 'ui-monospace, Menlo, monospace',
+      // mono 12/1.5 (designer m_38536)
       fontSize: 12,
-      lineHeight: 1.2,
+      lineHeight: 1.5,
       disableStdin: true,
       cursorBlink: false,
       cursorInactiveStyle: 'none',
       convertEol: true,
       scrollback: 5000,
-      theme: themeOf(),
+      theme: themeOf(el),
     });
     const fitter = new FitAddon();
     term.loadAddon(fitter);
     term.open(el);
     onTerm?.(term);
+    // its rows fill the box; its columns never fewer than WIDE, so a long line is never wrapped: the box scrolls sideways
     const fit = () => {
       if (el.clientWidth === 0 || el.clientHeight === 0) return;
-      try {
-        fitter.fit();
-      } catch {
-        // not laid out yet
-      }
+      const d = fitter.proposeDimensions();
+      if (d === undefined || !Number.isFinite(d.rows) || !Number.isFinite(d.cols)) return;
+      const cols = Math.max(d.cols, WIDE);
+      if (cols !== term.cols || d.rows !== term.rows) term.resize(cols, Math.max(1, d.rows));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -87,9 +88,12 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-/** xterm's colors from the ds palette, as the terminal panel's. */
-function themeOf() {
-  const bg = cssVar('--p-bg') || '#141211';
+/** The fewest columns: an output's long line scrolls sideways instead of wrapping. */
+const WIDE = 320;
+
+/** xterm's colors: its box's own fill (--c-raised, resolved: a color-mix xterm can't read), the palette's ink. */
+function themeOf(box: HTMLElement) {
+  const bg = getComputedStyle(box).backgroundColor || cssVar('--p-raised') || '#1f1c1a';
   const text = cssVar('--p-text') || '#ece6da';
-  return { background: bg, foreground: text, cursor: bg, cursorAccent: bg, selectionBackground: cssVar('--p-rule') || '#4a4540' };
+  return { background: bg, foreground: text, cursor: bg, cursorAccent: bg, selectionBackground: cssVar('--p-sel') || '#33292c' };
 }

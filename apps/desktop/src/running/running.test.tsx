@@ -65,7 +65,7 @@ describe('the running screen', () => {
     render(<RunningView items={[stripe, dev, failed, nohup]} ports={ports()} now={NOW} />);
     expect(screen.getByTestId('running.filter.running').textContent).toBe('running · 3');
     expect(screen.getByTestId('running.filter.ended').textContent).toBe('ended today · 1');
-    expect(screen.getByTestId('running.sub').textContent).toBe('running in 2 projects · 1 listening');
+    expect(screen.getByTestId('running.sub').textContent).toBe('3 running in 2 projects · 1 listening');
     expect(rowIds()).toEqual(['shop/checkout/bg1', 'shop/perf/bg3', 'tele/p99/p9.1']);
     expect(screen.getByTestId('running.row.shop/perf/bg3.url').textContent).toBe('localhost:5173 ↗');
     expect(screen.getByTestId('running.row.shop/perf/bg3.end').textContent).toBe('14 min');
