@@ -30,28 +30,35 @@ fn ids<'a>(gs: &[Group<'a>]) -> Vec<(String, Vec<String>)> {
 }
 
 #[test]
-fn groups_by_agent_running_oldest_first_then_ended_newest_first() {
+fn running_shows_the_running_oldest_first_and_tab_the_ended_newest_first() {
+    use std::collections::HashSet;
     let items = fixture();
     let order = vec!["main".to_string(), "docs".to_string(), "perf".to_string()];
-    let gs = groups(&items, &order, Filter::All, "");
-    // both run something: the panel's order; in a group running then ended
+    let none = HashSet::new();
+    // the running view: the running ones only, the panel's order
     assert_eq!(
-        ids(&gs),
+        ids(&groups(&items, &order, Filter::Running, "", &none)),
+        vec![("docs".into(), vec!["p49012.1791100160".into()]), ("perf".into(), vec!["bg3.1791100100".into(), "p48990.1791100150".into()])]
+    );
+    // tab: the ended ones only, newest first
+    let ended = groups(&items, &order, Filter::Ended, "", &none);
+    assert_eq!(
+        ids(&ended),
         vec![
-            ("docs".into(), vec!["p49012.1791100160".into(), "p47500.1791099650".into(), "bg1.1791098000".into()]),
-            ("perf".into(), vec!["bg3.1791100100".into(), "p48990.1791100150".into(), "bg2.1791099500".into(), "bg4.1791099600".into(), "bg1.1791099000".into()]),
+            ("docs".into(), vec!["p47500.1791099650".into(), "bg1.1791098000".into()]),
+            ("perf".into(), vec!["bg2.1791099500".into(), "bg4.1791099600".into(), "bg1.1791099000".into()]),
         ]
     );
-    // tab: the ended ones only
-    let ended = groups(&items, &order, Filter::Ended, "");
-    assert!(ended.iter().flat_map(|g| &g.rows).all(|p| !p.running()));
-    assert_eq!(flat(&ended).len(), 5);
+    // one that ended while the running view is open keeps its place
+    let kept: HashSet<(String, String)> = [("perf".to_string(), "bg3.1791100100".to_string())].into();
+    let mut later = items.clone();
+    later[0].state = ProcState::StoppedByYou;
+    later[0].ended_ms = Some(NOW);
+    assert_eq!(ids(&groups(&later, &order, Filter::Running, "", &kept))[1].1, vec!["bg3.1791100100".to_string(), "p48990.1791100150".to_string()]);
+    assert_eq!(flat(&groups(&later, &order, Filter::Running, "", &none)).len(), 2);
     // the search: its command or its agent
-    assert_eq!(ids(&groups(&items, &order, Filter::All, "MKDOCS")), vec![("docs".into(), vec!["bg1.1791098000".into()])]);
-    assert_eq!(flat(&groups(&items, &order, Filter::All, "perf")).len(), 5);
-    // an agent with only ended ones goes after those that run
-    let only_ended: Vec<Proc> = items.iter().filter(|p| p.agent == "perf" || !p.running()).cloned().collect();
-    assert_eq!(ids(&groups(&only_ended, &order, Filter::All, ""))[0].0, "perf");
+    assert_eq!(ids(&groups(&items, &order, Filter::Ended, "MKDOCS", &none)), vec![("docs".into(), vec!["bg1.1791098000".into()])]);
+    assert_eq!(flat(&groups(&items, &order, Filter::Running, "perf", &none)).len(), 2);
 }
 
 #[test]

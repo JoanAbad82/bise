@@ -19,12 +19,12 @@ use crate::theme::{dim, error, faint, selection_bg, text, G_FAILED, G_STOPPED, G
 /// `ended 3 min ago · rc 1`) and the keys say `its output`, `a its agent`.
 pub(crate) const WIDE_FROM: usize = 110;
 
-/// What the list shows: running then ended today, or the ended ones only
-/// (tab).
+/// What the list shows (designer m_38556, the desktop's two views): the
+/// running ones, or the ones that ended today (tab).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum Filter {
     #[default]
-    All,
+    Running,
     Ended,
 }
 
@@ -41,28 +41,30 @@ pub(crate) fn is_running(p: &Proc) -> bool {
 }
 
 /// The list in groups by agent: in the agents panel's order (`order`; an
-/// agent not there after them, by name), the groups with something
-/// running first; in a group the running ones oldest first, then the
-/// ended ones newest first. `query` keeps the rows whose command or agent
-/// holds it (case-blind).
-pub(crate) fn groups<'a>(items: &'a [Proc], order: &[String], filter: Filter, query: &str) -> Vec<Group<'a>> {
+/// agent not there after them, by name). Running: the running ones,
+/// oldest first, and those of `kept` (ended or stopped while the view is
+/// open) in their place, with their new state. Ended: the ended ones,
+/// newest first. `query` keeps the rows whose command or agent holds it
+/// (case-blind).
+pub(crate) fn groups<'a>(items: &'a [Proc], order: &[String], filter: Filter, query: &str, kept: &std::collections::HashSet<(String, String)>) -> Vec<Group<'a>> {
     let q = query.trim().to_lowercase();
-    let kept = |p: &&Proc| {
-        (filter == Filter::All || !is_running(p)) && (q.is_empty() || p.cmd.to_lowercase().contains(&q) || p.agent.to_lowercase().contains(&q))
+    let shown = |p: &&Proc| {
+        let in_view = match filter {
+            Filter::Running => is_running(p) || kept.contains(&(p.agent.clone(), p.id.clone())),
+            Filter::Ended => !is_running(p),
+        };
+        in_view && (q.is_empty() || p.cmd.to_lowercase().contains(&q) || p.agent.to_lowercase().contains(&q))
     };
-    let mut agents: Vec<&str> = items.iter().filter(kept).map(|p| p.agent.as_str()).collect();
-    agents.sort_by_key(|a| {
-        let live = items.iter().any(|p| p.agent == *a && is_running(p));
-        (!live, order.iter().position(|o| o == a).unwrap_or(usize::MAX), a.to_string())
-    });
+    let mut agents: Vec<&str> = items.iter().filter(shown).map(|p| p.agent.as_str()).collect();
+    agents.sort_by_key(|a| (order.iter().position(|o| o == a).unwrap_or(usize::MAX), a.to_string()));
     agents.dedup();
     agents
         .into_iter()
         .map(|a| {
-            let mut rows: Vec<&Proc> = items.iter().filter(|p| p.agent == a).filter(kept).collect();
-            rows.sort_by_key(|p| match is_running(p) {
-                true => (0, p.started_ms),
-                false => (1, u64::MAX - p.ended_ms.unwrap_or(p.started_ms)),
+            let mut rows: Vec<&Proc> = items.iter().filter(|p| p.agent == a).filter(shown).collect();
+            rows.sort_by_key(|p| match filter {
+                Filter::Running => p.started_ms,
+                Filter::Ended => u64::MAX - p.ended_ms.unwrap_or(p.started_ms),
             });
             Group { agent: a.to_string(), rows }
         })

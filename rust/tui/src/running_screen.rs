@@ -1,6 +1,7 @@
 //! `/running` (designer's page running-procs): the project's processes
-//! full screen, grouped by agent, running then ended today (running.rs
-//! draws the rows). In an agent's view it opens on that agent's rows.
+//! full screen, grouped by agent: the running ones (one that ends while
+//! it is open keeps its place, its new state), tab the ones ended today
+//! (running.rs draws the rows). In an agent's view it opens on that agent's rows.
 //! Open, it follows the list (`processes/list` with `watch`: the hub
 //! sends it again every 2 s); closed, it stops.
 //!
@@ -50,6 +51,10 @@ pub(crate) struct Screen {
     pub(crate) want: Option<String>,
     /// the ones he stopped, until the hub's row ends
     pub(crate) stopping: HashSet<Key>,
+    /// the rows the running view showed running since it opened (or since
+    /// tab): one that ends or that he stops keeps its place, its new
+    /// state, until he leaves or presses tab
+    pub(crate) kept: HashSet<Key>,
     /// what the last key did, for 6 s
     pub(crate) note: Option<(String, Instant)>,
     /// the first list row shown
@@ -104,7 +109,10 @@ pub(crate) fn listed(app: &mut App, items: &[Proc]) {
     // a stop is done when its row no longer runs
     sc.stopping.retain(|k| items.iter().any(|p| (&p.agent, &p.id) == (&k.0, &k.1) && p.running()));
     sc.items = Some(items.to_vec());
-    let shown = rows::flat(&rows::groups(items, &order, sc.filter, &sc.query)).into_iter().map(key).collect::<Vec<_>>();
+    if sc.filter == Filter::Running {
+        sc.kept.extend(items.iter().filter(|p| p.running()).map(key));
+    }
+    let shown = rows::flat(&rows::groups(items, &order, sc.filter, &sc.query, &sc.kept)).into_iter().map(key).collect::<Vec<_>>();
     if let Some(a) = sc.want.take() {
         sc.sel = shown.iter().find(|k| k.0 == a).cloned().or(sc.sel.take());
     }
@@ -141,7 +149,7 @@ fn order(app: &App) -> Vec<String> {
 fn shown(app: &App) -> Vec<Proc> {
     let Some(sc) = app.running.as_ref() else { return Vec::new() };
     let items = sc.items.as_deref().unwrap_or(&[]);
-    rows::flat(&rows::groups(items, &order(app), sc.filter, &sc.query)).into_iter().cloned().collect()
+    rows::flat(&rows::groups(items, &order(app), sc.filter, &sc.query, &sc.kept)).into_iter().cloned().collect()
 }
 
 fn selected(app: &App) -> Option<Proc> {
@@ -212,12 +220,12 @@ pub(crate) fn list_lines(sc: &Screen, order: &[String], project: &str, wd: usize
     let Some(items) = sc.items.as_deref() else {
         return (out, None);
     };
-    let gs = rows::groups(items, order, sc.filter, &sc.query);
+    let gs = rows::groups(items, order, sc.filter, &sc.query, &sc.kept);
     if gs.is_empty() {
         let empty = match (sc.query.trim().is_empty(), sc.filter) {
             (false, _) => running::none_match,
             (true, Filter::Ended) => running::empty_ended,
-            (true, Filter::All) => running::empty,
+            (true, Filter::Running) => running::empty,
         };
         out.push(Line::from(Span::styled(empty.to_string(), Style::default().fg(dim()))));
         return (out, None);
@@ -401,7 +409,9 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
         KeyCode::Down | KeyCode::Char('j') => step(app, 1),
         KeyCode::Tab => {
             if let Some(sc) = app.running.as_mut() {
-                sc.filter = if sc.filter == Filter::All { Filter::Ended } else { Filter::All };
+                sc.filter = if sc.filter == Filter::Running { Filter::Ended } else { Filter::Running };
+                // a new view: the ended ones the running view kept go
+                sc.kept = sc.items.iter().flatten().filter(|p| p.running()).map(key).collect();
             }
             reselect(app);
         }

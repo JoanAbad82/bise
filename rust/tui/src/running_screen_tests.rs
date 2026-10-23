@@ -56,11 +56,17 @@ fn at_150_columns_groups_rows_tip_and_keys() {
     // the selected row's tip under it, then the next row
     assert!(t[2].trim_start().starts_with("bg3 · started "), "{}", t[2]);
     assert!(t[3].starts_with("  ∿ node scripts/watch.mjs"), "{}", t[3]);
+    assert!(t.iter().any(|l| l == &running::group("acme", "docs")));
+    // the running view: no ended row (designer m_38556)
+    assert!(t.iter().all(|l| !l.contains("cargo test") && !l.contains("mkdocs")), "{t:#?}");
+    assert!(t.iter().all(|l| l.width() <= 146), "{t:#?}");
+    // tab: the ended ones, with how they ended
+    let ended = Screen { filter: Filter::Ended, ..screen() };
+    let t = texts(&list_lines(&ended, &order(), "acme", 146, NOW).0);
     assert!(t.iter().any(|l| l.contains("python3 -m http.server 8000") && l.contains(running::stopped_by_you)), "{t:#?}");
     assert!(t.iter().any(|l| l.starts_with("  ✗ cargo test --workspace") && l.contains(&running::exit_rc(101))), "{t:#?}");
-    assert!(t.iter().any(|l| l == &running::group("acme", "docs")));
     assert!(t.iter().any(|l| l.contains("mkdocs serve") && l.contains(&running::stopped_with("docs"))), "{t:#?}");
-    assert!(t.iter().all(|l| l.width() <= 146), "{t:#?}");
+    assert!(t.iter().all(|l| !l.contains("pnpm dev")), "{t:#?}");
     // no numbers on a row (cpu, memory, pid are the output's)
     assert!(t.iter().all(|l| !l.contains("cpu") && !l.contains("48211")), "{t:#?}");
 }
@@ -71,6 +77,9 @@ fn at_80_columns_the_short_words() {
     let (ls, _) = list_lines(&sc, &order(), "acme", 76, NOW);
     let t = texts(&ls);
     assert!(t[1].contains(":5173") && !t[1].contains("localhost"), "{}", t[1]);
+    assert!(t.iter().all(|l| l.width() <= 76), "{t:#?}");
+    let sc = Screen { filter: Filter::Ended, ..screen() };
+    let t = texts(&list_lines(&sc, &order(), "acme", 76, NOW).0);
     assert!(t.iter().any(|l| l.contains(&format!("{} · {}", running::exit_rc(101), running::ago_short("")).replace(" ago", ""))), "{t:#?}");
     assert!(t.iter().all(|l| l.width() <= 76), "{t:#?}");
 }
@@ -111,23 +120,19 @@ fn it_opens_on_the_agent_in_view_and_keys_move_and_filter() {
     assert!(sent(&mut hub).iter().any(|(m, p)| m == "processes/list" && p["watch"] == true));
     listed(&mut app, &fixture());
     let sel = |app: &App| app.running.as_ref().unwrap().sel.clone().unwrap();
-    assert_eq!(sel(&app).0, "docs");
+    assert_eq!(sel(&app), ("docs".into(), "p49012.1791100160".into()));
+    // the running view: docs' one row is the last
     press(&mut app, KeyCode::Down);
-    assert_eq!(sel(&app), ("docs".into(), "p47500.1791099650".into()));
-    press(&mut app, KeyCode::Down);
-    assert_eq!(sel(&app), ("docs".into(), "bg1.1791098000".into()));
-    press(&mut app, KeyCode::Down);
-    assert_eq!(sel(&app), ("docs".into(), "bg1.1791098000".into()), "the last row stays");
+    assert_eq!(sel(&app), ("docs".into(), "p49012.1791100160".into()), "the last row stays");
     press(&mut app, KeyCode::Up);
+    assert_eq!(sel(&app), ("perf".into(), "p48990.1791100150".into()));
     press(&mut app, KeyCode::Up);
-    press(&mut app, KeyCode::Up);
-    assert_eq!(sel(&app).0, "perf");
+    assert_eq!(sel(&app), ("perf".into(), "bg3.1791100100".into()));
     // tab: the ended ones only, the selection on one of them
     press(&mut app, KeyCode::Tab);
     let k = sel(&app);
     assert!(fixture().iter().any(|p| (p.agent.clone(), p.id.clone()) == k && !p.running()));
     // / searches, esc clears it
-    press(&mut app, KeyCode::Tab);
     press(&mut app, KeyCode::Char('/'));
     for c in "mkdocs".chars() {
         press(&mut app, KeyCode::Char(c));
@@ -178,7 +183,8 @@ fn o_on_a_port_nothing_answers_flashes_why() {
     app.running.as_mut().unwrap().sel = Some(("docs".into(), "p49012.1791100160".into()));
     press(&mut app, KeyCode::Char('o'));
     assert_eq!(app.running.as_ref().unwrap().note.as_ref().unwrap().0, running::no_port);
-    // an ended one: it has ended, not 'no port'
+    // an ended one (tab): it has ended, not 'no port'
+    app.running.as_mut().unwrap().filter = Filter::Ended;
     app.running.as_mut().unwrap().sel = Some(("docs".into(), "bg1.1791098000".into()));
     press(&mut app, KeyCode::Char('o'));
     assert_eq!(app.running.as_ref().unwrap().note.as_ref().unwrap().0, running::ended_no_open);
@@ -229,8 +235,24 @@ fn a_process_with_no_output_says_so_in_one_dim_line() {
 #[test]
 fn a_takes_you_to_its_agent() {
     let (mut app, _hub) = app_open();
-    app.running.as_mut().unwrap().sel = Some(("docs".into(), "bg1.1791098000".into()));
+    app.running.as_mut().unwrap().sel = Some(("docs".into(), "p49012.1791100160".into()));
     press(&mut app, KeyCode::Char('a'));
     assert!(app.running.is_none());
     assert_eq!(app.sb.focus, "docs");
+}
+
+/// designer m_38556: a row that ends while the running view is open keeps
+/// its place with its new state, until tab (or leaving).
+#[test]
+fn a_row_that_ends_while_open_keeps_its_place_until_tab() {
+    let (mut app, _hub) = app_open();
+    let mut items = fixture();
+    items[1].state = bise_proto::rows::ProcState::Exited { rc: Some(0) };
+    items[1].ended_ms = Some(NOW);
+    listed(&mut app, &items);
+    let rows = |app: &App| shown(app).iter().map(|p| p.id.clone()).collect::<Vec<_>>();
+    assert!(rows(&app).contains(&"p48990.1791100150".to_string()), "{:?}", rows(&app));
+    press(&mut app, KeyCode::Tab);
+    press(&mut app, KeyCode::Tab);
+    assert!(!rows(&app).contains(&"p48990.1791100150".to_string()), "{:?}", rows(&app));
 }
