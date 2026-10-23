@@ -43,7 +43,7 @@ const start = again ? all.filter((l) => !ONCE.has(JSON.parse(l).ev)) : all;
 // The world is written at spawn: the app's main keeps the newest state events and replays them to
 // a window that loads later (amb-core 162ec18b). A thread's lines aren't state: like the real core,
 // the stub sends them when the window asks (subscribe, page) and answers the per-project asks
-// (diff, worktrees, dev_servers, merged, inbox_history) from the same world.
+// (diff, worktrees, dev_servers, merged, processes, proc_out, inbox_history) from the same world.
 const evs = start.map((l) => JSON.parse(l)).filter((ev) => ev.ev !== 'transcript');
 // A world may give an agent's whole thread as one `{ev: 'transcript', project, agent, entries}` (the
 // harness's own line, never sent to the app): then subscribe and page answer as the hub does,
@@ -68,7 +68,9 @@ function answer(cmd) {
     case 'subscribe': return of(['thread', 'entry', 'typing'], (ev) => ev.ev !== 'thread' || ev.before === null || ev.before === undefined);
     case 'page': return of(['thread'], (ev) => ev.before !== null && ev.before !== undefined);
     case 'diff': return of(['diff'], (ev) => (cmd.commit ? ev.merged === cmd.commit : !ev.merged));
-    case 'worktrees': case 'dev_servers': case 'merged': return of([cmd.cmd]);
+    case 'worktrees': case 'dev_servers': case 'merged': case 'processes': return of([cmd.cmd]);
+    // a process's output (the running screen's terminal): the world's ranges of that one, in order
+    case 'proc_out': return of(['proc_out'], (ev) => ev.id === cmd.id);
     // an @ query (at-chips): the world's newest `files` list of that project, whatever the query,
     // answered with the ask's own rid and query
     case 'files': return of(['files']).slice(-1).map((ev) => ({ ...ev, q: cmd.q, rid: cmd.rid }));
