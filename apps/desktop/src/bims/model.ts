@@ -557,7 +557,8 @@ export interface OfficeRenderer {
 }
 
 /** render/index.ts's one export, behind `import('./render')`. */
-export type MakeRenderer = (canvas: HTMLCanvasElement) => OfficeRenderer;
+/** `transparent`: the canvas clears to nothing, the page shows under the cube (the welcome, in the thread's column); absent: the theme's page colour (the bar) */
+export type MakeRenderer = (canvas: HTMLCanvasElement, o?: { readonly transparent?: boolean }) => OfficeRenderer;
 
 /** What the overlay shows over one bim (labels.ts): nothing at rest, the spec's §2. */
 export interface Label {

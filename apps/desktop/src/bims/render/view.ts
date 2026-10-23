@@ -30,8 +30,10 @@ export interface View {
   dispose(): void;
 }
 
-export function makeView(canvas: HTMLCanvasElement, o: { readonly shadowAuto: boolean }): View {
-  const renderer = new WebGLRenderer({ canvas, antialias: STYLE.antialias, alpha: false, powerPreference: 'low-power' });
+export function makeView(canvas: HTMLCanvasElement, o: { readonly shadowAuto: boolean; readonly transparent?: boolean }): View {
+  // transparent: the page under the cube shows through (the welcome in the thread's column)
+  const clear = o.transparent === true;
+  const renderer = new WebGLRenderer({ canvas, antialias: STYLE.antialias, alpha: clear, powerPreference: 'low-power' });
   renderer.shadowMap.enabled = STYLE.shadows;
   // PCF with the sun's radius (three r186 folded PCFSoft into it): one soft shadow
   renderer.shadowMap.type = PCFShadowMap;
@@ -74,7 +76,7 @@ export function makeView(canvas: HTMLCanvasElement, o: { readonly shadowAuto: bo
     sky(c) {
       if (skyNow !== null && typeof c !== 'object' && skyNow === c) return;
       skyNow = c;
-      renderer.setClearColor(c);
+      renderer.setClearColor(c, clear ? 0 : 1);
     },
     tint(pal) {
       hemi.color.set(pal.hemi[0]);

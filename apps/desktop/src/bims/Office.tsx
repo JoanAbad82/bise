@@ -199,6 +199,7 @@ export function Office({
   onOpen,
   onPickMap,
   pins = false,
+  transparent = false,
   onState,
   snapRef,
 }: {
@@ -220,6 +221,8 @@ export function Office({
   onPickMap?: (map: MapId) => void;
   /** a new project's welcome (welcome/Welcome.tsx): the 1, 2, 3 pins over the lead, an empty desk, the tray (pins.tsx) */
   pins?: boolean;
+  /** the canvas clears to nothing: the page shows under the cube (the welcome in the thread's column) */
+  transparent?: boolean;
   /** its state as it changes: the welcome shows its pictures when the office can't draw */
   onState?: (s: OfficeState) => void;
   /** set while it draws: the office as drawn now onto a 2d canvas (the welcome's dock, renderer.copyTo) */
@@ -593,7 +596,7 @@ export function Office({
       .load()
       .then((make) => {
         if (gone) return;
-        const made = make(cv);
+        const made = make(cv, transparent ? { transparent } : undefined);
         r = made;
         made.onLost(fail);
         pick.current = (x, y) => (lost ? null : made.pick(x, y));
@@ -628,7 +631,7 @@ export function Office({
       if (snapRef !== undefined) snapRef.current = null;
       r?.dispose();
     };
-  }, [parts, driver, layoutTags, moveCam, snapRef]);
+  }, [parts, driver, layoutTags, moveCam, snapRef, transparent]);
 
   // hover: the bim under the pointer, its line after the tip's delay; off it, at once
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

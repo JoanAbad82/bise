@@ -77,6 +77,7 @@ export function Welcome({ project, name, onIdea, rootRef, mapRef, snapRef, docki
             map={map}
             parts={welcomeParts}
             pins
+            transparent
             onState={setState}
             {...(snapRef === undefined ? {} : { snapRef })}
             // a click on the lead: its thread is this one

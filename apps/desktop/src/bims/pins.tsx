@@ -9,6 +9,8 @@ import type { OfficeRenderer } from './model';
 const OVER_HEAD = 6;
 /** px over a floor point the '2' and '3' sit (on the piece, not under it) */
 const OVER_FLOOR = 10;
+/** px over the inbox's top tray the '3' sits: one pin's height, so the stand shows (bims m_38246) */
+const OVER_TRAY = 18;
 /** the most ghost desks a welcome asks about (bims/ghosts.ts WELCOME_GHOSTS) */
 const GHOSTS_MAX = 8;
 
@@ -27,8 +29,8 @@ export function pinPoints(r: Pick<OfficeRenderer, 'headOf' | 'pointOf'>, lead: s
   return [
     head === null ? null : { x: head.x, y: head.y - OVER_HEAD },
     desk === null ? null : { x: desk.x, y: desk.y - OVER_FLOOR },
-    // on the tray itself: main's desk carries it, the '1' sits higher over the lead's head
-    tray === null ? null : { x: tray.x, y: tray.y },
+    // over the top tray, as the '1' over the head
+    tray === null ? null : { x: tray.x, y: tray.y - OVER_TRAY },
   ];
 }
 

@@ -80,9 +80,9 @@ const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: b
 /** the town on bise's thread (render/town.ts): in this chunk too, so three loads once */
 export { makeTownRenderer } from './town';
 
-export const makeRenderer: MakeRenderer = (canvas) => {
+export const makeRenderer: MakeRenderer = (canvas, opts) => {
   // the office's shadow follows its bims: drawn again every frame (a still office draws none)
-  const view = makeView(canvas, { shadowAuto: true });
+  const view = makeView(canvas, { shadowAuto: true, transparent: opts?.transparent === true });
   const office = makeOfficeScene(STYLE);
   view.scene.add(office.root);
   /** the whole site fitted to the canvas, and what shows through his camera (fit = base at FIT) */
