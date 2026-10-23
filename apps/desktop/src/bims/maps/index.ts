@@ -7,6 +7,7 @@ import { DEFAULT_MAP, MAP_IDS } from './ids';
 import type { Plan } from './plan';
 import { withCozy } from '../cozy';
 import { withSeats } from '../sit';
+import { withInbox } from '../inbox';
 import { loft } from './loft';
 import { greenhouse } from './greenhouse';
 import { campus } from './campus';
@@ -43,5 +44,5 @@ export const readyMaps = (): MapId[] => MAP_IDS.filter((id) => PLANS[id].ready);
  */
 export function layoutOf(agents: readonly Agent[], map: MapId = DEFAULT_MAP, prev?: Office): Office {
   const p = planOf(map);
-  return withCozy(withSeats(p.layout(agents, prev?.map === p.id ? prev : undefined)), p.cozy ?? {});
+  return withInbox(withCozy(withSeats(p.layout(agents, prev?.map === p.id ? prev : undefined)), p.cozy ?? {}));
 }

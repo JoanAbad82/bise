@@ -33,16 +33,14 @@
 }
 .welcome-map {
   /* the office gives way to the words in a short window (the legend, the message, the ideas
-     take ~330 px), never under 240 px: past that the welcome scrolls */
+     take ~330 px), never under 240 px: past that the welcome scrolls. No frame, no fill: the
+     cube on the page, as in the bar (bims, designer m_38197) */
   max-width: max(240px, min(440px, calc((100cqh - 330px) * 1.4)));
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-3, 12px);
-  background: var(--c-raised);
-  overflow: hidden;
 }
-/* the office's own fold-in waits for the bar's fold: here it fades in once drawn */
+/* the bar's office spans the bar's padding (office.css): here it is the column's width */
 .welcome-map .bims-office {
   width: 100%;
+  margin: 0;
 }
 
 /* the legend: 1, 2, 3 stacked, the number in its column, the line under the head */
@@ -161,3 +159,8 @@
 .wp-gh { fill: none; stroke: var(--c-text-3); stroke-dasharray: 3 3; }
 .wp-lb { fill: var(--c-text-2); font: var(--t-11) var(--font-ui); }
 .wp-on { fill: var(--c-solid); font: 600 var(--t-11) var(--font-ui); }
+
+/* the lead's intro as main's first row, once he wrote: the message alone, its ideas gone */
+.welcome-intro .welcome-hi {
+  margin: 0 0 var(--s-3);
+}

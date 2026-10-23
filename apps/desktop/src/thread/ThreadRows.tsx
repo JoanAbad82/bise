@@ -21,6 +21,12 @@ import { FoldsContext } from './folds';
 import { FindMarkContext } from './findmark';
 import { GapRow, isGapKey, withGap } from './gap';
 import { useGoArtifact } from '@/artifacts/leave';
+import { IntroRow } from '@/welcome/Welcome';
+import { introShows } from '@/welcome/rule';
+import { MAIN } from '@/app/route';
+
+/** the lead's intro row's key (never an entry's: entry keys are numbers') */
+const INTRO = 'intro';
 
 /** The agent's folder: its worktree, else its project's checkout; none until the rows come. */
 function useBase(project: string, agent: string): string | undefined {
@@ -136,7 +142,13 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   const lastKind = useEntry(tkey, lastPos)?.kind;
   const live = useLive(partial, lastPos, lastKind);
   const still = useStill();
-  const keys = useMemo(() => (live.entry === null ? listed : [...listed, LIVE]), [listed, live.entry]);
+  // a project's main: the lead's intro is its first row once he wrote (welcome/Welcome.tsx IntroRow)
+  const hasYou = !bise && agent === MAIN && view.order.some((pos) => store.entry(tkey, pos)?.kind === 'you');
+  const intro = !bise && agent === MAIN && introShows(view, hasYou, pending.length);
+  const keys = useMemo(() => {
+    const withLive = live.entry === null ? listed : [...listed, LIVE];
+    return intro ? [INTRO, ...withLive] : withLive;
+  }, [listed, live.entry, intro]);
   const liveCall = live.call;
   const handed = live.handed;
   const reactKey = useCallback(
@@ -222,6 +234,7 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
         );
       }
       if (isGapKey(key)) return <GapRow project={project} agent={agent} />;
+      if (key === INTRO) return <IntroRow project={project} />;
       if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} carry={heads.carry} />;
       const pos = posOfKey(key);
       return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} underFold={underFold.has(pos)} retries={retries.runs.get(pos)} />;

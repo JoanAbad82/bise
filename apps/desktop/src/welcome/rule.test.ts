@@ -1,7 +1,7 @@
 // When the welcome shows (architect m_38075): derived from main's thread as the window holds it.
 import { describe, expect, it } from 'vitest';
 import { EMPTY_ORDER, type ThreadOrder } from '@/store/types';
-import { welcomeShows } from './rule';
+import { introShows, welcomeShows } from './rule';
 import { moveOf } from './dock';
 
 const view = (o: Partial<ThreadOrder>): ThreadOrder => ({ ...EMPTY_ORDER, loaded: true, ...o });
@@ -33,6 +33,19 @@ describe('welcomeShows', () => {
 
   it('a window around a far entry: no', () => {
     expect(welcomeShows(view({ order: [1], gap: { lo: 1, hi: 9, from: 2 } }), false, 0)).toBe(false);
+  });
+});
+
+describe('introShows: the lead\'s intro as the first row once he wrote', () => {
+  it('his message in a thread whose start is here: yes; his send on its way: yes', () => {
+    expect(introShows(view({ order: [1] }), true, 0)).toBe(true);
+    expect(introShows(view({}), false, 1)).toBe(true);
+  });
+
+  it('nothing of his yet (the welcome shows), or the start not in the window: no', () => {
+    expect(introShows(view({}), false, 0)).toBe(false);
+    expect(introShows(view({ order: [40], before: 40, more: true }), true, 0)).toBe(false);
+    expect(introShows(view({ order: [1], gap: { lo: 1, hi: 9, from: 2 } }), true, 0)).toBe(false);
   });
 });
 

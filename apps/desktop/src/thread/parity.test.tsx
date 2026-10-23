@@ -397,7 +397,9 @@ describe("a project's welcome in main's empty thread (page new-project-home, pic
       long.apply({ ev: 'agents', project: P, agents: [ag('main')] });
     });
     thread(long, [{ pos: 40, kind: 'agent', text: 'done.' }], true);
-    expect(screen(long).queryByTestId('welcome')).toBeNull();
+    const v = screen(long);
+    expect(v.queryByTestId('welcome')).toBeNull();
+    expect(v.queryByTestId('welcome.intro'), 'no intro over a thread whose start is not here').toBeNull();
   });
 
   it("bise's own thread: the first run, no welcome", () => {

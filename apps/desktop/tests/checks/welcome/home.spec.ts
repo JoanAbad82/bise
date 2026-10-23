@@ -107,6 +107,13 @@ for (const width of [1400, 1100, 800]) {
         await expect(page.getByTestId('welcome.hi')).toContainText(thread.welcome_hi({ project: NAME }));
         await expect(page.getByTestId('welcome.idea.0')).toHaveText(thread.welcome_idea_tests);
         await expect(page.locator('[data-testid="welcome.pins"] [data-pin="1"]')).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('[data-testid="welcome.pins"] [data-pin="3"]')).toBeVisible({ timeout: 10_000 });
+        // at least 32 px between any two pins (designer m_38202)
+        const pins = await page.locator('[data-testid="welcome.pins"] [data-pin]').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }));
+        for (let i = 0; i < pins.length; i++) for (let j = i + 1; j < pins.length; j++) {
+          const a = pins[i], b = pins[j];
+          if (a !== undefined && b !== undefined) expect(Math.hypot(a.x - b.x, a.y - b.y), `pins ${String(i + 1)} and ${String(j + 1)}`).toBeGreaterThanOrEqual(32);
+        }
         await expect(page.getByTestId('app.right.bims.fold')).toHaveCount(0);
         if (width > 800) await expect(page.getByTestId('app.right.agent.main')).toContainText(panel.role_lead);
         await page.waitForTimeout(1200);
@@ -122,6 +129,8 @@ for (const width of [1400, 1100, 800]) {
         const frames = await rec.stop();
         await expect(page.getByTestId('welcome')).toHaveCount(0);
         await expect(page.getByTestId('welcome.dock')).toHaveCount(0);
+        // the lead's intro stays as the thread's first message, over his
+        await expect(page.getByTestId('welcome.intro')).toContainText(thread.welcome_hi({ project: NAME }));
         const t0 = frames[0]?.t ?? 0;
         const mid = frames.find((f) => f.t - t0 >= 200) ?? frames[Math.floor(frames.length / 2)];
         if (mid !== undefined) save(`${String(width)}-${theme}-2-mid-dock.png`, PNG.sync.read(pngBytes(mid)), `${String(width)} ${theme} · mid-dock (~200 ms after ⏎)`);

@@ -95,14 +95,7 @@ export function Welcome({ project, name, onIdea, rootRef, mapRef, snapRef, docki
           </li>
         ))}
       </ol>
-      <div className="welcome-hi" data-testid="welcome.hi">
-        <div className="welcome-who">
-          <LiveBiseMark />
-          <b>bise</b>
-          <span className="welcome-role">{thread.welcome_role}</span>
-        </div>
-        <p>{thread.welcome_hi({ project: name })}</p>
-      </div>
+      <LeadHi name={name} testId="welcome.hi" />
       <div className="welcome-ideas">
         {IDEAS.map((idea, i) => (
           <Press
@@ -121,6 +114,34 @@ export function Welcome({ project, name, onIdea, rootRef, mapRef, snapRef, docki
           </Press>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** The lead's first message: in the welcome, then the thread's first row once he wrote (IntroRow). */
+export function LeadHi({ name, testId }: { name: string; testId: string }) {
+  return (
+    <div className="welcome-hi" data-testid={testId}>
+      <div className="welcome-who">
+        <LiveBiseMark />
+        <b>bise</b>
+        <span className="welcome-role">{thread.welcome_role}</span>
+      </div>
+      <p>{thread.welcome_hi({ project: name })}</p>
+    </div>
+  );
+}
+
+/**
+ * The lead's intro as main's first row (designer m_38190 (4)): once he wrote, it stays above his
+ * first message; only the office, the legend and the ideas went. Shown where the thread's start is
+ * in the window (rule.ts introShows).
+ */
+export function IntroRow({ project }: { project: string }) {
+  const name = useProjects().find((p) => p.project === project)?.name ?? project;
+  return (
+    <div className="th-row welcome-intro">
+      <LeadHi name={name} testId="welcome.intro" />
     </div>
   );
 }

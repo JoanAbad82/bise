@@ -218,6 +218,8 @@ export interface Office {
   readonly nooks?: readonly Nook[];
   /** a new project's welcome (ghosts.ts): the free desks drawn as dashed outlines, no desk built there; absent: none */
   readonly ghosts?: readonly Spot[];
+  /** the inbox stand's middle on the floor (inbox.ts, just inside the door); absent: none fits */
+  readonly inbox?: Pt;
 }
 
 /** A straight piece to grind or ride across, along x: a curb, a ledge, a rail, a flat lane (h 0). */
@@ -514,6 +516,8 @@ export interface Look {
   readonly planeFrom?: { readonly x: number; readonly y: number; readonly px?: number };
   /** the film's glides drawn in the layer over the page (TownOpts.planesOver: the hero's planes fly over its chat) */
   readonly planesUp?: boolean;
+  /** his open items in this project: the sheets in the inbox's top tray (0..3, render/inbox.ts); absent: none */
+  readonly inbox?: number;
 }
 
 /**
@@ -535,7 +539,7 @@ export interface OfficeRenderer {
   spotOf(name: string): { readonly x: number; readonly y: number; readonly u: number; readonly v: number } | null;
   /** where a stage's piece stands on the canvas, css px (the unlock moment's label); null off view */
   pieceOf(stage: number): { readonly x: number; readonly y: number } | null;
-  /** a new project's welcome pins (Office pins): main's inbox tray (its desk's top on a map without one) or a ghost desk's middle on the floor, css px; null off view */
+  /** a new project's welcome pins (Office pins): the inbox's top tray (render/inbox.ts; main's desk tray or top on a plan without one) or a ghost desk's middle on the floor, css px; null off view */
   pointOf(what: 'tray' | { readonly ghost: number }): { readonly x: number; readonly y: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */
   pick(x: number, y: number): string | null;

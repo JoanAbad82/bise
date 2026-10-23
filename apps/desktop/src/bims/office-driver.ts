@@ -225,7 +225,7 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       // the office grows: what it draws, and the unlock moment while it lasts
       const u = still ? undefined : unlock;
       const sky = skyOfClock(c);
-      const look: Look = { night, reduced, eggs: eg.office, grow: g, ...(u ? { unlock: u } : {}), ...(sky ? { sky } : {}) };
+      const look: Look = { night, reduced, eggs: eg.office, grow: g, inbox: snap?.cards.length ?? 0, ...(u ? { unlock: u } : {}), ...(sky ? { sky } : {}) };
       if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlock = undefined;
       const words = new Map([...pk].map(([n, x]) => [n, x.label]));
       const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), pokes: words, follow: a.follow, park: office.park });

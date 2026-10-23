@@ -1,6 +1,6 @@
 // A new project's empty desks (Office.ghosts, bims/ghosts.ts; page new-project-home, bims m_38078):
 // the desk's footprint as a dashed rounded rect on the floor, short thin flat boxes 1 cm over it,
-// the ink at 25%, no chair, no laptop. One piece for every map: the footprint is the plan's
+// the ink at 45%, no chair, no laptop. One piece for every map: the footprint is the plan's
 // furniture box ahead of the spot. The same values day and night: it takes the light like the floor.
 import type { Material } from 'three';
 import type { Box, Spot } from '../model';
@@ -8,13 +8,13 @@ import { boxAhead } from './furniture';
 import type { Build } from './maps/look';
 
 /** a dash's length, the gap after it, its width and height; its lift over the floor (m) */
-const DASH = 0.16;
-const GAP = 0.1;
-const THICK = 0.035;
+const DASH = 0.25;
+const GAP = 0.25;
+const THICK = 0.08;
 const H = 0.008;
 const LIFT = 0.01;
 /** the ink's alpha */
-const ALPHA = 0.25;
+const ALPHA = 0.45;
 /** what each corner leaves out: the rect reads rounded */
 const CORNER = 0.08;
 

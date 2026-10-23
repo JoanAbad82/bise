@@ -35,6 +35,7 @@ import { slabWithPits } from './ground';
 import { kitOf } from './kit';
 import { buildCozy } from './cozy';
 import { ghostDesks } from './ghost';
+import { inboxStand, type InboxHandles } from './inbox';
 import { napRests, type NapRest } from './nap';
 import type { Palette } from './palette';
 import type { Build, DeskHandles, MapLook } from './maps/look';
@@ -50,6 +51,8 @@ export interface World {
   /** by agent name, main's under its own name */
   readonly desks: ReadonlyMap<string, DeskHandles>;
   readonly mainDesk: DeskHandles;
+  /** the inbox stand (render/inbox.ts); null: none fits on this plan */
+  readonly inbox: InboxHandles | null;
   readonly pal: Palette;
   /** each stage's pieces: the unlock moment hides the newest until it is brought in */
   readonly pieces: Pieces;
@@ -191,6 +194,8 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   for (const [name, d] of o.desks) desks.set(name, look.desk(b, d, name));
   // a new project's welcome: the free desks as dashed outlines (render/ghost.ts)
   ghostDesks(b);
+  // the inbox stand just inside the door, his open items in its top tray (render/inbox.ts)
+  const inbox = inboxStand(b);
   const mainDesk = look.mainDesk(b, mainName);
   desks.set(mainName, mainDesk);
   look.growth(b);
@@ -218,6 +223,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   return {
     root,
     desks,
+    inbox,
     mainDesk,
     pal,
     pieces,

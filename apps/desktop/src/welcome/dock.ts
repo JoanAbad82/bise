@@ -24,9 +24,10 @@ export function moveOf(from: Rect, to: Rect | null, reduced: boolean): string | 
   return `translate(${(to.left - from.left).toFixed(1)}px, ${(to.top - from.top).toFixed(1)}px) scale(${s.toFixed(4)})`;
 }
 
-/** the bar's office on screen: its fold's top left and width (its height grows still), null when the bar isn't shown */
+/** the bar's office on screen: its top left and width (its fold grows still), null when the bar isn't shown */
 export function barTarget(doc: Document, ratio: number): Rect | null {
-  const fold = doc.querySelector<HTMLElement>('[data-testid="app.right.bims.fold"]');
+  // the office itself (it spans the bar's padding), else its fold while it mounts
+  const fold = doc.querySelector<HTMLElement>('[data-testid="app.right.bims.fold"] [data-testid="app.right.bims"]') ?? doc.querySelector<HTMLElement>('[data-testid="app.right.bims.fold"]');
   if (fold === null) return null;
   const r = fold.getBoundingClientRect();
   if (r.width <= 0 || r.right <= 0 || r.left >= doc.documentElement.clientWidth) return null;

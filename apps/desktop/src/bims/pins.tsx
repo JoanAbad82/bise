@@ -5,17 +5,24 @@
 // Placed by hand at each frame (Office.tsx's draw), so they follow a pinch. Owner: project-home.
 import type { OfficeRenderer } from './model';
 
-/** px over the lead's head the '1' sits */
-const OVER_HEAD = 24;
+/** px over the lead's head the '1' sits (its disc's middle) */
+const OVER_HEAD = 6;
 /** px over a floor point the '2' and '3' sit (on the piece, not under it) */
 const OVER_FLOOR = 10;
+/** the most ghost desks a welcome asks about (bims/ghosts.ts WELCOME_GHOSTS) */
+const GHOSTS_MAX = 8;
 
 export type PinPoint = { readonly x: number; readonly y: number } | null;
 
 /** Where the three pins go now, css px from the canvas's top left; null: off view. Pure but for the renderer's reads. */
 export function pinPoints(r: Pick<OfficeRenderer, 'headOf' | 'pointOf'>, lead: string | null): readonly [PinPoint, PinPoint, PinPoint] {
   const head = lead === null ? null : r.headOf(lead);
-  const desk = r.pointOf({ ghost: 0 });
+  // the empty desk nearest the camera (the lowest on the canvas)
+  let desk: PinPoint = null;
+  for (let i = 0; i < GHOSTS_MAX; i++) {
+    const p = r.pointOf({ ghost: i });
+    if (p !== null && (desk === null || p.y > desk.y)) desk = p;
+  }
   const tray = r.pointOf('tray');
   return [
     head === null ? null : { x: head.x, y: head.y - OVER_HEAD },

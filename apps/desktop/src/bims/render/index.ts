@@ -239,8 +239,9 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       if (!fit || !o) return null;
       let at: { x: number; y: number; z: number } | null = null;
       if (what === 'tray') {
+        // the inbox stand by the door; on a plan with none, the tray of main's desk (or its top)
         const d = lead === null ? undefined : office.desk(lead);
-        at = d ? (d.tray ?? d.top) : null;
+        at = office.inboxTop() ?? (d ? (d.tray ?? d.top) : null);
       } else {
         const s = o.ghosts?.[what.ghost];
         if (s) {

@@ -87,6 +87,8 @@ export interface OfficeScene {
   /** a bim's body (the hero's entry pops it in), null: no such bim */
   body(name: string): Object3D | null;
   desk(name: string): DeskHandles | undefined;
+  /** the inbox's top tray, world units; null: no inbox */
+  inboxTop(): { readonly x: number; readonly y: number; readonly z: number } | null;
   /** where a stage's piece stands (the map's look), office units */
   pieceAt(stage: number): { readonly x: number; readonly z: number } | null;
   /** its world alone (no bim, plane, halo): the town bakes its walls while its bims move */
@@ -490,6 +492,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     },
     frame(t, frames, look, fit, onRig) {
       if (!office || !world) return null;
+      // his open items as sheets in the inbox's top tray (render/inbox.ts): shown or hidden, never moving
+      world.inbox?.sheets(look.inbox ?? 0);
       // each napper on its bed's rest as built (render/nap.ts)
       const o = office;
       const naps = world.naps;
@@ -564,6 +568,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     names: () => [...bims.keys()],
     body: (name) => bims.get(name)?.group ?? null,
     desk: (name) => world?.desks.get(name),
+    inboxTop: () => world?.inbox?.top ?? null,
     pieceAt(stage) {
       return office ? mapLook().pieceAt(office, stage) : null;
     },
