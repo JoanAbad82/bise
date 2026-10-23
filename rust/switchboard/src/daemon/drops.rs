@@ -87,7 +87,7 @@ impl Shell {
                 ),
                 None => (crate::procs::Want::NotLive(&live), "agents gone before this start".to_string()),
             };
-            let hit = crate::procs::reap(&hub, &want, &sessions, Duration::from_secs(3));
+            let hit = crate::procs::reap(&hub, &want, &sessions, crate::procs::STOP_GRACE);
             if !hit.is_empty() {
                 log_line(&paths, &format!("processes of {} killed: {}", what, crate::procs::describe(&hit)));
             }

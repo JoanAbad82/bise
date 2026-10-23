@@ -223,6 +223,9 @@ impl Shell {
     pub(in crate::daemon) fn proto_state(&mut self, snap: &Snapshot) {
         let live: BTreeSet<ClientId> = self.clients.keys().copied().collect();
         self.proto.conns.retain(|id, _| live.contains(id));
+        // the processes worker: the live agents, a typed client or none
+        // (daemon/processes.rs; sent only when changed)
+        self.procs_sync();
         if self.proto.conns.is_empty() {
             return;
         }
@@ -330,7 +333,6 @@ impl Shell {
         if key != self.proto.worktrees {
             self.proto.worktrees = key;
             self.worktrees_typed(Typed::All);
-            self.dev_servers_typed(Typed::All);
         }
     }
 

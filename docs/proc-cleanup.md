@@ -18,9 +18,13 @@ A turn interrupt (esc, `sb interrupt`) kills nothing: the agent goes on
 and may still use its dev server. A REPL that restarts (crash, reload,
 `/version`) keeps its agent's processes.
 
-How: SIGTERM to each, up to 3 s for them to go, then SIGKILL to the ones
-still there (same pid and same start time). Off the hub's loop; one line
-in `hub.log`: `processes of t1 killed: 9 (47979 bise, 47990 tmux, ...)`.
+How: SIGTERM to each, up to 5 s for them to go (`procs::STOP_GRACE`, the
+same as his stop from the processes list), then SIGKILL to the ones still
+there (same pid and same start time). Off the hub's loop; one line in
+`hub.log`: `processes of t1 killed: 9 (47979 bise, 47990 tmux, ...)`.
+Before the kill the hub tells the processes worker (docs/processes.md),
+so their rows end as `stopped with` their agent; at the hub's quit that
+takes up to 2 s more (its ended log flushed).
 
 ## How they are tracked (`rust/switchboard/src/procs.rs`)
 

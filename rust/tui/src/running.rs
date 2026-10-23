@@ -79,7 +79,9 @@ pub(crate) fn flat<'a>(gs: &[Group<'a>]) -> Vec<&'a Proc> {
 pub(crate) fn glyph(p: &Proc) -> (&'static str, Color) {
     match &p.state {
         ProcState::Running => (G_WORKING, dim()),
-        ProcState::Exited { rc: 0 } => (crate::theme::G_DONE, dim()),
+        ProcState::Exited { rc: Some(0) } => (crate::theme::G_DONE, dim()),
+        // its code not known (a detached one): never a failure
+        ProcState::Exited { rc: None } => (G_STOPPED, dim()),
         ProcState::Exited { .. } => (G_FAILED, error()),
         _ => (G_STOPPED, dim()),
     }
@@ -100,9 +102,9 @@ pub(crate) fn status(p: &Proc, now: u64, stopping: bool, wide: bool) -> String {
     match &p.state {
         _ if stopping && is_running(p) => running::stopping.to_string(),
         ProcState::Running => wait_len(now.saturating_sub(p.started_ms), false),
-        ProcState::Exited { rc: 0 } => running::ended_ago(ago(p.ended_ms)),
-        ProcState::Exited { rc } if wide => format!("{} · {}", running::ended_ago(ago(p.ended_ms)), running::exit_rc(rc)),
-        ProcState::Exited { rc } => format!("{} · {}", running::exit_rc(rc), running::ago_short(ago(p.ended_ms))),
+        ProcState::Exited { rc: Some(0) | None } => running::ended_ago(ago(p.ended_ms)),
+        ProcState::Exited { rc: Some(rc) } if wide => format!("{} · {}", running::ended_ago(ago(p.ended_ms)), running::exit_rc(rc)),
+        ProcState::Exited { rc: Some(rc) } => format!("{} · {}", running::exit_rc(rc), running::ago_short(ago(p.ended_ms))),
         ProcState::StoppedByYou => match p.ended_ms {
             Some(at) => running::stopped_by_you_at(clock(at)),
             None => running::stopped_by_you.to_string(),

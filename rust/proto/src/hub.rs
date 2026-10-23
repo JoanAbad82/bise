@@ -139,8 +139,10 @@ pub enum HubEv {
     /// the agents change (a turn ends, one comes or goes) and on
     /// `worktrees`
     Worktrees { project: Project, items: Vec<Worktree> },
-    /// the agents' background servers, with `worktrees` (same moments)
-    /// and on `dev_servers`
+    /// the agents' background servers, as an older hub sent them: no hub
+    /// sends it any more (`processes` lists them), a new one answers an
+    /// older desktop's `dev_servers` with an empty list.
+    /// TODO(dev-servers): goes in a later release
     DevServers { project: Project, items: Vec<DevServer> },
     /// the processes the project's agents left running, then the ones
     /// that ended in the last 24 h (docs/processes.md): on `processes`,
@@ -709,7 +711,8 @@ pub enum HubCmd {
     Branches { project: Project },
     /// the environments screen opened: `worktrees` comes again
     Worktrees { project: Project },
-    /// the environments screen opened: `dev_servers` comes again
+    /// an older desktop's environments screen opened: `dev_servers`
+    /// comes, empty (TODO(dev-servers): goes in a later release)
     DevServers { project: Project },
     /// the processes list asked for: `processes` answers; `watch` true:
     /// it comes again every 2 s (cpu, memory, ports) until `watch` false

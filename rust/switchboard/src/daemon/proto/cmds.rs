@@ -10,6 +10,7 @@
 
 use super::super::capsule::Took;
 use super::super::page_cards::Page;
+use super::super::processes::Ask;
 use super::*;
 use bise_proto::hub::SendOpts;
 use bise_proto::slash::Version;
@@ -324,8 +325,13 @@ impl Shell {
             HubCmd::Branches { .. } => self.branches_scan(id),
             // git in a thread (worktrees.rs), to this client
             HubCmd::Worktrees { .. } => self.worktrees_typed(Typed::Answer(id)),
-            // jobs and lsof in a thread (dev_servers.rs), to this client
-            HubCmd::DevServers { .. } => self.dev_servers_typed(Typed::Answer(id)),
+            // an older desktop's Environments screen: no hub lists dev
+            // servers any more (the processes list does), an empty list.
+            // TODO(dev-servers): goes in a later release
+            HubCmd::DevServers { .. } => {
+                let project = self.project();
+                self.proto_send(id, &HubEv::DevServers { project, items: Vec::new() });
+            }
             // git and main's transcript in a thread (merged.rs)
             HubCmd::Merged { .. } => self.merged_typed(Typed::Answer(id)),
             // the registry and the facts the threads read: no git here
@@ -507,12 +513,18 @@ impl Shell {
                 }
                 self.proto_slash(id, &tag, agent, &line, cid)
             }
-            // running processes (docs/processes.md): the proto came first
-            // so the clients build on it; the scan, the output and the
-            // stop come with procs-hub's next land
-            HubCmd::Processes { .. } | HubCmd::ProcOut { .. } | HubCmd::ProcFollow { .. } | HubCmd::ProcStop { .. } => {
-                self.proto_error(id, &tag, "this hub doesn't list processes yet")
-            }
+            // running processes (docs/processes.md): the worker scans,
+            // reads and stops off the loop, and answers this client
+            HubCmd::Processes { watch, .. } => self.procs.ask(Ask::List { to: Typed::Answer(id), watch: watch.map(|on| (id, on)) }),
+            HubCmd::ProcOut { agent, id: pid, from, .. } => self.procs.ask(Ask::Out { client: id, agent, id: pid, from }),
+            HubCmd::ProcFollow { agent, id: pid, on, .. } => self.procs.ask(Ask::Follow { client: id, agent, id: pid, on }),
+            // his only (issue 16: a client's op, agents' connections never
+            // reach this arm): one process, or all of the agent's
+            HubCmd::ProcStop { agent, id: pid, all, .. } => match (pid, all) {
+                (Some(pid), false) => self.procs.ask(Ask::Stop { client: id, agent, id: Some(pid) }),
+                (None, true) => self.procs.ask(Ask::Stop { client: id, agent, id: None }),
+                _ => self.proto_error(id, &tag, "proc_stop takes a process id or all, one of the two"),
+            },
             HubCmd::Unknown { .. } => {}
         }
     }

@@ -92,6 +92,8 @@ pub struct AgentRow {
     /// les bims: what it is doing now, only while its turn runs (or
     /// paused on a backgrounded command: a build)
     pub doing: Option<Doing>,
+    /// its running processes and their lowest port (`Hub.procs`)
+    pub procs: (u16, Option<u16>),
     /// the shell's (issue #4): its model, for sb list / sb tasks too
     pub model: Option<Model>,
 }
@@ -193,6 +195,7 @@ impl AgentRow {
             waiting_on: None,
             watching: Vec::new(),
             doing: None,
+            procs: (0, None),
             model: None,
         }
     }

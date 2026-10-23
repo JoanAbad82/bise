@@ -17,16 +17,15 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 pub mod approvals;
-mod dev_servers;
 mod diff_ask;
 mod features;
 mod growth;
 pub mod heads;
 mod merged;
 mod models;
+pub mod processes;
 pub mod slash;
 mod worktrees;
-pub use dev_servers::{dev_servers, lsof_ports, server_name, Job};
 pub use diff_ask::DiffAsk;
 pub use features::{features, PlaceCard};
 pub use growth::growth_rows;
@@ -247,10 +246,9 @@ fn agent(
         // issue 22: its ended turns from the same sb-core view as its
         // status (set_rt's count), never from its lines
         turns: a.turns,
-        // running processes: the scan's counts come with procs-hub's
-        // next land
-        procs: 0,
-        procs_port: None,
+        // running processes: Hub.procs, daemon/processes.rs's counts
+        procs: a.procs.0,
+        procs_port: a.procs.1,
         name,
     }
 }

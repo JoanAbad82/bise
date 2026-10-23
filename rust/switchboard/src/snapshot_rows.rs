@@ -42,6 +42,9 @@ pub struct RowIn<'a> {
     /// les bims: what it is doing now, from `Hub.doing` (its one owner,
     /// core_doing.rs); the row says it through `crate::doing::row`
     pub doing: Option<Doing>,
+    /// its running processes and their lowest port, from `Hub.procs`
+    /// (daemon/processes.rs)
+    pub procs: (u16, Option<u16>),
 }
 
 /// A kept row and the inputs it was built from.
@@ -55,6 +58,7 @@ struct Kept {
     turn_ms: Option<u64>,
     watching: Vec<AgentWatch>,
     doing: Option<Doing>,
+    procs: (u16, Option<u16>),
     row: AgentRow,
 }
 
@@ -67,6 +71,7 @@ impl Kept {
             && self.queued_inputs == i.queued_inputs
             && self.watching == i.watching
             && self.doing == i.doing
+            && self.procs == i.procs
             && self.agent == *i.agent
     }
 }
@@ -112,7 +117,7 @@ impl Rows {
     }
 
     /// `a`'s row inputs, its messages' part from the last [`Rows::mail`].
-    pub fn input<'a>(&self, a: &'a Agent, role: Option<&'a str>, now: u64, watching: Vec<AgentWatch>, doing: Option<Doing>) -> RowIn<'a> {
+    pub fn input<'a>(&self, a: &'a Agent, role: Option<&'a str>, now: u64, watching: Vec<AgentWatch>, doing: Option<Doing>, procs: (u16, Option<u16>)) -> RowIn<'a> {
         RowIn {
             agent: a,
             role,
@@ -122,6 +127,7 @@ impl Rows {
             turn_ms: a.turn_ms.map(|t| now.saturating_sub(t)),
             watching,
             doing,
+            procs,
         }
     }
 
@@ -142,6 +148,7 @@ impl Rows {
             turn_ms: i.turn_ms,
             watching: i.watching,
             doing: i.doing,
+            procs: i.procs,
             row: row.clone(),
         };
         self.kept.insert(k.agent.name.clone(), k);
@@ -202,6 +209,7 @@ pub fn build(i: &RowIn) -> AgentRow {
         waiting_on: a.waiting_on.clone().filter(|_| a.waiting),
         watching: i.watching.clone(),
         doing: crate::doing::row(a.run == crate::model::Run::Busy, i.doing, &i.watching),
+        procs: i.procs,
         model: None,
     }
 }

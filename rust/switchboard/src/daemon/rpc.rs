@@ -47,10 +47,10 @@ fn one_ev(project: &str, body: &Value) -> Option<HubEv> {
 }
 
 /// The methods answered from a thread (git, lsof), after the arm returns.
-const LATER: &[&str] = &["diff/read", "worktrees/list", "devServers/list", "merged/list", "branches/list", "release/plan", "tool/output", "log/read", "log/completion"];
+const LATER: &[&str] = &["diff/read", "worktrees/list", "processes/list", "process/output", "merged/list", "branches/list", "release/plan", "tool/output", "log/read", "log/completion"];
 
 /// The hub-wide kinds sent from a thread: `hub/read` gives their last.
-const SCANNED: &[&str] = &["worktrees", "dev_servers", "merged"];
+const SCANNED: &[&str] = &["worktrees", "processes", "merged"];
 
 /// What runs now that a client connecting later must still see in
 /// `initialize`'s and `hub/read`'s state (the older hello's
@@ -101,7 +101,7 @@ struct Pending {
 /// connection open when it reaches the loop. Never the ones open when
 /// the thread started: a connection that said `initialize` while the
 /// scan ran would miss a number the watermark moved past (rpc_e2e's
-/// 'no gap' red: 15, 18 after 13, the worktrees and dev_servers scans).
+/// 'no gap' red: 15, 18 after 13, the worktrees and processes scans).
 pub(super) enum Typed {
     Answer(ClientId),
     All,
@@ -300,7 +300,7 @@ impl Shell {
         for kind in missing {
             match kind {
                 "worktrees" => self.worktrees_typed(Typed::All),
-                "dev_servers" => self.dev_servers_typed(Typed::All),
+                "processes" => self.procs.ask(super::processes::Ask::List { to: Typed::All, watch: None }),
                 _ => self.merged_typed(Typed::All),
             }
         }
@@ -520,7 +520,7 @@ mod tests {
             ("release", "in_progress"),
             ("update", "in_progress"),
             ("worktrees", "SCANNED"),
-            ("dev_servers", "SCANNED"),
+            ("processes", "SCANNED"),
             ("merged", "SCANNED"),
         ]
         .into_iter()
@@ -529,7 +529,9 @@ mod tests {
         // with inbox/history, not carried in the state; activity (les
         // bims): what happens after a client's initialize, never replayed
         let moments: BTreeSet<&str> =
-            ["job_end", "followed_end", "route", "route_done", "page_changed", "inbox_recorded", "activity"].into_iter().collect();
+            // dev_servers: no hub sends it any more (processes replaced it).
+            // TODO(dev-servers): goes in a later release
+            ["job_end", "followed_end", "route", "route_done", "page_changed", "inbox_recorded", "activity", "dev_servers"].into_iter().collect();
         let src = include_str!("rpc.rs");
         let body = src.split("fn hub_state(&mut self, id: ClientId)").nth(1).and_then(|s| s.split("\n    }\n").next()).unwrap();
         for row in rpc::NOTIFICATIONS.iter().filter(|r| r.scope == rpc::Scope::Hub) {

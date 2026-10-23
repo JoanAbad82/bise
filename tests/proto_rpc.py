@@ -154,7 +154,7 @@ def required_keys():
 
 # the kinds whose keys are frozen for the window (the desktop core's
 # reads): the others skip an empty field (hub/flow's `flow`)
-FROZEN = ("agents", "cards", "entry", "typing", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "jobs", "job_end", "notice", "approvals")
+FROZEN = ("agents", "cards", "entry", "typing", "artifacts", "scheduled", "worktrees", "processes", "merged", "features", "prs", "models", "jobs", "job_end", "notice", "approvals")
 
 
 def check_keys(c):

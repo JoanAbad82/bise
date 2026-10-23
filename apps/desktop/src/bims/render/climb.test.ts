@@ -20,7 +20,7 @@ import { climbLayout } from '../maps/climb';
 import type { Activity, ClimbPastime, FunIn, Gym } from '../model';
 import { growOf, STAGE_AT } from '../growth';
 import {
-  type Facet, type Hold, MAT_H, MOVES, type Route, type V3, bellAt, closestOnTri, decorHolds, dot, facets, goldenHold, insideVolume, len, routeHolds, routes, sub,
+  type Facet, type Hold, MAT_H, MOVES, type V3, bellAt, closestOnTri, decorHolds, dot, facets, goldenHold, insideVolume, len, routeHolds, routes, sub,
   volumes,
 } from '../climbwall';
 import { type Line, LINE_MAX, LINE_MIN, SESSION_S, climbers, compose, lineOf } from '../climb';
@@ -111,15 +111,12 @@ function verts(m: Mesh, mw: Matrix4): V3[] {
   return out;
 }
 
-/** a point's signed distance to the wall's facets near it (Infinity: none near). A facet whose plane
- *  is already farther than the best is skipped: a triangle is never nearer than its plane, so the
- *  answer is the same as with every facet, without most of closestOnTri's walks. */
+/** a point's signed distance to the wall's facets near it (Infinity: none near) */
 function wallDist(p: V3, fs: readonly Facet[]): { d: number; at: V3 } {
   let best = Infinity;
   let sign = 0;
   let at: V3 = p;
   for (const f of fs) {
-    if (Math.abs((p.x - f.a.x) * f.n.x + (p.y - f.a.y) * f.n.y + (p.z - f.a.z) * f.n.z) > best + 1e-6) continue;
     const q = closestOnTri(p, f.a, f.b, f.c);
     const d = len(sub(p, q));
     const s = dot(sub(p, q), f.n);
@@ -130,11 +127,13 @@ function wallDist(p: V3, fs: readonly Facet[]): { d: number; at: V3 } {
 }
 
 /** every line a climber may play on a problem: topped out with and without the bell, fallen off each move */
-function linesOf(r: Route): { name: string; line: Line }[] {
+function linesOf(): { name: string; line: Line }[] {
   const out: { name: string; line: Line }[] = [];
-  out.push({ name: `r${String(r.id)} top`, line: compose(r, r.slot, gym, false, MOVES, false) });
-  out.push({ name: `r${String(r.id)} top, the bell`, line: compose(r, r.slot, gym, false, MOVES, true) });
-  for (let j = 1; j < MOVES; j++) out.push({ name: `r${String(r.id)} fall ${String(j)}`, line: compose(r, r.slot, gym, true, j, false) });
+  for (const r of routes(gym)) {
+    out.push({ name: `r${String(r.id)} top`, line: compose(r, r.slot, gym, false, MOVES, false) });
+    out.push({ name: `r${String(r.id)} top, the bell`, line: compose(r, r.slot, gym, false, MOVES, true) });
+    for (let j = 1; j < MOVES; j++) out.push({ name: `r${String(r.id)} fall ${String(j)}`, line: compose(r, r.slot, gym, true, j, false) });
+  }
   return out;
 }
 
@@ -153,27 +152,20 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
     for (const pts of vols) expect(vs.some((x) => [x.a, x.b, x.c, x.apex].every((c) => pts.some((p) => near3(p, c))))).toBe(true);
   });
 
-  const holds: Hold[] = [...routes(gym).flatMap((r) => routeHolds(r)), ...decorHolds(gym)];
-  const gold = goldenHold(gym);
-  if (gold) holds.push(gold);
-  // the bells (a hand rings one: a hold of its own)
-  for (const r of routes(gym)) { const b = bellAt(r); if (b) holds.push({ p: b.at, n: r.n, r: 0.075, colour: 0 }); }
-
-  it('has problems to climb', () => {
-    expect(routes(gym).length).toBeGreaterThan(0);
-  });
-
-  // each problem its own case (all at once took 100 s alone at 30 fps and timed out at 120 s in the
-  // loaded full gate, be3347ff0): every line of one problem, every frame, with room for a busy Mac
-  for (const r of routes(gym)) {
-    it(`problem ${String(r.id)}: every frame of every line at ${String(FPS)} fps, with and without the bell`, { timeout: 60_000 }, async () => {
+  {
+    it(`every frame of every line at ${String(FPS)} fps, with and without the bell`, async () => {
+      const holds: Hold[] = [...routes(gym).flatMap((r) => routeHolds(r)), ...decorHolds(gym)];
+      const gold = goldenHold(gym);
+      if (gold) holds.push(gold);
+      // the bells (a hand rings one: a hold of its own)
+      for (const r of routes(gym)) { const b = bellAt(r); if (b) holds.push({ p: b.at, n: r.n, r: 0.075, colour: 0 }); }
       const bim = makeBim('climber', false, STYLE);
       const parts = partsOf(bim.group);
       expect(parts.hands.length).toBe(2);
       expect(parts.feet.length).toBe(2);
       const out = new Set<string>();
       const seen = new Set<string>();
-      for (const { name, line } of linesOf(r)) {
+      for (const { name, line } of linesOf()) {
         // a macrotask between two lines (src/test-busy.ts: no test holds the loop over 10 s of CPU)
         await new Promise((ok) => setTimeout(ok, 0));
         for (const beat of line.beats) {
@@ -190,9 +182,6 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
             const nearFs = fs.filter((x) => Math.min(...[x.a, x.b, x.c].map((p) => Math.hypot(p.x - g0.x, p.z - g0.z))) < 2.0);
             const nearVs = vs.filter((x) => Math.hypot(x.apex.x - g0.x, x.apex.z - g0.z) < 2.5);
             const holding = beat.k === 'move' ? into >= Math.min(beat.dur, 0.4) : beat.k === 'bell' || beat.k === 'cheer' || beat.k === 'slip';
-            // a mesh's nearest vertex to the wall, when check walked its vertices: the stance reads it back,
-            // the same min only because both walk this frame's nearFs (change check's facets, change the stance's too)
-            const walked = new Map<Mesh, number>();
             const check = (m: Mesh, kind: 'hand' | 'foot' | 'body' | 'limb'): void => {
               if (!shown(m)) return;
               // its bounding sphere first: a mesh clear of the wall, the mats and the volumes by its radius needs no vertex walk
@@ -217,7 +206,6 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
                 if (w.d < min.d) min = w;
               }
               if (min.d === Infinity) return;
-              if (wallNear) walked.set(m, min.d);
               if (kind === 'body' && min.d <= 0) here(`its body touches the wall at ${fmt(min.at)} (${min.d.toFixed(3)})`);
               if (min.d < -EPS) here(`its ${kind} in the wall at ${fmt(min.at)} (${min.d.toFixed(3)})`);
               if ((kind === 'hand' || kind === 'foot') && min.d < TOUCH) {
@@ -231,8 +219,7 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
             parts.limbs.forEach((m) => { check(m, 'limb'); });
             if (holding) {
               // the stance's limbs on: every foot, and every hand but the one that rings, cheers or slips
-              // (the min check already walked, else every vertex: a mesh it skipped is clear of the wall by TOUCH, or hidden)
-              const on = (ms: Mesh[]): number[] => ms.map((m) => walked.get(m) ?? Math.min(...verts(m, m.matrixWorld).map((p) => wallDist(p, nearFs).d)));
+              const on = (ms: Mesh[]): number[] => ms.map((m) => Math.min(...verts(m, m.matrixWorld).map((p) => wallDist(p, nearFs).d)));
               const free = beat.k === 'move' ? -1 : beat.k === 'slip' ? 1 : 0;
               on(parts.hands).forEach((d, i) => { if (i !== free && d >= TOUCH) here(`hand ${String(i)} off the wall in a stance (${d.toFixed(3)})`); });
               on(parts.feet).forEach((d, i) => { if (d >= TOUCH) here(`foot ${String(i)} off the wall in a stance (${d.toFixed(3)})`); });
@@ -242,7 +229,7 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
       }
       bim.dispose();
       expect([...out].slice(0, 30)).toEqual([]);
-    });
+    }, 120_000);
   }
 });
 

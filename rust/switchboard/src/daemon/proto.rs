@@ -52,8 +52,6 @@ pub(super) struct Proto {
     full: String,
     /// the agents' statuses and folders at the last `worktrees` scan
     worktrees: String,
-    /// the background jobs' ports once found (dev_servers.rs)
-    pub(super) dev_ports: super::dev_servers::Ports,
     /// the last `jobs` sent (S10: sent again only when changed)
     jobs: String,
     /// the last `features` sent (bar A.6: sent again only when changed)

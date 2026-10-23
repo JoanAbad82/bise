@@ -248,9 +248,11 @@ impl Shell {
             Msg::OlderHello { stream, peer } => self.older_hello(stream, &peer),
             Msg::RpcNew { id, stream, v, peer } => self.rpc_new(id, stream, v, peer),
             Msg::Typed { to, v } => self.typed_msg(to, v),
+            Msg::ProcCounts(c) => self.procs_counts(c),
             Msg::ClientLine { id, v } => self.client_line(id, v),
             Msg::ClientGone { id } => {
                 self.rpc_gone(id);
+                self.procs.ask(super::processes::Ask::Gone(id));
                 if self.clients.remove(&id).is_some() {
                     self.step(Input::ClientGone { client: id });
                 }

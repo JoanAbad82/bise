@@ -612,6 +612,10 @@ pub struct Hub {
     /// les bims: what each agent is doing now (doing.rs, core_doing.rs);
     /// runtime only, like `activity`.
     doing: BTreeMap<String, bise_proto::rows::Doing>,
+    /// Each agent's running processes: how many and their lowest port
+    /// (daemon/processes.rs's worker, the one source); runtime only, like
+    /// `doing`. The agents rows read it (`Agent.procs`, `procs_port`).
+    pub procs: BTreeMap<String, (u16, Option<u16>)>,
     /// The role line of each task, by dir (BISE-126).
     roles: BTreeMap<String, Role>,
     /// The timers' name calls (every_name.rs); runtime only.
@@ -783,6 +787,7 @@ impl Hub {
             rows: Default::default(),
             activity: BTreeMap::new(),
             doing: BTreeMap::new(),
+            procs: BTreeMap::new(),
             roles: BTreeMap::new(),
             timer_names: Default::default(),
             places: BTreeMap::new(),

@@ -76,6 +76,7 @@ export const NOTIFICATIONS = {
   "hub/scheduled": { ev: "scheduled", scope: "hub" },
   "hub/worktrees": { ev: "worktrees", scope: "hub" },
   "hub/devServers": { ev: "dev_servers", scope: "hub" },
+  "hub/processes": { ev: "processes", scope: "hub" },
   "process/output": { ev: "proc_out", scope: "one" },
   "hub/merged": { ev: "merged", scope: "hub" },
   "hub/features": { ev: "features", scope: "hub" },

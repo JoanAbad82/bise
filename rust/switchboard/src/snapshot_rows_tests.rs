@@ -35,8 +35,8 @@ fn both(rows: &mut Rows, st: &State, roles: &BTreeMap<String, String>, watches: 
     for a in st.order.iter().filter_map(|n| st.agents.get(n)) {
         let role = roles.get(&a.dir).map(String::as_str);
         let w = watches.get(&a.name).cloned().unwrap_or_default();
-        kept.push(rows.row(rows.input(a, role, now, w.clone(), None)));
-        built.push(build(&fresh.input(a, role, now, w, None)));
+        kept.push(rows.row(rows.input(a, role, now, w.clone(), None, (0, None))));
+        built.push(build(&fresh.input(a, role, now, w, None, (0, None))));
     }
     rows.keep_only(st.agents.keys());
     (kept, built)

@@ -33,10 +33,10 @@
 {"cmd":"dev_servers","project":"acme-1a2b3c4d"}
 {"cmd":"processes","project":"acme-1a2b3c4d"}
 {"cmd":"processes","project":"acme-1a2b3c4d","watch":true}
-{"cmd":"proc_out","project":"acme-1a2b3c4d","agent":"perf","id":"bg3"}
-{"cmd":"proc_out","project":"acme-1a2b3c4d","agent":"perf","id":"bg3","from":62}
-{"cmd":"proc_follow","project":"acme-1a2b3c4d","agent":"perf","id":"bg3","on":true}
-{"cmd":"proc_stop","project":"acme-1a2b3c4d","agent":"perf","id":"bg3"}
+{"cmd":"proc_out","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100"}
+{"cmd":"proc_out","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100","from":62}
+{"cmd":"proc_follow","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100","on":true}
+{"cmd":"proc_stop","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100"}
 {"cmd":"proc_stop","project":"acme-1a2b3c4d","agent":"perf","all":true}
 {"cmd":"route_correct","project":"bise-home-00000000","rid":3,"to":"shop-5e6f7a8b"}
 {"cmd":"route_cancel","project":"bise-home-00000000","rid":3}

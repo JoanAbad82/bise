@@ -29,9 +29,14 @@ pub enum ProcKind {
 #[serde(tag = "is", rename_all = "snake_case")]
 pub enum ProcState {
     Running,
-    /// it ended by itself, with that exit code (its bg slot's `.rc`; a
-    /// detached one's code isn't known: -1)
-    Exited { rc: i32 },
+    /// it ended by itself, with that exit code (its bg slot's `.rc`);
+    /// none when not known (a detached one, a slot its agent cleaned
+    /// before the hub read it): never drawn as a failure
+    Exited {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        rc: Option<i32>,
+    },
     /// he stopped it (`proc_stop`)
     StoppedByYou,
     /// killed with its agent (the agent stopped or dropped, the hub quit)
@@ -114,7 +119,8 @@ mod tests {
     #[test]
     fn kinds_and_states_are_tagged_and_a_newer_one_reads_as_unknown() {
         assert_eq!(serde_json::to_value(ProcKind::Bg { n: 3 }).unwrap(), json!({"is": "bg", "n": 3}));
-        assert_eq!(serde_json::to_value(ProcState::Exited { rc: 1 }).unwrap(), json!({"is": "exited", "rc": 1}));
+        assert_eq!(serde_json::to_value(ProcState::Exited { rc: Some(1) }).unwrap(), json!({"is": "exited", "rc": 1}));
+        assert_eq!(serde_json::to_value(ProcState::Exited { rc: None }).unwrap(), json!({"is": "exited"}));
         assert_eq!(serde_json::to_value(ProcState::StoppedByYou).unwrap(), json!({"is": "stopped_by_you"}));
         assert_eq!(serde_json::from_value::<ProcKind>(json!({"is": "container"})).unwrap(), ProcKind::Unknown);
         assert_eq!(serde_json::from_value::<ProcState>(json!({"is": "paused", "at": 1})).unwrap(), ProcState::Unknown);

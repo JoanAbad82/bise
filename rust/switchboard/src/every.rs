@@ -525,12 +525,19 @@ fn mk(mut tm: libc::tm) -> Option<u64> {
 }
 
 fn mktime(y: i32, mo: i32, d: i32, h: i32, mi: i32) -> Option<u64> {
+    mktime_s(y, mo, d, h, mi, 0)
+}
+
+/// A local date and time to the second, as epoch ms (a process's start,
+/// `ps`'s lstart: daemon/processes.rs).
+pub fn mktime_s(y: i32, mo: i32, d: i32, h: i32, mi: i32, s: i32) -> Option<u64> {
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
     tm.tm_year = y - 1900;
     tm.tm_mon = mo - 1;
     tm.tm_mday = d;
     tm.tm_hour = h;
     tm.tm_min = mi;
+    tm.tm_sec = s;
     mk(tm)
 }
 

@@ -290,10 +290,14 @@ def worktree_round(c, E):
             fh.write("python3 -m http.server 0")
 
         def t5_server():
-            rows = [x for x in ok(req(c, "devServers/list"), "devServers/list")["items"] if x["agent"] == "t5" and x.get("port")]
+            rows = [x for x in ok(req(c, "processes/list"), "processes/list")["items"] if x["agent"] == "t5" and x.get("ports")]
             return rows[0] if rows else None
         srv = c.wait(t5_server, 30, "t5's server with its port (asked until it listens)")
-        check(srv["url"] == "http://localhost:%d" % srv["port"] and srv["name"] == "http server" and srv["up"], "t5's server: %r" % srv)
+        port = srv["ports"][0]
+        check(srv["url"] == "http://127.0.0.1:%d" % port and srv["name"] == "http server" and srv["state"] == {"is": "running"}
+              and srv["kind"] == {"is": "bg", "n": 9} and srv["id"].startswith("bg9.") and srv["pid"] == server.pid, "t5's server: %r" % srv)
+        # an older desktop's Environments screen: answered, empty (shim dev-servers)
+        check(ok(req(c, "devServers/list"), "devServers/list")["items"] == [], "devServers/list is empty")
     finally:
         os.killpg(server.pid, signal.SIGTERM)
         server.wait(timeout=10)

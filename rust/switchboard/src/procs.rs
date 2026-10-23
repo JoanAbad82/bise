@@ -243,6 +243,22 @@ pub fn terminate(pid: u32) {
     send(pid, SIGTERM);
 }
 
+/// How long a TERM'd process gets before its KILL: proc-cleanup's reap
+/// and his stop from the processes list (docs/processes.md) alike.
+pub const STOP_GRACE: Duration = Duration::from_secs(5);
+
+/// TERM (or KILL) to process group `pgid` (`kill -TERM -<pgid>`); group
+/// 0 or 1 does nothing.
+pub fn signal_group(pgid: u32, kill_it: bool) {
+    let Ok(g) = i32::try_from(pgid) else { return };
+    if g > 1 {
+        // SAFETY: kill(2) on a negative pid: that group; a stale one fails
+        unsafe {
+            kill(-g, if kill_it { SIGKILL } else { SIGTERM });
+        }
+    }
+}
+
 /// SIGKILL to `pid` (`kill -9 <pid>`).
 pub fn kill_now(pid: u32) {
     send(pid, SIGKILL);

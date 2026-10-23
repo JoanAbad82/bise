@@ -84,6 +84,8 @@ pub const METHODS: &[MethodRow] = &[
     // steers it in, its id kept; the agents event drops it from the queue
     m("turn/steerQueued", "queued_steer", None),
     m("worktrees/list", "worktrees", Some("worktrees")),
+    // an older desktop's Environments screen, answered empty:
+    // TODO(dev-servers), goes in a later release
     m("devServers/list", "dev_servers", Some("dev_servers")),
     // running processes (docs/processes.md): the list, an output range,
     // following it, stop (the user's authority)
@@ -208,7 +210,9 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/artifacts", "artifacts", Scope::Hub),
     n("hub/scheduled", "scheduled", Scope::Hub),
     n("hub/worktrees", "worktrees", Scope::Hub),
+    // TODO(dev-servers): goes in a later release (no hub sends it: processes)
     n("hub/devServers", "dev_servers", Scope::Hub),
+    n("hub/processes", "processes", Scope::Hub),
     // a followed process's output as it grows (`process/follow`)
     n("process/output", "proc_out", Scope::One),
     n("hub/merged", "merged", Scope::Hub),

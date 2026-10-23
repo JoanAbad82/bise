@@ -122,6 +122,11 @@ impl Paths {
     pub fn images_since(&self) -> PathBuf {
         self.state.join("images-since")
     }
+    /// The processes that ended in the last 24 h (`ended.jsonl`) and
+    /// their kept output (`<agent>-<id>.out`), daemon/processes.rs's.
+    pub fn procs_dir(&self) -> PathBuf {
+        self.state.join("procs")
+    }
     pub fn bin_dir(&self) -> PathBuf {
         self.state.join("bin")
     }

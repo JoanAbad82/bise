@@ -38,16 +38,16 @@ fn groups_by_agent_running_oldest_first_then_ended_newest_first() {
     assert_eq!(
         ids(&gs),
         vec![
-            ("docs".into(), vec!["p49012.1791100160".into(), "bg1".into()]),
-            ("perf".into(), vec!["bg3".into(), "p48990.1791100150".into(), "bg2".into(), "bg4".into(), "bg1".into()]),
+            ("docs".into(), vec!["p49012.1791100160".into(), "p47500.1791099650".into(), "bg1.1791098000".into()]),
+            ("perf".into(), vec!["bg3.1791100100".into(), "p48990.1791100150".into(), "bg2.1791099500".into(), "bg4.1791099600".into(), "bg1.1791099000".into()]),
         ]
     );
     // tab: the ended ones only
     let ended = groups(&items, &order, Filter::Ended, "");
     assert!(ended.iter().flat_map(|g| &g.rows).all(|p| !p.running()));
-    assert_eq!(flat(&ended).len(), 4);
+    assert_eq!(flat(&ended).len(), 5);
     // the search: its command or its agent
-    assert_eq!(ids(&groups(&items, &order, Filter::All, "MKDOCS")), vec![("docs".into(), vec!["bg1".into()])]);
+    assert_eq!(ids(&groups(&items, &order, Filter::All, "MKDOCS")), vec![("docs".into(), vec!["bg1.1791098000".into()])]);
     assert_eq!(flat(&groups(&items, &order, Filter::All, "perf")).len(), 5);
     // an agent with only ended ones goes after those that run
     let only_ended: Vec<Proc> = items.iter().filter(|p| p.agent == "perf" || !p.running()).cloned().collect();
@@ -58,26 +58,30 @@ fn groups_by_agent_running_oldest_first_then_ended_newest_first() {
 fn a_rows_words_say_its_state_and_its_port() {
     let items = fixture();
     let by = |agent: &str, id: &str| items.iter().find(|p| p.agent == agent && p.id == id).unwrap().clone();
-    let dev = by("perf", "bg3");
+    let dev = by("perf", "bg3.1791100100");
     assert_eq!(status(&dev, NOW, false, true), "14 min");
     assert_eq!(port_words(&dev, true).as_deref(), Some("localhost:5173"));
     assert_eq!(port_words(&dev, false).as_deref(), Some(":5173"));
     assert_eq!(status(&dev, NOW, true, true), running::stopping);
-    let failed = by("perf", "bg1");
+    let failed = by("perf", "bg1.1791099000");
     let ago = wait_len(NOW - failed.ended_ms.unwrap(), false);
     assert_eq!(status(&failed, NOW, false, true), format!("{} · {}", running::ended_ago(&ago), running::exit_rc(101)));
     assert_eq!(status(&failed, NOW, false, false), format!("{} · {}", running::exit_rc(101), running::ago_short(&ago)));
     // stopping says nothing once it ended
     assert_eq!(status(&failed, NOW, true, true), status(&failed, NOW, false, true));
     assert_eq!(glyph(&failed), (G_FAILED, error()));
-    let his = by("perf", "bg2");
+    let his = by("perf", "bg2.1791099500");
     assert_eq!(status(&his, NOW, false, true), running::stopped_by_you_at(clock(his.ended_ms.unwrap())));
     // an ended one listens no more
     assert_eq!(port_words(&his, true), None);
-    assert_eq!(status(&by("docs", "bg1"), NOW, false, true), running::stopped_with("docs"));
+    assert_eq!(status(&by("docs", "bg1.1791098000"), NOW, false, true), running::stopped_with("docs"));
     let mut ok = failed.clone();
-    ok.state = ProcState::Exited { rc: 0 };
+    ok.state = ProcState::Exited { rc: Some(0) };
     assert_eq!(glyph(&ok).1, dim());
+    assert_eq!(status(&ok, NOW, false, true), running::ended_ago(&ago));
+    // its code not known (a detached one): '–' dim, no rc, never red
+    ok.state = ProcState::Exited { rc: None };
+    assert_eq!(glyph(&ok), (G_STOPPED, dim()));
     assert_eq!(status(&ok, NOW, false, true), running::ended_ago(&ago));
 }
 

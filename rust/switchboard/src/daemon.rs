@@ -48,7 +48,6 @@ mod session_log;
 mod skills;
 mod small_ask;
 mod versions;
-mod dev_servers;
 mod dispatch;
 mod drops;
 mod inbox;
@@ -60,6 +59,7 @@ mod loop_watch;
 mod merged;
 mod outbox;
 mod photo_take;
+mod processes;
 mod state_gate;
 mod contexts;
 mod tindex;
@@ -257,6 +257,8 @@ enum Msg {
         to: rpc::Typed,
         v: Value,
     },
+    /// the processes worker's counts changed (daemon/processes.rs)
+    ProcCounts(processes::Counts),
     /// a connection whose first line is JSON-RPC's `initialize`
     RpcNew {
         id: ClientId,
@@ -447,6 +449,9 @@ struct Shell {
     wake_look: wake_look::WakeLook,
     /// sb-core's worktrees, made off the loop (`daemon/place_work.rs`)
     place_work: place_work::PlaceWork,
+    /// the running processes' worker: scans, ended log, output, stop
+    /// (`daemon/processes.rs`, docs/processes.md)
+    procs: processes::Worker,
     /// the boot photo's bookkeeping (`daemon/photo_take.rs`, issue 36)
     photos: photo_take::Photos,
 }
@@ -1714,6 +1719,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         art: art::Art::default(),
         wake_look: wake_look::WakeLook::start(tx.clone()),
         place_work: place_work::PlaceWork::start(&paths, tx.clone()),
+        procs: processes::Worker::start(paths.clone(), proc_hub.clone(), crate::paths::workspace_id(&paths.workspace), tx.clone()),
         photos,
     };
     sh.answers_replayed(&events);
@@ -1868,7 +1874,9 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             sessions.extend(crate::procs::read_sids(&f));
             let _ = std::fs::remove_file(f);
         }
-        let hit = crate::procs::reap(&sh.proc_hub, &crate::procs::Want::NotLive(&none), &sessions, Duration::from_secs(3));
+        // the processes list's rows end as stopped with their agents first
+        sh.procs.quit(Duration::from_secs(2));
+        let hit = crate::procs::reap(&sh.proc_hub, &crate::procs::Want::NotLive(&none), &sessions, crate::procs::STOP_GRACE);
         if !hit.is_empty() {
             log_line(&paths, &format!("processes of the agents killed: {}", crate::procs::describe(&hit)));
         }

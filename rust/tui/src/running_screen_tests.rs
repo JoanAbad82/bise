@@ -16,7 +16,7 @@ fn order() -> Vec<String> {
 }
 
 fn screen() -> Screen {
-    Screen { items: Some(fixture()), sel: Some(("perf".into(), "bg3".into())), ..Default::default() }
+    Screen { items: Some(fixture()), sel: Some(("perf".into(), "bg3.1791100100".into())), ..Default::default() }
 }
 
 /// An app with main, perf and docs in its panel, and its hub's end.
@@ -113,9 +113,12 @@ fn it_opens_on_the_agent_in_view_and_keys_move_and_filter() {
     let sel = |app: &App| app.running.as_ref().unwrap().sel.clone().unwrap();
     assert_eq!(sel(&app).0, "docs");
     press(&mut app, KeyCode::Down);
-    assert_eq!(sel(&app), ("docs".into(), "bg1".into()));
+    assert_eq!(sel(&app), ("docs".into(), "p47500.1791099650".into()));
     press(&mut app, KeyCode::Down);
-    assert_eq!(sel(&app), ("docs".into(), "bg1".into()), "the last row stays");
+    assert_eq!(sel(&app), ("docs".into(), "bg1.1791098000".into()));
+    press(&mut app, KeyCode::Down);
+    assert_eq!(sel(&app), ("docs".into(), "bg1.1791098000".into()), "the last row stays");
+    press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Up);
     assert_eq!(sel(&app).0, "perf");
@@ -129,7 +132,7 @@ fn it_opens_on_the_agent_in_view_and_keys_move_and_filter() {
     for c in "mkdocs".chars() {
         press(&mut app, KeyCode::Char(c));
     }
-    assert_eq!(sel(&app), ("docs".into(), "bg1".into()));
+    assert_eq!(sel(&app), ("docs".into(), "bg1.1791098000".into()));
     press(&mut app, KeyCode::Esc);
     assert!(app.running.as_ref().unwrap().query.is_empty() && app.running.is_some());
     // esc closes, and the list stops coming
@@ -141,9 +144,9 @@ fn it_opens_on_the_agent_in_view_and_keys_move_and_filter() {
 #[test]
 fn s_stops_with_no_question_and_says_stopping_until_it_ends() {
     let (mut app, mut hub) = app_open();
-    app.running.as_mut().unwrap().sel = Some(("perf".into(), "bg3".into()));
+    app.running.as_mut().unwrap().sel = Some(("perf".into(), "bg3.1791100100".into()));
     press(&mut app, KeyCode::Char('s'));
-    assert!(sent(&mut hub).iter().any(|(m, p)| m == "process/stop" && p["agent"] == "perf" && p["id"] == "bg3"));
+    assert!(sent(&mut hub).iter().any(|(m, p)| m == "process/stop" && p["agent"] == "perf" && p["id"] == "bg3.1791100100"));
     let sc = app.running.as_ref().unwrap();
     let t = texts(&list_lines(sc, &order(), "acme", 146, NOW).0);
     assert!(t[1].ends_with(running::stopping) || t[1].trim_end().ends_with(running::stopping), "{}", t[1]);
@@ -169,7 +172,7 @@ fn o_on_a_port_nothing_answers_flashes_why() {
     let mut items = fixture();
     items[0].ports = vec![1];
     listed(&mut app, &items);
-    app.running.as_mut().unwrap().sel = Some(("perf".into(), "bg3".into()));
+    app.running.as_mut().unwrap().sel = Some(("perf".into(), "bg3.1791100100".into()));
     press(&mut app, KeyCode::Char('o'));
     assert_eq!(app.running.as_ref().unwrap().note.as_ref().unwrap().0, running::not_answering(1));
     app.running.as_mut().unwrap().sel = Some(("docs".into(), "p49012.1791100160".into()));
@@ -194,7 +197,7 @@ fn enter_without_a_local_file_reads_the_hub_and_follows() {
     output(&mut app, "perf", "p48990.1791100150", 0, &b64(first));
     output(&mut app, "perf", "p48990.1791100150", first.len() as u64, &b64("rebuilt\n"));
     // another process's bytes are not this view's
-    output(&mut app, "perf", "bg3", 0, &b64("nope\n"));
+    output(&mut app, "perf", "bg3.1791100100", 0, &b64("nope\n"));
     let sc = app.running.as_ref().unwrap();
     let o = sc.out.as_ref().unwrap();
     let p = sc.items.as_ref().unwrap().iter().find(|p| p.id == "p48990.1791100150").cloned();
@@ -223,7 +226,7 @@ fn a_process_with_no_output_says_so_in_one_dim_line() {
 #[test]
 fn a_takes_you_to_its_agent() {
     let (mut app, _hub) = app_open();
-    app.running.as_mut().unwrap().sel = Some(("docs".into(), "bg1".into()));
+    app.running.as_mut().unwrap().sel = Some(("docs".into(), "bg1.1791098000".into()));
     press(&mut app, KeyCode::Char('a'));
     assert!(app.running.is_none());
     assert_eq!(app.sb.focus, "docs");

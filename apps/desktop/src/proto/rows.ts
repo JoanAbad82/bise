@@ -416,7 +416,7 @@ export type ProcKind = { "is": "bg", n: number, } | { "is": "detached" } | { "is
 /**
  * Whether it runs, and how it ended.
  */
-export type ProcState = { "is": "running" } | { "is": "exited", rc: number, } | { "is": "stopped_by_you" } | { "is": "stopped_with" } | { "is": "unknown" };
+export type ProcState = { "is": "running" } | { "is": "exited", rc?: number, } | { "is": "stopped_by_you" } | { "is": "stopped_with" } | { "is": "unknown" };
 
 /**
  * Where its output can be read (`proc_out`): the app never gets a path.
