@@ -34,6 +34,7 @@ import { SHADOW_BLUR, SHADOW_DROP, SLAB_LOW, groundOf } from './camera';
 import { slabWithPits } from './ground';
 import { kitOf } from './kit';
 import { buildCozy } from './cozy';
+import { ghostDesks } from './ghost';
 import { napRests, type NapRest } from './nap';
 import type { Palette } from './palette';
 import type { Build, DeskHandles, MapLook } from './maps/look';
@@ -188,6 +189,8 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   look.lounge(b);
   const desks = new Map<string, DeskHandles>();
   for (const [name, d] of o.desks) desks.set(name, look.desk(b, d, name));
+  // a new project's welcome: the free desks as dashed outlines (render/ghost.ts)
+  ghostDesks(b);
   const mainDesk = look.mainDesk(b, mainName);
   desks.set(mainName, mainDesk);
   look.growth(b);

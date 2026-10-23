@@ -27,6 +27,7 @@ import { blendAt, blending, lightOf, retarget, sameSky, type Blend, type Light }
 import { louder } from './pose';
 import { makeOfficeScene } from './office-scene';
 import { makeView } from './view';
+import { ghostBox } from './ghost';
 
 /** the building's box for the rain's outline: past its walls, up to their tops (the tallest map's) */
 const HULL_PAD = 0.3;
@@ -96,6 +97,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let lastLook: Look | null = null;
   let drawnSky: Light | null = null;
   let skyMoving = false;
+  /** main's name in the office drawn (pointOf's tray) */
+  let lead: string | null = null;
 
   const probe: Probe | null = testMode()
     ? { frames: 0, slowest: null, trace: [], skate: [], head: (name) => headOf(name), at: (x, y, z) => (fit ? toScreen(fit, { x, y, z }) : null), zoom: () => cam.zoom, cam: () => cam, sky: () => (drawnSky ? { light: drawnSky, blending: skyMoving } : null) }
@@ -173,6 +176,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
 
   const api: OfficeRenderer = {
     setOffice(o, as) {
+      lead = as.find((a) => a.main)?.name ?? null;
       office.setOffice(o, as);
       lightUp(lastT, lastLook);
       applyFit();
@@ -229,6 +233,24 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       const p = toScreen(fit, { ...at, y: 1.2 });
       const m = 12;
       return { x: Math.min(fit.widthPx - m, Math.max(m, p.x)), y: Math.min(fit.heightPx - m, Math.max(m * 2, p.y)) };
+    },
+    pointOf(what) {
+      const o = office.office();
+      if (!fit || !o) return null;
+      let at: { x: number; y: number; z: number } | null = null;
+      if (what === 'tray') {
+        const d = lead === null ? undefined : office.desk(lead);
+        at = d ? (d.tray ?? d.top) : null;
+      } else {
+        const s = o.ghosts?.[what.ghost];
+        if (s) {
+          const b = ghostBox(o.furniture, s);
+          at = { x: (b.x0 + b.x1) / 2, y: 0, z: (b.z0 + b.z1) / 2 };
+        }
+      }
+      if (!at) return null;
+      const p = toScreen(fit, at);
+      return p.x < 0 || p.y < 0 || p.x > fit.widthPx || p.y > fit.heightPx ? null : { x: p.x, y: p.y };
     },
     pick(x, y) {
       if (!fit || !office.pal()) return null;

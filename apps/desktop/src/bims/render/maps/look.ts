@@ -23,6 +23,8 @@ export interface DeskHandles {
   readonly top: { readonly x: number; readonly y: number; readonly z: number };
   /** its chair (a poke's chair spin turns it with its bim); absent: a map without one (a cushion, a stool) */
   readonly chair?: Seat;
+  /** main's desk: the inbox tray's top (the welcome's pin 3, Office.pins); absent: the desk's top */
+  readonly tray?: { readonly x: number; readonly y: number; readonly z: number };
 }
 
 /** What every builder gets: the kit (palette, shared materials), the world's root, the office, the growth. */

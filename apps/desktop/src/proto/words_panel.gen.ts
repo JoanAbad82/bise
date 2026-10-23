@@ -48,6 +48,8 @@ export const panel = {
   archived: "archived",
   /** a role made of a raw tag (a model's `<think>`) */
   role_thinking: "thinking",
+  /** main's row at rest, beside 'bise' (page new-project-home: '○ bise  team lead') */
+  role_lead: "team lead",
   /** an agent's next wake, at a clock */
   wakes_at: (a: { at: string | number }): string => "wakes at " + String(a.at),
   /** the panel's cards section title */

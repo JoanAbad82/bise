@@ -60,7 +60,8 @@ function mainDesk({ k, root, o }: Build): DeskHandles {
   const seat = chair(k, root, md.x, md.z - 0.05, WORLD.dark, md.face);
   const neon = style.material(pal.neon, { flat: true });
   glyph(k, root, md.x, 1.25, 0.02 + style.pictureZ, pal.neon, 0.06, neon);
-  return { screen, lamp, top: { x: mcx, y: 0.55, z: mcz }, chair: seat };
+  // the crate on its slab is the inbox tray (the welcome's pin 3): its top
+  return { screen, lamp, top: { x: mcx, y: 0.55, z: mcz }, chair: seat, tray: { x: mcx - mw / 2 + 0.5, y: 0.85, z: mcz } };
 }
 
 /**

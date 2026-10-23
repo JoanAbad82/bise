@@ -36,6 +36,7 @@ import { cropped, growOf, tipOf, unlockLabel } from './growth';
 import { makeDriver, type Clock } from './office-driver';
 import { growHigh } from './grow-keep';
 import { FOLD_MS } from './Fold';
+import { Pins, pinPoints, placePins } from './pins';
 import { placeZzz, sleepers } from './zzz';
 import { fallingLook, fallingSig, type FallingLook } from './falling';
 import { WEATHERS, type Weather } from './sky';
@@ -197,6 +198,9 @@ export function Office({
   follow = null,
   onOpen,
   onPickMap,
+  pins = false,
+  onState,
+  snapRef,
 }: {
   project: string;
   /** the project's live agents (main among them) */
@@ -214,8 +218,18 @@ export function Office({
   onOpen: (agent: string) => void;
   /** his pick in the map chip's menu (MapChip.tsx, bottom left); absent (the town): no chip */
   onPickMap?: (map: MapId) => void;
+  /** a new project's welcome (welcome/Welcome.tsx): the 1, 2, 3 pins over the lead, an empty desk, the tray (pins.tsx) */
+  pins?: boolean;
+  /** its state as it changes: the welcome shows its pictures when the office can't draw */
+  onState?: (s: OfficeState) => void;
+  /** set while it draws: the office as drawn now onto a 2d canvas (the welcome's dock, renderer.copyTo) */
+  snapRef?: { current: ((target: HTMLCanvasElement) => void) | null };
 }) {
   const [state, setState] = useState<OfficeState>('loading');
+  useEffect(() => {
+    onState?.(state);
+  }, [state, onState]);
+  const pinsRef = useRef<HTMLDivElement | null>(null);
   // the scene fades in once its first frame is drawn and the fold has grown (Fold.tsx)
   const [drawn, setDrawn] = useState(false);
   const [grown, setGrown] = useState(false);
@@ -476,6 +490,7 @@ export function Office({
         }
       }
       layoutTags();
+      if (pinsRef.current !== null) placePins(pinsRef.current, pinPoints(r, step.agents.find((a) => a.main)?.name ?? null));
       if (zzzRef.current !== null) {
         const zs = new Map<string, { x: number; y: number }>();
         for (const name of sleepers(frames)) {
@@ -582,6 +597,10 @@ export function Office({
         r = made;
         made.onLost(fail);
         pick.current = (x, y) => (lost ? null : made.pick(x, y));
+        if (snapRef !== undefined)
+          snapRef.current = (target) => {
+            made.copyTo(target);
+          };
         made.setCam(camRef.current);
         started = true;
         setState('on');
@@ -606,9 +625,10 @@ export function Office({
       kickRef.current = () => undefined;
       applyCam.current = () => undefined;
       pick.current = () => null;
+      if (snapRef !== undefined) snapRef.current = null;
       r?.dispose();
     };
-  }, [parts, driver, layoutTags, moveCam]);
+  }, [parts, driver, layoutTags, moveCam, snapRef]);
 
   // hover: the bim under the pointer, its line after the tip's delay; off it, at once
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -777,6 +797,14 @@ export function Office({
       <div className="bims-overlay">
         <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
         <div ref={zzzRef} className="bims-zzzs" data-testid="app.right.bims.zzzs" />
+        {pins && (
+          <Pins
+            boxRef={(el) => {
+              pinsRef.current = el;
+              kickRef.current();
+            }}
+          />
+        )}
         <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
         {/* the ground's corner: hover says the level, the jobs done, the next piece (the map's own) */}
         <span className="bims-level" data-testid="app.right.bims.level" {...tipAttrs(tipOf(growNow, planOf(map).things))} />

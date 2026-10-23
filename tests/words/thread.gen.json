@@ -1256,6 +1256,63 @@
     "one": null,
     "text": "its last line"
   },
+  "thread.welcome_agents_head": {
+    "args": [],
+    "one": null,
+    "text": "an agent per task"
+  },
+  "thread.welcome_agents_says": {
+    "args": [],
+    "one": null,
+    "text": "its own desk and its own copy of the repo. they work side by side."
+  },
+  "thread.welcome_hi": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "hi, i'm the lead for {project}. tell me what you want done, as much as you like at once: i start an agent for each independent task, and i come back to you only when something needs your call."
+  },
+  "thread.welcome_idea_repo": {
+    "args": [],
+    "one": null,
+    "text": "what's in this repo?"
+  },
+  "thread.welcome_idea_tests": {
+    "args": [],
+    "one": null,
+    "text": "fix the failing tests"
+  },
+  "thread.welcome_inbox_head": {
+    "args": [],
+    "one": null,
+    "text": "your inbox"
+  },
+  "thread.welcome_inbox_says": {
+    "args": [],
+    "one": null,
+    "text": "only what needs your call reaches you."
+  },
+  "thread.welcome_lead_head": {
+    "args": [],
+    "one": null,
+    "text": "bise, your team lead"
+  },
+  "thread.welcome_lead_says": {
+    "args": [],
+    "one": null,
+    "text": "you talk to it. it splits the work and keeps track."
+  },
+  "thread.welcome_office": {
+    "args": [],
+    "one": null,
+    "text": "your project's office: the lead at its desk, the empty desks, the inbox tray"
+  },
+  "thread.welcome_role": {
+    "args": [],
+    "one": null,
+    "text": "team lead"
+  },
   "thread.went_agent_tip": {
     "args": [
       "name"

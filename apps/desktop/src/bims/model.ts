@@ -212,6 +212,8 @@ export interface Office {
   readonly lamps?: readonly Pt[];
   /** the nooks of its corners (the workshop's: a sofa, a drum stool, a bench), places of the walk graph an idle trip may go to instead of the island; absent: none */
   readonly nooks?: readonly Nook[];
+  /** a new project's welcome (ghosts.ts): the free desks drawn as dashed outlines, no desk built there; absent: none */
+  readonly ghosts?: readonly Spot[];
 }
 
 /** A straight piece to grind or ride across, along x: a curb, a ledge, a rail, a flat lane (h 0). */
@@ -490,6 +492,8 @@ export interface OfficeRenderer {
   spotOf(name: string): { readonly x: number; readonly y: number; readonly u: number; readonly v: number } | null;
   /** where a stage's piece stands on the canvas, css px (the unlock moment's label); null off view */
   pieceOf(stage: number): { readonly x: number; readonly y: number } | null;
+  /** a new project's welcome pins (Office pins): main's inbox tray (its desk's top on a map without one) or a ghost desk's middle on the floor, css px; null off view */
+  pointOf(what: 'tray' | { readonly ghost: number }): { readonly x: number; readonly y: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */
   pick(x: number, y: number): string | null;
   /** the office as drawn now, copied onto a 2d canvas of the same pixel size (the map's crossfade, /bims) */

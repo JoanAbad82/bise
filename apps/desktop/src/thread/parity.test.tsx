@@ -356,43 +356,57 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
   });
 });
 
-describe("the first-run text in main's empty thread (bar L1 / M18, amb-kit 29c5eb93)", () => {
-  const screen = (store: Store, agent = 'main') =>
+describe("a project's welcome in main's empty thread (page new-project-home, pick A); bise's own keeps the first run", () => {
+  const screen = (store: Store, agent = 'main', bise = false) =>
     render(
       <StoreProvider store={store}>
-        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent={agent} /></RouterContext>
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent={agent} bise={bise} /></RouterContext>
       </StoreProvider>,
     );
-  const thread = (store: Store, entries: { pos: number; kind: 'you' | 'agent'; text: string }[]) => {
+  const thread = (store: Store, entries: { pos: number; kind: 'you' | 'agent'; text: string }[], more = false) => {
     act(() => {
-      store.apply({ ev: 'thread', project: P, agent: 'main', entries: entries.map((e) => ({ ...e, at_ms: 1 })), before: null, more: false });
+      store.apply({ ev: 'thread', project: P, agent: 'main', entries: entries.map((e) => ({ ...e, at_ms: 1 })), before: more ? (entries[0]?.pos ?? null) : null, more });
     });
   };
 
-  it("shows while he said nothing and main is the only agent; not in another agent's thread", () => {
+  it("shows while he said nothing: the legend 1, 2, 3, the lead's first message, the ideas; not in another agent's thread", () => {
     const store = new Store(null);
     act(() => {
       store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('old', { archived: true })] });
     });
-    thread(store, [{ pos: 1, kind: 'agent', text: 'hi.' }]);
-    expect(screen(store).getByTestId('setup.firstrun').textContent).toContain('show me what you can do');
+    thread(store, []);
+    const v = screen(store);
+    expect(v.getByTestId('welcome.legend').textContent).toContain('bise, your team lead');
+    expect(v.getByTestId('welcome.hi').textContent).toContain(`hi, i'm the lead for ${P}.`);
+    expect(v.getByTestId('welcome.idea.2').textContent).toBe('show me what you can do');
+    expect(v.queryByTestId('setup.firstrun')).toBeNull();
     cleanup();
-    expect(screen(store, 'old').queryByTestId('setup.firstrun')).toBeNull();
+    expect(screen(store, 'old').queryByTestId('welcome')).toBeNull();
   });
 
-  it('gone once he said something, or once another agent runs', () => {
+  it('gone once he said something (from the terminal too), and in a thread with older pages', () => {
     const said = new Store(null);
     act(() => {
       said.apply({ ev: 'agents', project: P, agents: [ag('main')] });
     });
     thread(said, [{ pos: 1, kind: 'you', text: 'hello' }]);
-    expect(screen(said).queryByTestId('setup.firstrun')).toBeNull();
+    expect(screen(said).queryByTestId('welcome')).toBeNull();
     cleanup();
-    const busy = new Store(null);
+    const long = new Store(null);
     act(() => {
-      busy.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf')] });
+      long.apply({ ev: 'agents', project: P, agents: [ag('main')] });
     });
-    thread(busy, []);
-    expect(screen(busy).queryByTestId('setup.firstrun')).toBeNull();
+    thread(long, [{ pos: 40, kind: 'agent', text: 'done.' }], true);
+    expect(screen(long).queryByTestId('welcome')).toBeNull();
+  });
+
+  it("bise's own thread: the first run, no welcome", () => {
+    const store = new Store(null);
+    act(() => {
+      store.apply({ ev: 'agents', project: P, agents: [ag('main')] });
+    });
+    thread(store, []);
+    const v = screen(store, 'main', true);
+    expect(v.queryByTestId('welcome')).toBeNull();
   });
 });

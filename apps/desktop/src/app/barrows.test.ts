@@ -13,7 +13,7 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
   it('AGENTS: main first as bise, then the live ones in start order, the waiting one says waits in the accent', () => {
     const rows = agentRows([ag('perf', { status: 'working' }), ag('main', { main: true }), ag('search', { waits: 1 }), ag('old', { archived: true })], NOW, false);
     expect(rows.map((r) => r.name)).toEqual(['bise', 'perf', 'search']);
-    expect(rows[0]).toMatchObject({ kind: 'agent', main: true, agent: 'main', glyph: '○', sub: "main's job", testId: 'app.right.agent.main' });
+    expect(rows[0]).toMatchObject({ kind: 'agent', main: true, agent: 'main', glyph: '○', sub: 'team lead', testId: 'app.right.agent.main' });
     expect(rows[1]?.main).toBeUndefined();
     expect(rows[2]).toMatchObject({ glyph: '?', tone: 'acc', end: '', waits: true, sub: "search's job" });
   });

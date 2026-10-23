@@ -543,6 +543,25 @@
   position: absolute;
   inset: 0;
 }
+/* a new project's welcome (pins.tsx): 1, 2, 3 discs in ink on the page's colour, never the accent */
+.bims-pins {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bims-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--c-text);
+  color: var(--c-solid);
+  font: 600 var(--t-11) / 18px var(--font-ui);
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--c-solid);
+}
 .bims-zzz {
   position: absolute;
   top: 0;

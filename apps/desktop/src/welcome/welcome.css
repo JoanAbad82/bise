@@ -1,0 +1,163 @@
+/* A new project's welcome (Welcome.tsx; page new-project-home, pick A). Owner: project-home. */
+
+/* in main's empty thread: its own scroll when the window is short, centred when it has room */
+.th-first.th-welcome {
+  /* its height sizes the office: the whole welcome fits over the composer when it can */
+  container-type: size;
+  overflow-y: auto;
+  align-items: safe center;
+  padding: var(--s-4) 0;
+}
+.th-first.th-welcome.after {
+  container-type: normal;
+  overflow: visible;
+  padding: 0;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  width: 100%;
+  max-width: var(--th-col);
+  padding: 0 var(--pad-column);
+  box-sizing: border-box;
+  color: var(--c-text);
+}
+.welcome-map,
+.welcome-legend,
+.welcome-pics {
+  align-self: center;
+  width: 100%;
+  max-width: 440px;
+}
+.welcome-map {
+  /* the office gives way to the words in a short window (the legend, the message, the ideas
+     take ~330 px), never under 240 px: past that the welcome scrolls */
+  max-width: max(240px, min(440px, calc((100cqh - 330px) * 1.4)));
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-3, 12px);
+  background: var(--c-raised);
+  overflow: hidden;
+}
+/* the office's own fold-in waits for the bar's fold: here it fades in once drawn */
+.welcome-map .bims-office {
+  width: 100%;
+}
+
+/* the legend: 1, 2, 3 stacked, the number in its column, the line under the head */
+.welcome-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.welcome-lg {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  column-gap: var(--s-2);
+}
+.welcome-lg b {
+  font-weight: 600;
+}
+.welcome-says {
+  grid-column: 2;
+  color: var(--c-text-2);
+}
+.welcome-n {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--c-text);
+  color: var(--c-solid);
+  font: 600 var(--t-11) / 18px var(--font-ui);
+  text-align: center;
+}
+.welcome-lg .welcome-n {
+  grid-row: span 2;
+}
+
+/* the lead's first message, as its messages read in the thread */
+.welcome-hi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin-top: var(--s-2);
+}
+.welcome-hi p {
+  margin: 0;
+}
+.welcome-who {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+.welcome-who b {
+  font-weight: 600;
+}
+.welcome-role {
+  color: var(--c-text-3);
+}
+
+.welcome-ideas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.welcome-idea {
+  padding: 0 var(--s-2);
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  background: none;
+  color: var(--c-text-2);
+  font: inherit;
+  line-height: 1.8;
+  cursor: pointer;
+}
+.welcome-idea:hover {
+  border-color: var(--c-line-strong);
+  color: var(--c-text);
+}
+.welcome-idea:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+/* the office can't draw: B's three pictures in a row, numbered as the legend */
+.welcome-pics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-2);
+}
+.welcome-pic {
+  position: relative;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-3, 12px);
+  background: var(--c-raised);
+  overflow: hidden;
+}
+.welcome-pic svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.welcome-pic .welcome-n {
+  position: absolute;
+  top: var(--s-1);
+  left: var(--s-1);
+}
+.wp-fl { fill: var(--c-solid); stroke: var(--c-line); }
+.wp-dt { fill: var(--c-text-3); }
+.wp-dl { fill: var(--c-line-strong); }
+.wp-dr { fill: var(--c-line); }
+.wp-bt { fill: var(--c-text); }
+.wp-bl { fill: var(--c-text-2); }
+.wp-br { fill: var(--c-text-3); }
+.wp-pri { fill: var(--c-text); }
+.wp-gh { fill: none; stroke: var(--c-text-3); stroke-dasharray: 3 3; }
+.wp-lb { fill: var(--c-text-2); font: var(--t-11) var(--font-ui); }
+.wp-on { fill: var(--c-solid); font: 600 var(--t-11) var(--font-ui); }

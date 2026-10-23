@@ -383,6 +383,30 @@ crate::words! { thread:
     /// no project yet: the act
     noproj_add = "add a project";
 
+    // ---- a new project's welcome in main's empty thread (page new-project-home, pick A)
+    /// the office's label (its aria-label)
+    welcome_office = "your project's office: the lead at its desk, the empty desks, the inbox tray";
+    /// legend 1: its head
+    welcome_lead_head = "bise, your team lead";
+    /// legend 1: its line
+    welcome_lead_says = "you talk to it. it splits the work and keeps track.";
+    /// legend 2: its head
+    welcome_agents_head = "an agent per task";
+    /// legend 2: its line
+    welcome_agents_says = "its own desk and its own copy of the repo. they work side by side.";
+    /// legend 3: its head
+    welcome_inbox_head = "your inbox";
+    /// legend 3: its line
+    welcome_inbox_says = "only what needs your call reaches you.";
+    /// the lead's role beside its name, over its first message
+    welcome_role = "team lead";
+    /// the lead's first message, written by the app (no model call)
+    welcome_hi(project) = "hi, i'm the lead for {project}. tell me what you want done, as much as you like at once: i start an agent for each independent task, and i come back to you only when something needs your call.";
+    /// an idea, put in the composer
+    welcome_idea_tests = "fix the failing tests";
+    /// an idea, put in the composer
+    welcome_idea_repo = "what's in this repo?";
+
     // ---- computer use's line in the thread (the desktop)
     /// the still's caption, its time unknown
     cu_still = "a still · esc closes";

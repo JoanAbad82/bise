@@ -163,7 +163,8 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     tone: numbered ? 'dim' : sign.tone,
     name: shownName(x.a.name),
     // bise's thread: the project's name, but main's own doing line (its project is bise's home)
-    sub: all && !x.a.main ? x.projectName : roleWords(x.a.title !== '' ? x.a.title : x.a.purpose),
+    // main at rest says what it is, 'team lead' (page new-project-home), never its purpose's words
+    sub: all && !x.a.main ? x.projectName : roleWords(x.a.title !== '' ? x.a.title : x.a.main ? panel.role_lead : x.a.purpose),
     end: '',
     endTone: 'dim',
     time: timeOf(x.a, now),

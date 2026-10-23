@@ -39,6 +39,7 @@ import { BimsSwitch, Office } from '@/bims/Office';
 import { BimsToggle } from '@/bims/Cube';
 import { parts as bimsParts } from '@/bims/feed';
 import { BimsFold } from '@/bims/Fold';
+import { useWelcoming } from '@/welcome/shown';
 import { Town } from '@/bims/town/Town';
 import { townParts } from '@/bims/town/feed';
 import { useTownProjects } from '@/bims/town/useTown';
@@ -509,6 +510,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   // the office above the AGENTS rows (les bims); on bise's thread the town: one office per project (bims/town)
   const bims = useBimsView();
   const office = bims.view === 'bims';
+  const welcomeHere = useWelcoming(project);
   const townProjects = useTownProjects();
   const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
   // the row <-> bim link (bims/focus.ts): a row hovered lights its bim, a bim hovered its row
@@ -563,7 +565,8 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                 />
               </BimsFold>
             ) : (
-              <BimsFold open={office}>
+              // a new project's welcome shows the office in the thread: the bar's stays closed until it docks
+              <BimsFold open={office && !welcomeHere}>
               <Office
                 project={project}
                 agents={officeAgents}

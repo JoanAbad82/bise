@@ -367,6 +367,11 @@
     "one": null,
     "text": "refused"
   },
+  "panel.role_lead": {
+    "args": [],
+    "one": null,
+    "text": "team lead"
+  },
   "panel.role_thinking": {
     "args": [],
     "one": null,
