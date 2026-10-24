@@ -74,6 +74,11 @@ describe('the running screen', () => {
     expect(screen.getByTestId('running.row.shop/checkout/bg2.end').textContent).toBe('ended 3 min ago · rc 1');
   });
 
+  it("in the bar's scope (a project's, an agent's 'all ›') its head names no projects (designer m_38700)", () => {
+    render(<RunningView items={[dev]} ports={ports()} now={NOW} scoped />);
+    expect(screen.getByTestId('running.sub').textContent).toBe('1 running · 1 listening');
+  });
+
   it("s stops the selected one at once: 'stopping…', then its hub's row says how; it stays in place", () => {
     const p = ports();
     const v = render(<RunningView items={[dev, stripe]} ports={p} now={NOW} />);

@@ -55,7 +55,7 @@ export function RunningScreen() {
   // the bar's 'all ›' keeps its scope: a project's, an agent's; none: every project's
   const scope = route.screen === 'running' ? route.scope : undefined;
   const shown = useMemo(() => inScope(items, scope), [items, scope]);
-  return <RunningView items={shown} ports={ports} home={home} opened={opened} />;
+  return <RunningView items={shown} ports={ports} home={home} opened={opened} scoped={scope !== undefined} />;
 }
 
 /** How often the shown screen says it again: the core lets its hold go 30 s after the last (LISTS_LEASE). */
@@ -68,11 +68,14 @@ export function RunningView({
   now: pinned,
   home,
   opened,
+  scoped = false,
 }: {
   items: readonly ProcItem[];
   ports: RunningPorts;
   now?: number;
   home?: string | undefined;
+  /** the bar's scope ('all ›' from a project's or an agent's thread): its head names no projects */
+  scoped?: boolean;
   /** the process the route opens ('project/agent/id': the bar's row, a thread's backgrounded call) */
   opened?: string | undefined;
 }) {
@@ -181,7 +184,8 @@ export function RunningView({
         <header className="run-head">
           <div className="run-h1">{running.heading}</div>
           <div className="run-h2" data-testid="running.sub">
-            {`${running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}
+            {/* 'in N projects' only on every project's list: a scoped one is one place (designer m_38700) */}
+            {`${scoped ? running.count_running({ n: counts.running }) : running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}
           </div>
         </header>
         <div className="run-bar">
