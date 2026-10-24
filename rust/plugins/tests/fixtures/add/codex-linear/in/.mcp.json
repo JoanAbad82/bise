@@ -1,0 +1,1 @@
+{ "mcpServers": { "linear": { "type": "http", "url": "https://mcp.linear.app/mcp", "oauth_resource": "https://mcp.linear.app/mcp" } } }

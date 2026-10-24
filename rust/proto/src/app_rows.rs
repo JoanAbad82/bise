@@ -330,6 +330,69 @@ pub struct PluginPart {
     pub tool_count: Option<u32>,
 }
 
+/// What a plugin will run on his Mac once added, shown before his click
+/// (`core_ev::PluginPreview`, `bend_plugins::add::stage`): nothing of it
+/// runs before `plugin_add_confirm`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PluginPreview {
+    /// the plugin's name, its folder in `~/.agents/plugins`
+    pub name: String,
+    /// where it comes from, in his words (`git github.com/acme/plugins`,
+    /// `Claude Code (~/.claude.json)`)
+    pub from: String,
+    /// every MCP server it starts or calls
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runs: Vec<PluginRun>,
+    /// its skills' names
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<String>,
+    /// the names of the values kept in bise's secrets (never a value)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub secrets: Vec<String>,
+    /// what the source had that bise leaves out (`linear: oauth_resource`)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped: Vec<String>,
+    /// what else to know (`it shadows the built-in docs`)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
+    /// it replaces his plugin of that name (a new import of the same
+    /// source)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces: Option<String>,
+}
+
+/// One MCP server of a [`PluginPreview`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PluginRun {
+    pub server: String,
+    pub transport: RunTransport,
+    /// a local server's program and arguments, exactly (never one shell
+    /// string)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub argv: Vec<String>,
+    /// a remote server's host (its path may hold a key)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+}
+
+/// How a [`PluginRun`] is reached.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum RunTransport {
+    /// a program on his Mac
+    Stdio,
+    /// Streamable HTTP
+    Http,
+    /// the legacy HTTP+SSE transport
+    Sse,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
 /// What a plugin part is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

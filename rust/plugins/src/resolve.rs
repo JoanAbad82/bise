@@ -369,7 +369,7 @@ pub fn fingerprint(roots: &Roots) -> u64 {
     for root in [&roots.builtin, &roots.user, &roots.workspace].into_iter().flatten() {
         root.hash(&mut h);
         for p in sorted(root) {
-            if !p.is_dir() {
+            if !p.is_dir() || is_dot(&p) {
                 continue;
             }
             p.hash(&mut h);
@@ -915,6 +915,13 @@ struct Candidate {
     default_off: bool,
 }
 
+/// A dot folder in a root is never a plugin (a plugin name can't start
+/// with '.'): the add menu's staging folder (`add::staging_dir`) lives
+/// there, unseen by discovery and the fingerprint.
+fn is_dot(p: &Path) -> bool {
+    p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'))
+}
+
 fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -> Vec<Candidate> {
     let rd = match std::fs::read_dir(root) {
         Ok(rd) => rd,
@@ -925,7 +932,7 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
             return Vec::new();
         }
     };
-    let mut dirs: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.is_dir()).collect();
+    let mut dirs: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.is_dir() && !is_dot(p)).collect();
     dirs.sort();
     let mut found = Vec::new();
     for dir in dirs {

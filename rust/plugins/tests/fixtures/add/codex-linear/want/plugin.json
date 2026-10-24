@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "author": {
+    "name": "Linear Orbit, Inc",
+    "url": "https://linear.app/"
+  },
+  "description": "Search, create and update Linear issues.",
+  "homepage": "https://linear.app/",
+  "license": "MIT",
+  "name": "linear",
+  "repository": "https://github.com/openai/plugins",
+  "version": "5.0.1"
+}

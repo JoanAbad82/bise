@@ -364,6 +364,13 @@ fn the_fingerprint_moves_when_a_plugin_comes_goes_or_changes() {
     // a file that isn't a plugin folder changes nothing
     write(&t.0.join("user/notes.txt"), "x");
     assert_eq!(fingerprint(&r), edited);
+    // nor a dot folder (the add menu's staging), even with a plugin in it
+    write(&t.0.join("user/.staging/tok/x/plugin.json"), &manifest("x"));
+    write(&t.0.join("user/.hidden/plugin.json"), &manifest("hidden"));
+    assert_eq!(fingerprint(&r), edited, "a dot folder is not a plugin");
+    assert_eq!(resolve(&r).plugins.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["demo"], "nor found");
+    fs::remove_dir_all(t.0.join("user/.staging")).unwrap();
+    fs::remove_dir_all(t.0.join("user/.hidden")).unwrap();
     fs::remove_dir_all(t.0.join("user/demo")).unwrap();
     assert_eq!(fingerprint(&r), empty, "removed: back to empty");
 }

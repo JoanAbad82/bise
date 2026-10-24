@@ -60,6 +60,9 @@ fn bise_home_moves_everything() {
     assert_eq!(h.worktrees_dir(), p("/b/worktrees"));
     assert_eq!(h.mcp_index(), p("/b/cache/mcp-index.txt"));
     assert_eq!(h.skills_index(), p("/b/cache/skills-index.txt"));
+    assert_eq!(h.marketplaces(), p("/b/marketplaces.json"));
+    assert_eq!(h.marketplace_cache(), p("/b/cache/marketplaces"));
+    assert_eq!(h.mcp_secrets_dir(), p("/b/secrets/mcp-env"));
     assert_eq!(h.run_dir(), p("/b/run"));
     assert_eq!(h.drafts_dir(), p("/b/drafts"));
     assert_eq!(h.versions_dir(), p("/b/dev/versions"));

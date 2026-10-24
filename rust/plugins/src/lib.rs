@@ -20,11 +20,16 @@
 //! - `bridge`: the per-session loopback HTTP bridge the Bend REPL calls;
 //! - `cli`: the `bise plugins ...` subcommand;
 //! - `import`: `bise plugins import-mcp`, another agent's MCP servers as
-//!   one plugin (BISE-273).
+//!   one plugin (BISE-273);
+//! - `add`: the add menu (an MCP server, an import found on disk, a
+//!   folder, a git URL): staged, previewed, installed on his click;
+//! - `marketplace`: his plugin marketplaces and what they offer;
+//! - `secrets`: the values of an MCP server's `${VAR}` he typed in.
 
 // the tests run on a temp HOME, never the user's (bise_home::test_home)
 bise_home::test_home!();
 
+pub mod add;
 pub mod bridge;
 pub mod catalog;
 pub mod cli;
@@ -33,11 +38,13 @@ pub mod http;
 pub mod id;
 pub mod import;
 pub mod login;
+pub mod marketplace;
 pub mod model;
 pub mod oauth;
 pub mod remote;
 pub mod report;
 pub mod resolve;
+pub mod secrets;
 pub mod state;
 pub mod status;
 pub mod stdio;

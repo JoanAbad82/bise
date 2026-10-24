@@ -246,6 +246,66 @@ tools?: Array<PluginPart>,
 tool_count?: number | null, };
 
 /**
+ * What a plugin will run on his Mac once added, shown before his click
+ * (`core_ev::PluginPreview`, `bend_plugins::add::stage`): nothing of it
+ * runs before `plugin_add_confirm`.
+ */
+export type PluginPreview = { 
+/**
+ * the plugin's name, its folder in `~/.agents/plugins`
+ */
+name: string, 
+/**
+ * where it comes from, in his words (`git github.com/acme/plugins`,
+ * `Claude Code (~/.claude.json)`)
+ */
+from: string, 
+/**
+ * every MCP server it starts or calls
+ */
+runs?: Array<PluginRun>, 
+/**
+ * its skills' names
+ */
+skills?: Array<string>, 
+/**
+ * the names of the values kept in bise's secrets (never a value)
+ */
+secrets?: Array<string>, 
+/**
+ * what the source had that bise leaves out (`linear: oauth_resource`)
+ */
+dropped?: Array<string>, 
+/**
+ * what else to know (`it shadows the built-in docs`)
+ */
+notes?: Array<string>, 
+/**
+ * it replaces his plugin of that name (a new import of the same
+ * source)
+ */
+replaces?: string | null, };
+
+/**
+ * One MCP server of a [`PluginPreview`].
+ */
+export type PluginRun = { server: string, transport: RunTransport, 
+/**
+ * a local server's program and arguments, exactly (never one shell
+ * string)
+ */
+argv?: Array<string>, 
+/**
+ * a remote server's host (its path may hold a key)
+ */
+host?: string | null, };
+
+/**
+ * How a [`PluginRun`] is reached.
+ */
+export type RunTransport = "stdio" | "http" | "sse" | "unknown";
+
+/**
  * What a plugin part is.
  */
 export type PartKind = "skill" | "mcp" | "tool" | "unknown";

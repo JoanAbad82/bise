@@ -10,6 +10,8 @@ pub const USAGE: &str = "usage:
   bise plugins [list] [--workspace DIR] [--json]
   bise plugins on|off ID          (a plugin or part id: docs, mistral:gmail, docs#skill:docs, linear#mcp:linear)
   bise plugins import-mcp NAME [--dry-run] < servers.json   (Claude Code's / Codex's MCP servers as one plugin)
+  bise plugins add FOLDER|GIT-URL|--mcp NAME|--import AGENT [--yes]   (shows what it runs first: bise plugins add --help)
+  bise plugins marketplace [list|add URL|remove URL|show URL]
   bise plugins login [SERVER]   log in to a remote MCP server in the browser (no SERVER: the list)
   bise plugins logout SERVER    forget its tokens
   bise plugins serve --dir DIR [--workspace DIR] [--parent PID]   (internal: the session bridge)
@@ -89,6 +91,8 @@ pub fn main(args: &[String]) -> i32 {
             }
         }
         "login" | "logout" => crate::login::main(&args[1..], &workspace(args), sub == "logout"),
+        "add" => crate::add::main(&args[1..]),
+        "marketplace" => crate::marketplace::main(&args[1..]),
         "import-mcp" => {
             let root = resolve::Roots::standard(None).user.unwrap_or_else(|| resolve::home().join(".agents/plugins"));
             crate::import::main(&args[1..], &root)

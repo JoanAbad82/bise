@@ -26,20 +26,50 @@ use crate::resolve::{valid_name, MCP_SCHEMA, PLUGIN_SCHEMA};
 /// Codex's limit keys ([`limits`]).
 const LIMITS: [&str; 5] = ["startup_timeout_sec", "startup_timeout_ms", "tool_timeout_sec", "enabled_tools", "disabled_tools"];
 
-/// The mark in plugin.json's description: the folder is import-mcp's.
+/// The mark in plugin.json's description: the folder is import-mcp's
+/// (or the add menu's import).
 pub const MARK: &str = "Imported by bise plugins import-mcp";
 
+/// The same mark for a server added by hand (the add menu's "add an MCP
+/// server", `bend_plugins::add`).
+pub const MARK_ADD: &str = "Added by bise plugins add";
+
+/// bise wrote this plugin's folder for MCP servers (an import or an
+/// added server): the list shows it as an MCP plugin, and a new import
+/// or add of the same name may replace it.
+pub fn is_bise_mcp(description: &str) -> bool {
+    description.starts_with(MARK) || description.starts_with(MARK_ADD)
+}
+
 /// What the import makes of the input: the servers kept (the mcp.json
-/// value) and one line per server (kept or skipped, why).
+/// value), one line per server (kept or skipped, why), and what was left
+/// out (`linear: oauth_resource`, `ftp (the url is not http(s))`), for the
+/// add menu's preview.
 #[derive(Debug, PartialEq)]
 pub struct Plan {
     pub servers: Map<String, Value>,
     pub lines: Vec<String>,
+    pub dropped: Vec<String>,
+}
+
+/// Where the servers will live: a folder bise writes for them (another
+/// agent's config: a command is a bare name or an absolute path), or a
+/// plugin's own folder (a Codex or Claude plugin converted by the add
+/// menu: `./bin/x` and `${PLUGIN_ROOT}/bin/x` are its own files).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Home {
+    Bise,
+    Plugin,
 }
 
 /// Read `{"mcpServers": {...}}` or `{"mcp_servers": {...}}` or the bare
 /// server map.
 pub fn plan(input: &Value) -> Result<Plan, String> {
+    plan_for(input, Home::Bise)
+}
+
+/// [`plan`] for servers that live in `home`.
+pub fn plan_for(input: &Value, home: Home) -> Result<Plan, String> {
     let map = input
         .get("mcpServers")
         .or_else(|| input.get("mcp_servers"))
@@ -48,17 +78,22 @@ pub fn plan(input: &Value) -> Result<Plan, String> {
         .ok_or("expected a JSON object of MCP servers ({\"mcpServers\": {...}})")?;
     let mut servers = Map::new();
     let mut lines = Vec::new();
+    let mut dropped = Vec::new();
     for (id, v) in map {
-        match server(v) {
-            Ok((s, notes)) => {
+        match server(v, home) {
+            Ok((s, notes, left)) => {
                 let extra = if notes.is_empty() { String::new() } else { format!(" ({})", notes.join("; ")) };
                 lines.push(format!("+ {}{}", id, extra));
+                dropped.extend(left.iter().map(|k| format!("{}: {}", id, k)));
                 servers.insert(id.clone(), s);
             }
-            Err(why) => lines.push(format!("- {}: skipped, {}", id, why)),
+            Err(why) => {
+                lines.push(format!("- {}: skipped, {}", id, why));
+                dropped.push(format!("{} ({})", id, why));
+            }
         }
     }
-    Ok(Plan { servers, lines })
+    Ok(Plan { servers, lines, dropped })
 }
 
 /// A remote server (Claude Code's `{"type": "http"|"sse", "url",
@@ -66,7 +101,7 @@ pub fn plan(input: &Value) -> Result<Plan, String> {
 /// "env_http_headers"}`) in the plugin schema's shape. Header values are
 /// copied, never printed: `${VAR}` references stay as they are and are
 /// filled from bise's environment when the server connects.
-fn remote(o: &Map<String, Value>, ty: &str) -> Result<(Value, Vec<String>), String> {
+fn remote(o: &Map<String, Value>, ty: &str) -> Result<(Value, Vec<String>, Vec<String>), String> {
     let url = o.get("url").and_then(Value::as_str).filter(|u| !u.is_empty()).ok_or("no url")?;
     if !(url.starts_with("http://") || url.starts_with("https://") || url.starts_with("${")) {
         return Err("the url is not http(s)".into());
@@ -162,7 +197,7 @@ fn remote(o: &Map<String, Value>, ty: &str) -> Result<(Value, Vec<String>), Stri
     if !dropped.is_empty() {
         notes.push(format!("ignored: {}", dropped.join(", ")));
     }
-    Ok((Value::Object(out), notes))
+    Ok((Value::Object(out), notes, dropped))
 }
 
 /// Codex's (and Vibe's) per-server limits, copied under the same keys
@@ -197,7 +232,7 @@ fn host_of(url: &str) -> String {
 }
 
 /// One server in the plugin schema's shape; Err = why it can't be.
-fn server(v: &Value) -> Result<(Value, Vec<String>), String> {
+fn server(v: &Value, home: Home) -> Result<(Value, Vec<String>, Vec<String>), String> {
     let o = v.as_object().ok_or("not an object")?;
     let ty = o.get("type").and_then(Value::as_str).unwrap_or("stdio");
     if o.get("enabled").and_then(Value::as_bool) == Some(false) || o.get("disabled").and_then(Value::as_bool) == Some(true) {
@@ -226,10 +261,14 @@ fn server(v: &Value) -> Result<(Value, Vec<String>), String> {
         Some(Value::String(c)) if c.starts_with('/') => Some(c.clone()),
         Some(_) => return Err("cwd is not an absolute path".into()),
     };
-    if cmd.contains('/') && !cmd.starts_with('/') {
+    // a plugin's own program: the resolver finds it in the plugin's folder
+    let own = home == Home::Plugin && (cmd.starts_with("./") || cmd.starts_with("${PLUGIN_ROOT}/"));
+    if cmd.contains('/') && !cmd.starts_with('/') && !own {
         return Err(format!("command {:?} is a relative path: give its absolute path", cmd));
     }
-    let command = if let Some(c) = &cwd {
+    let command = if own {
+        cmd.to_string()
+    } else if let Some(c) = &cwd {
         notes.push("runs in its cwd, through sh".to_string());
         let mut a = vec![json!("-c"), json!("cd \"$0\" && exec \"$@\""), json!(c), json!(cmd)];
         a.append(&mut args);
@@ -276,19 +315,20 @@ fn server(v: &Value) -> Result<(Value, Vec<String>), String> {
     if !dropped.is_empty() {
         notes.push(format!("ignored: {}", dropped.join(", ")));
     }
-    Ok((Value::Object(out), notes))
+    Ok((Value::Object(out), notes, dropped))
 }
 
-/// Write the plan as plugin `name` under `root` (the user plugins root).
-/// Refuses a folder that holds another plugin. Returns the folder.
-pub fn write(root: &Path, name: &str, p: &Plan) -> Result<PathBuf, String> {
+/// Write the plan as plugin `name` under `root` (the user plugins root),
+/// `mark` ([`MARK`] or [`MARK_ADD`]) heading its description. Refuses a
+/// folder that holds another plugin. Returns the folder.
+pub fn write(root: &Path, name: &str, p: &Plan, mark: &str) -> Result<PathBuf, String> {
     let dir = root.join(name);
     let manifest = dir.join("plugin.json");
     if dir.exists() {
         let ours = std::fs::read_to_string(&manifest)
             .ok()
             .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-            .and_then(|v| v.get("description").and_then(Value::as_str).map(|d| d.starts_with(MARK)))
+            .and_then(|v| v.get("description").and_then(Value::as_str).map(is_bise_mcp))
             .unwrap_or(false);
         if !ours {
             return Err(format!("{} exists and is not an import: pick another name", dir.display()));
@@ -299,7 +339,7 @@ pub fn write(root: &Path, name: &str, p: &Plan) -> Result<PathBuf, String> {
         "$schema": PLUGIN_SCHEMA,
         "name": name,
         "version": "0.1.0",
-        "description": format!("{}: {} MCP server(s).", MARK, p.servers.len()),
+        "description": format!("{}: {} MCP server(s).", mark, p.servers.len()),
     });
     let mcp = json!({ "$schema": MCP_SCHEMA, "mcpServers": Value::Object(p.servers.clone()) });
     write_private(&manifest, &(serde_json::to_string_pretty(&m).unwrap_or_default() + "\n"))?;
@@ -377,7 +417,7 @@ pub fn main(args: &[String], root: &Path) -> i32 {
         println!("{}", out.dim(&format!("dry run: would write {}", shown(&root.join(name)))));
         return 0;
     }
-    match write(root, name, &p) {
+    match write(root, name, &p, MARK) {
         Ok(dir) => {
             let n = p.servers.len();
             println!("{}", out.ok(&format!("wrote {} ({} server{})", shown(&dir), n, if n == 1 { "" } else { "s" })));
@@ -481,7 +521,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         let root = d.join("plugins");
         let p = plan(&input()).unwrap();
-        let dir = write(&root, "from-claude-code", &p).unwrap();
+        let dir = write(&root, "from-claude-code", &p, MARK).unwrap();
         use std::os::unix::fs::PermissionsExt;
         assert_eq!(std::fs::metadata(dir.join("mcp.json")).unwrap().permissions().mode() & 0o777, 0o600);
         let roots = Roots { builtin: None, user: Some(root.clone()), workspace: None, data: d.join("data"), state: Default::default() };
@@ -494,10 +534,10 @@ mod tests {
         assert!(cl.limits.allows("a") && !cl.limits.allows("b") && !cl.limits.allows("c"));
         let remotes: Vec<&str> = r.plugins[0].remotes.iter().map(|s| s.id.as_str()).collect();
         assert_eq!(remotes, ["codex-remote", "linear", "old"], "{:?}", r.diagnostics);
-        assert!(write(&root, "from-claude-code", &p).is_ok(), "a rerun rewrites its own import");
+        assert!(write(&root, "from-claude-code", &p, MARK).is_ok(), "a rerun rewrites its own import");
         std::fs::create_dir_all(root.join("mine")).unwrap();
         std::fs::write(root.join("mine/plugin.json"), "{\"name\":\"mine\"}").unwrap();
-        assert!(write(&root, "mine", &p).unwrap_err().contains("not an import"));
+        assert!(write(&root, "mine", &p, MARK).unwrap_err().contains("not an import"));
         let _ = std::fs::remove_dir_all(&d);
     }
 }

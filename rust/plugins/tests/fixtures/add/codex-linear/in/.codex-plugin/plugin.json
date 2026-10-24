@@ -1,0 +1,13 @@
+{
+  "apps": "./.app.json",
+  "author": { "name": "Linear Orbit, Inc", "url": "https://linear.app/" },
+  "description": "Search, create and update Linear issues.",
+  "homepage": "https://linear.app/",
+  "interface": { "displayName": "Linear", "shortDescription": "Plan and build products", "category": "Productivity", "defaultPrompt": ["Triage my issues"] },
+  "keywords": [],
+  "license": "MIT",
+  "mcpServers": "./.mcp.json",
+  "name": "linear",
+  "repository": "https://github.com/openai/plugins",
+  "version": "5.0.1"
+}

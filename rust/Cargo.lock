@@ -109,6 +109,7 @@ dependencies = [
  "ring",
  "rustls",
  "serde_json",
+ "toml",
  "webpki-roots 0.26.11",
 ]
 

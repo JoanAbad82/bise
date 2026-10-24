@@ -287,6 +287,50 @@ tests use temp dirs.
   `PluginId`), through `state::set`; applies at the agents' next idle
   (below).
 
+### Add (the add menu, `bise plugins add`, `bise plugins marketplace`)
+
+One library both apps call (`bend_plugins::add`, `bend_plugins::marketplace`),
+in two steps so nothing of a plugin runs before his click:
+
+- `add::stage(&Request, &Ctx) -> Result<Staged, AddError>` builds the plugin
+  in `<user root>/.staging/<token>/<name>` (`add::staging_dir`; a dot folder
+  is never a plugin, for discovery and the fingerprint alike; folders older
+  than a day are swept) and resolves it alone. `Request`: `Mcp` (a command
+  line or a URL; his secret values), `Import` (Claude Code's
+  `~/.claude.json`, Codex's `~/.codex/config.toml`, Cursor's
+  `~/.cursor/mcp.json`, through `import::plan`; `add::found` lists them),
+  `Folder`, `Git` (`add::git_clone`: `--depth 1`, no hook, no submodule, no
+  `ext::`, no prompt, a timeout; GitHub's `owner/repo` works). A Codex
+  (`.codex-plugin/plugin.json`) or Claude Code (`.claude-plugin/plugin.json`)
+  plugin is converted: a 1.0 `plugin.json`, its `.mcp.json` through
+  `import::plan_for(.., Home::Plugin)` (`${CLAUDE_PLUGIN_ROOT}` read as
+  `${PLUGIN_ROOT}`), every key left out listed. Its `Preview`
+  (`bise_proto::app_rows::PluginPreview`): each server's exact argv (with its
+  installed paths) or transport and host, its skills, the names of its
+  secrets, what was dropped, notes (a built-in it shadows), `replaces`.
+- `add::install(Staged, &Ctx)`: the secrets first, then one rename into
+  `<user root>/<name>` (the commit point; bise's own MCP folder of that name,
+  `import::is_bise_mcp`, is moved aside and put back on a failure). A name he
+  has is `AddError::Exists`. `add::discard` drops a preview.
+- The desktop core holds a `Staged` by token: `plugin_add` answers
+  `plugin_preview {token, preview}`, then `plugin_add_confirm {token}` or
+  `plugin_add_cancel {token}`. The terminal holds it in its own process.
+- Secrets (`bend_plugins::secrets`, the one owner of the layout):
+  `<Home::mcp_secrets_dir()>/<escaped plugin id>.json` = `{"VAR": "value"}`
+  through `bise_secrets` (file or keychain), `mcp.json` keeps `${VAR}` (a
+  header `X-Api-Key` is `${X_API_KEY}`); the bridge reads them when the
+  environment has no value.
+- Marketplaces: his list in `Home::marketplaces()` (`{"marketplaces":
+  [url]}`, one writer, flock); `marketplace::read` clones into
+  `Home::marketplace_cache()/<hash>` (a failed refresh keeps the last one),
+  reads `.agents/plugins/marketplace.json` (Codex's, `openai/plugins`) or
+  `.claude-plugin/marketplace.json`; `marketplace::rows` are Browse rows
+  (available, never on); `marketplace::request` is the git add with its
+  folder.
+- "Make a plugin with an agent": `add::agent_brief(words)`, sent to main the
+  way "start an agent" is; the agent hands him a folder, added through the
+  same preview and click.
+
 ### Reload on change
 
 A plugin installed, removed, enabled, disabled or edited while bise runs
@@ -541,6 +585,13 @@ description, not a removed one).
   file watching, no `/reload-plugins`).
 - The Switchboard `/plugins` shows the static listing of the hub
   workspace, not the per-task bridge report.
+- No uninstall yet: `bend_plugins::secrets::remove` (a plugin's MCP
+  secrets) waits for it, and the uninstall must call it.
+- "Add an MCP server" does not try the server before his click (that
+  would run it unseen); trying it right after his confirm (one start, its
+  error on the row with a remove action) is open, with the core's confirm.
+- A Codex plugin's `interface.defaultPrompt` is dropped until the resolver
+  takes `dev.bise.prompts`.
 
 ## Later
 

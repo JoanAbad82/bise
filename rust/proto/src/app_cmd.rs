@@ -103,6 +103,12 @@ pub enum AppCmd {
         project: Option<Project>,
         add: PluginAddKind,
     },
+    /// his click on a `plugin_preview`: the plugin goes into
+    /// `~/.agents/plugins`, then `plugins` again; an unknown token is an
+    /// error
+    PluginAddConfirm { token: String },
+    /// the preview closed without adding: its staged folder goes
+    PluginAddCancel { token: String },
     /// log in to a plugin's remote MCP server: opens his browser (his
     /// click only, never a test), `plugins` again at its end
     PluginLogin {
@@ -426,6 +432,8 @@ impl AppCmd {
         "plugin_connect",
         "plugins_refresh",
         "plugin_add",
+        "plugin_add_confirm",
+        "plugin_add_cancel",
         "plugin_login",
         "plugin_logout",
         "computer_use",

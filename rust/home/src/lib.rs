@@ -353,6 +353,13 @@ impl Home {
         self.root.join("marketplaces.json")
     }
 
+    /// Each marketplace's last clone, `<cache>/marketplaces/<hash of its
+    /// url>` (bend_plugins::marketplace): rebuildable, read to list what
+    /// it offers, never run.
+    pub fn marketplace_cache(&self) -> PathBuf {
+        self.cache_dir().join("marketplaces")
+    }
+
     /// An MCP server's env and header values he typed in: `secrets/mcp-env/`,
     /// kept by bise_secrets.
     pub fn mcp_secrets_dir(&self) -> PathBuf {
