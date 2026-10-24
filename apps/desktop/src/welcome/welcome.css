@@ -8,9 +8,11 @@
   align-items: safe center;
   padding: var(--s-4) 0;
 }
+/* under main's own lines: it shrinks to the list's room and scrolls there, never drawn past it over
+   the inbox block under the list (designer m_38701: the ideas sat on the inbox's head) */
 .th-first.th-welcome.after {
   container-type: normal;
-  overflow: visible;
+  overflow-y: auto;
   padding: 0;
 }
 

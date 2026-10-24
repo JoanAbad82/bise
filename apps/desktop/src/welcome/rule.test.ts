@@ -8,31 +8,36 @@ const view = (o: Partial<ThreadOrder>): ThreadOrder => ({ ...EMPTY_ORDER, loaded
 
 describe('welcomeShows', () => {
   it('an empty thread at its start: yes', () => {
-    expect(welcomeShows(view({}), false, 0)).toBe(true);
+    expect(welcomeShows(view({}), false, 0, 0)).toBe(true);
   });
 
   it("main's own lines only, the start reached: yes", () => {
-    expect(welcomeShows(view({ order: [1, 2] }), false, 0)).toBe(true);
+    expect(welcomeShows(view({ order: [1, 2] }), false, 0, 0)).toBe(true);
   });
 
   it('not loaded yet: no (never a flash before the first page)', () => {
-    expect(welcomeShows(EMPTY_ORDER, false, 0)).toBe(false);
+    expect(welcomeShows(EMPTY_ORDER, false, 0, 0)).toBe(false);
   });
 
   it('his message, from the terminal too (an entry of his in the thread): no', () => {
-    expect(welcomeShows(view({ order: [1] }), true, 0)).toBe(false);
+    expect(welcomeShows(view({ order: [1] }), true, 0, 0)).toBe(false);
   });
 
   it('his first send leaving the composer: gone at once, before the hub echoes it', () => {
-    expect(welcomeShows(view({}), false, 1)).toBe(false);
+    expect(welcomeShows(view({}), false, 1, 0)).toBe(false);
   });
 
   it('a long thread with no entry of his in its first page: no (an older page is there)', () => {
-    expect(welcomeShows(view({ order: [40, 41], before: 40, more: true }), false, 0)).toBe(false);
+    expect(welcomeShows(view({ order: [40, 41], before: 40, more: true }), false, 0, 0)).toBe(false);
   });
 
   it('a window around a far entry: no', () => {
-    expect(welcomeShows(view({ order: [1], gap: { lo: 1, hi: 9, from: 2 } }), false, 0)).toBe(false);
+    expect(welcomeShows(view({ order: [1], gap: { lo: 1, hi: 9, from: 2 } }), false, 0, 0)).toBe(false);
+  });
+
+  it('a live agent besides main, with main\'s thread empty: no (designer m_38701)', () => {
+    expect(welcomeShows(view({}), false, 0, 1)).toBe(false);
+    expect(welcomeShows(view({ order: [1, 2] }), false, 0, 2)).toBe(false);
   });
 });
 

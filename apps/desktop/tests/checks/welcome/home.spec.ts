@@ -6,7 +6,10 @@
 //       3 ideas; AGENTS lists '○ bise  team lead'; the bar's own office stays closed;
 //   (2) his first message: the welcome goes, its copy docks into the bar (the bar's office on, as
 //       the cube does), the copy gone after the 400 ms; the thread holds his message;
-//   (3) the office can't draw (its WebGL context lost): B's 3 pictures, the legend and the message stay.
+//   (3) the office can't draw (its WebGL context lost): B's 3 pictures, the legend and the message stay;
+//   (4) a project with an agent besides main and open cards: no welcome; main alone with 2 open
+//       cards (its thread empty, then a line of main's): the welcome ends over the inbox block and
+//       never spills out of its slot (designer m_38701).
 // Writes every frame it checks to .harness-cache/welcome-shots (index.html) for the designer's sign.
 // Owner: project-home.
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -15,6 +18,8 @@ import { PNG } from 'pngjs';
 import { test, expect, FakeCore, Recorder, launchDesktop, pngBytes, type Session } from '../../harness';
 import { thread } from '../../../src/proto/words_thread.gen';
 import { panel } from '../../../src/proto/words_panel.gen';
+import { hub_ev } from '../../../src/proto/fixtures.gen';
+import type { Card, HubEv } from '../../../src/proto';
 
 const HOME = 'bise-home-00000000';
 const P = 'type-level-typescript-0a1b2c3d';
@@ -142,6 +147,65 @@ for (const width of [1400, 1100, 800]) {
       }
     });
   }
+}
+
+// (4) designer m_38701: the welcome only in a project with main alone; there, an open card's inbox
+// block and the welcome stack, never overlap (its ideas sat on 'inbox 2 waiting')
+const cardsEv = hub_ev.find((e): e is Extract<HubEv, { ev: 'cards' }> => e.ev === 'cards');
+const card = (id: number, agent: string): Card => {
+  const first = cardsEv?.cards[0];
+  if (first === undefined) throw new Error('no card in the fixtures');
+  return { ...first, project: P, id, agent, kind: 'question', approval: false, question: 'which bench?' };
+};
+const perf = { name: 'perf', main: false, status: 'idle', archived: false, title: 'profiling the hub', purpose: '', since_ms: Date.now(), waits: 1, watching: [], dir: 'perf' };
+
+function withCards(theme: Theme, o: { agents: Record<string, unknown>[]; cardAgent: string; mainLines: boolean }): Record<string, unknown>[] {
+  const now = Date.now();
+  return world(theme).map((ev) => {
+    if (ev.ev === 'agents' && ev.project === P) return { ...ev, agents: [...(ev.agents as unknown[]), ...o.agents] };
+    if (ev.ev === 'cards' && ev.project === P) return { ...ev, cards: [card(9, o.cardAgent), card(10, o.cardAgent)] };
+    if (ev.ev === 'thread' && ev.project === P && o.mainLines) return { ...ev, entries: [{ pos: 1, at_ms: now - 60_000, kind: 'agent', text: 'the repo is cloned.' }] };
+    return ev;
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`${theme}: an open card in a project with agents: no welcome; with main alone: welcome and inbox stacked`, async () => {
+    test.setTimeout(90_000);
+    // a project with an agent and its open cards: main's thread empty, no welcome
+    let s = await launchDesktop({ core: new FakeCore(withCards(theme, { agents: [perf], cardAgent: 'perf', mainLines: false }) as never), route: `project/${P}` });
+    try {
+      await expect(s.page.getByTestId('inbox.block')).toBeVisible({ timeout: 20_000 });
+      await s.page.waitForTimeout(800);
+      await expect(s.page.getByTestId('welcome')).toHaveCount(0);
+      save(`1280-${theme}-5-agents-no-welcome.png`, await shown(s), `1280 ${theme} · a project with agents and open cards: no welcome`);
+    } finally {
+      await s.close();
+    }
+    // main alone with open cards, its thread empty then with a line of main's: both stack
+    for (const mainLines of [false, true]) {
+      s = await launchDesktop({ core: new FakeCore(withCards(theme, { agents: [], cardAgent: 'main', mainLines }) as never), route: `project/${P}` });
+      try {
+        await expect(s.page.getByTestId('welcome')).toBeVisible({ timeout: 20_000 });
+        await expect(s.page.getByTestId('inbox.block')).toBeVisible();
+        await s.page.waitForTimeout(1200);
+        const slot = await s.page.getByTestId('thread.first').boundingBox();
+        const inbox = await s.page.getByTestId('inbox.block').boundingBox();
+        if (slot === null || inbox === null) throw new Error('no box for the welcome or the inbox');
+        expect(slot.y + slot.height, 'the welcome ends over the inbox block').toBeLessThanOrEqual(inbox.y + 0.5);
+        // what the welcome draws stays in its slot (it scrolls there, never spills)
+        const spills = await s.page.getByTestId('thread.first').evaluate((el) => {
+          const box = el.getBoundingClientRect();
+          return getComputedStyle(el).overflowY === 'visible' && el.scrollHeight > box.height + 1;
+        });
+        expect(spills, 'the welcome spills out of its slot').toBe(false);
+        const tag = mainLines ? 'under a line of main' : 'empty thread';
+        save(`1280-${theme}-6-stacked-${mainLines ? 'after' : 'centred'}.png`, await shown(s), `1280 ${theme} · main alone, 2 open cards, ${tag}: the welcome over the inbox, stacked`);
+      } finally {
+        await s.close();
+      }
+    }
+  });
 }
 
 test('the office cannot draw: B\'s three pictures', async () => {

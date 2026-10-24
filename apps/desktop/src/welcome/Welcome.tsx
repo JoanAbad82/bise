@@ -157,7 +157,8 @@ export function WelcomeSlot({ tkey, project, composer }: { tkey: string; project
   const pending = usePending(tkey);
   const name = useProjects().find((p) => p.project === project)?.name ?? project;
   const hasYou = view.order.some((pos) => store.entry(tkey, pos)?.kind === 'you');
-  const shows = welcomeShows(view, hasYou, pending.length);
+  const others = useAgents(project).filter((a) => !a.main && !a.archived).length;
+  const shows = welcomeShows(view, hasYou, pending.length, others);
   const root = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLDivElement>(null);
   const snap = useRef<((c: HTMLCanvasElement) => void) | null>(null);

@@ -4,13 +4,14 @@
 import type { ThreadOrder } from '@/store/types';
 
 /**
- * The welcome shows iff main's thread, as the window holds it, has no entry of his, nothing of his
- * on its way (his first send leaves the composer: it goes at once, before the hub's entry comes
- * back), and its paging reached the start: a thread with an older page isn't new, and the window
- * never loads the whole history to decide.
+ * The welcome shows iff the project has no live agent but main (`others`: its other agents not
+ * archived, the bar's AGENTS count less main; designer m_38701), and main's thread, as the
+ * window holds it, has no entry of his, nothing of his on its way (his first send leaves the
+ * composer: it goes at once, before the hub's entry comes back), and its paging reached the start:
+ * a thread with an older page isn't new, and the window never loads the whole history to decide.
  */
-export function welcomeShows(view: ThreadOrder, hasYou: boolean, pending: number): boolean {
-  if (!view.loaded || hasYou || pending > 0) return false;
+export function welcomeShows(view: ThreadOrder, hasYou: boolean, pending: number, others: number): boolean {
+  if (!view.loaded || hasYou || pending > 0 || others > 0) return false;
   return !view.more && view.gap === undefined;
 }
 
