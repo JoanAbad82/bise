@@ -41,6 +41,7 @@ const W = {
     site: "no notes yet. select some text, then note.",
     pdf: "no notes yet. select some text or draw a box, then note.",
     video: "no notes yet. pause it or draw a box on it, then note.",
+    markdown: "no notes yet. select some text, then note.",
   },
 };
 

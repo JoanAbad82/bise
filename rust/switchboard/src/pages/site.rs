@@ -189,7 +189,9 @@ pub fn frame_href(id: &str, v: u64, copy: &str, newest: bool) -> String {
 /// a note is a box drawn on it) or a site (`site`: a folder or an html
 /// file, still served sandboxed at [`copy_href`], framed inside the viewer
 /// so notes can sit on its blocks; art-notes) or a pdf (`pdf`: drawn by
-/// pdf.js, a note on a passage or a box; pdf-notes). None: framed as itself.
+/// pdf.js, a note on a passage or a box; pdf-notes) or a markdown file
+/// (`markdown`: .md, drawn as a document by kit/office/markdown.js;
+/// md-artifact). None: framed as itself.
 /// The videos bise's viewer plays (the browser's: an mkv is framed as itself).
 pub const VIDEO_EXTS: &[&str] = &["mp4", "mov", "webm", "m4v"];
 
@@ -213,6 +215,10 @@ pub fn viewer_kind(copy: &str) -> Option<&'static str> {
         // a video: played by kit/office/video.js from its byte ranges (media.rs), a
         // note on a moment or a box on its frame (video-view)
         _ if VIDEO_EXTS.contains(&ext.as_str()) => Some("video"),
+        // a markdown file: drawn as a document by kit/office/markdown.js (headings, tables,
+        // quotes...), its source a toggle away, notes on its blocks (md-artifact); its copy
+        // stays text/plain at copy_href
+        _ if ext == "md" || ext == "markdown" => Some("markdown"),
         _ => None,
     }
 }
@@ -434,6 +440,10 @@ mod tests {
         // an image too (art-notes: a note is a box drawn on it)
         assert_eq!((viewer_kind("v1/shot.PNG"), viewer_kind("v1/q3.xlsx"), viewer_kind("v1/a.csv")), (Some("image"), Some("xlsx"), None));
         assert_eq!((viewer_kind("v2/report.pdf"), viewer_kind("v2/R.PDF")), (Some("pdf"), Some("pdf")));
+        // md-artifact: a markdown file drawn as a document (its copy still text/plain); a .txt framed as itself
+        assert_eq!((viewer_kind("v3/learnings.md"), viewer_kind("v1/A.Markdown"), viewer_kind("v1/notes.txt")), (Some("markdown"), Some("markdown"), None));
+        assert_eq!(frame_href("l", 3, "v3/learnings.md", true), "/a/l/view");
+        assert!(serves_copy("learnings", "v3/learnings.md") && ctype("v3/learnings.md") == Some("text/plain; charset=utf-8"));
         // video-view: the browser's videos played in the viewer, served by ranges; a gif stays an image, an mkv is framed as itself
         for f in ["v1/film.mp4", "v1/a.MOV", "v1/b.webm", "v1/c.m4v"] {
             assert_eq!(viewer_kind(f), Some("video"), "{f}");

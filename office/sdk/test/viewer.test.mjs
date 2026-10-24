@@ -376,3 +376,32 @@ test("a column resized and a cell typed in the grid save as the next version, on
   assert.deepEqual(posts[2].head, { base: 3, rev: 1, session: "s1", seq: 3, force: false }, "keep mine: saved over v3");
   assert.equal(save.state.kind, "saved");
 });
+
+// md-artifact (architect m_38679): a .md artifact drawn as a document by kit/office/markdown.js on
+// office-md.js (micromark + GFM, the thread's parser): its own bundle, DOM-free, raw html escaped
+const BLOCK_TAGS = /<(h[1-6]|p|blockquote|ul|ol|li|table|tr|th|td|pre|hr)[\s>/]/g;
+
+test("office-md.js draws gfm.md with the block structure the thread's Markdown.tsx draws", async () => {
+  const { markdownHtml } = await import("../../dist/office-md.js");
+  const html = markdownHtml(readFileSync(join(root, "office", "fixtures", "gfm.md"), "utf8"));
+  const want = JSON.parse(readFileSync(join(root, "office", "fixtures", "gfm.blocks.json"), "utf8")).tags;
+  assert.deepEqual([...html.matchAll(BLOCK_TAGS)].map((m) => m[1]), want);
+  // raw html shows as text, an unsafe link loses its url
+  assert.ok(!html.includes("<script") && !html.includes("<b>"), "raw html escaped");
+  assert.ok(html.includes("&lt;script&gt;"));
+  assert.doesNotMatch(markdownHtml("[x](javascript:alert(1))"), /javascript:/);
+  const view = readFileSync(join(root, "office", "dist", "office-view.js"), "utf8");
+  assert.ok(!view.includes("micromark"), "the docx bundle carries no markdown parser");
+});
+
+test("a markdown file's text and links: utf-8 without BOM, relative paths beside the copy, the web out", async () => {
+  const { textOf, outUrl } = await helpers("markdown.js");
+  assert.equal(textOf(new Uint8Array([0xef, 0xbb, 0xbf, 0x23, 0x20, 0xc3, 0xa9, 0x0d, 0x0a, 0x61])), "# é\na");
+  const file = "/a/learn/3/learnings.md";
+  const base = "http://127.0.0.1:4000/a/learn/view";
+  assert.deepEqual(outUrl("https://bise.dev", file, base), { href: "https://bise.dev", out: true });
+  assert.deepEqual(outUrl("mailto:g@x.y", file, base), { href: "mailto:g@x.y", out: true });
+  assert.deepEqual(outUrl("shots/a.png", file, base), { href: "/a/learn/3/shots/a.png", out: false });
+  assert.deepEqual(outUrl("#f01", file, base), { href: "#f01", out: false });
+  assert.deepEqual(outUrl("artifact:deck@v2", file, base), { href: "artifact:deck@v2", out: false });
+});

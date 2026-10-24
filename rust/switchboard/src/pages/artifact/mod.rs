@@ -8,7 +8,7 @@
 //! - `GET /a/<id>/events`: the stream of its saves ([`events`]; server.rs
 //!   runs it, as `/p/<id>/events`);
 //! - `GET /kit/office/office.js`, `/kit/office/office-view.js`,
-//!   `office-pdf.js`, `pdf.worker.js`, `office-sheet.js`: the office SDK's bundles (pdf.js and
+//!   `office-pdf.js`, `pdf.worker.js`, `office-sheet.js`, `office-md.js`: the office SDK's bundles (pdf.js and
 //!   its worker, pdf-notes; Univer's grid, xlsx-univer), read from `office/dist` in the app root (one copy, never
 //!   in `kit/`, architect m_23781); the renderers beside them
 //!   (`kit/office/*.js`) are kit files;
@@ -28,7 +28,7 @@ use super::store::valid_id;
 use super::Pages;
 
 /// The bundles the viewer loads, from `Pages::office_dir`.
-const BUNDLES: &[&str] = &["office.js", "office-view.js", "office-pdf.js", "pdf.worker.js", "office-sheet.js"];
+const BUNDLES: &[&str] = &["office.js", "office-view.js", "office-pdf.js", "pdf.worker.js", "office-sheet.js", "office-md.js"];
 
 /// The response for `segs` (the path's segments), or None: not an
 /// artifact route of this module.

@@ -2,7 +2,8 @@
 // (platform neutral, so an `fs` or `node:` import fails the build), the
 // same bytes for the same sources and lockfile; and src/view/ into
 // office/dist/office-view.js, the viewer's docx renderer (browser only); src/view/pdf.ts and
-// src/view/pdf-worker.ts into office/dist/office-pdf.js and pdf.worker.js (pdf.js).
+// src/view/pdf-worker.ts into office/dist/office-pdf.js and pdf.worker.js (pdf.js); src/view/markdown.ts
+// into office/dist/office-md.js (micromark + GFM).
 // Committed (cargo and nix never run pnpm); shipped in the app root
 // (scripts/versions.sh), where the page server and bise office run read it.
 //
@@ -76,6 +77,8 @@ const stubs = {
 //   with the stubs above; fails past 3 MB (architect m_23769)
 // office-view.js: what draws a docx in the viewer (docx-preview + jszip), browser only,
 //   loaded by kit/office/docx.js alone (architect m_23781); fails past 2 MB
+// office-md.js: micromark + GFM, what draws a .md artifact (kit/office/markdown.js alone; md-artifact),
+//   platform neutral (no DOM, tested in node), minified, fails past 256 KB
 // office-pdf.js and pdf.worker.js: pdf.js (pdfjs-dist, Apache-2.0), what draws a pdf in the
 //   viewer and its worker, two files served under the viewer's script rule (architect m_24668:
 //   never a blob worker), loaded by kit/office/pdf.js alone; minified (pdf.js ships its own
@@ -101,6 +104,7 @@ const bundles = [
   { file: "office.js", entry: join("src", "index.ts"), platform: "neutral", mainFields: ["module", "main"], plugins: [stubs], max: 3 * 1024 * 1024 },
   { file: "office-view.js", entry: join("src", "view", "index.ts"), platform: "browser", max: 2 * 1024 * 1024 },
   { file: "office-pdf.js", entry: join("src", "view", "pdf.ts"), platform: "browser", minify: true, max: 1024 * 1024 },
+  { file: "office-md.js", entry: join("src", "view", "markdown.ts"), platform: "neutral", mainFields: ["module", "main"], minify: true, max: 256 * 1024 },
   { file: "pdf.worker.js", entry: join("src", "view", "pdf-worker.ts"), platform: "browser", minify: true, max: 1.5 * 1024 * 1024 },
   {
     file: "office-sheet.js",

@@ -17,6 +17,8 @@
 //! by kit/office/pdf.js (pdf.js, `office-pdf.js` and `pdf.worker.js`); a
 //! video too, played by kit/office/video.js from the copy's url (the shell
 //! says `data-stream`: no bytes fetched whole; its ranges: pages/media.rs).
+//! A markdown file too, drawn as a document by kit/office/markdown.js
+//! (micromark + GFM in `office-view.js`), its source a toggle away.
 //!
 //! [`shell`] is pure; [`serve`] reads the artifact store.
 
@@ -40,7 +42,7 @@ pub struct Shown<'a> {
     pub id: &'a str,
     pub title: &'a str,
     pub agent: &'a str,
-    /// `xlsx`, `pptx`, `docx`, `image`, `site`, `pdf`, `video` (site::viewer_kind)
+    /// `xlsx`, `pptx`, `docx`, `image`, `site`, `pdf`, `video`, `markdown` (site::viewer_kind)
     pub kind: &'static str,
     /// the version drawn, and the artifact's newest
     pub v: u64,
