@@ -122,6 +122,7 @@ Reference shots: docs/brand/bims/ (office-noon-light, office-noon-dark, office-g
   - sit.test.ts.
   - walklaw.ts: walks.
   - render/pathlaw.test.ts: town paths.
+  - render/objects/index.test.ts: the plugins' objects (one per family file, the registry is index.ts): each mesh inside its declared foot, no two faces seen from above in one plane (2 mm), no pink or red, glass when off (30%, no shadow), compact smaller.
 - **what never to draw:** a pink or red prop, a pink or mauve light cast, a monument or brand copied badly (real cities as maps failed: maps differ by layout and mood, not landmarks), a grey void around the cube, a plane that isn't his message, a bim on a stage-up that vanishes.
 - **reduced motion:** no blends, no skating, no planes in flight (the catch is a still), 'z' as one still letter, the follow as a cut, the hero as its 0:54 frame.
 - **shots:** check them off screen, on fake data (FakeCore, fixtures.ts). Do heavy renders through `~/.bise/run/heavy-run`. designer signs the bims' look and the UI chrome before a land.
