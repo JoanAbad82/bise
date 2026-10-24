@@ -84,6 +84,13 @@ describe('the frame', () => {
     expect(crumbOf({ screen: 'thread', project: 'p', agent: 'perf' }, name)).toEqual(['storefront', 'perf']);
     expect(crumbOf({ screen: 'thread', project: 'p', agent: 'main' }, name)).toEqual(['storefront']);
     expect(crumbOf({ screen: 'scheduled' }, name)).toEqual(['scheduled']);
+    // the processes screen says its noun, and whose in a scope; each earlier crumb goes back there
+    expect(crumbOf({ screen: 'running' }, name)).toEqual(['processes']);
+    expect(crumbOf({ screen: 'running', scope: { project: 'p', agent: 'perf' } }, name)).toEqual(['storefront', 'perf', 'processes']);
+    expect(crumbGoOf({ screen: 'running', scope: { project: 'p', agent: 'perf' } }, name).map((s) => s.go)).toEqual([
+      { screen: 'thread', project: 'p', agent: 'main' },
+      { screen: 'thread', project: 'p', agent: 'perf' },
+    ]);
     // /agents and /archived are two lists, each its own crumb (designer m_19489)
     expect(crumbOf({ screen: 'agents', project: 'p' }, name)).toEqual(['storefront', 'agents']);
     expect(crumbOf({ screen: 'agents', project: 'p', archived: true }, name)).toEqual(['storefront', 'archived']);

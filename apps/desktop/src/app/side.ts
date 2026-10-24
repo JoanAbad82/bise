@@ -6,6 +6,7 @@
 // Sidebar.tsx and App.tsx draw these.
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
+import { running } from '@/proto/words_running.gen';
 import { MAIN, type Route } from './route';
 import { shortAge } from '@/agents/model';
 import { pauseLine, shownPause } from '@/thread/wake';
@@ -183,6 +184,10 @@ export function crumbOf(route: Route, name: (project: string) => string): string
       return [route.log === 'restart' ? panel.crumb_update_log : panel.crumb_crash];
     case 'lab':
       return [panel.crumb_lab, route.lab];
+    case 'running':
+      // its noun, not its route's name (designer m_38642); in a scope, whose: 'acme › perf › processes'
+      if (route.scope === undefined) return [running.heading];
+      return route.scope.agent === undefined ? [name(route.scope.project), running.heading] : [name(route.scope.project), route.scope.agent, running.heading];
     default:
       return [route.screen];
   }
@@ -201,6 +206,9 @@ export function crumbGoOf(route: Route, name: (project: string) => string): { c:
       return { c, go: { screen: 'thread', project: route.project, agent: MAIN } };
     if ((route.screen === 'review' || route.screen === 'debug') && i === 1)
       return { c, go: { screen: 'thread', project: route.project, agent: route.agent } };
+    // processes in a scope: its project's main, its agent's thread
+    if (route.screen === 'running' && route.scope !== undefined)
+      return { c, go: { screen: 'thread', project: route.scope.project, agent: i === 0 ? MAIN : (route.scope.agent ?? MAIN) } };
     if (c === panel.crumb_settings) return { c, go: { screen: 'settings' } };
     return { c };
   });
