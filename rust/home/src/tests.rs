@@ -30,7 +30,6 @@ fn the_old_layout_keeps_todays_paths() {
     assert_eq!(h.images_dir(), p("/h/.bend-harness/images"));
     assert_eq!(h.crashes_dir(), p("/h/.bend-harness/crashes"));
     assert_eq!(h.mcp_index(), p("/h/.bend-harness/mcp-index.txt"));
-    assert_eq!(h.skills_index(), p("/h/.bend-harness/skills-index.txt"));
     assert_eq!(h.plugins_state(), p("/h/.bend-harness/plugins.json"));
     assert_eq!(h.plugin_data_dir(), p("/h/.bend-harness/plugin-data"));
     assert_eq!(h.run_dir(), p("/h/.bend-harness/run"));
@@ -59,7 +58,6 @@ fn bise_home_moves_everything() {
     assert_eq!(h.hub_dir("ws-1"), p("/b/hubs/ws-1"));
     assert_eq!(h.worktrees_dir(), p("/b/worktrees"));
     assert_eq!(h.mcp_index(), p("/b/cache/mcp-index.txt"));
-    assert_eq!(h.skills_index(), p("/b/cache/skills-index.txt"));
     assert_eq!(h.marketplaces(), p("/b/marketplaces.json"));
     assert_eq!(h.marketplace_cache(), p("/b/cache/marketplaces"));
     assert_eq!(h.mcp_secrets_dir(), p("/b/secrets/mcp-env"));
@@ -141,11 +139,9 @@ fn an_inherited_legacy_default_is_not_an_override_in_the_bise_layout() {
     std::fs::write(d.join(".bise").join(MIGRATED), "{}").unwrap();
     let hs = d.to_string_lossy().to_string();
     let old_index = d.join(".bend-harness/mcp-index.txt").to_string_lossy().to_string();
-    let old_skills = d.join(".bend-harness/skills-index.txt").to_string_lossy().to_string();
     let new_index = d.join(".bise/cache/mcp-index.txt");
-    let no_stamp = home_of(&[("HOME", &hs), ("BEND_MCP_INDEX", &old_index), ("BEND_SKILLS_INDEX", &old_skills)]);
+    let no_stamp = home_of(&[("HOME", &hs), ("BEND_MCP_INDEX", &old_index)]);
     assert_eq!(no_stamp.mcp_index(), new_index);
-    assert_eq!(no_stamp.skills_index(), d.join(".bise/cache/skills-index.txt"));
     // the poisoned export (a valid stamp) heals too
     let mut env: HashMap<String, String> = no_stamp.exports().into_iter().map(|(k, v)| (k.into(), v)).collect();
     env.insert("HOME".into(), hs.clone());
@@ -166,17 +162,17 @@ fn an_inherited_legacy_default_is_not_an_override_in_the_bise_layout() {
 fn another_homes_default_is_not_an_override() {
     // an agent's shell (HOME=/u, bise layout, exports stamped for /u) ran a
     // test with a temp HOME and BISE_EXPORTS_FOR unset: the test's REPL took
-    // BEND_SKILLS_INDEX=/u/.bise/cache/skills-index.txt as an override,
-    // scanned the temp HOME (no skills) and wrote an empty index over the
-    // user's one: the skill tool found no skill in main's session
+    // BEND_SKILLS_INDEX=/u/.bise/cache/skills-index.txt (a shared index,
+    // gone since) as an override and wrote an empty index over the user's
+    // one: the skill tool found no skill in main's session. The same rule
+    // holds for every path it exports
     let t = tmp("foreign-default");
     let ts = t.to_string_lossy().to_string();
     let inherited = [
         ("BEND_CONFIG", "/u/.bise/config.toml"),
         ("BEND_SESSIONS_DIR", "/u/.bise/sessions"),
         ("BEND_IMAGE_DIR", "/u/.bise/images"),
-        ("BEND_MCP_INDEX", "/u/.bend-harness/mcp-index.txt"),
-        ("BEND_SKILLS_INDEX", "/u/.bise/cache/skills-index.txt"),
+        ("BEND_MCP_INDEX", "/u/.bise/cache/mcp-index.txt"),
         ("BEND_PLUGINS_STATE", "/u/.bise/plugins.json"),
         ("BEND_PLUGINS_DATA", "/u/.bise/plugin-data"),
         ("BEND_RUN_DIR", "/u/.bise/run"),
@@ -187,22 +183,22 @@ fn another_homes_default_is_not_an_override() {
     pairs.extend(inherited);
     let h = home_of(&pairs);
     assert_eq!(h, home_of(&[("HOME", &ts)]), "every inherited path was /u's default");
-    assert_eq!(h.skills_index(), t.join(".bend-harness/skills-index.txt"));
+    assert_eq!(h.mcp_index(), t.join(".bend-harness/mcp-index.txt"));
     // every exported variable is covered by the rule
     assert_eq!(inherited.len(), PATH_VARS.len());
     // this HOME's own defaults and any other path stay overrides
-    let own = t.join(".bend-harness/skills-index.txt").to_string_lossy().to_string();
-    let kept = home_of(&[("HOME", &ts), ("BEND_SKILLS_INDEX", &own), ("BEND_CONFIG", "/u/cfg/config.toml")]);
-    assert_eq!(kept.skills_index(), PathBuf::from(&own));
+    let own = t.join(".bend-harness/mcp-index.txt").to_string_lossy().to_string();
+    let kept = home_of(&[("HOME", &ts), ("BEND_MCP_INDEX", &own), ("BEND_CONFIG", "/u/cfg/config.toml")]);
+    assert_eq!(kept.mcp_index(), PathBuf::from(&own));
     assert_eq!(kept.config_file(), PathBuf::from("/u/cfg/config.toml"));
     // same in the bise layout: /u's defaults dropped, its own kept
     std::fs::create_dir_all(t.join(".bise")).unwrap();
     std::fs::write(t.join(".bise").join(MIGRATED), "{}").unwrap();
-    let bise_own = t.join(".bise/cache/skills-index.txt").to_string_lossy().to_string();
-    let b = home_of(&[("HOME", &ts), ("BEND_SKILLS_INDEX", "/u/.bise/cache/skills-index.txt")]);
-    assert_eq!(b.skills_index(), PathBuf::from(&bise_own));
-    let b_own = home_of(&[("HOME", &ts), ("BEND_SKILLS_INDEX", &bise_own), ("BEND_SESSIONS_DIR", "/u/.bise/sessions")]);
-    assert_eq!(b_own.skills_index(), PathBuf::from(&bise_own));
+    let bise_own = t.join(".bise/cache/mcp-index.txt").to_string_lossy().to_string();
+    let b = home_of(&[("HOME", &ts), ("BEND_MCP_INDEX", "/u/.bise/cache/mcp-index.txt")]);
+    assert_eq!(b.mcp_index(), PathBuf::from(&bise_own));
+    let b_own = home_of(&[("HOME", &ts), ("BEND_MCP_INDEX", &bise_own), ("BEND_SESSIONS_DIR", "/u/.bise/sessions")]);
+    assert_eq!(b_own.mcp_index(), PathBuf::from(&bise_own));
     assert_eq!(b_own.sessions_dir(), t.join(".bise/sessions"));
 }
 
@@ -435,7 +431,7 @@ fn the_tests_run_on_a_temp_home() {
     }
     let h = Home::from_env();
     assert!(h.config_file().starts_with(std::env::temp_dir()), "{:?}", h.config_file());
-    assert!(crate::test_home::is_place_var("BEND_SKILLS_INDEX") && !crate::test_home::is_place_var("PATH"));
+    assert!(crate::test_home::is_place_var("BEND_MCP_INDEX") && !crate::test_home::is_place_var("PATH"));
 }
 
 #[test]

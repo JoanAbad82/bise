@@ -118,7 +118,10 @@ fn copy_user_files(old_root: &Path, old_state: &Path, bise: &Path, rep: &mut Rep
                 "run" => continue,
                 // merged into prefs.json below
                 "tui.json" => continue,
-                "mcp-index.txt" | "skills-index.txt" => bise.join("cache").join(&name),
+                // the old shared skills index: no reader since each
+                // session's bridge writes its own (bend_plugins::skills)
+                "skills-index.txt" => continue,
+                "mcp-index.txt" => bise.join("cache").join(&name),
                 _ => bise.join(&name),
             };
             note(copy_tree(&src, &dest), format!("~/.bend-harness/{name}"), rep);

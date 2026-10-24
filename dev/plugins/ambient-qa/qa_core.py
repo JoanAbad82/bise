@@ -238,7 +238,7 @@ class _ReusedEnv:
         self.tmp, self.ws, self.state, self.hub, self.keep = tmp, os.path.join(tmp, "ws"), os.path.join(tmp, "st"), None, False
         self._e2e = e2e
         self.env = {**e2e.host_env(), "SB_STATE_DIR": self.state,
-                    "BEND_MCP_INDEX": os.path.join(tmp, "mcp-index.txt"), "BEND_SKILLS_INDEX": os.path.join(tmp, "skills-index.txt"),
+                    "BEND_MCP_INDEX": os.path.join(tmp, "mcp-index.txt"),
                     "BEND_BG_ROOT": os.path.join(tmp, "bg"), "BEND_SESSIONS_DIR": os.path.join(tmp, "bise", "sessions"),
                     "BEND_BG_AFTER": "30", "SB_ONBOARDING": "off"}
 
@@ -294,14 +294,12 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
         for k in SCRIPTED_VARS:
             E.env.pop(k, None)
     # The user's rule (main m_5200): no test, QA or demo touches his real accounts.
-    # A QA hub never has a real connector: e2e's empty BEND_MCP_INDEX and
-    # BEND_SKILLS_INDEX stay, no plugin from his ~/.agents/plugins (an empty
+    # A QA hub never has a real connector: e2e's empty BEND_MCP_INDEX stays, no plugin from his ~/.agents/plugins (an empty
     # user root), no opt-in plugin, the computer plugin off (his browser, his
     # logins). The only way in is `user_ask`: the user's own words asking for
     # this one run, recorded in hub.json and run.json.
     if user_ask and connectors:
-        for k in ("BEND_MCP_INDEX", "BEND_SKILLS_INDEX"):
-            E.env.pop(k, None)
+        E.env.pop("BEND_MCP_INDEX", None)
     else:
         connectors = False
         # the hub's own user plugin root: none of his, only the fake accounts

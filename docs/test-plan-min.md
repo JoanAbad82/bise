@@ -532,7 +532,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `secrets_keychain_e2e` | KEEP | secrets in a throwaway macOS keychain (real security CLI) |
 | `send_latency_e2e` | KEEP | send/steer/queue echo and REPL delivery fast on a loaded hub (send-fast's guard) |
 | `send_parts_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
-| `skills_hang_e2e` | KEEP | a FIFO SKILL.md and a hanging reader never stall the REPL's startup scan (a shell script, real processes): no cheap unit (KEEP, min-tests, main m_37200; run_all, ~11 s) |
+| `skills_hang_e2e` | KEEP | a stuck SKILL.md (a link to a FIFO) never stalls main's first call: the hub, the REPL and its bridge's scan (bend_plugins::skills) are real processes; the bounded read itself is skills_tests.rs (KEEP, min-tests, main m_37200; architect m_39110; run_all, ~11 s) |
 | `skills_reload_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
 | `socket_auth_e2e` | KEEP | an agent's process cannot act as the user on its hub (socket auth) |
 | `spawn_model_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |

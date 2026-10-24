@@ -1252,7 +1252,7 @@ impl Shell {
             let skills_moved = now && {
                 let cur = *skills_by_ws
                     .entry((fp.ws.clone(), fp.main, fp.desktop))
-                    .or_insert_with(|| skills_fingerprint(&skill_roots(&fp.ws, &self.opts.app_root, fp.main, fp.desktop)));
+                    .or_insert_with(|| skills_fingerprint(&self.opts.paths, &skill_roots(&fp.ws, &self.opts.app_root, fp.main, fp.desktop)));
                 cur != fp.skills
             };
             if plugins != fp.plugins || skills_moved {
@@ -1288,7 +1288,7 @@ impl Shell {
         let Some(fp) = self.spawn_plugins.get(&dir) else {
             return;
         };
-        let cur = skills_fingerprint(&skill_roots(&fp.ws, &self.opts.app_root, fp.main, fp.desktop));
+        let cur = skills_fingerprint(&self.opts.paths, &skill_roots(&fp.ws, &self.opts.app_root, fp.main, fp.desktop));
         if cur == fp.skills && !self.reload_repls.contains(&dir) {
             return;
         }

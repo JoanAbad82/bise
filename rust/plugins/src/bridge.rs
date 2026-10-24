@@ -224,7 +224,6 @@ impl Entry {
 
 pub struct Session {
     pub index: String,
-    pub skills: String,
     pub report: String,
 }
 
@@ -245,12 +244,6 @@ fn token() -> String {
 /// Descriptions and schemas ride on one index line.
 fn flat(s: &str) -> String {
     s.chars().map(|c| if c == '\n' || c == '\r' { ' ' } else { c }).collect()
-}
-
-/// `name\tdescription\tpath`, tabs and quotes stripped (the scan's rule)
-pub fn skill_line(name: &str, desc: &str, path: &Path) -> String {
-    let clean = |s: &str| -> String { flat(s).chars().filter(|c| *c != '\t' && *c != '"').collect() };
-    format!("{}\t{}\t{}\n", clean(name), clean(desc), path.display())
 }
 
 /// The connector index format: `<cid> <group> <tool> : #<desc> | input: <schema>`
@@ -510,15 +503,9 @@ fn build(
     }
     res.diagnostics.extend(extra);
     res.diagnostics.extend(diags);
-    let mut skills = String::new();
-    for p in res.loaded() {
-        for s in &p.skills {
-            skills.push_str(&skill_line(&s.name, &s.description, &s.path));
-        }
-    }
     status.sort_by(|a, b| (&a.plugin, &a.server).cmp(&(&b.plugin, &b.server)));
     let report = report::text(res, Some(&status));
-    (entries, Session { index, skills, report }, late_rx)
+    (entries, Session { index, report }, late_rx)
 }
 
 /// `notifications/tools/list_changed`: list that server's tools again
@@ -774,10 +761,15 @@ pub fn serve(opts: Opts) -> std::io::Result<()> {
     let token = token();
     let base = format!("http://127.0.0.1:{}/{}", port, token);
     let mut res = resolve::resolve(&opts.roots);
+    // the loose skill folders, scanned while the servers start
+    let loose = std::thread::spawn(crate::skills::loose_on);
     let (changed_tx, changed_rx) = channel();
     let (entries, session, late) = build(&mut res, &opts.dir, &base, &changed_tx, opts.status_dir.as_deref(), opts.secrets_dir.as_deref(), opts.ready_wait);
     write_atomic(&opts.dir.join("mcp-index.txt"), &session.index)?;
-    write_atomic(&opts.dir.join("skills-index.txt"), &session.skills)?;
+    // the session's skills index, before `ready`: the REPL's first
+    // prompt reads it (and only it)
+    let skills = crate::skills::index(&crate::skills::ordered(loose.join().unwrap_or_default(), crate::skills::of_plugins(res.loaded())));
+    write_atomic(&opts.dir.join("skills-index.txt"), &skills)?;
     write_atomic(&opts.dir.join("report.txt"), &session.report)?;
     write_atomic(&opts.dir.join("ready"), &format!("{}\n", std::process::id()))?;
     let entries = Arc::new(entries);

@@ -72,7 +72,6 @@ def start(tmp, name, gw, extra):
     open(index, "w").write(OLD)
     env = {k: v for k, v in os.environ.items() if k not in PRIVATE}
     env.update(HOME=d, BEND_MCP_INDEX=index, BEND_MCP_BOOTSTRAP_URL=gw.url,
-               BEND_SKILLS_INDEX=os.path.join(d, "sk.txt"),
                BEND_PLUGINS_STATE=os.path.join(d, "plugins.json"),
                BEND_CONFIG=os.path.join(d, "config.toml"),
                BEND_SESSION_FILE=os.path.join(d, "session.txt"),

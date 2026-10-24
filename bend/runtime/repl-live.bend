@@ -251,10 +251,9 @@ def live_main() -> IO(Unit):
       String.append(U32.show(p),
         String.append(" (real model, FS tools, bash) — compaction threshold: ",
           String.append(Nat.show(threshold), " tokens (450k from a 1M context, else 85% of it, never above 85%; BEND_THRESHOLD or config.toml compaction_threshold to change)")))))
-    # the plugins bridge, then the skills scan (it reads the plugin
-    # skills), then the prompt (it lists the skills)
+    # the plugins bridge (it writes the session's skills index before
+    # it is ready), then the prompt (it lists the skills)
     u5 : Unit <- Pl.start()
-    u4 : Unit <- Sk.skills_scan()
     +cfg : T.Cfg <- live_cfg(core_thr, keep)
     +ld : P.Load <- P.load(T.new_session(cfg))
     kr : Result<&1, &1, U32 & String, String> <- IO.get_env("MISTRAL_API_KEY")

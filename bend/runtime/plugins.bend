@@ -10,7 +10,8 @@
 # loopback HTTP until this REPL is gone:
 #   mcp-index.txt    tool lines in the connector index format, the cid
 #                    being the loopback URL (runtime/mcp.bend calls it)
-#   skills-index.txt skill lines in the skills index format
+#   skills-index.txt every on skill (skill folders and plugins), in the
+#                    skills index format: the only one runtime/skills.bend reads
 #   report.txt       the listing /plugins shows
 # Scripted runs never start it (hermetic suites).
 import Base

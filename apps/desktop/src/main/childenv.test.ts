@@ -17,7 +17,7 @@ const HIS = { HOME: '/h', PATH: '/usr/bin:/bin', LANG: 'fr_FR.UTF-8', MISTRAL_AP
 
 describe('childEnv', () => {
   it('the table is the one bise has (generated from env::VARS)', () => {
-    for (const k of ['SB_SOCKET', 'SB_AGENT', 'BISE_OWNERS', 'BEND_WIRE_LOG', 'BEND_REPL_PORT', 'BISE_APP_ROOT', 'BISE_ONESHOT', 'BISE_EXPORTS_FOR', 'BISE_MODELS_FILE', 'BISE_DESKTOP', 'BISE_ROLE']) {
+    for (const k of ['SB_SOCKET', 'SB_AGENT', 'BISE_OWNERS', 'BEND_WIRE_LOG', 'BEND_REPL_PORT', 'BISE_APP_ROOT', 'BISE_ONESHOT', 'BISE_EXPORTS_FOR', 'BISE_MODELS_FILE', 'BISE_SKILL_ROOTS', 'BISE_ROLE']) {
       expect(INTERNAL_VARS as readonly string[]).toContain(k);
     }
     expect(TEST_VARS as readonly string[]).toContain('BISE_TEST_HOME');

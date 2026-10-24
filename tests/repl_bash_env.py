@@ -82,7 +82,7 @@ def part_a(tmp):
     env.update({
         "BEND_PROVIDER_URL": "http://127.0.0.1:%s/v1/chat/completions" % fake.stdout.readline().split()[1],
         "BEND_MODEL": "mistral-small-latest", "MISTRAL_API_KEY": "fake-key",
-        "BEND_MCP_INDEX": os.path.join(tmp, "mcp.txt"), "BEND_SKILLS_INDEX": os.path.join(tmp, "sk.txt"),
+        "BEND_MCP_INDEX": os.path.join(tmp, "mcp.txt"),
         # the sync window, the job (8 s) and the wait (4 s): 2 s of margin
         # each way (the job outlives the window, the wait does not, the job
         # ends before 3 runs). With 2 / 3 / 1.5 a full gate at load 12 made

@@ -70,7 +70,7 @@ def main():
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_", "BISE_"))}
     env.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"), BISE_MODELS_FILE=models, BEND_CONFIG=cfg,
                BEND_REPL_PORT=str(port), BEND_SESSION_FILE=session, BEND_WIRE_LOG=os.path.join(tmp, "wire.log"),
-               BEND_MCP_INDEX=os.path.join(tmp, "mcp.txt"), BEND_SKILLS_INDEX=os.path.join(tmp, "sk.txt"),
+               BEND_MCP_INDEX=os.path.join(tmp, "mcp.txt"),
                BEND_BG_ROOT=os.path.join(tmp, "bg"), BEND_BG_AFTER="3", SB_AGENT="probe", TMPDIR=tmp,
                BEND_WIRE_DUMP=dump)
     log, err = os.path.join(tmp, "repl.log"), os.path.join(tmp, "repl.err")

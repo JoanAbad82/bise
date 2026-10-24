@@ -79,12 +79,11 @@ pub const EXPORTS_FOR: &str = "BISE_EXPORTS_FOR";
 pub const MIGRATED: &str = "migrated.json";
 
 /// The env overrides of single paths, in the order they are exported.
-pub const PATH_VARS: [&str; 10] = [
+pub const PATH_VARS: [&str; 9] = [
     "BEND_CONFIG",
     "BEND_SESSIONS_DIR",
     "BEND_IMAGE_DIR",
     "BEND_MCP_INDEX",
-    "BEND_SKILLS_INDEX",
     "BEND_PLUGINS_STATE",
     "BEND_PLUGINS_DATA",
     "BEND_RUN_DIR",
@@ -331,12 +330,6 @@ impl Home {
         self.or("BEND_MCP_INDEX", d.join("mcp-index.txt"))
     }
 
-    /// The skills index (`$BEND_SKILLS_INDEX`).
-    pub fn skills_index(&self) -> PathBuf {
-        let d = if self.is_bise() { self.cache_dir() } else { self.root.clone() };
-        self.or("BEND_SKILLS_INDEX", d.join("skills-index.txt"))
-    }
-
     /// The plugins' enable state (`$BEND_PLUGINS_STATE`).
     pub fn plugins_state(&self) -> PathBuf {
         self.or("BEND_PLUGINS_STATE", self.root.join("plugins.json"))
@@ -457,7 +450,6 @@ impl Home {
             ("BEND_SESSIONS_DIR", s(self.sessions_dir())),
             ("BEND_IMAGE_DIR", s(self.images_dir())),
             ("BEND_MCP_INDEX", s(self.mcp_index())),
-            ("BEND_SKILLS_INDEX", s(self.skills_index())),
             ("BEND_PLUGINS_STATE", s(self.plugins_state())),
             ("BEND_PLUGINS_DATA", s(self.plugin_data_dir())),
             ("BEND_RUN_DIR", s(self.run_dir())),
@@ -491,7 +483,7 @@ fn stamp_of(home: Option<&str>, bise: Option<&str>, root: &Path) -> String {
 
 /// The defaults of a [`PATH_VARS`] variable relative to a HOME, in the
 /// legacy layout (`true`) and in `~/.bise` (`false`): e.g.
-/// `/.bend-harness/skills-index.txt` and `/.bise/cache/skills-index.txt`.
+/// `/.bend-harness/mcp-index.txt` and `/.bise/cache/mcp-index.txt`.
 fn default_suffixes(var: &str) -> Vec<(String, bool)> {
     const PROBE: &str = "/bise-probe-home";
     let user = PathBuf::from(PROBE);

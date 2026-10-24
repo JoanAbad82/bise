@@ -1,14 +1,16 @@
 //! The `$` popup of the composer: pick a skill by name, as in Codex.
 //!
-//! The list is the TUI's own scan of the skill folders the agents read
-//! (runtime/skills.bend: the workspace's `.agents/skills`, the loaded
-//! plugins' skills, bise's `prompts/skills`, `~/.agents/skills`,
-//! `~/.vibe/skills`; first name kept), rebuilt when a SKILL.md comes,
-//! goes or changes ([`index`]). Picking inserts `$name ` in the text; the
+//! The list is what main reads: `bend_plugins::skills`'s scan of the
+//! skill folders and the loaded plugins' skills, the off ones left out,
+//! first name kept, rebuilt when a SKILL.md comes, goes or changes or a
+//! skill is turned on or off ([`index`]). Picking inserts `$name ` in the text; the
 //! model reads the mention (nothing loads the skill on the client side).
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+use bend_plugins::model::StateV2;
+use bend_plugins::skills;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -50,128 +52,53 @@ fn short(desc: &str) -> String {
     }
 }
 
-/// Where the scan looks besides the workspace: the user's home, bise's
-/// built-in `prompts/skills` and the plugin roots. The real ones come
-/// from the environment ([`Roots::standard`]); a test passes temp folders
-/// (never the user's HOME: a skill there may link into ~/Documents, whose
-/// read waits on a macOS privacy prompt).
+/// How long the popup's scan waits on a folder or a file: short, the
+/// popup must not freeze (a stuck path is skipped, then never waited on
+/// again while it hangs: `bend_plugins::skills`).
+const LIMIT: Duration = Duration::from_millis(300);
+
+/// Where the scan looks: the skill folders (`bend_plugins::skills::roots`,
+/// main's: the user talks to main) and the plugin roots. The real ones
+/// come from the environment ([`Places::standard`]); a test passes temp
+/// folders (never the user's HOME: a skill there may link into
+/// ~/Documents, whose read waits on a macOS privacy prompt).
 struct Places {
-    home: Option<PathBuf>,
-    /// `prompts/skills-all` and `prompts/skills` ([`builtin_prompts`])
-    prompts: Vec<PathBuf>,
+    roots: Vec<skills::Root>,
     plugins: bend_plugins::resolve::Roots,
 }
 
 impl Places {
     fn standard(workspace: &Path) -> Places {
+        let home = std::env::var_os("HOME").filter(|h| !h.is_empty()).map(PathBuf::from);
+        let app = bend_plugins::resolve::builtin_root().and_then(|r| r.parent().map(Path::to_path_buf));
+        // bise-pages only where the desktop's rules are on (the hub's
+        // agents get it under the same flag, architect m_12576)
+        let bise = skills::BiseSkills::of(true, bise_home::projects::desktop_for(workspace));
         Places {
-            home: std::env::var_os("HOME").filter(|h| !h.is_empty()).map(PathBuf::from),
-            // bise-pages only where the desktop's rules are on (the hub's
-            // agents get it under the same flag, architect m_12576)
-            prompts: builtin_prompts(bise_home::projects::desktop_for(workspace)),
+            roots: skills::roots(home.as_deref(), workspace, app.as_deref(), bise),
             plugins: bend_plugins::resolve::Roots::standard(Some(workspace)),
         }
     }
 }
 
-/// The skill folders of `workspace`, in the agents' order (runtime/
-/// skills.bend: the session's index, then the shared one): the
-/// workspace's `.agents/skills`, (then the loaded plugins' skills, `scan`)
-/// bise's built-in `prompts/skills`, then `~/.agents/skills` and
-/// `~/.vibe/skills`.
-fn skill_dirs(workspace: &Path, places: &Places) -> Vec<PathBuf> {
-    let mut dirs = vec![workspace.join(".agents/skills")];
-    dirs.extend(places.prompts.clone());
-    if let Some(home) = &places.home {
-        dirs.push(home.join(".agents/skills"));
-        dirs.push(home.join(".vibe/skills"));
-    }
-    dirs
-}
-
-/// The app root's built-in skill folders: `prompts/skills-all` (every
-/// agent's, bise-pages, only when `desktop`: bise_home's desktop_on for
-/// this workspace) and `prompts/skills` (main's, bise-demo).
-fn builtin_prompts(desktop: bool) -> Vec<PathBuf> {
-    let Some(app) = bend_plugins::resolve::builtin_root().and_then(|r| r.parent().map(Path::to_path_buf)) else {
-        return Vec::new();
-    };
-    let dirs: &[&str] = if desktop { &["prompts/skills-all", "prompts/skills"] } else { &["prompts/skills"] };
-    dirs.iter().map(|d| app.join(d)).filter(|p| p.is_dir()).collect()
-}
-
-/// A SKILL.md's `name:` and `description:` lines, as the scan reads them
-/// (the first of each, tabs, CRs and quotes dropped, both non-empty).
-pub(crate) fn parse_skill(text: &str) -> Option<Skill> {
-    let field = |key: &str| {
-        text.lines()
-            .find_map(|l| l.strip_prefix(key))
-            .map(|v| v.trim_start().chars().filter(|c| !matches!(c, '\t' | '\r' | '"')).collect::<String>())
-            .filter(|v| !v.is_empty())
-    };
-    let name = field("name:")?;
-    let desc = field("description:")?;
-    (!name.contains(char::is_whitespace)).then(|| Skill { name, desc: short(desc.trim()) })
-}
-
-/// Stats only: each folder's `<skill>/SKILL.md` with its size and mtime,
-/// and the plugins' fingerprint (a plugin enabled, added or edited).
-fn fingerprint(workspace: &Path, places: &Places) -> u64 {
+/// Stats only: the skill folders' fingerprint with the on/off state, and
+/// the plugins' (a plugin enabled, added or edited).
+fn fingerprint(places: &Places, st: &StateV2) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     bend_plugins::resolve::fingerprint(&places.plugins).hash(&mut h);
-    for d in skill_dirs(workspace, places) {
-        d.hash(&mut h);
-        for f in skill_files(&d) {
-            let Ok(m) = std::fs::metadata(&f) else { continue };
-            f.hash(&mut h);
-            m.len().hash(&mut h);
-            m.modified().ok().hash(&mut h);
-        }
-    }
+    skills::fingerprint(&places.roots, st, LIMIT).0.hash(&mut h);
     h.finish()
 }
 
-fn skill_files(dir: &Path) -> Vec<PathBuf> {
-    let mut v: Vec<PathBuf> = std::fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path().join("SKILL.md"))
-        .filter(|f| f.is_file())
-        .collect();
-    v.sort();
-    v
-}
-
-/// Every skill of `workspace`'s folders, read now, first name kept.
-fn scan(workspace: &Path, places: &Places) -> Vec<Skill> {
-    let mut out: Vec<Skill> = Vec::new();
-    let mut push = |s: Skill| {
-        if !out.iter().any(|o| o.name == s.name) {
-            out.push(s);
-        }
-    };
-    let dirs = skill_dirs(workspace, places);
-    for f in skill_files(&dirs[0]) {
-        if let Some(s) = std::fs::read_to_string(&f).ok().as_deref().and_then(parse_skill) {
-            push(s);
-        }
-    }
+/// Every skill the agents read, on now, in their order (first name kept).
+fn scan(places: &Places, st: &StateV2) -> Vec<Skill> {
+    let found = skills::scan(&places.roots, LIMIT);
     let res = bend_plugins::resolve::resolve(&places.plugins);
-    for p in res.loaded() {
-        for s in &p.skills {
-            push(Skill { name: s.name.clone(), desc: short(s.description.trim()) });
-        }
-    }
-    for d in &dirs[1..] {
-        for f in skill_files(d) {
-            if let Some(s) = std::fs::read_to_string(&f).ok().as_deref().and_then(parse_skill) {
-                push(s);
-            }
-        }
-    }
-    out
+    skills::ordered(skills::on(found.skills, st), skills::of_plugins(res.loaded()))
+        .into_iter()
+        .map(|s| Skill { name: s.name, desc: short(s.description.trim()) })
+        .collect()
 }
 
 /// (workspace, last stat check, fingerprint, skills)
@@ -185,10 +112,9 @@ thread_local! {
     pub(crate) static TEST_INDEX: std::cell::RefCell<Option<Vec<Skill>>> = const { std::cell::RefCell::new(None) };
 }
 
-/// The skills of `workspace`'s skill folders and plugins, what its
-/// agents list (no index file: the shared one the REPLs write holds only
-/// the user folders, and only as of the last REPL start). Rebuilt when
-/// the folders' stats move (a SKILL.md added, edited or removed), checked
+/// The skills of `workspace`'s skill folders and plugins that are on,
+/// what main lists. Rebuilt when the folders' stats or the on/off state
+/// move (a SKILL.md added, edited or removed, a skill turned off), checked
 /// when the `$` popup asks after a second without asking (it asks at
 /// every frame while open): no timer, no watcher.
 pub(crate) fn index(workspace: &Path) -> Vec<Skill> {
@@ -203,14 +129,15 @@ pub(crate) fn index(workspace: &Path) -> Vec<Skill> {
         }
     }
     let places = Places::standard(workspace);
-    let fp = fingerprint(workspace, &places);
+    let st = bend_plugins::state::read(&bend_plugins::state::state_path());
+    let fp = fingerprint(&places, &st);
     if let Some((w, t, f, list)) = cache.as_mut() {
         if w == workspace && *f == fp {
             *t = Instant::now();
             return list.clone();
         }
     }
-    let list = scan(workspace, &places);
+    let list = scan(&places, &st);
     *cache = Some((workspace.to_path_buf(), Instant::now(), fp, list.clone()));
     list
 }
@@ -288,11 +215,11 @@ mcp-builder\tGuide for MCP servers\t/a/m/SKILL.md
         v.into_iter().map(|s| s.name.as_str()).collect()
     }
 
-    /// The workspace's skills: a SKILL.md added shows, edited shows its
-    /// new text, removed goes; the stats move each time and stay put
-    /// while nothing changes.
+    /// The popup's list: the workspace's skills follow their SKILL.md
+    /// (added, edited, removed: the stats move each time and stay put
+    /// while nothing changes), and a skill turned off leaves it.
     #[test]
-    fn the_scan_follows_the_workspace_skills() {
+    fn the_scan_follows_the_workspace_skills_and_the_state() {
         let root = std::env::temp_dir().join(format!("tui-skills-scan-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let ws = root.join("ws");
@@ -305,8 +232,7 @@ mcp-builder\tGuide for MCP servers\t/a/m/SKILL.md
         std::fs::create_dir_all(&other).unwrap();
         std::fs::write(other.join("SKILL.md"), "name: other\ndescription: from the home\n").unwrap();
         let places = Places {
-            home: Some(home.clone()),
-            prompts: vec![],
+            roots: skills::roots(Some(&home), &ws, None, skills::BiseSkills::None),
             plugins: bend_plugins::resolve::Roots {
                 builtin: None,
                 user: Some(home.join(".agents/plugins")),
@@ -315,26 +241,30 @@ mcp-builder\tGuide for MCP servers\t/a/m/SKILL.md
                 state: Default::default(),
             },
         };
-        let find = |ws: &Path| scan(ws, &places).into_iter().find(|s| s.name == "gamma");
-        let fingerprint = |ws: &Path| fingerprint(ws, &places);
-        let names: Vec<String> = scan(&ws, &places).into_iter().map(|s| s.name).collect();
+        let on = StateV2::default();
+        let find = |st: &StateV2| scan(&places, st).into_iter().find(|s| s.name == "gamma");
+        let fingerprint = |st: &StateV2| fingerprint(&places, st);
+        let names: Vec<String> = scan(&places, &on).into_iter().map(|s| s.name).collect();
         assert_eq!(names, ["other"], "the temp home's skill, nothing else");
-        let empty = fingerprint(&ws);
-        assert_eq!(find(&ws), None);
-        std::fs::write(dir.join("SKILL.md"), "---\nname: gamma\ndescription: \"First\" text\n---\nbody\n").unwrap();
-        let added = fingerprint(&ws);
+        let empty = fingerprint(&on);
+        assert_eq!(find(&on), None);
+        std::fs::write(dir.join("SKILL.md"), "---\nname: gamma\ndescription: \"First\" text. More.\n---\nbody\n").unwrap();
+        let added = fingerprint(&on);
         assert_ne!(added, empty);
-        assert_eq!(fingerprint(&ws), added);
-        assert_eq!(find(&ws).map(|s| s.desc), Some("First text".into()));
+        assert_eq!(fingerprint(&on), added);
+        assert_eq!(find(&on).map(|s| s.desc), Some("First text.".into()), "the first sentence");
+        let gamma_off = StateV2 {
+            parts_off: vec![bend_plugins::id::PluginId::parse("skills:workspace#skill:gamma").unwrap()],
+            ..StateV2::default()
+        };
+        assert_eq!(find(&gamma_off), None, "turned off: not offered");
+        assert_ne!(fingerprint(&gamma_off), added);
         std::fs::write(dir.join("SKILL.md"), "---\nname: gamma\ndescription: Second, longer\n---\n").unwrap();
-        assert_ne!(fingerprint(&ws), added);
-        assert_eq!(find(&ws).map(|s| s.desc), Some("Second, longer".into()));
+        assert_ne!(fingerprint(&on), added);
+        assert_eq!(find(&on).map(|s| s.desc), Some("Second, longer".into()));
         std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(fingerprint(&ws), empty);
-        assert_eq!(find(&ws), None);
-        // no description, or a name with a space: not a skill
-        assert_eq!(parse_skill("name: a\n"), None);
-        assert_eq!(parse_skill("name: a b\ndescription: d\n"), None);
+        assert_eq!(fingerprint(&on), empty);
+        assert_eq!(find(&on), None);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -345,8 +275,8 @@ mcp-builder\tGuide for MCP servers\t/a/m/SKILL.md
         assert!(bise_home::test_home::active(), "HOME = {:?}", std::env::var_os("HOME"));
         let ws = std::env::temp_dir().join(format!("tui-skills-home-{}", std::process::id()));
         let home = PathBuf::from(std::env::var_os("HOME").unwrap());
-        for d in Places::standard(&ws).home.iter().map(|h| h.join(".vibe/skills")) {
-            assert!(d.starts_with(&home), "{d:?}");
+        for r in Places::standard(&ws).roots.iter().filter(|r| r.scope != bend_plugins::id::SkillsScope::Workspace && r.scope != bend_plugins::id::SkillsScope::Bise) {
+            assert!(r.dir.starts_with(&home), "{r:?}");
         }
         for k in ["BISE_HOME", "BEND_CONFIG", "BEND_PLUGINS_HOME", "SB_SOCKET"] {
             assert_eq!(std::env::var_os(k), None, "{k}");

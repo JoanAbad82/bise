@@ -276,7 +276,11 @@ tests use temp dirs.
   - `D/mcp-index.txt`: the same line format as the connector index,
     `<cid> <namespace> <tool> : #<description> | input: <schema>`, with
     `cid = http://127.0.0.1:<port>/<token>/<plugin>/<server>`;
-  - `D/skills-index.txt`: `name\tdescription\tpath` lines;
+  - `D/skills-index.txt`: `name\tdescription\tpath` lines, every skill
+    of this session that is on: the loose skill folders
+    (`bend_plugins::skills`, scanned while the servers start) and the
+    loaded plugins' skills, first name kept (workspace, plugins, bise,
+    personal, vibe). The only skills index the REPL reads;
   - `D/report.txt`: the human report (the same text as the CLI).
 - Serves HTTP/1.1 on `127.0.0.1:0`. The path carries a random token, so
   another local process cannot call the tools without reading `D`.
@@ -302,12 +306,9 @@ tests use temp dirs.
   plugins, no error. Scripted runs never start it (hermetic suites).
 - `BEND_HARNESS_BIN` is set on the REPL by `bend-harness --headless`
   and by the hub (`Opts.exe`).
-- Skills: the scan keeps the user roots in the shared index (the TUI
-  `$` popup reads it). The workspace root (`$BEND_WORKDIR/.agents/skills`,
-  today `$PWD`, which is the app root in Switchboard, so workspace skills
-  were not found) and `D/skills-index.txt` go to a per-session index
-  `~/.bend-harness/run/<port>/skills-index.txt`. The catalog and the
-  `skill` tool read the session index, then the shared one.
+- Skills: no scan in Bend. The catalog and the `skill` tool read
+  `D/skills-index.txt` only, written by the bridge before `D/ready`; a
+  missing one means no skills this session, said once on repl.err.
 - MCP: `mcp_call` and `search_tool_functions` read `D/mcp-index.txt`,
   then the connector index. `gateway_url(cid)` keeps a cid that starts
   with `http://127.0.0.1:` as is, and the Mistral key is not sent to it.
@@ -396,11 +397,24 @@ Only REPLs restart: the TUI and the hub keep running. Test:
 conversation kept, the plugin loaded; nothing changes → no relaunch; a
 disable → a relaunch).
 
-Skills follow the same path, with no timer. The hub also keeps, per live
-REPL, a fingerprint of the skill folders its startup scan reads
-(runtime/skills.bend: `~/.agents/skills`, `~/.vibe/skills`,
-`<workspace>/.agents/skills`, for main the app root's `prompts/skills`;
-each `<skill>/SKILL.md` path with its size and mtime, stats only). It
+Skills follow the same path, with no timer. One scanner owns the loose
+skill folders, `bend_plugins::skills`: the hub, the TUI's `$` popup and
+the bridge call it. Its roots (`skills::roots`): `<workspace>/.agents/skills`
+(`skills:workspace`), the app root's `prompts/skills-all` where the
+desktop is on and `prompts/skills` for main (`skills:bise`, locked on),
+`~/.agents/skills` (`skills:personal`), `~/.vibe/skills` (`skills:vibe`).
+The hub picks an agent's roots and passes them to its REPL's bridge in
+`$BISE_SKILL_ROOTS` (`skills::Root::{encode,decode}`; without it, a
+bare REPL, the user's and the workspace's folders only). Each folder is
+a plugin and each skill a part (`skills:personal#skill:grill-me`): an
+off one is left out of the session's index. No read of a skill folder
+blocks: each listing, stat and read runs on a thread waited at most 3 s
+(the TUI: 300 ms), a file that is not a regular one (a FIFO) is never
+opened, a stuck path is skipped, named once (hub.log, the bridge's
+log) and not waited on again while it hangs. The hub also keeps, per
+live REPL, `skills::fingerprint` of its roots (each `<skill>/SKILL.md`
+path with its size and mtime, stats only, and the on/off of each folder
+and of its skills: a skill toggle changes the prompt). It
 compares it when an agent goes idle and right before a turn starts (the
 `say` of an idle agent, `skills_before_turn`): a SKILL.md added, edited
 or removed relaunches the REPL first, same session, and the `say` waits
@@ -409,13 +423,15 @@ the new skill. `prompt-plugins.fp` holds both fingerprints, so the
 restored session takes a fresh prompt. The workspace is the agent's
 `BEND_WORKDIR` (its hub workspace): a task working in a `gate.sh new`
 worktree still reads the shared folder's `.agents/skills`, like its
-plugins and AGENTS.md. The TUI's `$` popup scans the same folders
-itself (and the loaded plugins' skills), rebuilt when their stats move,
-checked when the popup asks after a second without asking
-(`rust/tui/src/skills.rs`). Tests: `tests/skills_reload_e2e.py` (no
-change → no relaunch; add, edit, remove → that turn's prompt has it),
-`tests/tui_skills_reload_tmux.py` (`$` shows an added skill, an edited
-description, not a removed one).
+plugins and AGENTS.md. The TUI's `$` popup lists main's skills with
+the same scanner (and the loaded plugins' skills, the off ones left
+out), rebuilt when their fingerprint moves, checked when the popup asks
+after a second without asking (`rust/tui/src/skills.rs`). Tests: the
+unit tests of `rust/plugins/src/skills_tests.rs` (roots per role and
+desktop flag, an off skill left out, `skills:bise` locked, the
+fingerprint on a change and a toggle, a FIFO and a stuck read) and
+`rust/tui/src/skills.rs`; `tests/skills_hang_e2e.py` (a stuck SKILL.md
+never stalls main's first call).
 - `/plugins` in the TUI prints the workspace's static listing (the
   single-agent TUI, gone with BISE-113, also showed its session's
   `D/report.txt`).
@@ -618,8 +634,6 @@ description, not a removed one).
 
 ## Known limits
 
-- The TUI `$` skill popup reads the shared index only: workspace and
-  plugin skills work for the agent but are not offered in the popup.
 - Plugin edits apply at the next session start or `/reload` (no
   file watching, no `/reload-plugins`).
 - The Switchboard `/plugins` shows the static listing of the hub

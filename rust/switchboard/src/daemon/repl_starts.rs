@@ -327,12 +327,14 @@ impl Shell {
         // the desktop's rules, read once at this start like the prompt's
         // (role_of): bise-pages (prompts/skills-all) only where they're on
         let desktop = bise_home::projects::desktop_for(&self.opts.paths.workspace);
-        if desktop {
-            env.set("BISE_DESKTOP", "1");
-        }
+        // its skill folders reach its bridge (bend_plugins::skills, the
+        // session's skills index), never guessed there
+        let roots = skill_roots(&ws, &self.opts.app_root, a.is_main, desktop);
+        let (k, v) = bend_plugins::skills::Root::env(&roots);
+        env.set(k, v);
         let spawned = PromptInputs {
             plugins: plugins_fingerprint(&ws),
-            skills: skills_fingerprint(&skill_roots(&ws, &self.opts.app_root, a.is_main, desktop)),
+            skills: skills_fingerprint(&self.opts.paths, &roots),
             ws,
             main: a.is_main,
             desktop,

@@ -4,6 +4,7 @@ real git worktrees, a scripted provider (fake_provider.py).
 
 Run from anywhere:  python3 -u tests/e2e.py [name...]
 """
+import glob
 import json
 import os
 import queue
@@ -168,7 +169,6 @@ class Env:
             "MISTRAL_API_KEY": "fake-key",
             "BEND_MCP_INDEX": os.path.join(self.tmp, "mcp-index.txt"),
             **no_real_accounts(self.tmp),
-            "BEND_SKILLS_INDEX": os.path.join(self.tmp, "skills-index.txt"),
             "BEND_BG_ROOT": os.path.join(self.tmp, "bg"),
             # the agents' session logs (BISE-196) and their blobs: never
             # the real ~/.bise
@@ -216,10 +216,12 @@ class Env:
             except Exception:
                 self.hub.kill()
         self.fake.kill()
-        # the HOME law, after the fact: its REPLs indexed none of his skills
-        # (raised only when the test itself passed: never hides its failure)
+        # the HOME law, after the fact: its REPLs' bridges indexed none of
+        # his skills (raised only when the test itself passed: never hides
+        # its failure)
         if sys.exc_info()[0] is None:
-            refuse_real_skills(self.env["BEND_SKILLS_INDEX"])
+            for idx in glob.glob(os.path.join(self.env["BEND_RUN_DIR"], "*", "plugins", "skills-index.txt")):
+                refuse_real_skills(idx)
         if os.environ.get("SB_KEEP") != "1":
             shutil.rmtree(self.tmp, ignore_errors=True)
         else:

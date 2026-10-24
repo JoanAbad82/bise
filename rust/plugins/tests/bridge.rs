@@ -8,7 +8,20 @@ use std::time::{Duration, Instant};
 
 use bend_plugins::{bridge, resolve};
 
+/// The loose skill folders of every bridge in this binary: one of the
+/// test's own (`$BISE_SKILL_ROOTS`, set the same by each test), never the
+/// user's HOME or the repo's `.agents/skills`.
+fn own_skill_roots() -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("bp-bridge-skills-{}", std::process::id()));
+    let f = dir.join("loose-one/SKILL.md");
+    std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+    std::fs::write(&f, "---\nname: loose-one\ndescription: A loose skill.\n---\n").unwrap();
+    std::env::set_var(bend_plugins::skills::ENV, format!("personal={}\n", dir.display()));
+    dir
+}
+
 fn fixture_root(tag: &str) -> (PathBuf, PathBuf) {
+    own_skill_roots();
     let base = std::env::temp_dir().join(format!("bp-bridge-{}-{}", tag, std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let plugins = base.join("ws/.agents/plugins");
@@ -76,9 +89,14 @@ fn fixture_plugin_end_to_end() {
         std::thread::sleep(Duration::from_millis(50));
     }
 
+    // written before ready (the REPL's first prompt reads it): the
+    // plugin's skill, then the loose folders' (bend_plugins::skills)
     let skills = std::fs::read_to_string(dir.join("skills-index.txt")).unwrap();
-    assert!(skills.starts_with("hello_plugin:greet\tGreet someone"), "{}", skills);
-    assert!(skills.trim_end().ends_with("skills/greet/SKILL.md"), "{}", skills);
+    let lines: Vec<&str> = skills.lines().collect();
+    assert_eq!(lines.len(), 2, "{}", skills);
+    assert!(lines[0].starts_with("hello_plugin:greet\tGreet someone"), "{}", skills);
+    assert!(lines[0].ends_with("skills/greet/SKILL.md"), "{}", skills);
+    assert!(lines[1].starts_with("loose-one\tA loose skill.\t") && lines[1].ends_with("loose-one/SKILL.md"), "{}", skills);
 
     let index = std::fs::read_to_string(dir.join("mcp-index.txt")).unwrap();
     let line = index.lines().next().expect("one tool line");

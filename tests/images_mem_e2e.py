@@ -39,7 +39,7 @@ fake = subprocess.Popen([sys.executable, "-u", os.path.join(HERE, "fake_provider
 s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
 env.update({"BEND_PROVIDER_URL": "http://127.0.0.1:%s/v1/chat/completions" % fake.stdout.readline().split()[1],
             "BEND_MODEL": "mistral-small-latest", "MISTRAL_API_KEY": "fake-key", "BEND_IMAGE_DIR": imgs,
-            "BEND_MCP_INDEX": os.path.join(tmp, "mcp.txt"), "BEND_SKILLS_INDEX": os.path.join(tmp, "sk.txt"),
+            "BEND_MCP_INDEX": os.path.join(tmp, "mcp.txt"),
             "BEND_BG_ROOT": os.path.join(tmp, "bg"), "BEND_REPL_PORT": str(port),
             "BEND_SESSION_FILE": os.path.join(tmp, "session.txt"), "BEND_WIRE_LOG": os.path.join(tmp, "wire.log")})
 log = os.path.join(tmp, "repl.log")

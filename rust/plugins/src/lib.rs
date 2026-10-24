@@ -6,6 +6,8 @@
 //!   skills, the on/off file as read);
 //! - `resolve`: discovery, manifest validation, precedence, components,
 //!   diagnostics (pure over the file system, no process started);
+//! - `skills`: the one scanner of the loose skill folders (roots, scan,
+//!   on/off, the session's skills index, the hub's fingerprint);
 //! - `state`: the on/off file (`plugins.json`);
 //! - `connectors`: his Mistral connectors' catalog, its cache and index
 //!   lines;
@@ -45,6 +47,7 @@ pub mod remote;
 pub mod report;
 pub mod resolve;
 pub mod secrets;
+pub mod skills;
 pub mod state;
 pub mod status;
 pub mod stdio;
