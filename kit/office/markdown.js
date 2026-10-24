@@ -13,7 +13,7 @@
 
 import { markdownHtml } from "/kit/office/office-md.js";
 
-const W = { source: "source", sourceTip: "show the markdown as written" };
+const W = { source: "source", sourceTip: "show the markdown as written", docTip: "show it as a document" };
 const BLOCKS = "h1, h2, h3, h4, h5, h6, p, blockquote, pre, table, li, hr";
 const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
 
@@ -81,6 +81,8 @@ export async function draw(root, bytes, info) {
     src.hidden = !on;
     doc.hidden = on;
     toggle.setAttribute("aria-pressed", String(on));
+    // designer m_38797: pressed, the tip says where it goes back to
+    toggle.title = on ? W.docTip : W.sourceTip;
     root.dataset.source = on ? "1" : "";
   };
   toggle.addEventListener("click", () => showSource(src.hidden));

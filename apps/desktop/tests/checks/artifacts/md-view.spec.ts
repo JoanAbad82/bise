@@ -61,6 +61,7 @@ sb inspect architect --query brief
 const SHELL = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="bise-token" content="t0"><title>learnings · carnet</title>
+<script src="/kit/office/theme.js"></script>
 <link rel="stylesheet" href="/kit/tokens.css"><link rel="stylesheet" href="/kit/office/viewer.css"><link rel="stylesheet" href="/kit/office/select.css">
 <script src="/kit/notes-anchors.js" defer></script><script src="/kit/notes.js" defer></script>
 <script type="module" src="/kit/office/viewer.js"></script><script type="module" src="/kit/office/select.js"></script><script type="module" src="/kit/office/swap.js"></script>
