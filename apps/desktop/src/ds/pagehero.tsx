@@ -25,7 +25,7 @@ export interface PageHeroProps {
 
 export function PageHero({ name, sentence, facts, vignette, size = "page", testId }: PageHeroProps) {
   return (
-    <header className={cx("b-hero", size === "dialog" && "dialog", vignette != null && "has-vig")} data-testid={testId}>
+    <header className={cx("b-hero", size === "dialog" && "dialog")} data-testid={testId}>
       <div className="words">
         <div className="name">{name}</div>
         <p className="say">{sentence}</p>
