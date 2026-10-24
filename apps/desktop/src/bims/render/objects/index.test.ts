@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { coplanarClashes } from '../coplanar';
 import { readsAsAttention } from '../palette.testkit';
 import { GLASS } from './kit';
-import { COMPACT, familyOf, FAMILIES, makeObject, type MakeOpts, OBJ_IDS, type ObjId } from './index';
+import { COMPACT, familyOf, FAMILIES, MAKER_IDS, makeObject, type MakeOpts, OBJ_IDS, type ObjId } from './index';
 
 /** float noise and a rounded edge */
 const SLACK = 0.02;
@@ -63,6 +63,13 @@ describe('objects', () => {
     expect(Object.keys(FAMILIES)).toEqual(['games', 'music', 'knowledge', 'workshop', 'kitchen', 'garden', 'animals', 'comms', 'machines', 'travel', 'office']);
     expect(familyOf('arcade')).toBe('games');
     expect(familyOf('calendar')).toBe('office');
+  });
+
+  it('ids.ts lists every maker, in the families order, and nothing else', () => {
+    const ids: readonly string[] = OBJ_IDS;
+    expect(MAKER_IDS.filter((id) => !ids.includes(id)), 'makers missing from ids.ts').toEqual([]);
+    expect(ids.filter((id) => !MAKER_IDS.includes(id as ObjId)), 'ids.ts ids with no maker').toEqual([]);
+    expect(MAKER_IDS).toEqual(OBJ_IDS);
   });
 
   // one test per object and law: a red names the object, and each stays in its time budget

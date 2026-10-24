@@ -22,8 +22,10 @@ import { MUSIC } from './music';
 import { OFFICE } from './office';
 import { TRAVEL } from './travel';
 import { WORKSHOP } from './workshop';
+import type { ObjId } from './ids';
 
 export type { Foot } from './kit';
+export { OBJ_IDS, isObjId, type ObjId } from './ids';
 
 /** the families, as the collection table of page bims-plugins sorts them */
 export const FAMILIES = {
@@ -43,17 +45,16 @@ export const FAMILIES = {
 export type Family = keyof typeof FAMILIES;
 
 type Ids<F> = F extends unknown ? Extract<keyof F, string> : never;
-export type ObjId = Ids<(typeof FAMILIES)[Family]>;
+/** the makers' ids: the same as ids.ts OBJ_IDS (the law in index.test.ts) */
+export type MakerId = Ids<(typeof FAMILIES)[Family]>;
 
 const MAKERS = new Map<ObjId, { maker: Maker; family: Family }>();
 for (const [family, makers] of Object.entries(FAMILIES) as [Family, Record<string, Maker>][]) {
   for (const [id, maker] of Object.entries(makers)) MAKERS.set(id as ObjId, { maker, family });
 }
 
-/** every object, in the families' order */
-export const OBJ_IDS: readonly ObjId[] = [...MAKERS.keys()];
-
-export const isObjId = (s: string): s is ObjId => MAKERS.has(s as ObjId);
+/** every maker's id, in the families' order (the law: the same list as ids.ts OBJ_IDS) */
+export const MAKER_IDS: readonly ObjId[] = [...MAKERS.keys()];
 
 export function familyOf(id: ObjId): Family {
   const m = MAKERS.get(id);

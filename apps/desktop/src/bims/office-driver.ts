@@ -14,6 +14,7 @@ import { dayOf } from './skate';
 import { MAX_WALK_S, SETTLE_S } from './timeline';
 import type { MapId } from './maps/ids';
 import { skyAt, skyOf, type Sky, type Weather } from './sky';
+import type { PluginObject } from './plugin-objects';
 import { forcedPokes, notePokes, NO_POKES, pokesAt, pokeWake, roomOf, type Click, type PokeLog } from './pokes';
 
 /** The pure modules a driver runs on: feed.ts's, or fakes in a test. */
@@ -69,6 +70,8 @@ export interface Step {
   readonly moving: boolean;
   /** s until a poke starts or ends that no frame would see (a delayed one, a word alone); null: none */
   readonly wake: number | null;
+  /** his plugins' objects as last heard (plugin-objects.ts officeObjects): what they are and how they look; placing them is the plan's */
+  readonly objects: readonly PluginObject[];
 }
 
 export interface OfficeDriver {
@@ -78,6 +81,8 @@ export interface OfficeDriver {
   grow(g: Grow, t: number): void;
   /** hub/activity: a plane, a visit, a report */
   event(e: BimEvent): void;
+  /** his plugins' objects (plugin-objects.ts officeObjects): no desk moves for them */
+  objects(list: readonly PluginObject[]): void;
   /** he typed the konami code at t */
   konami(t: number): void;
   /** he clicked this bim: its poke (pokes.ts) starts at t */
@@ -128,6 +133,7 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
   let lastClock = '';
   /** the sky's slot and pin the last step drew (skyKey): a new slot is a frame (its blend) */
   let lastSky = '';
+  let objs: readonly PluginObject[] = [];
 
   return {
     rows(s, as, m) {
@@ -148,6 +154,9 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
     event(e) {
       events.push(e);
       fresh = true;
+    },
+    objects(list) {
+      objs = list;
     },
     konami(t) {
       konamiAt = t;
@@ -230,6 +239,6 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       const words = new Map([...pk].map(([n, x]) => [n, x.label]));
       const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), pokes: words, follow: a.follow, park: office.park });
       const wake = c.forced !== undefined ? null : pokeWake(pokes, frames, t, reduced);
-      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake };
+      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake, objects: objs };
   }
 }

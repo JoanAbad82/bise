@@ -1,0 +1,151 @@
+import { describe, expect, it } from 'vitest';
+import type { Plugin } from '@/proto';
+import { defaultObject, kindOf, objectOf, objectsPrefKey, officeObjects, picksOf, pluginKey, withPick, type PluginRow } from './plugin-objects';
+
+const NONE = new Map();
+// main's row: no id, no kind (a real plugin's id is its bare name)
+const mainRow = (name: string, state = 'loaded', more: Partial<Plugin> = {}): Plugin => ({ name, state, scope: 'built-in', ...more });
+// the plugins branch's row: an id and a kind
+const row = (id: string, kind: string, state = 'loaded', more: Partial<PluginRow> = {}): PluginRow => ({ id, name: id, kind, state, ...more });
+
+describe('pluginKey', () => {
+  it('is the bare name on a row without id, the id on a row with one', () => {
+    expect(pluginKey(mainRow('docs'))).toBe('docs');
+    expect(pluginKey(row('mistral:gmail', 'mistral'))).toBe('mistral:gmail');
+    expect(pluginKey({ id: null, name: 'docs' })).toBe('docs');
+  });
+});
+
+describe('kindOf', () => {
+  it('reads the row kind, else the id prefix, never the scope', () => {
+    expect(kindOf(mainRow('docs'))).toBe('plugin');
+    expect(kindOf(row('mistral:gmail', 'mistral'))).toBe('connector');
+    expect(kindOf({ id: 'mistral:gmail', name: 'mistral:gmail' })).toBe('connector');
+    expect(kindOf({ id: 'skills:personal', name: 'skills:personal' })).toBe('skills');
+    expect(kindOf(row('linear', 'mcp'))).toBe('mcp');
+    expect(kindOf(mainRow('bise'))).toBe('bise');
+  });
+});
+
+describe('defaultObject', () => {
+  it('follows the table by name, a connector by its own name', () => {
+    const cases: [PluginRow, string, number?][] = [
+      [row('mistral:notion', 'mistral'), 'library'],
+      [row('mistral:google_drive', 'mistral'), 'files'],
+      [mainRow('google_drive_mcp'), 'files'],
+      [row('mistral:granola', 'mistral'), 'visio'],
+      [row('mistral:slack', 'mistral'), 'booth'],
+      [mainRow('hn'), 'arcade'],
+      [mainRow('reddit'), 'pingpong'],
+      [mainRow('kit'), 'scooter'],
+      [mainRow('bise'), 'cat'],
+      [row('mistral:gmail', 'mistral'), 'mailbox'],
+      [mainRow('blender'), 'easel'],
+      [row('mistral:image_generation', 'mistral'), 'easel'],
+      [mainRow('computer'), 'macdesk'],
+      [mainRow('docs'), 'printer', 1],
+      [mainRow('sheets'), 'printer', 2],
+      [mainRow('slides'), 'printer', 3],
+      [row('mistral:outlook_calendar', 'mistral'), 'calendar'],
+      [row('mistral:web_search', 'mistral'), 'telescope'],
+      [mainRow('tavily'), 'telescope'],
+      [mainRow('bise-stats'), 'trophies'],
+      [row('mistral:github_app', 'mistral'), 'packing'],
+      [mainRow('sentry'), 'extinguisher'],
+      [mainRow('metabase'), 'charts'],
+      [mainRow('bigquery'), 'charts'],
+      [mainRow('wandb'), 'charts'],
+    ];
+    for (const [r, obj, n] of cases) expect(defaultObject(r), pluginKey(r)).toEqual(n === undefined ? { obj } : { obj, n });
+  });
+
+  it('gives a skills folder a shelf with a book a skill', () => {
+    const parts = ['a', 'b', 'c'].map((s) => ({ kind: 'skill', on: s !== 'c' }));
+    expect(defaultObject(row('skills:personal', 'skills', 'loaded', { parts }))).toEqual({ obj: 'shelf', n: 3 });
+    expect(defaultObject(row('skills:vibe', 'skills'))).toEqual({ obj: 'shelf', n: 1 });
+  });
+
+  it('gives an MCP server with no entry a rack, a light per server on', () => {
+    const parts = [{ kind: 'mcp', on: true }, { kind: 'mcp', on: true }, { kind: 'mcp', on: false }, { kind: 'skill', on: true }];
+    expect(defaultObject(row('linear', 'mcp', 'loaded', { parts }))).toEqual({ obj: 'rack', n: 2 });
+  });
+
+  it('gives anything else a plant whose pot is its kind', () => {
+    expect(defaultObject(mainRow('weather'))).toEqual({ obj: 'plant', n: 0 });
+    expect(defaultObject(row('mistral:linear', 'mistral'))).toEqual({ obj: 'plant', n: 1 });
+  });
+
+  it('never gives a pick-only object by default', () => {
+    const only = new Set(['chess', 'piano', 'jukebox', 'aquarium', 'babyfoot', 'dog', 'bike', 'campfire', 'pinball']);
+    for (const name of ['chess', 'piano', 'jukebox', 'aquarium', 'babyfoot', 'dog', 'bike', 'campfire', 'pinball', 'x']) {
+      expect(only.has(defaultObject(mainRow(name)).obj)).toBe(false);
+    }
+  });
+});
+
+describe('objectOf', () => {
+  it('on: the object; disabled: glass; invalid: glass and ✗; shadowed: nothing', () => {
+    expect(objectOf(mainRow('docs'), NONE)).toEqual({ key: 'docs', obj: 'printer', n: 1, glass: false, pill: null, picked: false });
+    expect(objectOf(mainRow('docs', 'disabled'), NONE)).toMatchObject({ glass: true, pill: null });
+    expect(objectOf(mainRow('docs', 'invalid'), NONE)).toMatchObject({ glass: true, pill: '✗' });
+    expect(objectOf(mainRow('docs', 'shadowed'), NONE)).toBeNull();
+    expect(objectOf(row('mistral:gmail', 'mistral', 'available'), NONE)).toBeNull();
+  });
+
+  it('a login he owes is the ? pill: main logins, a connector own login, a part login', () => {
+    expect(objectOf(mainRow('linear', 'loaded', { logins: [{ name: 'linear', host: 'mcp.linear.app', state: 'needs' }] }), NONE)?.pill).toBe('?');
+    expect(objectOf(mainRow('linear', 'loaded', { logins: [{ name: 'linear', host: 'mcp.linear.app', state: 'in' }] }), NONE)?.pill).toBeNull();
+    expect(objectOf(row('mistral:gmail', 'mistral', 'loaded', { login: 'needs' }), NONE)?.pill).toBe('?');
+    expect(objectOf(row('linear', 'plugin', 'loaded', { parts: [{ kind: 'mcp', on: true, login: 'needs' }] }), NONE)?.pill).toBe('?');
+  });
+
+  it('a failed server marks it broken by its error field, ✗ over ?', () => {
+    const parts = [{ kind: 'mcp', on: true, login: 'needs', error: 'exited at start' }];
+    expect(objectOf(row('linear', 'plugin', 'loaded', { parts }), NONE)).toMatchObject({ glass: true, pill: '✗' });
+    // a server he turned off does not break it
+    expect(objectOf(row('linear', 'plugin', 'loaded', { parts: [{ kind: 'mcp', on: false, error: 'x' }] }), NONE)).toMatchObject({ glass: false, pill: null });
+  });
+
+  it('his pick wins, the default count only stays on the same object', () => {
+    expect(objectOf(mainRow('docs'), new Map([['docs', 'piano']]))).toEqual({ key: 'docs', obj: 'piano', glass: false, pill: null, picked: true });
+    expect(objectOf(mainRow('sheets'), new Map([['sheets', 'printer']]))).toMatchObject({ obj: 'printer', n: 2, picked: true });
+  });
+});
+
+describe('picks in the prefs', () => {
+  it('keys a project', () => {
+    expect(objectsPrefKey('shop')).toBe('bims.objects.shop');
+  });
+
+  it('reads { key: { obj } }, skips what is not a known object', () => {
+    const picks = picksOf({ docs: { obj: 'piano' }, 'mistral:gmail': { obj: 'nope' }, slack: 'booth', x: null, y: { spot: 'a' } });
+    expect([...picks]).toEqual([['docs', 'piano']]);
+    expect(picksOf(undefined).size).toBe(0);
+    expect(picksOf([1, 2]).size).toBe(0);
+  });
+
+  it('a stale key is skipped on read and kept on write', () => {
+    const v = { gone: { obj: 'piano' } };
+    expect(officeObjects([mainRow('docs')], picksOf(v)).map((o) => o.obj)).toEqual(['printer']);
+    expect(withPick(v, 'docs', 'chess')).toEqual({ gone: { obj: 'piano' }, docs: { obj: 'chess' } });
+  });
+
+  it('a pick keeps the entry other fields; back to the default drops only obj', () => {
+    expect(withPick({ docs: { obj: 'piano', spot: 'a:1,2' } }, 'docs', 'chess')).toEqual({ docs: { obj: 'chess', spot: 'a:1,2' } });
+    expect(withPick({ docs: { obj: 'piano', spot: 'a:1,2' } }, 'docs', null)).toEqual({ docs: { spot: 'a:1,2' } });
+    expect(withPick({ docs: { obj: 'piano' }, b: { obj: 'cat' } }, 'docs', null)).toEqual({ b: { obj: 'cat' } });
+    expect(withPick(undefined, 'docs', 'cat')).toEqual({ docs: { obj: 'cat' } });
+  });
+
+  it('round-trips through picksOf', () => {
+    expect(picksOf(withPick(undefined, 'mistral:gmail', 'dog')).get('mistral:gmail')).toBe('dog');
+  });
+});
+
+describe('officeObjects', () => {
+  it('one per key, by key, the first row winning', () => {
+    const rows = [mainRow('slides'), mainRow('docs'), mainRow('docs', 'disabled'), mainRow('x', 'shadowed')];
+    expect(officeObjects(rows, NONE).map((o) => [o.key, o.glass])).toEqual([['docs', false], ['slides', false]]);
+    expect(officeObjects(null, NONE)).toEqual([]);
+  });
+});

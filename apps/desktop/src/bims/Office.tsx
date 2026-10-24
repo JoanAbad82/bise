@@ -43,6 +43,9 @@ import { WEATHERS, type Weather } from './sky';
 import { aimAt, bimsLit, easeCam, edgeOf, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
 import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
+import type { PluginObject } from './plugin-objects';
+
+const NO_OBJECTS: readonly PluginObject[] = [];
 import { planOf } from './maps';
 import './office.css';
 
@@ -192,6 +195,7 @@ export function Office({
   agents,
   cards,
   places,
+  objects,
   growth = null,
   map = DEFAULT_MAP,
   parts,
@@ -208,6 +212,8 @@ export function Office({
   agents: readonly Agent[];
   cards: readonly Card[];
   places: readonly Place[];
+  /** his plugins' objects (plugin-objects.ts officeObjects); absent: none */
+  objects?: readonly PluginObject[];
   /** how much the project has done (hub/growth); the office draws its high-water mark (growth.ts) */
   growth?: Growth | null;
   /** the project's map (his /bims pick, prefs bims.map.<project>); the loft when he never picked one */
@@ -313,6 +319,11 @@ export function Office({
     driver.rows({ agents, cards, places }, agents, map);
     kickRef.current();
   }, [driver, agents, cards, places, map]);
+  // his plugins' objects (plugin-objects.ts): the next frame draws them
+  useEffect(() => {
+    driver.objects(objects ?? NO_OBJECTS);
+    kickRef.current();
+  }, [driver, objects]);
   useEffect(() => {
     live.current.held = held;
     kickRef.current();
