@@ -213,7 +213,7 @@ def d_artifacts(m):
     ta, ya = thread(680)
     o.append(at(0, open_, "".join(ta), dur=.15))
     # the click on the chip
-    o.append(at(1.7, open_, f'<circle cx="120" cy="{ya - 4}" r="14" fill="none" stroke="{c["acc"]}" stroke-width="2"/>', dur=.1))
+    o.append(at(1.7, open_, f'<circle cx="120" cy="{ya - 4}" r="14" fill="none" stroke="{c["dim"]}" stroke-width="2"/>', dur=.1))
     # phase B: the narrow thread, the panel beside it
     PX = 300
     tb, yb = thread(PX)
@@ -437,7 +437,7 @@ def d_worktree(m):
     hb, end = ahead(d, "perf", "product page speed")
     o.append(colT(hb) + colT(at(wt0, wt1, t(end - 4, 25, f'<tspan fill="{c["faint"]}">ψ</tspan> sb/perf', 12.5, "dim"), dur=.15)))
     # his pointer on the row's ψ, and its tip (the app's words: 'ψ worktree: its own copy of the repo, on sb/perf')
-    o.append(at(1.7, 4.6, f'<circle cx="{RB - 20}" cy="{ys[0] - 4}" r="9" fill="none" stroke="{c["acc"]}" stroke-width="1.6"/>', dur=.1))
+    o.append(at(1.7, 4.6, f'<circle cx="{RB - 20}" cy="{ys[0] - 4}" r="9" fill="none" stroke="{c["dim"]}" stroke-width="1.6"/>', dur=.1))
     l1 = "ψ worktree: its own copy of the repo,"
     tw_ = tw(l1, 11.5) * 1.1 + 24; tx_ = RB - 10 - tw_; ty_ = ys[0] + 12
     tip = (f'<rect x="{tx_ + 2:.0f}" y="{ty_ + 3}" width="{tw_:.0f}" height="48" rx="8" fill="{c["shadow"]}"/>'
@@ -485,5 +485,148 @@ def d_talk(m):
     o.append(d.key(R - 64, 402, "⏎", 3.8, send + .1))
     return d.svg("4 in bise desktop: bise is working on the checkout; you type that the old discount codes stay and press enter: it steers, your message lands mid-turn with 'steered · bise read it mid-turn', and bise answers and goes on.")
 
+REST_KEYS = "^R dictate   ∿ voice   @ file   $ skills   / commands"
+
+def ring(d, x, y, t0, t1, r=9):
+    """his pointer: a ring in text-2 (pink is only for what waits on him)."""
+    return d.at(t0, t1, f'<circle cx="{x}" cy="{y}" r="{r}" fill="none" stroke="{d.c["dim"]}" stroke-width="1.6"/>', dur=.1)
+
+def bise_head(d):
+    c = d.c
+    return d.t(18, 25, f'<tspan fill="{c["acc"]}" style="font-family:{MONO}" font-weight="700">:*</tspan> <tspan font-weight="600">bise</tspan> <tspan fill="{c["dim"]}">· storefront</tspan>', 13)
+
+def mail(d, x, y, frm, to, what, bold=None):
+    """an agent-to-agent row: '✉ perf → search' as a chip, the words after it (text-2)."""
+    c = d.c; lab = f"✉ {frm} → {to}"; cw = tw(lab, 12) * 1.08 + 16
+    who = f'<tspan font-weight="600" fill="{c["text"]}">{E(frm)}</tspan>'
+    return d.chip(x, y, f'✉ {who} → {E(to)}', cw) + d.t(x + cw + 8, y, E(what), 12.5, "dim")
+
+def main_view(d, colT, X, R):
+    """bise's thread after one ask: his bubble, bise's answer, the two agents it started. returns (body, y below)."""
+    b, h = d.bubble(R, 54, wrap("product page is slow on phones. and search needs a size filter", 270))
+    y = 54 + h + 24
+    b += colT(d.head(X, y, "bise") + d.t(X, y + 20, "on it. perf takes the product page, search the size filter.", 13))
+    b += colT(mail(d, X, y + 48, "bise", "perf", "make the product page fast on phones") + mail(d, X, y + 74, "bise", "search", "add a size filter to search"))
+    return b, y + 74
+
+def meter(d, x, y, n=7):
+    """the dictation chip's meter: n bars that move (the mic's level)."""
+    if not any("@keyframes mb{" in s for s in d.tl.css):
+        d.tl.css.append("@keyframes mb{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}.mb{transform-box:fill-box;transform-origin:50% 100%;animation:mb .6s ease-in-out infinite}")
+    return "".join(f'<rect class="mb" x="{x + 4 * i}" y="{y - 12}" width="2.2" height="12" rx="1" fill="{d.c["dim"]}" style="animation-duration:{.42 + .09 * ((i * 5) % 4):.2f}s;animation-delay:-{.11 * i:.2f}s"/>' for i in range(n))
+
+def d_dictation(m):
+    """6 · dictation: ctrl+r in the composer: '●', the meter and the time; any key stops; his words come in; ⏎ sends."""
+    c = DPAL[m]; T = 10.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")])])
+    o.append(bise_head(d) + d.head(X, 62, "bise") + colT(t(X, 82, "morning. perf is on the product page; nothing waits on you.", 13, "dim")))
+    on, stop, words_at, send = 1.0, 4.2, 4.9, 6.4
+    said = "search needs a size filter, EU sizes only"
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
+    o.append(cb)
+    o.append(placeholder_at(d, cx, cy, ph, [(on, send)]))
+    o.append(d.key(R - 96, 402, "ctrl+r", 0.6, on + .1))
+    # the chip: '●' (accent: the mic is live), the meter, the time; then '∿' while it writes his words
+    def chip_(sign, body, w=104):
+        return (f'<rect x="{cx - 2}" y="{cy - 15}" width="{w}" height="21" rx="6" fill="{c["chip"]}"/>'
+                + t(cx + 6, cy, sign, 11.5, "acc" if sign == "●" else "dim") + body)
+    for k in range(int(stop - on) + 1):
+        a = on + k; b = min(a + 1, stop)
+        if a >= stop: break
+        o.append(at(a, b, chip_("●", meter(d, cx + 22, cy + 1) + t(cx + 56, cy, f"0:{k:02d}", 11.5, "dim")), dur=.05))
+    o.append(at(stop, words_at, chip_('<tspan class="g">∿</tspan>', meter(d, cx + 22, cy + 1), 56), dur=.05))
+    o.append(d.key(R - 64, 402, "space", stop - .3, stop + .1))
+    lines = wrap(said, R - X - 40)
+    for i, l in enumerate(lines):
+        o.append(at(words_at, send, d.words(cx, cy + 20 * i, l, words_at + i * .3, .03), dur=.05))
+    o.append(d.key(R - 50, 402, "⏎", send - .4, send + .1))
+    bl, bh = d.bubble(R, 104, wrap(said, 270))
+    o.append(at(send, None, bl))
+    yb = 104 + bh + 24
+    o.append(colT(at(7.1, None, d.head(X, yb, "bise") + t(X, yb + 20, "on it. search takes the size filter, EU sizes only.", 13)
+                     + mail(d, X, yb + 48, "bise", "search", "add a size filter, EU sizes only"))))
+    return d.svg("6 in bise desktop: you press ctrl+r in the composer; a chip shows the mic is live, its level and the time; a key stops it, your words come into the composer; you send them and bise starts search.")
+
+def d_card(m):
+    """7 · main answers routine questions: search asks bise something routine; bise answers it for him; nothing reaches the inbox."""
+    c = DPAL[m]; T = 9.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, 5.2, 2), (5.2, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")]),
+                                                     (0, "search", "size filter", [(0, "∿", "dim"), (5.2, "✓", "dim")])])
+    o.append(bise_head(d))
+    body, y = main_view(d, colT, X, R)
+    o.append(body)
+    # search asks bise (agent to agent), bise answers it for you: '↳ bise answered search for you: which sizes? → EU only', the why dim
+    y += 34
+    o.append(colT(at(1.2, None, mail(d, X, y, "search", "bise", "which sizes: EU, or US too?"))))
+    y += 30
+    o.append(colT(at(2.6, None, t(X, y, f'<tspan fill="{c["faint"]}">↳</tspan> bise answered search for you: which sizes? → <tspan font-weight="700">EU only</tspan>', 12.5)
+                     + t(X + 16, y + 20, "the shop only ships to the EU (shipping.ts), so you weren't asked.", 12, "dim"))))
+    y += 52
+    o.append(colT(at(5.2, None, landrow(d, X, y, who="search", sha="9f3e21b", files="2 files", plus=36, minus=4))))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
+    o.append(cb + t(cx, cy, E(ph), 13, "faint"))
+    return d.svg("7 in bise desktop: search asks bise which sizes to support; bise answers it for you (EU only, the shop only ships to the EU), so nothing waits in your inbox, and search lands its filter.")
+
+def d_sync(m):
+    """8 · agent-to-agent messages: perf and search talk; their messages fold into one quiet row; a click opens it."""
+    c = DPAL[m]; T = 9.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 2)], [(0, "perf", "product page speed", [(0, "∿", "dim")]), (0, "search", "size filter", [(0, "∿", "dim")])])
+    o.append(bise_head(d))
+    body, y = main_view(d, colT, X, R)
+    o.append(body)
+    y += 36; op = 3.6
+    for a, b, n in [(1.0, 1.8, 1), (1.8, 2.6, 2), (2.6, op, 3)]:
+        words = "1 message between 2 agents" if n == 1 else f"{n} messages between 2 agents"
+        o.append(colT(at(a, b, t(X, y, f'<tspan fill="{c["faint"]}">▸</tspan> {words}', 12.5, "dim"), dur=.1)))
+    o.append(ring(d, X + 4, y - 4, op - .5, op + .3))
+    o.append(colT(at(op, None, t(X, y, f'<tspan fill="{c["faint"]}">▾</tspan> 3 messages between 2 agents', 12.5, "dim"))))
+    for i, (frm, to, what) in enumerate([("perf", "search", "i'm changing ProductCard. hold your edit 2 min?"),
+                                         ("search", "perf", "ok, waiting."), ("perf", "search", "done, it's yours.")]):
+        o.append(colT(at(op + .1 + i * .12, None, f'<g opacity=".8">{mail(d, X + 14, y + 28 + 26 * i, frm, to, what)}</g>', dur=.2)))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
+    o.append(cb + t(cx, cy, E(ph), 13, "faint"))
+    return d.svg("8 in bise desktop: perf and search agree who edits ProductCard; their three messages fold into one quiet row in bise's thread, '3 messages between 2 agents'; a click opens them, dim, the names in chips.")
+
+def d_direct(m):
+    """9 · talk to any agent: a click on search in the right bar; its thread; he writes to it; esc: back to bise."""
+    c = DPAL[m]; T = 10.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX, RB = 448, 680; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    go, back = 1.6, 7.4
+    # the row he is on, a soft fill in the right bar
+    o.append(at(go, back, f'<rect x="{TX + 8}" y="{115 - 17}" width="{RB - TX - 16}" height="24" rx="6" fill="{c["chip"]}"/>', dur=.1))
+    ys = rbar(d, TX, colR, [(0, None, 2)], [(0, "perf", "product page speed", [(0, "∿", "dim")]), (0, "search", "size filter", [(0, "∿", "dim")])])
+    o.append(ring(d, TX + 50, ys[1] - 4, 1.0, go + .3))
+    # bise's thread, before and after
+    mb, _ = main_view(d, colT, X, R)
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
+    home = bise_head(d) + mb + cb + t(cx, cy, E(ph), 13, "faint")
+    o.append(at(0, go, home, dur=.05)); o.append(at(back, None, home, dur=.15))
+    # search's thread
+    hb, _ = ahead(d, "search", "size filter", "∿ working · 6 min")
+    s = [colT(hb), d.head(X, 64, "search"),
+         colT(toolrow(d, X, R, 84, f'± SizeFilter.tsx  {diffs(c, 54, 0)}', "✓ 0.2 s") + toolrow(d, X, R, 104, "$ run the search tests", "✓ 21 s")),
+         colT(t(X, 134, "the filter works with EU sizes. adding US sizes next.", 13))]
+    q = "skip US, the shop doesn't ship there"
+    cb2, ph2, (cx2, cy2) = d.composer(X - 4, 360, R - X + 8, to="search", keys=WORKING_KEYS)
+    s.append(cb2)
+    send = 4.6
+    s.append(placeholder_at(d, cx2, cy2, ph2, [(2.3, send)]))
+    s.append(at(2.25, send, d.typing(cx2, cy2, q, 2.3, 4.0), dur=.05))
+    bl, bh = d.bubble(R, 156, [q])
+    s.append(at(send, None, bl))
+    s.append(colT(at(5.6, None, d.head(X, 156 + bh + 24, "search") + t(X, 156 + bh + 44, "ok: EU sizes only. landing it.", 13))))
+    o.append(at(go, back, "".join(s), dur=.05))
+    o.append(d.key(R - 50, 402, "⏎", send - .4, send + .1))
+    o.append(d.key(R - 60, 402, "esc", back - .5, back + .1))
+    return d.svg("9 in bise desktop: you click search in the right bar; its thread opens; you tell it to skip US sizes and it answers; esc brings you back to bise's thread.")
+
 DESK = [("demo-b-desktop", d_session), ("artifacts-desktop", d_artifacts), ("voicemode-desktop", d_voicemode),
-        ("resume-desktop", d_resume), ("worktree-desktop", d_worktree), ("talk-desktop", d_talk)]
+        ("resume-desktop", d_resume), ("worktree-desktop", d_worktree), ("talk-desktop", d_talk),
+        ("voice-desktop", d_dictation), ("card-desktop", d_card), ("sync-desktop", d_sync), ("direct-desktop", d_direct)]
