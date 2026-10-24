@@ -218,23 +218,20 @@ const car: Maker = (g, o) => {
   return { w: 1.98, d: 0.87, h: 1.07 };
 };
 
-/** a yoga mat (a health, a calm plugin): rolled out, its end curling, two blocks, a strap, a cushion, a water bottle, a little plant */
+/** a yoga mat (a health, a calm plugin): rolled out, its end rolled up, two cork blocks, a water bottle, a little plant at the corner */
 const yoga: Maker = (g) => {
+  const CORK = '#d2a86a';
   g.contact(1.9, 0.9, -0.08, 0.1);
-  // the mat, its far end curled up
-  g.box(1.6, 0.02, 0.6, VIOLET, 0, 0.01, 0, 0.008);
-  g.cyl(0.06, 0.6, VIOLET, 0.84, 0.06, 0).rotation.x = Math.PI / 2;
-  g.cyl(0.035, 0.61, darker(VIOLET, 0.8), 0.84, 0.06, 0).rotation.x = Math.PI / 2;
-  // the strap and the cushion on it
-  g.box(0.5, 0.012, 0.04, CREAM, -0.1, 0.026, -0.12, 0.004).rotation.y = 0.3;
-  g.cyl(0.18, 0.1, ORANGE, -0.5, 0.072, 0.02);
-  g.ball(0.02, darker(ORANGE, 0.8), -0.5, 0.122, 0.02);
-  // two blocks, a water bottle and a plant beside it
-  g.box(0.23, 0.08, 0.15, LEAF_L, -0.55, 0.04, 0.42, 0.02);
-  g.box(0.15, 0.23, 0.08, LEAF_L, -0.27, 0.115, 0.42, 0.02).rotation.y = 0.3;
-  g.cyl(0.04, 0.22, SKY, 0.1, 0.11, 0.42); g.cyl(0.03, 0.03, CREAM, 0.1, 0.235, 0.42);
-  g.cyl(0.08, 0.12, WOOD, 0.55, 0.06, 0.43); g.ball(0.1, LEAF, 0.55, 0.19, 0.43); g.ball(0.07, LEAF_L, 0.6, 0.25, 0.46);
-  return { w: 1.71, d: 0.85, h: 0.33, x: 0.05, z: 0.11 };
+  // the mat, its far end rolled up
+  g.box(1.6, 0.035, 0.6, VIOLET, 0, 0.0175, 0, 0.012);
+  g.cyl(0.085, 0.6, VIOLET, 0.84, 0.085, 0).rotation.x = Math.PI / 2;
+  g.cyl(0.05, 0.61, darker(VIOLET, 0.8), 0.84, 0.085, 0).rotation.x = Math.PI / 2;
+  // two cork blocks and a water bottle beside it, a little plant at the corner
+  g.box(0.23, 0.09, 0.15, CORK, -0.5, 0.045, 0.42, 0.02);
+  g.box(0.15, 0.23, 0.09, CORK, -0.22, 0.115, 0.42, 0.02).rotation.y = 0.3;
+  g.cyl(0.045, 0.26, SKY, 0.12, 0.13, 0.42); g.cyl(0.032, 0.03, CREAM, 0.12, 0.275, 0.42);
+  g.cyl(0.08, 0.12, WOOD, 0.6, 0.06, 0.43); g.ball(0.1, LEAF, 0.6, 0.19, 0.43); g.ball(0.07, LEAF_L, 0.65, 0.25, 0.46);
+  return { w: 1.75, d: 0.85, h: 0.33, x: 0.06, z: 0.11 };
 };
 
 /** a trampoline (a fun, a bounce plugin): legs, its padded ring and springs, the dark mat, a ball on it, a step */

@@ -81,8 +81,9 @@ const visio: Maker = (g, o) => {
 
 /** brass, a warm yellow (never a copper that reads red) */
 const BRASS = '#d6a94e';
-/** a pigeon's grey */
-const DOVE = '#b4bcc6';
+/** a pigeon's pale grey, and its wings' darker one */
+const DOVE = '#d5dae0';
+const WING = '#8e98a4';
 
 type V3 = readonly [number, number, number];
 
@@ -116,15 +117,16 @@ const radio: Maker = (g, o) => {
   return { w: 0.69, d: 0.49, h: 1.52, x: 0.02 };
 };
 
-/** a pigeon perched at (x, y) its feet, looking to +z turned by `turn` */
+/** a pigeon perched at (x, y, z) its feet, looking to +z turned by `turn`: pale grey, darker wings, big enough to read at 256 px */
 function pigeon(g: Part, x: number, y: number, z: number, turn: number): void {
   const p = g.at(x, y, z); p.root.rotation.y = turn;
-  p.ball(0.06, DOVE, 0, 0.05, 0).scale.set(0.85, 0.8, 1.25);
-  p.box(0.06, 0.015, 0.08, darker(DOVE, 0.8), 0, 0.05, -0.08, 0.005).rotation.x = -0.4;
-  p.ball(0.034, DOVE, 0, 0.11, 0.05);
-  p.ball(0.022, lighter(TEAL, 0.3), 0, 0.075, 0.055).scale.set(1.2, 1, 0.8);
-  p.box(0.012, 0.012, 0.03, YELLOW, 0, 0.105, 0.088, 0.004);
-  for (const e of [-1, 1]) p.ball(0.007, INK, e * 0.026, 0.118, 0.065);
+  p.ball(0.1, DOVE, 0, 0.08, 0).scale.set(0.8, 0.75, 1.25);
+  for (const s of [-1, 1]) p.ball(0.07, WING, s * 0.06, 0.1, -0.02).scale.set(0.35, 0.6, 1.3);
+  p.box(0.08, 0.02, 0.1, WING, 0, 0.08, -0.15, 0.008).rotation.x = -0.35;
+  p.ball(0.035, lighter(TEAL, 0.3), 0, 0.13, 0.085).scale.set(1.2, 1, 0.8);
+  p.ball(0.05, DOVE, 0, 0.17, 0.08);
+  p.box(0.018, 0.016, 0.04, YELLOW, 0, 0.165, 0.135, 0.005);
+  for (const e of [-1, 1]) p.ball(0.01, INK, e * 0.036, 0.18, 0.105);
 }
 
 /** a dovecote (a pigeon post, notifications going out): a little house on its post, two rows of doors, perches, three pigeons */
@@ -136,20 +138,20 @@ const dovecote: Maker = (g) => {
   g.box(0.74, 0.05, 0.6, WOOD, 0, 1.18, 0, 0.015);
   // the house, its doors and perches, its slate gable roof
   g.box(0.64, 0.5, 0.5, CREAM, 0, 1.455, 0, 0.03);
-  for (const row of [0, 1]) {
-    for (const i of [-1, 0, 1]) {
-      g.cyl(0.055, 0.012, INK, i * 0.2, 1.33 + row * 0.22, 0.256).rotation.x = Math.PI / 2;
-    }
-    g.box(0.6, 0.02, 0.06, WOOD_D, 0, 1.265 + row * 0.22, 0.28, 0.006);
-  }
+  for (const row of [0, 1]) for (const i of [-1, 0, 1]) g.cyl(0.055, 0.012, INK, i * 0.2, 1.33 + row * 0.22, 0.256).rotation.x = Math.PI / 2;
+  // the landing board under the lower doors, a perch under the upper ones
+  g.box(0.6, 0.025, 0.16, WOOD_D, 0, 1.265, 0.33, 0.008);
+  g.box(0.6, 0.02, 0.06, WOOD_D, 0, 1.485, 0.28, 0.006);
   const roof = g.at(0, 1.7, 0);
   roof.box(0.32, 0.32, 0.48, CREAM, 0, 0, 0, 0.01).rotation.z = Math.PI / 4;
   for (const s of [-1, 1]) roof.box(0.43, 0.04, 0.62, SLATE_L, -s * 0.16, 0.11, 0, 0.012).rotation.z = s * 0.6;
   roof.box(0.06, 0.06, 0.64, SLATE, 0, 0.24, 0, 0.02);
-  pigeon(g, -0.2, 1.275, 0.27, 0.3);
-  pigeon(g, 0.2, 1.495, 0.27, -0.5);
-  pigeon(g, 0.06, 1.95, 0, 1.2);
-  return { w: 0.77, d: 0.72, h: 2.1, z: 0.02 };
+  // two on the ridge, one on the landing board
+  const ridge = 1.7 + 0.27 - 0.02 / 4;
+  pigeon(g, 0, ridge, 0.17, 0.6);
+  pigeon(g, 0, ridge, -0.15, Math.PI / 2);
+  pigeon(g, 0.17, 1.278, 0.33, -0.3);
+  return { w: 0.77, d: 0.83, h: 2.19, z: 0.08 };
 };
 
 /** a rotary phone (a phone, a call): on its round side table, the dial tilted up, the handset on its cradle, a notepad */
@@ -215,15 +217,17 @@ const dish: Maker = (g, o) => {
   g.box(0.12, 0.12, 0.1, SLATE, 0, 1.0, -0.02, 0.02);
   g.ball(0.022, GREEN, 0.07, 0.125, 0.205, 0.5 + o.night);
   g.box(0.03, 0.03, 0.2, INK, -0.07, 0.155, 0.12, 0.01);
-  // the dish: a shallow bowl, its back ring, the arm and the feed
-  const d = g.at(0, 1.1, 0.03); d.root.rotation.x = -0.8;
-  d.ball(0.45, CREAM, 0, 0, 0).scale.set(1, 1, 0.2);
-  d.cyl(0.12, 0.06, STEEL, 0, 0, -0.1).rotation.x = Math.PI / 2;
-  rod(d, 0.012, STEEL, [0, -0.4, 0.06], [0, 0, 0.36]);
-  for (const s of [-1, 1]) rod(d, 0.008, STEEL, [s * 0.36, 0.2, 0.05], [0, 0, 0.36]);
-  d.box(0.07, 0.07, 0.12, SLATE, 0, 0, 0.4, 0.02);
-  d.cyl(0.03, 0.02, INK, 0, 0, 0.46).rotation.x = Math.PI / 2;
-  return { w: 0.91, d: 0.79, h: 1.49, z: 0.03 };
+  // the dish, 35° up: its inside a step darker than its rim (the lightest edge), its back shell, the feed horn on three struts at its focus
+  const d = g.at(0, 1.1, 0.03); d.root.rotation.x = -0.61;
+  d.ball(0.43, STEEL, 0, 0, -0.08).scale.set(1, 1, 0.18);
+  d.cyl(0.42, 0.02, darker(CREAM, 0.8), 0, 0, 0).rotation.x = Math.PI / 2;
+  for (let i = 0; i < 32; i++) { const a = (i / 32) * Math.PI * 2; d.ball(0.04, CREAM, Math.cos(a) * 0.43, Math.sin(a) * 0.43, 0.02); }
+  d.cyl(0.1, 0.06, STEEL, 0, 0, -0.17).rotation.x = Math.PI / 2;
+  for (const a of [Math.PI / 2, (7 * Math.PI) / 6, (11 * Math.PI) / 6]) rod(d, 0.008, STEEL, [Math.cos(a) * 0.42, Math.sin(a) * 0.42, 0.03], [0, 0, 0.33]);
+  d.cone(0.06, 0.1, SLATE, 0, 0, 0.34).rotation.x = Math.PI / 2;
+  d.box(0.06, 0.06, 0.1, SLATE, 0, 0, 0.42, 0.02);
+  d.cyl(0.022, 0.02, INK, 0, 0, 0.475).rotation.x = Math.PI / 2;
+  return { w: 0.95, d: 0.8, h: 1.53, z: 0.05 };
 };
 
 /** a pneumatic tube station (a send-and-receive plugin): a brass tube up into the wall, its chamber, a capsule in the tray, a gauge */

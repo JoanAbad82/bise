@@ -104,7 +104,8 @@ const crt: Maker = (g, o) => {
   // the screen: its cream bezel, the glass, the bars
   g.box(0.52, 0.46, 0.01, CREAM, -0.1, 0.66, f + 0.005, 0.04);
   g.box(0.46, 0.38, 0.01, SCREEN, -0.1, 0.66, f + 0.012, 0.06, 0.2 + o.night * 0.4);
-  const bars = [CREAM, YELLOW, TEAL, GREEN, VIOLET, SKY];
+  // amber, mint, teal, sky, violet: never a red or a magenta bar (designer m_40569)
+  const bars = [CREAM, AMBER, lighter(GREEN, 0.35), TEAL, SKY, VIOLET];
   for (let i = 0; i < bars.length; i++) g.box(0.065, 0.26, 0.008, bars[i] as string, -0.1 - 0.1625 + i * 0.065, 0.69, f + 0.02, 0, 0.3 + o.night * 0.6);
   g.box(0.39, 0.05, 0.008, SLATE_L, -0.1, 0.53, f + 0.02, 0, 0.2 + o.night * 0.3);
   // the speaker and the knobs on the right
