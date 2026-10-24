@@ -200,7 +200,7 @@ export function PayStep({ frame, accounts, claudePlan = false, check, s, set, se
       {credits && (
         <div className="setup-works" data-testid="setup.pay.claude">
           <p className="setup-dim">{settings.first_claude_plan}</p>
-          <p className="setup-dim">{settings.first_claude_credits_how}</p>
+          <p className="setup-dim setup-then">{settings.first_claude_credits_how}</p>
         </div>
       )}
     </Onb>

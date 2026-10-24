@@ -54,6 +54,8 @@
 .setup-said .setup-took { color: var(--c-text-3); }
 .setup-dim { margin: 0; color: var(--c-text-3); font-size: var(--t-12); }
 .setup-dim.err { color: var(--c-err); }
+/* a Claude plan's credits note: two thoughts, 8 px apart (designer m_38844) */
+.setup-dim + .setup-dim.setup-then { margin-top: var(--s-2); }
 .setup .b-onb code, .setup-dim code { font: var(--t-12) var(--font-mono); }
 .setup-key { width: 100%; text-align: left; }
 .setup-key .b-field { width: 100%; box-sizing: border-box; }
