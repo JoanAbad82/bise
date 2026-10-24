@@ -566,8 +566,8 @@ def exec_program.nr(out: Pv.Out, nr: NR, +prog: String,
 
 def exec_program.step(pr: Pv.Out & (Sfp.Def & EpNext), k: Nat, +prog: String,
     +results: List<&2, J.Json>, +live: Bool,
-    next: Nat -> Pv.Out -> Sfp.Def -> EpNext -> IO(Pv.Out & Xp.ExecRes))
-    -> IO(Pv.Out & Xp.ExecRes):
+    next: Nat -> Pv.Out -> Sfp.Def -> EpNext -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)))
+    -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match pr:
     case (out2, (d2, nx)):
       next(k)(out2)(d2)(nx)
@@ -582,16 +582,16 @@ def exec_program.fail(d: Sfp.Def, +why: String) -> Xp.ExecRes:
   Xp.Ex{False{}, String.append(why, Sfp.def_acks.suffix(d))}
 
 @unsafe
-def exec_program.go(fuel: Nat, out: Pv.Out, d: Sfp.Def, act: EpAct, +prog: String,
-    +results: List<&2, J.Json>, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+def exec_program.go(fuel: Nat, out: Pv.Out, +d: Sfp.Def, act: EpAct, +prog: String,
+    +results: List<&2, J.Json>, +live: Bool) -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match fuel:
     case 0n:
-      IO.pure(Pv.Out & Xp.ExecRes,
-        (out, exec_program.fail(d, "program step budget exhausted")))
+      IO.pure(Pv.Out & (Sfp.Def & Xp.ExecRes),
+        (out, (d, exec_program.fail(d, "program step budget exhausted"))))
     case 1n+k:
       match act:
         case EpRun{}:
-          do IO<Pv.Out & Xp.ExecRes>:
+          do IO<Pv.Out & (Sfp.Def & Xp.ExecRes)>:
             pr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_REPL_PORT")
             +port : String <- IO.pure(String, P.env_or(pr, "0"))
             nr : NR <- node_run(prog, results, port)
@@ -603,24 +603,31 @@ def exec_program.go(fuel: Nat, out: Pv.Out, d: Sfp.Def, act: EpAct, +prog: Strin
         case EpNext{+nx}:
           match nx:
             case EpDone{+o}:
-              IO.pure(Pv.Out & Xp.ExecRes, (out, exec_program.done(d, o)))
+              IO.pure(Pv.Out & (Sfp.Def & Xp.ExecRes), (out, (d, exec_program.done(d, o))))
             case EpFail{+why}:
-              IO.pure(Pv.Out & Xp.ExecRes, (out, exec_program.fail(d, why)))
+              IO.pure(Pv.Out & (Sfp.Def & Xp.ExecRes), (out, (d, exec_program.fail(d, why))))
             case EpRe{+rs}:
               exec_program.go(k, out, d, EpRun{}, prog, rs, live)
 
 # @unsafe: the loop recurses through the step continuation closure
 @unsafe
 def exec_program(fuel: Nat, pr0: Pv.Out & (Sfp.Def & EpAct), +prog: String,
-    +results: List<&2, J.Json>, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+    +results: List<&2, J.Json>, +live: Bool) -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match pr0:
     case (out, (d, act)):
       exec_program.go(fuel, out, d, act, prog, results, live)
 
-def exec_tool.with(out: Pv.Out, act: IO(Xp.ExecRes)) -> IO(Pv.Out & Xp.ExecRes):
-  do IO<Pv.Out & Xp.ExecRes>:
+# a tool other than a program files no self.* request
+def exec_tool.with(out: Pv.Out, act: IO(Xp.ExecRes))
+    -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
+  do IO<Pv.Out & (Sfp.Def & Xp.ExecRes)>:
     r : Xp.ExecRes <- act
-    IO.pure(Pv.Out & Xp.ExecRes, (out, r))
+    IO.pure(Pv.Out & (Sfp.Def & Xp.ExecRes), (out, (Sfp.def_none(), r)))
+
+def exec_tool.no_req(pr: Pv.Out & Xp.ExecRes) -> Pv.Out & (Sfp.Def & Xp.ExecRes):
+  match pr:
+    case (out, +r):
+      (out, (Sfp.def_none(), r))
 
 # ---- a call a stop leaves behind (issue 13) ----
 # A remote call (the merged search, an MCP tool) or a program's sleep
@@ -651,7 +658,7 @@ def exec_tool.skill(+args: String, +live: Bool) -> IO(Xp.ExecRes):
     IO.pure(Xp.ExecRes, Sh.exec_mr(r))
 
 def exec_tool.run(t: Rtp.Tool, out: Pv.Out, +name: String, +args: String,
-    +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+    +live: Bool) -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match t:
     case Rtp.TNode{}:
       exec_program(1000n, (out, (Sfp.def_none(), EpRun{})),
@@ -676,32 +683,35 @@ def exec_tool.run(t: Rtp.Tool, out: Pv.Out, +name: String, +args: String,
 # a call past its gate: run (bash under the sandbox its allow names), or
 # its denial as a failed result
 def exec_tool.go(is_bash: Bool, out: Pv.Out, +name: String, +args: String,
-    +flags: String, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+    +flags: String, +live: Bool) -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match is_bash:
     case True{}:
-      bash_gated(out, args, W.flat_cmd(args), flags)
+      do IO<Pv.Out & (Sfp.Def & Xp.ExecRes)>:
+        pr : Pv.Out & Xp.ExecRes <- bash_gated(out, args, W.flat_cmd(args), flags)
+        IO.pure(Pv.Out & (Sfp.Def & Xp.ExecRes), exec_tool.no_req(pr))
     case False{}:
       exec_tool.run(Rtp.tool_of(name), out, name, args, live)
 
 def exec_tool.after(m: Maybe<&2, String>, out: Pv.Out, +name: String, +args: String,
-    +flags: String, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+    +flags: String, +live: Bool) -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match m:
     case None{}:
       exec_tool.go(String.eq(name, "bash"), out, name, args, flags, live)
     case Some{+why}:
-      IO.pure(Pv.Out & Xp.ExecRes, (out, Xp.Ex{False{}, why}))
+      IO.pure(Pv.Out & (Sfp.Def & Xp.ExecRes),
+        (out, (Sfp.def_none(), Xp.Ex{False{}, why})))
 
 def exec_tool.gated(pv: Pv.Out & Gp.Verdict, +name: String, +args: String,
-    +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+    +live: Bool) -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match pv:
     case (out, +v):
       exec_tool.after(Gp.denial(v), out, name, args, Gp.flags(v), live)
 
 @unsafe
-def exec_tool(out: Pv.Out, +call: T.Call, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+def exec_tool(out: Pv.Out, +call: T.Call, +live: Bool) -> IO(Pv.Out & (Sfp.Def & Xp.ExecRes)):
   match call:
     case T.Call{_, +name, +args}:
-      do IO<Pv.Out & Xp.ExecRes>:
+      do IO<Pv.Out & (Sfp.Def & Xp.ExecRes)>:
         pv : Pv.Out & Gp.Verdict <- gate(out, name, args, live)
         exec_tool.gated(pv, name, args, live)
 
@@ -774,16 +784,31 @@ def exec_done.stopped(live: Bool) -> IO(Bool):
     case False{}:
       IO.pure(Bool, False{})
 
-def exec_done(pr: Pv.Out & Xp.ExecRes, k: Nat, +call: T.Call,
+def exec_done.run(out3: Pv.Out, +d: Sfp.Def, +r: Xp.ExecRes, k: Nat,
+    +call: T.Call, +after: List<&2, T.Act>, +rt2: Rtp.Rt, +live: Bool,
+    next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
+  do IO<RtEnd>:
+    out4 : Pv.Out <- emit_res_ann(out3, Rtp.call_id(call), r, live)
+    +cmd : T.Cmd <- IO.pure(T.Cmd,
+      Xp.exec_cmd(r, Rtp.call_id(call), Sfp.def_compact(d)))
+    +stop : Bool <- exec_done.stopped(live)
+    exec_done.pick(stop, out4, k, cmd, after, rt2, next)
+
+def exec_done.go(out3: Pv.Out, dr: Sfp.Def & Xp.ExecRes, k: Nat,
+    +call: T.Call, +after: List<&2, T.Act>, +rt2: Rtp.Rt, +live: Bool,
+    next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
+  match dr:
+    case (+d, +r):
+      exec_done.run(out3, d, r, k, call, after, rt2, live, next)
+
+# the call's result goes to the Core with the requests it filed: a
+# self.compact makes the turn compact before its next model call
+def exec_done(pr: Pv.Out & (Sfp.Def & Xp.ExecRes), k: Nat, +call: T.Call,
     +after: List<&2, T.Act>, +rt2: Rtp.Rt, +live: Bool,
     next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
   match pr:
-    case (out3, +r):
-      do IO<RtEnd>:
-        out4 : Pv.Out <- emit_res_ann(out3, Rtp.call_id(call), r, live)
-        +cmd : T.Cmd <- IO.pure(T.Cmd, X.exec_cmd(r, Rtp.call_id(call)))
-        +stop : Bool <- exec_done.stopped(live)
-        exec_done.pick(stop, out4, k, cmd, after, rt2, next)
+    case (out3, dr):
+      exec_done.go(out3, dr, k, call, after, rt2, live, next)
 
 # the same boundary for a model result: the completion is applied on the
 # drained state, so steering that arrived during the call is already in
@@ -899,7 +924,7 @@ def run(fuel: Nat, out: Pv.Out, +rt: Rtp.Rt, +job: Rtp.Job, tr: Rtp.Trans) -> IO
                       do IO<RtEnd>:
                         out1 : Pv.Out <- emit_call_ann(out, call, live)
                         out2 : Pv.Out <- emit_code_ann(out1, call, live)
-                        pr : Pv.Out & Xp.ExecRes <- exec_tool(out2, call, live)
+                        pr : Pv.Out & (Sfp.Def & Xp.ExecRes) <- exec_tool(out2, call, live)
                         exec_done(pr, k, call, after, rt2, live,
                           k2 => o4 => +r3 => +j =>
                             run(k2, o4, r3, j, Rtp.transition(r3, j)))

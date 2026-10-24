@@ -467,13 +467,14 @@ law patch_parse_glm_variant:
     : Maybe<&2, List<&2, Pa.PAction>>}
 
 # ---- BR-004: the deferred scan trusts only standalone tool acks ----
+# (it reads reload only: a compaction runs inside its turn, laws/session)
 
 # LAW: assistant prose quoting the ack never fires the deferred
 # request (the model echoes tool outputs routinely).
-# BR-004 helper: an assistant message that quotes the compact ack
+# BR-004 helper: an assistant message that quotes the reload ack
 def prose_quoting_ack() -> T.Msg:
   T.asst(String.append("the tool said '",
-    String.append(Sf.COMPACT_ACK(), "' - filing it")), Nil{})
+    String.append(Sf.RELOAD_ACK(), "' - filing it")), Nil{})
 
 law deferred_ignores_assistant_prose:
   {Sf.deferred_of(Con{T.user("hi"), Con{prose_quoting_ack(), Nil{}}})
@@ -485,7 +486,7 @@ law deferred_ignores_assistant_prose:
 law deferred_ignores_source_quotes:
   {Sf.deferred_of(Con{T.user("hi"),
       Con{T.tool_res(String.append("  \"",
-          String.append(Sf.COMPACT_ACK(), "\""))), Nil{}}})
+          String.append(Sf.RELOAD_ACK(), "\""))), Nil{}}})
     == Sf.Def{False{}, False{}} : Sf.Def}
 
 # LAW: a tool result that merely CONTAINS the marker mid-text never
@@ -493,22 +494,22 @@ law deferred_ignores_source_quotes:
 law deferred_ignores_midtext_marker:
   {Sf.deferred_of(Con{T.user("hi"),
       Con{T.tool_res(String.append("prefix ",
-          String.append(Sf.COMPACT_ACK(), " suffix"))), Nil{}}})
+          String.append(Sf.RELOAD_ACK(), " suffix"))), Nil{}}})
     == Sf.Def{False{}, False{}} : Sf.Def}
 
 # LAW: the real direct shape fires - the self.* tool result prefixes
 # the ack with "tool X ok: ", so the ack ends the text.
 law deferred_reads_prefixed_ack:
   {Sf.deferred_of(Con{T.user("hi"),
-      Con{T.tool_res(String.append("tool self.compact ok: ",
-          Sf.COMPACT_ACK())), Nil{}}})
-    == Sf.Def{True{}, False{}} : Sf.Def}
+      Con{T.tool_res(String.append("tool self.reload ok: ",
+          Sf.RELOAD_ACK())), Nil{}}})
+    == Sf.Def{False{}, True{}} : Sf.Def}
 
 # LAW: the real program shape fires - the acks ride their own lines of
 # the escaped tool text (a literal backslash-n line boundary).
 law deferred_reads_program_acked_result:
   {Sf.deferred_of(Con{T.user("hi"),
       Con{S.tool_result_msg("run_typescript",
-          String.append("prog out\n", Sf.COMPACT_ACK()), True{}),
+          String.append("prog out\n", Sf.RELOAD_ACK()), True{}),
         Nil{}}})
-    == Sf.Def{True{}, False{}} : Sf.Def}
+    == Sf.Def{False{}, True{}} : Sf.Def}

@@ -31,8 +31,11 @@ type Cmd is Data:
   Compact{extra: String}
   CompletionOk{action: U32, text: String, calls: List<&2, Call>}
   CompletionFail{action: U32, error: String}
-  ToolOk{call: U32, out: String}
-  ToolFail{call: U32, error: String}
+  # compact: the tool asked to compact the conversation (self.compact,
+  # filed from a program): the turn compacts before its next model call
+  # and goes on from the summary
+  ToolOk{call: U32, out: String, compact: Bool}
+  ToolFail{call: U32, error: String, compact: Bool}
   Interrupt{}
   FailTurn{error: String}
 
@@ -77,11 +80,16 @@ type Pending is Data:
   PAgent{action: U32}
   PTools{waiting: List<&2, Call>}
   # ADR 0011: stable compaction id, one-based attempt, per-request action id.
-  PComp{compaction: U32, attempt: Nat, action: U32, extra: String, auto: Bool}
+  # in_turn: the compaction runs inside a turn (past the threshold, or
+  # the agent's own request): when it is done the turn goes on
+  PComp{compaction: U32, attempt: Nat, action: U32, extra: String, in_turn: Bool}
 
 # ---- active turn state ----
+# compact: a tool of this turn asked for a compaction; the next dispatch
+# runs it (and clears it) before the next model call
 type Turn is Data:
-  Turn{nulls: Nat, steer: List<&2, String>, notifs: List<&2, String>}
+  Turn{nulls: Nat, steer: List<&2, String>, notifs: List<&2, String>,
+    compact: Bool}
 
 # ---- apply result: rejection never mutates (no `next` to corrupt) ----
 # (defined after Session: a type may only name already-defined types)

@@ -376,7 +376,7 @@ two"}, Nil{}}}, Nil{}}, None{}}
 # orphan result can never touch the session.
 law orphan_tool_result_rejected:
   for +cfg: T.Cfg
-  {S.apply(T.new_session(cfg), T.ToolOk{0, "out"})
+  {S.apply(T.new_session(cfg), T.ToolOk{0, "out", False{}})
     == T.Rejected{"no pending tool result"} : T.Res}
 
 # LAW: interrupting an idle session is an accepted no-op: the session
@@ -647,7 +647,7 @@ def steer_flow.called(+cfg: T.Cfg) -> T.Session:
 def steer_flow(+cfg: T.Cfg) -> T.Session:
   # the completion renumbers the calls (base = the consumed action ids),
   # so Call{1,...} waits as call id 2
-  S.res_next(S.apply(steer_flow.called(cfg), T.ToolOk{2, "out"}),
+  S.res_next(S.apply(steer_flow.called(cfg), T.ToolOk{2, "out", False{}}),
     steer_flow.called(cfg))
 
 # LAW: a steered user message enters the durable history at the next
@@ -723,7 +723,7 @@ def steer_order.called(+cfg: T.Cfg) -> T.Session:
     steer_order.two(cfg))
 
 def steer_order(+cfg: T.Cfg) -> T.Session:
-  S.res_next(S.apply(steer_order.called(cfg), T.ToolOk{2, "out"}),
+  S.res_next(S.apply(steer_order.called(cfg), T.ToolOk{2, "out", False{}}),
     steer_order.called(cfg))
 
 # LAW: several steers commit in arrival order, not reversed.
@@ -931,7 +931,7 @@ law run_typescript_batches_with_other_calls:
 # tool result, right after its call.
 law run_typescript_result_comes_back:
   {S.sess_history(S.res_next(S.apply(ts_flow.called(law_cfg()),
-      T.ToolOk{2, "1"}), ts_flow.called(law_cfg())))
+      T.ToolOk{2, "1", False{}}), ts_flow.called(law_cfg())))
     == Con{T.user("hi"),
       Con{T.asst("", Con{T.Call{2, "run_typescript", ts_args()}, Nil{}}),
       Con{T.tool_res("tool run_typescript ok: 1"), Nil{}}}}
@@ -941,11 +941,215 @@ law run_typescript_result_comes_back:
 # program) comes back as a failed run_typescript result.
 law run_typescript_failure_comes_back:
   {S.sess_history(S.res_next(S.apply(ts_flow.called(law_cfg()),
-      T.ToolFail{2, "program error"}), ts_flow.called(law_cfg())))
+      T.ToolFail{2, "program error", False{}}), ts_flow.called(law_cfg())))
     == Con{T.user("hi"),
       Con{T.asst("", Con{T.Call{2, "run_typescript", ts_args()}, Nil{}}),
       Con{T.tool_res("tool run_typescript failed: program error"), Nil{}}}}
     : List<&2, T.Msg>}
+
+# ---- the agent's own compaction (self.compact) goes on in the turn ----
+# A program that filed self.compact comes back with ToolOk's compact
+# flag. The turn compacts before its next model call and goes on from
+# the summary: no turn_done, no message from anyone needed. It used to
+# compact after turn_done, and the agent sat idle until someone said
+# 'continue'.
+
+def ask_flow.asked(+cfg: T.Cfg) -> T.Res:
+  S.apply(ts_flow.called(cfg), T.ToolOk{2, "1", True{}})
+
+def ask_flow.compacting(+cfg: T.Cfg) -> T.Session:
+  S.res_next(ask_flow.asked(cfg), ts_flow.called(cfg))
+
+# the compaction call is action 3 (0: the first call, 1-2: the tool round)
+def ask_flow.summary() -> T.Cmd:
+  T.CompletionOk{3, "<summary>the work so far; next: finish it</summary>", Nil{}}
+
+# what an apply's actions are, in short
+def act_kinds(acts: List<&2, T.Act>) -> List<&2, String>:
+  match acts:
+    case Nil{}:
+      Nil{}
+    case Con{+a, rest}:
+      match a:
+        case T.AgentCall{_, _}:
+          Con{"agent", act_kinds(rest)}
+        case T.ToolAct{_, _}:
+          Con{"tool", act_kinds(rest)}
+        case T.CompactionCall{_, _}:
+          Con{"compact", act_kinds(rest)}
+
+def res_kinds(r: T.Res) -> List<&2, String>:
+  match r:
+    case T.Accepted{_, acts, _}:
+      act_kinds(acts)
+    case T.Rejected{_}:
+      Nil{}
+
+# how an apply's compaction was started: "auto", "asked" or "none"
+def comp_label(obs: List<&2, T.Obs>) -> String:
+  match obs:
+    case Nil{}:
+      "none"
+    case Con{+o, rest}:
+      match o:
+        case T.CompactionStarted{_, +auto}:
+          Bool.pick(String, auto, "auto", "asked")
+        case _:
+          comp_label(rest)
+
+def res_label(r: T.Res) -> String:
+  match r:
+    case T.Accepted{obs, _, _}:
+      comp_label(obs)
+    case T.Rejected{_}:
+      "none"
+
+# LAW: a program's compaction request starts a compaction right after
+# its result, inside the turn (no turn_done), labelled as asked (not
+# automatic).
+law asked_compaction_starts_in_turn:
+  {Con{big_flow.of(ask_flow.asked(law_cfg())),
+    Con{res_label(ask_flow.asked(law_cfg())), res_kinds(ask_flow.asked(law_cfg()))}}
+    == Con{"compact", Con{"asked", Con{"compact", Nil{}}}} : List<&2, String>}
+
+# LAW: a compaction never ends a turn that had work left: when the
+# summary comes back, the same turn makes its next model call. And one
+# request is one compaction: that call is the agent's, not another
+# compaction.
+law asked_compaction_goes_on:
+  {Con{big_flow.of(S.apply(ask_flow.compacting(law_cfg()), ask_flow.summary())),
+    res_kinds(S.apply(ask_flow.compacting(law_cfg()), ask_flow.summary()))}
+    == Con{"other", Con{"agent", Nil{}}} : List<&2, String>}
+
+# LAW: without the request, the same result goes straight to the next
+# model call: only the flag compacts.
+law unasked_result_does_not_compact:
+  {res_kinds(S.apply(ts_flow.called(law_cfg()), T.ToolOk{2, "1", False{}}))
+    == Con{"agent", Nil{}} : List<&2, String>}
+
+# a two-call round: the program (call 2) asks, bash (call 3) answers last
+def ask_flow.two(+cfg: T.Cfg) -> T.Session:
+  S.res_next(S.apply(steer_flow.started(cfg),
+      T.CompletionOk{0, "", Con{T.Call{1, "run_typescript", ts_args()},
+        Con{T.Call{2, "bash", "ls"}, Nil{}}}}),
+    steer_flow.started(cfg))
+
+def ask_flow.two.asked(+cfg: T.Cfg) -> T.Session:
+  S.res_next(S.apply(ask_flow.two(cfg), T.ToolOk{2, "1", True{}}),
+    ask_flow.two(cfg))
+
+# LAW: a request filed by any call of a round holds until the round's
+# last result, then compacts.
+law asked_compaction_waits_for_the_round:
+  {Con{big_flow.of(S.apply(ask_flow.two(law_cfg()), T.ToolOk{2, "1", True{}})),
+    Con{big_flow.of(S.apply(ask_flow.two.asked(law_cfg()), T.ToolOk{3, "ok", False{}})),
+      Nil{}}}
+    == Con{"other", Con{"compact", Nil{}}} : List<&2, String>}
+
+# a steering too big for the threshold even after a compaction
+def big_text(+n: Nat) -> String:
+  match n:
+    case 0n:
+      "xxxxxxxxxxxxxxxx"
+    case 1n+p:
+      +half = big_text(p)
+      String.append(half, half)
+
+def ask_flow.flooded(+cfg: T.Cfg) -> T.Session:
+  S.res_next(S.apply(ask_flow.compacting(cfg), T.UserMsg{T.Steer{}, big_text(8n)}),
+    ask_flow.compacting(cfg))
+
+# LAW: never two compactions in a row. The dispatch right after a
+# compaction never starts another one: an input still over the threshold
+# (here a steering bigger than it) fails the turn instead of compacting
+# forever.
+law no_compaction_after_compaction:
+  {Con{big_flow.of(S.apply(ask_flow.flooded(law_cfg()), ask_flow.summary())),
+    res_kinds(S.apply(ask_flow.flooded(law_cfg()), ask_flow.summary()))}
+    == Con{"fail", Nil{}} : List<&2, String>}
+
+# ---- chained compactions keep what was done ----
+# An automatic compaction's request always drops its oldest messages
+# (it starts when the input passes the threshold, its budget is the
+# threshold less the prompt). The summary of the last compaction is
+# protected like the latest user message: the next summary is written
+# with it, so a long task never loses what it did.
+
+def fit_case.summary() -> T.Msg:
+  C.summary_message("SUMMARY-ONE")
+
+def fit_case.round() -> List<&2, T.Msg>:
+  Con{T.asst("", Con{T.Call{1, "bash", "ls"}, Nil{}}),
+    Con{T.tool_res(big_text(7n)), Nil{}}}
+
+# LAW: a fit that must drop keeps the summary (and the latest user
+# message) and drops the tool rounds.
+law fit_keeps_the_summary:
+  {C.fit_list(300n, Con{fit_case.summary(), Con{T.user("task"), fit_case.round()}})
+    == C.FOk{Con{fit_case.summary(), Con{T.user("task"), Nil{}}}} : C.FitR}
+
+# LAW: when only the summary and the latest user message are left and
+# they still do not fit, the fit says too large: never a loop, never a
+# silently dropped summary.
+law fit_never_drops_the_summary:
+  {C.fit_list(10n, Con{fit_case.summary(), Con{T.user("task"), Nil{}}})
+    == C.FBig{} : C.FitR}
+
+# LAW: the user's own message is never taken for a summary, even one
+# that opens like it; the compaction's summary message is.
+law only_the_compaction_writes_a_summary:
+  {Bool.and(Bool.not(H.is_summary(T.user(String.append(H.SUMMARY_PREFIX(), "mine</summary>")))),
+     H.is_summary(C.summary_message("theirs")))
+    == True{} : Bool}
+
+# two chained compactions in one turn: the asked one, a tool round with
+# a big output, then the automatic one (action 7)
+def chain.resumed(+cfg: T.Cfg) -> T.Session:
+  S.res_next(S.apply(ask_flow.compacting(cfg), ask_flow.summary()),
+    ask_flow.compacting(cfg))
+
+def chain.called(+cfg: T.Cfg) -> T.Session:
+  S.res_next(S.apply(chain.resumed(cfg),
+      T.CompletionOk{4, "", Con{T.Call{1, "bash", "ls"}, Nil{}}}),
+    chain.resumed(cfg))
+
+def chain.second(+cfg: T.Cfg) -> T.Res:
+  S.apply(chain.called(cfg), T.ToolOk{6, big_text(7n), False{}})
+
+def msgs_have(ms: List<&2, T.Msg>, +needle: String) -> Bool:
+  match ms:
+    case Nil{}:
+      False{}
+    case Con{+m, rest}:
+      match m:
+        case T.Msg{_, +text, _, _}:
+          Bool.or(String.contains(text, needle), msgs_have(rest, needle))
+
+def comp_input_has(acts: List<&2, T.Act>, +needle: String) -> Bool:
+  match acts:
+    case Nil{}:
+      False{}
+    case Con{+a, rest}:
+      match a:
+        case T.CompactionCall{_, +input}:
+          msgs_have(input, needle)
+        case _:
+          comp_input_has(rest, needle)
+
+def res_comp_has(r: T.Res, +needle: String) -> Bool:
+  match r:
+    case T.Accepted{_, acts, _}:
+      comp_input_has(acts, needle)
+    case T.Rejected{_}:
+      False{}
+
+# LAW: the second compaction of a turn is written WITH the first one's
+# summary in its input.
+law chained_compaction_sees_the_summary:
+  {Con{res_label(chain.second(law_cfg())),
+    Con{Bool.pick(String, res_comp_has(chain.second(law_cfg()), "the work so far"),
+      "sees it", "lost it"), Nil{}}}
+    == Con{"auto", Con{"sees it", Nil{}}} : List<&2, String>}
 
 # LAW: an interrupt answers the running program like any waiting call.
 law run_typescript_interrupted:

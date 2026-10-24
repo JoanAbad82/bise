@@ -1,5 +1,8 @@
 # core/history.bend — history queries used by compaction (ADR 0011).
 # - the most recent non-injected user message is protected from removal
+# - so is the summary of the last compaction: the next compaction is
+#   written with it, so a long task's chained compactions never lose
+#   what was done
 # - dropping an assistant tool call drops its result messages with it
 # - a lone oversized text message is middle-truncated to fit
 import Base
@@ -36,6 +39,25 @@ def is_asst_with_calls(m: T.Msg) -> Bool:
               False{}
             case Con{_, _}:
               True{}
+        case _:
+          False{}
+
+# the opening of the one message that carries a compaction's summary
+# (compaction.bend summary_message, its only writer). A prefix, not a
+# type flag: the message is serialized in checkpoints, and --resume
+# (runtime/main-pure.bend) and the session migration already know a
+# summary by this opening.
+def SUMMARY_PREFIX() -> String:
+  "Summary of the earlier conversation:\n<summary>"
+
+# the summary message: injected (a user never writes it) and opening
+# with the prefix
+def is_summary(m: T.Msg) -> Bool:
+  match m:
+    case T.Msg{role, +text, _, injected}:
+      match role:
+        case T.RUser{}:
+          Bool.and(injected, String.starts_with(text, SUMMARY_PREFIX()))
         case _:
           False{}
 
@@ -98,14 +120,33 @@ def drop_one.pick(is_u: Bool, has_later: Bool, paired: Bool,
     case False{}:
       Some{drop_head_tail(paired, m, rest)}
 
-# drop_one: remove the oldest item that is not the protected latest
-# non-injected user message; an assistant tool call takes its results with it.
+# the summary is kept: the drop happens after it (nothing to drop after
+# it: nothing to drop at all, so a fit reports too large)
+def drop_one.keep(+m: T.Msg, after: Maybe<&2, List<&2, T.Msg>>)
+    -> Maybe<&2, List<&2, T.Msg>>:
+  match after:
+    case None{}:
+      None{}
+    case Some{+r}:
+      Some{Con{m, r}}
+
+def drop_one.summary(summary: Bool, +m: T.Msg, +rest: List<&2, T.Msg>,
+    after: Maybe<&2, List<&2, T.Msg>>) -> Maybe<&2, List<&2, T.Msg>>:
+  match summary:
+    case True{}:
+      drop_one.keep(m, after)
+    case False{}:
+      drop_one.pick(is_user(m), has_user(rest), is_asst_with_calls(m), m, rest)
+
+# drop_one: remove the oldest item that is neither the protected latest
+# non-injected user message nor the summary; an assistant tool call
+# takes its results with it.
 def drop_one(ms: List<&2, T.Msg>) -> Maybe<&2, List<&2, T.Msg>>:
   match ms:
     case Nil{}:
       None{}
     case Con{+m, +rest}:
-      drop_one.pick(is_user(m), has_user(rest), is_asst_with_calls(m), m, rest)
+      drop_one.summary(is_summary(m), m, rest, drop_one(rest))
 
 # ---- middle truncation of a lone oversized text message ----
 # keeps a head, a "[...]" marker, and a tail, within `budget` tokens

@@ -161,8 +161,9 @@ law reload_allows_with_notif:
 
 # ---- self.reload / self.compact: the agent files requests mid-turn ----
 # Called inside a run_typescript program (no top-level tools since
-# BISE-293), answered with an ack, executed at the turn boundary by
-# the REPL.
+# BISE-293), answered with an ack. A reload executes at the turn
+# boundary (the REPL); a compaction rides the program's result to the
+# Core as ToolOk's compact flag and runs inside the turn (laws/session).
 
 # LAW: self.reload answers with the reload ack — visible to the model.
 law self_reload_acks:
@@ -195,7 +196,7 @@ law sleep_program_bounds:
 law sleep_program_secs:
   {Rt.prog_sleep.secs(None{}, "19") == 19 : U32}
 
-# LAW: the acks carry their scan markers — what deferred_of finds is
+# LAW: the acks carry their markers — what deferred_of finds is
 # exactly what the model read.
 law self_acks_carry_markers:
   {Bool.and(String.contains(Sf.RELOAD_ACK(), "reload: scheduled"),
@@ -208,15 +209,14 @@ law deferred_reads_reload_request:
   {Sf.deferred_of(Con{T.user("hi"), Con{T.tool_res(Sf.RELOAD_ACK()), Nil{}}})
     == Sf.Def{False{}, True{}} : Sf.Def}
 
-law deferred_reads_compact_request:
-  {Sf.deferred_of(Con{T.user("hi"), Con{T.tool_res(Sf.COMPACT_ACK()), Nil{}}})
-    == Sf.Def{True{}, False{}} : Sf.Def}
-
-law deferred_reads_both_requests:
+# LAW: a compaction is never read back from the history: it already
+# ran inside the turn that asked for it, so the turn's end never
+# compacts a second time.
+law deferred_never_compacts:
   {Sf.deferred_of(Con{T.user("hi"),
       Con{T.tool_res(Sf.RELOAD_ACK()),
         Con{T.tool_res(Sf.COMPACT_ACK()), Nil{}}}})
-    == Sf.Def{True{}, True{}} : Sf.Def}
+    == Sf.Def{False{}, True{}} : Sf.Def}
 
 # LAW: a request older than the last user message is spent — an old
 # request can never fire twice.
@@ -226,14 +226,14 @@ law deferred_resets_at_user:
     == Sf.Def{False{}, False{}} : Sf.Def}
 
 # LAW: a message injected mid-turn (an agent's report steered in right
-# after the ack) does not spend the request: the turn still compacts
-# at its end. It once did: main's self.compact was lost that way.
+# after the ack) does not spend the request: the turn still reloads
+# at its end. It once did: main's request was lost that way.
 law deferred_survives_injected_message:
   {Sf.deferred_of(Con{T.user("hi"),
-      Con{T.tool_res(Sf.COMPACT_ACK()),
+      Con{T.tool_res(Sf.RELOAD_ACK()),
         Con{T.injected_user("<agent_message>report</agent_message>"),
           Con{T.asst("done", Nil{}), Nil{}}}}})
-    == Sf.Def{True{}, False{}} : Sf.Def}
+    == Sf.Def{False{}, True{}} : Sf.Def}
 
 # LAW: a turn's final reply ends it: a later turn started by an
 # injected message (an agent's report waking main) does not fire the
@@ -250,10 +250,16 @@ law deferred_resets_after_final_reply:
 # request filed before it still stands.
 law deferred_survives_tool_calls:
   {Sf.deferred_of(Con{T.user("hi"),
-      Con{T.tool_res(Sf.COMPACT_ACK()),
+      Con{T.tool_res(Sf.RELOAD_ACK()),
         Con{T.asst("more", Con{T.Call{1, "bash", "ls"}, Nil{}}),
           Con{T.tool_res("ok"), Nil{}}}}})
-    == Sf.Def{True{}, False{}} : Sf.Def}
+    == Sf.Def{False{}, True{}} : Sf.Def}
+
+# LAW: the compaction a program filed reaches the Core typed: its
+# result's command carries compact = true (never read from the ack).
+law program_compact_reaches_core:
+  {Xt.exec_cmd(Xt.Ex{True{}, "done"}, 3, Sf.def_compact(Sf.Def{True{}, False{}}))
+    == T.ToolOk{3, "done", True{}} : T.Cmd}
 
 # LAW: no history, no requests.
 law deferred_empty_history:

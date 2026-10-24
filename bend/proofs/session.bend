@@ -295,3 +295,30 @@ def Laws.checkpoint_loads_node_program_as_run_typescript():
 
 def Laws.checkpoint_keeps_call_names():
   {==}
+
+def Laws.asked_compaction_starts_in_turn():
+  {==}
+
+def Laws.asked_compaction_goes_on():
+  {==}
+
+def Laws.unasked_result_does_not_compact():
+  {==}
+
+def Laws.asked_compaction_waits_for_the_round():
+  {==}
+
+def Laws.no_compaction_after_compaction():
+  {==}
+
+def Laws.fit_keeps_the_summary():
+  {==}
+
+def Laws.fit_never_drops_the_summary():
+  {==}
+
+def Laws.only_the_compaction_writes_a_summary():
+  {==}
+
+def Laws.chained_compaction_sees_the_summary():
+  {==}

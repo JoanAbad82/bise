@@ -257,7 +257,7 @@ def tool_ok(+c: Ctx) -> Bool:
   match c:
     case Ctx{_, +cmd, _, _, _}:
       match cmd:
-        case T.ToolOk{_, _}:
+        case T.ToolOk{_, _, _}:
           True{}
         case _:
           False{}
@@ -283,9 +283,9 @@ def tool_ids(+c: Ctx) -> List<&2, U32>:
   match c:
     case Ctx{_, +cmd, _, +pending, _}:
       match cmd:
-        case T.ToolOk{+id, _}:
+        case T.ToolOk{+id, _, _}:
           Con{id, Nil{}}
-        case T.ToolFail{+id, _}:
+        case T.ToolFail{+id, _, _}:
           Con{id, Nil{}}
         case T.Interrupt{}:
           pending_ids(pending)

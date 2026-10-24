@@ -577,3 +577,18 @@ def cap_out_at(+n: Nat, +out: String) -> String:
 
 def cap_out(+out: String) -> String:
   cap_out_at(cap_out_limit(), out)
+
+# ---- a tool's result as the Core's command ----
+# compact: the call filed self.compact (the program's request set, typed:
+# never read back from the ack's words)
+def exec_cmd.pick(ok: Bool, +out: String, +id: U32, +compact: Bool) -> T.Cmd:
+  match ok:
+    case True{}:
+      T.ToolOk{id, cap_out(out), compact}
+    case False{}:
+      T.ToolFail{id, cap_out(out), compact}
+
+def exec_cmd(r: ExecRes, +id: U32, +compact: Bool) -> T.Cmd:
+  match r:
+    case Ex{+ok, +out}:
+      exec_cmd.pick(ok, out, id, compact)

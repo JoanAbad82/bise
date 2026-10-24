@@ -136,9 +136,9 @@ def add_steer(turn: Maybe<&2, T.Turn>, +text: String) -> Maybe<&2, T.Turn>:
       None{}
     case Some{t}:
       match t:
-        case T.Turn{nulls, steer, notifs}:
+        case T.Turn{nulls, steer, notifs, compact}:
           Some{T.Turn{nulls,
-            List.append(&2, String, steer, Con{text, Nil{}}), notifs}}
+            List.append(&2, String, steer, Con{text, Nil{}}), notifs, compact}}
 
 def add_notif(turn: Maybe<&2, T.Turn>, +text: String) -> Maybe<&2, T.Turn>:
   match turn:
@@ -146,9 +146,9 @@ def add_notif(turn: Maybe<&2, T.Turn>, +text: String) -> Maybe<&2, T.Turn>:
       None{}
     case Some{t}:
       match t:
-        case T.Turn{nulls, steer, notifs}:
+        case T.Turn{nulls, steer, notifs, compact}:
           Some{T.Turn{nulls, steer,
-            List.append(&2, String, notifs, Con{text, Nil{}})}}
+            List.append(&2, String, notifs, Con{text, Nil{}}), compact}}
 
 # ---- session field updates ----
 
@@ -196,7 +196,7 @@ def start_turn(+text: String, +s: T.Session) -> T.Session:
     case T.Sess{+cfg, +history, +inputs, +actions, _, _, +queued, +notifs}:
       T.Sess{cfg, List.append(&2, T.Msg, history, Con{T.user(text), Nil{}}),
         Nat.add(inputs, 1n), actions,
-        Some{T.Turn{0n, Nil{}, Nil{}}}, None{}, queued, notifs}
+        Some{T.Turn{0n, Nil{}, Nil{}, False{}}}, None{}, queued, notifs}
 
 # ---- the between-turns gate (/reload) ----
 # Checkpoints are only coherent at turn boundaries: turn and pending
@@ -295,7 +295,7 @@ def finish_history(turn: Maybe<&2, T.Turn>, +history: List<&2, T.Msg>)
       history
     case Some{t}:
       match t:
-        case T.Turn{_, +steer, +tnotifs}:
+        case T.Turn{_, +steer, +tnotifs, _}:
           List.append(&2, T.Msg,
             List.append(&2, T.Msg, history, inject_users(steer)),
             inject_users(tnotifs))
@@ -314,18 +314,23 @@ def retry_turn(+s: T.Session, +nulls: Nat) -> Maybe<&2, T.Turn>:
     case T.Sess{_, _, _, _, +turn, _, _, _}:
       match turn:
         case None{}:
-          Some{T.Turn{nulls, Nil{}, Nil{}}}
+          Some{T.Turn{nulls, Nil{}, Nil{}, False{}}}
         case Some{t}:
           match t:
-            case T.Turn{_, +steer, +tnotifs}:
-              Some{T.Turn{nulls, steer, tnotifs}}
+            case T.Turn{_, +steer, +tnotifs, +compact}:
+              Some{T.Turn{nulls, steer, tnotifs, compact}}
 
-# ---- compaction start (shared by automatic preflight and manual command) ----
+# ---- compaction start (shared by the threshold, the agent's own request
+# and the manual command) ----
+# in_turn: the compaction runs inside a turn, which goes on from the
+# summary when it is done; auto: the threshold started it (the label of
+# its CompactionStarted). The agent's own request (self.compact) is in
+# a turn but not automatic.
 
-def start_compaction.too_large(auto: Bool, turn: Maybe<&2, T.Turn>,
+def start_compaction.too_large(in_turn: Bool, turn: Maybe<&2, T.Turn>,
     +steer: List<&2, String>, +notifs: List<&2, String>,
     +history: List<&2, T.Msg>) -> DRes:
-  match auto:
+  match in_turn:
     case True{}:
       # in-turn: the active turn fails; what it was still holding is
       # committed (finish_turn), not dropped with the turn
@@ -339,8 +344,8 @@ def start_compaction.too_large(auto: Bool, turn: Maybe<&2, T.Turn>,
           List.append(&2, T.Obs, steer_obs(steer), notif_obs(notifs))},
         Nil{}, None{}, turn, Nil{}, history}
 
-def start_compaction.project(+auto: Bool, +extra: String, +actions: U32,
-    turn: Maybe<&2, T.Turn>, +steer: List<&2, String>,
+def start_compaction.project(+in_turn: Bool, +auto: Bool, +extra: String,
+    +actions: U32, turn: Maybe<&2, T.Turn>, +steer: List<&2, String>,
     +notifs: List<&2, String>, p: C.PRes,
     +history: List<&2, T.Msg>) -> DRes:
   match p:
@@ -352,24 +357,46 @@ def start_compaction.project(+auto: Bool, +extra: String, +actions: U32,
       DR{Con{T.CompactionStarted{actions, auto},
           List.append(&2, T.Obs, steer_obs(steer), notif_obs(notifs))},
         Con{T.CompactionCall{actions, input}, Nil{}},
-        Some{T.PComp{actions, 1n, actions, extra, auto}},
+        Some{T.PComp{actions, 1n, actions, extra, in_turn}},
         turn, Nil{}, history}
     case C.PBig{}:
-      start_compaction.too_large(auto, turn, steer, notifs, history)
+      start_compaction.too_large(in_turn, turn, steer, notifs, history)
 
-def start_compaction(auto: Bool, +extra: String, +cfg: T.Cfg,
+def start_compaction(in_turn: Bool, auto: Bool, +extra: String, +cfg: T.Cfg,
     +history: List<&2, T.Msg>, +actions: U32, turn: Maybe<&2, T.Turn>,
     +steer: List<&2, String>, +notifs: List<&2, String>) -> DRes:
-  start_compaction.project(auto, extra, actions, turn, steer, notifs,
+  start_compaction.project(in_turn, auto, extra, actions, turn, steer, notifs,
     C.project(cfg, history, extra), history)
 
 # ---- dispatch: the seam before every agent completion ----
 # Steering and notifications enter model context here (model-safe
 # boundary), then ADR 0011 preflight budgets the complete input.
 
-def dispatch.pick(fits: Bool, +cfg: T.Cfg, +history: List<&2, T.Msg>,
-    +history2: List<&2, T.Msg>, +actions: U32, +nulls: Nat,
-    +steer: List<&2, String>, +notifs: List<&2, String>) -> DRes:
+# never two compactions in a row (law no_compaction_after_compaction):
+# the dispatch right after a compaction (may = False) never starts
+# another one. Its input still over the threshold (a huge steering)
+# fails the turn instead of compacting forever.
+def dispatch.over(+may: Bool, +cfg: T.Cfg, +history: List<&2, T.Msg>,
+    +actions: U32, +nulls: Nat, +steer: List<&2, String>,
+    +notifs: List<&2, String>) -> DRes:
+  match may:
+    case True{}:
+      # oversized input starts compaction before the agent Action. The
+      # steering is NOT consumed (vibe_sdk keeps it pending): the
+      # compaction request projects the un-injected history, and the
+      # turn carries the steering for the first agent call after it
+      start_compaction(True{}, True{}, "", cfg, history, actions,
+        Some{T.Turn{nulls, steer, notifs, False{}}}, Nil{}, Nil{})
+    case False{}:
+      # the turn dies: what it was still holding is committed
+      DR{Con{T.TurnDone{"failed", "context_still_too_large"},
+          List.append(&2, T.Obs, steer_obs(steer), notif_obs(notifs))},
+        Nil{}, None{}, None{}, Nil{},
+        finish_history(Some{T.Turn{nulls, steer, notifs, False{}}}, history)}
+
+def dispatch.pick(fits: Bool, +may: Bool, +cfg: T.Cfg,
+    +history: List<&2, T.Msg>, +history2: List<&2, T.Msg>, +actions: U32,
+    +nulls: Nat, +steer: List<&2, String>, +notifs: List<&2, String>) -> DRes:
   match fits:
     case True{}:
       # the injected users are COMMITTED into the durable history
@@ -378,41 +405,56 @@ def dispatch.pick(fits: Bool, +cfg: T.Cfg, +history: List<&2, T.Msg>,
       DR{List.append(&2, T.Obs, steer_obs(steer), notif_obs(notifs)),
         Con{T.AgentCall{actions, model_input(cfg, history2)}, Nil{}},
         Some{T.PAgent{actions}},
-        Some{T.Turn{nulls, Nil{}, Nil{}}}, Nil{}, history2}
+        Some{T.Turn{nulls, Nil{}, Nil{}, False{}}}, Nil{}, history2}
     case False{}:
-      # oversized input starts compaction before the agent Action. The
-      # steering is NOT consumed (vibe_sdk keeps it pending): the
-      # compaction request projects the un-injected history, and the
-      # turn carries the steering for the first agent call after it
-      start_compaction(True{}, "", cfg, history, actions,
-        Some{T.Turn{nulls, steer, notifs}}, Nil{}, Nil{})
+      dispatch.over(may, cfg, history, actions, nulls, steer, notifs)
 
-def dispatch.thresh(+threshold: Nat, +cfg: T.Cfg, +history: List<&2, T.Msg>,
-    +actions: U32, turn: Maybe<&2, T.Turn>, +sess_notifs: List<&2, String>)
-    -> DRes:
+# the agent asked for a compaction (a tool result's compact flag): it
+# runs now, before the next model call, inside the turn, which goes on
+# from the summary when it is done. The flag is spent here: one request,
+# one compaction.
+def dispatch.asked(asked: Bool, +threshold: Nat, +may: Bool, +cfg: T.Cfg,
+    +history: List<&2, T.Msg>, +history2: List<&2, T.Msg>, +actions: U32,
+    +nulls: Nat, +steer: List<&2, String>, +notifs: List<&2, String>) -> DRes:
+  match asked:
+    case True{}:
+      start_compaction(True{}, False{}, "", cfg, history, actions,
+        Some{T.Turn{nulls, steer, notifs, False{}}}, Nil{}, Nil{})
+    case False{}:
+      dispatch.pick(Nat.is_lt(E.input_tokens(cfg, history2), threshold), may,
+        cfg, history, history2, actions, nulls, steer, notifs)
+
+def dispatch.thresh(+threshold: Nat, +may: Bool, +cfg: T.Cfg,
+    +history: List<&2, T.Msg>, +actions: U32, turn: Maybe<&2, T.Turn>,
+    +sess_notifs: List<&2, String>) -> DRes:
   match turn:
     case None{}:
       DR{Nil{}, Nil{}, None{}, None{}, Nil{}, history}
     case Some{t}:
       match t:
-        case T.Turn{+nulls, +steer, +tnotifs}:
+        case T.Turn{+nulls, +steer, +tnotifs, +compact}:
           +all_notifs = List.append(&2, String, sess_notifs, tnotifs)
           +history2 = List.append(&2, T.Msg,
             List.append(&2, T.Msg, history, inject_users(steer)),
             inject_users(all_notifs))
-          dispatch.pick(Nat.is_lt(E.input_tokens(cfg, history2), threshold),
-            cfg, history, history2, actions, nulls, steer, all_notifs)
+          dispatch.asked(Bool.and(compact, may), threshold, may, cfg, history,
+            history2, actions, nulls, steer, all_notifs)
 
-def dispatch.turn(+cfg: T.Cfg, +history: List<&2, T.Msg>, +actions: U32,
-    turn: Maybe<&2, T.Turn>, +sess_notifs: List<&2, String>) -> DRes:
+def dispatch.turn(+may: Bool, +cfg: T.Cfg, +history: List<&2, T.Msg>,
+    +actions: U32, turn: Maybe<&2, T.Turn>, +sess_notifs: List<&2, String>)
+    -> DRes:
   match cfg:
     case T.Cfg{+threshold, _, _, _, _}:
-      dispatch.thresh(threshold, cfg, history, actions, turn, sess_notifs)
+      dispatch.thresh(threshold, may, cfg, history, actions, turn, sess_notifs)
 
-def dispatch(+s: T.Session) -> DRes:
+# may: this dispatch may start a compaction (False right after one)
+def dispatch.may(+may: Bool, +s: T.Session) -> DRes:
   match s:
     case T.Sess{+cfg, +history, _, +actions, +turn, _, _, +notifs}:
-      dispatch.turn(cfg, history, actions, turn, notifs)
+      dispatch.turn(may, cfg, history, actions, turn, notifs)
+
+def dispatch(+s: T.Session) -> DRes:
+  dispatch.may(True{}, s)
 
 # wrap a dispatch result as an Accepted apply result; the emitted action id
 # is consumed, so the next action id moves on by one
@@ -429,8 +471,8 @@ def dispatch_result(+d: DRes, +pre: List<&2, T.Obs>, +s: T.Session) -> T.Res:
 
 # ---- completion result handlers ----
 
-def apply.completion.too_large(auto: Bool, +code: String, +s: T.Session) -> T.Res:
-  match auto:
+def apply.completion.too_large(in_turn: Bool, +code: String, +s: T.Session) -> T.Res:
+  match in_turn:
     case True{}:
       # the turn dies: commit what it was still holding
       T.Accepted{Con{T.CompactionFailed{code},
@@ -440,31 +482,32 @@ def apply.completion.too_large(auto: Bool, +code: String, +s: T.Session) -> T.Re
       T.Accepted{Con{T.CompactionFailed{code}, Nil{}}, Nil{},
         bump_inputs(set_pending(s, None{}))}
 
-def apply.completion.resume(auto: Bool, +s: T.Session, +summary: String) -> T.Res:
-  match auto:
+def apply.completion.resume(in_turn: Bool, +s: T.Session, +summary: String) -> T.Res:
+  match in_turn:
     case True{}:
       # the turn continues on the replacement context; the first agent
-      # Action after compaction uses the full new input
-      d = dispatch(s)
+      # Action after compaction uses the full new input. That dispatch
+      # never starts another compaction (dispatch.over)
+      d = dispatch.may(False{}, s)
       dispatch_result(d, Con{T.CompactionDone{summary}, Nil{}}, bump_inputs(s))
     case False{}:
       T.Accepted{Con{T.CompactionDone{summary}, Nil{}}, Nil{},
         bump_inputs(set_pending(s, None{}))}
 
-def apply.completion.accepted(r: C.RRes, +auto: Bool, +summary: String,
+def apply.completion.accepted(r: C.RRes, +in_turn: Bool, +summary: String,
     +s: T.Session) -> T.Res:
   match r:
     case C.ROk{+h2}:
       match s:
         case T.Sess{+cfg, +history, +inputs, +actions, +turn, _, +queued, +notifs}:
-          apply.completion.resume(auto,
+          apply.completion.resume(in_turn,
             T.Sess{cfg, h2, inputs, actions, turn, None{}, queued, notifs},
             summary)
     case C.RBig{}:
-      apply.completion.too_large(auto, "compaction_replacement_too_large", s)
+      apply.completion.too_large(in_turn, "compaction_replacement_too_large", s)
 
 def apply.completion.malformed.project(p: C.PRes, +action: U32,
-    +compaction: U32, +extra: String, +auto: Bool, +s: T.Session) -> T.Res:
+    +compaction: U32, +extra: String, +in_turn: Bool, +s: T.Session) -> T.Res:
   match p:
     case C.POk{+input}:
       match s:
@@ -475,43 +518,43 @@ def apply.completion.malformed.project(p: C.PRes, +action: U32,
               Nil{}},
             Con{T.CompactionCall{action, input}, Nil{}},
             T.Sess{cfg, history, Nat.add(inputs, 1n), U32.add(action, 1),
-              turn, Some{T.PComp{compaction, 2n, action, extra, auto}},
+              turn, Some{T.PComp{compaction, 2n, action, extra, in_turn}},
               queued, notifs}}
     case C.PBig{}:
-      apply.completion.too_large(auto, "compaction_request_too_large", s)
+      apply.completion.too_large(in_turn, "compaction_request_too_large", s)
 
 def apply.completion.malformed(retry: Bool, +compaction: U32, +extra: String,
-    +auto: Bool, +s: T.Session) -> T.Res:
+    +in_turn: Bool, +s: T.Session) -> T.Res:
   match retry:
     case True{}:
       match s:
         case T.Sess{+cfg, +history, _, +actions, _, _, _, _}:
           apply.completion.malformed.project(
             C.project(cfg, history, extra), U32.add(actions, 1),
-            compaction, extra, auto, s)
+            compaction, extra, in_turn, s)
     case False{}:
-      apply.completion.too_large(auto, "invalid_compaction_summary", s)
+      apply.completion.too_large(in_turn, "invalid_compaction_summary", s)
 
-def apply.completion.reply(v: Maybe<&2, String>, +auto: Bool,
+def apply.completion.reply(v: Maybe<&2, String>, +in_turn: Bool,
     +compaction: U32, +attempt: Nat, +extra: String, +s: T.Session) -> T.Res:
   match v:
     case Some{+summary}:
       match s:
         case T.Sess{+cfg, +history, _, _, _, _, _, _}:
-          apply.completion.accepted(C.replace(cfg, history, summary), auto,
+          apply.completion.accepted(C.replace(cfg, history, summary), in_turn,
             summary, s)
     case None{}:
       apply.completion.malformed(Nat.is_lt(attempt, 3n), compaction, extra,
-        auto, s)
+        in_turn, s)
 
 def apply.completion.comp(matched: Bool, +text: String,
     +calls: List<&2, T.Call>, +compaction: U32, +attempt: Nat,
-    +extra: String, +auto: Bool, +s: T.Session) -> T.Res:
+    +extra: String, +in_turn: Bool, +s: T.Session) -> T.Res:
   match matched:
     case False{}:
       T.Rejected{"stale completion action"}
     case True{}:
-      apply.completion.reply(C.valid_summary(text, calls), auto, compaction,
+      apply.completion.reply(C.valid_summary(text, calls), in_turn, compaction,
         attempt, extra, s)
 
 def cfg_max_nulls(+cfg: T.Cfg) -> Nat:
@@ -558,7 +601,7 @@ def apply.completion.empty(+s: T.Session) -> T.Res:
           T.Rejected{"no active turn"}
         case Some{t}:
           match t:
-            case T.Turn{+nulls, _, _}:
+            case T.Turn{+nulls, _, _, _}:
               apply.completion.null2(
                 Bool.not(Nat.is_le(Nat.add(nulls, 1n), cfg_max_nulls(cfg))),
                 nulls, s)
@@ -605,9 +648,9 @@ def apply.completion.pending(action: U32, +text: String,
       apply.completion.agent(U32.is_eq(a, action), text, calls, s)
     case T.PTools{_}:
       T.Rejected{"completion while tools pending"}
-    case T.PComp{+compaction, +attempt, a, +extra, +auto}:
+    case T.PComp{+compaction, +attempt, a, +extra, +in_turn}:
       apply.completion.comp(U32.is_eq(a, action), text, calls, compaction,
-        attempt, extra, auto, s)
+        attempt, extra, in_turn, s)
 
 def apply.completion(action: U32, +text: String, +calls: List<&2, T.Call>,
     +s: T.Session) -> T.Res:
@@ -643,11 +686,12 @@ def turn_with_notifs(turn: Maybe<&2, T.Turn>, +notifs: List<&2, String>)
     -> Maybe<&2, T.Turn>:
   match turn:
     case None{}:
-      Some{T.Turn{0n, Nil{}, notifs}}
+      Some{T.Turn{0n, Nil{}, notifs, False{}}}
     case Some{t}:
       match t:
-        case T.Turn{+nulls, +steer, +tnotifs}:
-          Some{T.Turn{nulls, steer, List.append(&2, String, notifs, tnotifs)}}
+        case T.Turn{+nulls, +steer, +tnotifs, _}:
+          Some{T.Turn{nulls, steer, List.append(&2, String, notifs, tnotifs),
+            False{}}}
 
 # big-request (2026-10-04): a call the provider refused for its size,
 # after the images were already cut (runtime/provider.bend), starts an
@@ -661,7 +705,7 @@ def apply.completion_fail.big(big: Bool, +error: String, +s: T.Session)
     case True{}:
       match s:
         case T.Sess{+cfg, +history, _, +actions, +turn, _, _, +notifs}:
-          dispatch_result(start_compaction(True{}, "", cfg, history, actions,
+          dispatch_result(start_compaction(True{}, True{}, "", cfg, history, actions,
               turn_with_notifs(turn, notifs), Nil{}, Nil{}),
             Con{T.CandidateDiscarded{error}, Nil{}}, bump_inputs(s))
     case False{}:
@@ -678,13 +722,13 @@ def apply.completion_fail.agent(matched: Bool, +error: String,
       apply.completion_fail.big(Bool.and(W.too_large(error),
           has_asst(sess_history(s))), error, s)
 
-def apply.completion_fail.comp(matched: Bool, +error: String, +auto: Bool,
+def apply.completion_fail.comp(matched: Bool, +error: String, +in_turn: Bool,
     +s: T.Session) -> T.Res:
   match matched:
     case False{}:
       T.Rejected{"stale completion action"}
     case True{}:
-      apply.completion.too_large(auto, String.append("provider failure: ", error), s)
+      apply.completion.too_large(in_turn, String.append("provider failure: ", error), s)
 
 def apply.completion_fail.pending(action: U32, +error: String,
     +s: T.Session, +p: T.Pending) -> T.Res:
@@ -693,8 +737,8 @@ def apply.completion_fail.pending(action: U32, +error: String,
       apply.completion_fail.agent(U32.is_eq(a, action), error, s)
     case T.PTools{_}:
       T.Rejected{"completion while tools pending"}
-    case T.PComp{+compaction, +attempt, a, +extra, +auto}:
-      apply.completion_fail.comp(U32.is_eq(a, action), error, auto, s)
+    case T.PComp{+compaction, +attempt, a, +extra, +in_turn}:
+      apply.completion_fail.comp(U32.is_eq(a, action), error, in_turn, s)
 
 def apply.completion_fail(action: U32, +error: String, +s: T.Session) -> T.Res:
   match s:
@@ -720,8 +764,19 @@ def apply.tool.done(+rest: List<&2, T.Call>, +call: U32, ok: Bool,
       T.Accepted{Con{T.ToolFinished{call, ok}, Con{T.ToolCommitted{call}, Nil{}}},
         Nil{}, bump_inputs(s1)}
 
-def apply.tool.commit(+call: U32, +out: String, +ok: Bool, +s: T.Session,
-    +c: T.Call, +rest: List<&2, T.Call>) -> T.Res:
+# a result that asks for a compaction marks the turn: the dispatch after
+# the last result of the batch runs it (dispatch.asked)
+def ask_compact(compact: Bool, turn: Maybe<&2, T.Turn>) -> Maybe<&2, T.Turn>:
+  match turn:
+    case None{}:
+      None{}
+    case Some{t}:
+      match t:
+        case T.Turn{+nulls, +steer, +tnotifs, +was}:
+          Some{T.Turn{nulls, steer, tnotifs, Bool.or(was, compact)}}
+
+def apply.tool.commit(+call: U32, +out: String, +ok: Bool, +compact: Bool,
+    +s: T.Session, +c: T.Call, +rest: List<&2, T.Call>) -> T.Res:
   match s:
     case T.Sess{+cfg, +history, +inputs, +actions, +turn, _, +queued, +notifs}:
       match c:
@@ -729,41 +784,45 @@ def apply.tool.commit(+call: U32, +out: String, +ok: Bool, +s: T.Session,
           apply.tool.done(rest, call, ok,
             T.Sess{cfg, List.append(&2, T.Msg, history,
               Con{tool_result_msg(name, out, ok), Nil{}}), inputs,
-              actions, turn, Some{T.PTools{rest}}, queued, notifs})
+              actions, ask_compact(compact, turn), Some{T.PTools{rest}},
+              queued, notifs})
 
-def apply.tool.found(+call: U32, +out: String, +ok: Bool, +s: T.Session,
-    +found: Taken) -> T.Res:
+def apply.tool.found(+call: U32, +out: String, +ok: Bool, +compact: Bool,
+    +s: T.Session, +found: Taken) -> T.Res:
   match found:
     case Got{c, rest}:
-      apply.tool.commit(call, out, ok, s, c, rest)
+      apply.tool.commit(call, out, ok, compact, s, c, rest)
 
-def apply.tool.take(+call: U32, +out: String, +ok: Bool, +s: T.Session,
-    +waiting: List<&2, T.Call>, taken: Maybe<&2, Taken>) -> T.Res:
+def apply.tool.take(+call: U32, +out: String, +ok: Bool, +compact: Bool,
+    +s: T.Session, +waiting: List<&2, T.Call>, taken: Maybe<&2, Taken>)
+    -> T.Res:
   match taken:
     case None{}:
       # a late result cannot complete the current work
       T.Rejected{"unknown tool call id"}
     case Some{found}:
-      apply.tool.found(call, out, ok, s, found)
+      apply.tool.found(call, out, ok, compact, s, found)
 
-def apply.tool.pending(+call: U32, +out: String, +ok: Bool, +s: T.Session,
-    +p: T.Pending) -> T.Res:
+def apply.tool.pending(+call: U32, +out: String, +ok: Bool, +compact: Bool,
+    +s: T.Session, +p: T.Pending) -> T.Res:
   match p:
     case T.PTools{+waiting}:
-      apply.tool.take(call, out, ok, s, waiting, take_call(waiting, call))
+      apply.tool.take(call, out, ok, compact, s, waiting,
+        take_call(waiting, call))
     case T.PAgent{_}:
       T.Rejected{"completion pending, not tools"}
     case T.PComp{_, _, _, _, _}:
       T.Rejected{"compaction pending, not tools"}
 
-def apply.tool(+call: U32, +out: String, +ok: Bool, +s: T.Session) -> T.Res:
+def apply.tool(+call: U32, +out: String, +ok: Bool, +compact: Bool,
+    +s: T.Session) -> T.Res:
   match s:
     case T.Sess{_, _, _, _, _, +pending, _, _}:
       match pending:
         case None{}:
           T.Rejected{"no pending tool result"}
         case Some{p}:
-          apply.tool.pending(call, out, ok, s, p)
+          apply.tool.pending(call, out, ok, compact, s, p)
 
 # ---- user messages ----
 
@@ -851,7 +910,7 @@ def apply.compact.idle(pending: Maybe<&2, T.Pending>, +extra: String,
     case None{}:
       match s:
         case T.Sess{+cfg, +history, _, +actions, _, _, _, +notifs}:
-          +d = start_compaction(False{}, extra, cfg, history, actions, None{},
+          +d = start_compaction(False{}, False{}, extra, cfg, history, actions, None{},
             Nil{}, notifs)
           dispatch_result(d, Nil{}, bump_inputs(s))
 
@@ -949,10 +1008,10 @@ def apply.cmd(cmd: T.Cmd, +s: T.Session) -> T.Res:
       apply.completion(action, text, calls, s)
     case T.CompletionFail{action, error}:
       apply.completion_fail(action, error, s)
-    case T.ToolOk{call, out}:
-      apply.tool(call, out, True{}, s)
-    case T.ToolFail{call, error}:
-      apply.tool(call, error, False{}, s)
+    case T.ToolOk{call, out, compact}:
+      apply.tool(call, out, True{}, compact, s)
+    case T.ToolFail{call, error, compact}:
+      apply.tool(call, error, False{}, compact, s)
     case T.Interrupt{}:
       apply.interrupt(s)
     case T.FailTurn{error}:

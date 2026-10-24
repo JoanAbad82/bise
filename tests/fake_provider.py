@@ -319,6 +319,28 @@ def last_user(conv):
     return idx
 
 
+# the Core's compaction prompt (bend/core/compaction.bend compaction_prompt) and the [[done: N]]
+# a fake summary carries
+COMPACT_PROMPT = "Summarize the conversation so far for the agent that continues it."
+DONE_MARK = re.compile(r"\[\[done: (\d+)\]\]")
+
+
+def calls_done_of(conv, i):
+    """The script calls of conv[i] that ran: the ones after it, plus what a compaction summary
+    before it says ran ([[done: N]]: the calls it replaced)."""
+    after = sum(m["calls"] for m in conv[i + 1:] if m["role"] == "assistant")
+    before = [int(d) for m in conv[:i] if m["role"] == "user" for d in DONE_MARK.findall(m["text"])]
+    return after + (before[-1] if before else 0)
+
+
+def compacted_calls(prev):
+    """What a compaction summary says ran: the last summary's count plus the calls after it (the
+    request carries the newest messages that fit, so the task's own message may be cut off)."""
+    marks = [(j, int(d)) for j, m in enumerate(prev) if m["role"] == "user" for d in DONE_MARK.findall(m["text"])]
+    start, k = marks[-1] if marks else (-1, 0)
+    return k + sum(m["calls"] for m in prev[start + 1:] if m["role"] == "assistant")
+
+
 def is_real_user(m):
     return m["role"] == "user" and not m["text"].lstrip().startswith("<bise_state>")
 
@@ -463,6 +485,17 @@ def reply_for(conv, seen=0):
             hit = [x for x in names if want and x.startswith(want)]
             turn["text"] = hit[0] if hit else "none"
         return turn
+    if conv and conv[-1]["role"] == "user" and conv[-1]["text"].lstrip().startswith(COMPACT_PROMPT):
+        # a compaction request: like a real model, the summary says how much of the task is
+        # done ([[done: N]], the script's calls that ran), so the turn that goes on from it
+        # runs the rest of the script, not the whole script again (compact_resume_e2e)
+        prev = conv[:-1]
+        i = last_user(prev)
+        key = script_of(prev[i]["text"]) if i is not None else ""
+        with State.lock:
+            done = max(compacted_calls(prev), State.done.get(key, 0))
+        turn["text"] = "<summary>[[done: %d]] the task so far: %d call(s) of its script ran; next: the rest</summary>" % (done, done)
+        return turn
     idx = last_user(conv)
     if idx is None:
         turn["text"] = "ack: (nothing)"
@@ -494,7 +527,7 @@ def reply_for(conv, seen=0):
     if um:
         turn["usage"] = {"input": int(um.group(1))}
     after = conv[idx + 1:]
-    calls_done = sum(m["calls"] for m in after if m["role"] == "assistant")
+    calls_done = calls_done_of(conv, idx)
     sc = scripted(user)
     if sc:
         marks = [(c["tool"], c["arg"] if isinstance(c["arg"], str) else json.dumps(c["arg"])) for c in sc.get("calls", [])]
@@ -530,6 +563,10 @@ def reply_for(conv, seen=0):
             cmd, desc = arg.split(" @@ ", 1)
             args = {"arg": cmd.strip(), "description": desc.strip()}
         turn["calls"] = [{"id": "call_%d_%d" % (idx, calls_done), "name": tool, "args": args}]
+        # what a summary of this task will say ran: a compaction request carries only the
+        # newest messages that fit, so the oldest calls are not in it (the summarizer saw them)
+        with State.lock:
+            State.done[user] = max(State.done.get(user, 0), calls_done + 1)
         say = SAY.search(user)
         if say:
             turn["text"] = say.group(1).strip()
@@ -938,6 +975,7 @@ def openai_view(turn):
 class State:
     lock = threading.Lock()
     seen = {}  # (family, agent, user message) -> requests so far
+    done = {}  # user message -> the most script calls seen made for it (a compaction's summary)
 
 
 def fixture_reply(family, name, stream):

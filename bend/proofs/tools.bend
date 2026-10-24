@@ -185,10 +185,7 @@ def Laws.self_acks_carry_markers():
 def Laws.deferred_reads_reload_request():
   {==}
 
-def Laws.deferred_reads_compact_request():
-  {==}
-
-def Laws.deferred_reads_both_requests():
+def Laws.deferred_never_compacts():
   {==}
 
 def Laws.deferred_resets_at_user():
@@ -201,6 +198,9 @@ def Laws.deferred_resets_after_final_reply():
   {==}
 
 def Laws.deferred_survives_tool_calls():
+  {==}
+
+def Laws.program_compact_reaches_core():
   {==}
 
 def Laws.deferred_empty_history():

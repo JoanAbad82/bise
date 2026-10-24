@@ -9,17 +9,19 @@ import ./tools-pure.bend as Xp
 # ---- self.* harness tools: requests the agent files mid-turn ----
 # self.reload and self.compact are programmatic: a run_typescript
 # program calls them (free identifiers become tool requests); they are
-# no top-level tools (BISE-293). Both only make sense BETWEEN turns, so the tool
-# result is an ACK; the deferred scan below finds it in the history
-# at the end of the turn and the REPL executes the request (compact
-# first, then reload — the checkpoint then carries the compacted
-# session into the restarted process).
+# no top-level tools (BISE-293). The tool result is an ACK, words for
+# the model. self.compact rides the program's result to the Core as a
+# typed flag (ToolOk's compact, from the request set below): the turn
+# compacts before its next model call and goes on from the summary.
+# self.reload only makes sense BETWEEN turns: the deferred scan below
+# finds its ack in the history at the end of the turn and the REPL
+# restarts the process.
 
 def RELOAD_ACK() -> String:
   "reload: scheduled - the harness will restart with the latest code when this turn ends; the session and background commands are preserved"
 
 def COMPACT_ACK() -> String:
-  "compact: scheduled - the conversation will be compacted when this turn ends"
+  "compact: scheduled - the conversation is compacted right after this call, then your turn goes on from the summary: keep working, do not end your turn for it"
 
 # is this name one of the self.* harness tools? (self.sleep is NOT
 # one: it is a programmatic tool executed inside run_typescript
@@ -56,6 +58,12 @@ type Def is Data:
 def def_none() -> Def:
   Def{False{}, False{}}
 
+# did the program file self.compact? (exec_done hands it to the Core)
+def def_compact(d: Def) -> Bool:
+  match d:
+    case Def{+compact, _}:
+      compact
+
 def def_merge(+d: Def, +compact: Bool, +reload: Bool) -> Def:
   match d:
     case Def{+c, +r}:
@@ -81,9 +89,10 @@ def def_ack.hit.ends(hit: Bool, +text: String, +ack: String) -> Bool:
 def def_ack.hit(+text: String, +ack: String) -> Bool:
   def_ack.hit.ends(String.ends_with(text, ack), text, ack)
 
+# only reload is read back from the history: a compaction already ran
+# inside the turn that asked for it
 def def_note(+d: Def, +text: String) -> Def:
-  def_merge(d, def_ack.hit(text, COMPACT_ACK()),
-    def_ack.hit(text, RELOAD_ACK()))
+  def_merge(d, False{}, def_ack.hit(text, RELOAD_ACK()))
 
 # a user message starts a new segment: requests before it are spent
 def def_step.role_is_tool(role: T.Role) -> Bool:
