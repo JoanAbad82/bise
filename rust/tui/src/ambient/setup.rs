@@ -56,7 +56,7 @@ pub enum Done {
     Market { source: String, res: Result<Vec<Plugin>, String> },
     /// a Mistral connector's connect said a step (`said`) or ended
     /// (`res`); the list is sent again either way
-    Connecting { project: Option<String>, said: Option<String>, res: Option<Result<(), String>> },
+    Connecting { id: String, project: Option<String>, said: Option<String>, res: Option<Result<(), String>> },
     /// the Mistral catalog fetched again (Err: its problem)
     Refreshed { project: Option<String>, res: Result<(), String> },
 }
@@ -188,6 +188,8 @@ pub struct SetupPorts {
     pub add_ctx: Box<dyn Fn() -> bend_plugins::add::Ctx>,
     pub plugin_connect: PluginConnectFn,
     pub plugins_refresh: PluginsRefreshFn,
+    /// why his Mistral connectors may be missing or old (their cache's)
+    pub connectors_problem: Box<dyn Fn() -> Option<bise_proto::app_rows::ConnectorsProblem>>,
     pub cu: CuPorts,
     /// each role's model (V17, [`role_rows`] of config.toml's setup)
     pub roles: Box<dyn Fn() -> Vec<RoleRow>>,
@@ -638,13 +640,14 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         add_ctx: Box::new(bend_plugins::add::Ctx::standard),
         // the TUI's own threads (crate::plugins), never the core loop
         plugin_connect: Box::new(|id, project, tx| {
-            let (tx2, p2) = (tx.clone(), project.clone());
+            let (tx2, p2, id1, id2) = (tx.clone(), project.clone(), id.to_string(), id.to_string());
             crate::plugins::connect(
                 id,
-                move |l| drop(tx.send(Done::Connecting { project: project.clone(), said: Some(l), res: None })),
-                move |r| drop(tx2.send(Done::Connecting { project: p2, said: None, res: Some(r) })),
+                move |l| drop(tx.send(Done::Connecting { id: id1.clone(), project: project.clone(), said: Some(l), res: None })),
+                move |r| drop(tx2.send(Done::Connecting { id: id2, project: p2, said: None, res: Some(r) })),
             )
         }),
+        connectors_problem: Box::new(crate::plugins::connectors_problem),
         plugins_refresh: Box::new(|project, tx| {
             crate::plugins::refresh(move |e| drop(tx.send(Done::Refreshed { project, res: e.map_or(Ok(()), Err) })));
         }),

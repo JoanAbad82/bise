@@ -45,6 +45,13 @@ pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::app_
     catalog::rows(&inputs)
 }
 
+/// Why his Mistral connectors may be missing or old (their cache's last
+/// problem), for the `plugins` and `browse {mistral}` events.
+pub(crate) fn connectors_problem() -> Option<bise_proto::app_rows::ConnectorsProblem> {
+    let cat = bend_plugins::connectors::cached(&bise_home::Home::from_env().connectors_cache());
+    bend_plugins::catalog::problem(&cat)
+}
+
 /// Connect Mistral connector `id` (`plugin_connect`, `/plugins
 /// connect`): his browser or one click, then the catalog polled until it
 /// is ready (up to 5 min), all on its own thread, never a draw or core

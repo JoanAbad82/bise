@@ -163,7 +163,13 @@ locked?: boolean,
 /**
  * what its button does (none: no button)
  */
-action?: PluginAction | null, parts?: Array<PluginPart>, 
+action?: PluginAction | null, 
+/**
+ * a Mistral connector's own login (it is its own server): pending
+ * while its connect runs (no button then), in when ready, out when
+ * not connected; none for every other kind
+ */
+login?: LoginState | null, parts?: Array<PluginPart>, 
 /**
  * what to try it with: its manifest's `dev.bise.prompts` (at most
  * 3, one line each); a click puts one in the composer, never sends it
@@ -314,6 +320,13 @@ export type PartKind = "skill" | "mcp" | "tool" | "unknown";
  * A remote MCP server's login.
  */
 export type LoginState = "needs" | "in" | "out" | "pending" | "unknown";
+
+/**
+ * Why his Mistral connectors may be missing or old (the connectors'
+ * cache, `bend_plugins::connectors::Problem`): the window says so from
+ * the kind, never from `why`.
+ */
+export type ConnectorsProblem = { "kind": "no_key" } | { "kind": "locked" } | { "kind": "fetch", why: string, } | { "kind": "unknown" };
 
 /**
  * A step of computer use's setup (P.2, the TUI's `/computer-use`

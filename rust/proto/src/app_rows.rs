@@ -195,6 +195,11 @@ pub struct Plugin {
     /// what its button does (none: no button)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<PluginAction>,
+    /// a Mistral connector's own login (it is its own server): pending
+    /// while its connect runs (no button then), in when ready, out when
+    /// not connected; none for every other kind
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<LoginState>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<PluginPart>,
     /// what to try it with: its manifest's `dev.bise.prompts` (at most
@@ -401,6 +406,25 @@ pub enum PartKind {
     Skill,
     Mcp,
     Tool,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
+/// Why his Mistral connectors may be missing or old (the connectors'
+/// cache, `bend_plugins::connectors::Problem`): the window says so from
+/// the kind, never from `why`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ConnectorsProblem {
+    /// no Mistral key: his account isn't connected
+    NoKey,
+    /// the keychain is locked: the key is there, unread
+    Locked,
+    /// the last fetch failed (`why`: its words, display only); the list is
+    /// the last good one
+    Fetch { why: String },
     /// a newer core's value
     #[serde(other)]
     Unknown,

@@ -257,6 +257,30 @@ fn a_server_turned_off_is_listed_off() {
 }
 
 #[test]
+fn a_connector_carries_its_own_login_pending_while_its_connect_runs() {
+    let t = tmp();
+    fixture(&t);
+    let rows = build(&t, &state(), &["mistral:notion".to_string()]);
+    let login = |id: &str| (row(&rows, id).login, row(&rows, id).action);
+    assert_eq!(login("mistral:gmail"), (Some(LoginState::In), None));
+    assert_eq!(login("mistral:notion"), (Some(LoginState::Pending), None), "no button while it connects");
+    assert_eq!(login("mistral:slack"), (Some(LoginState::Out), Some(PluginAction::Connect)));
+    assert_eq!(login("docs"), (None, None), "not a connector");
+}
+
+#[test]
+fn the_catalog_problem_is_typed() {
+    let mut cat = catalog();
+    assert_eq!(problem(&cat), None);
+    cat.error = Some(connectors::Problem::Locked);
+    assert_eq!(problem(&cat), Some(ConnectorsProblem::Locked));
+    cat.error = Some(connectors::Problem::Fetch("HTTP 500".into()));
+    assert_eq!(problem(&cat), Some(ConnectorsProblem::Fetch { why: "HTTP 500".into() }));
+    cat.error = Some(connectors::Problem::NoKey);
+    assert_eq!(problem(&cat), Some(ConnectorsProblem::NoKey));
+}
+
+#[test]
 fn connectors_ready_are_plugins_with_their_tools() {
     let t = tmp();
     fixture(&t);

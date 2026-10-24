@@ -88,10 +88,19 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         project: Option<Project>,
         items: Vec<Plugin>,
+        /// why his Mistral connectors may be missing or old (none: fine)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        connectors: Option<ConnectorsProblem>,
     },
     /// what a source offers to add: `source` is `mistral` (the connectors
     /// not connected yet) or a marketplace's address
-    Browse { source: String, items: Vec<Plugin> },
+    Browse {
+        source: String,
+        items: Vec<Plugin>,
+        /// `mistral`'s: why the list may be missing or old
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        connectors: Option<ConnectorsProblem>,
+    },
     /// the answer to `plugin_add`: what the plugin will run, shown before
     /// his click; `plugin_add_confirm {token}` adds it, `plugin_add_cancel`
     /// drops it (nothing of it ran)

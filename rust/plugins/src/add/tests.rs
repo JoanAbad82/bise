@@ -370,6 +370,21 @@ fn the_core_holds_previews_by_token_until_his_answer() {
     assert!(staging_is_empty(&ctx), "a closed window leaves no staged folder");
 }
 
+/// architect m_39668: a preview he never answered (a window closed
+/// without a cancel) goes after HELD_TTL, its staged folder with it.
+#[test]
+fn a_held_preview_goes_after_its_ttl() {
+    let (_t, ctx) = tmp("held-ttl");
+    let mut h = Held::default();
+    let (tok, _) = h.hold(stage(&mcp("a", Some("npx a"), None, &[]), &ctx).unwrap());
+    let now = std::time::Instant::now();
+    h.sweep(now);
+    assert!(!staging_is_empty(&ctx), "still waiting for him");
+    h.sweep(now + HELD_TTL);
+    assert_eq!(h.cancel(&tok).unwrap_err(), AddError::UnknownToken);
+    assert!(staging_is_empty(&ctx), "its staged folder went with it");
+}
+
 #[test]
 fn the_wire_add_carries_secret_names_only_and_writes_no_value() {
     use bise_proto::app_cmd::PluginAddKind as K;

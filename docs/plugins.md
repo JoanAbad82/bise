@@ -143,7 +143,15 @@ the bodies marked `todo!("plugins chunk ...")` come with their chunk.
   (`status`), `tool_count`, its tools by name (each switchable) and
   `error` (Some: it failed; display only); a remote one its `login`.
   `prompts`: the manifest's `dev.bise.prompts`, at most 3, blank ones
-  out.
+  out. A connector row carries its own `login` (it is its own server):
+  `in` when ready, `out` when not connected, `pending` with no button
+  while its connect runs (the core keeps its id with the open logins);
+  none for every other kind. The `plugins` and `browse {mistral}` events
+  carry `connectors: {kind: no_key|locked|fetch, why?}` when the
+  connectors' cache has a problem (`catalog::problem`): the window words
+  it from the kind (a locked keychain is never "connect your account").
+  The core's add previews (`add::Held`) go when it stops or after
+  `add::HELD_TTL` (30 min) without his answer, swept before each command.
 - **Paths** (`bise_home::Home`): `connectors_cache()`, `marketplaces()`
   (`~/.bise/marketplaces.json`), `mcp_secrets_dir()`
   (`~/.bise/secrets/mcp-env/`).

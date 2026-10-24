@@ -112,7 +112,8 @@ pub(crate) struct Setup {
     rx: Receiver<Done>,
     /// the provider whose sign-in runs (one at a time)
     signing: Option<String>,
-    /// the plugin servers whose login runs (their browser is open)
+    /// the plugin servers whose login runs (their browser is open) and
+    /// the connectors whose connect runs (by id): their rows say pending
     logins: Vec<String>,
     /// the add menu's previews waiting for his click (dropped with the
     /// core: their staged folders go)
@@ -323,6 +324,10 @@ impl Core {
 
     /// One of the window's setup commands.
     pub(super) fn app_cmd(&mut self, c: AppCmd) {
+        // a preview he never answered goes after add::HELD_TTL
+        if let Some(s) = self.setup.as_mut() {
+            s.staged.sweep(Instant::now());
+        }
         let Some(s) = &self.setup else {
             return self.setup_error("setup", "this core has no setup");
         };
@@ -434,7 +439,17 @@ impl Core {
                 let shown = self.emit_plugins(project);
                 ("plugin_logout", res.and(shown))
             }
-            AppCmd::PluginConnect { project, id } => ("plugin_connect", (p.plugin_connect)(&id, project, s.tx.clone())),
+            AppCmd::PluginConnect { project, id } => {
+                let res = (p.plugin_connect)(&id, project.clone(), s.tx.clone());
+                // its row shows login: pending until the connect ends
+                if res.is_ok() {
+                    if let Some(s) = self.setup.as_mut() {
+                        s.logins.push(id);
+                    }
+                    let _ = self.emit_plugins(project);
+                }
+                ("plugin_connect", res)
+            }
             AppCmd::PluginsRefresh { project } => {
                 (p.plugins_refresh)(project, s.tx.clone());
                 ("plugins_refresh", Ok(()))
@@ -578,12 +593,9 @@ impl Core {
         let s = self.setup.as_ref().ok_or("this core has no setup")?;
         let (browse, items): (Vec<_>, Vec<_>) =
             (s.ports.plugins)(&ws, &s.logins).into_iter().partition(|r| r.state == bise_proto::app_rows::PluginState::Available);
-        let mut ev = json!({"ev": "plugins", "items": items});
-        if let Some(p) = project {
-            ev["project"] = json!(p);
-        }
-        self.emit(ev);
-        self.ev(CoreEv::Browse { source: MISTRAL.into(), items: browse });
+        let connectors = (s.ports.connectors_problem)();
+        self.ev(CoreEv::Plugins { project, items, connectors: connectors.clone() });
+        self.ev(CoreEv::Browse { source: MISTRAL.into(), items: browse, connectors });
         Ok(())
     }
 
@@ -675,7 +687,7 @@ impl Core {
                 },
                 // a step's line goes to the core's log (no window event
                 // carries it yet); its end, the list again
-                Done::Connecting { project, said, res } => {
+                Done::Connecting { id, project, said, res } => {
                     if let Some(l) = said {
                         eprintln!("ambient-core: plugin_connect: {l}");
                     }
@@ -683,6 +695,9 @@ impl Core {
                         Some(Err(e)) => self.setup_error("plugin_connect", &e),
                         Some(Ok(())) => {}
                         None => continue,
+                    }
+                    if let Some(s) = self.setup.as_mut() {
+                        s.logins.retain(|n| *n != id);
                     }
                     let _ = self.emit_plugins(project);
                 }
@@ -693,7 +708,7 @@ impl Core {
                     let _ = self.emit_plugins(project);
                 }
                 Done::Market { source, res } => match res {
-                    Ok(items) => self.ev(CoreEv::Browse { source, items }),
+                    Ok(items) => self.ev(CoreEv::Browse { source, items, connectors: None }),
                     Err(e) => self.setup_error("plugin_add", &format!("{source}: {e}")),
                 },
                 Done::LoggedIn { name, project, res } => {

@@ -22,7 +22,7 @@ use crate::id::{PartKind as IdPart, PluginId, SkillsScope};
 use crate::model::{ConnectorAuth, ConnectorEntry, SkillEntry, StateV2};
 use crate::resolve::{self, HttpServer, StdioServer};
 use crate::{connectors, status};
-use bise_proto::app_rows::{LoginState, PartKind, Plugin, PluginAction, PluginKind, PluginLogin, PluginPart, PluginScope, PluginState};
+use bise_proto::app_rows::{ConnectorsProblem, LoginState, PartKind, Plugin, PluginAction, PluginKind, PluginLogin, PluginPart, PluginScope, PluginState};
 use bise_proto::words::settings;
 use std::path::{Path, PathBuf};
 
@@ -41,7 +41,8 @@ pub struct Inputs<'a> {
     pub status_dir: Option<&'a Path>,
     /// the remote servers' login tokens (`oauth::store_dir`)
     pub oauth_dir: Option<&'a Path>,
-    /// the logins open in his browser, by name
+    /// the logins open in his browser, by name (a remote server's), and
+    /// the connectors whose connect runs, by id (`mistral:gmail`)
     pub pending_logins: &'a [String],
 }
 
@@ -61,7 +62,7 @@ pub fn rows(inputs: &Inputs) -> Vec<Plugin> {
     for scope in [SkillsScope::Personal, SkillsScope::Workspace, SkillsScope::Vibe] {
         out.extend(skills_row(inputs, scope));
     }
-    out.extend(browse.into_iter().map(browse_row));
+    out.extend(browse.into_iter().map(|c| browse_row(c, inputs.pending_logins)));
     out
 }
 
@@ -143,6 +144,7 @@ fn plugin_row(i: &Inputs, p: &resolve::Plugin, names: &[(String, String, String)
         on,
         locked: false,
         action: (on && needs).then_some(PluginAction::LogIn),
+        login: None,
         prompts: prompts(&p.prompts),
         // TODO(plugin-logins): the released app's reader, the same parts
         // in the released shape; goes in desktop-v2026.10.16
@@ -286,21 +288,36 @@ fn connector_row(st: &StateV2, c: &ConnectorEntry) -> Plugin {
     Plugin {
         on,
         state: if on { PluginState::Loaded } else { PluginState::Disabled },
+        login: Some(LoginState::In),
         parts,
         ..connector_base(c, id)
     }
 }
 
 /// A connector not connected yet: a Browse item with its button (none
-/// when bise can't connect it).
-fn browse_row(c: &ConnectorEntry) -> Plugin {
+/// when bise can't connect it, nor while its connect runs: `pending`).
+fn browse_row(c: &ConnectorEntry, pending: &[String]) -> Plugin {
+    let id = PluginId::mistral(&c.name);
+    if pending.contains(&id.to_string()) {
+        return Plugin { state: PluginState::Available, login: Some(LoginState::Pending), ..connector_base(c, id) };
+    }
     // Unknown: no auth_action bise knows, not connectable from bise (no button)
     let action = match c.auth {
         ConnectorAuth::CredentialsSetup => Some(PluginAction::SetUp),
         ConnectorAuth::OAuth | ConnectorAuth::NoAuthConnect => Some(PluginAction::Connect),
         ConnectorAuth::Ready | ConnectorAuth::Unknown => None,
     };
-    Plugin { state: PluginState::Available, action, ..connector_base(c, PluginId::mistral(&c.name)) }
+    Plugin { state: PluginState::Available, action, login: Some(LoginState::Out), ..connector_base(c, id) }
+}
+
+/// Why his connectors may be missing or old, for the `plugins` and
+/// `browse {mistral}` events (the window words it from the kind).
+pub fn problem(catalog: &connectors::Catalog) -> Option<ConnectorsProblem> {
+    catalog.error.as_ref().map(|p| match p {
+        connectors::Problem::NoKey => ConnectorsProblem::NoKey,
+        connectors::Problem::Locked => ConnectorsProblem::Locked,
+        connectors::Problem::Fetch(why) => ConnectorsProblem::Fetch { why: why.clone() },
+    })
 }
 
 fn connector_base(c: &ConnectorEntry, id: PluginId) -> Plugin {
@@ -318,6 +335,7 @@ fn connector_base(c: &ConnectorEntry, id: PluginId) -> Plugin {
         on: false,
         locked: false,
         action: None,
+        login: None,
         parts: Vec::new(),
         prompts: Vec::new(),
         logins: Vec::new(),
@@ -368,6 +386,7 @@ fn skills_row(i: &Inputs, scope: SkillsScope) -> Option<Plugin> {
         on,
         locked,
         action: None,
+        login: None,
         parts,
         prompts: Vec::new(),
         logins: Vec::new(),

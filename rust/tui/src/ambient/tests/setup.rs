@@ -47,6 +47,9 @@ struct World {
     /// marketplaces read, and where a confirmed add installs (a temp dir)
     staging: Option<std::sync::mpsc::Sender<Done>>,
     markets: Vec<String>,
+    /// a connect's channel, and the pending names each rows call saw
+    connecting: Option<std::sync::mpsc::Sender<Done>>,
+    pending_seen: Vec<Vec<String>>,
     add_root: PathBuf,
 }
 
@@ -73,7 +76,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (x, y, z) = (w.clone(), w.clone(), w.clone());
     let mf = w.clone();
-    let (ad, am, ac) = (w.clone(), w.clone(), w.clone());
+    let (ad, am, ac, pc) = (w.clone(), w.clone(), w.clone(), w.clone());
     let (kn, ks) = (w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
@@ -151,6 +154,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             Ok(())
         }),
         plugins: Box::new(move |ws, pending| {
+            j.borrow_mut().pending_seen.push(pending.to_vec());
             let off = j.borrow().plugin_sets.iter().rev().find(|(n, _)| n == "computer").is_none_or(|(_, on)| !on);
             let login = |name: &str| PluginPart {
                 id: format!("{name}#mcp:{name}"),
@@ -178,6 +182,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 on,
                 locked: false,
                 action: None,
+                login: None,
                 prompts: vec![],
                 logins: vec![],
                 parts,
@@ -212,8 +217,12 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
         }),
         add_ctx: Box::new(move || add_ctx(&ac.borrow().add_root)),
         // a connect never runs here (his browser); a refresh ends at once
-        plugin_connect: Box::new(|_id, _project, _tx| Ok(())),
+        plugin_connect: Box::new(move |_id, _project, tx| {
+            pc.borrow_mut().connecting = Some(tx);
+            Ok(())
+        }),
         plugins_refresh: Box::new(|project, tx| drop(tx.send(Done::Refreshed { project, res: Err("no key".into()) }))),
+        connectors_problem: Box::new(|| Some(bise_proto::app_rows::ConnectorsProblem::Locked)),
         cu: CuPorts {
             is_on: Box::new(move || n.borrow().cu_on),
             set_on: Box::new(move |on| o.borrow_mut().cu_on = on),
@@ -539,6 +548,9 @@ fn the_add_menu_previews_then_installs_on_his_click() {
     app(&mut t, r#"{"cmd":"plugins"}"#);
     let out = t.take();
     assert_eq!(evs(&out, "browse")[0]["source"], "mistral");
+    // the connectors' problem, typed, on both events (the fake: a locked keychain)
+    assert_eq!(evs(&out, "plugins")[0]["connectors"]["kind"], "locked");
+    assert_eq!(evs(&out, "browse")[0]["connectors"]["kind"], "locked");
     assert!(evs(&out, "plugins")[0]["items"].as_array().unwrap().iter().all(|r| r["state"] != "available"));
     assert_eq!(evs(&out, "browse")[0]["items"][0]["id"], "mistral:notion");
 
@@ -557,6 +569,17 @@ fn the_add_menu_previews_then_installs_on_his_click() {
     assert_eq!(evs(&out, "plugins").len(), 1, "the list again");
     app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}"}}"#));
     assert_eq!(evs(&t.take(), "error")[0]["cmd"], "plugin_add_confirm", "a token works once");
+
+    // a connect: its id is pending in the rows until its end (the fake port
+    // never runs it); the end, the list again without it
+    app(&mut t, r#"{"cmd":"plugin_connect","id":"mistral:notion"}"#);
+    assert_eq!(w.borrow().pending_seen.last().cloned().unwrap_or_default(), vec!["mistral:notion".to_string()]);
+    t.take();
+    let tx = w.borrow_mut().connecting.take().expect("its connect started");
+    tx.send(Done::Connecting { id: "mistral:notion".into(), project: None, said: None, res: Some(Ok(())) }).unwrap();
+    t.until(|o| !evs(o, "plugins").is_empty());
+    t.take();
+    assert!(w.borrow().pending_seen.last().is_some_and(|p| p.is_empty()), "no longer pending");
 
     app(&mut t, r#"{"cmd":"plugin_add","add":{"kind":"marketplace","url":"openai/plugins"}}"#);
     assert_eq!(w.borrow().markets, vec!["openai/plugins".to_string()]);

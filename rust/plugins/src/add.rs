@@ -594,14 +594,19 @@ pub fn discard(staged: Staged) {
 /// `plugin_preview` -> `plugin_add_confirm`/`cancel`). Dropped whole when
 /// the window closes or the core stops ([`Held::clear`], and on drop).
 #[derive(Default)]
-pub struct Held(std::collections::BTreeMap<String, Staged>);
+pub struct Held(std::collections::BTreeMap<String, (std::time::Instant, Staged)>);
+
+/// How long a preview waits for his answer: a window that closed
+/// without a cancel doesn't keep its token (and staged folder) forever
+/// (architect m_39668).
+pub const HELD_TTL: Duration = Duration::from_secs(30 * 60);
 
 impl Held {
     /// Keep `staged` until his answer; its token and preview, for
     /// `plugin_preview`.
     pub fn hold(&mut self, staged: Staged) -> (String, Preview) {
         let out = (staged.token.clone(), staged.preview.clone());
-        if let Some(old) = self.0.insert(staged.token.clone(), staged) {
+        if let Some((_, old)) = self.0.insert(staged.token.clone(), (std::time::Instant::now(), staged)) {
             discard(old);
         }
         out
@@ -612,7 +617,7 @@ impl Held {
     /// then the held plugin installed. A name the preview doesn't list
     /// refuses and writes nothing; the preview stays held.
     pub fn confirm(&mut self, token: &str, secrets: &[SecretValue], ctx: &Ctx) -> Result<PathBuf, AddError> {
-        let staged = self.0.get_mut(token).ok_or(AddError::UnknownToken)?;
+        let (_, staged) = self.0.get_mut(token).ok_or(AddError::UnknownToken)?;
         if let Some(s) = secrets.iter().find(|s| !staged.preview.secrets.contains(&s.name)) {
             return Err(AddError::UnknownSecret { name: s.name.clone() });
         }
@@ -622,19 +627,30 @@ impl Held {
                 None => staged.secrets.push((s.name.clone(), s.value.expose().to_string())),
             }
         }
-        let staged = self.0.remove(token).ok_or(AddError::UnknownToken)?;
+        let (_, staged) = self.0.remove(token).ok_or(AddError::UnknownToken)?;
         install(staged, ctx)
     }
 
     /// He closed the preview.
     pub fn cancel(&mut self, token: &str) -> Result<(), AddError> {
-        discard(self.0.remove(token).ok_or(AddError::UnknownToken)?);
+        discard(self.0.remove(token).ok_or(AddError::UnknownToken)?.1);
         Ok(())
+    }
+
+    /// The previews held longer than [`HELD_TTL`] at `now` dropped (the
+    /// desktop's core, before each command it handles).
+    pub fn sweep(&mut self, now: std::time::Instant) {
+        let old: Vec<String> = self.0.iter().filter(|(_, (at, _))| now.saturating_duration_since(*at) >= HELD_TTL).map(|(k, _)| k.clone()).collect();
+        for k in old {
+            if let Some((_, s)) = self.0.remove(&k) {
+                discard(s);
+            }
+        }
     }
 
     /// Every preview dropped (the window closed).
     pub fn clear(&mut self) {
-        for (_, s) in std::mem::take(&mut self.0) {
+        for (_, (_, s)) in std::mem::take(&mut self.0) {
             discard(s);
         }
     }
