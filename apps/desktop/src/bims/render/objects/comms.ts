@@ -217,11 +217,17 @@ const dish: Maker = (g, o) => {
   g.box(0.12, 0.12, 0.1, SLATE, 0, 1.0, -0.02, 0.02);
   g.ball(0.022, GREEN, 0.07, 0.125, 0.205, 0.5 + o.night);
   g.box(0.03, 0.03, 0.2, INK, -0.07, 0.155, 0.12, 0.01);
-  // the dish, 35° up: its inside a step darker than its rim (the lightest edge), its back shell, the feed horn on three struts at its focus
+  // the dish, 35° up: its inside a step darker than its rolled lip (the lightest edge), its back shell, the feed horn on three struts at its focus
   const d = g.at(0, 1.1, 0.03); d.root.rotation.x = -0.61;
   d.ball(0.43, STEEL, 0, 0, -0.08).scale.set(1, 1, 0.18);
   d.cyl(0.42, 0.02, darker(CREAM, 0.8), 0, 0, 0).rotation.x = Math.PI / 2;
-  for (let i = 0; i < 32; i++) { const a = (i / 32) * Math.PI * 2; d.ball(0.04, CREAM, Math.cos(a) * 0.43, Math.sin(a) * 0.43, 0.02); }
+  // the rolled lip: one smooth torus, short tube segments meeting in balls of the same radius (the kit has no torus)
+  const LIP = 36, R = 0.43;
+  for (let i = 0; i < LIP; i++) {
+    const a = (i / LIP) * Math.PI * 2, m = a + Math.PI / LIP;
+    d.ball(0.035, CREAM, Math.cos(a) * R, Math.sin(a) * R, 0.02);
+    d.cyl(0.035, 2 * R * Math.sin(Math.PI / LIP), CREAM, Math.cos(m) * R * Math.cos(Math.PI / LIP), Math.sin(m) * R * Math.cos(Math.PI / LIP), 0.02).rotation.z = m;
+  }
   d.cyl(0.1, 0.06, STEEL, 0, 0, -0.17).rotation.x = Math.PI / 2;
   for (const a of [Math.PI / 2, (7 * Math.PI) / 6, (11 * Math.PI) / 6]) rod(d, 0.008, STEEL, [Math.cos(a) * 0.42, Math.sin(a) * 0.42, 0.03], [0, 0, 0.33]);
   d.cone(0.06, 0.1, SLATE, 0, 0, 0.34).rotation.x = Math.PI / 2;
