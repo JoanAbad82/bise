@@ -2,8 +2,8 @@
 
 /* in main's empty thread: its own scroll when the window is short, centred when it has room */
 .th-first.th-welcome {
-  /* its height sizes the office: the whole welcome fits over the composer when it can */
-  container-type: size;
+  /* its height sizes the office (Welcome.tsx useOfficeRoom): the whole welcome fits over the
+     inbox and the composer when it can, and scrolls only once the office hid */
   overflow-y: auto;
   align-items: safe center;
   padding: var(--s-4) 0;
@@ -11,7 +11,6 @@
 /* under main's own lines: it shrinks to the list's room and scrolls there, never drawn past it over
    the inbox block under the list (designer m_38701: the ideas sat on the inbox's head) */
 .th-first.th-welcome.after {
-  container-type: normal;
   overflow-y: auto;
   padding: 0;
 }
@@ -33,11 +32,18 @@
   width: 100%;
   max-width: 440px;
 }
+/* the office gives way first (designer m_38760): its width is set from the room left over the
+   words (Welcome.tsx, room.ts), its height follows; under 120 px it goes, and only then the
+   welcome scrolls. No frame, no fill: the cube on the page, as in the bar (bims, designer m_38197) */
 .welcome-map {
-  /* the office gives way to the words in a short window (the legend, the message, the ideas
-     take ~330 px), never under 240 px: past that the welcome scrolls. No frame, no fill: the
-     cube on the page, as in the bar (bims, designer m_38197) */
-  max-width: max(240px, min(440px, calc((100cqh - 330px) * 1.4)));
+  flex: none;
+}
+/* the legend, the message and the ideas: one block, measured, never squeezed */
+.welcome-words {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--s-3);
 }
 /* the bar's office spans the bar's padding (office.css): here it is the column's width */
 .welcome-map .bims-office {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_ORDER, type ThreadOrder } from '@/store/types';
 import { introShows, welcomeShows } from './rule';
 import { moveOf } from './dock';
+import { officeRoom } from './room';
 
 const view = (o: Partial<ThreadOrder>): ThreadOrder => ({ ...EMPTY_ORDER, loaded: true, ...o });
 
@@ -51,6 +52,19 @@ describe('introShows: the lead\'s intro as the first row once he wrote', () => {
     expect(introShows(view({}), false, 0)).toBe(false);
     expect(introShows(view({ order: [40], before: 40, more: true }), true, 0)).toBe(false);
     expect(introShows(view({ order: [1], gap: { lo: 1, hi: 9, from: 2 } }), true, 0)).toBe(false);
+  });
+});
+
+describe('officeRoom: the office gives way first (designer m_38760)', () => {
+  it("its height is the slot's room after the words and the gap", () => {
+    expect(officeRoom(700, 330, 12)).toBe(358);
+  });
+
+  it('under 120 px it hides; at 120 it shows', () => {
+    expect(officeRoom(461, 330, 12)).toBeNull();
+    expect(officeRoom(461.5, 330, 12)).toBeNull();
+    expect(officeRoom(462, 330, 12)).toBe(120);
+    expect(officeRoom(300, 330, 12)).toBeNull();
   });
 });
 

@@ -183,9 +183,13 @@ for (const theme of ['light', 'dark'] as const) {
       await s.close();
     }
     // main alone with open cards, its thread empty then with a line of main's: both stack
-    for (const mainLines of [false, true]) {
+    for (const [mainLines, height] of [[false, 720], [true, 720], [false, 900]] as const) {
       s = await launchDesktop({ core: new FakeCore(withCards(theme, { agents: [], cardAgent: 'main', mainLines }) as never), route: `project/${P}` });
       try {
+        await s.app.evaluate(({ BrowserWindow }, h) => {
+          BrowserWindow.getAllWindows().find((b) => b.webContents.getURL().includes('surface=window'))?.setContentSize(1280, h);
+        }, height);
+        await expect.poll(() => s.page.evaluate(() => window.innerHeight), { timeout: 5000 }).toBe(height);
         await expect(s.page.getByTestId('welcome')).toBeVisible({ timeout: 20_000 });
         await expect(s.page.getByTestId('inbox.block')).toBeVisible();
         await s.page.waitForTimeout(1200);
@@ -199,8 +203,18 @@ for (const theme of ['light', 'dark'] as const) {
           return getComputedStyle(el).overflowY === 'visible' && el.scrollHeight > box.height + 1;
         });
         expect(spills, 'the welcome spills out of its slot').toBe(false);
+        // the office gives way first (designer m_38760): the ideas whole over the inbox, and while
+        // the office shows the slot doesn't scroll
+        const idea = await s.page.getByTestId('welcome.idea.2').boundingBox();
+        if (idea === null) throw new Error('no box for the last idea');
+        expect(idea.y + idea.height, 'the ideas end over the inbox block').toBeLessThanOrEqual(Math.min(inbox.y, slot.y + slot.height) + 0.5);
+        const office = await s.page.getByTestId('welcome').getAttribute('data-room');
+        if (office !== 'none') {
+          const scrolls = await s.page.getByTestId('thread.first').evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+          expect(scrolls, 'the slot scrolls while the office shows').toBe(false);
+        }
         const tag = mainLines ? 'under a line of main' : 'empty thread';
-        save(`1280-${theme}-6-stacked-${mainLines ? 'after' : 'centred'}.png`, await shown(s), `1280 ${theme} · main alone, 2 open cards, ${tag}: the welcome over the inbox, stacked`);
+        save(`1280x${String(height)}-${theme}-6-stacked-${mainLines ? 'after' : 'centred'}.png`, await shown(s), `1280x${String(height)} ${theme} · main alone, 2 open cards, ${tag}: the welcome over the inbox, stacked${office === 'none' ? ' (no room: the office hid)' : ''}`);
       } finally {
         await s.close();
       }
