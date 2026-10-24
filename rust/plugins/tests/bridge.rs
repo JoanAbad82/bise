@@ -4,9 +4,14 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use bend_plugins::{bridge, resolve};
+use bend_plugins::connectors::Catalog;
+use bend_plugins::id::{PartKind, PluginId};
+use bend_plugins::model::{ConnectorAuth, ConnectorEntry, StateV2, ToolEntry};
+use bend_plugins::{bridge, resolve, secrets, state, status};
 
 /// The loose skill folders of every bridge in this binary: one of the
 /// test's own (`$BISE_SKILL_ROOTS`, set the same by each test), never the
@@ -36,6 +41,14 @@ fn fixture_root(tag: &str) -> (PathBuf, PathBuf) {
         .success();
     assert!(ok);
     (base.canonicalize().unwrap(), plugins)
+}
+
+fn wait_until(what: &str, f: impl Fn() -> bool) {
+    let t0 = Instant::now();
+    while !f() {
+        assert!(t0.elapsed() < Duration::from_secs(20), "never: {}", what);
+        std::thread::sleep(Duration::from_millis(25));
+    }
 }
 
 /// POST one JSON-RPC body on a kept-alive connection.
@@ -81,7 +94,7 @@ fn fixture_plugin_end_to_end() {
         data: base.join("data"),
         state: Default::default(),
     };
-    let opts = bridge::Opts { dir: dir.clone(), parent: Some(parent.id()), roots, status_dir: None, secrets_dir: None, ready_wait: bridge::READY_WAIT };
+    let opts = bridge::Opts::new(dir.clone(), Some(parent.id()), roots);
     let server = std::thread::spawn(move || bridge::serve(opts));
     let t0 = Instant::now();
     while !dir.join("ready").exists() {
@@ -165,14 +178,19 @@ fn failing_server_is_a_diagnostic() {
         data: base.join("data"),
         state: Default::default(),
     };
-    // nothing to serve: returns once the files are written
-    bridge::serve(bridge::Opts { dir: dir.clone(), parent: None, roots, status_dir: None, secrets_dir: None, ready_wait: bridge::READY_WAIT }).unwrap();
+    let mut parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+    let opts = bridge::Opts::new(dir.clone(), Some(parent.id()), roots);
+    let server = std::thread::spawn(move || bridge::serve(opts));
+    wait_until("the bridge ready", || dir.join("ready").exists());
     assert_eq!(std::fs::read_to_string(dir.join("mcp-index.txt")).unwrap(), "");
     let report = std::fs::read_to_string(dir.join("report.txt")).unwrap();
     assert!(report.contains("plugin.mcp.connection_failed"), "{}", report);
     assert!(report.contains("boom"), "{}", report);
     // the skill still loads
     assert!(std::fs::read_to_string(dir.join("skills-index.txt")).unwrap().contains("hello_plugin:greet"));
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    server.join().unwrap().unwrap();
     let _ = std::fs::remove_dir_all(&base);
 }
 
@@ -201,7 +219,7 @@ fn limits_filter_tools_bound_calls_and_late_servers_join() {
         data: base.join("data"),
         state: Default::default(),
     };
-    let opts = bridge::Opts { dir: dir.clone(), parent: Some(parent.id()), roots, status_dir: None, secrets_dir: None, ready_wait: Duration::from_secs(4) };
+    let opts = bridge::Opts { ready_wait: Duration::from_secs(4), ..bridge::Opts::new(dir.clone(), Some(parent.id()), roots) };
     let server = std::thread::spawn(move || bridge::serve(opts));
     let t0 = Instant::now();
     while !dir.join("ready").exists() {
@@ -253,6 +271,177 @@ fn limits_filter_tools_bound_calls_and_late_servers_join() {
         assert!(t0.elapsed() < Duration::from_secs(30), "the slow server never came up: {}", b);
         std::thread::sleep(Duration::from_millis(200));
     }
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    server.join().unwrap().unwrap();
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+// ---- the session's one tool index: connectors, toggles, no server ----
+
+/// A catalog with one ready connector (`gmail`, one tool), given once.
+fn fake_catalog() -> bridge::CatalogSource {
+    let given = AtomicBool::new(false);
+    Arc::new(move |_now| {
+        if given.swap(true, Ordering::SeqCst) {
+            return None;
+        }
+        Some(Catalog {
+            connectors: vec![ConnectorEntry {
+                name: "gmail".into(),
+                display_name: "Gmail".into(),
+                id: "c0ffee-gmail".into(),
+                auth: ConnectorAuth::Ready,
+                tools: vec![ToolEntry { name: "send_email".into(), description: "Send a mail".into(), input_schema: r#"{"type":"object"}"#.into() }],
+            }],
+            fetched_ms: 1,
+            error: None,
+        })
+    })
+}
+
+fn roots_of(base: &Path, workspace: Option<PathBuf>) -> resolve::Roots {
+    resolve::Roots { builtin: None, user: None, workspace, data: base.join("data"), state: StateV2::default() }
+}
+
+fn index(dir: &Path) -> String {
+    std::fs::read_to_string(dir.join("mcp-index.txt")).unwrap_or_default()
+}
+
+/// The loopback connection and path of the line of `tool` in the index.
+fn route(dir: &Path, tool: &str) -> (BufReader<TcpStream>, String) {
+    let i = index(dir);
+    let line = i.lines().find(|l| l.split(' ').nth(2) == Some(tool)).unwrap_or_else(|| panic!("no {tool} in {i}"));
+    let rest = line.split(' ').next().unwrap().strip_prefix("http://").unwrap().to_string();
+    let (host, path) = rest.split_at(rest.find('/').unwrap());
+    (BufReader::new(TcpStream::connect(host).unwrap()), path.to_string())
+}
+
+const SHOUT: &str = r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"shout","arguments":{"text":"x"}}}"#;
+
+/// The index has the plugin's tools and the connectors'; a connector, a
+/// tool and a server turned off leave it within one poll (no relaunch);
+/// a call to a tool turned off is refused with the words at once, and a
+/// server turned on again starts and answers.
+#[test]
+fn connectors_and_toggles_reach_the_index_within_a_poll() {
+    let (base, plugins) = fixture_root("toggles");
+    let (dir, sp) = (base.join("run/plugins"), base.join("plugins.json"));
+    let mut parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+    let sd = base.join("status");
+    let opts = bridge::Opts {
+        state_path: Some(sp.clone()),
+        catalog: Some(fake_catalog()),
+        status_dir: Some(sd.clone()),
+        poll: Duration::from_millis(100),
+        grace: Duration::from_millis(500),
+        ..bridge::Opts::new(dir.clone(), Some(parent.id()), roots_of(&base, Some(plugins)))
+    };
+    let server = std::thread::spawn(move || bridge::serve(opts));
+    wait_until("the bridge ready", || dir.join("ready").exists());
+    // a stdio server's state for the Plugins list: its command's name and
+    // its tools by name (the switches)
+    let st = status::read(&sd, "hello-plugin", "echo").expect("the stdio server's status");
+    assert_eq!((st.transport.as_str(), st.host.as_str(), st.tools.clone()), ("stdio", "python3", Ok(1)));
+    assert_eq!(st.listed.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(), vec!["shout"]);
+    let i = index(&dir);
+    assert!(i.lines().any(|l| l.contains(" hello_plugin shout : #Upper-case")), "{i}");
+    assert!(i.lines().any(|l| l.starts_with("c0ffee-gmail ") && l.contains(" send_email : #Send a mail")), "{i}");
+
+    // a connector off
+    state::set(&sp, &PluginId::mistral("gmail"), false).unwrap();
+    wait_until("gmail out of the index", || !index(&dir).contains("send_email"));
+    assert!(index(&dir).contains(" shout "));
+
+    // a tool off: refused at once (plugins.json read at the call), then
+    // out of the index
+    let plugin = PluginId::plugin("hello-plugin");
+    let (mut r, path) = route(&dir, "shout");
+    state::set(&sp, &plugin.part(PartKind::Tool, Some("echo"), "shout"), false).unwrap();
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains(&bridge::off_error("hello_plugin.shout")), "{b}");
+    wait_until("shout out of the index", || !index(&dir).contains(" shout "));
+    state::set(&sp, &plugin.part(PartKind::Tool, Some("echo"), "shout"), true).unwrap();
+    wait_until("shout back", || index(&dir).contains(" shout "));
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+
+    // its server off: refused, out of the index; on again: started, answers
+    state::set(&sp, &plugin.part(PartKind::Mcp, None, "echo"), false).unwrap();
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains(&bridge::off_error("hello_plugin.shout")), "{b}");
+    wait_until("echo out of the index", || !index(&dir).contains("/hello-plugin/echo"));
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains(&bridge::off_error("hello_plugin.shout")), "the retired server still says why: {b}");
+    state::set(&sp, &plugin.part(PartKind::Mcp, None, "echo"), true).unwrap();
+    wait_until("echo back", || index(&dir).contains("/hello-plugin/echo"));
+    let (mut r, path) = route(&dir, "shout");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    server.join().unwrap().unwrap();
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// No plugin server: the bridge stays (it keeps the connectors' lines
+/// fresh) and stops with its parent.
+#[test]
+fn the_bridge_stays_up_with_no_server_and_stops_with_its_parent() {
+    let base = std::env::temp_dir().join(format!("bp-bridge-alone-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let dir = base.join("run/plugins");
+    let mut parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+    let opts = bridge::Opts { catalog: Some(fake_catalog()), poll: Duration::from_millis(100), ..bridge::Opts::new(dir.clone(), Some(parent.id()), roots_of(&base, None)) };
+    let server = std::thread::spawn(move || bridge::serve(opts));
+    wait_until("the bridge ready", || dir.join("ready").exists());
+    assert!(index(&dir).contains("c0ffee-gmail gmail send_email"), "{}", index(&dir));
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(!server.is_finished(), "the bridge left with no server");
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    wait_until("the bridge gone with its parent", || server.is_finished());
+    server.join().unwrap().unwrap();
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// A `${VAR}` of a server's env that the env lacks comes from his MCP
+/// secrets for that plugin; with none, the server does not start and the
+/// report names the variable.
+#[test]
+fn an_env_var_falls_back_to_his_mcp_secrets() {
+    let (base, plugins) = fixture_root("secret-env");
+    std::fs::write(
+        plugins.join("hello-plugin/mcp.json"),
+        r#"{"mcpServers":{"echo":{"command":"python3","args":["-B","${PLUGIN_ROOT}/server.py"],
+            "env":{"HELLO_STATE":"${BP_BRIDGE_TEST_STATE}"}}}}"#,
+    )
+    .unwrap();
+    let (dir, secrets_dir) = (base.join("run/plugins"), base.join("mcp-env"));
+    let calls = base.join("from-secret.txt");
+    let start = |dir: &Path| {
+        let parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+        let opts = bridge::Opts { env_dir: Some(secrets_dir.clone()), ..bridge::Opts::new(dir.to_path_buf(), Some(parent.id()), roots_of(&base, Some(plugins.clone()))) };
+        let server = std::thread::spawn(move || bridge::serve(opts));
+        wait_until("the bridge ready", || dir.join("ready").exists());
+        (parent, server)
+    };
+    // nothing saved: not started, the report says which variable
+    let (mut parent, server) = start(&dir);
+    let report = std::fs::read_to_string(dir.join("report.txt")).unwrap();
+    assert!(report.contains("env HELLO_STATE uses ${BP_BRIDGE_TEST_STATE}, which is not set"), "{report}");
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    server.join().unwrap().unwrap();
+    // saved: the server gets it
+    secrets::write(&secrets_dir, &PluginId::plugin("hello-plugin"), &[("BP_BRIDGE_TEST_STATE".to_string(), calls.to_string_lossy().into_owned())]).unwrap();
+    let dir2 = base.join("run2/plugins");
+    let (mut parent, server) = start(&dir2);
+    let (mut r, path) = route(&dir2, "shout");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X (call 1)"), "{b}");
+    assert_eq!(std::fs::read_to_string(&calls).unwrap(), "1");
     parent.kill().unwrap();
     parent.wait().unwrap();
     server.join().unwrap().unwrap();

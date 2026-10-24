@@ -67,7 +67,6 @@ class Repl:
                    BEND_CONFIG=cfg, BEND_REPL_PORT=str(self.port),
                    BEND_SESSION_FILE=os.path.join(self.dir, "session.txt"),
                    BEND_WIRE_LOG=os.path.join(self.dir, "wire.log"),
-                   BEND_MCP_INDEX=os.path.join(self.dir, "mcp.txt"),
                    BEND_BG_ROOT=os.path.join(self.dir, "bg"), SB_AGENT="probe", TMPDIR=self.dir,
                    BEND_WIRE_DUMP=self.dump)
         # run_typescript's engine of this tree (a fresh worktree has none)

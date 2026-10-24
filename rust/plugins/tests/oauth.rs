@@ -277,7 +277,7 @@ fn the_bridge_keeps_a_server_that_needs_a_login_and_connects_it_after() {
         state: Default::default(),
     };
     let mut parent = Command::new("sleep").arg("60").spawn().unwrap();
-    let opts = bridge::Opts { dir: dir.clone(), parent: Some(parent.id()), roots, status_dir: Some(sd.clone()), secrets_dir: Some(secrets.clone()), ready_wait: bridge::READY_WAIT };
+    let opts = bridge::Opts { status_dir: Some(sd.clone()), secrets_dir: Some(secrets.clone()), ..bridge::Opts::new(dir.clone(), Some(parent.id()), roots) };
     let srv = std::thread::spawn(move || bridge::serve(opts));
     wait_for("the bridge", || dir.join("ready").exists());
     let report = std::fs::read_to_string(dir.join("report.txt")).unwrap();

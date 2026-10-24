@@ -56,12 +56,16 @@ def check(cond, what):
 def call(exe, tmp, url, tool, args):
     home = os.path.join(tmp, "home")
     os.makedirs(home, exist_ok=True)
-    index = os.path.join(tmp, "index.txt")
+    # the session's index, where its plugins bridge writes it
+    # ($BEND_RUN_DIR/<port>/plugins/mcp-index.txt)
+    run = os.path.join(tmp, "run")
+    index = os.path.join(run, "0", "plugins", "mcp-index.txt")
+    os.makedirs(os.path.dirname(index), exist_ok=True)
     with open(index, "w") as f:
         for t, schema in (("echo", ECHO), ("search", SEARCH), ("get_file", GET_FILE),
                           ("fail_text", ECHO), ("nope", None)):
             f.write("%s fake %s : #%s%s\n" % (url, t, t, " | input: " + json.dumps(schema) if schema else ""))
-    env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "BEND_MCP_INDEX": index,
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "BEND_RUN_DIR": run, "BEND_REPL_PORT": "0",
            "PROBE_TOOL": tool, "PROBE_ARGS": json.dumps(args)}
     out = subprocess.run([exe], env=env, capture_output=True, text=True, timeout=120).stdout
     status, _, text = out.partition("\n")

@@ -29,7 +29,6 @@ fn the_old_layout_keeps_todays_paths() {
     assert_eq!(h.worktrees_dir(), p("/h/.local/state/switchboard/worktrees"));
     assert_eq!(h.images_dir(), p("/h/.bend-harness/images"));
     assert_eq!(h.crashes_dir(), p("/h/.bend-harness/crashes"));
-    assert_eq!(h.mcp_index(), p("/h/.bend-harness/mcp-index.txt"));
     assert_eq!(h.plugins_state(), p("/h/.bend-harness/plugins.json"));
     assert_eq!(h.plugin_data_dir(), p("/h/.bend-harness/plugin-data"));
     assert_eq!(h.run_dir(), p("/h/.bend-harness/run"));
@@ -57,7 +56,6 @@ fn bise_home_moves_everything() {
     assert_eq!(h.sessions_dir(), p("/b/sessions"));
     assert_eq!(h.hub_dir("ws-1"), p("/b/hubs/ws-1"));
     assert_eq!(h.worktrees_dir(), p("/b/worktrees"));
-    assert_eq!(h.mcp_index(), p("/b/cache/mcp-index.txt"));
     assert_eq!(h.marketplaces(), p("/b/marketplaces.json"));
     assert_eq!(h.marketplace_cache(), p("/b/cache/marketplaces"));
     assert_eq!(h.mcp_secrets_dir(), p("/b/secrets/mcp-env"));
@@ -131,31 +129,31 @@ fn exported_paths_follow_the_same_home_and_only_it() {
 
 #[test]
 fn an_inherited_legacy_default_is_not_an_override_in_the_bise_layout() {
-    // an older version exported BEND_MCP_INDEX=~/.bend-harness/mcp-index.txt
-    // (no stamp); the bise hub took it as an override and exported it again
-    // with its own stamp: the agents read an empty connector index
+    // an older version exported BEND_CONFIG=~/.bend-harness/config.toml (no
+    // stamp); the bise hub took it as an override and exported it again
+    // with its own stamp: the agents read the old file
     let d = tmp("legacy-default");
     std::fs::create_dir_all(d.join(".bise")).unwrap();
     std::fs::write(d.join(".bise").join(MIGRATED), "{}").unwrap();
     let hs = d.to_string_lossy().to_string();
-    let old_index = d.join(".bend-harness/mcp-index.txt").to_string_lossy().to_string();
-    let new_index = d.join(".bise/cache/mcp-index.txt");
-    let no_stamp = home_of(&[("HOME", &hs), ("BEND_MCP_INDEX", &old_index)]);
-    assert_eq!(no_stamp.mcp_index(), new_index);
+    let old_cfg = d.join(".bend-harness/config.toml").to_string_lossy().to_string();
+    let new_cfg = d.join(".bise/config.toml");
+    let no_stamp = home_of(&[("HOME", &hs), ("BEND_CONFIG", &old_cfg)]);
+    assert_eq!(no_stamp.config_file(), new_cfg);
     // the poisoned export (a valid stamp) heals too
     let mut env: HashMap<String, String> = no_stamp.exports().into_iter().map(|(k, v)| (k.into(), v)).collect();
     env.insert("HOME".into(), hs.clone());
-    env.insert("BEND_MCP_INDEX".into(), old_index.clone());
+    env.insert("BEND_CONFIG".into(), old_cfg.clone());
     let stamped = Home::from_lookup(&|k: &str| env.get(k).cloned());
-    assert_eq!(stamped.mcp_index(), new_index);
+    assert_eq!(stamped.config_file(), new_cfg);
     let ex: HashMap<_, _> = stamped.exports().into_iter().collect();
-    assert_eq!(ex["BEND_MCP_INDEX"], new_index.to_string_lossy());
+    assert_eq!(ex["BEND_CONFIG"], new_cfg.to_string_lossy());
     // any other path is still a real override
-    let mine = home_of(&[("HOME", &hs), ("BEND_MCP_INDEX", "/elsewhere/idx.txt")]);
-    assert_eq!(mine.mcp_index(), PathBuf::from("/elsewhere/idx.txt"));
+    let mine = home_of(&[("HOME", &hs), ("BEND_CONFIG", "/elsewhere/config.toml")]);
+    assert_eq!(mine.config_file(), PathBuf::from("/elsewhere/config.toml"));
     // the legacy layout keeps its own defaults as overrides (same value)
-    let legacy = home_of(&[("HOME", "/h"), ("BEND_MCP_INDEX", "/h/.bend-harness/mcp-index.txt")]);
-    assert_eq!(legacy.mcp_index(), PathBuf::from("/h/.bend-harness/mcp-index.txt"));
+    let legacy = home_of(&[("HOME", "/h"), ("BEND_CONFIG", "/h/.bend-harness/config.toml")]);
+    assert_eq!(legacy.config_file(), PathBuf::from("/h/.bend-harness/config.toml"));
 }
 
 #[test]
@@ -172,7 +170,6 @@ fn another_homes_default_is_not_an_override() {
         ("BEND_CONFIG", "/u/.bise/config.toml"),
         ("BEND_SESSIONS_DIR", "/u/.bise/sessions"),
         ("BEND_IMAGE_DIR", "/u/.bise/images"),
-        ("BEND_MCP_INDEX", "/u/.bise/cache/mcp-index.txt"),
         ("BEND_PLUGINS_STATE", "/u/.bise/plugins.json"),
         ("BEND_PLUGINS_DATA", "/u/.bise/plugin-data"),
         ("BEND_RUN_DIR", "/u/.bise/run"),
@@ -183,22 +180,22 @@ fn another_homes_default_is_not_an_override() {
     pairs.extend(inherited);
     let h = home_of(&pairs);
     assert_eq!(h, home_of(&[("HOME", &ts)]), "every inherited path was /u's default");
-    assert_eq!(h.mcp_index(), t.join(".bend-harness/mcp-index.txt"));
+    assert_eq!(h.plugins_state(), t.join(".bend-harness/plugins.json"));
     // every exported variable is covered by the rule
     assert_eq!(inherited.len(), PATH_VARS.len());
     // this HOME's own defaults and any other path stay overrides
-    let own = t.join(".bend-harness/mcp-index.txt").to_string_lossy().to_string();
-    let kept = home_of(&[("HOME", &ts), ("BEND_MCP_INDEX", &own), ("BEND_CONFIG", "/u/cfg/config.toml")]);
-    assert_eq!(kept.mcp_index(), PathBuf::from(&own));
+    let own = t.join(".bend-harness/plugins.json").to_string_lossy().to_string();
+    let kept = home_of(&[("HOME", &ts), ("BEND_PLUGINS_STATE", &own), ("BEND_CONFIG", "/u/cfg/config.toml")]);
+    assert_eq!(kept.plugins_state(), PathBuf::from(&own));
     assert_eq!(kept.config_file(), PathBuf::from("/u/cfg/config.toml"));
     // same in the bise layout: /u's defaults dropped, its own kept
     std::fs::create_dir_all(t.join(".bise")).unwrap();
     std::fs::write(t.join(".bise").join(MIGRATED), "{}").unwrap();
-    let bise_own = t.join(".bise/cache/mcp-index.txt").to_string_lossy().to_string();
-    let b = home_of(&[("HOME", &ts), ("BEND_MCP_INDEX", "/u/.bise/cache/mcp-index.txt")]);
-    assert_eq!(b.mcp_index(), PathBuf::from(&bise_own));
-    let b_own = home_of(&[("HOME", &ts), ("BEND_MCP_INDEX", &bise_own), ("BEND_SESSIONS_DIR", "/u/.bise/sessions")]);
-    assert_eq!(b_own.mcp_index(), PathBuf::from(&bise_own));
+    let bise_own = t.join(".bise/plugins.json").to_string_lossy().to_string();
+    let b = home_of(&[("HOME", &ts), ("BEND_PLUGINS_STATE", "/u/.bise/plugins.json")]);
+    assert_eq!(b.plugins_state(), PathBuf::from(&bise_own));
+    let b_own = home_of(&[("HOME", &ts), ("BEND_PLUGINS_STATE", &bise_own), ("BEND_SESSIONS_DIR", "/u/.bise/sessions")]);
+    assert_eq!(b_own.plugins_state(), PathBuf::from(&bise_own));
     assert_eq!(b_own.sessions_dir(), t.join(".bise/sessions"));
 }
 
@@ -327,7 +324,9 @@ fn the_migration_copies_the_user_files_and_moves_the_idle_hubs() {
     assert_eq!(std::fs::metadata(h.key_file()).unwrap().permissions().mode() & 0o777, 0o600);
     assert_eq!(read(h.sessions_dir().join("s1.txt")), "session");
     assert_eq!(read(h.images_dir().join("a.png")), "png");
-    assert_eq!(read(h.mcp_index()), "idx");
+    // the old shared connector index is not carried over (each session's
+    // bridge writes its own)
+    assert!(!h.cache_dir().join("mcp-index.txt").exists() && !bise.join("mcp-index.txt").exists());
     assert_eq!(read(h.cache_dir().join("models.toml")), "m");
     assert_eq!(read(h.drafts_dir().join("ws.json")), "{}");
     assert!(!bise.join("run").exists());
@@ -431,7 +430,7 @@ fn the_tests_run_on_a_temp_home() {
     }
     let h = Home::from_env();
     assert!(h.config_file().starts_with(std::env::temp_dir()), "{:?}", h.config_file());
-    assert!(crate::test_home::is_place_var("BEND_MCP_INDEX") && !crate::test_home::is_place_var("PATH"));
+    assert!(crate::test_home::is_place_var("BEND_RUN_DIR") && !crate::test_home::is_place_var("PATH"));
 }
 
 #[test]

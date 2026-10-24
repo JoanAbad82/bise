@@ -208,7 +208,6 @@ def harness_turn(row, prov, model, family, base, key_env, env):
     e.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"), BISE_MODELS_FILE=os.path.join(tmp, "models.toml"),
              BISE_MODEL="%s/%s" % (pid, model), BEND_MODEL=legacy, BEND_REPL_PORT=str(port),
              BEND_SESSION_FILE=session, BEND_WIRE_LOG=os.path.join(tmp, "wire.log"),
-             BEND_MCP_INDEX=os.path.join(tmp, "mcp.txt"),
              BEND_BG_ROOT=os.path.join(tmp, "bg"))
     log, err = os.path.join(tmp, "repl.log"), os.path.join(tmp, "repl.err")
     repl = subprocess.Popen([os.path.join(ROOT, "repl-live")], cwd=ROOT, env=e,

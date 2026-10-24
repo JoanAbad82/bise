@@ -7,90 +7,13 @@ import ../core/text.bend as Tx
 import ../core/wire.bend as W
 import ./provider-pure.bend as Pvp
 
-# ---- the published alias: a valid identifier (vibe_sdk requires it) ----
-# vibe's _normalize_name: anything outside [a-zA-Z0-9_-] flattens to
-# "_", the edges strip, the result caps at 256 (an empty name becomes
-# "unnamed"). tools.<alias>.<function> in the sandbox needs a clean
-# identifier; the connector id (used for the gateway URL) stays raw.
+# The connectors' aliases (vibe's normalize and dedupe), the bootstrap
+# URL and bise's image_generation note are Rust's now
+# (bend_plugins::connectors): the session's bridge writes the index.
 
-def norm_chr.ok(ok: Bool, +c: U32) -> String:
-  match ok:
-    case True{}:
-      SCon{Chr{c}, SNil{}}
-    case False{}:
-      "_"
-
-def norm_chr.digit(+c: U32) -> Bool:
-  Bool.and(U32.is_le(48, c), U32.is_le(c, 57))
-
-def norm_chr.alpha(+c: U32) -> Bool:
-  Bool.or(Bool.and(U32.is_le(65, c), U32.is_le(c, 90)),
-    Bool.and(U32.is_le(97, c), U32.is_le(c, 122)))
-
-def norm_chr.sym(+c: U32) -> Bool:
-  Bool.or(U32.is_eq(c, 95), U32.is_eq(c, 45))
-
-def norm_chr.ok2(d: Bool, a: Bool, s: Bool) -> Bool:
-  Bool.or(d, Bool.or(a, s))
-
-def norm_chr(+c: U32) -> String:
-  norm_chr.ok(norm_chr.ok2(norm_chr.digit(c), norm_chr.alpha(c),
-    norm_chr.sym(c)), c)
-
-def norm_go(s: String) -> String:
-  match s:
-    case SNil{}:
-      ""
-    case SCon{Chr{+c}, +t}:
-      String.append(norm_chr(c), norm_go(t))
-
-def trim_go.next(head_edge: Bool, tail_edge: Bool, +s: String) -> String:
-  match head_edge:
-    case True{}:
-      String.drop(s, 1n)
-    case False{}:
-      match tail_edge:
-        case True{}:
-          String.take(s, Nat.sub(String.length(s), 1n))
-        case False{}:
-          s
-
-# fuel-bound edge trim: one character per iteration, so 2*len fuel is
-# always enough (+s: the edges and the recursion each read the string)
-def trim_go(fuel: Nat, +s: String) -> String:
-  match fuel:
-    case 0n:
-      s
-    case 1n+k:
-      trim_go(k, trim_go.next(
-        Bool.or(String.starts_with(s, "_"), String.starts_with(s, "-")),
-        Bool.or(String.ends_with(s, "_"), String.ends_with(s, "-")), s))
-
-def norm_trim(+s: String) -> String:
-  trim_go(Nat.add(String.length(s), String.length(s)), s)
-
-def norm_pick(empty: Bool, +s: String) -> String:
-  match empty:
-    case True{}:
-      "unnamed"
-    case False{}:
-      s
-
-def norm_take.fits(fits: Bool, +s: String) -> String:
-  match fits:
-    case True{}:
-      s
-    case False{}:
-      String.take(s, 256n)
-
-def normalize_name(+s: String) -> String:
-  norm_pick(String.is_empty(s),
-    norm_take.fits(Nat.is_le(String.length(s), 256n),
-      norm_trim(norm_go(s))))
-
-# alias dedupe (vibe): colliding normalized aliases get _2, _3, ...
-# (the codebase patterns: leaf helpers first, the recursive def calls
-# itself by its own name, the recursive result rides as an argument)
+# whether a name is in a list (the codebase patterns: leaf helpers
+# first, the recursive def calls itself by its own name, the recursive
+# result rides as an argument)
 
 def seen_pick(hit: Bool, rest_res: Bool) -> Bool:
   match hit:
@@ -105,63 +28,6 @@ def seen_has(seen: List<&2, String>, +alias: String) -> Bool:
       False{}
     case Con{+h, rest}:
       seen_pick(String.eq(h, alias), seen_has(rest, alias))
-
-def suffix.base(+base: String, +n: Nat) -> String:
-  String.append(base, String.append("_", Nat.show(n)))
-
-# fuel = len(seen) + 2 tries: one suffix per seen alias, plus slack;
-# each try checks base_n against the seen list
-def suffix_go(fuel: Nat, +base: String, +n: Nat,
-    +seen: List<&2, String>, taken: Bool) -> String:
-  match fuel:
-    case 0n:
-      suffix.base(base, n)
-    case 1n+k:
-      match taken:
-        case True{}:
-          suffix_go(k, base, Nat.add(n, 1n), seen,
-            seen_has(seen, suffix.base(base, Nat.add(n, 1n))))
-        case False{}:
-          suffix.base(base, n)
-
-def dedupe.pick(taken: Bool, +alias: String, +seen: List<&2, String>)
-    -> String:
-  match taken:
-    case True{}:
-      # the loop starts by trying <alias>_2 (not the alias itself)
-      suffix_go(Nat.add(List.length(&2, String, seen), 2n), alias, 2n, seen,
-        seen_has(seen, suffix.base(alias, 2n)))
-    case False{}:
-      alias
-
-# +seen: both the collision check and the suffix search read the list
-def dedupe(+alias: String, +seen: List<&2, String>) -> String:
-  dedupe.pick(seen_has(seen, alias), alias, seen)
-
-
-
-# the bootstrap endpoint, as the vibe CLI calls it: the server returns
-# a Mistral builtin only when builtin_connectors (repeatable) names it.
-# web_search (as vibe) and image_generation (generate_image,
-# edit_image; vibe does not ask for it) ride along as MCP-callable
-# connectors, and auth-actionable (not yet connected) connectors are
-# included (they stay out of the index: only ready connectors index
-# their tools)
-def bootstrap_url() -> String:
-  "https://api.mistral.ai/v1/connectors/bootstrap?supports_mcp=true&include_auth_actionable_connectors=true&builtin_connectors=web_search&builtin_connectors=image_generation"
-
-# bise's words after a builtin's own tool description. image_generation
-# answers a JSON {url}: a signed link that expires in about an hour, so
-# the agent must save the image at once
-def desc_note.pick(img: Bool) -> String:
-  match img:
-    case True{}:
-      " NOTE (bise): the result is a JSON {url}, a link that expires in about 1 hour: download it to a file at once (curl -sSL <url> -o <file>.jpg) and use the file; pass the url to edit_image only within that hour. Each image costs $0.10 on the user's Mistral account."
-    case False{}:
-      ""
-
-def desc_note(+cname: String) -> String:
-  desc_note.pick(String.eq(cname, "image_generation"))
 
 # ---- the index line format, parsed ----
 # line: "<cid> <cname> <tool> : #<desc>"

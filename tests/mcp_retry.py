@@ -86,11 +86,15 @@ def call(exe, tmp, url, tool, args):
     dbg = os.path.join(tmp, "debug")
     os.makedirs(home, exist_ok=True)
     os.makedirs(dbg, exist_ok=True)
-    index = os.path.join(tmp, "index.txt")
+    # the session's index, where its plugins bridge writes it
+    # ($BEND_RUN_DIR/<port>/plugins/mcp-index.txt)
+    run = os.path.join(tmp, "run")
+    index = os.path.join(run, "0", "plugins", "mcp-index.txt")
+    os.makedirs(os.path.dirname(index), exist_ok=True)
     with open(index, "w") as f:
         for t in ("echo", "nope"):
             f.write("%s fake %s : #%s\n" % (url, t, t))
-    env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "BEND_MCP_INDEX": index,
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "BEND_RUN_DIR": run, "BEND_REPL_PORT": "0",
            "BEND_DEBUG_DIR": dbg, "PROBE_TOOL": tool, "PROBE_ARGS": json.dumps(args)}
     t0 = time.time()
     out = subprocess.run([exe], env=env, capture_output=True, text=True, timeout=120).stdout

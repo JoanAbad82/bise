@@ -55,7 +55,7 @@ def _path_vars():
     return names
 
 
-# The single-path overrides (BEND_RUN_DIR, BEND_SESSIONS_DIR, BEND_MCP_INDEX...)
+# The single-path overrides (BEND_RUN_DIR, BEND_SESSIONS_DIR, BEND_CONFIG...)
 # and their stamp. The caller's are his own ~/.bise paths (an agent's shell
 # exports them): a REPL a test starts reads them raw (bend/runtime/plugins.bend,
 # jsrt), so a test's own HOME or BISE_HOME never keeps them. Rust's Home drops

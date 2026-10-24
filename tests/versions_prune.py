@@ -20,7 +20,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SCRIPT = os.environ.get("VERSIONS_SH", os.path.join(ROOT, "scripts", "versions.sh"))
 PRIVATE = ("BISE_HOME", "SB_VERSIONS_DIR", "SB_BUILD_DIR", "SB_KEEP_VERSIONS", "XDG_STATE_HOME",
            "BISE_EXPORTS_FOR", "BEND_SESSION_FILE", "BEND_CONTEXT_FILE", "BEND_WIRE_LOG",
-           "BEND_REPL_PORT", "BEND_CONFIG", "BEND_SESSIONS_DIR", "BEND_IMAGE_DIR", "BEND_MCP_INDEX",
+           "BEND_REPL_PORT", "BEND_CONFIG", "BEND_SESSIONS_DIR", "BEND_IMAGE_DIR",
            "BEND_PLUGINS_STATE", "BEND_PLUGINS_DATA", "BEND_RUN_DIR")
 
 

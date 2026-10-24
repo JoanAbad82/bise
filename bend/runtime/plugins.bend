@@ -8,12 +8,17 @@
 # <workspace>/.agents/plugins), starts their stdio servers, writes three
 # files into the session's plugin dir, then serves the servers over
 # loopback HTTP until this REPL is gone:
-#   mcp-index.txt    tool lines in the connector index format, the cid
-#                    being the loopback URL (runtime/mcp.bend calls it)
+#   mcp-index.txt    the session's one tool index (runtime/mcp.bend reads
+#                    only it): the plugins' tools (cid: the loopback URL)
+#                    and the Mistral connectors' (cid: the connector id),
+#                    minus the ones turned off; rewritten every 2 s when
+#                    plugins.json or the connectors' catalog moves, so a
+#                    tool toggle needs no new REPL
 #   skills-index.txt every on skill (skill folders and plugins), in the
 #                    skills index format: the only one runtime/skills.bend reads
 #   report.txt       the listing /plugins shows
-# Scripted runs never start it (hermetic suites).
+# Scripted runs never start it (hermetic suites): a probe writes its own
+# mcp-index.txt there.
 import Base
 import ./persist.bend as P
 import ./proc.bend as Proc

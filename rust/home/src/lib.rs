@@ -79,11 +79,10 @@ pub const EXPORTS_FOR: &str = "BISE_EXPORTS_FOR";
 pub const MIGRATED: &str = "migrated.json";
 
 /// The env overrides of single paths, in the order they are exported.
-pub const PATH_VARS: [&str; 9] = [
+pub const PATH_VARS: [&str; 8] = [
     "BEND_CONFIG",
     "BEND_SESSIONS_DIR",
     "BEND_IMAGE_DIR",
-    "BEND_MCP_INDEX",
     "BEND_PLUGINS_STATE",
     "BEND_PLUGINS_DATA",
     "BEND_RUN_DIR",
@@ -154,9 +153,9 @@ impl Home {
     ///
     /// - in the bise layout, this HOME's legacy default: an older version
     ///   computed it (before BISE-160 no stamp came with it, e.g.
-    ///   `BEND_MCP_INDEX=~/.bend-harness/mcp-index.txt`), and taking it
-    ///   would re-export it with a valid stamp for good (the agents read an
-    ///   empty connector index, not `<root>/cache/mcp-index.txt`);
+    ///   `BEND_CONFIG=~/.bend-harness/config.toml`), and taking it would
+    ///   re-export it with a valid stamp for good (the agents read the old
+    ///   file, not `<root>/config.toml`);
     /// - in any layout, another HOME's default (legacy or `~/.bise`): an
     ///   agent's shell ran a test with a temp HOME and the stamp unset, and
     ///   the test's REPL wrote its empty skills index over the user's one.
@@ -324,12 +323,6 @@ impl Home {
         self.root.join("cache")
     }
 
-    /// The MCP connector index (`$BEND_MCP_INDEX`).
-    pub fn mcp_index(&self) -> PathBuf {
-        let d = if self.is_bise() { self.cache_dir() } else { self.root.clone() };
-        self.or("BEND_MCP_INDEX", d.join("mcp-index.txt"))
-    }
-
     /// The plugins' enable state (`$BEND_PLUGINS_STATE`).
     pub fn plugins_state(&self) -> PathBuf {
         self.or("BEND_PLUGINS_STATE", self.root.join("plugins.json"))
@@ -449,7 +442,6 @@ impl Home {
             ("BEND_CONFIG", s(self.config_file())),
             ("BEND_SESSIONS_DIR", s(self.sessions_dir())),
             ("BEND_IMAGE_DIR", s(self.images_dir())),
-            ("BEND_MCP_INDEX", s(self.mcp_index())),
             ("BEND_PLUGINS_STATE", s(self.plugins_state())),
             ("BEND_PLUGINS_DATA", s(self.plugin_data_dir())),
             ("BEND_RUN_DIR", s(self.run_dir())),

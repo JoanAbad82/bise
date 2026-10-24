@@ -114,14 +114,12 @@ fn copy_user_files(old_root: &Path, old_state: &Path, bise: &Path, rep: &mut Rep
         for name in names {
             let src = old_root.join(&name);
             let dest = match name.as_str() {
-                // per-session side channels: nothing to keep
-                "run" => continue,
+                // per-session side channels, and the old shared tool and
+                // skills indexes (each session's bridge writes its own:
+                // bend_plugins::bridge, bend_plugins::skills): nothing to keep
+                "run" | "mcp-index.txt" | "skills-index.txt" => continue,
                 // merged into prefs.json below
                 "tui.json" => continue,
-                // the old shared skills index: no reader since each
-                // session's bridge writes its own (bend_plugins::skills)
-                "skills-index.txt" => continue,
-                "mcp-index.txt" => bise.join("cache").join(&name),
                 _ => bise.join(&name),
             };
             note(copy_tree(&src, &dest), format!("~/.bend-harness/{name}"), rep);

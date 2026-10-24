@@ -194,6 +194,8 @@ repl-live ──start──▶ bend-harness plugins serve --dir D --parent <repl
     │                   ├─ spawn each stdio server, initialize + tools/list (10 s)
     │                   ├─ write D/skills-index.txt, D/mcp-index.txt, D/report.txt
     │                   ├─ touch D/ready
+    │                   ├─ every 2 s: plugins.json, roots, connectors' cache
+    │                   │    → start/stop servers, rewrite D/mcp-index.txt
     │                   └─ serve http://127.0.0.1:<p>/<token>/<plugin>/<server>
     │                        until the REPL pid is gone
     └─ mcp_call "ns.tool" ──POST (initialize, initialized, tools/call)──▶ bridge ──stdin/stdout──▶ server
@@ -301,9 +303,12 @@ tests use temp dirs.
   of one plugin with the same name (from two servers):
   `plugin.tool.name_collision`, the later one is dropped.
 - Writes, then touches `D/ready`:
-  - `D/mcp-index.txt`: the same line format as the connector index,
-    `<cid> <namespace> <tool> : #<description> | input: <schema>`, with
-    `cid = http://127.0.0.1:<port>/<token>/<plugin>/<server>`;
+  - `D/mcp-index.txt`: the session's one tool index (the REPL reads no
+    other): one line per tool, `<cid> <namespace> <tool> : #<description>
+    | input: <schema>`, the plugins' tools first (`cid =
+    http://127.0.0.1:<port>/<token>/<plugin>/<server>`), then his Mistral
+    connectors' (`connectors::index_lines`, `cid` = the connector's id),
+    minus every tool, server, connector or plugin turned off;
   - `D/skills-index.txt`: `name\tdescription\tpath` lines, every skill
     of this session that is on: the loose skill folders
     (`bend_plugins::skills`, scanned while the servers start) and the
@@ -318,11 +323,32 @@ tests use temp dirs.
   `tool_timeout_sec`, 300 s by default; the REPL waits up to an hour
   for a plugin tool, 60 s for a connector). A server
   that died is respawned once on the next call.
-- No server up (no plugin, or every server failed): it exits as soon
-  as the files are written, so no process lingers.
+- Every 2 s (`bridge::POLL`) it reads `plugins.json`, the roots'
+  fingerprint and the connectors' catalog (`bridge::shared_catalog`: the
+  cache every session shares, parsed only when the file moved or its
+  catalog is past `connectors::TTL_MS`; `connectors::load` fetches a
+  stale one under the cache's lock). A change re-resolves the plugins:
+  a server on now and not running starts (turned on, added to an
+  mcp.json, a new plugin; `still starting` until it is up), one off or
+  gone refuses new calls at once, finishes the call in flight (at most
+  10 s, `bridge::STOP_GRACE`) and stops; then `D/mcp-index.txt` and
+  `D/report.txt` are written again. A tool, server or connector toggle
+  never relaunches the REPL ("at their next call").
+- A call to a tool turned off (the tool, its server or its plugin) is
+  refused with `<namespace>.<tool> is turned off in plugins`
+  (`bridge::off_error`), `plugins.json` read at the call: the agent
+  learns it even before the index moves. A connector turned off has no
+  line, so the REPL cannot reach the gateway for it.
+- `${VAR}` in a stdio server's `env` and a remote server's `url` and
+  `headers`: the env's value, else the one he saved for that plugin in
+  `Home::mcp_secrets_dir()` (`bend_plugins::secrets`); neither and no
+  default: the server does not start, `env X uses ${VAR}, which is not
+  set` in the report (never a value).
+- It stays up with no server (no plugin, or every server failed): it
+  keeps the connectors' lines current.
 - Polls the REPL pid every 500 ms; when it is gone, stops the servers
-  (a short grace period, then a kill) and exits. `/reload` therefore restarts the
-  bridge with the new REPL, and plugin edits apply on `/reload`.
+  (a short grace period, then a kill) and exits. `/reload` restarts the
+  bridge with the new REPL.
 
 ### Bend runtime
 
@@ -337,9 +363,12 @@ tests use temp dirs.
 - Skills: no scan in Bend. The catalog and the `skill` tool read
   `D/skills-index.txt` only, written by the bridge before `D/ready`; a
   missing one means no skills this session, said once on repl.err.
-- MCP: `mcp_call` and `search_tool_functions` read `D/mcp-index.txt`,
-  then the connector index. `gateway_url(cid)` keeps a cid that starts
-  with `http://127.0.0.1:` as is, and the Mistral key is not sent to it.
+- MCP: `mcp_call` and `search_tool_functions` read `D/mcp-index.txt`
+  only (`Mcp.index_content`); there is no shared connector index any
+  more (no `BEND_MCP_INDEX`, no Bend bootstrap: the bridge's Rust writes
+  every line). A scripted probe writes its own `D/mcp-index.txt`.
+  `gateway_url(cid)` keeps a cid that starts with `http://127.0.0.1:` as
+  is, and the Mistral key is not sent to it.
 
 ### UI and CLI
 
@@ -668,8 +697,9 @@ never stalls main's first call).
 
 ## Known limits
 
-- Plugin edits apply at the next session start or `/reload` (no
-  file watching, no `/reload-plugins`).
+- A plugin's MCP servers and tools follow edits and toggles within one
+  bridge poll (2 s); its skills only at the next session start or
+  `/reload` (the prompt lists them).
 - The Switchboard `/plugins` shows the static listing of the hub
   workspace, not the per-task bridge report.
 - No uninstall yet: `bend_plugins::secrets::remove` (a plugin's MCP

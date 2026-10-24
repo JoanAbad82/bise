@@ -89,16 +89,15 @@ def short_tmp():
 
 def no_real_accounts(tmp):
     """Tests run on fake data, never the user's real accounts: a throwaway
-    hub gets an empty connector index and a bootstrap URL nothing answers
-    (with a real Mistral key it would fetch his Gmail, Slack...), none of
+    hub gets a Mistral API base nothing answers (BISE_MISTRAL_URL: with a
+    real Mistral key its bridges would fetch his Gmail, Slack...), none of
     his plugins (~/.agents/plugins: their logins) and its own plugin state
     (computer use off: not his browser). BISE_TEST_REAL_ACCOUNTS=1 keeps
     his own, for the one run he asks for."""
     if os.environ.get("BISE_TEST_REAL_ACCOUNTS") == "1":
         return {}
     return {
-        "BEND_MCP_INDEX": os.path.join(tmp, "mcp-index.txt"),
-        "BEND_MCP_BOOTSTRAP_URL": "http://127.0.0.1:9/v1/connectors/bootstrap",
+        "BISE_MISTRAL_URL": "http://127.0.0.1:9",
         "BEND_PLUGINS_HOME": os.path.join(tmp, "user-plugins"),
         "BEND_PLUGINS_STATE": os.path.join(tmp, "plugins.json"),
         "BEND_PLUGINS_DATA": os.path.join(tmp, "plugin-data"),
@@ -167,7 +166,6 @@ class Env:
             "BEND_PROVIDER_URL": "http://127.0.0.1:%s/v1/chat/completions" % port,
             "BEND_MODEL": "mistral-small-latest",
             "MISTRAL_API_KEY": "fake-key",
-            "BEND_MCP_INDEX": os.path.join(self.tmp, "mcp-index.txt"),
             **no_real_accounts(self.tmp),
             "BEND_BG_ROOT": os.path.join(self.tmp, "bg"),
             # the agents' session logs (BISE-196) and their blobs: never

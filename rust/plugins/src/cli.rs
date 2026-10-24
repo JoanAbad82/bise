@@ -108,13 +108,14 @@ pub fn main(args: &[String]) -> i32 {
             };
             let parent = val(args, "--parent").and_then(|p| p.parse().ok());
             let ws = workspace(args);
+            let home = bise_home::Home::from_env();
             let opts = bridge::Opts {
-                dir: PathBuf::from(dir),
-                parent,
-                roots: resolve::Roots::standard(Some(&ws)),
+                state_path: Some(state::state_path()),
+                catalog: Some(bridge::shared_catalog(home.connectors_cache())),
                 status_dir: Some(crate::status::dir()),
                 secrets_dir: Some(crate::oauth::store_dir()),
-                ready_wait: bridge::READY_WAIT,
+                env_dir: Some(home.mcp_secrets_dir()),
+                ..bridge::Opts::new(PathBuf::from(dir), parent, resolve::Roots::standard(Some(&ws)))
             };
             match bridge::serve(opts) {
                 Ok(()) => 0,

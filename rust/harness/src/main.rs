@@ -760,14 +760,6 @@ fn run_main() -> std::io::Result<()> {
     // the next spawn restores the checkpointed session (BEND_CONTINUE)
     let mut cont = resume || resume_id.is_some();
 
-    // MCP connector index: the live REPL bootstraps the connector catalog
-    // here at startup; search_mcp_tools/call_mcp_tool read it
-    let mcp_index = home.mcp_index();
-    if let Some(dir) = mcp_index.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    std::env::set_var("BEND_MCP_INDEX", &mcp_index);
-
     // child REPL log, out of the client's way. Recreated per spawn, so
     // the reload-exit marker of one generation never leaks to the next.
     // In bise's home, never the app root (the cwd here): a Nix store

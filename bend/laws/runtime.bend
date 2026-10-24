@@ -158,51 +158,9 @@ law node_err_extracts_message:
     == "missing required parameter: owner" : String}
 
 # ---- MCP connector parity (vibe connector_registry) ----
-
-# LAW: the published alias is a clean identifier (vibe_sdk requires a
-# TypeScript identifier for tools.<alias>.<function>): everything
-# outside [a-zA-Z0-9_-] flattens to "_", edges strip, "" is "unnamed".
-law mcp_alias_normalizes:
-  {Bool.and(String.eq(Mc.normalize_name("github app!"), "github_app"),
-     Bool.and(String.eq(Mc.normalize_name("--x.y--"), "x_y"),
-       Bool.and(String.eq(Mc.normalize_name("ok-name_1"), "ok-name_1"),
-         String.eq(Mc.normalize_name(""), "unnamed")))) == True{} : Bool}
-
-# LAW: colliding normalized aliases get _2, _3... (vibe dedupe).
-law mcp_alias_dedupes:
-  {Bool.and(
-     String.eq(Mc.dedupe("github", Nil{}), "github"),
-     Bool.and(
-       String.eq(Mc.dedupe("github", Con{"github", Nil{}}), "github_2"),
-       String.eq(Mc.dedupe("github",
-         Con{"github", Con{"github_2", Nil{}}}), "github_3")))
-    == True{} : Bool}
-
-# LAW: the bootstrap hits the same endpoint as the vibe CLI, with its
-# params: auth-actionable connectors are included (ready ones index
-# only) and both builtins are named, web_search (as vibe) and
-# image_generation (generate_image, edit_image), each its own param.
-law mcp_bootstrap_url_parity:
-  {Bool.and(
-     String.contains(Mc.bootstrap_url(),
-       "/v1/connectors/bootstrap?supports_mcp=true"),
-     Bool.and(
-       String.contains(Mc.bootstrap_url(),
-         "include_auth_actionable_connectors=true"),
-       Bool.and(
-         String.contains(Mc.bootstrap_url(),
-           "&builtin_connectors=web_search"),
-         String.contains(Mc.bootstrap_url(),
-           "&builtin_connectors=image_generation"))))
-    == True{} : Bool}
-
-# LAW: image_generation's tools tell the agent to save the image at
-# once (the link expires); other connectors' descriptions stay theirs.
-law mcp_image_note:
-  {Bool.and(
-     String.contains(Mc.desc_note("image_generation"), "expires"),
-     String.eq(Mc.desc_note("web_search"), ""))
-    == True{} : Bool}
+# The aliases (normalize, dedupe), the bootstrap URL and the
+# image_generation note are Rust's (bend_plugins::connectors, its unit
+# tests): the session's bridge writes the index the REPL reads.
 
 # ---- bash background handoff (runtime/bash.bend) ----
 # A command that outlives the sync window must never block the turn: it

@@ -92,6 +92,7 @@ def main():
         c.wait(lambda: "late-one/nap" in open(os.path.join(run_dir(E), "mcp-index.txt")).read(), 40, "the late server in the index")
         run(c, "return await tools.late_one.shout({text: 'late'})", "HELLO-PLUGIN:LATE")
         run(c, "return await search_tool_functions({query: 'late_one'})", "late_one.shout")
+        toggles(E, c)
     finally:
         web.kill()
         if FAILS:
@@ -99,6 +100,29 @@ def main():
         E.close()
     print("PASS plugins ts" if not FAILS else "FAIL plugins ts: %s" % FAILS, flush=True)
     sys.exit(1 if FAILS else 0)
+
+
+def toggles(E, c):
+    """A tool turned off (plugins.json's parts_off, as /plugins writes it)
+    leaves the session's index within a bridge poll, with no new REPL, and
+    a call by its old address is refused by name; turned on again, the
+    agent calls it."""
+    idx = os.path.join(run_dir(E), "mcp-index.txt")
+    line = [l for l in open(idx).read().splitlines() if " hello_plugin shout " in l][0]
+    cid = line.split(" ")[0]
+    state = E.env["BEND_PLUGINS_STATE"]
+    json.dump({"parts_off": ["hello-plugin#tool:echo/shout"]}, open(state, "w"))
+    c.wait(lambda: " hello_plugin shout " not in open(idx).read(), 10, "shout out of the index")
+    import urllib.request
+    body = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                       "params": {"name": "shout", "arguments": {"text": "x"}}}).encode()
+    req = urllib.request.Request(cid, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    said = urllib.request.urlopen(req, timeout=10).read().decode()
+    check("hello_plugin.shout is turned off in plugins" in said, "an off tool's call is refused by name: %s" % said[:200])
+    check(os.path.exists(idx), "same REPL, same index (no relaunch)")
+    json.dump({"parts_off": []}, open(state, "w"))
+    c.wait(lambda: " hello_plugin shout " in open(idx).read(), 10, "shout back in the index")
+    run(c, "return await tools.hello_plugin.shout({text: 'back'})", "HELLO-PLUGIN:BACK")
 
 
 def run_dir(E):
