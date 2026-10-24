@@ -148,12 +148,13 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(doc.locator('.md-doc blockquote')).toContainText('Chaque agent a son folder privé');
       await expect(doc.locator('.md-doc')).not.toContainText('| tag |');
       await page.screenshot({ path: test.info().outputPath(`md-${theme}.png`) });
-      // 'source': the file as written, and back
-      await doc.locator('.md-toggle').click();
+      // 'source': the file as written, and back. The click is dispatched on the button: Playwright's
+      // mouse never reaches an out-of-process frame in this Electron (the pages server inside file://)
+      await doc.locator('.md-toggle').dispatchEvent('click');
       await expect(doc.locator('.md-source')).toContainText('| tag | findings |');
       await expect(doc.locator('.md-doc')).toBeHidden();
       await page.screenshot({ path: test.info().outputPath(`md-${theme}-source.png`) });
-      await doc.locator('.md-toggle').click();
+      await doc.locator('.md-toggle').dispatchEvent('click');
       await expect(doc.locator('.md-doc h1')).toBeVisible();
     } finally {
       await s.close();

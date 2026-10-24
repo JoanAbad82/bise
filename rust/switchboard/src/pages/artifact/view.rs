@@ -9,7 +9,8 @@
 //! Which artifacts get the viewer is pages::site's one rule (serves_copy +
 //! office_kind), the same that gives the row its `frame_url`.
 //!
-//! The shell also carries the page server's token and loads the notes
+//! The shell sets the theme the panel asked for first (`?theme=`,
+//! kit/office/theme.js: kit.js's rule; md-artifact). It also carries the page server's token and loads the notes
 //! layer (kit/notes-anchors.js, kit/notes.js's model and words,
 //! kit/office/select.js: the selection, the marks, the browser's list;
 //! pages/artifact/notes.rs is its api). An image gets the same frame
@@ -71,6 +72,7 @@ pub fn shell(s: &Shown) -> String {
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
 <meta name=\"bise-token\" content=\"{token}\">
 <title>{title}</title>
+<script src=\"/kit/office/theme.js\"></script>
 <link rel=\"stylesheet\" href=\"/kit/tokens.css\">
 <link rel=\"stylesheet\" href=\"/kit/office/viewer.css\">
 <link rel=\"stylesheet\" href=\"/kit/office/select.css\">
@@ -177,6 +179,9 @@ mod tests {
         assert!(html.contains("<title>Q3 &lt;numbers&gt;</title>"));
         assert!(!html.contains("data-follows"));
         assert!(html.contains("<script type=\"module\" src=\"/kit/office/viewer.js\"></script>"));
+        // md-artifact: the panel's ?theme on <html data-theme> before any style or paint
+        let theme = html.find("<script src=\"/kit/office/theme.js\"></script>").expect("theme.js");
+        assert!(theme < html.find("/kit/tokens.css").unwrap(), "theme first, then the tokens");
         // the notes' api (art-notes): the token, then notes.js's model and the selection layer
         assert!(html.contains("<meta name=\"bise-token\" content=\"t0k\">"));
         let order: Vec<usize> = ["notes-anchors.js", "/kit/notes.js", "office/viewer.js", "office/select.js"].iter().map(|f| html.find(f).unwrap()).collect();
