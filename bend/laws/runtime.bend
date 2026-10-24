@@ -178,9 +178,10 @@ law mcp_alias_dedupes:
          Con{"github", Con{"github_2", Nil{}}}), "github_3")))
     == True{} : Bool}
 
-# LAW: the bootstrap hits the same endpoint as the vibe CLI, with the
-# same params: the web_search builtin is exposed as an MCP tool and
-# auth-actionable connectors are included (ready ones index only).
+# LAW: the bootstrap hits the same endpoint as the vibe CLI, with its
+# params: auth-actionable connectors are included (ready ones index
+# only) and both builtins are named, web_search (as vibe) and
+# image_generation (generate_image, edit_image), each its own param.
 law mcp_bootstrap_url_parity:
   {Bool.and(
      String.contains(Mc.bootstrap_url(),
@@ -188,7 +189,19 @@ law mcp_bootstrap_url_parity:
      Bool.and(
        String.contains(Mc.bootstrap_url(),
          "include_auth_actionable_connectors=true"),
-       String.contains(Mc.bootstrap_url(), "builtin_connectors=web_search")))
+       Bool.and(
+         String.contains(Mc.bootstrap_url(),
+           "&builtin_connectors=web_search"),
+         String.contains(Mc.bootstrap_url(),
+           "&builtin_connectors=image_generation"))))
+    == True{} : Bool}
+
+# LAW: image_generation's tools tell the agent to save the image at
+# once (the link expires); other connectors' descriptions stay theirs.
+law mcp_image_note:
+  {Bool.and(
+     String.contains(Mc.desc_note("image_generation"), "expires"),
+     String.eq(Mc.desc_note("web_search"), ""))
     == True{} : Bool}
 
 # ---- bash background handoff (runtime/bash.bend) ----

@@ -178,7 +178,8 @@ def tool_line(+cid: String, +cname: String, +t: Jv.Val) -> String:
     String.append(" ", String.append(flat(jstr(t, "name", "?")),
       String.append(" : ", String.append("#",
         String.append(flat(jstr(t, "description", "")),
-          tool_line.schema(Jv.get(t, "inputSchema"))))))))))
+          String.append(Mcp.desc_note(cname),
+            tool_line.schema(Jv.get(t, "inputSchema")))))))))))
 
 def tool_lines(+cid: String, +cname: String, ts: List<&2, Jv.Val>) -> String:
   match ts:

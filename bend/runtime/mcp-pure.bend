@@ -140,12 +140,28 @@ def dedupe(+alias: String, +seen: List<&2, String>) -> String:
 
 
 
-# the bootstrap endpoint, exactly as the vibe CLI calls it: the
-# web_search builtin rides along as an MCP-callable connector, and
-# auth-actionable (not yet connected) connectors are included (they
-# stay out of the index: only ready connectors index their tools)
+# the bootstrap endpoint, as the vibe CLI calls it: the server returns
+# a Mistral builtin only when builtin_connectors (repeatable) names it.
+# web_search (as vibe) and image_generation (generate_image,
+# edit_image; vibe does not ask for it) ride along as MCP-callable
+# connectors, and auth-actionable (not yet connected) connectors are
+# included (they stay out of the index: only ready connectors index
+# their tools)
 def bootstrap_url() -> String:
-  "https://api.mistral.ai/v1/connectors/bootstrap?supports_mcp=true&include_auth_actionable_connectors=true&builtin_connectors=web_search"
+  "https://api.mistral.ai/v1/connectors/bootstrap?supports_mcp=true&include_auth_actionable_connectors=true&builtin_connectors=web_search&builtin_connectors=image_generation"
+
+# bise's words after a builtin's own tool description. image_generation
+# answers a JSON {url}: a signed link that expires in about an hour, so
+# the agent must save the image at once
+def desc_note.pick(img: Bool) -> String:
+  match img:
+    case True{}:
+      " NOTE (bise): the result is a JSON {url}, a link that expires in about 1 hour: download it to a file at once (curl -sSL <url> -o <file>.jpg) and use the file; pass the url to edit_image only within that hour. Each image costs $0.10 on the user's Mistral account."
+    case False{}:
+      ""
+
+def desc_note(+cname: String) -> String:
+  desc_note.pick(String.eq(cname, "image_generation"))
 
 # ---- the index line format, parsed ----
 # line: "<cid> <cname> <tool> : #<desc>"

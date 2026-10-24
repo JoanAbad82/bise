@@ -207,3 +207,6 @@ def Laws.mcp_alias_dedupes():
 
 def Laws.mcp_bootstrap_url_parity():
   {==}
+
+def Laws.mcp_image_note():
+  {==}
