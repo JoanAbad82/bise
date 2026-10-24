@@ -79,6 +79,7 @@ impl Agent {
             watching: a.watching.clone(),
             procs: a.procs,
             procs_port: a.procs_port,
+            rank: a.rank,
         }
     }
 }

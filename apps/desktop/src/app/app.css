@@ -794,6 +794,18 @@ body:has(.app-shell) {
 }
 /* the last row of a long section: 'show 50 more · N left' and, at its right, 'show less' (his
    m_26894); each its own hover tint */
+/* AGENTS' 'show 14 more · 3 working · 11 idle' (designer m_39151): the click and the working count
+   text-2, the idle and 'of 365' text-3, ' · ' faint; never the accent */
+.app-rb-more-mid {
+  color: var(--c-text-2);
+}
+.app-rb-more-dim {
+  color: var(--c-text-3);
+}
+.app-rb-more-faint {
+  color: var(--c-text-3);
+  opacity: 0.6;
+}
 .app-rb-pager {
   display: flex;
   align-items: center;

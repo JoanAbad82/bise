@@ -43,6 +43,9 @@ use bise_proto::thread::{self as pthread, Ctx, PageRef};
 pub(super) struct Proto {
     conns: BTreeMap<ClientId, Conn>,
     since: Since,
+    /// agent-rank: his talk with each agent and the last order
+    /// (proto_view/rank.rs), lost on restart by design
+    rank: proto_view::rank::Ranks,
     /// the last `agents` (the live rows, agents-light) and `cards` sent
     /// (sent again only when changed)
     last: (String, String),

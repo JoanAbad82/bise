@@ -83,7 +83,19 @@ impl Shell {
 
     /// The snapshot's agents as rows, `which` of them.
     fn agent_rows(&mut self, snap: &Snapshot, which: proto_view::Which) -> Vec<bise_proto::rows::Agent> {
-        self.agent_rows_with(snap, |snap, since, now, vision, usage, head| proto_view::agents(snap, since, now, crate::model::user_kind, vision, usage, head, which))
+        let mut rows = self.agent_rows_with(snap, |snap, since, now, vision, usage, head| proto_view::agents(snap, since, now, crate::model::user_kind, vision, usage, head, which));
+        self.rank_rows(&mut rows);
+        rows
+    }
+
+    /// agent-rank: his messages not read yet (the first rows: all of
+    /// them, once), then the rows' `rank` (proto_view/rank.rs).
+    fn rank_rows(&mut self, rows: &mut [bise_proto::rows::Agent]) {
+        use proto_view::rank::{apply, Heard};
+        let ranks = &mut self.proto.rank;
+        let his = self.hub.st.msgs().range(ranks.unread()..).filter(|(_, m)| m.from == crate::model::USER).map(|(id, m)| Heard { id: *id, to: &m.to, at: m.created_ms });
+        ranks.hear(his);
+        apply(rows, ranks, now_ms());
     }
 
     /// The row builder's inputs (the live agents seeded, the catalog,

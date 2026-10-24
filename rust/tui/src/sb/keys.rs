@@ -179,8 +179,10 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
             false
         }
         _ if matches!(nav, Some(Nav::Goto(_))) => {
-            // the number shown in the panel (it stays while the agent lives)
+            // the number shown in the panel (the hub's rank, held a moment
+            // after the jump so ⌥1 ⌥2 ⌥3 never shift: numbers.rs)
             if let Some(t) = nav.and_then(|n| if let Nav::Goto(i) = n { sb.agent_numbered(i) } else { None }) {
+                sb.jumped();
                 focus(app, &t);
             }
             true

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { agentRows, archivedRows, pageRows, procRoots, procRows, roleWords, watchRows, type ProjAgent } from './barrows';
+import { agentRows, agentsMore, archivedRows, pageRows, procRoots, procRows, roleWords, watchRows, type ProjAgent } from './barrows';
 import type { Proc } from '@/proto';
 
 const NOW = 1_791_100_000_000;
@@ -83,6 +83,27 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     const { shown, hidden } = pageRows(agentRows(list, NOW, false), 8);
     expect(shown.map((r) => r.name)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a10']);
     expect(hidden).toBe(3);
+  });
+  it("AGENTS' 'show N more' says how many folded agents work and rest (designer m_39151)", () => {
+    const busy = (i: number) => (i % 5 === 0 ? { status: 'working' as const } : i % 7 === 0 ? { waiting_on: { who: 'agent' as const, name: 'main' } } : {});
+    const rows = agentRows(Array.from({ length: 22 }, (_, i) => ag(`a${String(i + 1)}`, i >= 8 ? busy(i) : {})), NOW, false);
+    const p = pageRows(rows, 8, 0, agentsMore);
+    expect(p.more).toBe('show 14 more · 5 working · 9 idle');
+    expect(p.words?.parts.map((x) => x.tone)).toEqual(['mid', 'faint', 'mid', 'faint', 'dim']);
+    expect(p.words?.tip).toBe('14 agents not shown: 5 working (a11, a15, a16, + 2), 9 idle');
+    // the folded ones all at rest, all at work
+    const idle = agentRows(Array.from({ length: 11 }, (_, i) => ag(`b${String(i)}`)), NOW, false);
+    expect(pageRows(idle, 8, 0, agentsMore).more).toBe('show 3 more · all idle');
+    const work = agentRows(Array.from({ length: 11 }, (_, i) => ag(`w${String(i)}`, { status: 'working' })), NOW, false);
+    expect(pageRows(work, 8, 0, agentsMore)).toMatchObject({ more: 'show 3 more · all working' });
+    expect(pageRows(work, 8, 0, agentsMore).words?.tip).toBe('3 agents not shown: 3 working (w8, w9, w10)');
+    // past a page: 'show 50 more of 365 · 3 working', then 'of 315'
+    const many = agentRows(Array.from({ length: 372 }, (_, i) => ag(`m${String(i)}`, i === 100 || i === 200 || i === 300 ? { status: 'working' } : {})), NOW, false);
+    expect(pageRows(many, 7, 0, agentsMore).more).toBe('show 50 more of 365 · 3 working');
+    expect(pageRows(many, 7, 1, agentsMore).more).toBe('show 50 more of 315 · 3 working');
+    // what waits on him is never folded: never counted, never the accent
+    const asks = agentRows(Array.from({ length: 10 }, (_, i) => ag(`q${String(i)}`, i === 9 ? { waits: 1 } : {})), NOW, false);
+    expect(pageRows(asks, 8, 0, agentsMore)).toMatchObject({ hidden: 1, more: 'show 1 more · all idle' });
   });
   it("'show 50 more' opens 50 at a time, 'show less' goes back to the cap (his m_26894): 370 rows, cap 5", () => {
     const rows = agentRows(Array.from({ length: 370 }, (_, i) => ag(`a${String(i + 1)}`, i === 300 ? { waits: 1 } : {})), NOW, false);

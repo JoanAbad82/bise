@@ -138,6 +138,20 @@ export const panel = {
   show_more: (a: { n: string | number }): string => "show " + String(a.n) + " more",
   /** back to the cap */
   show_less: "show less",
+  /** AGENTS' next page when more than a page is folded: after 'show 50 more', text-3 (designer m_39151) */
+  more_of: (a: { left: string | number }): string => "of " + String(a.left),
+  /** AGENTS' folded agents at rest (idle or done), text-3 */
+  more_idle: (a: { n: string | number }): string => String(a.n) + " idle",
+  /** AGENTS' folded agents, none at work */
+  more_all_idle: "all idle",
+  /** AGENTS' folded agents, all at work */
+  more_all_working: "all working",
+  /** the tip of AGENTS' 'show N more': how many agents it folds */
+  more_tip: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent not shown" : String(a.n) + " agents not shown",
+  /** the tip's agents at work, their first names */
+  more_tip_working: (a: { n: string | number; names: string | number }): string => String(a.n) + " working (" + String(a.names) + ")",
+  /** the tip's names past the third */
+  more_tip_plus: (a: { n: string | number }): string => "+ " + String(a.n),
   /** a new artifact's chip */
   new_chip: "new",
   /** a browser-only artifact's mark */

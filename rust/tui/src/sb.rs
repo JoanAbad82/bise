@@ -28,6 +28,7 @@ use cards::{Card, CardView};
 mod card_draw;
 pub(super) use card_draw::{answer_target, box_height, card_frame, BoxFit, card_view_open, divider_label as card_divider_label, draw_box, draw_view as draw_card_view, fit_pairs as fit_card_pairs, key_pairs as card_key_pairs};
 mod panel;
+pub(crate) mod numbers;
 mod waiting;
 pub(crate) use waiting::{end_short, rule_states as watching_rule, Watch};
 pub(crate) mod places;
@@ -190,6 +191,9 @@ pub(super) struct Agent {
     /// port they listen on (the panel's faint `∿ 2 running · :5173`)
     procs: u16,
     procs_port: Option<u16>,
+    /// agent-rank: its place in the hub's one order (main 0), none from
+    /// an older hub (numbers.rs: start order)
+    rank: Option<u32>,
 }
 
 impl Agent {

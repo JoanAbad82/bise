@@ -56,6 +56,8 @@ export interface BarRow {
   readonly mark?: Mark;
   /** the worktree group it is in (its head's too): the 1 px rule in the margin */
   readonly group?: string;
+  /** an agent at work (working, or waiting on an agent or an event): 'show N more''s 'N working' (designer m_39151) */
+  readonly busy?: true;
   /** an orphan PR's or a head's branch (an orphan opens it) */
   readonly branch?: string;
   /** at work: the DS's breeze '∿' (a Dot) in the glyph's place */
@@ -82,7 +84,7 @@ export interface AgentExtras {
   /** the project's cards: a 'merge' one tints its PR's '↑' pink */
   readonly cards?: readonly Card[];
   readonly computer?: readonly ComputerAgent[];
-  /** the TUI's ⌥ numbers (agents/model numbersOf): the order and ⌥N; none: start order */
+  /** the ⌥ numbers, the hub's rank (agents/model numbersOf, the TUI's too): the order and ⌥N; none: start order */
   readonly numbers?: ReadonlyMap<string, number>;
   /** bise's home project: on bise's thread, its main is AGENTS' first row */
   readonly home?: string;
@@ -179,6 +181,7 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     waits: s.g === '?',
     ...(x.a.main ? { main: true as const } : {}),
     ...(!numbered && sign.working ? { working: true } : {}),
+    ...(busyOf(x.a) ? { busy: true as const } : {}),
     ...(cu === null ? {} : { cu }),
     ...(pct === '' ? {} : { ctx: Number.parseInt(pct, 10) }),
     ...(mark === undefined ? {} : { mark }),
@@ -186,10 +189,15 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
   };
 }
 
+/** At work, in 'show N more''s words (designer m_39151): working, or waiting on an agent or on an event it resumes on. Pure. */
+export function busyOf(a: Agent): boolean {
+  return a.status === 'working' || a.status === 'waiting' || a.waiting_on?.who === 'agent' || a.watching.some((w) => w.resumes === true);
+}
+
 /**
  * AGENTS (desktop-agents-bar §2-§4), the TUI panel's order (sb.rs blocks, designer m_23651): a
  * project's main first, named 'bise' (on bise's thread, the home project's), then the
- * live agents that share no worktree, by their ⌥ number (the shared checkout's and the
+ * live agents that share no worktree, by their ⌥ number, the hub's rank (the shared checkout's and the
  * ones alone in theirs, each with its mark), then the open PRs with no live agent (no sign, the
  * branch text-3, its '↑'), then each worktree 2 or more live agents share: a 'ψ <branch>' head with
  * its PR's '↑ #418', its rows with no mark, in the order of their smallest number. A head waits on
@@ -423,6 +431,18 @@ export function watchRows(agents: readonly ProjAgent[], now: number, all: boolea
 /** How many rows one click on 'show 50 more' adds (his m_26894: hundreds of artifacts). */
 export const PAGE = 50;
 
+/** One run of a 'show N more' row's words and its tone: the click text-2, the folded idle text-3, ' · ' faint (designer m_39151). */
+export interface MorePart {
+  readonly text: string;
+  readonly tone: 'mid' | 'dim' | 'faint';
+}
+
+/** A 'show N more' row's words in parts and its tip (AGENTS'); none: `more` alone. */
+export interface MoreWords {
+  readonly parts: readonly MorePart[];
+  readonly tip: string;
+}
+
 /** A section's rows under its cap and the pages he opened past it, and its last row's words. */
 export interface Paged {
   readonly shown: BarRow[];
@@ -432,6 +452,8 @@ export interface Paged {
   readonly pages: number;
   /** the row that shows the next page, the cap's too: 'show 50 more · 365 left', 'show 15 more' under 50 ('' none): it says what a click does (designer m_27020) */
   readonly more: string;
+  /** AGENTS': `more` in parts with their tones, and its tip (agentsMore) */
+  readonly words?: MoreWords;
   /** 'show less' is there: some page is open past the cap */
   readonly less: boolean;
 }
@@ -439,16 +461,50 @@ export interface Paged {
 /**
  * The rows a section shows: its cap (8 for AGENTS, 5 for the others), then PAGE more for each page
  * he opened. A row that waits on him is never hidden, it shows in its place past the limit and the
- * count leaves it out (designer v5, ambient-lead m_20091). Pure.
+ * count leaves it out (designer v5, ambient-lead m_20091). `say`: the section's own words for the
+ * row (AGENTS': agentsMore). Pure.
  */
-export function pageRows(rows: readonly BarRow[], cap: number, pages = 0): Paged {
+export function pageRows(rows: readonly BarRow[], cap: number, pages = 0, say?: (folded: readonly BarRow[], next: number) => MoreWords): Paged {
   const over = rows.filter((r, i) => i >= cap && !r.waits).length;
   const p = Math.min(Math.max(0, Math.floor(pages)), Math.ceil(over / PAGE));
   const limit = cap + p * PAGE;
   const shown = rows.filter((r, i) => i < limit || r.waits);
   const hidden = rows.length - shown.length;
+  if (hidden > 0 && say !== undefined) {
+    const words = say(rows.filter((r, i) => !(i < limit || r.waits)), Math.min(hidden, PAGE));
+    return { shown, hidden, pages: p, more: words.parts.map((x) => x.text).join(''), words, less: p > 0 };
+  }
   const more = hidden === 0 ? '' : hidden > PAGE ? panel.show_more_left({ n: PAGE, left: hidden }) : panel.show_more({ n: hidden });
   return { shown, hidden, pages: p, more, less: p > 0 };
+}
+
+/**
+ * AGENTS' 'show N more' (designer m_39151): what a click shows, then how many of the folded agents
+ * work and rest: 'show 14 more · 3 working · 11 idle', 'show 11 more · all idle', 'show 3 more · all
+ * working'; past a page 'show 50 more of 365 · 3 working'. Its tip: '14 agents not shown: 3 working
+ * (perf, docs, search), 11 idle', the names cut after 3 with '+ n'. Never the accent: what needs
+ * him is never folded. Pure.
+ */
+export function agentsMore(folded: readonly BarRow[], next: number): MoreWords {
+  const agents = folded.filter((r) => r.kind === 'agent');
+  const busy = agents.filter((r) => r.busy === true);
+  const idle = agents.length - busy.length;
+  const dot: MorePart = { text: ' · ', tone: 'faint' };
+  const parts: MorePart[] = [{ text: panel.show_more({ n: next }), tone: 'mid' }];
+  if (folded.length > next) parts.push({ text: ` ${panel.more_of({ left: folded.length })}`, tone: 'dim' });
+  if (busy.length === 0) parts.push(dot, { text: panel.more_all_idle, tone: 'dim' });
+  else if (idle === 0) parts.push(dot, { text: panel.more_all_working, tone: 'mid' });
+  else {
+    parts.push(dot, { text: panel.count_working({ n: busy.length }), tone: 'mid' });
+    if (folded.length <= next) parts.push(dot, { text: panel.more_idle({ n: idle }), tone: 'dim' });
+  }
+  const names = busy.slice(0, 3).map((r) => r.name);
+  const plus = busy.length > 3 ? [panel.more_tip_plus({ n: busy.length - 3 })] : [];
+  const say = [
+    ...(busy.length > 0 ? [panel.more_tip_working({ n: busy.length, names: [...names, ...plus].join(', ') })] : []),
+    ...(idle > 0 ? [panel.more_idle({ n: idle })] : []),
+  ];
+  return { parts, tip: `${panel.more_tip({ n: agents.length })}: ${say.join(', ')}` };
 }
 
 /**

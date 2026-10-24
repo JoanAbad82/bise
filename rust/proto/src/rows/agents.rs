@@ -236,6 +236,13 @@ pub struct Agent {
     /// `· :5173`), none when none listens
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub procs_port: Option<u16>,
+    /// agent-rank (architect m_39150): its place in the agents list, the
+    /// hub's one stable order (switchboard proto_view/rank.rs): main 0,
+    /// the live others 1..n, the terminal's panel and the desktop's bar
+    /// sort by it and ⌥N reaches rank N. None for an archived agent and
+    /// from an older hub (the clients keep start order)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rank: Option<u32>,
 }
 
 fn is_zero_u16(n: &u16) -> bool {
@@ -355,6 +362,7 @@ impl Agent {
             doing: None,
             procs: 0,
             procs_port: None,
+            rank: None,
         }
     }
 }

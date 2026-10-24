@@ -1,5 +1,5 @@
 // The right bar (designer's desktop-right-bar v5, ambient-lead m_20085/m_20087): what happens in the
-// place shown, as the terminal's panel: four foldable sections in his order, AGENTS (start order,
+// place shown, as the terminal's panel: four foldable sections in his order, AGENTS (the hub's rank,
 // ⌥N = the TUI's), ARCHIVED (folded until he opens it), ARTIFACTS, SCHEDULED & WATCHING (an alarm: agent-waiting-states A). 320 px, it takes panel A's slots
 // (docked from 1000 px, sliding over under it, ⌥⌘0). On bise's thread the same sections cover every
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
@@ -33,7 +33,7 @@ import { useNowFor } from './clock';
 import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
-import { agentRows, archivedRows, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
+import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type MoreWords, type ProjAgent } from './barrows';
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
@@ -129,6 +129,7 @@ function Section({
   onAll,
   act,
   office,
+  say,
   children,
 }: {
   id: SectionId;
@@ -150,13 +151,15 @@ function Section({
   act?: ReactNode;
   /** AGENTS with bims on: the office, above the rows */
   office?: ReactNode;
+  /** the section's own 'show N more' words (AGENTS': agentsMore) */
+  say?: (folded: readonly BarRow[], next: number) => MoreWords;
   children: (r: BarRow) => ReactNode;
 }) {
   const [folded, toggle] = useFolded(id, id === 'archived');
   const [kept, setPages] = usePages(`frame.rb.more.${id}.${pageScope}`);
   const head = useRef<HTMLDivElement>(null);
   const shut = folded && !noFold;
-  const { shown, pages, more, less } = pageRows(rows, cap, kept);
+  const { shown, pages, more, words, less } = pageRows(rows, cap, kept, say);
   // a head that folds is a row: pointer, the rows' hover tint, a chevron ('▾' on hover while open,
   // '▸' always while folded); one that can't fold looks like a plain title (designer m_21633)
   return (
@@ -211,8 +214,15 @@ function Section({
                     setPages(pages + 1);
                   }}
                   data-testid={`app.right.${id}.more`}
+                  {...tipAttrs(words?.tip)}
                 >
-                  {more}
+                  {words === undefined
+                    ? more
+                    : words.parts.map((x, i) => (
+                        <span key={i} className={`app-rb-more-${x.tone}`}>
+                          {x.text}
+                        </span>
+                      ))}
                 </Press>
               )}
               {less && (
@@ -500,8 +510,8 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const officeMap = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
-  // the TUI's ⌥ numbers: the rows' order and ⌥N (a project's only; bise's thread keeps start order)
-  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a));
+  // the hub's rank as ⌥ numbers, held while ⌥ is (agents/model numbersOf): the rows' order and ⌥N (a project's only; bise's thread keeps start order)
+  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a), alt);
   // bise's home: on bise's thread, its main is AGENTS' first row
   const home = useProjects().find((p) => p.home)?.project;
   const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }), ...(home === undefined ? {} : { home }) });
@@ -580,6 +590,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           count={agentCount}
           // 8 rows, main's among them: a 9th overflows the bar at 1000 px tall (bar-overflow)
           cap={8}
+          say={agentsMore}
           pageScope={project}
           summary={live.length === 0 ? '' : panel.count_working({ n: working })}
           noFold={waits}

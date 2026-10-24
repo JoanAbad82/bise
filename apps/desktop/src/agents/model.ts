@@ -70,10 +70,8 @@ export function archivedEnd(a: Agent, now: number): string {
 }
 
 /**
- * The live list in the TUI's panel order (qa-flows 5ee10a00): main first,
- * then the hub's order, which is start order; a status never moves a row
- * (the dot and the end say what needs him). Archived agents are not in it
- * (`archivedOf`).
+ * The live list, main first, then the hub's order (start order): rankedOf
+ * numbers it by the hub's rank. Archived agents are not in it (`archivedOf`).
  */
 export function liveOf(agents: readonly Agent[]): Agent[] {
   return agents.filter((a) => !a.archived && a.main).concat(agents.filter((a) => !a.archived && !a.main));
@@ -83,40 +81,67 @@ export function liveOf(agents: readonly Agent[]): Agent[] {
 export type Slots = ReadonlyMap<string, number>;
 
 /**
- * The TUI's numbers (sb/panel.rs assign): `slots` brought up to date with
- * the `live` agents in panel order; a gone agent frees its number, one that
- * stays keeps it (an archive never renumbers the others), a newcomer takes
- * the smallest free number from 1, main is 0. Pure.
+ * The hub's one order as ⌥ numbers (agent-rank, architect m_39150): each live row's `rank`
+ * (switchboard proto_view/rank.rs; the TUI's panel reads the same field, rust/tui/src/sb/numbers.rs):
+ * main 0, the others 1..n by rank; a row with none (an older hub) after them, in start order.
+ * Nothing is ranked here. Pure.
  */
-export function assign(slots: Slots, live: readonly Agent[]): Map<string, number> {
+export function rankedOf(live: readonly Agent[]): Map<string, number> {
+  const others = live
+    .filter((a) => !a.main)
+    .map((a, i) => ({ a, i }))
+    .sort((x, y) => (x.a.rank ?? Number.MAX_SAFE_INTEGER) - (y.a.rank ?? Number.MAX_SAFE_INTEGER) || x.i - y.i);
   const out = new Map<string, number>();
-  for (const [name, n] of slots) {
-    if (live.some((a) => a.name === name && a.main === (n === 0))) out.set(name, n);
-  }
-  const used = new Set(out.values());
-  for (const a of live) {
-    if (out.has(a.name)) continue;
-    let n = 0;
-    if (!a.main) {
-      n = 1;
-      while (used.has(n)) n += 1;
-    }
-    used.add(n);
-    out.set(a.name, n);
+  for (const a of live) if (a.main) out.set(a.name, 0);
+  others.forEach(({ a }, k) => out.set(a.name, k + 1));
+  return out;
+}
+
+/**
+ * `next` held to the numbers he sees (`shown`): the ones still there keep theirs, a gone one frees
+ * its number, a newcomer goes after the last. Nothing shown yet: `next`. Pure.
+ */
+export function heldNumbers(shown: Slots | undefined, next: Slots): Map<string, number> {
+  if (shown === undefined || shown.size === 0) return new Map(next);
+  const out = new Map([...shown].filter(([name]) => next.has(name)));
+  let last = Math.max(0, ...out.values());
+  for (const [name, n] of next) {
+    if (out.has(name)) continue;
+    out.set(name, n === 0 ? 0 : ++last);
   }
   return out;
 }
 
-const kept = new Map<string, Map<string, number>>();
+/** How long the numbers hold still after an ⌥N jump (his ⌥1, ⌥2, ⌥3 often lets go of ⌥ between keys). */
+export const HOLD_MS = 5_000;
+
+/** Whether the numbers hold still: ⌥ held, or an ⌥N jump less than HOLD_MS ago. Pure. */
+export function holds(alt: boolean, jumped: number | undefined, now: number): boolean {
+  return alt || (jumped !== undefined && now - jumped < HOLD_MS);
+}
+
+const shownBy = new Map<string, Slots>();
+let jumpedAt: number | undefined;
+
+/** An ⌥N jump now: the numbers hold still HOLD_MS. */
+export function noteJump(now = Date.now()): void {
+  jumpedAt = now;
+}
 
 /**
- * The project's ⌥ numbers now, kept for the window's life as the TUI keeps
- * them for its session: the sidebar shows them, ⌥1-9 reads them.
+ * The project's ⌥ numbers now, as the window shows them: the hub's rank (rankedOf), held while ⌥
+ * is held (`alt`) and a moment after an ⌥N jump (heldNumbers). The sidebar shows them, ⌥1-9 reads them.
  */
-export function numbersOf(project: string, agents: readonly Agent[]): ReadonlyMap<string, number> {
-  const next = assign(kept.get(project) ?? new Map(), liveOf(agents));
-  kept.set(project, next);
-  return next;
+export function numbersOf(project: string, agents: readonly Agent[], alt = false, now = Date.now()): Slots {
+  const next = rankedOf(liveOf(agents));
+  const out = holds(alt, jumpedAt, now) ? heldNumbers(shownBy.get(project), next) : next;
+  shownBy.set(project, out);
+  return out;
+}
+
+/** The numbers the window shows now (numbersOf's last), without moving them: the tour's words. */
+export function shownOf(project: string, agents: readonly Agent[]): Slots {
+  return shownBy.get(project) ?? rankedOf(liveOf(agents));
 }
 
 /** The archived ones, newest first (/archived). */

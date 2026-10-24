@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { ago, archivedEnd, archivedOf, assign, dotOf, endOf, lineOf, liveOf, numbersOf } from './model';
+import { ago, archivedEnd, archivedOf, dotOf, endOf, heldNumbers, holds, HOLD_MS, lineOf, liveOf, noteJump, numbersOf, rankedOf } from './model';
 
 const T = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: false, status: 'idle', archived: false, title: '', purpose: '', since_ms: T, waits: 0, watching: [], ...over });
@@ -49,22 +49,30 @@ describe('the agents list', () => {
     expect(lineOf(ag('a', { title: 'profiling', purpose: 'x' }))).toBe('profiling');
   });
 
-  it("⌥ numbers as the TUI's (sb/panel.rs assign): start order, kept while alive, the smallest free one for a newcomer", () => {
-    const main = ag('main', { main: true });
-    const [p99, alerts, docs] = [ag('p99'), ag('alerts', { status: 'blocked', waits: 1 }), ag('docs')];
-    const first = assign(new Map(), [main, p99, alerts]);
-    expect([...first]).toEqual([['main', 0], ['p99', 1], ['alerts', 2]]);
-    // p99 archived: alerts keeps 2, nobody is renumbered
-    const after = assign(first, [main, alerts]);
-    expect([...after]).toEqual([['main', 0], ['alerts', 2]]);
-    // a newcomer takes the free 1
-    expect(assign(after, [main, alerts, docs]).get('docs')).toBe(1);
+  it("⌥ numbers are the hub's rank (agent-rank): main 0, then by rank; an older hub's rows in start order", () => {
+    const main = ag('main', { main: true, rank: 0 });
+    const [p99, alerts, docs] = [ag('p99', { rank: 3 }), ag('alerts', { rank: 1 }), ag('docs', { rank: 2 })];
+    expect([...rankedOf([p99, main, alerts, docs])]).toEqual([['main', 0], ['alerts', 1], ['docs', 2], ['p99', 3]]);
+    expect([...rankedOf([main, ag('x'), ag('y')])]).toEqual([['main', 0], ['x', 1], ['y', 2]]);
   });
 
-  it('numbersOf keeps a project\'s numbers between calls', () => {
-    const main = ag('main', { main: true });
-    expect(numbersOf('p-num', [main, ag('a'), ag('b')]).get('b')).toBe(2);
-    expect(numbersOf('p-num', [main, ag('b')]).get('b')).toBe(2);
+  it('the numbers hold still while ⌥ is held, and a moment after an ⌥N jump', () => {
+    const shown = new Map([['main', 0], ['a', 1], ['b', 2], ['c', 3]]);
+    // the hub moved c up, dropped a, brought d: held, b and c keep theirs, d goes last
+    const next = new Map([['main', 0], ['c', 1], ['d', 2], ['b', 3]]);
+    expect([...heldNumbers(shown, next)]).toEqual([['main', 0], ['b', 2], ['c', 3], ['d', 4]]);
+    expect(holds(true, undefined, T)).toBe(true);
+    expect(holds(false, T, T + HOLD_MS - 1)).toBe(true);
+    expect(holds(false, T, T + HOLD_MS)).toBe(false);
+    // through numbersOf: ⌥ held, a rank change from the hub moves nothing
+    const main = ag('main', { main: true, rank: 0 });
+    const before = numbersOf('p-hold', [main, ag('a', { rank: 1 }), ag('b', { rank: 2 })], false, T);
+    const moved = [main, ag('a', { rank: 2 }), ag('b', { rank: 1 })];
+    expect(numbersOf('p-hold', moved, true, T)).toEqual(before);
+    // an ⌥N jump: still held after ⌥ goes, until HOLD_MS
+    noteJump(T);
+    expect(numbersOf('p-hold', moved, false, T + 1_000)).toEqual(before);
+    expect(numbersOf('p-hold', moved, false, T + HOLD_MS).get('b')).toBe(1);
   });
 });
 

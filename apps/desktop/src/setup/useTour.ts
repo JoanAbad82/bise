@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useAgents, useProjects } from '@/store';
 import { useRoute } from '@/app/router';
 import { MAIN, type Route } from '@/app/route';
-import { numbersOf } from '@/agents/model';
+import { shownOf } from '@/agents/model';
 import { sortCards } from '@/inbox/order';
 import type { Agent, Card } from '@/proto';
 import { TOUR, isDemo, observe, sent, tip as tipOf, type Member, type Snap, type Tip, type Tour } from './tour';
@@ -132,7 +132,7 @@ export function useTour(project: string): { tip: Tip | null; snap: Snap; sent: (
   useSyncExternalStore(subscribe, getVersion);
   const open = palette;
   const cards = useMemo(() => rows.find((r) => r.project === project)?.cards ?? [], [rows, project]);
-  const snap = useMemo(() => snapOf(agents, numbersOf(project, agents), route, project, cards, open, knownDemos(project, agents)), [agents, project, route, cards, open]);
+  const snap = useMemo(() => snapOf(agents, shownOf(project, agents), route, project, cards, open, knownDemos(project, agents)), [agents, project, route, cards, open]);
   useEffect(() => {
     observeTour(project, snap);
   }, [project, snap]);
