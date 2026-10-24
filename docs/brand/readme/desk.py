@@ -4,9 +4,9 @@
 # the app's own look (apps/desktop/src/ds/tokens.css, the shots in site/download/), cropped to the part that tells the
 # feature, on the same paper card as the terminal scenes. the system sans (SF) like the app; mono only for code and keys.
 DPAL = {
-  "dark":  dict(mode="dark", bg="#141211", text="#ece6da", dim="#a39c90", faint="#857d72", rule="#4a4540", acc="#f4a6b0", ok="#b9d99a",
+  "dark":  dict(mode="dark", bg="#141211", text="#ece6da", dim="#a39c90", faint="#857d72", rule="#4a4540", acc="#f4a6b0", ok="#b9d99a", err="#ff5a52",
                 raised="#1f1c1a", chip="#262220", side="#191715", line="#2b2725", sel="#33292c", accsoft="#2e2326", win="#1a1816", shadow="#00000066"),
-  "light": dict(mode="light", bg="#fdfbf7", text="#1b1917", dim="#6b645a", faint="#7d766c", rule="#cfc8bd", acc="#b8416b", ok="#3f7a2a",
+  "light": dict(mode="light", bg="#fdfbf7", text="#1b1917", dim="#6b645a", faint="#7d766c", rule="#cfc8bd", acc="#b8416b", ok="#3f7a2a", err="#b3261e",
                 raised="#f4f0e8", chip="#efe9df", side="#f7f3ec", line="#e9e3d9", sel="#fdeef2", accsoft="#f8e6ec", win="#f6f2ea", shadow="#5a4a3a33"),
 }
 SANS = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif"
@@ -109,7 +109,12 @@ def d_session(m):
     d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
     TX, RB = 448, 680  # the thread column ends, the right bar starts
     o.append(f'<rect x="{TX}" y="0" width="{RB - TX}" height="{d.H}" fill="{c["side"]}"/><path d="M{TX} 0 V{d.H}" stroke="{c["line"]}"/>'
-             f'<path d="M0 38 H{TX}" stroke="{c["line"]}"/>')
+             f'<path d="M0 38 H{TX}" stroke="{c["line"]}"/>'
+             f'<clipPath id="col-t"><rect x="0" y="0" width="{TX - 8}" height="{d.H}"/></clipPath>'
+             f'<clipPath id="col-r"><rect x="{TX + 1}" y="0" width="{RB - TX - 9}" height="{d.H}"/></clipPath>')
+    # every line stays in its column: the thread's and the right bar's
+    colT = lambda body: f'<g clip-path="url(#col-t)">{body}</g>'
+    colR = lambda body: f'<g clip-path="url(#col-r)">{body}</g>'
     # the thread's head: bise · storefront, and the pill while something waits on him
     o.append(t(18, 25, f'<tspan fill="{c["acc"]}" style="font-family:{MONO}" font-weight="700">:*</tspan> <tspan font-weight="600">bise</tspan> <tspan fill="{c["dim"]}">· storefront</tspan>', 13))
     pw = tw("1 waiting for you", 11.5) + 16; px_ = 18 + tw(":* bise · storefront", 13) + 14
@@ -123,10 +128,10 @@ def d_session(m):
     for a, b, n in [(0, 3.5, 0), (3.5, 3.9, 1), (3.9, None, 2)]:
         o.append(at(a, b, lab(64, f"AGENTS · {n}"), dur=.1))
     o.append(t(RB - 16, 64, "all ›", 11.5, "faint", anchor="end"))
-    for i, (t0, name, what, marks) in enumerate([(3.5, "perf", "product page speed", [(3.5, "∿", "dim"), (7.6, "✓", "ok")]),
+    for i, (t0, name, what, marks) in enumerate([(3.5, "perf", "product page speed", [(3.5, "∿", "dim"), (7.6, "✓", "dim")]),
                                                   (3.9, "search", "size filter", [(3.9, "∿", "dim"), (5.0, "?", "acc"), (6.4, "∿", "dim")])]):
         y = 90 + i * 25
-        o.append(at(t0, None, t(rx + 18, y, f'<tspan font-weight="500">{name}</tspan>  <tspan fill="{c["dim"]}" font-size="12">{what}</tspan>', 13)))
+        o.append(colR(at(t0, None, t(rx + 18, y, f'<tspan font-weight="500">{name}</tspan>  <tspan fill="{c["dim"]}" font-size="12">{what}</tspan>', 13))))
         for j, (a, g, col) in enumerate(marks):
             b = marks[j + 1][0] if j + 1 < len(marks) else None
             o.append(at(a, b, t(rx, y, f'<tspan class="g">{g}</tspan>' if g == "∿" else g, 13, col), dur=.08))
@@ -140,19 +145,26 @@ def d_session(m):
     bl, bh = d.bubble(R, 98, wrap(ask, 270))
     o.append(at(send, None, bl))
     y = 98 + bh + 24
-    o.append(at(2.9, None, d.head(X, y, "bise") + t(X, y + 20, "on it. perf takes the product page, search the size filter.", 13)))
+    o.append(colT(at(2.9, None, d.head(X, y, "bise") + t(X, y + 20, "on it. perf takes the product page, search the size filter.", 13))))
     for i, (who, what, t0) in enumerate([("perf", "make the product page fast on phones", 3.4), ("search", "add a size filter to search", 3.8)]):
         yy = y + 48 + i * 26
-        cw = tw(f"✉ bise → {who}", 12) + 14
-        o.append(at(t0, None, d.chip(X, yy, f'✉ <tspan font-weight="600" fill="{c["text"]}">bise</tspan> → {who}', cw) + t(X + cw + 8, yy, E(what), 12.5, "dim")))
-    yq = y + 48 + 2 * 26 + 8
-    o.append(at(6.5, None, t(X, yq, f'<tspan fill="{c["ok"]}">✓</tspan> you answered search · EU only', 12.5, "dim")))
-    o.append(at(7.6, None, t(X, yq + 24, f'<tspan fill="{c["ok"]}">✓</tspan> perf landed on main · <tspan fill="{c["text"]}">a1b2c3d</tspan> · 3 files +42 −18', 12.5, "dim")))
+        cw = tw(f"✉ bise → {who}", 12) * 1.08 + 16
+        o.append(colT(at(t0, None, d.chip(X, yy, f'✉ <tspan font-weight="600" fill="{c["text"]}">bise</tspan> → {who}', cw) + t(X + cw + 8, yy, E(what), 12.5, "dim"))))
+    # his answer, on his side: '✓ you answered search' (text-3) over his bubble (rows-cards)
+    yq = y + 48 + 2 * 26 + 4
+    ab, ah = d.bubble(R, yq + 8, ["EU only"])
+    o.append(colT(at(6.5, None, t(R, yq, "✓ you answered search", 11.5, "faint", anchor="end") + ab)))
+    # the land: 'perf landed on main · a1b2c3d' (thread.landed), the files as their own quiet chip; green only for the diff's +
+    yl = yq + 8 + ah + 22
+    lw = tw("✓ perf landed on main · a1b2c3d", 12.5) * 1.05 + 10
+    fw = tw("± 3 files +42 −18", 11.5) * 1.06 + 16
+    o.append(colT(at(7.6, None, t(X, yl, f'✓ perf landed on main · <tspan fill="{c["text"]}">a1b2c3d</tspan>', 12.5, "dim")
+                     + d.chip(X + lw, yl, f'± 3 files <tspan fill="{c["ok"]}">+42</tspan> <tspan fill="{c["err"]}">−18</tspan>', fw, size=11.5))))
     # the inbox block above the composer, while search's question waits
     iy = 280
     ib = (f'<rect x="{X - 4}" y="{iy}" width="{R - X + 8}" height="80" rx="10" fill="{c["raised"]}" stroke="{c["line"]}"/>'
-          + t(X + 10, iy + 20, f'inbox <tspan fill="{c["dim"]}">1 waiting</tspan>', 12)
-          + t(R - 8, iy + 20, f'<tspan style="font-family:{MONO}">^1</tspan> open', 12, "dim", anchor="end")
+          + t(X + 10, iy + 20, f'inbox <tspan fill="{c["dim"]}">· 1 waiting</tspan>', 12)
+          + t(R - 8, iy + 20, '⌃1 open', 12, "dim", anchor="end")
           + t(X + 10, iy + 44, f'<tspan fill="{c["dim"]}">1</tspan>  <tspan fill="{c["acc"]}">?</tspan>  <tspan font-weight="600">search</tspan>  which size system: EU, or US too?', 12.5)
           + t(X + 30, iy + 66, f'<tspan style="font-family:{MONO}">1</tspan> EU only     <tspan style="font-family:{MONO}">2</tspan> EU and US', 12, "dim"))
     o.append(at(5.0, 6.4, ib))
@@ -173,16 +185,18 @@ def d_artifacts(m):
     # phase A: the thread alone, wide
     def thread(w, x0=22):
         R = w - 22; b = []
-        b.append(t(x0, 25, f'<tspan font-weight="600">product page speed</tspan>', 13))
-        bw = tw("∿ working · 4 min", 11.5) + 16; bx = x0 + tw("product page speed", 13) * 1.12 + 12
+        # the head: the agent's name, its role dim, its state (thread header)
+        b.append(t(x0, 25, f'<tspan font-weight="600">perf</tspan>  <tspan fill="{c["dim"]}">product page speed</tspan>', 13))
+        bw = tw("∿ working · 4 min", 11.5) + 16; bx = x0 + tw("perf  product page speed", 13) * 1.1 + 12
         b.append(f'<rect x="{bx:.0f}" y="12" width="{bw:.0f}" height="20" rx="10" fill="{c["chip"]}"/>' + t(bx + 8, 26, "∿ working · 4 min", 11.5, "dim"))
         b.append(f'<path d="M0 38 H{w}" stroke="{c["line"]}"/>')
         y = 64
         b.append(d.head(x0, y, "perf")); y += 20
-        for i, l in enumerate(["$ lighthouse staging/product --preset=mobile", "± src/product/Hero.tsx"]):
-            n = int((w - 2 * x0 - 30) / 7.1)
-            l = l if len(l) <= n else l[:n - 1] + "…"
-            b.append(t(x0, y + i * 19, E(l) + f'  <tspan fill="{c["ok"]}">✓</tspan>', 11.5, "dim", mono=True))
+        # tool rows as the app draws them: '$' + the model's description (sans, text-2), the time text-3 at the right;
+        # an edit: '± Hero.tsx  +18 −6' (green only for the diff's +)
+        b.append(t(x0, y, "$ run lighthouse on a mid phone", 12.5, "dim") + t(R, y, "✓ 38 s", 11.5, "faint", anchor="end"))
+        b.append(t(x0, y + 20, f'± Hero.tsx  <tspan fill="{c["ok"]}">+18</tspan> <tspan fill="{c["err"]}">−6</tspan>', 12.5, "dim")
+                 + t(R, y + 20, "✓ 0.3 s", 11.5, "faint", anchor="end"))
         y += 50
         for l in wrap("the hero image went from 2.4 MB to 180 KB; first paint on a mid phone from 3.1 s to 0.9 s.", R - x0):
             b.append(t(x0, y, E(l), 13)); y += 20
@@ -200,7 +214,7 @@ def d_artifacts(m):
     PX = 300
     tb, yb = thread(PX)
     reply = at(8.4, None, d.head(22, yb + 40, "perf") + "".join(t(22, yb + 60 + 20 * i, E(l), 13) for i, l in enumerate(wrap("on it: 14 thumbnails, same treatment. v3 in a few minutes.", PX - 44))))
-    cb, ph, (cx, cy) = d.composer(18, 362, PX - 36, to="perf", where="product page, before / after", placeholder="ask perf about it, then ⏎", keys="^R dictate   ∿ voice   ctrl+c stop")
+    cb, ph, (cx, cy) = d.composer(18, 362, PX - 36, to="perf", where="product page, before / after", placeholder="ask perf about it, then ⏎", keys="tab queue   ⏎ steer   ctrl+c stop")
     o.append(at(open_, None, "".join(tb) + reply + cb + d.t(cx, cy, E(ph), 13, "faint"), dur=.15))
     # the panel slides in from the right
     pan = [f'<rect x="{PX}" y="0" width="{680 - PX}" height="{d.H}" fill="{c["side"]}"/><path d="M{PX} 0 V{d.H}" stroke="{c["line"]}"/>',
@@ -236,8 +250,8 @@ def d_artifacts(m):
     pw = tw("notes · 1 ▸", 11.5) + 18
     pill = at(5.9, 7.0, f'<rect x="{gx + gw - 14 - pw:.0f}" y="84" width="{pw:.0f}" height="20" rx="10" fill="{c["text"]}"/>' + t(gx + gw - 14 - pw / 2, 98, "notes · 1 ▸", 11.5, "bg", anchor="middle"), dur=.1)
     press = at(6.6, 7.0, f'<rect x="{gx + gw - 46}" y="61" width="38" height="19" rx="5" fill="{c["accsoft"]}" stroke="{c["acc"]}"/>' + t(gx + gw - 27, 74, "send", 11.5, "acc", 600, anchor="middle"), dur=.08)
-    sent_w = tw("1 note sent to perf", 12) + 24
-    sent = at(7.0, None, f'<rect x="{gx + (gw - sent_w) / 2:.0f}" y="400" width="{sent_w:.0f}" height="26" rx="13" fill="{c["text"]}"/>' + t(gx + gw / 2, 417, "1 note sent to perf", 12, "bg", anchor="middle"), dur=.15)
+    # sent: one ink line on the page, no pill
+    sent = at(7.0, None, t(gx + gw / 2, 417, "✓ 1 note sent to perf", 12, "text", anchor="middle"), dur=.15)
     body = "".join(pan) + o_note + typed + pin + pill + press + sent
     sl = f"sl{d.tl.n + 1}"; d.tl.n += 1
     d.keyframes(sl, f"0%,{d.p(open_)}{{transform:translateX({680 - PX}px)}}{d.p(open_ + .4)},{d.p(T - .3)}{{transform:translateX(0)}}100%{{transform:translateX({680 - PX}px)}}", "cubic-bezier(.2,0,0,1)")
@@ -249,42 +263,51 @@ def d_voicemode(m):
     c = DPAL[m]; T = 12.5
     d = Desk(c, T, 432); o = d.o; t = d.t; at = d.at
     # the browser in front: a plain window (traffic lights, a tab, the address), a docs page
-    o[0] = f'<rect width="680" height="432" fill="{c["frame"] if "frame" in c else c["chip"]}"/>'
-    bx, by, bw, bh = 18, 16, 644, 400
+    # the paper frame is the screen: the browser is a window on it, the corner card sits at the screen's corner
+    o[0] = f'<rect width="680" height="432" fill="{c["chip"]}"/>'
+    bx, by, bw, bh = 18, 16, 560, 356
     o.append(f'<rect x="{bx}" y="{by}" width="{bw}" height="{bh}" rx="10" fill="{c["bg"]}" stroke="{c["line"]}"/>'
              f'<path d="M{bx} {by + 34} H{bx + bw}" stroke="{c["line"]}"/>')
     for i, col in enumerate(["#ff5f57", "#febc2e", "#28c840"]):
         o.append(f'<circle cx="{bx + 18 + i * 16}" cy="{by + 17}" r="5.5" fill="{col}"/>')
-    o.append(f'<rect x="{bx + 180}" y="{by + 8}" width="284" height="19" rx="6" fill="{c["chip"]}"/>' + t(bx + 322, by + 22, "stripe.com/docs/billing/testing", 11.5, "dim", anchor="middle"))
+    o.append(f'<rect x="{bx + 150}" y="{by + 8}" width="260" height="19" rx="6" fill="{c["chip"]}"/>' + t(bx + 280, by + 22, "stripe.com/docs/billing/testing", 11.5, "dim", anchor="middle"))
     o.append(t(bx + 40, by + 80, '<tspan font-weight="700">testing subscriptions</tspan>', 20))
-    for i, wdt in enumerate([520, 470, 500, 300, 0, 480, 510, 420, 260]):
+    for i, wdt in enumerate([460, 410, 440, 260, 0, 420, 450, 370, 220]):
         if wdt: o.append(f'<rect x="{bx + 40}" y="{by + 102 + i * 20}" width="{wdt}" height="7" rx="3.5" fill="{c["line"]}"/>')
     # fn held, bottom left
     o.append(d.key(bx + 14, by + bh - 14, "fn", 0.8, 4.3))
     # the corner card, bottom right: ':*', listening, the still chip, his words; then the answer line by line
-    kx, kw = 330, 316
-    ky0 = 410
+    kw = 300; kx = 680 - 16 - kw  # 16 px from the screen's right and bottom, over the browser's edge
+    ky0 = 432 - 16
     def card(h, inner):
         y = ky0 - h
         return (f'<rect x="{kx + 2}" y="{y + 4}" width="{kw}" height="{h}" rx="14" fill="{c["shadow"]}"/>'
                 f'<rect x="{kx}" y="{y}" width="{kw}" height="{h}" rx="14" fill="{c["raised"]}" stroke="{c["line"]}"/>' + inner(y))
     mark = lambda y: t(kx + 14, y + 24, f'<tspan fill="{c["acc"]}" style="font-family:{MONO}" font-weight="700">:*</tspan>', 13)
-    still = lambda y: (f'<rect x="{kx + 14}" y="{y + 36}" width="{tw("▣ Safari · stripe.com  ✕", 11.5) + 14:.0f}" height="20" rx="6" fill="{c["chip"]}"/>'
-                       + t(kx + 21, y + 50, f'▣ Safari · stripe.com  <tspan fill="{c["faint"]}">✕</tspan>', 11.5, "dim"))
+    # the still chip as signed: a 16 px thumbnail of the page, 'Safari · stripe.com', ✕
+    def still(y):
+        w = tw("Safari · stripe.com", 11.5) * 1.06 + 50
+        thumb = (f'<rect x="{kx + 19}" y="{y + 38}" width="16" height="16" rx="3" fill="{c["bg"]}" stroke="{c["line"]}"/>'
+                 + "".join(f'<rect x="{kx + 21}" y="{y + 42 + 3 * j}" width="{12 - 3 * (j % 2)}" height="1.4" fill="{c["faint"]}"/>' for j in range(3)))
+        return (f'<rect x="{kx + 14}" y="{y + 35}" width="{w:.0f}" height="22" rx="6" fill="{c["chip"]}"/>' + thumb
+                + t(kx + 41, y + 50, f'Safari · stripe.com  <tspan fill="{c["faint"]}">✕</tspan>', 11.5, "dim"))
     q = "how do i test a renewal without waiting a month?"
-    qlines = wrap(q, kw - 28)
-    H1 = 70 + 20 * len(qlines)
-    listen = card(H1, lambda y: mark(y) + t(kx + 40, y + 24, "● listening", 12, "dim") + still(y)
-                  + "".join(d.words(kx + 14, y + 76 + 20 * i, l, 1.3 + sum(len(x.split()) for x in qlines[:i]) * .26, .26) for i, l in enumerate(qlines)))
+    qlines = wrap(q, kw - 34)
+    H1 = 94 + 20 * len(qlines)
+    hint = lambda y: t(kx + 14, y + H1 - 14, "fn ⌫ no screenshot", 11.5, "faint")
+    listen = card(H1, lambda y: mark(y) + t(kx + 40, y + 24, "● listening", 12, "dim") + still(y) + hint(y)
+                  + "".join(d.words(kx + 14, y + 78 + 20 * i, l, 1.3 + sum(len(x.split()) for x in qlines[:i]) * .26, .26) for i, l in enumerate(qlines)))
     o.append(at(1.0, 4.3, listen, dur=.15))
-    think = card(H1, lambda y: mark(y) + t(kx + 40, y + 24, f'<tspan class="g">∿</tspan> bise is on it', 12, "dim") + still(y)
-                 + "".join(t(kx + 14, y + 76 + 20 * i, E(l), 13, "dim") for i, l in enumerate(qlines)))
+    think = card(H1, lambda y: mark(y) + t(kx + 40, y + 24, f'<tspan class="g">∿</tspan> bise is on it', 12, "dim") + still(y) + hint(y)
+                 + "".join(t(kx + 14, y + 78 + 20 * i, E(l), 13, "dim") for i, l in enumerate(qlines)))
     o.append(at(4.3, 5.2, think, dur=.05))
     ans = ["use a test clock: create one,", "attach the customer to it, then", "advance it 31 days. the renewal", "and its webhooks fire like in prod."]
     for n in range(1, len(ans) + 1):
         a0 = 5.2 + (n - 1) * .75; a1 = 5.2 + n * .75 if n < len(ans) else 8.8
-        Hn = 44 + 20 * n
-        o.append(at(a0, a1, card(Hn, lambda y, n=n: mark(y) + "".join(t(kx + 14, y + 52 + 20 * i, E(l), 13) for i, l in enumerate(ans[:n]))), dur=.05))
+        Hn = 70 + 20 * n
+        # the answering card ends with its keys (signed, m_22387)
+        o.append(at(a0, a1, card(Hn, lambda y, n=n, Hn=Hn: mark(y) + "".join(t(kx + 14, y + 52 + 20 * i, E(l), 13) for i, l in enumerate(ans[:n]))
+                                 + t(kx + 14, y + Hn - 14, "⏎ open in bise   esc close", 11.5, "faint")), dur=.05))
     # it closes; the answer is in bise's thread: bise's window comes up
     wx, wy, ww, wh = 70, 46, 540, 330
     win = (f'<rect x="{wx + 3}" y="{wy + 5}" width="{ww}" height="{wh}" rx="12" fill="{c["shadow"]}"/>'
