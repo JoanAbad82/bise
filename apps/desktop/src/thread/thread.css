@@ -776,6 +776,23 @@
   min-width: 0;
   overflow: hidden;
 }
+/* a live agent's role: whole-or-drop below its floor (designer m_39925): it shows a word's start and
+   its '…' ('Propos…', the floor at 1100), else it goes whole (the name's tip says it). The floor is
+   its flex-basis, 6ch: when the name and 6ch don't fit on the line, the role wraps to a second line, hidden below the
+   head; when they fit, it grows to its whole width and cuts with '…' where the row ends. An
+   archived maker's head cuts its own way (useArchivedFit, below). */
+.ah:not(.ah-bise):not([data-arch]) .ah-who {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  row-gap: var(--h-head);
+  /* one line (the name's), the same whether the role shows or went */
+  height: calc(var(--t-14) * var(--lh-ui));
+  line-height: var(--lh-ui);
+}
+.ah:not(.ah-bise):not([data-arch]) .ah-role {
+  flex: 1 1 6ch;
+  max-width: max-content;
+}
 .ah-bise .ah-who {
   align-items: center;
   gap: var(--gap-inline);
