@@ -291,7 +291,23 @@ tests use temp dirs.
 
 ### Bridge (`bend-harness plugins serve`)
 
-- Spawns every stdio server of every enabled plugin in parallel, sends
+- Lazy stdio servers (`bend_plugins::tools_cache`): a stdio server runs
+  only while an agent uses it. Its tools come from the cache every
+  session shares (`Home::mcp_tools_cache()`, one file per server spec,
+  keyed by plugin, server, command, args, cwd, env names, never a value,
+  and the mtimes of mcp.json, plugin.json and his typed-in secrets; 24 h
+  TTL). A miss: one bridge starts it, lists, stops it and writes the
+  cache under the key's flock; the other cold bridges wait at most the
+  server's startup timeout, then read the list (or leave the server out,
+  logged). The first call starts it; every real start lists again and
+  rewrites the cache and the index. No call for 10 min
+  (`tools_cache::IDLE_STOP`): stopped, the next call starts it again, so
+  a server that keeps state between calls loses it then. Its status
+  (`status::Status::idle`) says listed, not running (the Plugins list:
+  "N tools · starts when used"), never an error. Remote servers hold no
+  local process and connect at start as before.
+- Spawns every remote server of every enabled plugin (and a stdio one
+  to list it, on a cache miss) in parallel, sends
   `initialize` (protocol `2025-06-18`), `notifications/initialized`,
   `tools/list`. 30 s per server unless its `startup_timeout_sec` says
   otherwise. The index files wait at most 12 s for them (the REPL waits
@@ -741,6 +757,17 @@ never stalls main's first call).
 
 ## Later
 
+- One shared server per hub (architect m_40002), only if the lazy
+  servers' RSS measure says it is still needed: one 'plugin host' child
+  process per hub, its code in `bend_plugins` (`host.rs`), never in the
+  hub's daemon; the hub's shell only spawns, tags and reaps it (procs),
+  sb-core decides nothing. Each session's bridge stays: its own index,
+  its call-time off check (`StateV2::is_on`) and off words, and it
+  forwards allowed calls to the host over a socket whose path comes from
+  `Paths` (the hub dir), handed over in an internal env var row. Only a
+  server that declares itself shareable (a `dev.bise` manifest flag,
+  default per session) is shared: one with per-session state
+  (PLUGIN_DATA, cwd, a login) stays per session.
 - An inbox item when a remote server needs a login.
 - `ai.mistral.vibe` extension: `toolNamespace`, `toolOverrides`.
 - A `/plugins` picker with per-server toggles (mcp.json's `"enabled":

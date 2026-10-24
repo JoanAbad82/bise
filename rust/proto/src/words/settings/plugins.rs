@@ -23,6 +23,9 @@ crate::words! { settings:
     plugins_bise_what = "bise's own skills: pages, notes, the group";
     /// Plugins list: an MCP server that answered
     plugins_connected(n) = one "connected · {n} tool" | "connected · {n} tools";
+    /// Plugins list: a stdio MCP server whose tools are listed, not running
+    /// (it starts on an agent's first call)
+    plugins_listed(n) = one "{n} tool · starts when used" | "{n} tools · starts when used";
     /// Plugins list: a remote MCP server that said it needs a login
     plugins_part_needs_login = "needs a login";
     /// Plugins list: a remote MCP server logged in, before a session listed it

@@ -38,6 +38,7 @@ use crate::report::{self, ServerStatus};
 use crate::resolve::{self, Diagnostic, HttpServer, Resolution, Severity, StdioServer};
 use crate::state;
 use crate::status;
+use crate::tools_cache::{self, Cache, Listed};
 use crate::stdio::Client;
 
 /// A server's start, handshake and first tools/list when its mcp.json
@@ -87,6 +88,13 @@ pub struct Opts {
     pub poll: Duration,
     /// [`STOP_GRACE`]
     pub grace: Duration,
+    /// the stdio servers' tool lists shared by the sessions
+    /// (`Home::mcp_tools_cache`); None: each bridge lists by starting the
+    /// server once and stopping it
+    pub tools_cache: Option<PathBuf>,
+    /// a stdio server with no call for this long is stopped
+    /// ([`tools_cache::IDLE_STOP`])
+    pub idle_stop: Duration,
 }
 
 impl Opts {
@@ -105,6 +113,8 @@ impl Opts {
             ready_wait: READY_WAIT,
             poll: POLL,
             grace: STOP_GRACE,
+            tools_cache: None,
+            idle_stop: tools_cache::IDLE_STOP,
         }
     }
 }
@@ -237,6 +247,10 @@ impl Conn {
 #[derive(Clone, Debug, PartialEq)]
 enum Outcome {
     Starting,
+    /// a stdio server's tools are known (the shared cache, or started,
+    /// listed and stopped) and it is not running: the first call starts
+    /// it (lazy, `crate::tools_cache`)
+    Listed,
     Up,
     /// a remote server that wants a login: kept without tools, a login
     /// (any session's) brings it up
@@ -292,6 +306,13 @@ struct Entry {
     tools: Mutex<Vec<Value>>,
     /// published tool name -> the server's own name
     names: Mutex<HashMap<String, String>>,
+    /// a stdio server's key in the tools cache ([`tools_cache::key`])
+    cache_key: Option<String>,
+    /// a lazy server's `initialize` result, answered while it is not
+    /// running
+    init: Mutex<Option<Value>>,
+    /// its last call's end (or start): the idle stop's clock
+    last_call: Mutex<Instant>,
 }
 
 impl Entry {
@@ -351,7 +372,8 @@ impl Entry {
                 .collect(),
             Err(_) => Vec::new(),
         };
-        status::write(d, &self.plugin_name, self.spec.id(), &status::Status::now(&transport, &host, tools).listed(listed));
+        let idle = *lock(&self.outcome) == Outcome::Listed;
+        status::write(d, &self.plugin_name, self.spec.id(), &status::Status::now(&transport, &host, tools).listed(listed).idle(idle));
     }
 
     fn login_status(&self) {
@@ -411,13 +433,38 @@ impl Entry {
             }
             e => e.to_string(),
         };
+        *lock(&self.last_call) = Instant::now();
         if dead {
             let c = self.start().map_err(said)?;
             *lock(&self.pid) = c.pid();
             *guard = Some(c);
+            if self.cache_key.is_some() {
+                // a lazy server's real start: list again (the refresh
+                // loop, once this call lets go of the client), so a
+                // changed list reaches the cache and the index
+                *lock(&self.outcome) = Outcome::Up;
+                (self.on_change)();
+            }
         }
         let c = guard.as_ref().ok_or("no server")?;
-        c.request_raw(method, params, self.spec.call_timeout()).map_err(said)
+        let answer = c.request_raw(method, params, self.spec.call_timeout()).map_err(said);
+        *lock(&self.last_call) = Instant::now();
+        answer
+    }
+
+    /// A running stdio server with no call for `idle_stop`: stopped,
+    /// listed again (the next call starts it). A call in flight holds
+    /// the client: never stopped under it.
+    fn stop_if_idle(&self, idle_stop: Duration) -> bool {
+        if self.cache_key.is_none() || !tools_cache::idle(*lock(&self.last_call), Instant::now(), idle_stop) {
+            return false;
+        }
+        let Ok(mut g) = self.client.try_lock() else { return false };
+        let Some(mut c) = g.take() else { return false };
+        c.stop();
+        *lock(&self.pid) = None;
+        *lock(&self.outcome) = Outcome::Listed;
+        true
     }
 
     /// Turned off or gone: refuse new calls at once, let the call in
@@ -532,6 +579,10 @@ struct Live {
     status_dir: Option<PathBuf>,
     secrets_dir: Option<PathBuf>,
     env_dir: Option<PathBuf>,
+    /// the stdio servers' shared tool lists ([`Opts::tools_cache`])
+    tools_cache: Option<Cache>,
+    /// [`Opts::idle_stop`]
+    idle_stop: Duration,
     /// `<plugin>/<server>` when a server says its tools changed, or a
     /// login or a late start brought it up
     changed: Sender<String>,
@@ -590,6 +641,13 @@ impl Live {
                 let on_change: OnChange = Arc::new(move || {
                     let _ = lock(&tx).send(k.clone());
                 });
+                let cache_key = match &spec {
+                    Spec::Stdio(s) => {
+                        let secrets = self.env_dir.as_deref().map(|d| crate::secrets::path(d, &PluginId::plugin(p.name.as_str())));
+                        Some(tools_cache::key(&p.name, &p.root, s, secrets.as_deref()))
+                    }
+                    Spec::Http(_) => None,
+                };
                 let e = Arc::new(Entry {
                     log: self.dir.join(format!("{}.{}.log", p.name, spec.id())),
                     key,
@@ -610,6 +668,9 @@ impl Live {
                     off: AtomicBool::new(false),
                     tools: Mutex::new(Vec::new()),
                     names: Mutex::new(HashMap::new()),
+                    cache_key,
+                    init: Mutex::new(None),
+                    last_call: Mutex::new(Instant::now()),
                 });
                 launch(self.clone(), e.clone());
                 next.push(e);
@@ -637,7 +698,7 @@ impl Live {
         let mut status: Vec<ServerStatus> = Vec::new();
         for e in entries.iter() {
             let tools = match lock(&e.outcome).clone() {
-                Outcome::Up => Ok(counts.get(&e.key).copied().unwrap_or(0)),
+                Outcome::Up | Outcome::Listed => Ok(counts.get(&e.key).copied().unwrap_or(0)),
                 Outcome::Starting => Err("still starting".to_string()),
                 Outcome::Login => {
                     res.diagnostics.push(Diagnostic {
@@ -686,17 +747,36 @@ impl Live {
 fn launch(live: Arc<Live>, e: Arc<Entry>) {
     std::thread::spawn(move || {
         let timeout = e.spec.startup_timeout();
-        let result = e
-            .start()
-            .map_err(|f| {
-                let login = matches!(f, Fail::Auth { .. } | Fail::Scope { .. }) && e.login_file().is_some();
-                let why = if matches!(f, Fail::Locked { .. }) { crate::remote::locked_line(e.spec.id()) } else { f.to_string() };
-                (why, login)
+        let result = if let Some(key) = e.cache_key.as_deref() {
+            // a stdio server: listed, never left running (lazy)
+            let list = || {
+                let mut c = e.start().map_err(|f| f.to_string())?;
+                let ts = c.list_tools(timeout).map_err(|err| format!("tools/list: {}", err));
+                let init = c.init();
+                c.stop();
+                ts.map(|tools| Listed { tools, init })
+            };
+            match &live.tools_cache {
+                Some(cache) => cache.tools_of(key, timeout, list),
+                None => list(),
+            }
+            .map(|l| {
+                *lock(&e.init) = Some(l.init);
+                (None, l.tools)
             })
-            .and_then(|c| match c.list_tools(timeout) {
-                Ok(ts) => Ok((c, ts)),
-                Err(err) => Err((format!("tools/list: {}", err), false)),
-            });
+            .map_err(|why| (why, false))
+        } else {
+            e.start()
+                .map_err(|f| {
+                    let login = matches!(f, Fail::Auth { .. } | Fail::Scope { .. }) && e.login_file().is_some();
+                    let why = if matches!(f, Fail::Locked { .. }) { crate::remote::locked_line(e.spec.id()) } else { f.to_string() };
+                    (why, login)
+                })
+                .and_then(|c| match c.list_tools(timeout) {
+                    Ok(ts) => Ok((Some(c), ts)),
+                    Err(err) => Err((format!("tools/list: {}", err), false)),
+                })
+        };
         let result = result.map_err(|(why, login)| {
             if matches!(e.spec, Spec::Http(_)) {
                 return (why, login);
@@ -711,7 +791,11 @@ fn launch(live: Arc<Live>, e: Arc<Entry>) {
             }
         });
         match result {
-            Ok((mut c, tools)) => {
+            Ok((None, tools)) => {
+                *lock(&e.tools) = tools;
+                *lock(&e.outcome) = Outcome::Listed;
+            }
+            Ok((Some(mut c), tools)) => {
                 if e.off.load(Ordering::SeqCst) {
                     // turned off while it started
                     c.stop();
@@ -739,7 +823,7 @@ fn launch(live: Arc<Live>, e: Arc<Entry>) {
         live.signal();
         if live.ready.load(Ordering::SeqCst) {
             live.publish();
-            if *lock(&e.outcome) == Outcome::Up {
+            if matches!(*lock(&e.outcome), Outcome::Up | Outcome::Listed) {
                 let counts = index_of(&live.entries(), &live.base, &live.state()).2;
                 e.status(Ok(counts.get(&e.key).copied().unwrap_or(0)));
             }
@@ -764,6 +848,10 @@ fn refresh_loop(rx: Receiver<String>, live: Arc<Live>) {
         let entries = live.entries();
         for k in keys {
             let Some(e) = entries.iter().find(|e| e.key == k && !e.off.load(Ordering::SeqCst)) else { continue };
+            if lock(&e.client).is_none() && e.cache_key.is_some() {
+                // a lazy stdio server stopped since: its list stands
+                continue;
+            }
             if lock(&e.client).is_none() {
                 // a login happened: connect now
                 match e.start() {
@@ -779,15 +867,21 @@ fn refresh_loop(rx: Receiver<String>, live: Arc<Live>) {
                     }
                 }
             }
-            let listed = {
+            let (listed, init) = {
                 let guard = lock(&e.client);
                 match guard.as_ref() {
-                    Some(c) => c.list_tools(e.spec.startup_timeout()),
+                    Some(c) => (c.list_tools(e.spec.startup_timeout()), c.init()),
                     None => continue,
                 }
             };
             match listed {
-                Ok(ts) => *lock(&e.tools) = ts,
+                Ok(ts) => {
+                    if let (Some(cache), Some(key)) = (&live.tools_cache, e.cache_key.as_deref()) {
+                        cache.write(key, &Listed { tools: ts.clone(), init: init.clone() }, SystemTime::now());
+                        *lock(&e.init) = Some(init);
+                    }
+                    *lock(&e.tools) = ts;
+                }
                 Err(err) => e.status(Err(format!("tools/list: {}", err))),
             }
         }
@@ -893,7 +987,7 @@ fn handle_rpc(live: &Live, entry: &Entry, body: &[u8]) -> (&'static str, String)
     };
     let method = msg.get("method").and_then(Value::as_str).unwrap_or("");
     if method == "initialize" {
-        let init = lock(&entry.client).as_ref().map(Conn::init).unwrap_or_else(|| {
+        let init = lock(&entry.client).as_ref().map(Conn::init).or_else(|| lock(&entry.init).clone()).unwrap_or_else(|| {
             json!({"protocolVersion": crate::stdio::PROTOCOL, "capabilities": {"tools": {}},
                    "serverInfo": {"name": "bend-plugin-bridge", "version": "1"}})
         });
@@ -1011,6 +1105,8 @@ pub fn serve(opts: Opts) -> std::io::Result<()> {
         status_dir: opts.status_dir.clone(),
         secrets_dir: opts.secrets_dir.clone(),
         env_dir: opts.env_dir.clone(),
+        tools_cache: opts.tools_cache.clone().map(Cache::new),
+        idle_stop: opts.idle_stop,
         changed: changed_tx.clone(),
         entries: RwLock::new(Vec::new()),
         state: RwLock::new(roots.state.clone()),
@@ -1063,7 +1159,7 @@ pub fn serve(opts: Opts) -> std::io::Result<()> {
     // a server up between files() and ready: its index line now
     live.publish();
     for e in live.entries() {
-        if *lock(&e.outcome) == Outcome::Up {
+        if matches!(*lock(&e.outcome), Outcome::Up | Outcome::Listed) {
             let counts = index_of(&live.entries(), &live.base, &live.state()).2;
             e.status(Ok(counts.get(&e.key).copied().unwrap_or(0)));
         }
@@ -1135,6 +1231,14 @@ pub fn serve(opts: Opts) -> std::io::Result<()> {
         tick += 1;
         if tick.is_multiple_of(4) {
             logins(&live.entries());
+            let stopped: Vec<Arc<Entry>> = live.entries().into_iter().filter(|e| e.stop_if_idle(live.idle_stop)).collect();
+            if !stopped.is_empty() {
+                let counts = index_of(&live.entries(), &live.base, &live.state()).2;
+                for e in stopped {
+                    e.status(Ok(counts.get(&e.key).copied().unwrap_or(0)));
+                }
+                live.publish();
+            }
         }
     }
     live.stop.store(true, Ordering::SeqCst);

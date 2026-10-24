@@ -226,6 +226,14 @@ fn mcp_servers_say_their_status_tools_login_and_error_as_data() {
     assert_eq!(gh.status.as_deref(), Some(settings::plugins_connected(2).as_str()));
     let tools: Vec<(&str, bool)> = gh.tools.iter().map(|t| (t.id.as_str(), t.on)).collect();
     assert_eq!(tools, [("stats#tool:gh/issues", true), ("stats#tool:gh/stars", false)]);
+    // the same server listed from the tools cache, not running: its
+    // tools and a state, never an error
+    let sd = t.0.join("status");
+    status::write(&sd, "stats", "gh", &status::Status::now("stdio", "", Ok(2)).idle(true).listed(vec![("issues".into(), "list issues".into())]));
+    let idle = part(row(&build(&t, &state(), &[]), "stats"), "stats#mcp:gh").clone();
+    assert_eq!((idle.tool_count, idle.error.as_deref()), (Some(2), None));
+    assert_eq!(idle.status.as_deref(), Some(settings::plugins_listed(2).as_str()));
+    status::write(&sd, "stats", "gh", &status::Status::now("stdio", "", Ok(2)).listed(vec![("issues".into(), "list issues".into()), ("stars".into(), "count stars".into())]));
     // a remote server that needs a login: the data, the button, the released shape
     let linear = row(&rows, "linear");
     let l = part(linear, "linear#mcp:linear");

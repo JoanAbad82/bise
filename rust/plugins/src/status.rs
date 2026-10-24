@@ -31,6 +31,10 @@ pub struct Status {
     /// its tools as it listed them (name, description), for the Plugins
     /// list's switches; empty when unknown
     pub listed: Vec<(String, String)>,
+    /// a stdio server listed (from the shared tools cache, or started,
+    /// listed and stopped) but not running: it starts on the first call
+    /// (`crate::tools_cache`). Never an error.
+    pub idle: bool,
 }
 
 fn now() -> u64 {
@@ -39,7 +43,7 @@ fn now() -> u64 {
 
 impl Status {
     pub fn now(transport: &str, host: &str, tools: Result<usize, String>) -> Status {
-        Status { transport: transport.into(), host: host.into(), tools, at: now(), login: false, listed: Vec::new() }
+        Status { transport: transport.into(), host: host.into(), tools, at: now(), login: false, listed: Vec::new(), idle: false }
     }
 
     pub fn login_needed(transport: &str, host: &str) -> Status {
@@ -51,14 +55,21 @@ impl Status {
         Status { listed, ..self }
     }
 
-    /// `connected · 12 tools · 3 min ago`, `✗ <error> · 3 min ago` or
-    /// `needs a login · /plugins login`
+    /// The same, listed but not running ([`Status::idle`]).
+    pub fn idle(self, idle: bool) -> Status {
+        Status { idle, ..self }
+    }
+
+    /// `connected · 12 tools · 3 min ago`, `listed · 12 tools · starts on
+    /// first call · 3 min ago`, `✗ <error> · 3 min ago` or `needs a login
+    /// · /plugins login`
     pub fn line(&self) -> String {
         let ago = ago(now().saturating_sub(self.at));
         if self.login {
             return "needs a login · /plugins login".into();
         }
         match &self.tools {
+            Ok(n) if self.idle => format!("listed · {} tool{} · starts on first call · {}", n, if *n == 1 { "" } else { "s" }, ago),
             Ok(n) => format!("connected · {} tool{} · {}", n, if *n == 1 { "" } else { "s" }, ago),
             Err(e) => format!("✗ {} · {}", e, ago),
         }
@@ -87,7 +98,7 @@ pub fn write(dir: &Path, plugin: &str, server: &str, s: &Status) {
         return;
     }
     let v = match &s.tools {
-        Ok(n) => json!({"transport": s.transport, "host": s.host, "tools": n, "at": s.at, "list": s.listed}),
+        Ok(n) => json!({"transport": s.transport, "host": s.host, "tools": n, "at": s.at, "list": s.listed, "idle": s.idle}),
         Err(e) => json!({"transport": s.transport, "host": s.host, "error": e, "at": s.at, "login": s.login}),
     };
     let tmp = f.with_extension(format!("tmp{}", std::process::id()));
@@ -112,6 +123,7 @@ pub fn read(dir: &Path, plugin: &str, server: &str) -> Option<Status> {
         at: v.get("at").and_then(Value::as_u64).unwrap_or(0),
         login: v.get("login").and_then(Value::as_bool).unwrap_or(false),
         listed: serde_json::from_value(v.get("list").cloned().unwrap_or(Value::Null)).unwrap_or_default(),
+        idle: v.get("idle").and_then(Value::as_bool).unwrap_or(false),
     })
 }
 
@@ -128,6 +140,12 @@ mod tests {
         assert_eq!((s.host.as_str(), s.tools.clone()), ("mcp.linear.app", Ok(3)));
         assert_eq!(s.listed, vec![("search".to_string(), "find issues".to_string())]);
         assert_eq!(s.line(), "connected · 3 tools · just now");
+        assert!(!s.idle);
+        // listed from the tools cache, not running: a state, not an error
+        write(&d, "p", "linear", &Status::now("stdio", "node", Ok(1)).idle(true));
+        let i = read(&d, "p", "linear").unwrap();
+        assert!(i.idle && i.tools == Ok(1));
+        assert_eq!(i.line(), "listed · 1 tool · starts on first call · just now");
         write(&d, "p", "linear", &Status::now("http", "mcp.linear.app", Err("HTTP 500 from mcp.linear.app".into())));
         assert!(read(&d, "p", "linear").unwrap().line().starts_with("✗ HTTP 500"));
         assert!(read(&d, "p", "other").is_none());

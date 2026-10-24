@@ -480,3 +480,80 @@ fn an_opt_in_plugins_tool_is_refused_once_it_leaves_enabled() {
     server.join().unwrap().unwrap();
     let _ = std::fs::remove_dir_all(&base);
 }
+
+/// Lazy stdio servers (`bend_plugins::tools_cache`): N cold bridges
+/// sharing one tools cache start the server once (listed, then stopped)
+/// and each lists its tools; a warm bridge starts it 0 times; a call
+/// starts it, a server idle past `idle_stop` is stopped, and the next
+/// call starts it again. The wrapper counts the starts (its pid, one
+/// line each).
+#[test]
+fn lazy_servers_start_once_for_n_cold_bridges_and_on_a_call() {
+    let (base, plugins) = fixture_root("lazy");
+    let starts = base.join("starts.txt");
+    std::fs::write(
+        plugins.join("hello-plugin/mcp.json"),
+        format!(
+            r#"{{"mcpServers":{{"echo":{{"command":"sh","args":["-c","echo $$ >> {}; exec python3 -B \"$0\"","${{PLUGIN_ROOT}}/server.py"]}}}}}}"#,
+            starts.display()
+        ),
+    )
+    .unwrap();
+    let (cache, sd) = (base.join("cache/mcp-tools"), base.join("status"));
+    let count = || std::fs::read_to_string(&starts).unwrap_or_default().lines().count();
+    let start = |dir: &Path| {
+        let parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+        let opts = bridge::Opts {
+            tools_cache: Some(cache.clone()),
+            status_dir: Some(sd.clone()),
+            idle_stop: Duration::from_secs(2),
+            ..bridge::Opts::new(dir.to_path_buf(), Some(parent.id()), roots_of(&base, Some(plugins.clone())))
+        };
+        (parent, std::thread::spawn(move || bridge::serve(opts)))
+    };
+    let stop = |(mut parent, server): (std::process::Child, std::thread::JoinHandle<std::io::Result<()>>)| {
+        parent.kill().unwrap();
+        parent.wait().unwrap();
+        server.join().unwrap().unwrap();
+    };
+    // 4 cold bridges at once: one start among them
+    let dirs: Vec<PathBuf> = (0..4).map(|i| base.join(format!("run{i}/plugins"))).collect();
+    let cold: Vec<_> = dirs.iter().map(|d| start(d)).collect();
+    for d in &dirs {
+        wait_until("a cold bridge ready", || d.join("ready").exists());
+        wait_until("shout in its index", || index(d).contains(" shout :"));
+    }
+    assert_eq!(count(), 1, "one start for 4 cold bridges");
+    let first: u32 = std::fs::read_to_string(&starts).unwrap().trim().parse().unwrap();
+    let alive = |pid: u32| std::process::Command::new("kill").args(["-0", &pid.to_string()]).stderr(std::process::Stdio::null()).status().unwrap().success();
+    wait_until("the listing start stopped", || !alive(first));
+    // listed, not running: a state, not an error
+    let st = status::read(&sd, "hello-plugin", "echo").unwrap();
+    assert!(st.idle && st.tools == Ok(1), "{st:?}");
+    // a warm bridge: 0 starts
+    let warm_dir = base.join("warm/plugins");
+    let warm = start(&warm_dir);
+    wait_until("the warm bridge ready", || warm_dir.join("ready").exists());
+    assert!(index(&warm_dir).contains(" shout :"), "{}", index(&warm_dir));
+    assert_eq!(count(), 1, "a warm bridge started it");
+    // a call starts it, once
+    let (mut r, path) = route(&dirs[0], "shout");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+    assert_eq!(count(), 2, "one start for two calls");
+    let running: u32 = std::fs::read_to_string(&starts).unwrap().lines().last().unwrap().parse().unwrap();
+    assert!(alive(running));
+    // idle past idle_stop: stopped; the next call starts it again
+    wait_until("the idle server stopped", || !alive(running));
+    assert!(index(&dirs[0]).contains(" shout :"), "still listed");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+    assert_eq!(count(), 3);
+    for b in cold {
+        stop(b);
+    }
+    stop(warm);
+    let _ = std::fs::remove_dir_all(&base);
+}

@@ -2695,6 +2695,13 @@
     "one": null,
     "text": "skills"
   },
+  "settings.plugins_listed": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} tool · starts when used",
+    "text": "{n} tools · starts when used"
+  },
   "settings.plugins_locked": {
     "args": [
       "name"

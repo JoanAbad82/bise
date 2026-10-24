@@ -346,6 +346,14 @@ impl Home {
         self.cache_dir().join("marketplaces")
     }
 
+    /// `<cache>/mcp-tools`: each stdio plugin server's last `tools/list`,
+    /// one file per server spec (bend_plugins::tools_cache), shared by
+    /// every session's bridge so a session lists a server's tools
+    /// without starting it. Rebuildable.
+    pub fn mcp_tools_cache(&self) -> PathBuf {
+        self.cache_dir().join("mcp-tools")
+    }
+
     /// An MCP server's env and header values he typed in: `secrets/mcp-env/`,
     /// kept by bise_secrets.
     pub fn mcp_secrets_dir(&self) -> PathBuf {

@@ -201,6 +201,8 @@ fn said(last: Option<&status::Status>) -> (Option<String>, Option<u32>, Option<S
         None => (None, None, None),
         Some(s) if s.login => (Some(settings::plugins_part_needs_login.into()), None, None),
         Some(s) => match &s.tools {
+            // listed, not running: a state, never an error
+            Ok(n) if s.idle => (Some(settings::plugins_listed(*n)), Some(*n as u32), None),
             Ok(n) => (Some(settings::plugins_connected(*n)), Some(*n as u32), None),
             Err(e) => (Some(settings::plugins_failed(e)), None, Some(e.clone())),
         },
