@@ -265,6 +265,9 @@ struct Entry {
     /// `<plugin>/<server>`
     key: String,
     plugin_name: String,
+    /// its plugin is opt-in (`resolve::Plugin::opt_in`): the `opt_in` of
+    /// every on/off check about it
+    opt_in: bool,
     namespace: String,
     spec: Spec,
     plugin_root: PathBuf,
@@ -377,7 +380,9 @@ impl Entry {
             tool = Some(src);
         }
         let off = |s: &StateV2| {
-            self.off.load(Ordering::SeqCst) || !s.is_on(&self.server_id(), false) || tool.as_deref().is_some_and(|t| !s.is_on(&self.tool_id(t), false))
+            self.off.load(Ordering::SeqCst)
+                || !s.is_on(&self.server_id(), self.opt_in)
+                || tool.as_deref().is_some_and(|t| !s.is_on(&self.tool_id(t), self.opt_in))
         };
         if off(state) {
             return Err(off_error(&shown));
@@ -502,7 +507,7 @@ fn index_of(entries: &[Arc<Entry>], base: &str, state: &StateV2) -> (String, Vec
                 continue;
             }
             used.push(published.clone());
-            if state.is_on(&e.tool_id(src), false) {
+            if state.is_on(&e.tool_id(src), e.opt_in) {
                 let desc = t.get("description").and_then(Value::as_str).unwrap_or("");
                 index.push_str(&index_line(&cid, &e.namespace, &published, desc, t.get("inputSchema")));
                 shown += 1;
@@ -589,6 +594,7 @@ impl Live {
                     log: self.dir.join(format!("{}.{}.log", p.name, spec.id())),
                     key,
                     plugin_name: p.name.clone(),
+                    opt_in: p.opt_in,
                     namespace: p.namespace.clone(),
                     spec,
                     plugin_root: p.root.clone(),

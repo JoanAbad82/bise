@@ -291,6 +291,9 @@ pub struct Plugin {
     pub prompts: Vec<String>,
     /// components present on disk but not supported yet
     pub unsupported: Vec<String>,
+    /// opt-in (`"dev.bise": {"default": "off"}`): on only when named in
+    /// `enabled`; the `opt_in` of every `StateV2::is_on` about it
+    pub opt_in: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -997,6 +1000,7 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
             off_servers: Vec::new(),
             prompts: Vec::new(),
             unsupported: Vec::new(),
+            opt_in: false,
         };
         let parsed = std::fs::read_to_string(&manifest)
             .map_err(|e| format!("unreadable: {}", e))
@@ -1013,6 +1017,7 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
                 p.state = State::Loaded;
                 extensions = m.extensions;
                 default_off = m.default_off;
+                p.opt_in = m.default_off;
                 let (kept, cut) = cut_prompts(&m.prompts);
                 if cut {
                     out.push(diag("plugin.prompts.cut", Severity::Warning, &p.name,

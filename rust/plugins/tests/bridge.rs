@@ -447,3 +447,36 @@ fn an_env_var_falls_back_to_his_mcp_secrets() {
     server.join().unwrap().unwrap();
     let _ = std::fs::remove_dir_all(&base);
 }
+
+/// An opt-in plugin (`"dev.bise": {"default": "off"}`, like `computer`)
+/// is on only while named in `enabled`: emptied by hand, its tool's call
+/// is refused at once, before any poll retires its server.
+#[test]
+fn an_opt_in_plugins_tool_is_refused_once_it_leaves_enabled() {
+    let (base, plugins) = fixture_root("opt-in");
+    let manifest = plugins.join("hello-plugin/plugin.json");
+    let mut m: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&manifest).unwrap()).unwrap();
+    m["extensions"] = serde_json::json!({"dev.bise": {"default": "off"}});
+    std::fs::write(&manifest, m.to_string()).unwrap();
+    let (dir, sp) = (base.join("run/plugins"), base.join("plugins.json"));
+    std::fs::write(&sp, r#"{"enabled": ["hello-plugin"]}"#).unwrap();
+    let mut parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+    let opts = bridge::Opts {
+        state_path: Some(sp.clone()),
+        // no poll during the test: the refusal is the call's own check
+        poll: Duration::from_secs(600),
+        ..bridge::Opts::new(dir.clone(), Some(parent.id()), roots_of(&base, Some(plugins)))
+    };
+    let server = std::thread::spawn(move || bridge::serve(opts));
+    wait_until("the bridge ready", || dir.join("ready").exists());
+    let (mut r, path) = route(&dir, "shout");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+    std::fs::write(&sp, r#"{"enabled": []}"#).unwrap();
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains(&bridge::off_error("hello_plugin.shout")), "{b}");
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    server.join().unwrap().unwrap();
+    let _ = std::fs::remove_dir_all(&base);
+}
