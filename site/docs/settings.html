@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>settings · bise docs</title>
+<meta name="description" content="bise desktop&#x27;s settings, page by page. ⌘, opens them. what they change is shared with bise terminal, which has a command for most of it.">
+<link rel="canonical" href="https://bise.dev/docs/settings">
+<meta name="theme-color" content="#f2ede2">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" type="text/markdown" href="/docs/settings.md">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="bise">
+<meta property="og:url" content="https://bise.dev/docs/settings">
+<meta property="og:title" content="settings · bise docs">
+<meta property="og:description" content="bise desktop&#x27;s settings, page by page. ⌘, opens them. what they change is shared with bise terminal, which has a command for most of it.">
+<meta property="og:image" content="https://bise.dev/og.png?v=paper">
+<meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
+<script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<header class="top">
+  <button class="menu" type="button" aria-label="the pages" aria-expanded="false">≡</button>
+  <a class="logo" href="/">bise <span class="acc">:*</span></a>
+  <a class="docs" href="/docs">docs</a>
+  <div class="search">
+    <input type="search" placeholder="/ search" aria-label="search the docs" autocomplete="off" spellcheck="false">
+    <div class="results" hidden></div>
+  </div>
+  <nav>
+    <a href="https://github.com/gvergnaud/bise">GitHub</a>
+    <button id="theme" type="button" title="light / dark">◐</button>
+  </nav>
+</header>
+<div class="wrap">
+  <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
+<div class="grp">get started</div><ul>
+<li><a href="/docs">what bise is</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
+</ul>
+<div class="grp">models</div><ul>
+<li><a href="/docs/providers">providers and keys</a></li>
+<li><a href="/docs/subscriptions">subscriptions</a></li>
+<li><a href="/docs/models">models and roles</a></li>
+<li><a href="/docs/gateways">gateways and local models</a></li>
+</ul>
+<div class="grp">using bise</div><ul>
+<li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
+<li><a href="/docs/approvals">approvals</a></li>
+<li><a href="/docs/flow">landing work</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
+<li><a href="/docs/computer-use">computer use</a></li>
+</ul>
+<div class="grp">extend</div><ul>
+<li><a href="/docs/plugins">plugins and MCP</a></li>
+<li><a href="/docs/skills">instructions and skills</a></li>
+</ul>
+<div class="grp">reference</div><ul>
+<li><a href="/docs/settings" class="here" aria-current="page" data-app="desktop">settings <span class="tag">desktop</span></a></li>
+<li><a href="/docs/config">config.toml</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
+<li><a href="/docs/troubleshooting">troubleshooting</a></li>
+<li><a href="/docs/updates">updates</a></li>
+</ul>
+  </nav></aside>
+  <main>
+    <article data-app="desktop">
+      <div class="head">
+        <h1>settings</h1>
+        <button class="copymd" type="button" data-md="/docs/settings.md">copy as markdown</button>
+      </div>
+      <p class="lede">bise desktop&#x27;s settings, page by page. ⌘, opens them. what they change is shared with bise terminal, which has a command for most of it.</p>
+<p class="only"><span>only in bise desktop</span> <a href="/docs/config?terminal" data-to="terminal">in bise terminal: config.toml and its commands ›</a></p>
+<p><code class="key">⌘,</code> opens settings, or <strong>settings</strong> at the foot of the sidebar, or <strong>settings…</strong> in the menu bar's <code>:*</code>. the models, approvals, plugins and keys are the same as in bise terminal: a change here shows there too.</p>
+<div class="table"><table><thead><tr><th>page</th><th>what you set there</th><th>in bise terminal</th></tr></thead><tbody><tr><td>general</td><td>macOS notifications, the appearance (light, dark, or as macOS), updates and beta builds</td><td><code class="key">/theme</code>, <code class="key">/update</code></td></tr><tr><td>setup</td><td>what bise needs, checked again: a model, bise's home, the permissions of <code>fn</code></td><td><code class="key">/setup</code>, <code>bise doctor</code></td></tr><tr><td>voice and fn</td><td>hold <code>fn</code> to talk, <code class="key">fn fn</code> hands-free, the language bise hears</td><td><code class="key">/voice</code></td></tr><tr><td>context and privacy</td><td>what <code>fn</code> adds to your question, how long images are kept, the apps it never reads</td><td>none</td></tr><tr><td>quiet moments</td><td>when notifications wait, and how they come back</td><td>none</td></tr><tr><td>models</td><td>your plans and keys, and which model does what</td><td><code class="key">/models</code>, <code class="key">/provider</code></td></tr><tr><td>approvals</td><td>yolo or auto, the checker, and the rules you saved, per repo</td><td><code class="key">/approvals</code>, <code class="key">shift+tab</code></td></tr><tr><td>projects</td><td>your projects: rename, reorder (the <code class="key">⌘1</code> … <code class="key">⌘9</code> order), remove, add</td><td>none: one repo per window</td></tr><tr><td>plugins</td><td>every plugin, on or off, and the servers that log in</td><td><code class="key">/plugins</code></td></tr><tr><td>computer use</td><td>agents drive Chrome and your apps; its setup, or off</td><td><code class="key">/computer-use</code></td></tr><tr><td>keys</td><td>every key, and whether your keys and sign-ins sit in the macOS keychain</td><td><code class="key">/shortcuts</code>, <code class="key">/keychain</code></td></tr></tbody></table></div>
+<h2 id="general"><a class="anchor" href="#general" aria-hidden="true">#</a>general</h2>
+<ul><li><strong>macOS notifications</strong>: whether questions can reach you when bise isn't in front. <strong>turn on</strong> asks macOS; after that, your answer lives in System Settings.</li><li><strong>appearance</strong>: light, dark, or system.</li><li><strong>update</strong>: the build you run and the next one. see <a href="/docs/updates">updates</a>.</li></ul>
+<h2 id="context-and-privacy"><a class="anchor" href="#context-and-privacy" aria-hidden="true">#</a>context and privacy</h2>
+<p>what bise adds when you hold <code>fn</code>, each with its own switch: a screenshot of the window in front (never the whole screen), the tab's URL and title, the open file and your selection, the text of the window. nothing is read unless you hold <code>fn</code>.</p>
+<p><strong>images</strong>: pasted, made by agents or taken with <code>fn</code>, deleted after the number of days you pick. <strong>never sent to an agent</strong>: the apps <code>fn</code> reads nothing in, no title, URL, file, selection, text or capture; <strong>add…</strong> another one by its bundle id.</p>
+<h2 id="quiet-moments"><a class="anchor" href="#quiet-moments" aria-hidden="true">#</a>quiet moments</h2>
+<p>notifications wait during a call (Zoom, Meet, FaceTime), while you share your screen, in full screen, and in focus mode, each with its switch. then they come together, one at a time, at most every so many minutes; and after you were away, one notification when you open your Mac again.</p>
+<h2 id="projects"><a class="anchor" href="#projects" aria-hidden="true">#</a>projects</h2>
+<p>one main per project; yours, <strong>bise</strong>, coordinates them. <strong>add a project</strong> (<code class="key">⌘N</code>): a folder, a git repo; its main starts right away. <strong>main may land on main</strong>: main commits to your default branch once the tests pass, without asking you; off, your repo's flow decides (see <a href="/docs/flow">landing work</a>).</p>
+<p>removing a project takes it out of bise. its folder and its git history stay.</p>
+<h2 id="keys"><a class="anchor" href="#keys" aria-hidden="true">#</a>keys</h2>
+<p>the key list of <a href="/docs/desktop-keys">keys and menus</a>, and <strong>keep them in the macOS keychain</strong>: on, your keys and sign-ins move to the macOS keychain; off, they stay in files in <code>~/.bise</code>.</p>
+    </article>
+    <nav class="pn"><a class="prev" href="/docs/skills"><span>previous</span>instructions and skills</a><a class="next" href="/docs/config"><span>next</span>config.toml</a></nav>
+    <footer>
+      <p>for agents: <a href="/docs/settings.md">bise.dev/docs/settings.md</a></p>
+      <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/settings.md">edit this page on GitHub</a></p>
+    </footer>
+  </main>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#general">general</a></li><li class="l2"><a href="#context-and-privacy">context and privacy</a></li><li class="l2"><a href="#quiet-moments">quiet moments</a></li><li class="l2"><a href="#projects">projects</a></li><li class="l2"><a href="#keys">keys</a></li></ul></aside>
+</div>
+<script src="/docs/docs.js" defer></script>
+</body>
+</html>

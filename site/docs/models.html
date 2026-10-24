@@ -17,6 +17,7 @@
 <meta property="og:description" content="which model does what in bise, and how to change each one.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -74,12 +80,13 @@
         <button class="copymd" type="button" data-md="/docs/models.md">copy as markdown</button>
       </div>
       <p class="lede">which model does what in bise, and how to change each one.</p>
+
 <p>bise uses models for a few different jobs. each job is a <strong>role</strong>, and each role has its own model. you pick one model at the first run; every other role follows it or picks a cheap one for you.</p>
 <h2 id="the-roles"><a class="anchor" href="#the-roles" aria-hidden="true">#</a>the roles</h2>
 <div class="table"><table><thead><tr><th>role</th><th>what it does</th><th>unset</th></tr></thead><tbody><tr><td><code>main</code></td><td>your team lead: the agent you talk to</td><td>the model of the first run</td></tr><tr><td><code>agents</code></td><td>the agents main starts</td><td>same as main</td></tr><tr><td><code>small</code></td><td>small jobs: titles, summaries</td><td>the cheap model of main's provider</td></tr><tr><td><code>voice</code></td><td>listens when you talk (<code class="key">ctrl+r</code>)</td><td>Mistral's or OpenAI's speech model, when you have that key</td></tr><tr><td><code>classify</code></td><td>the checker: in auto, decides which commands run and which ask you</td><td>Jev, through TypeSafe or OpenRouter when you have one of those keys, else your small jobs model (<a href="/docs/approvals#the-checker">more</a>)</td></tr></tbody></table></div>
-<p><code class="key">/models</code> shows them all, with what each one resolves to. pick a row to change it: role, then provider, then model, then effort.</p>
+<div class="scopes"><div class="scoped" data-app="desktop"><p class="tag">bise desktop</p><div class="body"><p>settings › models shows them all under "which model does what", with where each one comes from (set here, from your environment, follows another role, the default). pick a row to change its model.</p></div><button class="fold" type="button" data-to="desktop">in bise desktop: settings › models ›</button></div><div class="scoped" data-app="terminal"><p class="tag">bise terminal</p><div class="body"><p><code class="key">/models</code> shows them all, with what each one resolves to. pick a row to change it: role, then provider, then model, then effort.</p></div><button class="fold" type="button" data-to="terminal">in bise terminal: /models ›</button></div></div>
 <h2 id="change-a-model"><a class="anchor" href="#change-a-model" aria-hidden="true">#</a>change a model</h2>
-<p>for the agent you're looking at, now:</p>
+<p>for the agent you're looking at, now, in either app's composer:</p>
 <div class="code"><div class="box"><pre><code class="lang-text">/model anthropic/claude-sonnet-5-5</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p><code class="key">/model &lt;model&gt; default</code> also makes it the default for new sessions: main's role when you're in main's view, the agents' role in an agent's view.</p>
 <p>from a terminal, for every new session:</p>
@@ -102,7 +109,7 @@ effort = &quot;high&quot;</code></pre><button class="copy" type="button" aria-la
 <h2 id="reasoning-effort"><a class="anchor" href="#reasoning-effort" aria-hidden="true">#</a>reasoning effort</h2>
 <p>for a model that reasons, <code class="key">/reasoning</code> picks how hard it thinks:</p>
 <div class="code"><div class="box"><pre><code class="lang-text">/reasoning high</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
-<p>Anthropic's models take <code>none</code>, <code>low</code>, <code>medium</code>, <code>high</code> and <code>max</code>; the others <code>none</code>, <code>low</code>, <code>medium</code> and <code>high</code>. unset, a model gets <code>high</code>. the effort shows on the divider next to the model.</p>
+<p>Anthropic's models take <code>none</code>, <code>low</code>, <code>medium</code>, <code>high</code> and <code>max</code>; the others <code>none</code>, <code>low</code>, <code>medium</code> and <code>high</code>. unset, a model gets <code>high</code>. in bise terminal, the effort shows on the divider next to the model.</p>
 <h2 id="compaction"><a class="anchor" href="#compaction" aria-hidden="true">#</a>compaction</h2>
 <p>when a conversation grows close to the model's context window, bise compacts it: it replaces the older part with a summary, so the agent goes on. by default that happens at 80% of the window. to compact earlier:</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise config set compaction_threshold 450000   <span class="c"># tokens</span>

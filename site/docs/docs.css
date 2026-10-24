@@ -94,13 +94,42 @@ html.pd .code .box { box-shadow:0 0 0 1px #3d3935; }
 table { border-collapse:collapse; width:100%; font-size:17px; line-height:1.45; }
 th { text-align:left; font-weight:600; color:var(--dim); font-size:15px; }
 th, td { padding:8px 14px 8px 0; border-bottom:1px solid var(--faint); vertical-align:top; }
-td code { font-size:.82em; }
+td code { font-size:.82em; white-space:nowrap; overflow-wrap:normal; }
 
 /* callouts: a rule and a label, no colored boxes */
 .callout { margin:6px 0 22px; padding:2px 0 2px 18px; border-left:2px solid var(--faint); }
 .callout .label { display:block; font-size:12.5px; color:var(--dim); margin-bottom:2px; }
 .callout.careful .label { color:var(--err); }
 .callout p { margin:0; }
+
+/* bise desktop / bise terminal (designer's docs-both): one tree, a switch, scoped blocks.
+   html.app-desktop / html.app-terminal come from page.tmpl's head script; with no script
+   neither is set: every block shows, tagged, and the switch hides. */
+.appswitch { display:none; height:34px; margin:0 0 20px; padding:2px; border:1px solid var(--faint); border-radius:8px; font-family:system-ui, -apple-system, "Helvetica Neue", sans-serif; font-size:13px; }
+html.app-desktop .appswitch, html.app-terminal .appswitch { display:flex; }
+.appswitch button { flex:1; border-radius:6px; color:var(--kick); }
+.appswitch button:hover { color:var(--text); }
+.appswitch button[aria-pressed="true"] { color:var(--bg); background:var(--text); }
+.side li a .tag { color:var(--kick); font-size:12px; margin-left:.6ch; }
+html.app-desktop .side li a[data-app="terminal"], html.app-terminal .side li a[data-app="desktop"] { color:var(--kick); }
+html.app-desktop .side li a[data-app="desktop"] .tag, html.app-terminal .side li a[data-app="terminal"] .tag { display:none; }
+.side li a.here[data-app] { color:var(--acc); }
+.only { font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-size:13px; color:var(--kick); margin:-24px 0 36px; }
+.only a { color:var(--dim); margin-left:2ch; }
+/* blocks side by side: the reader's app's first, the other's folded line after it */
+.scopes { display:flex; flex-direction:column; }
+html.app-desktop .scopes > [data-app="desktop"], html.app-terminal .scopes > [data-app="terminal"] { order:-1; }
+.scoped { margin:0 0 20px; }
+.scoped .tag { font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-size:12px; color:var(--kick); margin:0 0 8px; }
+.scoped .body > :last-child { margin-bottom:0; }
+.scoped .fold { display:none; font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-size:13px; color:var(--kick); text-align:left; }
+.scoped .fold:hover { color:var(--text); }
+.scoped .fold code { color:inherit; font-size:inherit; }
+html.app-desktop .scoped[data-app="terminal"] > .tag, html.app-desktop .scoped[data-app="terminal"] > .body,
+html.app-terminal .scoped[data-app="desktop"] > .tag, html.app-terminal .scoped[data-app="desktop"] > .body { display:none; }
+html.app-desktop .scoped[data-app="terminal"] > .fold, html.app-terminal .scoped[data-app="desktop"] > .fold { display:block; }
+html.app-desktop .toc li[data-app="terminal"], html.app-terminal .toc li[data-app="desktop"] { display:none; }
+.results a .tag { color:var(--kick); font-size:12px; }
 
 /* previous / next, footer */
 .pn { max-width:68ch; display:flex; gap:20px; margin-top:64px; }

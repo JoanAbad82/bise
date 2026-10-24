@@ -9,11 +9,19 @@ computer use lets an agent see and act in a web page or an app: open a page, rea
 
 computer use is off until you turn it on. off, it costs nothing: no tools, no process, no file.
 
+::: desktop settings › computer use
+open settings › computer use and turn on **agents may drive Chrome and your apps**. the setup shows below it, one step at a time.
+:::
+
+::: terminal /computer-use
 ```text
 /computer-use
 ```
 
-this turns it on and opens its setup, one step at a time. bise checks each step by itself while you do it:
+this turns it on and opens its setup, one step at a time.
+:::
+
+bise checks each step by itself while you do it:
 
 1. **Chrome**: open, and recent enough.
 2. **the extension**: bise's Chrome extension, loaded in `chrome://extensions`. bise copies the folder's path for you.
@@ -24,18 +32,24 @@ then ask any agent to use Chrome or an app. the agents that are already open get
 
 ## what happens when an agent acts
 
-> careful: in yolo, agents act without asking, purchases included. `shift+tab` switches to auto, where agents ask you in their thread before buying, sending or posting. in both modes, they never type passwords: when a site asks you to log in, the agent asks you to do it.
+> careful: in yolo, agents act without asking, purchases included. switch to [auto](approvals), where agents ask you in their thread before buying, sending or posting. in both modes, they never type passwords: when a site asks you to log in, the agent asks you to do it.
 
 - what the agents see (page text, screenshots) goes only to the model of the agent that took it. the setup screen names that provider.
 - some places are off limits in every mode: Chrome's own pages (`chrome://`, settings), the extension stores, and apps like password managers and your terminal. the agent asks you to do that step.
-- `/stop <agent>` stops an agent's turn and its hands on Chrome or an app, until you write to it again. Chrome's "bise started debugging this browser" bar has a Cancel button that does the same.
+- `/stop <agent>`, in either app's composer, stops an agent's turn and its hands on Chrome or an app, until you write to it again. Chrome's "bise started debugging this browser" bar has a Cancel button that does the same.
 
 ## turn it off
 
+::: desktop settings › computer use
+settings › computer use: turn the switch off (agents lose it at their next idle), or **turn off and remove its files**.
+:::
+
+::: terminal /computer-use off
 ```text
 /computer-use off         # agents lose it at their next idle
 /computer-use uninstall   # also removes the browser hosts and bise's computer-use files
 ```
+:::
 
 after an uninstall, two things are yours to do: remove the extension in Chrome, and remove bise Computer Use from System Settings → Privacy & Security (Accessibility, Screen Recording).
 

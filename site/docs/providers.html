@@ -17,6 +17,7 @@
 <meta property="og:description" content="the model providers bise knows, where a key comes from, and how to add one.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers" class="here" aria-current="page">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -74,30 +80,31 @@
         <button class="copymd" type="button" data-md="/docs/providers.md">copy as markdown</button>
       </div>
       <p class="lede">the model providers bise knows, where a key comes from, and how to add one.</p>
+
 <p>bise talks to the model providers directly with your key. there is no bise account and no bise server in between: your prompts go from your Mac to the provider you picked.</p>
 <p>two ways to pay for the models:</p>
 <ul><li><strong>an API key</strong> from a provider: this page.</li><li><strong>a plan you already pay for</strong>, like ChatGPT Plus or Pro, or a coding plan: see <a href="/docs/subscriptions">subscriptions</a>.</li></ul>
 <h2 id="add-a-key"><a class="anchor" href="#add-a-key" aria-hidden="true">#</a>add a key</h2>
 <p>the fastest way is the first run: when bise finds no key, it asks for one and checks it. after that, any time:</p>
-<ul><li>in bise: <code class="key">/provider</code>, then the provider, then paste the key.</li><li>in a terminal:</li></ul>
+<div class="scopes"><div class="scoped" data-app="desktop"><p class="tag">bise desktop</p><div class="body"><p>settings › models: <strong>add a key</strong> on the "an API key" row, pick the provider, paste the key, then <code class="key">⏎</code>. bise checks it with the provider before it saves it; a refused key says why. <code class="key">/provider</code> in the composer opens the same page.</p></div><button class="fold" type="button" data-to="desktop">in bise desktop: settings › models ›</button></div><div class="scoped" data-app="terminal"><p class="tag">bise terminal</p><div class="body"><ul><li>in bise: <code class="key">/provider</code>, then the provider, then paste the key.</li><li>in a terminal:</li></ul>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise login anthropic        <span class="c"># asks for the key, hidden</span>
 bise login                  <span class="c"># no provider: pick one from the list</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p><code>bise login</code> makes one tiny call with the key before it saves it, so a wrong key never gets saved. from a script, the key comes on stdin:</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">printf &#x27;%s&#x27; &quot;$MY_KEY&quot; | bise login openai --check
 bise login openai --from ~/.env    <span class="c"># reads OPENAI_API_KEY=... from that file</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <div class="table"><table><thead><tr><th>flag</th><th>what it does</th></tr></thead><tbody><tr><td><code>--check</code></td><td>one tiny call first, saved only if it answers (for a script)</td></tr><tr><td><code>--no-check</code></td><td>save it without the call</td></tr><tr><td><code>--model provider/model</code></td><td>the model of that call (default: the one in use, else the provider's)</td></tr><tr><td><code>--from FILE</code></td><td>read the key from a <code>PROVIDER_API_KEY=...</code> line in a <code>.env</code> or shell file</td></tr></tbody></table></div>
-<p>to remove a saved key: <code>bise logout anthropic</code>.</p>
+<p>to remove a saved key: <code>bise logout anthropic</code>.</p></div><button class="fold" type="button" data-to="terminal">in bise terminal: /provider, bise login ›</button></div></div>
 <h2 id="where-a-key-comes-from"><a class="anchor" href="#where-a-key-comes-from" aria-hidden="true">#</a>where a key comes from</h2>
 <p>for each provider, bise takes the first key it finds, in this order:</p>
-<ol><li><code>~/.bise/auth.json</code>: what <code>bise login</code>, <code class="key">/provider</code> and the first run save. only you can read it (mode 0600).</li><li>the environment: the provider's variable, for example <code>ANTHROPIC_API_KEY</code>.</li><li>the old <code>.env</code> files of earlier versions: <code>~/.bend-harness/.env</code>, <code>~/.vibe/.env</code>.</li></ol>
+<ol><li>what you saved in bise: <code>~/.bise/auth.json</code>, where the first run, settings › models, <code class="key">/provider</code> and <code>bise login</code> save. only you can read it (mode 0600). or the macOS keychain, if you moved them there (settings › keys, or <code class="key">/keychain on</code>).</li><li>the environment: the provider's variable, for example <code>ANTHROPIC_API_KEY</code>.</li><li>the old <code>.env</code> files of earlier versions: <code>~/.bend-harness/.env</code>, <code>~/.vibe/.env</code>.</li></ol>
 <p>so a key you saved in bise wins over the one in your shell. when your environment holds another key for the same provider, bise says once that it isn't used. <code>bise logout &lt;provider&gt;</code> goes back to the environment's key.</p>
-<p>to see where each key comes from (never the key itself):</p>
+<p>from a terminal, to see where each key comes from (never the key itself):</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise providers</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>and to test one with a tiny call, without saving anything:</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise auth check anthropic</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <aside class="callout careful"><span class="label">▲ careful</span><p><code>auth.json</code> holds your keys in clear text, readable only by you. don't commit it, paste it, or share it.</p></aside>
 <h2 id="the-providers"><a class="anchor" href="#the-providers" aria-hidden="true">#</a>the providers</h2>
-<p><code>bise models</code> prints this list with each model's context, price and key state. the first run offers the first five; the others work with <code>bise login &lt;id&gt;</code> or their variable.</p>
+<p><code>bise models</code> prints this list with each model's context, price and key state. the first run offers the first five; the others work from settings › models, <code>bise login &lt;id&gt;</code> or their variable.</p>
 <div class="table"><table><thead><tr><th>provider</th><th>id</th><th>key variable</th><th>starts with</th><th>get a key</th></tr></thead><tbody><tr><td>Anthropic</td><td><code>anthropic</code></td><td><code>ANTHROPIC_API_KEY</code></td><td><code>anthropic/claude-opus-5-5</code></td><td><a href="https://platform.claude.com/settings/keys" rel="noopener">platform.claude.com</a></td></tr><tr><td>OpenAI</td><td><code>openai</code></td><td><code>OPENAI_API_KEY</code></td><td><code>openai/gpt-6-astra</code></td><td><a href="https://platform.openai.com/api-keys" rel="noopener">platform.openai.com</a></td></tr><tr><td>Google AI Studio</td><td><code>google</code></td><td><code>GEMINI_API_KEY</code> (or <code>GOOGLE_API_KEY</code>)</td><td><code>google/gemini-3.8-flash</code></td><td><a href="https://aistudio.google.com/app/apikey" rel="noopener">aistudio.google.com</a></td></tr><tr><td>Mistral</td><td><code>mistral</code></td><td><code>MISTRAL_API_KEY</code></td><td><code>mistral/mistral-large-4</code></td><td><a href="https://console.mistral.ai/api-keys" rel="noopener">console.mistral.ai</a></td></tr><tr><td>OpenRouter</td><td><code>openrouter</code></td><td><code>OPENROUTER_API_KEY</code></td><td><code>openrouter/anthropic/claude-sonnet-5.5</code></td><td><a href="https://openrouter.ai/settings/keys" rel="noopener">openrouter.ai</a></td></tr><tr><td>Groq</td><td><code>groq</code></td><td><code>GROQ_API_KEY</code></td><td><code>groq/openai/gpt-oss-120b</code></td><td><a href="https://console.groq.com/keys" rel="noopener">console.groq.com</a></td></tr><tr><td>xAI</td><td><code>xai</code></td><td><code>XAI_API_KEY</code></td><td><code>xai/grok-4.7</code></td><td><a href="https://console.x.ai/team/default/api-keys" rel="noopener">console.x.ai</a></td></tr><tr><td>DeepSeek</td><td><code>deepseek</code></td><td><code>DEEPSEEK_API_KEY</code></td><td><code>deepseek/deepseek-v4-pro</code></td><td><a href="https://platform.deepseek.com/api_keys" rel="noopener">platform.deepseek.com</a></td></tr><tr><td>Together AI</td><td><code>together</code></td><td><code>TOGETHER_API_KEY</code></td><td><code>together/zai-org/GLM-5.3</code></td><td><a href="https://api.together.ai/settings/api-keys" rel="noopener">api.together.ai</a></td></tr><tr><td>Fireworks AI</td><td><code>fireworks</code></td><td><code>FIREWORKS_API_KEY</code></td><td><code>fireworks/accounts/fireworks/models/glm-5p3</code></td><td><a href="https://app.fireworks.ai/settings/users/api-keys" rel="noopener">app.fireworks.ai</a></td></tr><tr><td>Cerebras</td><td><code>cerebras</code></td><td><code>CEREBRAS_API_KEY</code></td><td><code>cerebras/gpt-oss-120b</code></td><td><a href="https://cloud.cerebras.ai" rel="noopener">cloud.cerebras.ai</a></td></tr><tr><td>Ollama</td><td><code>ollama</code></td><td>none, local</td><td><code>ollama/&lt;model&gt;</code></td><td><a href="https://ollama.com" rel="noopener">ollama.com</a></td></tr><tr><td>LM Studio</td><td><code>lmstudio</code></td><td>none, local</td><td><code>lmstudio/&lt;model&gt;</code></td><td><a href="https://lmstudio.ai" rel="noopener">lmstudio.ai</a></td></tr></tbody></table></div>
 <p>listed but not usable yet: Azure OpenAI, Google Vertex AI and Amazon Bedrock (they need a cloud login bise doesn't do yet). to reach them today, put a gateway in front: see <a href="/docs/gateways">gateways and local models</a>.</p>
 <p>some keys only do one job:</p>
@@ -112,7 +119,7 @@ bise models openai     <span class="c"># only these</span></code></pre><button c
 <h2 id="what-leaves-your-mac"><a class="anchor" href="#what-leaves-your-mac" aria-hidden="true">#</a>what leaves your Mac</h2>
 <p>your messages, the files and command output the agents read, and the images you paste go to the provider of the model that works on them. nothing goes to bise. a few features send more, and each one says so the first time: <a href="/docs/voice">voice</a> sends your audio to its speech provider, and <a href="/docs/approvals">auto mode's</a> checker sends the commands it checks to its model.</p>
     </article>
-    <nav class="pn"><a class="prev" href="/docs/install"><span>previous</span>install and first run</a><a class="next" href="/docs/subscriptions"><span>next</span>subscriptions</a></nav>
+    <nav class="pn"><a class="prev" href="/docs/install"><span>previous</span>start with bise terminal</a><a class="next" href="/docs/subscriptions"><span>next</span>subscriptions</a></nav>
     <footer>
       <p>for agents: <a href="/docs/providers.md">bise.dev/docs/providers.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/providers.md">edit this page on GitHub</a></p>

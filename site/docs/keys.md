@@ -1,6 +1,8 @@
 ---
 title: keys and commands
-description: the keys and slash commands of bise. in the app, /help shows the essential ones and /shortcuts every one.
+description: the keys and slash commands of bise terminal. in the app, /help shows the essential ones and /shortcuts every one.
+app: terminal
+other: keys and menus | desktop-keys
 ---
 
 hold `ctrl` (or `⌥`) in bise to see that key's shortcuts where they act, in Ghostty and kitty. `/` in the composer lists the commands; `tab` completes, `⏎` runs.
@@ -72,9 +74,18 @@ select text in the feed, then type: the selection goes into your message as a qu
 | `/model [<model>] [default]` | the model of the agent in view; `default`: for new sessions too |
 | `/models` | which model does what: main, agents, small jobs, voice, the checker |
 | `/provider` | set up a provider's key, or change it |
+| `/keychain [on\|off]` | keep your keys and sign-ins in the macOS keychain |
 | `/reasoning [<effort>]` | the reasoning effort of the agent in view |
 | `/approvals [yolo\|auto]` | the mode, the checker and your saved rules; or switch the mode |
 | `/compact` | compact the conversation of the agent in view |
+| `/pause` | pause the whole project: every turn stops, messages and timers wait, nothing is lost |
+| `/resume` | resume a paused project: what waited is delivered |
+| `/usage` | what the agents and models cost, today and this week |
+| `/artifacts` | what your agents made: pages, docs, files, links |
+| `/scheduled` | your scheduled tasks: list, open, run now, stop |
+| `/processes` | what your agents left running: its output, open, stop (also `/running`) |
+| `/diff [<branch>]` | a branch's changes against main, in a panel on the right |
+| `/debug` | the agent in view: its raw session, or a request as its provider got it |
 | `/voice` | dictation and voice mode: the model, the voice, the language |
 | `/computer-use [off\|uninstall]` | turn on and set up computer use; or turn it off |
 | `/plugins [list\|enable\|disable\|login\|logout] [<name>]` | the agent plugins |

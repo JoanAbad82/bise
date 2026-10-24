@@ -3,7 +3,7 @@ title: config.toml
 description: every setting of bise in one file, ~/.bise/config.toml. most of them have a command, so you rarely edit it by hand.
 ---
 
-bise reads `~/.bise/config.toml` (or `$BISE_HOME/config.toml`). you rarely need to open it: `/models`, `/voice`, `shift+tab` and `bise config set` write it for you, and keep the rest of the file as it was. `bise models` prints the path on its last line, and lists what it can't read as warnings.
+bise reads `~/.bise/config.toml` (or `$BISE_HOME/config.toml`), in both apps. you rarely need to open it: [settings](settings) in bise desktop, `/models`, `/voice`, `shift+tab` and `bise config set` in bise terminal, write it for you, and keep the rest of the file as it was. `bise models` prints the path on its last line, and lists what it can't read as warnings.
 
 > note: config.toml never holds a key. keys go in `~/.bise/auth.json` (`bise login`), in the environment, or come from a command. see [providers and keys](providers).
 

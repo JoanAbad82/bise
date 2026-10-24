@@ -14,6 +14,11 @@ bise talks to the model providers directly with your key. there is no bise accou
 
 the fastest way is the first run: when bise finds no key, it asks for one and checks it. after that, any time:
 
+::: desktop settings › models
+settings › models: **add a key** on the "an API key" row, pick the provider, paste the key, then `⏎`. bise checks it with the provider before it saves it; a refused key says why. `/provider` in the composer opens the same page.
+:::
+
+::: terminal /provider, bise login
 - in bise: `/provider`, then the provider, then paste the key.
 - in a terminal:
 
@@ -37,18 +42,19 @@ bise login openai --from ~/.env    # reads OPENAI_API_KEY=... from that file
 | `--from FILE` | read the key from a `PROVIDER_API_KEY=...` line in a `.env` or shell file |
 
 to remove a saved key: `bise logout anthropic`.
+:::
 
 ## where a key comes from
 
 for each provider, bise takes the first key it finds, in this order:
 
-1. `~/.bise/auth.json`: what `bise login`, `/provider` and the first run save. only you can read it (mode 0600).
+1. what you saved in bise: `~/.bise/auth.json`, where the first run, settings › models, `/provider` and `bise login` save. only you can read it (mode 0600). or the macOS keychain, if you moved them there (settings › keys, or `/keychain on`).
 2. the environment: the provider's variable, for example `ANTHROPIC_API_KEY`.
 3. the old `.env` files of earlier versions: `~/.bend-harness/.env`, `~/.vibe/.env`.
 
 so a key you saved in bise wins over the one in your shell. when your environment holds another key for the same provider, bise says once that it isn't used. `bise logout <provider>` goes back to the environment's key.
 
-to see where each key comes from (never the key itself):
+from a terminal, to see where each key comes from (never the key itself):
 
 ```sh
 bise providers
@@ -64,7 +70,7 @@ bise auth check anthropic
 
 ## the providers
 
-`bise models` prints this list with each model's context, price and key state. the first run offers the first five; the others work with `bise login <id>` or their variable.
+`bise models` prints this list with each model's context, price and key state. the first run offers the first five; the others work from settings › models, `bise login <id>` or their variable.
 
 | provider | id | key variable | starts with | get a key |
 |---|---|---|---|---|

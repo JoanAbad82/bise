@@ -17,6 +17,7 @@
 <meta property="og:description" content="how the agents&#x27; work reaches your repo: small commits straight on main, a feature branch you try first, or pull requests.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow" class="here" aria-current="page">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -74,6 +80,7 @@
         <button class="copymd" type="button" data-md="/docs/flow.md">copy as markdown</button>
       </div>
       <p class="lede">how the agents&#x27; work reaches your repo: small commits straight on main, a feature branch you try first, or pull requests.</p>
+
 <h2 id="two-flows-one-per-repo"><a class="anchor" href="#two-flows-one-per-repo" aria-hidden="true">#</a>two flows, one per repo</h2>
 <div class="table"><table><thead><tr><th>flow</th><th>for</th><th>what the agents do</th></tr></thead><tbody><tr><td><strong>trunk</strong></td><td>a repo only you push to</td><td>land small commits on your default branch, one at a time, each one checked, with no pull request</td></tr><tr><td><strong>PR</strong></td><td>a repo you share</td><td>each task gets its own branch in a worktree, pushes it, opens a pull request, and follows it until it is merged</td></tr></tbody></table></div>
 <p>bise suggests a flow from the repo itself:</p>
@@ -87,12 +94,12 @@
 <p>experimental, risky or big work (several agents, several days) goes on a local feature branch: its agents land there, never on main. when they're done, an inbox item lets you try a build of the branch. main merges it into your default branch on your go. say "in a branch" or "I want to try it first" to get one; "just land it" puts a task back on main.</p>
 <h2 id="pr-flow"><a class="anchor" href="#pr-flow" aria-hidden="true">#</a>PR flow</h2>
 <ol><li>the task's agent works in its own worktree, on a branch made from your remote's default branch.</li><li>it commits small and runs the check.</li><li>it pushes the branch and opens the pull request with <code>gh pr create</code>, using the repo's template when there is one.</li><li>it stays alive until the merge: it answers review comments, fixes red checks, and rebases when the base moves.</li><li>it never merges, approves, closes, or comments on GitHub unless you allowed it.</li></ol>
-<p>when the PR is merged, bise archives its agents and removes the worktree. <code>↑</code> in the panel marks an agent with a PR.</p>
-<p>PR flow needs the GitHub CLI logged in: <code>gh auth login</code>. <code>bise doctor</code> checks it.</p>
+<p>when the PR is merged, bise archives its agents and removes the worktree. in bise terminal, <code>↑</code> in the panel marks an agent with a PR.</p>
+<p>PR flow needs the GitHub CLI logged in: <code>gh auth login</code>. <code>bise doctor</code> checks it from a terminal.</p>
 <h2 id="the-check"><a class="anchor" href="#the-check" aria-hidden="true">#</a>the check</h2>
 <p>every land runs the repo's check command first, the one in <code>[flow] check</code>. main asks for it once when it isn't set, or reads it from the repo.</p>
     </article>
-    <nav class="pn"><a class="prev" href="/docs/approvals"><span>previous</span>approvals</a><a class="next" href="/docs/voice"><span>next</span>voice</a></nav>
+    <nav class="pn"><a class="prev" href="/docs/approvals"><span>previous</span>approvals</a><a class="next" href="/docs/voice"><span>next</span>voice and fn</a></nav>
     <footer>
       <p>for agents: <a href="/docs/flow.md">bise.dev/docs/flow.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/flow.md">edit this page on GitHub</a></p>
