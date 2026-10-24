@@ -9,71 +9,89 @@
   <b>bise</b> /beez/ · french, n.<br>
   1. a quick kiss on the cheek :*<br>
   2. a brisk north wind<br>
-  3. a terminal where multi-agent coding is painless
+  3. a team lead for your coding agents, in a Mac app or in your terminal
 </p>
 
 <p align="center">
   <a href="https://bise.dev">bise.dev</a> ·
   <a href="#install">install</a> ·
-  <a href="#features">features</a> ·
   <a href="https://bise.dev/docs/">docs</a> ·
-  <a href="https://bise.dev/book/">brand book</a>
+  <a href="#how-its-built">how it's built</a> ·
+  <a href="#features">features</a>
 </p>
 
 <br>
 
-**meet your team lead. you stay in flow, it runs the agents.**
+bise runs several coding agents for you behind one lead agent.
 
-bise is a terminal app for multi-agent coding. there's one thread per repo. in it you talk to **main**, an agent that acts as your team lead: it splits your requests into jobs, starts an agent when a job needs one, answers their routine questions, and only comes back to you with the decisions that are yours.
+you talk to one agent, the lead (`main`). it splits what you ask into tasks, does the small ones itself, and starts an agent per task when one is needed. the agents work in parallel, tell each other before they touch the same files, and get their own git worktree when they need a separate copy. what needs your decision (an approval, a choice between options, a review) waits in an inbox; the rest doesn't interrupt you.
 
-no sessions to juggle and no workflow to set up: the orchestration is built in, and it has opinions.
+one lead, one agent per task, one inbox. there is no workflow to configure.
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/demo-b-dark.svg">
-    <img src="docs/brand/readme/demo-b-light.svg" width="860" alt="a bise session in the terminal: you send ideas one after the other, main starts an agent for each, they ship.">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/demo-b-desktop-dark.svg">
+    <img src="docs/brand/readme/demo-b-desktop-light.svg" width="860" alt="bise desktop: you ask for two things; main starts perf and search, they show in the right bar; search's question waits in the inbox, you answer with one key; perf lands on main.">
   </picture>
 </p>
 
-more demos and the docs on [bise.dev](https://bise.dev).
+## two front ends, one engine
+
+|  | bise desktop | bise terminal |
+|---|---|---|
+| what | a macOS app: every project in one window, an inbox, notifications, hold fn to talk from any app | a terminal UI: one thread per repo, keyboard first, works over SSH |
+| runs on | macOS 14 or later, Apple silicon | macOS (Apple silicon and Intel), Linux x86_64 and arm64 (glibc 2.34+) |
+| install | [download on bise.dev](https://bise.dev) | `curl -fsSL bise.dev/install \| sh` |
+
+both are clients of the same local hub: the same projects, agents, threads, keys and settings. you can use one, or both at once on the same repo. voice and computer use are macOS only.
 
 ## install
 
+**bise desktop**: download it on [bise.dev](https://bise.dev), drag it to Applications, open it. it updates itself.
+
+**bise terminal**:
+
 ```sh
 curl -fsSL bise.dev/install | sh
-```
-
-then start it in the repo you want to work on:
-
-```sh
 cd ~/your-repo
 bise
 ```
 
-the first run walks you through a theme and a model key. `bise doctor` checks your install, your keys and the running hubs.
+the first run asks for a theme and a model. `bise doctor` checks the install, your keys and the running hubs. Linux: see [install](https://bise.dev/docs/install) for the supported distributions; NixOS: [the flake](docs/nixos.md).
 
-switching from Claude Code or Codex? paste this into it:
+coming from Claude Code or Codex? paste this into it:
 
 ```text
 read https://bise.dev/setup.md and set bise up for me
 ```
 
-your agent installs bise and brings over what you already have: your API key, your model, your `CLAUDE.md`, skills and MCP servers. it shows you one plan and waits for your yes. it never prints a key. if your agent can't open links, paste [the full prompt](https://bise.dev/setup) instead. no API key? your ChatGPT Plus or Pro plan works too (`bise login chatgpt`), and so do [a few other plans](https://bise.dev/docs/subscriptions). a Claude Max or Team plan works through its [monthly API credits](https://bise.dev/docs/subscriptions#claude-max-or-team-the-monthly-api-credits) (`bise login anthropic`).
+it installs bise and brings over your API key, your model, your `CLAUDE.md`, your skills and your MCP servers. it shows you one plan and waits for your yes; it never prints a key.
 
-using LiteLLM or another gateway, or any OpenAI-compatible base URL? see [custom providers](docs/custom-providers.md).
+## models and plans
 
-> [!NOTE]
-> bise is pre-release. **macOS** (Apple silicon and Intel) **and Linux** (x86_64 and arm64, glibc 2.34+: Ubuntu 22.04+, Debian 12+, Fedora, RHEL 9, Arch, WSL2). NixOS: [the flake](docs/nixos.md). the desktop app, voice and computer use are macOS only.
-> bring your own key: Anthropic, OpenAI, Mistral and more.
+bise is free and open source. you pay for the models, with a key or a plan you already have:
+
+- **API keys**: Anthropic, OpenAI, Google AI Studio, Mistral, OpenRouter, Groq, xAI, DeepSeek, Together AI, Fireworks AI, Cerebras; local models through Ollama or LM Studio; any OpenAI-compatible endpoint or gateway ([custom providers](docs/custom-providers.md)). see [providers](https://bise.dev/docs/providers).
+- **plans**: ChatGPT Plus or Pro (`bise login chatgpt`), OpenRouter sign-in, GLM Coding Plan, Kimi Code, MiniMax M plan. a Claude Pro or Max plan only runs in Anthropic's apps; Max and Team include monthly API credits that work here through an Anthropic key. see [subscriptions](https://bise.dev/docs/subscriptions).
+
+each agent can use its own model and reasoning effort (`/model`, `/reasoning`).
 
 ## how it works
 
-- **one thread per repo.** you always talk to the same thread. it never ends: when it gets long, bise compacts it and keeps going.
-- **main is the team lead.** it answers what it can, starts an agent when a job needs one, follows up, and picks up work that stopped half-way.
-- **agents work in the background,** in your checkout. they message each other before they touch the same files. one makes a git worktree only when it needs its own copy, and cleans it up after.
-- **the inbox holds the decisions that need you.** only the real ones reach you. they wait above your message (`ctrl+1`, or a click), never in the middle of your sentence.
+- **one thread per project.** you always talk to the same lead. when the thread gets long, it is compacted and goes on; any agent can search the full history.
+- **the lead routes.** for each message it decides: answer it, hand it to an agent already on that work, start a new agent, or order it after another task.
+- **agents work in the background,** in your checkout. they message each other before touching the same files. one makes a git worktree only when it needs its own copy, and removes it after.
+- **the inbox** holds what needs you: approvals, questions with options, merges. an item can open the page the agent wrote, where you leave notes on the work and pick an option.
+- **approvals**: by default commands run without asking (yolo). `shift+tab` switches to auto: safe commands run, risky ones wait for you (sandboxed on macOS).
 
-four words to learn: you, main, agents, inbox.
+## how it's built
+
+- **the hub** keeps the state of every agent and message on your machine. its core, sb-core (message delivery, the inbox, wakes and timers, routing), is written in [Bend](https://github.com/HigherOrderCO/Bend) with checked laws and proofs: no message lost or delivered twice, a restart rebuilds the same state, nothing waits forever (`bend/laws/`, `bend/proofs/`).
+- **the agent runtime** (`bend/runtime/`) runs each agent's loop; agents write small TypeScript scripts to call several tools in one step.
+- **the terminal UI, the harness, providers and plugins** are in Rust (`rust/`).
+- **the desktop app** (`apps/desktop/`) is an Electron app, a client of the same hub.
+- **plugins** use the [Agent Plugins](https://agent-plugins.org) format: skills, MCP servers (local, or remote with OAuth) and hooks, from `~/.agents/plugins` or your repo.
+- **restart-safe**: quit or update mid-task; agents resume where they stopped, with your draft and queued messages.
 
 ## features
 
@@ -83,13 +101,13 @@ four words to learn: you, main, agents, inbox.
 
 give main a large goal. it splits it into jobs, runs agents in parallel, restarts any that stop on an error, and keeps going until the goal is done.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/resume-dark.svg"><img src="docs/brand/readme/feat/resume-light.svg" width="680" alt="you give main one big goal: port 40 materials to a new shader. it runs three agents at a time, starts again the one that stops on an error, and keeps going until all 40 are done."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/resume-desktop-dark.svg"><img src="docs/brand/readme/feat/resume-desktop-light.svg" width="680" alt="bise desktop: perf has worked on the product page for two hours; bise restarts for an update and says your agents keep running; the window comes back and perf's thread goes on where it was."></picture>
 
 #### automatic worktrees
 
-agents share your checkout by default. when one needs an isolated copy (a clean build, a risky change), it creates a git worktree, works there, and removes it when it's done. no branches to name, no folders to clean up.
+agents share your checkout by default. when one needs an isolated copy (a clean build, a risky change), it creates a git worktree, works there, and removes it when it's done. no branches to name, no folders to clean up. `ψ` marks an agent that works in its own worktree, in both apps.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/worktree-dark.svg"><img src="docs/brand/readme/feat/worktree-light.svg" width="680" alt="search and promo share your folder; stock gets its own worktree to replay a flash sale on a clean build, finishes, and the worktree is cleaned up."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/worktree-desktop-dark.svg"><img src="docs/brand/readme/feat/worktree-desktop-light.svg" width="680" alt="bise desktop: perf starts in its own worktree: 'ψ sb/perf' shows on its head, its row in the right bar and its composer tab; perf lands on main and the worktree's mark goes."></picture>
 
 ### focus
 
@@ -97,11 +115,11 @@ agents share your checkout by default. when one needs an isolated copy (a clean 
 
 main hands the heavy work to agents, so it's never busy. ask it anything while five agents run: it listens and answers right away, and nothing you send interrupts a job.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/talk-dark.svg"><img src="docs/brand/readme/feat/talk-light.svg" width="680" alt="three agents are working on a telemetry pipeline. you ask main what ingest is doing and it answers right away; you add a job, it starts one more agent and is still there."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/talk-desktop-dark.svg"><img src="docs/brand/readme/feat/talk-desktop-light.svg" width="680" alt="bise desktop: main is working on the checkout; you type that the old discount codes stay and press enter: your message lands mid-turn, marked 'steered · bise read it mid-turn', and main answers and goes on."></picture>
 
 #### zen mode
 
-while you type, the agents panel, the counters and the agents' chatter dim. they come back when you send. messages between agents stay folded; `ctrl+o` expands them.
+in the terminal, while you type, the agents panel, the counters and the agents' chatter dim. they come back when you send. messages between agents stay folded; `ctrl+o` expands them.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/zen-dark.svg"><img src="docs/brand/readme/feat/zen-light.svg" width="680" alt="you start typing and everything else fades: the agents, the counts. rag finishes meanwhile. you send, and it all comes back."></picture>
 
@@ -109,15 +127,15 @@ while you type, the agents panel, the counters and the agents' chatter dim. they
 
 #### voice to voice
 
-press `ctrl+r` twice for voice mode and just talk to main. it answers out loud while the agents keep working. `space` sends right away, `esc` leaves, and `/voice` picks the model, the voice and the language. the face is drawn in the terminal: it smiles while it listens, turns a * while it thinks, and blows you a kiss when it's done.
+in the desktop app, hold `fn` in any app and talk. bise takes a still of the window you're on, and the answer shows in a small card in the screen's corner, then stays in main's thread. in the terminal, press `ctrl+r` twice for voice mode: main answers out loud while the agents keep working. `space` sends right away, `esc` leaves, and `/voice` picks the model, the voice and the language.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/voicemode-dark.svg"><img src="docs/brand/readme/feat/voicemode-light.svg" width="680" alt="you press ctrl+r twice and ask main to move the promo field out of checkout. the face listens, thinks, then talks: main says promo will move it to the cart. it ends with a kiss."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/voicemode-desktop-dark.svg"><img src="docs/brand/readme/feat/voicemode-desktop-light.svg" width="680" alt="bise desktop: over a browser on stripe's docs you hold fn and ask how to test a renewal; the corner card shows your words and the still of the page, then the answer line by line; it closes, and the answer is in main's thread."></picture>
 
 #### dictation
 
-set it up with `/voice`, then press `ctrl+r` and talk. your words land in the composer.
+press `ctrl+r` and talk: your words land in the composer, and any key stops it. in the desktop app it works from anywhere in the window.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/voice-dark.svg"><img src="docs/brand/readme/feat/voice-light.svg" width="680" alt="you press ctrl+r and say it; a level meter moves while you talk; your words land in the composer as text, and you send them."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/voice-desktop-dark.svg"><img src="docs/brand/readme/feat/voice-desktop-light.svg" width="680" alt="bise desktop: you press ctrl+r in the composer; a chip shows the mic is live, its level and the time; a key stops it, your words come into the composer; you send them and main starts search."></picture>
 
 ### coordination
 
@@ -125,13 +143,13 @@ set it up with `/voice`, then press `ctrl+r` and talk. your words land in the co
 
 agents ask main, not you. main answers what it can, the way you would, and says why. only the decisions that are yours reach your inbox.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/card-dark.svg"><img src="docs/brand/readme/feat/card-light.svg" width="680" alt="three agents ask main a question. main answers two of them itself, the way you would, and passes you the one decision that is yours."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/card-desktop-dark.svg"><img src="docs/brand/readme/feat/card-desktop-light.svg" width="680" alt="bise desktop: search asks main which sizes to support; main answers it for you (EU only, the shop only ships to the EU), so nothing waits in your inbox, and search lands its filter."></picture>
 
 #### agent-to-agent messages
 
 agents message each other directly: questions, hand-offs, who edits which file. these messages are folded in your thread.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/sync-dark.svg"><img src="docs/brand/readme/feat/sync-light.svg" width="680" alt="report asks rag and dedupe what it needs for the eval report; they answer; the four messages fold into one line, and main says there is nothing for you."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/sync-desktop-dark.svg"><img src="docs/brand/readme/feat/sync-desktop-light.svg" width="680" alt="bise desktop: perf and search agree who edits ProductCard; their three messages fold into one quiet row in main's thread, '3 messages between 2 agents'; a click opens them."></picture>
 
 ### tools
 
@@ -157,63 +175,61 @@ skills, MCP servers and hooks in the [Agent Plugins](https://agent-plugins.org) 
 
 #### talk to any agent
 
-`⌥` + a number, or `@name`, talks to one agent directly. ask it why, redirect it, then `⌥0` takes you back to main. the other agents keep running.
+`⌥` + a number talks to one agent directly; in the desktop app a click on its row in the right bar does too, and in the terminal `@name`. ask it why, redirect it, then `esc` takes you back to main. the other agents keep running.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/direct-dark.svg"><img src="docs/brand/readme/feat/direct-light.svg" width="680" alt="you press alt+1 and talk to streaming directly: why the frame spikes, then add a perf test. alt+0 takes you back to main. nobody stopped."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/direct-desktop-dark.svg"><img src="docs/brand/readme/feat/direct-desktop-light.svg" width="680" alt="bise desktop: you click search in the right bar; its thread opens; you tell it to skip US sizes and it answers; esc brings you back to main's thread."></picture>
 
 #### pull requests
 
-in a repo that takes pull requests, each change gets its own branch and PR, and goes through your CI, review bots and teammates. the panel shows each PR's state: checks, review, merged.
+in a repo that takes pull requests, each change gets its own branch and PR, and goes through your CI, review bots and teammates. the agent's row (the right bar in the app, the agents panel in the terminal) shows where its PR stands: checks, review, merged.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/prs-dark.svg"><img src="docs/brand/readme/feat/prs-light.svg" width="680" alt="checkout opens pull request #812. CI fails, it fixes the test; a review bot asks to cap the retries, you say do it; #812 merges. the panel shows where it stands."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/prs-desktop-dark.svg"><img src="docs/brand/readme/feat/prs-desktop-light.svg" width="680" alt="bise desktop: perf opens pull request #409; its chip shows in perf's thread and '↑' on its row in the right bar; the checks run, then pass."></picture>
 
 ### what they made
 
 #### artifacts
 
-what agents make for you (a page, a doc, a sheet, slides, a PR) lands in `/artifacts`: one list, newest first, with its versions. `/` finds one, `space` shows it in Quick Look. in a reply it's a ↗ link that opens it, and `@` puts one in your message.
+what agents make for you (a page, a doc, a sheet, slides, a PR) is an artifact: a ↗ chip in the thread, and one list with its versions (the artifacts screen in the app, `/artifacts` in the terminal). in the desktop app it opens beside the thread: select a line, leave a note, and send your notes to the agent that made it. in the terminal, `space` shows it in Quick Look and `@` puts one in your message.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/artifacts-dark.svg"><img src="docs/brand/readme/feat/artifacts-light.svg" width="680" alt="report made an eval report and a sheet: they show in the thread as links. you type /artifacts: every page, doc, sheet, deck and PR your agents made, in one list. you search deck and press space: the deck opens in Quick Look."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/artifacts-desktop-dark.svg"><img src="docs/brand/readme/feat/artifacts-desktop-light.svg" width="680" alt="bise desktop: perf's page 'product page, before / after' is a chip in its thread; a click opens it beside the thread; you select a line, leave a note, and send it; perf answers it's on it."></picture>
 
 #### diffs beside the thread
 
-click `± 3 files` under an agent's work, or press `ctrl+g`: its changes against main open on the right, file by file. `tab` goes to the next file, `⏎` opens the line in your editor, and `/diff` picks any branch.
+click `± 3 files` under an agent's work: its changes against main open beside the thread, file by file. select lines and type to ask the agent about them. in the terminal, `ctrl+g` opens them too, `tab` goes to the next file, `⏎` opens the line in your editor, and `/diff` picks any branch.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/diff-dark.svg"><img src="docs/brand/readme/feat/diff-light.svg" width="680" alt="checkout landed: ± 3 files +42 −18. a click opens its diff against main on the right, file by file, green and red. tab goes to the next file; enter opens the line in your editor."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/diff-desktop-dark.svg"><img src="docs/brand/readme/feat/diff-desktop-light.svg" width="680" alt="bise desktop: under perf's message, '± 3 files +41 −7'; a click opens the changes beside the thread; you select two lines and type: the quote of those lines goes into the composer with your question to perf."></picture>
 
 ## details
-
-small things, done carefully.
 
 #### agents only when needed
 
 main does small jobs itself and starts an agent only when a job needs one. no agents reviewing each other in loops, so fewer tokens.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/tokens-dark.svg"><img src="docs/brand/readme/feat/tokens-light.svg" width="680" alt="you ask to change one number in a config file. main does it itself: too small for an agent. 0 agents started, the count stays at 2."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/tokens-desktop-dark.svg"><img src="docs/brand/readme/feat/tokens-desktop-light.svg" width="680" alt="bise desktop: you ask for free shipping from 60 € instead of 50; main changes the one number itself, runs the tests and lands it; no agent starts: the right bar still shows the same two."></picture>
 
 #### images
 
-paste a screenshot with `ctrl+v` or drag it in. it becomes one chip in your message.
+paste a screenshot (`⌘V` in the app, `ctrl+v` in the terminal) or drag it in. it becomes one chip in your message.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/screenshot-dark.svg"><img src="docs/brand/readme/feat/screenshot-light.svg" width="680" alt="you type a message, paste a screenshot with ctrl+v: it lands as one chip in your text, and the agent gets the image."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/screenshot-desktop-dark.svg"><img src="docs/brand/readme/feat/screenshot-desktop-light.svg" width="680" alt="bise desktop: you drag a screenshot onto the composer; it becomes 'image 1' with its thumbnail in your text; you say the chips overlap the price on small phones and send; search sees it and fixes the CSS."></picture>
 
 #### quotes
 
-select lines in the history and start typing: they're attached to your message as a quote.
+select text in the thread and start typing: it's attached to your message as a quote.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/quote-dark.svg"><img src="docs/brand/readme/feat/quote-light.svg" width="680" alt="you select &#x27;12% to 71%&#x27; in cache&#x27;s answer and start typing: the lines come along as a quote chip, and cache answers about them."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/quote-desktop-dark.svg"><img src="docs/brand/readme/feat/quote-desktop-light.svg" width="680" alt="bise desktop: you select a sentence in perf's answer; the pill says type to ask perf about it; you type, and the quote goes into the composer with your question; perf answers it."></picture>
 
 #### a model per agent
 
-a large model for the hard job, a fast one for chores. `/model` and `/reasoning` set them per agent.
+a large model for the hard job, a fast one for chores. the composer's model menu in the app, `/model` and `/reasoning` in the terminal, set them per agent.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/model-dark.svg"><img src="docs/brand/readme/feat/model-light.svg" width="680" alt="each agent shows its model in the panel. you switch to release and type /model opus, then /reasoning hi: its line goes from haiku·lo to opus·hi."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/model-desktop-dark.svg"><img src="docs/brand/readme/feat/model-desktop-light.svg" width="680" alt="bise desktop: perf's composer shows its model, devstral medium; the menu lists the models under their provider; you pick opus 5.5, then set its effort to max: the chip reads opus 5.5 max."></picture>
 
 #### scheduled tasks
 
-agents can wake themselves on a schedule: check the build every 2 minutes, ship a release every morning. `/scheduled` lists them; `r` runs one now, `x` stops it.
+agents can wake themselves on a schedule: check the build every 2 minutes, ship a release every morning. the app's right bar shows them under scheduled & watching; in the terminal, `/scheduled` lists them, `r` runs one now, `x` stops it.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/scheduled-dark.svg"><img src="docs/brand/readme/feat/scheduled-light.svg" width="680" alt="you ask main to check the ingest lag every 2 minutes: ingest gets a scheduled task, wakes, reports, and stops it once the lag is under 10 s. /scheduled lists every scheduled task: what wakes your agents, and when."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/scheduled-desktop-dark.svg"><img src="docs/brand/readme/feat/scheduled-desktop-light.svg" width="680" alt="bise desktop: you ask main to check the ingest lag every 2 minutes and tell you only if it goes over 30 s; a ◷ row says it's scheduled, every 2 min, next 10:44; the right bar shows it."></picture>
 
 #### built-in shell
 
@@ -243,20 +259,19 @@ bise uses your terminal's colors, light or dark, and keeps text at a reading wid
 
 ```sh
 git clone https://github.com/gvergnaud/bise && cd bise
-./run.sh    # builds and starts bise in the current folder
+./run.sh    # builds and starts bise terminal in the current folder
 ```
 
 ## what's in here
 
-- [`rust/`](rust/) · the app: the terminal UI, the agent harness, plugins, sessions
-- [`bend/`](bend/) · the agent runtime and the Switchboard hub, written in [Bend](https://github.com/HigherOrderCO/Bend), and their laws (`bend/laws/`, proved in `bend/proofs/`)
+- [`rust/`](rust/) · the terminal UI, the agent harness, providers, plugins, sessions
+- [`bend/`](bend/) · sb-core (the hub's core) and the agent runtime, in [Bend](https://github.com/HigherOrderCO/Bend), with their laws (`bend/laws/`) and proofs (`bend/proofs/`)
+- [`apps/desktop/`](apps/desktop/) · bise desktop, the macOS app
 - [`prompts/`](prompts/) · the system prompts and tool descriptions the agents read
-- [`scripts/`](scripts/) · dev scripts: build the Bend binaries, build and switch versions
-- [`docs/`](docs/) · design docs, RFCs, the implementation notes
-- [`site/`](site/) · [bise.dev](https://bise.dev), a static site (the installer too)
+- [`site/`](site/) · [bise.dev](https://bise.dev) and its docs (the installer too)
 - [`tests/`](tests/) · the gate (`gate.sh`), e2e and TUI tests
-- [`packaging/`](packaging/) · build, install and release scripts
-- [`docs/brand/`](docs/brand/) · the brand book, the issue list, these images
+- [`scripts/`](scripts/), [`packaging/`](packaging/) · dev, build, install and release scripts
+- [`docs/`](docs/) · design docs and notes; [`docs/brand/`](docs/brand/) the brand book and these images
 
 ## license
 
