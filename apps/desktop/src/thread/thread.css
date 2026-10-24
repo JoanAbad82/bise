@@ -208,7 +208,7 @@
 }
 
 /* the catching-up cue (thread-loading, syncCue.tsx): his thread's newest page is on its way. Three
-   3 px dots in text-3 under the last row, on the column's left edge, in the band between the list's
+   4 px dots in text-3 (designer m_40515: 3 px read near invisible at 1x) under the last row, on the column's left edge, in the band between the list's
    end and the composer (the list's own 12 px end and its padding): absolute, over the list, never
    in its layout, so nothing moves when it comes or goes. Shown after 300 ms (a page in time never
    flashes it), faded out at once; still for reduced motion. */
@@ -238,8 +238,8 @@
   gap: var(--s-1);
 }
 .th-sync-dots > i {
-  width: 3px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--c-text-3);
   animation: th-sync 1.2s var(--ease-io) infinite;
