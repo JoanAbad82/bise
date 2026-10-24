@@ -9,6 +9,11 @@
 //! This hub writes only its own store's `folder` (meta.json, a page's in
 //! `artifacts/filed.json`); the library file through
 //! `bise_home::library`, its one writer.
+//!
+//! His undo slot: a typed `artifacts/move` here records each artifact's
+//! folder before; with `keep_undo` it leaves the slot to its caller (the
+//! desktop core's move across projects records one slot for the whole
+//! move from its items' `from`, core/library.rs).
 
 use super::*;
 use crate::artifacts::{self, Store};

@@ -9,6 +9,14 @@
 //!   page store's layout, written by the pages module): every page gets
 //!   in by itself, with its versions and open notes.
 //!
+//! Folders (docs/artifacts.md, "Folders"): an artifact's library folder
+//! is `folder` in its meta.json; a page's is in `artifacts/filed.json`
+//! (`{"<page id>": "<folder id>"}`: the page store owns the page's
+//! meta.json). Both are written only by [`Store::move_to`] (and a new
+//! artifact's add), and read in one place, [`Store::all`]; the join with
+//! the library (`bise_home::library`) is [`resolve_folders`], for this
+//! hub's rows and another project's ([`rows_of`]).
+//!
 //! Plain functions over the state folder; the daemon's thread is the only
 //! writer, so there is no lock.
 
