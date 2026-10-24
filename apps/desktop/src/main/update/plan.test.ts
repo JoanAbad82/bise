@@ -8,6 +8,10 @@ describe('readVersion (the app bundle VERSION)', () => {
     expect(readVersion('built=2026\n')).toBeNull();
     expect(readVersion('')).toBeNull();
   });
+  it("a release's (desktop_feed.py version_text): its commit, the About panel's build", () => {
+    const text = ['id=desktop-2026.10.2', 'built=2026-10-24T10:00:00Z', 'commit=5f9a429951ab', 'runtime_id=r1', ''].join('\u000a');
+    expect(readVersion(text)).toEqual({ id: 'desktop-2026.10.2', built: '2026-10-24T10:00:00Z', commit: '5f9a429951ab' });
+  });
 });
 
 describe('bundleOf', () => {

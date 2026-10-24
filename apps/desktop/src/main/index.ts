@@ -324,8 +324,9 @@ void app.whenReady().then(() => {
   ipcMain.handle(IPC.updateInfo, updateInfo);
   // the About panel (bise › About bise): his app's name and its real build (about.ts), the same
   // version the settings' update row says — Electron's default panel would say package.json's
-  // 'bise-desktop' '0.0.0', a file a release pack never touches
-  app.setAboutPanelOptions(aboutPanel(app.name, updateInfo().version));
+  // 'bise-desktop' '0.0.0', a file a release pack never touches; the build in parentheses is
+  // VERSION's commit (a test run's fake dist has none)
+  app.setAboutPanelOptions(aboutPanel(app.name, updateInfo().version, fakeDist !== null ? null : (updates?.commit() ?? null)));
   // his try's swap to the staged gated build, from inside (update/tryrun.ts)
   installTrySwapIpc({ testMode, env: process.env, execPath: process.execPath, packaged: app.isPackaged, realHome: userInfo().homedir, updatesDir });
   // after a swap, the screen he was on (written before it); a quiet moment's reopens without focus

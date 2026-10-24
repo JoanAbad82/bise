@@ -212,6 +212,11 @@ export class Updates {
     return { version, updated };
   }
 
+  /** The commit this app was built from (VERSION's `commit=`), or null: the About panel's build. */
+  commit(): string | null {
+    return this.build?.commit ?? null;
+  }
+
   /** The core's events: its prefs mean it runs (it asks the channel), app_update an offer. */
   onCoreEvent(ev: Record<string, unknown>): void {
     if (ev['ev'] === 'prefs') {

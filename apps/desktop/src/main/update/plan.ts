@@ -12,9 +12,11 @@ export interface AppBuild {
   readonly version?: string;
   /** UTC RFC 3339 with a Z; none in a dev build (never offered an update) */
   readonly built?: string;
+  /** the commit it was built from (`commit=`), when VERSION says one: the About panel's build */
+  readonly commit?: string;
 }
 
-/** VERSION's `id` and `built`, or null without an id. */
+/** VERSION's `id`, `built`, `version` and `commit`, or null without an id. */
 export function readVersion(text: string): AppBuild | null {
   const kv = new Map<string, string>();
   for (const line of text.split('\n')) {
@@ -25,7 +27,8 @@ export function readVersion(text: string): AppBuild | null {
   if (id === '') return null;
   const built = kv.get('built') ?? '';
   const version = kv.get('version') ?? '';
-  return { id, ...(built !== '' ? { built } : {}), ...(version !== '' ? { version } : {}) };
+  const commit = kv.get('commit') ?? '';
+  return { id, ...(built !== '' ? { built } : {}), ...(version !== '' ? { version } : {}), ...(commit !== '' ? { commit } : {}) };
 }
 
 /** The .app around an executable (`/A/bise.app/Contents/MacOS/bise` → `/A/bise.app`), or null. */
