@@ -590,7 +590,7 @@ printf '%s\n' "$changed" | grep -qE '^bend/(hub|vendor)/' && hub_changed=1
 printf '%s\n' "$changed" | grep -qE '^bend/(core|hub|vendor|laws|proofs)/.*\.bend$' && bend_changed=1
 # a light run (heavy-run's light lane: HEAVY_SLOT 'light <pid>', no slot, no disk reserve) runs
 # no heavy step, whatever changed since heavy-run asked `gate.sh light` (review-gates m_37126)
-if [ "$mode" = quick ] && [ "${HEAVY_SLOT%% *}" = light ]; then
+if [ "$mode" = quick ] && [ "${HEAVY_SLOT:-}" != "" ] && [ "${HEAVY_SLOT%% *}" = light ]; then
   lw="$(map_paths $changed; heavy_why)"
   [ -n "$lw" ] && { echo "FAIL heavy step in a light run:$lw: rerun through heavy-run (HEAVY_NO_LIGHT=1)"; echo "GATE quick FAILED"; exit 1; }
 fi
