@@ -6,12 +6,13 @@ import ../core/deepseek.bend as Ds
 import ../core/oai-chat.bend as Oai
 import ../core/wire.bend as W
 import ../runtime/provider-pure.bend as Pv
+import ../runtime/remote.bend as Rm
 import ../vendor/json.bend as J
 
-# Use the public family in the registry, as the built-in catalog does.
+# The catalog names the dialect (models.toml: api = "deepseek-chat").
 law deepseek_provider_resolves_its_dialect:
   {Pv.resolve_id("deepseek/deepseek-flash", Pv.registry("[providers.deepseek]
-api = \"openai-chat\"
+api = \"deepseek-chat\"
 base_url = \"https://api.deepseek.com/v1\"
 key_env = \"DEEPSEEK_API_KEY\"
 reasoning = true
@@ -20,14 +21,13 @@ reasoning = true
       "https://api.deepseek.com/v1/chat/completions", "DEEPSEEK_API_KEY",
       Api.MFacts{True{}, 0n, "max_tokens", "", "", "", False{}}}} : Pv.Resolved}
 
-law deepseek_dialect_is_provider_and_family_specific:
-  {[Api.style_for_provider("deepseek", "openai-chat"),
-      Api.style_for_provider("mistral", "openai-chat"),
-      Api.style_for_provider("gateway", "openai-chat"),
-      Api.style_for_provider("deepseek", "anthropic"),
-      Api.style_for_provider("deepseek", "typo")]
-    == [Some{Api.DeepSeek{}}, Some{Api.OpenAI{}}, Some{Api.OpenAI{}},
-      Some{Api.Anthropic{}}, None{}] : List<&2, Maybe<&2, Api.Style>>}
+# The api name picks the dialect, never the provider's id: openai-chat
+# stays OpenAI's for every provider, deepseek-chat round-trips.
+law deepseek_dialect_is_named_by_its_api:
+  {[Api.style_of_api("deepseek-chat"), Api.style_of_api("openai-chat"),
+      Api.style_of_api("typo")]
+    == [Some{Api.DeepSeek{}}, Some{Api.OpenAI{}}, None{}]
+      : List<&2, Maybe<&2, Api.Style>>}
 
 law deepseek_native_whitespace_is_verbatim:
   {Ds.split("<think>  native\nreason \n</think>\nanswer")
@@ -175,3 +175,42 @@ law deepseek_stream_errors_stay_errors:
 law deepseek_http_errors_stay_errors:
   {Api.reply_of_for(Api.DeepSeek{}, 422, "fake invalid content")
     == W.reply_err(422, "fake invalid content") : String}
+
+# The round trip the runtime makes between two calls: a reply's OK line
+# is parsed (runtime/remote.bend), kept as the assistant's text, and
+# sent back as its MSG line in the next request.
+def asst_line(r: Rm.RemoteRes) -> String:
+  match r:
+    case Rm.RROk{+text, _}:
+      String.append("MSG assistant : ", text)
+    case Rm.RRErr{+why}:
+      String.append("MSG user : error ", why)
+
+def next_body(+reply: String) -> String:
+  Api.api_body_for(Api.DeepSeek{}, "deepseek-flash", Api.facts0(),
+    W.parse_wire(String.concat(["MODEL default
+MSG user : go
+", asst_line(Rm.parse_reply(reply)), "
+MSG user : next
+END
+"])))
+
+# DeepSeek's own streamed reasoning comes back as reasoning_content, the
+# answer as content (the 400 of a tool continuation without it).
+law deepseek_reasoning_round_trips:
+  {next_body(Api.stream_reply(Api.DeepSeek{}, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\" native\\n \",\"content\":\"answer\"}}]}
+
+data: [DONE]
+
+"))
+    == "{\"model\":\"deepseek-flash\",\"reasoning_effort\":\"high\",\"messages\":[{\"role\":\"user\",\"content\":\"go\"},{\"role\":\"assistant\",\"content\":\"answer\",\"reasoning_content\":\" native\\n \"},{\"role\":\"user\",\"content\":\"next\"}]}" : String}
+
+# A Mistral/vibe reply with a signed thinking block, then the thread
+# moves to DeepSeek: its text goes back, the thinking never does (the 422).
+law deepseek_foreign_thinking_round_trips_out:
+  {next_body(Api.stream_reply(Api.OpenAI{}, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":[{\"type\":\"thinking\",\"thinking\":[{\"type\":\"text\",\"text\":\"foreign thought\"}],\"signature\":\"foreign-sig\"},{\"type\":\"text\",\"text\":\"foreign answer\"}]}}]}
+
+data: [DONE]
+
+"))
+    == "{\"model\":\"deepseek-flash\",\"reasoning_effort\":\"high\",\"messages\":[{\"role\":\"user\",\"content\":\"go\"},{\"role\":\"assistant\",\"content\":\"foreign answer\",\"reasoning_content\":\"\"},{\"role\":\"user\",\"content\":\"next\"}]}" : String}

@@ -8,6 +8,9 @@
 #   core/wire.bend       the wire, shared by every family
 #   core/oai-chat.bend   OpenAI Chat Completions (and compatibles)
 #   core/oai-stream.bend OpenAI Chat, streamed
+#   core/deepseek.bend   DeepSeek Chat: reasoning as reasoning_content
+#                        (on core/oai-chat.bend and core/oai-stream.bend)
+#   core/oai-resp.bend   OpenAI Responses
 #   core/anthropic.bend  Anthropic Messages (+ core/anth-stream.bend)
 #
 # The family is one of the two registries of the provider arc (the
@@ -73,18 +76,13 @@ def style_of_api.deepseek(deepseek: Bool, st: Maybe<&2, Style>)
       st
 
 # None: a family bise does not speak (yet): gemini, bedrock-converse,
-# a typo. deepseek-chat names the resolved dialect for round-tripping;
-# the catalog can keep openai-chat and resolve it by provider below.
+# a typo. deepseek-chat: Chat Completions with DeepSeek's reasoning
+# replay, named by the catalog (`api = "deepseek-chat"`), never by the
+# provider's id: a custom provider pointed at DeepSeek sets it too.
 def style_of_api(+api: String) -> Maybe<&2, Style>:
   style_of_api.deepseek(String.eq(api, "deepseek-chat"),
     style_of_api.chat(String.eq(api, "openai-chat"), String.eq(api, "anthropic"),
       String.eq(api, "openai-responses")))
-
-# A provider's Chat dialect is selected only after resolving its id;
-# keep the catalog's public wire family and every other provider intact.
-def style_for_provider(+prov: String, +api: String) -> Maybe<&2, Style>:
-  style_of_api.deepseek(Bool.and(String.eq(prov, "deepseek"),
-    String.eq(api, "openai-chat")), style_of_api(api))
 
 def api_name(st: Style) -> String:
   match st:

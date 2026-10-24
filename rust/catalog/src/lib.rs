@@ -51,9 +51,11 @@ pub const KEY_COMMAND_STATE: &str = "key from key_command · not checked";
 /// The built-in list, shipped in the binary.
 pub const BUILTIN: &str = include_str!("../models.toml");
 
-/// The wire families a provider may speak.
-pub const FAMILIES: [&str; 5] = [
+/// The wire families a provider may speak. `deepseek-chat` is Chat
+/// Completions with DeepSeek's reasoning replay (bend/core/deepseek.bend).
+pub const FAMILIES: [&str; 6] = [
     "openai-chat",
+    "deepseek-chat",
     "anthropic",
     "openai-responses",
     "gemini",

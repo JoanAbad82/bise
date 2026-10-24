@@ -5,7 +5,7 @@ import ../laws/deepseek.bend as Laws
 def Laws.deepseek_provider_resolves_its_dialect():
   {==}
 
-def Laws.deepseek_dialect_is_provider_and_family_specific():
+def Laws.deepseek_dialect_is_named_by_its_api():
   {==}
 
 def Laws.deepseek_native_whitespace_is_verbatim():
@@ -63,4 +63,10 @@ def Laws.deepseek_stream_errors_stay_errors():
   {==}
 
 def Laws.deepseek_http_errors_stay_errors():
+  {==}
+
+def Laws.deepseek_reasoning_round_trips():
+  {==}
+
+def Laws.deepseek_foreign_thinking_round_trips_out():
   {==}
