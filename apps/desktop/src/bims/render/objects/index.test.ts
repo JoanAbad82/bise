@@ -122,7 +122,7 @@ describe('objects', () => {
         expect(twin, 'a glass mesh with no depth twin').toBeDefined();
         expect(twin?.geometry).toBe(m.geometry);
         expect(twin?.renderOrder).toBe(1);
-        for (const t of twin ? mats(twin) : []) expect(t.colorWrite === false && t.depthWrite && !t.transparent).toBe(true);
+        for (const t of twin ? mats(twin) : []) expect(!t.colorWrite && t.depthWrite && !t.transparent).toBe(true);
       }
       for (const m of ms) {
         expect(m.castShadow, 'casts a shadow').toBe(false);

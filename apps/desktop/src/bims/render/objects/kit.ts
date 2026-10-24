@@ -85,7 +85,7 @@ const DEPTH = new MeshBasicMaterial({ colorWrite: false, depthWrite: true, polyg
 export function glassDepth(root: Object3D): void {
   const ms: Mesh[] = [];
   root.traverse((m) => {
-    if (m instanceof Mesh && m.userData.depth !== true) ms.push(m);
+    if (m instanceof Mesh && m.userData.depth !== true) ms.push(m as Mesh);
   });
   for (const m of ms) {
     const twin = new Mesh(m.geometry, DEPTH);
