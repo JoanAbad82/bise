@@ -7,6 +7,7 @@
 // Owner: art-grid.
 import type { Artifact } from '@/proto';
 import { extOf } from '@/ds';
+import { library } from '@/proto/words_library.gen';
 import { dayOf, dayWords, kindOf, leaves, timeOf, type Item } from './model';
 
 /** The turn that made an artifact's current version (art-store m_39731: its start, ms); none for his adds and old rows. */
@@ -116,7 +117,7 @@ export function whenOf(ms: number, now: number): string {
 }
 
 /** Who made it, as a line says it: 'you' for his adds, else the agent. */
-const whoOf = (a: Artifact): string => (a.by === 'you' ? 'you' : a.agent);
+export const whoOf = (a: Artifact): string => (a.by === 'you' ? library.you : a.agent);
 
 /**
  * The line under a card (density rule 1): in a task's folder, the time alone (another agent's work:
@@ -143,7 +144,7 @@ export function lineOf(c: Card, place: Place, now: number): string {
 export function lineTip(c: Card): string {
   const top = topOf(c);
   const where = top.projectName !== '' ? top.projectName : top.project;
-  return top.a.by === 'you' ? `added by you in ${where}` : `made by ${top.a.agent} in ${where}`;
+  return top.a.by === 'you' ? library.tip_added({ project: where }) : library.tip_made({ who: top.a.agent, project: where });
 }
 
 /** A task folder's own agent: the one that made most of it (ties: the newest's). Pure. */
@@ -184,19 +185,18 @@ export function galleryView(items: readonly Item[], place: Place, now: number): 
 
 // ---- the marks' tips (page block 'tips'), one string per mark
 
+/** A stack's word: shots when they all are, else files. Pure. */
+const stackWhat = (s: Stack): string => (s.items.every((it) => kindOf(it.a.kind) === 'shots') ? library.kind_shots : library.kind_files);
+
 /** A stack's count: '16 shots saved in one turn: opens as a sheet'. Pure. */
 export function countTip(s: Stack): string {
-  const n = String(s.items.length);
-  const shots = s.items.every((it) => kindOf(it.a.kind) === 'shots');
-  return `${n} ${shots ? 'shots' : 'files'} saved in one turn: opens as a sheet`;
+  return library.tip_stack({ n: s.items.length, what: stackWhat(s) });
 }
 
-export const TIPS = {
-  menu: 'more: open, move, archive…',
-  pick: 'pick: ⌘-click picks several',
-  browser: 'opens in your browser',
-  newChip: 'new: you have not opened it yet',
-} as const;
+/** The extension's tip on a card's corner: 'xlsx: sheet · xlsx'. Pure. */
+export function extTip(it: Item, ext: string): string {
+  return library.tip_ext({ ext, kind: listKind(oneOf(it)) });
+}
 
 /** A link's domain, for its '↗ github.com' mark: '' when it has none. Pure. */
 export function domainOf(a: Artifact): string {
@@ -348,9 +348,8 @@ export function sheetItems(s: Stack, chip: string | null): readonly Item[] {
 /** A sheet's line under its name: '16 shots amb-home saved in one turn, today 14:02'. Pure. */
 export function sheetLine(s: Stack, now: number): string {
   const top = s.items[0] as Item;
-  const shots = s.items.every((it) => kindOf(it.a.kind) === 'shots');
-  const day = dayWords(top.a.at_ms, now);
-  return `${String(s.items.length)} ${shots ? 'shots' : 'files'} ${top.a.agent} saved in one turn, ${day} ${timeOf(top.a.at_ms)}`;
+  const day = `${dayWords(top.a.at_ms, now)} ${timeOf(top.a.at_ms)}`;
+  return library.sheet_line({ n: s.items.length, what: stackWhat(s), who: top.a.agent, day });
 }
 
 // ---- the list view (☰)
@@ -361,19 +360,19 @@ const DOCS = new Set(['md', 'txt', 'docx', 'doc', 'rtf']);
 
 /** The list view's kind column (b-pages 'list view'): 'shots', 'image', 'page', 'doc · md', 'PR'. Pure. */
 export function listKind(c: Card): string {
-  if (c.kind === 'stack') return c.items.every((it) => kindOf(it.a.kind) === 'shots') ? 'shots' : 'files';
+  if (c.kind === 'stack') return stackWhat(c);
   const a = c.it.a;
   const ext = extOf(a);
   const k = kindOf(a.kind);
-  if (k === 'pr') return 'PR';
-  if (IMAGES.has(ext)) return 'image';
-  if (VIDEOS.has(ext)) return 'video';
-  if (DOCS.has(ext)) return `doc · ${ext}`;
-  if (ext === 'xlsx' || ext === 'csv') return `sheet · ${ext}`;
-  if (ext === 'pptx' || ext === 'key') return `deck · ${ext}`;
-  if (k === 'page') return a.kind.toLowerCase() === 'link' ? 'link' : 'page';
-  if (k === 'shots') return 'image';
-  return ext !== '' ? ext : 'file';
+  if (k === 'pr') return library.one_pr;
+  if (IMAGES.has(ext)) return library.one_image;
+  if (VIDEOS.has(ext)) return library.one_video;
+  if (DOCS.has(ext)) return `${library.one_doc} · ${ext}`;
+  if (ext === 'xlsx' || ext === 'csv') return `${library.one_sheet} · ${ext}`;
+  if (ext === 'pptx' || ext === 'key') return `${library.one_deck} · ${ext}`;
+  if (k === 'page') return a.kind.toLowerCase() === 'link' ? library.one_link : library.one_page;
+  if (k === 'shots') return library.one_image;
+  return ext !== '' ? ext : library.one_file;
 }
 
 /** The list view's name: a stack says its count, 'agent view step 2 · 16 shots'. Pure. */

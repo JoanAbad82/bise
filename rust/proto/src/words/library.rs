@@ -215,4 +215,54 @@ crate::words! { library:
     tip_folder_more = "more: rename, merge, delete…";
     /// the crumb under 900 px
     tip_crumb = "the folders";
+    /// a stack's count, `16 shots saved in one turn: opens as a sheet` (what: kind_shots or kind_files)
+    tip_stack(n, what) = "{n} {what} saved in one turn: opens as a sheet";
+    /// the extension on a card's corner, `xlsx: sheet`
+    tip_ext(ext, kind) = "{ext}: {kind}";
+    /// a PR's or a link's ↗ on its card
+    tip_leaves = "opens in your browser";
+    /// a card's ···
+    tip_more = "more: open, move, archive…";
+    /// a card's pick circle
+    tip_pick = "pick: ⌘-click picks several";
+    /// a card's line: where it comes from, the project it never shows, `made by epargne-offre in ai-docs`
+    tip_made(who, project) = "made by {who} in {project}";
+    /// the same for what he added himself, `added by you in ai-docs`
+    tip_added(project) = "added by you in {project}";
+    /// a card's new chip
+    tip_new = "new: you have not opened it yet";
+
+    // ---- the cards (art-grid): a card's line, a stack open, the list behind ☰
+    /// who made it, when he added it himself: `you · 10:00`
+    you = "you";
+    /// a stack open, its line: `16 shots amb-home saved in one turn, today 14:02`
+    sheet_line(n, what, who, day) = "{n} {what} {who} saved in one turn, {day}";
+    /// a stack open, its first chip: `all 16`
+    sheet_all(n) = "all {n}";
+    /// the list view's head: the name column
+    col_name = "name";
+    /// the list view's head
+    col_made_by = "made by";
+    /// the list view's head
+    col_kind = "kind";
+    /// the list view's head
+    col_when = "when";
+    /// the list view's kind column, one artifact
+    one_image = "image";
+    /// the list view's kind column
+    one_video = "video";
+    /// the list view's kind column, `doc · md`
+    one_doc = "doc";
+    /// the list view's kind column, `sheet · xlsx`
+    one_sheet = "sheet";
+    /// the list view's kind column, `deck · pptx`
+    one_deck = "deck";
+    /// the list view's kind column
+    one_page = "page";
+    /// the list view's kind column
+    one_link = "link";
+    /// the list view's kind column
+    one_pr = "PR";
+    /// the list view's kind column
+    one_file = "file";
 }

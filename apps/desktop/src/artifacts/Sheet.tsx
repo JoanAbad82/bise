@@ -11,6 +11,7 @@ import { useGridKeys } from './gridKeys';
 import { captionOf, chipsOf, sheetItems, sheetLine, type Card, type Stack } from './gallery';
 import { rowKey } from './List';
 import type { Item } from './model';
+import { library } from '@/proto/words_library.gen';
 import './cards.css';
 
 export interface SheetProps {
@@ -53,7 +54,7 @@ export function StackSheet({ stack, now, onOpen, onLook, onPut, onBack, testId }
       {chips.length > 0 && (
         <div className="art-sheet-chips">
           <Press look={`art-chip${chip === null ? ' on' : ''}`} aria-pressed={chip === null} onClick={() => { setChip(null); }} data-testid={`${testId}.chip.all`}>
-            {`all ${String(stack.items.length)}`}
+            {library.sheet_all({ n: stack.items.length })}
           </Press>
           {chips.map((c) => (
             <Press key={c} look={`art-chip${chip === c ? ' on' : ''}`} aria-pressed={chip === c} onClick={() => { setChip(chip === c ? null : c); }}

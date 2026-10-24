@@ -58,6 +58,26 @@
     "one": null,
     "text": "the closest: {name}, in {folder}, at v{v}."
   },
+  "library.col_kind": {
+    "args": [],
+    "one": null,
+    "text": "kind"
+  },
+  "library.col_made_by": {
+    "args": [],
+    "one": null,
+    "text": "made by"
+  },
+  "library.col_name": {
+    "args": [],
+    "one": null,
+    "text": "name"
+  },
+  "library.col_when": {
+    "args": [],
+    "one": null,
+    "text": "when"
+  },
   "library.count_from": {
     "args": [
       "n",
@@ -385,6 +405,51 @@
     "one": null,
     "text": "{n} of {total}"
   },
+  "library.one_deck": {
+    "args": [],
+    "one": null,
+    "text": "deck"
+  },
+  "library.one_doc": {
+    "args": [],
+    "one": null,
+    "text": "doc"
+  },
+  "library.one_file": {
+    "args": [],
+    "one": null,
+    "text": "file"
+  },
+  "library.one_image": {
+    "args": [],
+    "one": null,
+    "text": "image"
+  },
+  "library.one_link": {
+    "args": [],
+    "one": null,
+    "text": "link"
+  },
+  "library.one_page": {
+    "args": [],
+    "one": null,
+    "text": "page"
+  },
+  "library.one_pr": {
+    "args": [],
+    "one": null,
+    "text": "PR"
+  },
+  "library.one_sheet": {
+    "args": [],
+    "one": null,
+    "text": "sheet"
+  },
+  "library.one_video": {
+    "args": [],
+    "one": null,
+    "text": "video"
+  },
   "library.open_it": {
     "args": [
       "name"
@@ -447,6 +512,23 @@
     "one": null,
     "text": "type a name in the search: \"in:{example}\""
   },
+  "library.sheet_all": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "all {n}"
+  },
+  "library.sheet_line": {
+    "args": [
+      "n",
+      "what",
+      "who",
+      "day"
+    ],
+    "one": null,
+    "text": "{n} {what} {who} saved in one turn, {day}"
+  },
   "library.sort_with_main": {
     "args": [],
     "one": null,
@@ -465,6 +547,13 @@
     "one": null,
     "text": "filed by main when each task started"
   },
+  "library.tip_added": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "added by you in {project}"
+  },
   "library.tip_cards": {
     "args": [],
     "one": null,
@@ -482,15 +571,46 @@
     "one": null,
     "text": "the folders"
   },
+  "library.tip_ext": {
+    "args": [
+      "ext",
+      "kind"
+    ],
+    "one": null,
+    "text": "{ext}: {kind}"
+  },
   "library.tip_folder_more": {
     "args": [],
     "one": null,
     "text": "more: rename, merge, delete…"
   },
+  "library.tip_leaves": {
+    "args": [],
+    "one": null,
+    "text": "opens in your browser"
+  },
   "library.tip_list": {
     "args": [],
     "one": null,
     "text": "show as a list"
+  },
+  "library.tip_made": {
+    "args": [
+      "who",
+      "project"
+    ],
+    "one": null,
+    "text": "made by {who} in {project}"
+  },
+  "library.tip_more": {
+    "args": [],
+    "one": null,
+    "text": "more: open, move, archive…"
+  },
+  "library.tip_new": {
+    "args": [],
+    "one": null,
+    "text": "new: you have not opened it yet"
   },
   "library.tip_new_dot": {
     "args": [
@@ -498,6 +618,19 @@
     ],
     "one": null,
     "text": "new inside: {n} since you last looked"
+  },
+  "library.tip_pick": {
+    "args": [],
+    "one": null,
+    "text": "pick: ⌘-click picks several"
+  },
+  "library.tip_stack": {
+    "args": [
+      "n",
+      "what"
+    ],
+    "one": null,
+    "text": "{n} {what} saved in one turn: opens as a sheet"
   },
   "library.type_folder": {
     "args": [],
@@ -532,5 +665,10 @@
     ],
     "one": null,
     "text": "{agent}'s work"
+  },
+  "library.you": {
+    "args": [],
+    "one": null,
+    "text": "you"
   }
 }

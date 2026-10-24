@@ -8,7 +8,9 @@
 import { memo, type HTMLAttributes, type MouseEvent } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { Thumb, thumbExt } from './thumbs';
-import { countTip, domainOf, isNew, lineTip, TIPS, titleOf, topOf, type Card } from './gallery';
+import { countTip, domainOf, extTip, isNew, lineTip, titleOf, topOf, type Card } from './gallery';
+import { library } from '@/proto/words_library.gen';
+import { panel } from '@/proto/words_panel.gen';
 import { leaves, type Item } from './model';
 
 /** How a click picked: ⌘ adds or takes one, shift picks the run up to it. */
@@ -38,19 +40,19 @@ export function CardPic({ card, it, visible, picked, onPick, onMenu, testId }: {
       {stack && <span className="art-card-s1" aria-hidden="true" />}
       <span className="art-card-th" data-testid={`${testId}.pic`}>
         <Thumb item={it} visible={visible} />
-        {ext !== null && !out && <span className="art-card-x" data-testid={`${testId}.ext`} {...tipAttrs(`${ext}: ${it.a.kind}`)}>{ext}</span>}
+        {ext !== null && !out && <span className="art-card-x" data-testid={`${testId}.ext`} {...tipAttrs(extTip(it, ext))}>{ext}</span>}
         {stack && <span className="art-card-n" data-testid={`${testId}.count`} {...tipAttrs(countTip(stack))}>{stack.items.length}</span>}
-        {out && <span className="art-card-lk" data-testid={`${testId}.out`} {...tipAttrs(TIPS.browser)}>{domain === '' ? '↗' : `↗ ${domain}`}</span>}
+        {out && <span className="art-card-lk" data-testid={`${testId}.out`} {...tipAttrs(library.tip_leaves)}>{domain === '' ? '↗' : `↗ ${domain}`}</span>}
       </span>
       {onPick && (
         <Press tabIndex={-1} look={`art-card-ck${picked ? ' y' : ''}`} aria-label="pick" aria-pressed={picked}
-          data-testid={`${testId}.pick`} {...tipAttrs(TIPS.pick)}
+          data-testid={`${testId}.pick`} {...tipAttrs(library.tip_pick)}
           onClick={(e) => { e.stopPropagation(); onPick({ meta: true, shift: false }); }}>
           {picked ? '✓' : ''}
         </Press>
       )}
       {onMenu && (
-        <Press tabIndex={-1} look="art-card-mb" aria-label="more" data-testid={`${testId}.menu`} {...tipAttrs(TIPS.menu)}
+        <Press tabIndex={-1} look="art-card-mb" aria-label="more" data-testid={`${testId}.menu`} {...tipAttrs(library.tip_more)}
           onClick={(e) => {
             e.stopPropagation();
             const r = e.currentTarget.getBoundingClientRect();
@@ -97,7 +99,7 @@ export const ArtCard = memo(function ArtCard({ card, line, on, picked, many, vis
         onPick={(how) => { onPick(card.key, how); }} {...(menu === undefined ? {} : { onMenu: menu })} testId={testId} />
       <span className="art-card-tt">
         <span className="art-card-t1" {...tipAttrs(name)}>{name}</span>
-        {isNew(card) && <span className="art-new" data-testid={`${testId}.new`} {...tipAttrs(TIPS.newChip)}>new</span>}
+        {isNew(card) && <span className="art-new" data-testid={`${testId}.new`} {...tipAttrs(library.tip_new)}>{panel.new_chip}</span>}
       </span>
       <span className="art-card-mt" data-testid={`${testId}.line`} {...tipAttrs(lineTip(card))}>{line}</span>
     </div>

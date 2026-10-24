@@ -6,7 +6,8 @@ import type { Artifact } from '@/proto';
 import { ArtifactGrid } from './Grid';
 import { StackSheet } from './Sheet';
 import { useGridKeys, type View } from './gridKeys';
-import { TIPS, type Card, type Place, type Stack } from './gallery';
+import type { Card, Place, Stack } from './gallery';
+import { library } from '@/proto/words_library.gen';
 import type { Item } from './model';
 
 afterEach(cleanup);
@@ -84,7 +85,7 @@ describe('the gallery, as he sees it', () => {
     expect(screen.getByTestId('grid.card.h-1/hero.new').textContent).toBe('new');
     expect(screen.queryByTestId(`grid.card.${STACK}.new`)).toBeNull();
     expect(screen.getByTestId('grid.card.h-1/pr.out').textContent).toBe('↗ github.com');
-    expect(screen.getByTestId('grid.card.h-1/pr.out').getAttribute('data-tip')).toBe(TIPS.browser);
+    expect(screen.getByTestId('grid.card.h-1/pr.out').getAttribute('data-tip')).toBe(library.tip_leaves);
     expect(screen.queryByTestId('grid.card.h-1/pr.ext')).toBeNull();
   });
 
