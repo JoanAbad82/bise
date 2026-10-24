@@ -186,8 +186,12 @@ def d_artifacts(m):
     def thread(w, x0=22):
         R = w - 22; b = []
         # the head: the agent's name, its role dim, its state (thread header)
-        b.append(t(x0, 25, f'<tspan font-weight="600">perf</tspan>  <tspan fill="{c["dim"]}">product page speed</tspan>', 13))
-        bw = tw("∿ working · 4 min", 11.5) + 16; bx = x0 + tw("perf  product page speed", 13) * 1.1 + 12
+        # 16 px before the divider: the role cuts with … when the column is narrow (designer, m_40550)
+        bw = tw("∿ working · 4 min", 11.5) + 16; full = "product page speed"; role = full; n = len(full)
+        fits = lambda r: x0 + tw("perf  " + r, 13) * 1.1 + 12 + bw <= w - 16
+        while not fits(role) and n > 4: n -= 1; role = full[:n].rstrip() + "…"
+        b.append(t(x0, 25, f'<tspan font-weight="600">perf</tspan>  <tspan fill="{c["dim"]}">{role}</tspan>', 13))
+        bx = x0 + tw("perf  " + role, 13) * 1.1 + 12
         b.append(f'<rect x="{bx:.0f}" y="12" width="{bw:.0f}" height="20" rx="10" fill="{c["chip"]}"/>' + t(bx + 8, 26, "∿ working · 4 min", 11.5, "dim"))
         b.append(f'<path d="M0 38 H{w}" stroke="{c["line"]}"/>')
         y = 64
@@ -321,4 +325,165 @@ def d_voicemode(m):
     o.append(at(9.2, None, win, dur=.3))
     return d.svg("5 in bise desktop: over a browser on stripe's docs you hold fn and ask how to test a renewal; the corner card shows your words and the still of the page, then bise's answer line by line; it closes, and the answer is in bise's thread.")
 
-DESK = [("demo-b-desktop", d_session), ("artifacts-desktop", d_artifacts), ("voicemode-desktop", d_voicemode)]
+# ---------- shared parts of the window: two columns, the right bar, an agent's head, its rows ----------
+WORKING_KEYS = "tab queue   ⏎ steer   ctrl+c stop"
+
+def cols(d, TX, RB=680):
+    """the thread column and the right bar; every line stays in its column. returns (colT, colR)."""
+    c = d.c
+    d.o.append(f'<rect x="{TX}" y="0" width="{RB - TX}" height="{d.H}" fill="{c["side"]}"/><path d="M{TX} 0 V{d.H}" stroke="{c["line"]}"/>'
+               f'<path d="M0 38 H{TX}" stroke="{c["line"]}"/>'
+               f'<clipPath id="col-t"><rect x="0" y="0" width="{TX - 8}" height="{d.H}"/></clipPath>'
+               f'<clipPath id="col-r"><rect x="{TX + 1}" y="0" width="{RB - TX - 9}" height="{d.H}"/></clipPath>')
+    return (lambda b: f'<g clip-path="url(#col-t)">{b}</g>'), (lambda b: f'<g clip-path="url(#col-r)">{b}</g>')
+
+def rbar(d, TX, colR, working, agents, RB=680, project="storefront"):
+    """the right bar: the project and 'n working' ([(t0, t1, n)]), AGENTS with their rows ([(t0, name, what, [(t, mark, color)])]),
+    ARTIFACTS and SCHEDULED & WATCHING. returns the rows' baselines."""
+    c, t, at, o = d.c, d.t, d.at, d.o
+    rx = TX + 16
+    o.append(t(rx, 25, f'<tspan font-weight="600">{project}</tspan>', 13))
+    for a, b, n in working:
+        o.append(at(a, b, t(rx + tw(project, 13) + 10, 25, f"{n} working", 12, "dim"), dur=.1))
+    lab = lambda y, s_: t(rx, y, s_, 11.5, "faint", 600, extra=' letter-spacing=".06em"')
+    o.append(lab(64, f"AGENTS · {len(agents)}") + t(RB - 16, 64, "all ›", 11.5, "faint", anchor="end"))
+    ys = []
+    for i, (t0, name, what, marks) in enumerate(agents):
+        y = 90 + i * 25; ys.append(y)
+        o.append(colR(at(t0, None, t(rx + 18, y, f'<tspan font-weight="500">{name}</tspan>  <tspan fill="{c["dim"]}" font-size="12">{what}</tspan>', 13))))
+        for j, (a, g, col) in enumerate(marks):
+            b = marks[j + 1][0] if j + 1 < len(marks) else None
+            o.append(at(a, b, t(rx, y, f'<tspan class="g">{g}</tspan>' if g == "∿" else g, 13, col), dur=.08))
+    o.append(lab(158, "ARTIFACTS · 0") + lab(186, "SCHEDULED &amp; WATCHING · 0"))
+    return ys
+
+def ahead(d, name, role, chip=None, x=18):
+    """an agent's thread head: its name, its role dim, its state chip ('∿ working · 2 h'). returns (body, where the head ends)."""
+    c = d.c
+    b = d.t(x, 25, f'<tspan font-weight="600">{E(name)}</tspan>  <tspan fill="{c["dim"]}">{E(role)}</tspan>', 13)
+    end = x + tw(f"{name}  {role}", 13) * 1.1 + 12
+    if chip:
+        bw = tw(chip, 11.5) + 16
+        b += f'<rect x="{end:.0f}" y="12" width="{bw:.0f}" height="20" rx="10" fill="{c["chip"]}"/>' + d.t(end + 8, 26, E(chip).replace("∿", '<tspan class="g">∿</tspan>'), 11.5, "dim")
+        end += bw + 10
+    return b, end
+
+def toolrow(d, x, R, y, html, done):
+    """a tool row: '$' or '±' and the model's words (text-2), its time at the right (text-3)."""
+    return d.t(x, y, html, 12.5, "dim") + d.t(R, y, done, 11.5, "faint", anchor="end")
+
+def diffs(c, plus, minus):
+    return f'<tspan fill="{c["ok"]}">+{plus}</tspan> <tspan fill="{c["err"]}">−{minus}</tspan>'
+
+def landrow(d, x, y, who="perf", sha="a1b2c3d", files="3 files", plus=42, minus=18):
+    """'✓ perf landed on main · a1b2c3d', the files as their own quiet chip (green only for the diff's +)."""
+    c = d.c
+    lw = tw(f"✓ {who} landed on main · {sha}", 12.5) * 1.05 + 10
+    fw = tw(f"± {files} +{plus} −{minus}", 11.5) * 1.06 + 16
+    return (d.t(x, y, f'✓ {who} landed on main · <tspan fill="{c["text"]}">{sha}</tspan>', 12.5, "dim")
+            + d.chip(x + lw, y, f'± {files} {diffs(c, plus, minus)}', fw, size=11.5))
+
+def live(d, x, y, desc, s0, t0, t1, end=-1):
+    """the working line: '∿ <what it does> · 12 s', the seconds counting from t0 to t1; held to end (None: the loop's end)."""
+    out, k = [], 0
+    while t0 + k < t1:
+        a = t0 + k; b = min(a + 1, t1) if a + 1 < t1 else (t1 if end == -1 else end)
+        out.append(d.at(a, b, d.t(x, y, f'<tspan class="g">∿</tspan> {E(desc)} <tspan fill="{d.c["faint"]}">· {s0 + k} s</tspan>', 12.5, "dim"), dur=.05))
+        k += 1
+    return "".join(out)
+
+def d_resume(m):
+    """2 · long-running goals: perf has worked for hours; bise restarts for an update; the window comes back, perf's thread goes on."""
+    c = DPAL[m]; T = 11.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")]), (0, "search", "size filter", [(0, "✓", "dim")])])
+    hb, _ = ahead(d, "perf", "product page speed", "∿ working · 2 h")
+    o.append(colT(hb))
+    o.append(d.head(X, 64, "perf"))
+    o.append(colT(toolrow(d, X, R, 84, "$ convert 14 thumbnails to avif", "✓ 12 s")
+                  + toolrow(d, X, R, 104, f'± Gallery.tsx  {diffs(c, 31, 12)}', "✓ 0.2 s")))
+    y = 134
+    for l in wrap("thumbnails done: 2.1 MB down to 290 KB. now the fonts: two of the four aren't used anywhere.", R - X):
+        o.append(t(X, y, E(l), 13)); y += 20
+    y += 12
+    back = 5.4
+    # the row that runs through the restart: running before, done after (perf never stopped)
+    o.append(colT(t(X, y, "$ find the fonts no page uses", 12.5, "dim")))
+    o.append(at(0, back, t(R, y, '<tspan class="g">∿</tspan>', 12.5, "dim", anchor="end"), dur=.05))
+    o.append(at(back, None, t(R, y, "✓ 9 s", 11.5, "faint", anchor="end"), dur=.05))
+    o.append(colT(at(6.2, None, toolrow(d, X, R, y + 20, f'± fonts.css  {diffs(c, 2, 9)}', "✓ 0.1 s"))))
+    yy = y + 52
+    o.append(colT(at(7.0, None, "".join(t(X, yy + 20 * i, E(l), 13) for i, l in enumerate(wrap("two fonts gone: 140 KB less on every page. next, the checkout images.", R - X))))))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, to="perf", keys=WORKING_KEYS)
+    o.append(cb + t(cx, cy, E(ph), 13, "faint"))
+    # the restart: the update's own words, over the whole window
+    rs = (f'<rect width="680" height="{d.H}" fill="{c["bg"]}"/>'
+          + t(340, 196, '<tspan class="g">∿</tspan>', 18, "dim", anchor="middle")
+          + t(340, 228, f'restarting on <tspan style="font-family:{MONO}">7a4c4a5</tspan>…', 14, "text", anchor="middle")
+          + t(340, 252, "the window comes back in a moment. your agents keep running.", 12.5, "dim", anchor="middle"))
+    o.append(at(3.2, back, rs, dur=.3))
+    return d.svg("2 in bise desktop: perf has worked on the product page for two hours; bise restarts for an update and says your agents keep running; the window comes back and perf's thread goes on where it was, the command it was running now done.")
+
+def d_worktree(m):
+    """3 · automatic worktrees: perf starts; 'ψ sb/perf' on its head, its right-bar row and its composer tab, with its tip; after its land the mark goes."""
+    c = DPAL[m]; T = 10
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX, RB = 448, 680; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    wt0, wt1 = 0.9, 6.4
+    ys = rbar(d, TX, colR, [(0, wt1, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim"), (wt1, "✓", "dim")])])
+    # the worktree's mark: last on its row (text-3), on its head and in its composer tab
+    o.append(at(wt0, wt1, t(RB - 16, ys[0], "ψ", 13, "faint", anchor="end"), dur=.15))
+    hb, end = ahead(d, "perf", "product page speed")
+    o.append(colT(hb) + colT(at(wt0, wt1, t(end - 4, 25, f'<tspan fill="{c["faint"]}">ψ</tspan> sb/perf', 12.5, "dim"), dur=.15)))
+    # his pointer on the row's ψ, and its tip (the app's words: 'ψ worktree: its own copy of the repo, on sb/perf')
+    o.append(at(1.7, 4.6, f'<circle cx="{RB - 20}" cy="{ys[0] - 4}" r="9" fill="none" stroke="{c["acc"]}" stroke-width="1.6"/>', dur=.1))
+    l1 = "ψ worktree: its own copy of the repo,"
+    tw_ = tw(l1, 11.5) * 1.1 + 24; tx_ = RB - 10 - tw_; ty_ = ys[0] + 12
+    tip = (f'<rect x="{tx_ + 2:.0f}" y="{ty_ + 3}" width="{tw_:.0f}" height="48" rx="8" fill="{c["shadow"]}"/>'
+           f'<rect x="{tx_:.0f}" y="{ty_}" width="{tw_:.0f}" height="48" rx="8" fill="{c["raised"]}" stroke="{c["rule"]}"/>'
+           + t(tx_ + 11, ty_ + 19, E(l1), 11.5, "dim") + t(tx_ + 11, ty_ + 38, f'on <tspan fill="{c["text"]}" style="font-family:{MONO}">sb/perf</tspan>', 11.5, "dim"))
+    o.append(at(1.9, 4.6, tip, dur=.15))
+    # perf's thread
+    o.append(at(0.5, None, d.head(X, 64, "perf")))
+    o.append(colT(at(1.4, None, toolrow(d, X, R, 84, f'± Hero.tsx  {diffs(c, 18, 6)}', "✓ 0.3 s"))))
+    o.append(colT(at(2.6, None, toolrow(d, X, R, 104, "$ run lighthouse on a mid phone", "✓ 38 s"))))
+    y = 134
+    o.append(colT(at(3.8, None, "".join(t(X, y + 20 * i, E(l), 13) for i, l in enumerate(wrap("the hero is 180 KB now; first paint 0.9 s on a mid phone. landing it.", R - X))))))
+    o.append(colT(at(5.2, None, landrow(d, X, y + 40))))
+    # the composer: 'to perf  ψ sb/perf' while the worktree lives
+    for a, b, where in [(0, wt0, "storefront"), (wt0, wt1, "ψ sb/perf"), (wt1, None, "storefront")]:
+        cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, to="perf", where=where, keys=WORKING_KEYS)
+        o.append(at(a, b, cb + t(cx, cy, E(ph), 13, "faint"), dur=.05))
+    return d.svg("3 in bise desktop: perf starts in its own worktree: 'ψ sb/perf' shows on its head, its row in the right bar and its composer tab, whose tip says it's its own copy of the repo; perf lands on main and the worktree's mark goes.")
+
+def d_talk(m):
+    """4 · main is always available: bise is working; he types; ⏎ steers; his message lands mid-turn and bise takes it in."""
+    c = DPAL[m]; T = 11.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 2)], [(0, "perf", "product page speed", [(0, "∿", "dim")]), (0, "search", "size filter", [(0, "∿", "dim")])])
+    o.append(t(18, 25, f'<tspan fill="{c["acc"]}" style="font-family:{MONO}" font-weight="700">:*</tspan> <tspan font-weight="600">bise</tspan> <tspan fill="{c["dim"]}">· storefront</tspan>', 13))
+    b1, h1 = d.bubble(R, 54, ["clean up checkout: drop what we don't use"])
+    o.append(b1)
+    o.append(d.head(X, 114, "bise") + colT(t(X, 134, "on it. reading the checkout code first.", 13)))
+    send = 4.1
+    o.append(colT(live(d, X, 164, "reading the checkout code", 12, 0, send)))
+    q = "keep the old discount codes, marketing still sends them"
+    b2, h2 = d.bubble(R, 152, wrap(q, 270))
+    o.append(at(send, None, b2))
+    o.append(at(4.6, None, t(R, 152 + h2 + 16, "steered · bise read it mid-turn", 11.5, "faint", anchor="end"), dur=.2))
+    ans = 5.4
+    o.append(colT(live(d, X, 152 + h2 + 46, "reading the checkout code", 16, send, ans)))
+    ya = 152 + h2 + 50
+    o.append(colT(at(ans, None, d.head(X, ya, "bise") + t(X, ya + 20, "ok: the discount codes stay. i'm dropping the rest.", 13))))
+    o.append(colT(live(d, X, ya + 48, "removing unused checkout code", 1, 5.8, 8.8, end=None)))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=WORKING_KEYS)
+    o.append(cb)
+    o.append(placeholder_at(d, cx, cy, ph, [(0.9, send)]))
+    o.append(at(0.85, send, d.typing(cx, cy, q, 0.9, 3.5), dur=.05))
+    o.append(d.key(R - 64, 402, "⏎", 3.8, send + .1))
+    return d.svg("4 in bise desktop: bise is working on the checkout; you type that the old discount codes stay and press enter: it steers, your message lands mid-turn with 'steered · bise read it mid-turn', and bise answers and goes on.")
+
+DESK = [("demo-b-desktop", d_session), ("artifacts-desktop", d_artifacts), ("voicemode-desktop", d_voicemode),
+        ("resume-desktop", d_resume), ("worktree-desktop", d_worktree), ("talk-desktop", d_talk)]
