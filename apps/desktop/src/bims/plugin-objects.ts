@@ -94,7 +94,8 @@ const BY_NAME: readonly (readonly [RegExp, ObjId, number?])[] = [
   [/^reddit$/, 'pingpong'],
   [/^kit$/, 'scooter'],
   [/^gmail$/, 'mailbox'],
-  [/^(blender|image generation)$/, 'easel'],
+  // figma: where you draw (designer m_40518)
+  [/^(blender|image generation|figma)$/, 'easel'],
   [/^(computer|computer use)$/, 'macdesk'],
   [/^docs$/, 'printer', 1],
   [/^sheets$/, 'printer', 2],

@@ -1,8 +1,8 @@
 // The objects' builders' kit (bims-plugins plan p1): a plugin is a real thing in the bims' office.
 // Each object is built at the origin on the floor (y 0), its front to +z (the camera sees +z and +x),
 // centred on its foot, in the office's clay look (style.ts), with a soft contact shadow under it.
-// Off (a disabled plugin): the same object in glass where it stood, 30% opacity, no shadow cast and
-// no contact shadow. A wall object (the calendar) hangs with its back on z = -d/2.
+// Off (a disabled plugin): the same object in glass where it stood, in one neutral (ink, no hue:
+// designer m_40518), 30% opacity, no shadow cast and no contact shadow. A wall object (the calendar) hangs with its back on z = -d/2.
 //
 // A family file (games.ts, music.ts, ...) only builds with a Part: a box, a cylinder, a ball, a cone,
 // a pane of glass and a child group, so every object shares the materials, the glass rule and the
@@ -11,7 +11,7 @@ import { Color, ConeGeometry, Group, type Material, Mesh, type Object3D } from '
 import { STYLE } from '../style';
 
 export interface ObjOpts {
-  /** a disabled plugin: glass, 30% */
+  /** a disabled plugin: glass, ink at 30%, no hue */
   readonly off: boolean;
   /** 0 day .. 1 night: a screen's, a lamp's glow */
   readonly night: number;
@@ -73,7 +73,9 @@ export const lighter = (c: string, k: number): string => '#' + new Color(c).lerp
 const cache = new Map<string, Material>();
 
 /** a shared material: `opacity` a see-through one (glass, water), `glow` its emissive strength (never in glass) */
-function mat(color: string, off: boolean, glow: number, opacity?: number): Material {
+function mat(colour: string, off: boolean, glow: number, opacity?: number): Material {
+  // glass loses its hue: one neutral for every part, so it reads off, not faded (designer m_40518)
+  const color = off ? INK : colour;
   const op = opacity ?? (off ? GLASS : undefined);
   const ei = off ? 0 : glow;
   const key = `${color}|${op ?? 1}|${ei}`;

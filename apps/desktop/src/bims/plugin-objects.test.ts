@@ -42,6 +42,7 @@ describe('defaultObject', () => {
       [row('mistral:gmail', 'mistral'), 'mailbox'],
       [mainRow('blender'), 'easel'],
       [row('mistral:image_generation', 'mistral'), 'easel'],
+      [row('mistral:figma', 'mistral'), 'easel'],
       [mainRow('computer'), 'macdesk'],
       [mainRow('docs'), 'printer', 1],
       [mainRow('sheets'), 'printer', 2],
@@ -73,6 +74,7 @@ describe('defaultObject', () => {
   it('gives anything else a plant whose pot is its kind', () => {
     expect(defaultObject(mainRow('weather'))).toEqual({ obj: 'plant', n: 0 });
     expect(defaultObject(row('mistral:linear', 'mistral'))).toEqual({ obj: 'plant', n: 1 });
+    expect(defaultObject(mainRow('x'))).toEqual({ obj: 'plant', n: 0 });
   });
 
   it('never gives a pick-only object by default', () => {

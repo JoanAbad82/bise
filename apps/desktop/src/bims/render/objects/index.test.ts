@@ -9,7 +9,7 @@ import { Box3, type Material, Mesh, type MeshStandardMaterial, type Object3D } f
 import { describe, expect, it } from 'vitest';
 import { coplanarClashes } from '../coplanar';
 import { readsAsAttention } from '../palette.testkit';
-import { GLASS } from './kit';
+import { GLASS, INK } from './kit';
 import { COMPACT, familyOf, FAMILIES, MAKER_IDS, makeObject, type MakeOpts, OBJ_IDS, type ObjId } from './index';
 
 /** float noise and a rounded edge */
@@ -112,7 +112,7 @@ describe('objects', () => {
       expect(bad).toEqual([]);
     });
 
-    it('is glass when off: 30% at most, no shadow, no contact shadow', () => {
+    it('is glass when off: ink at 30% at most, no hue, no shadow, no contact shadow', () => {
       const ms = meshes(makeObject(id, { off: true, night: 1 }).group);
       expect(ms.length).toBeGreaterThan(0);
       for (const m of ms) {
@@ -121,6 +121,8 @@ describe('objects', () => {
         for (const mat of mats(m)) {
           expect(mat.transparent && mat.opacity <= GLASS + 1e-6, `opacity ${mat.opacity}`).toBe(true);
           expect((mat as MeshStandardMaterial).emissiveIntensity, 'glows in glass').toBe(0);
+          // glass loses its hue: one neutral, ink (designer m_40518)
+          expect('#' + (mat as MeshStandardMaterial).color.getHexString(), 'a hue in glass').toBe(INK);
         }
       }
       // on the floor, a contact shadow under it (nothing floats); a wall object hangs, none
