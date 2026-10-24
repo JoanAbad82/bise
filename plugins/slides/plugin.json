@@ -4,5 +4,10 @@
   "version": "0.1.0",
   "description": "pptx: make, read and edit PowerPoint decks (bise office run)",
   "homepage": "https://bise.dev",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "extensions": {
+    "dev.bise": {
+      "prompts": ["make a 5-slide status deck from this week's work", "read this pptx and sum up each slide in one line", "turn this page into a short pitch deck"]
+    }
+  }
 }

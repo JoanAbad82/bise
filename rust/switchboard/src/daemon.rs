@@ -1241,24 +1241,11 @@ impl Shell {
             return;
         }
         self.plugins_checked = Some(std::time::Instant::now());
-        let mut plugins_by_ws: BTreeMap<PathBuf, u64> = BTreeMap::new();
-        let mut skills_by_ws: BTreeMap<(PathBuf, bool, bool), u64> = BTreeMap::new();
-        let mut stale = Vec::new();
-        for (d, fp) in &self.spawn_plugins {
-            if !self.repls.contains_key(d) || self.switching.contains_key(d) || self.reload_repls.contains(d) {
-                continue;
-            }
-            let plugins = *plugins_by_ws.entry(fp.ws.clone()).or_insert_with(|| plugins_fingerprint(&fp.ws));
-            let skills_moved = now && {
-                let cur = *skills_by_ws
-                    .entry((fp.ws.clone(), fp.main, fp.desktop))
-                    .or_insert_with(|| skills_fingerprint(&self.opts.paths, &skill_roots(&fp.ws, &self.opts.app_root, fp.main, fp.desktop)));
-                cur != fp.skills
-            };
-            if plugins != fp.plugins || skills_moved {
-                stale.push(d.clone());
-            }
-        }
+        let skip = |d: &str| !self.repls.contains_key(d) || self.switching.contains_key(d) || self.reload_repls.contains(d);
+        let (app_root, paths) = (self.opts.app_root.clone(), self.opts.paths.clone());
+        let mut skills = |fp: &PromptInputs| skills_fingerprint(&paths, &skill_roots(&fp.ws, &app_root, fp.main, fp.desktop));
+        let skills_now: Option<&mut dyn FnMut(&PromptInputs) -> u64> = if now { Some(&mut skills) } else { None };
+        let stale = prompt_inputs::stale(&self.spawn_plugins, &skip, &mut |ws| plugins_fingerprint(ws), skills_now);
         for d in stale {
             log_line(
                 &self.opts.paths,

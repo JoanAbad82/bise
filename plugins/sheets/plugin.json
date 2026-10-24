@@ -4,5 +4,10 @@
   "version": "0.1.0",
   "description": "xlsx: make, read and edit Excel workbooks (bise office run)",
   "homepage": "https://bise.dev",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "extensions": {
+    "dev.bise": {
+      "prompts": ["make a budget sheet for this month with formulas", "read this xlsx and tell me which rows look wrong", "turn this table into an Excel workbook with a total row"]
+    }
+  }
 }

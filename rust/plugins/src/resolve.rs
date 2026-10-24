@@ -287,6 +287,8 @@ pub struct Plugin {
     /// its MCP servers turned off in plugins.json (`<name>#mcp:<id>`,
     /// stdio or remote): listed, never in `servers`/`remotes`
     pub off_servers: Vec<crate::id::PluginId>,
+    /// what to try it with (`dev.bise.prompts`, cut: [`cut_prompts`])
+    pub prompts: Vec<String>,
     /// components present on disk but not supported yet
     pub unsupported: Vec<String>,
 }
@@ -471,10 +473,18 @@ pub struct Manifest {
     /// `"extensions": {"dev.bise": {"default": "off"}}`: opt-in, loaded
     /// only once enabled (computer use: /computer-use turns it on)
     pub default_off: bool,
+    /// `"extensions": {"dev.bise": {"prompts": [...]}}`: what to try it
+    /// with, as written (cut at load, [`MAX_PROMPTS`] of [`PROMPT_CHARS`])
+    pub prompts: Vec<String>,
 }
 
 /// bise's own manifest extension.
 pub const BISE_EXTENSION: &str = "dev.bise";
+/// At most this many `dev.bise.prompts` are kept, each at most
+/// [`PROMPT_CHARS`] characters (a longer list or line: a warning).
+pub const MAX_PROMPTS: usize = 3;
+pub const PROMPT_CHARS: usize = 120;
+
 
 fn opt_string(o: &Map<String, Value>, k: &str) -> Result<Option<String>, String> {
     match o.get(k) {
@@ -535,6 +545,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
     }
     let mut extensions = Vec::new();
     let mut default_off = false;
+    let mut prompts = Vec::new();
     if let Some(ex) = o.get("extensions") {
         let ex = ex.as_object().ok_or("/extensions must be an object")?;
         for (k, v) in ex {
@@ -547,6 +558,13 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
                         ("default", Some("off")) => default_off = true,
                         ("default", Some("on")) => {}
                         ("default", _) => return Err(format!("/extensions/{}/default must be \"on\" or \"off\"", k)),
+                        ("prompts", _) => {
+                            let list = fv.as_array().filter(|a| a.iter().all(Value::is_string));
+                            let Some(list) = list else {
+                                return Err(format!("/extensions/{}/prompts must be an array of strings", k));
+                            };
+                            prompts = list.iter().filter_map(|s| s.as_str().map(String::from)).collect();
+                        }
                         _ => return Err(format!("unknown field /extensions/{}/{}", k, f)),
                     }
                 }
@@ -561,6 +579,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
         description: opt_string(o, "description")?,
         extensions,
         default_off,
+        prompts,
     })
 }
 
@@ -909,6 +928,26 @@ fn load_unsupported(p: &mut Plugin, extensions: &[String], out: &mut Vec<Diagnos
     }
 }
 
+/// The prompts kept (blank ones out, at most [`MAX_PROMPTS`], each cut
+/// at [`PROMPT_CHARS`] characters), and whether any was cut.
+pub fn cut_prompts(list: &[String]) -> (Vec<String>, bool) {
+    let plain: Vec<&str> = list.iter().map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+    let mut cut = plain.len() > MAX_PROMPTS;
+    let kept = plain
+        .into_iter()
+        .take(MAX_PROMPTS)
+        .map(|p| {
+            if p.chars().count() > PROMPT_CHARS {
+                cut = true;
+                p.chars().take(PROMPT_CHARS).collect::<String>().trim_end().to_string()
+            } else {
+                p.to_string()
+            }
+        })
+        .collect();
+    (kept, cut)
+}
+
 struct Candidate {
     plugin: Plugin,
     extensions: Vec<String>,
@@ -956,6 +995,7 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
             remotes: Vec::new(),
             off_skills: Vec::new(),
             off_servers: Vec::new(),
+            prompts: Vec::new(),
             unsupported: Vec::new(),
         };
         let parsed = std::fs::read_to_string(&manifest)
@@ -973,6 +1013,12 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
                 p.state = State::Loaded;
                 extensions = m.extensions;
                 default_off = m.default_off;
+                let (kept, cut) = cut_prompts(&m.prompts);
+                if cut {
+                    out.push(diag("plugin.prompts.cut", Severity::Warning, &p.name,
+                        format!("dev.bise prompts: at most {} of {} characters each; the rest is cut", MAX_PROMPTS, PROMPT_CHARS)));
+                }
+                p.prompts = kept;
             }
             Err(e) => out.push(diag("plugin.manifest.invalid", Severity::Error, &folder,
                 format!("{}: {}", manifest.display(), e))),

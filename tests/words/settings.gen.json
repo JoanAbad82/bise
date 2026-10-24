@@ -2180,6 +2180,23 @@
     "one": null,
     "text": "fn sends your words without a capture without it"
   },
+  "settings.plugins_bise_title": {
+    "args": [],
+    "one": null,
+    "text": "bise"
+  },
+  "settings.plugins_bise_what": {
+    "args": [],
+    "one": null,
+    "text": "bise's own skills: pages, notes, the group"
+  },
+  "settings.plugins_connected": {
+    "args": [
+      "n"
+    ],
+    "one": "connected · {n} tool",
+    "text": "connected · {n} tools"
+  },
   "settings.plugins_disabled": {
     "args": [],
     "one": null,
@@ -2190,10 +2207,29 @@
     "one": null,
     "text": "turned on"
   },
+  "settings.plugins_failed": {
+    "args": [
+      "why"
+    ],
+    "one": null,
+    "text": "✗ {why}"
+  },
   "settings.plugins_help": {
     "args": [],
     "one": null,
     "text": "a change applies to the agents' next sessions."
+  },
+  "settings.plugins_logged_in": {
+    "args": [],
+    "one": null,
+    "text": "logged in"
+  },
+  "settings.plugins_logged_in_tools": {
+    "args": [
+      "n"
+    ],
+    "one": "logged in · {n} tool",
+    "text": "logged in · {n} tools"
   },
   "settings.plugins_logged_out": {
     "args": [
@@ -2215,6 +2251,11 @@
     ],
     "one": null,
     "text": "opening your browser to log in to {name}…"
+  },
+  "settings.plugins_login_pending": {
+    "args": [],
+    "one": null,
+    "text": "logging in, in your browser"
   },
   "settings.plugins_logins": {
     "args": [],
@@ -2243,6 +2284,40 @@
     "one": null,
     "text": "no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md)."
   },
+  "settings.plugins_not_logged_in": {
+    "args": [],
+    "one": null,
+    "text": "not logged in"
+  },
+  "settings.plugins_part_needs_login": {
+    "args": [],
+    "one": null,
+    "text": "needs a login"
+  },
+  "settings.plugins_personal_title": {
+    "args": [],
+    "one": null,
+    "text": "personal skills"
+  },
+  "settings.plugins_personal_where": {
+    "args": [],
+    "one": null,
+    "text": "~/.agents/skills"
+  },
+  "settings.plugins_project_title": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "{project} skills"
+  },
+  "settings.plugins_project_where": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "{project}/.agents/skills · this project only"
+  },
   "settings.plugins_set": {
     "args": [
       "name",
@@ -2261,6 +2336,16 @@
     "args": [],
     "one": null,
     "text": "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME"
+  },
+  "settings.plugins_vibe_title": {
+    "args": [],
+    "one": null,
+    "text": "Vibe skills"
+  },
+  "settings.plugins_vibe_where": {
+    "args": [],
+    "one": null,
+    "text": "~/.vibe/skills"
   },
   "settings.privacy_add": {
     "args": [],

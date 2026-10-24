@@ -349,8 +349,15 @@ pub fn loaded_plugins(workspace: &Path) -> Vec<(String, String, Vec<String>)> {
 }
 
 fn loaded_plugins_in(roots: &bend_plugins::resolve::Roots) -> Vec<(String, String, Vec<String>)> {
-    bend_plugins::resolve::resolve(roots)
-        .loaded()
+    loaded_plugins_of(&bend_plugins::resolve::resolve(roots))
+}
+
+/// The plugins on in a resolution, each with its skills on (the
+/// resolver leaves a plugin off or a skill off out of `loaded()` and
+/// `skills`): what [`plugins_note`] lists. A server, a tool or a Mistral
+/// connector is never in it, so turning one off leaves the note as is.
+pub fn loaded_plugins_of(res: &bend_plugins::resolve::Resolution) -> Vec<(String, String, Vec<String>)> {
+    res.loaded()
         .map(|p| {
             // a plugin skill's name is already `<namespace>:<name>`, the
             // one `<available-skills>` and the skill tool take

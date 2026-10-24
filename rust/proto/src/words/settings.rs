@@ -9,6 +9,7 @@ mod accounts;
 mod first;
 mod keys;
 mod pages;
+mod plugins;
 mod projects;
 mod providers;
 mod roles;
@@ -20,6 +21,7 @@ pub use accounts::*;
 pub use first::*;
 pub use keys::*;
 pub use pages::*;
+pub use plugins::*;
 pub use projects::*;
 pub use providers::*;
 pub use roles::*;
@@ -27,7 +29,7 @@ pub use setup::*;
 pub use tui::*;
 pub use update::*;
 
-const PARTS: &[&[Word]] = &[pages::WORDS, accounts::WORDS, projects::WORDS, update::WORDS, keys::WORDS, setup::WORDS, first::WORDS, providers::WORDS, roles::WORDS, tui::WORDS];
+const PARTS: &[&[Word]] = &[pages::WORDS, accounts::WORDS, projects::WORDS, update::WORDS, keys::WORDS, setup::WORDS, first::WORDS, providers::WORDS, roles::WORDS, tui::WORDS, plugins::WORDS];
 
 /// This area's words, in order (bise_proto::words::ALL).
 pub const WORDS: &[Word] = &super::concat::<{ super::count(PARTS) }>(PARTS);

@@ -70,6 +70,11 @@ pub const TAGS: &[&str] = &[
     "plugin_set",
     "plugin_login",
     "plugin_logout",
+    "plugin_connect",
+    "plugins_refresh",
+    "plugin_add",
+    "plugin_add_confirm",
+    "plugin_add_cancel",
     "computer_use",
     "setup_check",
     "role_set",
@@ -109,6 +114,9 @@ pub(crate) struct Setup {
     signing: Option<String>,
     /// the plugin servers whose login runs (their browser is open)
     logins: Vec<String>,
+    /// the add menu's previews waiting for his click (dropped with the
+    /// core: their staged folders go)
+    staged: bend_plugins::add::Held,
     /// computer use's page while it is open
     cu: Option<CuLive>,
     /// the desktop app's update check (bar S.6)
@@ -153,7 +161,7 @@ impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), staged: Default::default(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
     }
 
     /// R8: his `/model <model>` in `agent`'s view, before it goes to the
@@ -426,6 +434,28 @@ impl Core {
                 let shown = self.emit_plugins(project);
                 ("plugin_logout", res.and(shown))
             }
+            AppCmd::PluginConnect { project, id } => ("plugin_connect", (p.plugin_connect)(&id, project, s.tx.clone())),
+            AppCmd::PluginsRefresh { project } => {
+                (p.plugins_refresh)(project, s.tx.clone());
+                ("plugins_refresh", Ok(()))
+            }
+            AppCmd::PluginAdd { project: _, add } => ("plugin_add", self.plugin_add(add)),
+            AppCmd::PluginAddConfirm { token, secrets } => {
+                let ctx = (p.add_ctx)();
+                let res = match self.setup.as_mut() {
+                    Some(s) => s.staged.confirm(&token, &secrets, &ctx).map(|_| ()).map_err(|e| e.to_string()),
+                    None => Err("this core has no setup".into()),
+                };
+                let shown = self.emit_plugins(None);
+                ("plugin_add_confirm", res.and(shown))
+            }
+            AppCmd::PluginAddCancel { token } => {
+                let res = match self.setup.as_mut() {
+                    Some(s) => s.staged.cancel(&token).map_err(|e| e.to_string()),
+                    None => Err("this core has no setup".into()),
+                };
+                ("plugin_add_cancel", res)
+            }
             AppCmd::RoleSet { role, model, effort } => {
                 let res = (p.role_set)(&role, model.as_deref(), effort.as_deref());
                 if res.is_ok() {
@@ -540,16 +570,36 @@ impl Core {
         Ok(row.path.clone())
     }
 
-    /// `plugins` for that workspace (its logins still open marked pending).
+    /// `plugins` for that workspace (its logins still open marked pending:
+    /// bend_plugins::catalog::rows, the one builder), then `browse` of the
+    /// Mistral connectors not connected yet (the same rows, `available`).
     fn emit_plugins(&mut self, project: Option<String>) -> Result<(), String> {
         let ws = self.workspace_of(project.as_deref())?;
         let s = self.setup.as_ref().ok_or("this core has no setup")?;
-        let items = (s.ports.plugins)(&ws, &s.logins);
+        let (browse, items): (Vec<_>, Vec<_>) =
+            (s.ports.plugins)(&ws, &s.logins).into_iter().partition(|r| r.state == bise_proto::app_rows::PluginState::Available);
         let mut ev = json!({"ev": "plugins", "items": items});
         if let Some(p) = project {
             ev["project"] = json!(p);
         }
         self.emit(ev);
+        self.ev(CoreEv::Browse { source: MISTRAL.into(), items: browse });
+        Ok(())
+    }
+
+    /// The add menu's item: staged off the loop (then a preview), a
+    /// marketplace read (then `browse`), or a brief to main.
+    fn plugin_add(&mut self, add: bise_proto::app_cmd::PluginAddKind) -> Result<(), String> {
+        use bise_proto::app_cmd::PluginAddKind as K;
+        let s = self.setup.as_ref().ok_or("this core has no setup")?;
+        match add {
+            K::Marketplace { url } => (s.ports.plugin_market)(url, s.tx.clone()),
+            K::Agent { words } => self.send_via(bend_plugins::add::agent_brief(&words), false, "capsule-start"),
+            other => {
+                let req = bend_plugins::add::Request::from_wire(&other).ok_or("plugin_add: not something to add")?;
+                (s.ports.plugin_stage)(req, s.tx.clone());
+            }
+        }
         Ok(())
     }
 
@@ -615,6 +665,37 @@ impl Core {
                     }
                     self.emit_keychain();
                 }
+                Done::Staged { res } => match res {
+                    Ok(staged) => {
+                        let Some(s) = self.setup.as_mut() else { continue };
+                        let (token, preview) = s.staged.hold(staged.0);
+                        self.ev(CoreEv::PluginPreview { token, preview });
+                    }
+                    Err(e) => self.setup_error("plugin_add", &e),
+                },
+                // a step's line goes to the core's log (no window event
+                // carries it yet); its end, the list again
+                Done::Connecting { project, said, res } => {
+                    if let Some(l) = said {
+                        eprintln!("ambient-core: plugin_connect: {l}");
+                    }
+                    match res {
+                        Some(Err(e)) => self.setup_error("plugin_connect", &e),
+                        Some(Ok(())) => {}
+                        None => continue,
+                    }
+                    let _ = self.emit_plugins(project);
+                }
+                Done::Refreshed { project, res } => {
+                    if let Err(e) = res {
+                        self.setup_error("plugins_refresh", &e);
+                    }
+                    let _ = self.emit_plugins(project);
+                }
+                Done::Market { source, res } => match res {
+                    Ok(items) => self.ev(CoreEv::Browse { source, items }),
+                    Err(e) => self.setup_error("plugin_add", &format!("{source}: {e}")),
+                },
                 Done::LoggedIn { name, project, res } => {
                     if let Some(s) = self.setup.as_mut() {
                         s.logins.retain(|n| *n != name);
@@ -630,6 +711,11 @@ impl Core {
         self.update_tick();
     }
 }
+
+
+/// The `browse` source of his Mistral connectors not connected yet.
+const MISTRAL: &str = "mistral";
+
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,8 @@
 //! `/plugins` in the TUI (docs/plugins.md).
 //!
+//! - [`rows`]: the Plugins list (bend_plugins::catalog::rows), for the
+//!   desktop's core and the TUI's screen; [`connect`] and [`refresh`]
+//!   run a connector's connect and a catalog fetch on their own thread.
 //! - `/plugins`: the plugins of the workspace (the static listing).
 //! - `/plugins on|off ID`: edits `plugins.json` (bend_plugins::state);
 //!   applies at the next `/reload` (or task restart).
@@ -13,90 +16,58 @@
 use bise_proto::words::settings;
 use std::path::Path;
 
-/// The plugins of `workspace` as rows (the desktop's `plugins` event, P.1):
-/// bend_plugins' resolution (built-in, user and workspace plugins, their
-/// state) and, for each, its remote MCP servers that log in as `mcp`
-/// parts, with their login (needs a login, logged in, not logged in;
-/// `pending`: a login whose browser is open, by name). Real plugins only
-/// until `bend_plugins::catalog::rows` builds the whole list. The TUI's
-/// popup reads the same resolution ([`choices`]).
+/// The Plugins list of `workspace` (the desktop's `plugins` and `browse`
+/// events, the TUI's /plugins screen): bend_plugins::catalog::rows, the
+/// one builder, on what each owner reads now (`pending`: the logins whose
+/// browser is open, by name). The connectors from their cache only, never
+/// a fetch ([`refresh`] fetches, on its own thread).
 pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::app_rows::Plugin> {
-    use bend_plugins::resolve::State;
-    use bise_proto::app_rows::{PluginKind, PluginScope, PluginState};
-    let res = bend_plugins::resolve::resolve(&bend_plugins::resolve::Roots::standard(Some(workspace)));
-    let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
-    let targets = bend_plugins::login::targets(workspace);
-    res.plugins
-        .iter()
-        .map(|p| {
-            let id = bend_plugins::id::PluginId::plugin(&p.name);
-            let parts: Vec<_> = targets.iter().filter(|t| t.plugin == p.name).map(|t| login_part(&id, t, &secrets, &sd, pending)).collect();
-            bise_proto::app_rows::Plugin {
-                id: id.to_string(),
-                name: p.name.clone(),
-                kind: PluginKind::Plugin,
-                scope: match p.scope.as_str() {
-                    "built-in" => PluginScope::BuiltIn,
-                    "workspace" => PluginScope::Workspace,
-                    _ => PluginScope::User,
-                },
-                title: p.name.clone(),
-                what: p.description.clone().filter(|d| !d.trim().is_empty()),
-                icon: None,
-                version: p.version.clone(),
-                path: Some(p.root.to_string_lossy().into_owned()),
-                state: match p.state {
-                    State::Loaded => PluginState::Loaded,
-                    State::Disabled => PluginState::Disabled,
-                    State::Shadowed => PluginState::Shadowed,
-                    State::Invalid => PluginState::Invalid,
-                },
-                on: p.state == State::Loaded,
-                locked: false,
-                action: None,
-                prompts: vec![],
-                // TODO(plugin-logins): the released app's reader, the same
-                // parts in the released shape; goes in desktop-v2026.10.16
-                logins: parts.iter().filter_map(released_login).collect(),
-                parts,
-            }
-        })
-        .collect()
-}
-
-/// An `mcp` part that logs in, as the released row's `logins` item.
-fn released_login(part: &bise_proto::app_rows::PluginPart) -> Option<bise_proto::app_rows::PluginLogin> {
-    Some(bise_proto::app_rows::PluginLogin { name: part.name.clone(), host: part.what.clone()?, state: part.login?, tools: part.tool_count })
-}
-
-/// One remote server that logs in, as an `mcp` part: what `/plugins
-/// login`'s popup says, as data (`login`) and in words (`status`).
-fn login_part(owner: &bend_plugins::id::PluginId, t: &bend_plugins::login::Target, secrets: &Path, sd: &Path, pending: &[String]) -> bise_proto::app_rows::PluginPart {
-    use bise_proto::app_rows::LoginState;
-    let last = bend_plugins::status::read(sd, &t.plugin, &t.server.id);
-    let login = if pending.contains(&t.name) {
-        LoginState::Pending
-    } else if last.as_ref().is_some_and(|s| s.login) {
-        LoginState::Needs
-    } else if bend_plugins::login::logged_in(t, secrets) {
-        LoginState::In
-    } else {
-        LoginState::Out
+    use bend_plugins::{catalog, connectors, oauth, resolve, skills, state, status};
+    let res = resolve::resolve(&resolve::Roots::standard(Some(workspace)));
+    let cat = connectors::cached(&bise_home::Home::from_env().connectors_cache());
+    let st = state::read(&state::state_path());
+    let (sd, od) = (status::dir(), oauth::store_dir());
+    // the skills folders main reads (the user's view), off ones too; a
+    // short wait per folder: a stuck one is skipped (bend_plugins::skills)
+    let home = std::env::var_os("HOME").filter(|h| !h.is_empty()).map(std::path::PathBuf::from);
+    let app = resolve::builtin_root().and_then(|r| r.parent().map(Path::to_path_buf));
+    let bise = skills::BiseSkills::of(true, bise_home::projects::desktop_for(workspace));
+    let found = skills::scan(&skills::roots(home.as_deref(), workspace, app.as_deref(), bise), std::time::Duration::from_millis(300));
+    let inputs = catalog::Inputs {
+        resolution: &res,
+        catalog: &cat,
+        skills: &found.skills,
+        state: &st,
+        status_dir: Some(&sd),
+        oauth_dir: Some(&od),
+        pending_logins: pending,
     };
-    let host = t.server.host();
-    let said = bend_plugins::login::state(t, secrets, sd);
-    bise_proto::app_rows::PluginPart {
-        id: owner.part(bend_plugins::id::PartKind::Mcp, None, &t.server.id).to_string(),
-        kind: bise_proto::app_rows::PartKind::Mcp,
-        name: t.name.clone(),
-        status: Some(said.strip_prefix(&format!("{host} · ")).unwrap_or(&said).to_string()),
-        what: Some(host),
-        on: true,
-        login: Some(login),
-        error: None,
-        tools: Vec::new(),
-        tool_count: last.and_then(|s| s.tools.ok()).map(|n| n as u32),
+    catalog::rows(&inputs)
+}
+
+/// Connect Mistral connector `id` (`plugin_connect`, `/plugins
+/// connect`): his browser or one click, then the catalog polled until it
+/// is ready (up to 5 min), all on its own thread, never a draw or core
+/// loop; `say` gets each step's line, `done` its end.
+pub(crate) fn connect(id: &str, say: impl Fn(String) + Send + 'static, done: impl FnOnce(Result<(), String>) + Send + 'static) -> Result<(), String> {
+    let id = bend_plugins::id::PluginId::parse(id)?;
+    if !matches!(id, bend_plugins::id::PluginId::Mistral { .. }) {
+        return Err(format!("{id} is not a Mistral connector"));
     }
+    std::thread::spawn(move || {
+        let r = bend_plugins::connectors::connect_now(&id, &|l| say(l.to_string()));
+        done(r.map(|_| ()));
+    });
+    Ok(())
+}
+
+/// The Mistral catalog fetched again now (`plugins_refresh`, `/plugins
+/// refresh`), on its own thread; `done` with the fetch's problem, if any.
+pub(crate) fn refresh(done: impl FnOnce(Option<String>) + Send + 'static) {
+    std::thread::spawn(move || {
+        let cat = bend_plugins::connectors::refresh();
+        done(cat.error.map(|p| p.to_string()));
+    });
 }
 
 /// Turn plugin or part `id` (any `PluginId`) on or off through

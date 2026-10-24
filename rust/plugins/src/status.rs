@@ -2,8 +2,8 @@
 //! `bise plugins list`: the bridge of every session writes
 //! `<dir>/<plugin>/<server>.json` when it connects (or fails), lists the
 //! tools again, or gives up; the static listing reads it. Host, transport,
-//! a tool count or one error line, and the time: never a header value or
-//! the URL's path.
+//! a tool count (and the tools' names and descriptions) or one error
+//! line, and the time: never a header value or the URL's path.
 
 use std::path::{Path, PathBuf};
 
@@ -28,6 +28,9 @@ pub struct Status {
     pub at: u64,
     /// the server answered 401 and bise can log in (`/plugins login`)
     pub login: bool,
+    /// its tools as it listed them (name, description), for the Plugins
+    /// list's switches; empty when unknown
+    pub listed: Vec<(String, String)>,
 }
 
 fn now() -> u64 {
@@ -36,11 +39,16 @@ fn now() -> u64 {
 
 impl Status {
     pub fn now(transport: &str, host: &str, tools: Result<usize, String>) -> Status {
-        Status { transport: transport.into(), host: host.into(), tools, at: now(), login: false }
+        Status { transport: transport.into(), host: host.into(), tools, at: now(), login: false, listed: Vec::new() }
     }
 
     pub fn login_needed(transport: &str, host: &str) -> Status {
         Status { login: true, ..Status::now(transport, host, Err("needs a login".into())) }
+    }
+
+    /// The same, with its tools by name (the bridge, after `tools/list`).
+    pub fn listed(self, listed: Vec<(String, String)>) -> Status {
+        Status { listed, ..self }
     }
 
     /// `connected · 12 tools · 3 min ago`, `✗ <error> · 3 min ago` or
@@ -79,7 +87,7 @@ pub fn write(dir: &Path, plugin: &str, server: &str, s: &Status) {
         return;
     }
     let v = match &s.tools {
-        Ok(n) => json!({"transport": s.transport, "host": s.host, "tools": n, "at": s.at}),
+        Ok(n) => json!({"transport": s.transport, "host": s.host, "tools": n, "at": s.at, "list": s.listed}),
         Err(e) => json!({"transport": s.transport, "host": s.host, "error": e, "at": s.at, "login": s.login}),
     };
     let tmp = f.with_extension(format!("tmp{}", std::process::id()));
@@ -103,6 +111,7 @@ pub fn read(dir: &Path, plugin: &str, server: &str) -> Option<Status> {
         tools,
         at: v.get("at").and_then(Value::as_u64).unwrap_or(0),
         login: v.get("login").and_then(Value::as_bool).unwrap_or(false),
+        listed: serde_json::from_value(v.get("list").cloned().unwrap_or(Value::Null)).unwrap_or_default(),
     })
 }
 
@@ -114,9 +123,10 @@ mod tests {
     fn a_status_round_trips_and_reads_as_one_line() {
         let d = std::env::temp_dir().join(format!("bp-status-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
-        write(&d, "p", "linear", &Status::now("http", "mcp.linear.app", Ok(3)));
+        write(&d, "p", "linear", &Status::now("http", "mcp.linear.app", Ok(3)).listed(vec![("search".into(), "find issues".into())]));
         let s = read(&d, "p", "linear").unwrap();
         assert_eq!((s.host.as_str(), s.tools.clone()), ("mcp.linear.app", Ok(3)));
+        assert_eq!(s.listed, vec![("search".to_string(), "find issues".to_string())]);
         assert_eq!(s.line(), "connected · 3 tools · just now");
         write(&d, "p", "linear", &Status::now("http", "mcp.linear.app", Err("HTTP 500 from mcp.linear.app".into())));
         assert!(read(&d, "p", "linear").unwrap().line().starts_with("✗ HTTP 500"));

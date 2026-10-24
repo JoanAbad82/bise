@@ -49,6 +49,26 @@ pub enum Done {
     /// N1: a /keychain move ended: its lines (item names and counts,
     /// never a secret) and whether it failed
     Keychain { lines: Vec<String>, failed: bool },
+    /// a plugin to add built in the staging folder (a git clone may have
+    /// run), its preview next (Err: why not)
+    Staged { res: Result<StagedPlugin, String> },
+    /// a marketplace added and read: its plugins as Browse rows
+    Market { source: String, res: Result<Vec<Plugin>, String> },
+    /// a Mistral connector's connect said a step (`said`) or ended
+    /// (`res`); the list is sent again either way
+    Connecting { project: Option<String>, said: Option<String>, res: Option<Result<(), String>> },
+    /// the Mistral catalog fetched again (Err: its problem)
+    Refreshed { project: Option<String>, res: Result<(), String> },
+}
+
+/// A staged plugin on its way back to the core (compared by its token).
+#[derive(Debug)]
+pub struct StagedPlugin(pub bend_plugins::add::Staged);
+
+impl PartialEq for StagedPlugin {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.token() == other.0.token()
+    }
 }
 
 /// A repo the walk found.
@@ -86,6 +106,19 @@ pub type PluginSetFn = Box<dyn Fn(&str, bool) -> Result<(), String>>;
 /// (workspace, server name, the project it was asked for, the channel of its end)
 pub type PluginLoginFn = Box<dyn Fn(&Path, &str, Option<String>, Sender<Done>) -> Result<(), String>>;
 pub type PluginLogoutFn = Box<dyn Fn(&Path, &str) -> Result<(), String>>;
+/// Builds what he adds in the staging folder on its own thread (a git
+/// clone), `Done::Staged` at its end; nothing of the plugin runs
+pub type PluginStageFn = Box<dyn Fn(bend_plugins::add::Request, Sender<Done>)>;
+/// Adds a marketplace to his list and reads it on its own thread (a git
+/// clone), `Done::Market` at its end
+pub type MarketFn = Box<dyn Fn(String, Sender<Done>)>;
+/// (connector id, the project it was asked for, the channel): its connect
+/// on its own thread (his browser, then a poll up to 5 min),
+/// `Done::Connecting` at each step and at its end (never run by a test)
+pub type PluginConnectFn = Box<dyn Fn(&str, Option<String>, Sender<Done>) -> Result<(), String>>;
+/// (the project it was asked for, the channel): the catalog fetched on
+/// its own thread, `Done::Refreshed` at its end
+pub type PluginsRefreshFn = Box<dyn Fn(Option<String>, Sender<Done>)>;
 /// (role, model, effort): config.toml's `[roles]` through the one locked writer
 pub type RoleSetFn = Box<dyn Fn(&str, Option<&str>, Option<&str>) -> Result<(), String>>;
 /// What runs now from computer use's page (the live test, a helper that reopens).
@@ -146,6 +179,15 @@ pub struct SetupPorts {
     /// run by a test)
     pub plugin_login: PluginLoginFn,
     pub plugin_logout: PluginLogoutFn,
+    /// the add menu (bend_plugins::add): a plugin staged, then held by
+    /// the core until his click (`plugin_preview`)
+    pub plugin_stage: PluginStageFn,
+    pub plugin_market: MarketFn,
+    /// where an add reads and writes (`add::Ctx::standard`, a temp one in
+    /// tests): what a confirmed preview installs into
+    pub add_ctx: Box<dyn Fn() -> bend_plugins::add::Ctx>,
+    pub plugin_connect: PluginConnectFn,
+    pub plugins_refresh: PluginsRefreshFn,
     pub cu: CuPorts,
     /// each role's model (V17, [`role_rows`] of config.toml's setup)
     pub roles: Box<dyn Fn() -> Vec<RoleRow>>,
@@ -576,6 +618,36 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             Ok(())
         }),
         plugin_logout: Box::new(|ws, name| crate::plugins::logout(ws, name).map(|_| ())),
+        plugin_stage: Box::new(|req, tx| {
+            std::thread::spawn(move || {
+                let res = bend_plugins::add::stage(&req, &bend_plugins::add::Ctx::standard());
+                let _ = tx.send(Done::Staged { res: res.map(StagedPlugin).map_err(|e| e.to_string()) });
+            });
+        }),
+        plugin_market: Box::new(|url, tx| {
+            std::thread::spawn(move || {
+                use bend_plugins::marketplace;
+                let h = bise_home::Home::from_env();
+                let res = marketplace::add(&h.marketplaces(), &url)
+                    .and_then(|(_, url)| marketplace::read(&h.marketplace_cache(), &url, true))
+                    .map(|m| marketplace::rows(&m))
+                    .map_err(|e| e.to_string());
+                let _ = tx.send(Done::Market { source: url, res });
+            });
+        }),
+        add_ctx: Box::new(bend_plugins::add::Ctx::standard),
+        // the TUI's own threads (crate::plugins), never the core loop
+        plugin_connect: Box::new(|id, project, tx| {
+            let (tx2, p2) = (tx.clone(), project.clone());
+            crate::plugins::connect(
+                id,
+                move |l| drop(tx.send(Done::Connecting { project: project.clone(), said: Some(l), res: None })),
+                move |r| drop(tx2.send(Done::Connecting { project: p2, said: None, res: Some(r) })),
+            )
+        }),
+        plugins_refresh: Box::new(|project, tx| {
+            crate::plugins::refresh(move |e| drop(tx.send(Done::Refreshed { project, res: e.map_or(Ok(()), Err) })));
+        }),
         // the harness binary sets bise update's fetch (crate harness)
         manifest: Box::new(|_, _| {}),
         own_built: Box::new(String::new),

@@ -43,6 +43,22 @@ struct World {
     keychain: Option<String>,
     keychain_moves: Vec<bool>,
     keychain_tx: Option<std::sync::mpsc::Sender<Done>>,
+    /// the add menu: the staging's channel (to end it from the test), the
+    /// marketplaces read, and where a confirmed add installs (a temp dir)
+    staging: Option<std::sync::mpsc::Sender<Done>>,
+    markets: Vec<String>,
+    add_root: PathBuf,
+}
+
+/// Where the add menu reads and writes in a test: all under `root`.
+fn add_ctx(root: &Path) -> bend_plugins::add::Ctx {
+    bend_plugins::add::Ctx {
+        user_root: root.join("plugins"),
+        home: root.join("home"),
+        secrets_dir: root.join("secrets"),
+        builtin: None,
+        data: root.join("data"),
+    }
 }
 
 fn rows() -> Vec<Row> {
@@ -57,6 +73,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (x, y, z) = (w.clone(), w.clone(), w.clone());
     let mf = w.clone();
+    let (ad, am, ac) = (w.clone(), w.clone(), w.clone());
     let (kn, ks) = (w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
@@ -165,7 +182,8 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 logins: vec![],
                 parts,
             };
-            vec![p("linear", true, vec![login("linear")]), p("computer", !off, vec![])]
+            let notion = Plugin { id: "mistral:notion".into(), name: "mistral:notion".into(), kind: PluginKind::Mistral, state: PluginState::Available, on: false, ..p("notion", false, vec![]) };
+            vec![p("linear", true, vec![login("linear")]), p("computer", !off, vec![]), notion]
         }),
         plugin_set: Box::new(move |name, on| {
             if name == "nope" {
@@ -184,6 +202,18 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             m.borrow_mut().plugin_logouts.push((ws.into(), name.into()));
             Ok(())
         }),
+        // the add menu: nothing staged nor cloned here; the test ends
+        // each job itself (Done::Staged / Done::Market)
+        plugin_stage: Box::new(move |_req, tx| ad.borrow_mut().staging = Some(tx)),
+        plugin_market: Box::new(move |url, tx| {
+            let mut w = am.borrow_mut();
+            w.markets.push(url);
+            w.staging = Some(tx);
+        }),
+        add_ctx: Box::new(move || add_ctx(&ac.borrow().add_root)),
+        // a connect never runs here (his browser); a refresh ends at once
+        plugin_connect: Box::new(|_id, _project, _tx| Ok(())),
+        plugins_refresh: Box::new(|project, tx| drop(tx.send(Done::Refreshed { project, res: Err("no key".into()) }))),
         cu: CuPorts {
             is_on: Box::new(move || n.borrow().cu_on),
             set_on: Box::new(move |on| o.borrow_mut().cu_on = on),
@@ -489,6 +519,96 @@ fn the_window_lists_toggles_and_logs_in_to_plugins() {
     let out = t.take();
     assert!(evs(&out, "error")[0]["text"].as_str().is_some_and(|e| e.contains("linear: the browser closed")));
     assert_eq!(evs(&out, "plugins")[0]["items"][0]["parts"][0]["login"], "needs", "no longer pending");
+}
+
+/// The add menu (plug-add's add::Held in the core): an item staged off
+/// the loop, its preview, his click installs it (once), a marketplace
+/// read into `browse`; the Mistral connectors not connected go to
+/// `browse` too, never into `plugins`.
+#[test]
+fn the_add_menu_previews_then_installs_on_his_click() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    let root = std::env::temp_dir().join(format!("amb-add-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let src = root.join("src/hello");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("plugin.json"), format!("{{\"$schema\":\"{}\",\"name\":\"hello\"}}", bend_plugins::resolve::PLUGIN_SCHEMA)).unwrap();
+    w.borrow_mut().add_root = root.clone();
+
+    app(&mut t, r#"{"cmd":"plugins"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "browse")[0]["source"], "mistral");
+    assert!(evs(&out, "plugins")[0]["items"].as_array().unwrap().iter().all(|r| r["state"] != "available"));
+    assert_eq!(evs(&out, "browse")[0]["items"][0]["id"], "mistral:notion");
+
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add","add":{{"kind":"folder","path":"{}"}}}}"#, src.display()));
+    assert!(t.take().iter().all(|e| e["ev"] != "error"));
+    let tx = w.borrow_mut().staging.take().expect("staged off the loop");
+    let staged = bend_plugins::add::stage(&bend_plugins::add::Request::Folder { path: src.clone() }, &add_ctx(&root)).unwrap();
+    tx.send(Done::Staged { res: Ok(crate::ambient::setup::StagedPlugin(staged)) }).unwrap();
+    t.until(|o| !evs(o, "plugin_preview").is_empty());
+    let token = evs(&t.take(), "plugin_preview")[0]["token"].as_str().unwrap().to_string();
+    assert!(!root.join("plugins/hello").exists(), "nothing installed before his click");
+
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}"}}"#));
+    let out = t.take();
+    assert!(root.join("plugins/hello/plugin.json").exists(), "installed on his click");
+    assert_eq!(evs(&out, "plugins").len(), 1, "the list again");
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}"}}"#));
+    assert_eq!(evs(&t.take(), "error")[0]["cmd"], "plugin_add_confirm", "a token works once");
+
+    app(&mut t, r#"{"cmd":"plugin_add","add":{"kind":"marketplace","url":"openai/plugins"}}"#);
+    assert_eq!(w.borrow().markets, vec!["openai/plugins".to_string()]);
+    let tx = w.borrow_mut().staging.take().unwrap();
+    tx.send(Done::Market { source: "openai/plugins".into(), res: Ok(vec![]) }).unwrap();
+    t.until(|o| !evs(o, "browse").is_empty());
+    assert_eq!(evs(&t.take(), "browse")[0]["source"], "openai/plugins");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// architect m_39446 (the merge checklist): a secret value he types for
+/// an MCP server goes through the core into the secrets store only: no
+/// event, no other file under the test home holds it.
+#[test]
+fn a_typed_secret_reaches_the_secrets_store_only() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    let root = std::env::temp_dir().join(format!("amb-secret-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    w.borrow_mut().add_root = root.clone();
+    const PLANTED: &str = "PLANTED-pg-pass-7f3a";
+    let add = r#"{"kind":"mcp","name":"pg","command":"sh -c true","secrets":["DATABASE_URL"]}"#;
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add","add":{add}}}"#));
+    let tx = w.borrow_mut().staging.take().expect("staged off the loop");
+    let kind: bise_proto::app_cmd::PluginAddKind = serde_json::from_str(add).unwrap();
+    let req = bend_plugins::add::Request::from_wire(&kind).unwrap();
+    let staged = bend_plugins::add::stage(&req, &add_ctx(&root)).unwrap();
+    tx.send(Done::Staged { res: Ok(crate::ambient::setup::StagedPlugin(staged)) }).unwrap();
+    t.until(|o| !evs(o, "plugin_preview").is_empty());
+    let token = evs(&t.take(), "plugin_preview")[0]["token"].as_str().unwrap().to_string();
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}","secrets":[{{"name":"DATABASE_URL","value":"{PLANTED}"}}]}}"#));
+    let out = t.take();
+    assert!(evs(&out, "error").is_empty(), "{out:?}");
+    assert!(!format!("{out:?}").contains(PLANTED), "an event holds it");
+    let mut holders = Vec::new();
+    let mut stack = vec![root.clone(), bise_home::Home::from_env().root().to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if std::fs::read(&p).is_ok_and(|b| b.windows(PLANTED.len()).any(|x| x == PLANTED.as_bytes())) {
+                holders.push(p);
+            }
+        }
+    }
+    let store = bend_plugins::secrets::path(&root.join("secrets"), &bend_plugins::id::PluginId::plugin("pg"));
+    assert_eq!(holders, vec![store], "the value is in the secrets store and nowhere else");
+    let mcp = std::fs::read_to_string(root.join("plugins/pg/mcp.json")).unwrap();
+    assert!(mcp.contains("${DATABASE_URL}"), "{mcp}");
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// P.2: computer use's page polls only while open (check), its rows are

@@ -125,9 +125,25 @@ the bodies marked `todo!("plugins chunk ...")` come with their chunk.
   forced fetch. `BISE_MISTRAL_URL`: a fake Mistral in tests
   (`tests/fake_bootstrap.py`). Cache: `Home::connectors_cache()`
   (`~/.bise/connectors/bootstrap.json`).
-- **List** (`bend_plugins::catalog::rows(&Inputs) -> Vec<app_rows::Plugin>`,
-  chunk "catalog + hub"): pure; the TUI and the desktop's core call it in
-  their own process.
+- **List** (`bend_plugins::catalog::rows(&Inputs) -> Vec<app_rows::Plugin>`):
+  the one builder; the TUI and the desktop's core call it in their own
+  process. Inputs read by their owners first: the resolution, the
+  connectors' cache (never a fetch), the skills folders' skills (off ones
+  too), the on/off file, the MCP status folder, the OAuth token folder,
+  the logins open in his browser. Rows in order: `skills:bise` (locked
+  on), the real plugins (a folder bise wrote for an MCP server,
+  `import::is_bise_mcp`, is kind `mcp` and shows its command's name and
+  package or its host, never an argument, header, env value or URL
+  path), the ready connectors (their tools as parts; `web_search` and
+  `image_generation` scope `built-in`), the skills folders (personal,
+  the project's, Vibe's; none when empty), then the connectors not
+  connected yet: state `available` with `connect` or `set_up`, which the
+  desktop core sends as `browse {source: "mistral"}`, never in
+  `plugins`. Each MCP part carries, from its last status file, its words
+  (`status`), `tool_count`, its tools by name (each switchable) and
+  `error` (Some: it failed; display only); a remote one its `login`.
+  `prompts`: the manifest's `dev.bise.prompts`, at most 3, blank ones
+  out.
 - **Paths** (`bise_home::Home`): `connectors_cache()`, `marketplaces()`
   (`~/.bise/marketplaces.json`), `mcp_secrets_dir()`
   (`~/.bise/secrets/mcp-env/`).
@@ -209,7 +225,11 @@ live REPLs, so two sessions (or two Switchboard tasks) never share it.
    disabled plugin is listed, its components are not loaded. **Opt-in**: a
    manifest with `"extensions": {"dev.bise": {"default": "off"}}` (bise's
    own extension, never reported as unsupported) loads only when its name
-   is in `enabled`; `disabled` still wins. A part is on only when its
+   is in `enabled`; `disabled` still wins. The same extension's
+   `"prompts": [...]` is what to try a plugin with (the list's `prompts`):
+   at most 3 kept, each at most 120 characters (`resolve::cut_prompts`,
+   a longer list or line: warning `plugin.prompts.cut`); bise's built-in
+   plugins have three each. A part is on only when its
    plugin is on, it is not in `parts_off`, and, for a plugin's tool, its
    server's `#mcp:` part is not off (`parts_on` never overrides an off
    owner or server). The resolver lists a loaded plugin's off skills and
@@ -376,12 +396,17 @@ in two steps so nothing of a plugin runs before his click:
 A plugin installed, removed, enabled, disabled or edited while bise runs
 reaches every agent without a restart of the TUI (the user: a voice
 recording, a draft, the scroll must survive). The hub keeps, per live
-REPL, its workspace and `bend_plugins::resolve::fingerprint` of its roots
-(the enable state's plugins and skill parts: a server or a tool turned
-on or off moves nothing, the session's bridge applies it; in the built-in, user and workspace roots each plugin
-folder and the size and mtime of its `plugin.json`, `mcp.json` and
-`skills/*/SKILL.md`), taken at spawn. Every 2 s on the tick, and when an
-agent goes idle, it compares: a REPL whose fingerprint moved relaunches
+REPL, its workspace and the fingerprint of what its prompt shows of its
+plugins (`daemon/prompt_inputs.rs`, architect B1): the `## Plugins`
+note (every plugin on, its description, its skills on) and each of those
+skills' name, description and path; never `plugins.json`'s bytes. A
+server, a tool or a Mistral connector turned on or off, or an
+`mcp.json` edit, moves nothing: the session's bridge applies it (its
+index, its servers), so one toggle never relaunches every REPL (the
+26-REPL burst, 959d1e474); a plugin or a skill turned on or off, a
+plugin added or removed, a description or a SKILL.md edited does. Taken
+at spawn. Every 2 s on the tick, and when an
+agent goes idle, it compares ([`prompt_inputs::stale`]): a REPL whose fingerprint moved relaunches
 at its next idle, same session and port (the path a key change and a
 version switch take, `switch_idle_repls`); a busy one finishes its turn
 first. The new REPL starts a fresh bridge and lists the new skills in its
@@ -392,10 +417,11 @@ with (`<agent dir>/prompt-plugins.fp`; a version switch or a TUI restart
 counts too). The prompt's `## Plugins` section (BEND_TOOLS_NOTE,
 `tools_env::session_note`) names each loaded plugin, its description and
 its skills, so an agent knows what a plugin is for before it searches.
-Only REPLs restart: the TUI and the hub keep running. Test:
-`tests/plugins_reload_e2e.py` (install → relaunch at idle, the
-conversation kept, the plugin loaded; nothing changes → no relaunch; a
-disable → a relaunch).
+Only REPLs restart: the TUI and the hub keep running; a relaunch goes
+through `repl_start`'s limiter. Test: `prompt_inputs.rs`'s units (20
+REPLs: a tool, server or connector toggle relaunches none; a skill or a
+plugin toggle relaunches each once; an `mcp.json` edit moves nothing, a
+SKILL.md edit does).
 
 Skills follow the same path, with no timer. One scanner owns the loose
 skill folders, `bend_plugins::skills`: the hub, the TUI's `$` popup and
