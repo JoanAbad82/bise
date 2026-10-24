@@ -285,7 +285,7 @@ export function Diff({ file, add, rm, lines, onLine, pop, testId }: DiffProps) {
         const last = l.sel && !lines[i + 1]?.sel;
         return (
           <div key={i} className={cx("b-dl", l.sign === "+" && "ad", l.sign === "-" && "rm", l.sel && "pk", first && "first", last && "last")}
-            onClick={onLine ? () => { onLine(i); } : undefined} data-testid={sub(testId, i)}>
+            role={onLine ? "button" : undefined} onClick={onLine ? () => { onLine(i); } : undefined} data-testid={sub(testId, i)}>
             <i>{l.old ?? ""}</i><i>{l.new ?? ""}</i><i>{l.sign ?? ""}</i>{l.text}
           </div>
         );

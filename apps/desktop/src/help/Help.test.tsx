@@ -53,6 +53,10 @@ describe('the key list (V3)', () => {
     expect((field as HTMLInputElement).value).toBe('');
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(field, { key: 'Escape' });
+    // it fades out first (120 ms, as the ds sheet), then asks to close
+    expect(over.classList.contains('out')).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.animationEnd(over);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

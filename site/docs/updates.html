@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>updates · bise docs</title>
-<meta name="description" content="bise looks for a new release once a day and tells you in the inbox. you pick when it switches.">
+<meta name="description" content="bise looks for a new release by itself. bise desktop installs it when you quit or step away; bise terminal tells you in the inbox and you pick when it switches.">
 <link rel="canonical" href="https://bise.dev/docs/updates">
 <meta name="theme-color" content="#f2ede2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -14,9 +14,10 @@
 <meta property="og:site_name" content="bise">
 <meta property="og:url" content="https://bise.dev/docs/updates">
 <meta property="og:title" content="updates · bise docs">
-<meta property="og:description" content="bise looks for a new release once a day and tells you in the inbox. you pick when it switches.">
+<meta property="og:description" content="bise looks for a new release by itself. bise desktop installs it when you quit or step away; bise terminal tells you in the inbox and you pick when it switches.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates" class="here" aria-current="page">updates</a></li>
 </ul>
@@ -73,11 +79,18 @@
         <h1>updates</h1>
         <button class="copymd" type="button" data-md="/docs/updates.md">copy as markdown</button>
       </div>
-      <p class="lede">bise looks for a new release once a day and tells you in the inbox. you pick when it switches.</p>
-<h2 id="how-bise-updates"><a class="anchor" href="#how-bise-updates" aria-hidden="true">#</a>how bise updates</h2>
+      <p class="lede">bise looks for a new release by itself. bise desktop installs it when you quit or step away; bise terminal tells you in the inbox and you pick when it switches.</p>
+
+<p>an update never cuts an agent mid-task, and nothing is lost: the agents and their threads come back on the new version.</p>
+<div class="scopes"><div class="scoped" data-app="desktop"><p class="tag">bise desktop</p><div class="body"><h2 id="bise-desktop"><a class="anchor" href="#bise-desktop" aria-hidden="true">#</a>bise desktop</h2>
+<p>bise desktop gets a new build in the background. when it is ready, settings › general says so, and it installs by itself when you quit or step away from your Mac. your agents keep running. <strong>restart to update</strong> there does it now.</p>
+<p>it can replace itself only from Applications. opened from the disk image or your Downloads, it offers <strong>move to Applications</strong> first.</p>
+<p>if the new build doesn't start right, settings › general says so, with <strong>go back</strong> to the build you had.</p>
+<h3 id="beta-builds"><a class="anchor" href="#beta-builds" aria-hidden="true">#</a>beta builds</h3>
+<p>settings › general › <strong>beta builds</strong>: new builds a few days early, newer and less tested. turning it off keeps your build until stable passes it.</p></div><button class="fold" type="button" data-to="desktop">in bise desktop: it installs itself ›</button></div><div class="scoped" data-app="terminal"><p class="tag">bise terminal</p><div class="body"><h2 id="bise-terminal"><a class="anchor" href="#bise-terminal" aria-hidden="true">#</a>bise terminal</h2>
 <p>once a day, when bise starts, it looks for a new release in the background. it never slows the start. when there is one, an item waits in your inbox: install it from there.</p>
-<p>a running bise keeps its version until you switch, so an update never cuts an agent mid-task. <code class="key">/restart</code> switches to the new version, and so does starting <code>bise</code> again in that folder. nothing is lost: the agents and their threads come back.</p>
-<h2 id="by-hand"><a class="anchor" href="#by-hand" aria-hidden="true">#</a>by hand</h2>
+<p>a running bise keeps its version until you switch, so an update never cuts an agent mid-task. <code class="key">/restart</code> switches to the new version, and so does starting <code>bise</code> again in that folder.</p>
+<h3 id="by-hand"><a class="anchor" href="#by-hand" aria-hidden="true">#</a>by hand</h3>
 <p>in bise:</p>
 <div class="code"><div class="box"><pre><code class="lang-text">/update</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>in a terminal:</p>
@@ -85,12 +98,12 @@
 bise update           <span class="c"># download it, check its sha256, install it</span>
 bise --version</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>each version is installed in its own folder in <code>~/.local/share/bise/versions/</code>, and <code>current</code> points to the one in use. a few older versions are kept.</p>
-<h2 id="turn-the-daily-check-off"><a class="anchor" href="#turn-the-daily-check-off" aria-hidden="true">#</a>turn the daily check off</h2>
+<h3 id="turn-the-daily-check-off"><a class="anchor" href="#turn-the-daily-check-off" aria-hidden="true">#</a>turn the daily check off</h3>
 <div class="code"><div class="box"><pre><code class="lang-sh">export BISE_NO_UPDATE=1</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p><code class="key">/update</code> and <code>bise update</code> still work.</p>
-<h2 id="install-the-same-version-again"><a class="anchor" href="#install-the-same-version-again" aria-hidden="true">#</a>install the same version again</h2>
+<h3 id="install-the-same-version-again"><a class="anchor" href="#install-the-same-version-again" aria-hidden="true">#</a>install the same version again</h3>
 <p>the installer is safe to run twice:</p>
-<div class="code"><div class="box"><pre><code class="lang-sh">curl -fsSL https://bise.dev/install | sh</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
+<div class="code"><div class="box"><pre><code class="lang-sh">curl -fsSL https://bise.dev/install | sh</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div></div><button class="fold" type="button" data-to="terminal">in bise terminal: the inbox, /update ›</button></div></div>
     </article>
     <nav class="pn"><a class="prev" href="/docs/troubleshooting"><span>previous</span>troubleshooting</a></nav>
     <footer>
@@ -98,7 +111,7 @@ bise --version</code></pre><button class="copy" type="button" aria-label="copy t
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/updates.md">edit this page on GitHub</a></p>
     </footer>
   </main>
-  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#how-bise-updates">how bise updates</a></li><li class="l2"><a href="#by-hand">by hand</a></li><li class="l2"><a href="#turn-the-daily-check-off">turn the daily check off</a></li><li class="l2"><a href="#install-the-same-version-again">install the same version again</a></li></ul></aside>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2" data-app="desktop"><a href="#bise-desktop">bise desktop</a></li><li class="l3" data-app="desktop"><a href="#beta-builds">beta builds</a></li><li class="l2" data-app="terminal"><a href="#bise-terminal">bise terminal</a></li><li class="l3" data-app="terminal"><a href="#by-hand">by hand</a></li><li class="l3" data-app="terminal"><a href="#turn-the-daily-check-off">turn the daily check off</a></li><li class="l3" data-app="terminal"><a href="#install-the-same-version-again">install the same version again</a></li></ul></aside>
 </div>
 <script src="/docs/docs.js" defer></script>
 </body>

@@ -327,7 +327,7 @@ function CRow({
         data-n={row.n}
         data-testid={id}
       >
-        <div className="lg-h" onClick={onToggle}>
+        <div className="lg-h" role="button" onClick={onToggle}>
           <span className="seq">{row.n === 0 ? "" : String(row.n)}</span>
           <span className="label" data-testid={`${id}.role`}>
             {compRole(row)}

@@ -11,7 +11,19 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--s-2) var(--pad-panel) var(--s-6);
+  /* the pages' one left edge (--pad-column, as inbox, artifacts, scheduled: designer m_39330) */
+  padding: var(--s-2) var(--pad-column) var(--s-6);
+}
+
+/* the hero card first (ds PageHero), on the screens' 20 px top as the other pages; '+ new agent'
+   under it, at the list's right edge (a hero holds no button) */
+.ag-body > .b-hero:first-child {
+  margin-top: var(--s-3);
+}
+.ag-acts {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--s-2);
 }
 
 .ag-item {

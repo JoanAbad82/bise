@@ -17,6 +17,7 @@
 <meta property="og:description" content="every subcommand of bise, for your terminal and your scripts. bise --help prints the same list.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,20 +64,23 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli" class="here" aria-current="page">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" class="here" aria-current="page" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
   </nav></aside>
   <main>
-    <article>
+    <article data-app="terminal">
       <div class="head">
         <h1>the bise command</h1>
         <button class="copymd" type="button" data-md="/docs/cli.md">copy as markdown</button>
       </div>
       <p class="lede">every subcommand of bise, for your terminal and your scripts. bise --help prints the same list.</p>
+<p class="only"><span>only in bise terminal</span> <a href="/docs/settings?desktop" data-to="desktop">in bise desktop: settings ›</a></p>
 <h2 id="start"><a class="anchor" href="#start" aria-hidden="true">#</a>start</h2>
 <div class="table"><table><thead><tr><th>command</th><th>what it does</th></tr></thead><tbody><tr><td><code>bise</code></td><td>open bise in this folder: main and its agents</td></tr><tr><td><code>bise switchboard --stop</code></td><td>stop this folder's bise and its agents; <code>--keep-agents</code>: they go on</td></tr></tbody></table></div>
 <h2 id="keys-and-models"><a class="anchor" href="#keys-and-models" aria-hidden="true">#</a>keys and models</h2>
@@ -85,7 +92,7 @@
 <h2 id="for-programs"><a class="anchor" href="#for-programs" aria-hidden="true">#</a>for programs</h2>
 <div class="table"><table><thead><tr><th>command</th><th>what it does</th></tr></thead><tbody><tr><td><code>bise --headless</code></td><td>one session without the TUI: <code>--model NAME</code>, <code>--port N</code>, <code>--continue</code>, <code>--resume ID</code> (a prefix of the id works)</td></tr><tr><td><code>bise sb &lt;command&gt;</code></td><td>the agents' own tool (<code>sb</code> is a link to bise). <code>sb help</code> lists its commands</td></tr></tbody></table></div>
     </article>
-    <nav class="pn"><a class="prev" href="/docs/config"><span>previous</span>config.toml</a><a class="next" href="/docs/keys"><span>next</span>keys and commands</a></nav>
+    <nav class="pn"><a class="prev" href="/docs/keys"><span>previous</span>keys and commands</a><a class="next" href="/docs/troubleshooting"><span>next</span>troubleshooting</a></nav>
     <footer>
       <p>for agents: <a href="/docs/cli.md">bise.dev/docs/cli.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/cli.md">edit this page on GitHub</a></p>

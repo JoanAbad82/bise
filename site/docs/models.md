@@ -15,11 +15,17 @@ bise uses models for a few different jobs. each job is a **role**, and each role
 | `voice` | listens when you talk (`ctrl+r`) | Mistral's or OpenAI's speech model, when you have that key |
 | `classify` | the checker: in auto, decides which commands run and which ask you | Jev, through TypeSafe or OpenRouter when you have one of those keys, else your small jobs model ([more](approvals#the-checker)) |
 
+::: desktop settings › models
+settings › models shows them all under "which model does what", with where each one comes from (set here, from your environment, follows another role, the default). pick a row to change its model.
+:::
+
+::: terminal /models
 `/models` shows them all, with what each one resolves to. pick a row to change it: role, then provider, then model, then effort.
+:::
 
 ## change a model
 
-for the agent you're looking at, now:
+for the agent you're looking at, now, in either app's composer:
 
 ```text
 /model anthropic/claude-sonnet-5-5
@@ -62,7 +68,7 @@ for a model that reasons, `/reasoning` picks how hard it thinks:
 /reasoning high
 ```
 
-Anthropic's models take `none`, `low`, `medium`, `high` and `max`; the others `none`, `low`, `medium` and `high`. unset, a model gets `high`. the effort shows on the divider next to the model.
+Anthropic's models take `none`, `low`, `medium`, `high` and `max`; the others `none`, `low`, `medium` and `high`. unset, a model gets `high`. in bise terminal, the effort shows on the divider next to the model.
 
 ## compaction
 

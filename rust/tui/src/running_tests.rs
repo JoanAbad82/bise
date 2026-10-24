@@ -69,6 +69,9 @@ fn a_rows_words_say_its_state_and_its_port() {
     assert_eq!(status(&dev, NOW, false, true), "14 min");
     assert_eq!(port_words(&dev, true).as_deref(), Some("localhost:5173"));
     assert_eq!(port_words(&dev, false).as_deref(), Some(":5173"));
+    // a port that isn't a web page (its hub found no HTTP there, no url): its port plain, never an address (procs-bar)
+    let inspect = by("perf", "p48990.1791100150");
+    assert_eq!(port_words(&inspect, true).as_deref(), Some(":9229"));
     assert_eq!(status(&dev, NOW, true, true), running::stopping);
     let failed = by("perf", "bg1.1791099000");
     let ago = wait_len(NOW - failed.ended_ms.unwrap(), false);
@@ -114,13 +117,13 @@ fn rows_fit_150_and_80_columns_with_the_command_cut_last() {
 #[test]
 fn heads_count_the_running_and_the_listening_short_only_when_it_must() {
     let items = fixture();
-    let long = format!("acme · {} · {}", running::count_running(3), running::count_listening(1));
+    let long = format!("acme · {} · {}", running::count_running(3), running::count_listening(2));
     assert_eq!(head("acme", &items, 120), long);
     // 80 columns hold the long words too (designer m_38541)
     assert_eq!(head("acme", &items, 60), long);
-    assert_eq!(head("acme", &items, long.width() - 1), format!("acme · 3 · {}", running::count_listening(1)));
+    assert_eq!(head("acme", &items, long.width() - 1), format!("acme · 3 · {}", running::count_listening(2)));
     let quiet: Vec<Proc> = items.iter().filter(|p| p.ports.is_empty()).cloned().collect();
-    assert_eq!(head("acme", &quiet, 120), format!("acme · {}", running::count_running(2)));
+    assert_eq!(head("acme", &quiet, 120), format!("acme · {}", running::count_running(1)));
 }
 
 #[test]

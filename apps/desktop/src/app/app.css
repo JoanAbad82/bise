@@ -794,6 +794,18 @@ body:has(.app-shell) {
 }
 /* the last row of a long section: 'show 50 more · N left' and, at its right, 'show less' (his
    m_26894); each its own hover tint */
+/* AGENTS' 'show 14 more · 3 working · 11 idle' (designer m_39151): the click and the working count
+   text-2, the idle and 'of 365' text-3, ' · ' faint; never the accent */
+.app-rb-more-mid {
+  color: var(--c-text-2);
+}
+.app-rb-more-dim {
+  color: var(--c-text-3);
+}
+.app-rb-more-faint {
+  color: var(--c-text-3);
+  opacity: 0.6;
+}
 .app-rb-pager {
   display: flex;
   align-items: center;
@@ -841,10 +853,29 @@ body:has(.app-shell) {
 .app-rb-end.app-rb-link:hover {
   color: var(--c-text);
 }
-/* a command (RUNNING's rows): mono, a step smaller so it sits on the sans rows' line */
+/* a command (PROCESSES' rows): mono, a step smaller so it sits on the sans rows' line; it takes the
+   room its row leaves, cut only where the row ends (designer m_38897: no 'where' and no port, never
+   cut short) */
 .app-rb-name.mono {
-  max-width: 70%;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
   font: var(--t-12) var(--font-mono);
+}
+/* a command's where: whole or gone, it gives way before the command cuts (designer m_38942): it
+   shrinks first (1000) and, short of room, wraps onto a hidden second line (the 0-wide first item
+   keeps it from staying on its line alone, as .app-rb-cols) */
+.app-rb-where {
+  display: flex;
+  flex: 0 1000 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  height: var(--h-row);
+  overflow: hidden;
+  line-height: var(--h-row);
+}
+.app-rb-where .app-rb-sub {
+  flex: none;
 }
 /* a browser-only artifact: '↗' 4 px after its title (designer m_21742) */
 .app-rb-out {

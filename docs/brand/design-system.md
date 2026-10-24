@@ -74,6 +74,16 @@ Rules: the position separates look-alikes (✓ at the start of a row = done, at 
 - **defaults**: the first run asks one thing (the main model). every other role is `same as main`/`auto · resolved`. picks are remembered. name what leaves the machine the first time.
 - **never block**: items wait in the inbox, never auto-open while the draft has text, and open in place with the thread visible. no modal eats keys.
 
+## dialogs and page heroes (desktop)
+Mocks: page `page-hero` (bise pages). Gabriel's ask: calmer popups, and every page and dialog says what it is, for good.
+- **scrim**: the window ground at 62 % (`--c-scrim: color-mix(in srgb, var(--c-ground) 62%, transparent)`, dark and light): the page fades toward its own paper and stays sharp. never a blur behind a dialog.
+- **dialog shadow**: `--e-sheet: 0 0 0 1px var(--c-line), 0 1px 2px <shadow 8%>, 0 12px 32px -12px <shadow 22%, light 12%>`. `--e-3` (the wide halo) only for what floats over other apps: spotlight, capsule, palette.
+- **dialog place**: 12 % from the window top, centred across, 520 px (480 under 800), grows down. solid surface, radius 12, padding 24. in: fade + 8 px rise, 160 ms ease-out; scrim 120 ms; out 120 ms fade; reduced motion: fades only.
+- **page hero**: the first block of every full page (inbox, artifacts, scheduled, processes, agents, archived, each settings section) and of every dialog or sheet; never in the thread, side panels, menus, popovers, the capsule. page: a card on `--c-raised`, radius 12, padding 20 24, 24 above the content; text left, a bims-world vignette right (220 × 132, bleeding to the card's right and bottom edges). dialog: no card, a 64 px vignette left of the title, 16 px gap, 20 px to the first field.
+- **its words**: the place's name (t-22 600; dialog t-17); one sentence, t-15/1.5 text-2, ≤ 56 ch, 4 px under it, saying what this place is in his words; a facts line, t-13 text-3, 8 px under: live numbers, the accent only on what waits on him. never "welcome", "here you can…", click steps, a button.
+- **permanent**: no ×, no "got it", no setting hides it; it scrolls away with the page (the title-bar crumb keeps the name). under 800 px the vignette goes, the words stay.
+- **the vignette**: stills from the bims renderer at his hour's light, one per state (a letter more in the mailbox, the bim's `?` only when something waits). still at rest; a 1–2 s move only when its state changes; none under reduced motion.
+
 ## words
 - bise says "i", the user is "you". four nouns: you, main (team lead), agents, the inbox; what waits in the inbox is a notification (#12 in a tight row, never "notif"), and the macOS one is a banner. never task, hub, sub-agent, orchestrator, cards.
 - state words, the same everywhere: working, idle, done, waiting, asks you, failed, starting, stopped.

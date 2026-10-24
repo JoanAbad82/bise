@@ -108,7 +108,6 @@
   height: var(--h-row);
   padding: 0 var(--pad-row-x);
   border-radius: 8px;
-  cursor: default;
 }
 .app-k-row.on {
   background: color-mix(in srgb, var(--c-text) 9%, transparent);

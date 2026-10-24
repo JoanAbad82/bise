@@ -35,6 +35,7 @@ use std::fmt::Display;
 pub mod bims;
 pub mod common;
 pub mod composer;
+pub mod hero;
 pub mod inbox;
 pub mod panel;
 pub mod running;
@@ -62,6 +63,7 @@ pub const ALL: &[(&str, &[Word])] = &[
     ("bims", bims::WORDS),
     ("common", common::WORDS),
     ("composer", composer::WORDS),
+    ("hero", hero::WORDS),
     ("inbox", inbox::WORDS),
     ("panel", panel::WORDS),
     ("running", running::WORDS),

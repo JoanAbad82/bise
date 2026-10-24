@@ -850,7 +850,8 @@ def t_detect(W):
     check("codex" in out and "claude" in out.lower(), "auth status names both logins: %r" % out[:600])
     code, out, err = W.run("doctor")
     check("· codex" in out and "signed in with ChatGPT" in out, "doctor's codex line: %r" % out[-1500:])
-    check("· claude code" in out and "Anthropic API key" in out, "doctor's claude code line: %r" % out[-1500:])
+    # its words: bise_proto::words::settings::claude_code_seen (the plan's API credits, 1d884862e)
+    check("· claude code" in out and "login anthropic" in out, "doctor's claude code line: %r" % out[-1500:])
     check(secret_c not in out + err and secret_a not in out + err, "doctor prints no value")
     # CODEX_HOME moves Codex's file
     shutil.rmtree(os.path.join(W.home, ".codex"))

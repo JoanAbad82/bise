@@ -48,11 +48,8 @@ impl Shell {
 
     /// The agents event for connection `id`: a light one gets the live
     /// rows and the archived list when it hasn't got this one yet
-    /// (always its first); an older client every row in full.
+    /// (always its first).
     pub(in crate::daemon) fn agents_for(&mut self, id: ClientId, snap: &Snapshot, live: &HubEv) -> HubEv {
-        if !self.proto.light(id) {
-            return self.full_agents(snap);
-        }
         let (list, hash) = self.archived_now(snap);
         with_archived(live, self.proto.archived_for(id, &list, hash))
     }
@@ -67,14 +64,6 @@ impl Shell {
         (list, h.finish())
     }
 
-    /// The older clients' agents event: every agent's row in full, the
-    /// archived ones inside `agents`. TODO(agents-full-archived): goes in
-    /// a later release (tests/shims.txt).
-    fn full_agents(&mut self, snap: &Snapshot) -> HubEv {
-        let agents = self.agent_rows(snap, proto_view::Which::All);
-        HubEv::Agents { project: self.project(), agents, places: proto_view::places(snap), archived: None }
-    }
-
     /// `agent/get`: one agent's full row, archived or not (the same
     /// builder as the agents event's rows).
     pub(in crate::daemon) fn agent_row(&mut self, snap: &Snapshot, name: &str) -> Option<bise_proto::rows::Agent> {
@@ -83,7 +72,19 @@ impl Shell {
 
     /// The snapshot's agents as rows, `which` of them.
     fn agent_rows(&mut self, snap: &Snapshot, which: proto_view::Which) -> Vec<bise_proto::rows::Agent> {
-        self.agent_rows_with(snap, |snap, since, now, vision, usage, head| proto_view::agents(snap, since, now, crate::model::user_kind, vision, usage, head, which))
+        let mut rows = self.agent_rows_with(snap, |snap, since, now, vision, usage, head| proto_view::agents(snap, since, now, crate::model::user_kind, vision, usage, head, which));
+        self.rank_rows(&mut rows);
+        rows
+    }
+
+    /// agent-rank: his messages not read yet (the first rows: all of
+    /// them, once), then the rows' `rank` (proto_view/rank.rs).
+    fn rank_rows(&mut self, rows: &mut [bise_proto::rows::Agent]) {
+        use proto_view::rank::{apply, Heard};
+        let ranks = &mut self.proto.rank;
+        let his = self.hub.st.msgs().range(ranks.unread()..).filter(|(_, m)| m.from == crate::model::USER).map(|(id, m)| Heard { id: *id, to: &m.to, at: m.created_ms });
+        ranks.hear(his);
+        apply(rows, ranks, now_ms());
     }
 
     /// The row builder's inputs (the live agents seeded, the catalog,
@@ -238,21 +239,11 @@ impl Shell {
         // changed, the archived list only to a connection that hasn't got
         // this one (a usage tick never resends it)
         let (list, hash) = self.archived_now(snap);
-        let full = self.proto.any_full().then(|| self.full_agents(snap)).filter(|f| {
-            let e = f.encode();
-            let moved = e != self.proto.full;
-            self.proto.full = e;
-            moved
-        });
         let mut outs = Vec::new();
         for id in &ids {
-            if self.proto.light(*id) {
-                let arch = self.proto.archived_for(*id, &list, hash);
-                if new.0 || arch.is_some() {
-                    outs.push((*id, with_archived(&agents, arch)));
-                }
-            } else if let Some(f) = &full {
-                outs.push((*id, f.clone()));
+            let arch = self.proto.archived_for(*id, &list, hash);
+            if new.0 || arch.is_some() {
+                outs.push((*id, with_archived(&agents, arch)));
             }
         }
         self.proto_note_each(&outs);

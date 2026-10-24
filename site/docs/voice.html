@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>voice · bise docs</title>
-<meta name="description" content="ctrl+r dictates into the composer. ctrl+r twice starts voice mode, a spoken conversation with the agent in view.">
+<title>voice and fn · bise docs</title>
+<meta name="description" content="talk to bise instead of typing. in bise desktop, hold fn from any app. in bise terminal, ctrl+r dictates, and ctrl+r twice starts voice mode.">
 <link rel="canonical" href="https://bise.dev/docs/voice">
 <meta name="theme-color" content="#f2ede2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -13,10 +13,11 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="bise">
 <meta property="og:url" content="https://bise.dev/docs/voice">
-<meta property="og:title" content="voice · bise docs">
-<meta property="og:description" content="ctrl+r dictates into the composer. ctrl+r twice starts voice mode, a spoken conversation with the agent in view.">
+<meta property="og:title" content="voice and fn · bise docs">
+<meta property="og:description" content="talk to bise instead of typing. in bise desktop, hold fn from any app. in bise terminal, ctrl+r dictates, and ctrl+r twice starts voice mode.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice" class="here" aria-current="page">voice</a></li>
+<li><a href="/docs/voice" class="here" aria-current="page">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -70,22 +76,30 @@
   <main>
     <article>
       <div class="head">
-        <h1>voice</h1>
+        <h1>voice and fn</h1>
         <button class="copymd" type="button" data-md="/docs/voice.md">copy as markdown</button>
       </div>
-      <p class="lede">ctrl+r dictates into the composer. ctrl+r twice starts voice mode, a spoken conversation with the agent in view.</p>
+      <p class="lede">talk to bise instead of typing. in bise desktop, hold fn from any app. in bise terminal, ctrl+r dictates, and ctrl+r twice starts voice mode.</p>
+
+<div class="scopes"><div class="scoped" data-app="desktop"><p class="tag">bise desktop</p><div class="body"><h2 id="fn-from-any-app"><a class="anchor" href="#fn-from-any-app" aria-hidden="true">#</a>fn, from any app</h2>
+<div class="table"><table><thead><tr><th>key</th><th>what it does</th></tr></thead><tbody><tr><td><code class="key">hold fn</code></td><td>talk to bise, with what is in front of you; your words go when you let go</td></tr><tr><td><code class="key">fn fn</code></td><td>hands-free: talk without holding; <code>fn</code> again stops</td></tr><tr><td><code class="key">fn space</code></td><td>the spotlight: find an agent, or ask bise by typing</td></tr></tbody></table></div>
+<p>bise's answer shows in a small panel over the app you're in; a long one offers the rest in the window. with bise's window in front, <code class="key">fn fn</code> starts <a href="#voice-mode">voice mode</a> with the agent in view.</p>
+<p>when you hold <code>fn</code>, bise adds what is in front of you to your question: a screenshot of the window in front (never the whole screen), the tab's URL and title (Chrome, Safari, Arc), the open file and your selection (VS Code, Cursor, Xcode, Zed), and the text of the window. settings › context and privacy turns each one off, says how long images are kept, and lists the apps <code>fn</code> never reads.</p>
+<p><code>fn</code> needs three macOS permissions, asked the first time you hold it: see <a href="/docs/desktop#permissions-for-fn">permissions for fn</a>. settings › voice and fn turns hold and <code class="key">fn fn</code> on or off, and sets the language bise hears.</p>
+<p>in the composer, <code class="key">ctrl+r</code> dictates, as below.</p></div><button class="fold" type="button" data-to="desktop">in bise desktop: hold fn, fn fn, fn space ›</button></div></div>
 <h2 id="dictation"><a class="anchor" href="#dictation" aria-hidden="true">#</a>dictation</h2>
-<p><code class="key">ctrl+r</code> records; any key stops and keeps the text in the composer, ready to edit and send. <code class="key">esc</code> or <code class="key">ctrl+c</code> stops and drops it.</p>
-<p>dictation needs a speech-to-text model, the <strong>voice</strong> role. with a Mistral or an OpenAI key, bise picks one for you. <code class="key">/voice</code> shows what is set and changes it: the model, the language, the voice.</p>
+<p><code class="key">ctrl+r</code> in the composer records; any key stops and keeps the text in the composer, ready to edit and send. <code class="key">esc</code> or <code class="key">ctrl+c</code> stops and drops it.</p>
+<p>dictation and <code>fn</code> need a speech-to-text model, the <strong>voice</strong> role. with a Mistral or an OpenAI key, bise picks one for you. settings › voice and fn in bise desktop, <code class="key">/voice</code> in bise terminal, show what is set and change it.</p>
 <div class="table"><table><thead><tr><th>provider</th><th>models</th><th>key</th></tr></thead><tbody><tr><td>Mistral</td><td><code>mistral/voxtral-mini-transcribe-3</code>, <code>mistral/voxtral-small-transcribe-3</code></td><td><code>MISTRAL_API_KEY</code></td></tr><tr><td>OpenAI</td><td><code>openai/gpt-transcribe</code>, <code>openai/gpt-4o-mini-transcribe</code>, <code>openai/gpt-4o-transcribe</code>, <code>openai/whisper-1</code></td><td><code>OPENAI_API_KEY</code></td></tr><tr><td>Groq</td><td><code>groq/whisper-large-v3-turbo</code>, <code>groq/whisper-large-v3</code></td><td><code>GROQ_API_KEY</code></td></tr><tr><td>ElevenLabs</td><td><code>elevenlabs/scribe_v2</code>, <code>elevenlabs/scribe_v1</code></td><td><code>ELEVENLABS_API_KEY</code></td></tr><tr><td>Deepgram</td><td><code>deepgram/nova-3</code></td><td><code>DEEPGRAM_API_KEY</code></td></tr></tbody></table></div>
-<p><code>bise models voice</code> lists them with the state of each key.</p>
+<p>in a terminal, <code>bise models voice</code> lists them with the state of each key.</p>
 <h2 id="voice-mode"><a class="anchor" href="#voice-mode" aria-hidden="true">#</a>voice mode</h2>
-<p><code class="key">ctrl+r</code> twice starts voice mode: you talk with the agent in view, and it answers out loud.</p>
-<div class="table"><table><thead><tr><th>key</th><th>in voice mode</th></tr></thead><tbody><tr><td><code class="key">space</code></td><td>send now</td></tr><tr><td><code class="key">hold space</code></td><td>keep the floor, or cut in when it talks on speakers</td></tr><tr><td><code>m</code></td><td>mute</td></tr><tr><td><code class="key">tab</code></td><td>type instead</td></tr><tr><td><code class="key">esc</code></td><td>leave voice mode (<code class="key">ctrl+c</code> too)</td></tr></tbody></table></div>
+<p>voice mode is a spoken conversation with the agent in view: you talk, and it answers out loud.</p>
+<div class="scopes"><div class="scoped" data-app="desktop"><p class="tag">bise desktop</p><div class="body"><p>with bise's window in front, <code class="key">fn fn</code> starts voice mode with the agent in view, or ends it. with no thread in view, bise's own thread opens and voice mode starts there.</p></div><button class="fold" type="button" data-to="desktop">in bise desktop: fn fn, with bise in front ›</button></div><div class="scoped" data-app="terminal"><p class="tag">bise terminal</p><div class="body"><p><code class="key">ctrl+r</code> twice starts voice mode.</p>
+<div class="table"><table><thead><tr><th>key</th><th>in voice mode</th></tr></thead><tbody><tr><td><code class="key">space</code></td><td>send now</td></tr><tr><td><code class="key">hold space</code></td><td>keep the floor, or cut in when it talks on speakers</td></tr><tr><td><code>m</code></td><td>mute</td></tr><tr><td><code class="key">tab</code></td><td>type instead</td></tr><tr><td><code class="key">esc</code></td><td>leave voice mode (<code class="key">ctrl+c</code> too)</td></tr></tbody></table></div></div><button class="fold" type="button" data-to="terminal">in bise terminal: ctrl+r twice ›</button></div></div>
 <p>with headphones it listens hands-free. on speakers you hold <code class="key">space</code> while you talk, so it doesn't hear itself. today only Mistral's voice model speaks, so voice mode needs a Mistral key.</p>
 <p>by default it reads aloud what needs you and what you asked. the first time, voice mode says who hears you: your audio goes to the speech-to-text provider, and the text it speaks goes to Mistral.</p>
 <h2 id="settings"><a class="anchor" href="#settings" aria-hidden="true">#</a>settings</h2>
-<p><code class="key">/voice</code> changes all of these. they live in <code>[voice]</code>:</p>
+<p><code class="key">/voice</code> in bise terminal changes all of these; bise desktop's settings › voice and fn has the language. they live in <code>[voice]</code>:</p>
 <div class="code"><div class="file">~/.bise/config.toml</div><div class="box"><pre><code class="lang-toml">[roles]
 voice = &quot;mistral/voxtral-mini-transcribe-3&quot;   <span class="c"># dictation&#x27;s model</span>
 
@@ -105,7 +119,7 @@ sounds = true</code></pre><button class="copy" type="button" aria-label="copy th
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/voice.md">edit this page on GitHub</a></p>
     </footer>
   </main>
-  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#dictation">dictation</a></li><li class="l2"><a href="#voice-mode">voice mode</a></li><li class="l2"><a href="#settings">settings</a></li></ul></aside>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2" data-app="desktop"><a href="#fn-from-any-app">fn, from any app</a></li><li class="l2"><a href="#dictation">dictation</a></li><li class="l2"><a href="#voice-mode">voice mode</a></li><li class="l2"><a href="#settings">settings</a></li></ul></aside>
 </div>
 <script src="/docs/docs.js" defer></script>
 </body>

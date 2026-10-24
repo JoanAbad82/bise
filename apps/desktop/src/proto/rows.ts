@@ -198,7 +198,15 @@ procs?: number,
  * the lowest port its running processes listen on (the panel's
  * `· :5173`), none when none listens
  */
-procs_port?: number | null, };
+procs_port?: number | null, 
+/**
+ * agent-rank (architect m_39150): its place in the agents list, the
+ * hub's one stable order (switchboard proto_view/rank.rs): main 0,
+ * the live others 1..n, the terminal's panel and the desktop's bar
+ * sort by it and ⌥N reaches rank N. None for an archived agent and
+ * from an older hub (the clients keep start order)
+ */
+rank?: number | null, };
 
 /**
  * agents-light (issue 36, architect m_37000/m_37220): an archived agent

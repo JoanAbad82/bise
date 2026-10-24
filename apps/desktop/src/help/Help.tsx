@@ -18,6 +18,11 @@ export function Help({ onClose, page: first = 'help' }: { onClose: () => void; p
   const field = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const sections = helpRows(page, q);
+  // out like the ds sheet: a 120 ms fade, then the parent unmounts it (its animationend)
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    setClosing(true);
+  };
 
   useEffect(() => {
     field.current?.focus();
@@ -40,8 +45,8 @@ export function Help({ onClose, page: first = 'help' }: { onClose: () => void; p
       scroll('top');
     } else if (e.key === 'Escape') {
       if (escOf(q) === 'clear') setQ('');
-      else onClose();
-    } else if (e.ctrlKey && e.key === 'c') onClose();
+      else close();
+    } else if (e.ctrlKey && e.key === 'c') close();
     else if (e.key === 'ArrowDown') scroll(STEP);
     else if (e.key === 'ArrowUp') scroll(-STEP);
     else if (e.key === 'PageDown') scroll(page1);
@@ -53,11 +58,14 @@ export function Help({ onClose, page: first = 'help' }: { onClose: () => void; p
 
   return (
     <div
-      className="help-over"
+      className={closing ? 'help-over out' : 'help-over'}
       data-testid="help.overlay"
       data-page={page}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) close();
+      }}
+      onAnimationEnd={(e) => {
+        if (closing && e.target === e.currentTarget) onClose();
       }}
     >
       <div className="help-box" onKeyDown={onKey} role="dialog" aria-label="keys">

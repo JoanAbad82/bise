@@ -30,8 +30,8 @@ export function scanSay(s: { answered: boolean; n: number; error: string | null;
   if (s.error !== null) return { kind: 'failed', text: settings.scan_failed({ why: s.error }) };
   if (s.answered) return { kind: 'found', n: s.n, text: s.n === 0 ? settings.scan_nothing : settings.scan_found({ n: s.n }) };
   if (s.ms >= WAIT_MS) return { kind: 'failed', text: settings.no_answer({ s: Math.round(WAIT_MS / 1000) }) };
-  const secs = Math.floor(s.ms / 1000);
-  return { kind: 'looking', text: secs < 1 ? settings.scan_looking : settings.scan_looking_s({ s: secs }) };
+  // no seconds count: the '…' says it waits, and the head's capitals made it '· 1 S' (designer m_39043)
+  return { kind: 'looking', text: settings.scan_looking };
 }
 
 /** The last part of a path: what 'add shop' names. */

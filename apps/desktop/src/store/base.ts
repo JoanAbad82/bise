@@ -14,6 +14,8 @@ export interface Thread {
   byPos: Map<number, Entry>;
   typing: string;
   ask?: Ask; // the window's page on its way (window.ts)
+  /** subscribed, its newest page not in yet: what the view holds may be old (thread-loading) */
+  syncing?: boolean;
 }
 
 export type Listener = () => void;

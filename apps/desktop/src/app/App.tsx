@@ -41,7 +41,7 @@ import { Over, Titlebar, useFrame } from './Frame';
 import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
 import { RightBar } from './RightBar';
 import { TipLayer } from './TipLayer';
-import { numbersOf } from '@/agents/model';
+import { noteJump, numbersOf } from '@/agents/model';
 import { HubMoments } from './HubMoments';
 import { ReportScreen } from './ReportScreen';
 import { Palette, usePaletteOpen } from './Palette';
@@ -416,7 +416,7 @@ function ScreenOf({ route }: { route: Route }) {
     case 'thread':
       return <ProjectThread project={route.project} agent={route.agent} />;
     case 'agents':
-      return <Known project={route.project}>{(name) => <AgentsScreen project={route.project} projectName={name} archived={route.archived === true} />}</Known>;
+      return <Known project={route.project}>{() => <AgentsScreen project={route.project} archived={route.archived === true} />}</Known>;
     case 'changes':
       return <Known project={route.project}>{() => <ChangesScreen project={route.project} />}</Known>;
     case 'review':
@@ -572,7 +572,12 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
         projects: store.projects(),
         agents: (p) => store.agents(p),
         typing: typingIn(document.activeElement),
-        numbers: (p) => numbersOf(p, store.agents(p)),
+        // ⌥N reads the numbers he sees (held), then they hold still a moment (agent-rank)
+        numbers: (p) => {
+          const n = numbersOf(p, store.agents(p), true);
+          noteJump();
+          return n;
+        },
       });
       if (act === undefined) return;
       e.preventDefault();

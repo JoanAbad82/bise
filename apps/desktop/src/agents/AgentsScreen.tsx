@@ -6,7 +6,9 @@
 // (actions.ts). Owner: amb-win.
 import { memo, useState } from 'react';
 import { Peek } from './Peek';
-import { Act, Button, cx, Empty, Head, IconButton, Row, Slide } from '@/ds';
+import { Act, Button, cx, Empty, HeroWait, IconButton, PageHero, Row, Slide } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
+import { archivedFacts, liveFacts } from './hero';
 import type { Agent } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useRouter } from '@/app/router';
@@ -34,7 +36,7 @@ export function peekKey(key: string, sel: string | null, peek: string | null): {
  * only the archived ones, each with restore. No archived row on the live list (designer's v6:
  * the archived ones are under /archived and the project's ⋯ menu).
  */
-export function AgentsScreen({ project, projectName, archived: showArchived = false }: { project: string; projectName?: string; archived?: boolean }) {
+export function AgentsScreen({ project, archived: showArchived = false }: { project: string; archived?: boolean }) {
   useKeptScroll(`agents:${project}${showArchived ? ':archived' : ''}`, () => document.querySelector<HTMLElement>('[data-testid="agents.screen"] .ag-body'));
   const agents = useAgents(project);
   const live = liveOf(agents);
@@ -52,6 +54,8 @@ export function AgentsScreen({ project, projectName, archived: showArchived = fa
   const router = useRouter();
   const [peek, setPeek] = useState<string | null>(null);
   const shown = showArchived ? archived : live;
+  const now = useNow();
+  const liveNow = liveFacts(live);
   // W6/K18: the list keys (app/listkeys.ts), space shows its feed in place, space again (or esc)
   // closes it; the selected row comes back after a reload, an update swap or a core restart (keep.ts: 10 minutes)
   const { sel, ref: section, onKeyDown } = useListKeys({
@@ -70,22 +74,27 @@ export function AgentsScreen({ project, projectName, archived: showArchived = fa
   });
   return (
     <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
-      <Head
-        title={showArchived ? panel.archived : panel.agents}
-        sub={`${projectName ?? project} · ${showArchived ? panel.archived_count({ n: archived.length }) : panel.live_count({ n: live.length })}`}
-        end={
-          !showArchived && <Button
-            kind="ghost"
-            onClick={() => {
-              setAdding((x) => !x);
-            }}
-            testId="agents.new"
-          >
-            + new agent
-          </Button>
-        }
-      />
       <div className="ag-body">
+        {/* the hero card (designer's page-hero) scrolls away with the list; the crumb keeps the
+            project's name. It holds no button: '+ new agent' sits under it, at the list's right */}
+        {showArchived ? (
+          <PageHero name={panel.archived} sentence={hero.archived_say} facts={archivedFacts(archived, now)} testId="agents.hero" />
+        ) : (
+          <PageHero name={panel.agents} sentence={hero.agents_say} facts={<>{liveNow.rest}{liveNow.wait !== undefined && <>{' · '}<HeroWait>{liveNow.wait}</HeroWait></>}</>} testId="agents.hero" />
+        )}
+        {!showArchived && (
+          <div className="ag-acts">
+            <Button
+              kind="ghost"
+              onClick={() => {
+                setAdding((x) => !x);
+              }}
+              testId="agents.new"
+            >
+              + new agent
+            </Button>
+          </div>
+        )}
         {adding && (
           <NewAgentSheet
             project={project}

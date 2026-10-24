@@ -17,6 +17,7 @@
 <meta property="og:description" content="every setting of bise in one file, ~/.bise/config.toml. most of them have a command, so you rarely edit it by hand.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config" class="here" aria-current="page">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -74,7 +80,8 @@
         <button class="copymd" type="button" data-md="/docs/config.md">copy as markdown</button>
       </div>
       <p class="lede">every setting of bise in one file, ~/.bise/config.toml. most of them have a command, so you rarely edit it by hand.</p>
-<p>bise reads <code>~/.bise/config.toml</code> (or <code>$BISE_HOME/config.toml</code>). you rarely need to open it: <code class="key">/models</code>, <code class="key">/voice</code>, <code class="key">shift+tab</code> and <code>bise config set</code> write it for you, and keep the rest of the file as it was. <code>bise models</code> prints the path on its last line, and lists what it can't read as warnings.</p>
+
+<p>bise reads <code>~/.bise/config.toml</code> (or <code>$BISE_HOME/config.toml</code>), in both apps. you rarely need to open it: <a href="/docs/settings">settings</a> in bise desktop, <code class="key">/models</code>, <code class="key">/voice</code>, <code class="key">shift+tab</code> and <code>bise config set</code> in bise terminal, write it for you, and keep the rest of the file as it was. <code>bise models</code> prints the path on its last line, and lists what it can't read as warnings.</p>
 <aside class="callout note"><span class="label">note</span><p>config.toml never holds a key. keys go in <code>~/.bise/auth.json</code> (<code>bise login</code>), in the environment, or come from a command. see <a href="/docs/providers">providers and keys</a>.</p></aside>
 <h2 id="a-full-example"><a class="anchor" href="#a-full-example" aria-hidden="true">#</a>a full example</h2>
 <div class="code"><div class="file">~/.bise/config.toml</div><div class="box"><pre><code class="lang-toml">approvals = &quot;auto&quot;                        <span class="c"># yolo (default) or auto</span>
@@ -124,7 +131,7 @@ push = true               <span class="c"># trunk: push the default branch after
 <h2 id="environment-variables"><a class="anchor" href="#environment-variables" aria-hidden="true">#</a>environment variables</h2>
 <div class="table"><table><thead><tr><th>variable</th><th>what it does</th></tr></thead><tbody><tr><td><code>BISE_HOME</code></td><td>moves <code>~/.bise</code></td></tr><tr><td><code>BISE_MODEL</code>, <code>BISE_AGENT_MODEL</code>, <code>BISE_SMALL_MODEL</code>, <code>BISE_VOICE_MODEL</code>, <code>BISE_CLASSIFY_MODEL</code></td><td>a role's model for this session</td></tr><tr><td><code>BISE_APPROVALS</code></td><td><code>yolo</code> or <code>auto</code> for this session, never written</td></tr><tr><td><code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, ...</td><td>a provider's key (see <a href="/docs/providers#the-providers">providers and keys</a>)</td></tr></tbody></table></div>
     </article>
-    <nav class="pn"><a class="prev" href="/docs/skills"><span>previous</span>instructions and skills</a><a class="next" href="/docs/cli"><span>next</span>the bise command</a></nav>
+    <nav class="pn"><a class="prev" href="/docs/settings"><span>previous</span>settings</a><a class="next" href="/docs/desktop-keys"><span>next</span>keys and menus</a></nav>
     <footer>
       <p>for agents: <a href="/docs/config.md">bise.dev/docs/config.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/config.md">edit this page on GitHub</a></p>

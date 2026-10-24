@@ -5,10 +5,16 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 10vh;
-  /* the window's scrim, as the ds sheet's (designer m_22179) */
-  background: rgb(0 0 0 / 0.4);
+  /* a dialog as the ds sheet (designer's dialogs rules, ds/css/controls.css): 12% from the top,
+     over the window's ground at 62%, a short soft shadow, in with a fade and an 8 px rise */
+  padding-top: 12vh;
+  background: var(--c-scrim);
   z-index: 20;
+  animation: b-fade-in 120ms var(--ease-out);
+}
+.help-over.out {
+  animation: b-fade-out 120ms var(--ease-out) forwards;
+  pointer-events: none;
 }
 
 .help-box {
@@ -18,10 +24,21 @@
   max-height: 76vh;
   /* opaque, as the ds sheet: nothing of the thread reads through its rows (designer m_22179) */
   background: linear-gradient(var(--c-raised), var(--c-raised)), var(--c-solid);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-3);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--e-sheet);
   overflow: hidden;
+  animation: help-in 160ms var(--ease-out);
+}
+@keyframes help-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .help-box {
+    animation-name: b-fade-in;
+  }
 }
 
 .help-head {

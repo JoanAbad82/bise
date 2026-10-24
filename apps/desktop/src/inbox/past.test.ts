@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { inbox } from '@/proto/words_inbox.gen';
-import { ALL, dayHead, endWords, headWords, jumpOf, lineTwo, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
+import { hero } from '@/proto/words_hero.gen';
+import { age } from './InboxCard';
+import { ALL, dayHead, endWords, heroFacts, jumpOf, lineTwo, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
 // at collect time: waiting.ts pulls ./Block (the inbox UI), too slow to transform inside a test's 5 s at load
 import { waitingCount } from './waiting';
 
@@ -44,8 +46,9 @@ describe('listsOf: waiting first, then the past by day', () => {
     expect(listsOf(cards, records, NAMES, { ...ALL, q: '#5' }, NOW).order).toEqual(['p:shop/5']);
     expect(listsOf(cards, records, NAMES, { ...ALL, q: '3' }, NOW).order).toEqual(['w:shop/3']);
   });
-  it('counts waiting and answered, not withdrawn', () => {
-    expect(headWords(cards, records)).toBe('2 waiting · 2 answered');
+  it("the hero's facts: how many wait and the oldest's age, or nothing waits", () => {
+    expect(heroFacts([{ since_ms: NOW - 2 * 3600_000 }, { since_ms: NOW - 60_000 }], NOW)).toEqual({ wait: hero.waiting({ n: 2 }), rest: hero.oldest({ age: age(2 * 3600_000) }) });
+    expect(heroFacts([], NOW)).toEqual({ rest: hero.nothing_waits });
   });
 });
 

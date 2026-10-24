@@ -1,5 +1,5 @@
 // The right bar (designer's desktop-right-bar v5, ambient-lead m_20085/m_20087): what happens in the
-// place shown, as the terminal's panel: four foldable sections in his order, AGENTS (start order,
+// place shown, as the terminal's panel: four foldable sections in his order, AGENTS (the hub's rank,
 // ⌥N = the TUI's), ARCHIVED (folded until he opens it), ARTIFACTS, SCHEDULED & WATCHING (an alarm: agent-waiting-states A). 320 px, it takes panel A's slots
 // (docked from 1000 px, sliding over under it, ⌥⌘0). On bise's thread the same sections cover every
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
@@ -33,7 +33,7 @@ import { useNowFor } from './clock';
 import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
-import { agentRows, archivedRows, artifactRows, pageRows, procRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
+import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type MoreWords, type ProjAgent } from './barrows';
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
@@ -129,6 +129,7 @@ function Section({
   onAll,
   act,
   office,
+  say,
   children,
 }: {
   id: SectionId;
@@ -150,13 +151,15 @@ function Section({
   act?: ReactNode;
   /** AGENTS with bims on: the office, above the rows */
   office?: ReactNode;
+  /** the section's own 'show N more' words (AGENTS': agentsMore) */
+  say?: (folded: readonly BarRow[], next: number) => MoreWords;
   children: (r: BarRow) => ReactNode;
 }) {
   const [folded, toggle] = useFolded(id, id === 'archived');
   const [kept, setPages] = usePages(`frame.rb.more.${id}.${pageScope}`);
   const head = useRef<HTMLDivElement>(null);
   const shut = folded && !noFold;
-  const { shown, pages, more, less } = pageRows(rows, cap, kept);
+  const { shown, pages, more, words, less } = pageRows(rows, cap, kept, say);
   // a head that folds is a row: pointer, the rows' hover tint, a chevron ('▾' on hover while open,
   // '▸' always while folded); one that can't fold looks like a plain title (designer m_21633)
   return (
@@ -211,8 +214,15 @@ function Section({
                     setPages(pages + 1);
                   }}
                   data-testid={`app.right.${id}.more`}
+                  {...tipAttrs(words?.tip)}
                 >
-                  {more}
+                  {words === undefined
+                    ? more
+                    : words.parts.map((x, i) => (
+                        <span key={i} className={`app-rb-more-${x.tone}`}>
+                          {x.text}
+                        </span>
+                      ))}
                 </Press>
               )}
               {less && (
@@ -256,6 +266,7 @@ function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; 
   return (
     <span
       className={`app-rb-mark ${m.tone}${head ? ' head' : ''}`}
+      role="button"
       data-testid={`${r.testId}.mark`}
       data-tone={m.tone}
       aria-label={m.tip}
@@ -350,7 +361,8 @@ function Row({ r, onOpen, on, onOpenPr, lit, onLit, onEnd }: {
           <span className={`app-rb-g ${r.tone}`} {...tipAttrs(r.tips?.glyph)}>
             {r.glyph}
           </span>
-          <span className="app-rb-name">{r.name}</span>
+          {/* a command (PROCESSES): mono, it takes the room its row leaves (designer m_38897) */}
+          <span className={r.mono === true ? 'app-rb-name mono' : 'app-rb-name'}>{r.name}</span>
         </>
       )}
       {r.leaves === true && (
@@ -358,7 +370,15 @@ function Row({ r, onOpen, on, onOpenPr, lit, onLit, onEnd }: {
           {LEAVES}
         </span>
       )}
-      {r.sub !== '' && (r.fit === true ? <FitWords className="app-rb-sub" text={r.sub} testId={`${r.testId}.sub`} /> : <span className="app-rb-sub">{r.sub}</span>)}
+      {r.sub !== '' && r.mono === true ? (
+        // a command's where: it goes whole before the command cuts (designer m_38942), never 'app…'
+        <span className="app-rb-where">
+          <span className="app-rb-cols-0" />
+          <span className="app-rb-sub" data-testid={`${r.testId}.sub`}>
+            {r.sub}
+          </span>
+        </span>
+      ) : r.sub !== '' && (r.fit === true ? <FitWords className="app-rb-sub" text={r.sub} testId={`${r.testId}.sub`} /> : <span className="app-rb-sub">{r.sub}</span>)}
       {/* a new artifact: the signed 'new' chip (designer m_20132: 1 px line, r 9, ink, t-11) */}
       {r.end === panel.new_chip && r.id !== undefined ? (
         <span className="app-rb-end">
@@ -490,8 +510,8 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const officeMap = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
-  // the TUI's ⌥ numbers: the rows' order and ⌥N (a project's only; bise's thread keeps start order)
-  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a));
+  // the hub's rank as ⌥ numbers, held while ⌥ is (agents/model numbersOf): the rows' order and ⌥N (a project's only; bise's thread keeps start order)
+  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a), alt);
   // bise's home: on bise's thread, its main is AGENTS' first row
   const home = useProjects().find((p) => p.home)?.project;
   const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }), ...(home === undefined ? {} : { home }) });
@@ -516,7 +536,9 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   // PROCESSES follows the bar's scope: an agent's thread, what it started; a project's main, the
   // project's; bise's thread, every project's (designer m_38642); its 'all ›' keeps that scope
   const runningAgent = scope.level === 'agent' ? scope.agent : null;
-  const runs = procRows(all ? procItems.filter((x) => isRunning(x.p)) : barProcs(procItems, project, runningAgent), all ? 'all' : runningAgent !== null ? 'agent' : 'project');
+  const projects = useProjects();
+  const roots = useMemo(() => procRoots(projects, agents), [projects, agents]);
+  const runs = procRows(all ? procItems.filter((x) => isRunning(x.p)) : barProcs(procItems, project, runningAgent), all ? 'all' : runningAgent !== null ? 'agent' : 'project', roots);
   const procScope = all ? undefined : runningAgent === null ? { project } : { project, agent: runningAgent };
   const store = useStore();
   // the alarm whose detail is open (one at a time; a click on its row again closes it)
@@ -568,6 +590,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           count={agentCount}
           // 8 rows, main's among them: a 9th overflows the bar at 1000 px tall (bar-overflow)
           cap={8}
+          say={agentsMore}
           pageScope={project}
           summary={live.length === 0 ? '' : panel.count_working({ n: working })}
           noFold={waits}
@@ -643,43 +666,6 @@ export function RightBar({ project, name, over, column }: { project: string; nam
             )
           }
         </Section>
-        {/* PROCESSES: what the scope left running, under AGENTS (designer's running-procs): a row
-            opens its output on the processes screen, its port its address; nothing at 0 */}
-        {runs.length > 0 && (
-          <Section
-            id="running"
-            title={running.bar}
-            rows={runs}
-            cap={5}
-            pageScope={inView}
-            scope={runningAgent === null ? null : { words: running.by({ agent: runningAgent }), tip: running.by({ agent: runningAgent }), empty: '' }}
-            summary={runs[0] === undefined ? '' : `∿ ${runs[0].name}`}
-            onAll={() => {
-              router.go(procScope === undefined ? { screen: 'running' } : { screen: 'running', scope: procScope });
-            }}
-          >
-            {(r) => {
-              const x = procItems.find((y) => `p:${keyOf(y)}` === r.key);
-              const u = x === undefined ? null : urlWords(x.p, stateOf(x.p));
-              return (
-                <Row
-                  key={r.key}
-                  r={r}
-                  onOpen={() => {
-                    if (x !== undefined) router.go({ screen: 'running', open: { project: x.project, agent: x.p.agent, id: x.p.id } });
-                  }}
-                  onEnd={
-                    u === null
-                      ? undefined
-                      : () => {
-                          void (window as Partial<Window>).bise?.openExternal(u.url);
-                        }
-                  }
-                />
-              );
-            }}
-          </Section>
-        )}
         <Section
           id="archived"
           title={panel.bar_archived}
@@ -760,6 +746,44 @@ export function RightBar({ project, name, over, column }: { project: string; nam
             )
           }
         </Section>
+        {/* PROCESSES: what the scope left running, last, under ARTIFACTS and SCHEDULED & WATCHING
+            (Gabriel, procs-bar): a row opens its output on the processes screen, a web page's
+            address its browser tab (a port that isn't one is plain); nothing at 0 */}
+        {runs.length > 0 && (
+          <Section
+            id="running"
+            title={running.bar}
+            rows={runs}
+            cap={5}
+            pageScope={inView}
+            scope={runningAgent === null ? null : { words: running.by({ agent: runningAgent }), tip: running.by({ agent: runningAgent }), empty: '' }}
+            summary={runs[0] === undefined ? '' : `∿ ${runs[0].name}`}
+            onAll={() => {
+              router.go(procScope === undefined ? { screen: 'running' } : { screen: 'running', scope: procScope });
+            }}
+          >
+            {(r) => {
+              const x = procItems.find((y) => `p:${keyOf(y)}` === r.key);
+              const u = x === undefined ? null : urlWords(x.p, stateOf(x.p));
+              return (
+                <Row
+                  key={r.key}
+                  r={r}
+                  onOpen={() => {
+                    if (x !== undefined) router.go({ screen: 'running', open: { project: x.project, agent: x.p.agent, id: x.p.id } });
+                  }}
+                  onEnd={
+                    u === null
+                      ? undefined
+                      : () => {
+                          void (window as Partial<Window>).bise?.openExternal(u.url);
+                        }
+                  }
+                />
+              );
+            }}
+          </Section>
+        )}
       </div>
     </aside>
   );

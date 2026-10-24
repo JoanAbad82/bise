@@ -122,6 +122,16 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
     await this.raw([JSON.stringify({ harness: 'result', cmd, ...(card === undefined ? {} : { card }), result, before })]);
   }
 
+  /** The answers to `cmd` wait (a busy hub: thread-loading's subscribe) until `release()`. */
+  async hold(cmd: string): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'hold', cmd })]);
+  }
+
+  /** The held answers go, in order; `cmd` is answered at once again. */
+  async release(): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'release' })]);
+  }
+
   env(): Record<string, string> {
     return {
       BISE_DESKTOP_BISE: this.stub,

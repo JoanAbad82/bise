@@ -130,7 +130,6 @@
   column-gap: 1ch;
   align-items: baseline;
   white-space: nowrap;
-  cursor: default;
   border-radius: var(--r-1);
   padding: 0 var(--pad-row-x);
 }

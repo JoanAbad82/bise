@@ -7,7 +7,8 @@
 // search then leaves the archived ones. Owner: amb-mac (amb-kit's before).
 import { useState, type KeyboardEvent } from 'react';
 import { useListKeys } from '@/app/listkeys';
-import { Dropdown, Field, Press } from '@/ds';
+import { Dropdown, Field, PageHero, Press } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { useProjects } from '@/store';
 import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
@@ -15,14 +16,14 @@ import { ArtifactRows, rowKey, useLook } from './List';
 import { usePutInMessage } from './Open';
 import { useGoArtifact } from './leave';
 import { AddButton, AddDrop, useAddPlace } from './Drops';
-import { agentsOf, ALL, filterItems, KIND_FILTERS, keyOf, splitArchived, type Filter, type Item, type KindFilter } from './model';
+import { agentsOf, ALL, filterItems, heroFacts, KIND_FILTERS, keyOf, splitArchived, type Filter, type Item, type KindFilter } from './model';
 import './artifacts.css';
 
 export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const all = useAllArtifacts();
   const projects = useProjects();
   // back from an open artifact (esc, ‹): the list where he left it (designer's desktop-history)
-  useKeptScroll(`artifacts:${project}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.list"]'));
+  useKeptScroll(`artifacts:${project}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.scroll"]'));
   const [f, setF] = useState<Filter>({ ...ALL, project });
   const [now] = useState(() => Date.now());
   // the archived ones leave the list behind a faint 'N archived' row; a (or a click) shows them
@@ -95,14 +96,9 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   };
   return (
     <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} onKeyDown={onKeyDown}>
-      <header className="art-head">
-        <div className="art-h1-row">
-          <div className="art-h1">{archivedOn ? 'artifacts · archived' : 'artifacts'}</div>
-          {/* '+ add' always there (designer m_23898): the picked project's main, else bise's home */}
-          <AddButton place={place} testId="artifacts.add" />
-        </div>
-        <div className="art-h2">{archivedOn ? 'what you or your agents put away' : 'what your agents made'}</div>
-      </header>
+      {/* one scroller: the hero scrolls away with the list (designer m_39330) */}
+      <div className="art-scroll" data-testid="artifacts.scroll">
+      <PageHero name={archivedOn ? 'artifacts · archived' : 'artifacts'} sentence={hero.artifacts_say} facts={heroFacts(splitArchived(all).live)} testId="artifacts.hero" />
       <div className="art-filters">
         <Dropdown label={f.project === '' ? 'all projects' : projectName} testId="artifacts.projects"
           groups={[{ id: 'projects', rows: [
@@ -127,6 +123,9 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
         <span className="art-search">
           <Field slash placeholder="search artifacts" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="artifacts.search" />
         </span>
+        {/* '+ add' always there (designer m_23898): the picked project's main, else bise's home; the
+            hero holds no button, so it ends the filters' row */}
+        <AddButton place={place} testId="artifacts.add" />
       </div>
       {/* a drop on the list adds there too, the dashed zone only while he drags files */}
       <AddDrop place={place} testId="artifacts.drop">
@@ -140,6 +139,7 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
           <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={open} onLook={look} onPut={putIt} form="screen" testId="artifacts.list" />
         )}
       </AddDrop>
+      </div>
       {!archivedOn && archived.length > 0 && (
         <Press look="art-archived" onClick={() => { showArchived(true); }} data-testid="artifacts.archived">
           {archived.length} archived

@@ -25,6 +25,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 <style>
+  /* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.mjs) */
+  :where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
+  :is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
   :root, [data-theme="dark"] {
     --bg:#141211; --bg2:#1b1816; --text:#ece6da; --dim:#a39c90; --faint:#4a4540; --line:#2a2623;
     --acc:#f4a6b0; --raised:#1f1c1a; --chip:#231f1d; --tint:#2b1c21; --err:#ff5a52; --ok:#b9d99a;

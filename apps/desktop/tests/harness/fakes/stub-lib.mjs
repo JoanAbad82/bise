@@ -112,9 +112,24 @@ export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow })
     for (const l of follow?.(line) ?? []) sent(l);
   };
   for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l));
+  // a test's {"harness":"hold","cmd":c}: the answers to `c` wait (a busy hub, thread-loading)
+  // until {"harness":"release"} sends them, in order
+  let holding = null;
+  let held = [];
   // a test's {"harness":"exit","code":n} line ends this process with that code (a core that
   // stops: the app restarts it, amb-win's app/keep); any other line goes out as is
   const relay = (line) => {
+    if (line.startsWith('{"harness":"hold"')) {
+      try { holding = JSON.parse(line).cmd ?? null; } catch { /* a broken line: nothing */ }
+      return;
+    }
+    if (line.startsWith('{"harness":"release"')) {
+      holding = null;
+      const lines = held;
+      held = [];
+      for (const l of lines) out(l);
+      return;
+    }
     if (line.startsWith('{"harness":"refuse"') || line.startsWith('{"harness":"result"')) {
       try {
         const r = JSON.parse(line);
@@ -154,7 +169,13 @@ export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow })
     if (cmd === null) return;
     if (log) appendFileSync(log, (side ? JSON.stringify(cmd) : line) + NL);
     if (quitCmd && cmd.cmd === quitCmd) quit();
-    if (answer) for (const l of answer(cmd)) out(typeof l === 'string' ? l : JSON.stringify(l));
+    if (answer) {
+      for (const l of answer(cmd)) {
+        const line = typeof l === 'string' ? l : JSON.stringify(l);
+        if (holding !== null && cmd.cmd === holding) held.push(line);
+        else out(line);
+      }
+    }
   });
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (d) => s.push(d));

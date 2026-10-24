@@ -2026,7 +2026,7 @@
   "settings.page_approvals_sub": {
     "args": [],
     "one": null,
-    "text": "what runs without asking you. /approvals in the terminal."
+    "text": "what runs without asking, and what waits for your yes."
   },
   "settings.page_computer": {
     "args": [],
@@ -2036,7 +2036,7 @@
   "settings.page_computer_sub": {
     "args": [],
     "one": null,
-    "text": "agents drive Chrome and your apps, step by step. /computer-use in the terminal."
+    "text": "your browser and your Mac apps, for your agents: set it up once, then see what they did."
   },
   "settings.page_general": {
     "args": [],
@@ -2046,7 +2046,7 @@
   "settings.page_general_sub": {
     "args": [],
     "one": null,
-    "text": "bise on your Mac."
+    "text": "how bise starts, updates and looks."
   },
   "settings.page_keys": {
     "args": [],
@@ -2056,7 +2056,7 @@
   "settings.page_keys_sub": {
     "args": [],
     "one": null,
-    "text": "every terminal key works here too; ⌘ adds a Mac app's gestures. /help in the terminal."
+    "text": "your keys and sign-ins. they stay on this Mac."
   },
   "settings.page_models": {
     "args": [],
@@ -2066,7 +2066,7 @@
   "settings.page_models_sub": {
     "args": [],
     "one": null,
-    "text": "your subscription is enough; an API key works too. /models and /provider in the terminal."
+    "text": "the models your agents use, and how you pay for them: a plan, a key, or both."
   },
   "settings.page_plugins": {
     "args": [],
@@ -2086,7 +2086,7 @@
   "settings.page_privacy_sub": {
     "args": [],
     "one": null,
-    "text": "what fn adds to your question. nothing is read unless you hold fn."
+    "text": "what bise sees when you hold fn, and what it never sends."
   },
   "settings.page_projects": {
     "args": [],
@@ -2096,7 +2096,7 @@
   "settings.page_projects_sub": {
     "args": [],
     "one": null,
-    "text": "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's."
+    "text": "the folders bise works in. each one has its own main."
   },
   "settings.page_quiet": {
     "args": [],
@@ -2106,7 +2106,7 @@
   "settings.page_quiet_sub": {
     "args": [],
     "one": null,
-    "text": "when notifications wait, and how they come back."
+    "text": "when bise keeps quiet: in a call, while you share your screen, in full screen."
   },
   "settings.page_setup": {
     "args": [],
@@ -2116,7 +2116,7 @@
   "settings.page_setup_sub": {
     "args": [],
     "one": null,
-    "text": "what bise needs, checked again. /setup in the terminal."
+    "text": "what's set up and what's left: a model, the permissions, your first project."
   },
   "settings.page_voice": {
     "args": [],
@@ -2126,7 +2126,7 @@
   "settings.page_voice_sub": {
     "args": [],
     "one": null,
-    "text": "how you talk to bise."
+    "text": "how bise hears you and answers: hold fn to talk from any app, ctrl+r to dictate in the composer."
   },
   "settings.perm_accessibility": {
     "args": [],
@@ -4006,13 +4006,6 @@
     "args": [],
     "one": null,
     "text": "looking in your folders…"
-  },
-  "settings.scan_looking_s": {
-    "args": [
-      "s"
-    ],
-    "one": null,
-    "text": "looking in your folders… · {s} s"
   },
   "settings.scan_nothing": {
     "args": [],

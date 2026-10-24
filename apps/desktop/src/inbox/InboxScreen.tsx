@@ -57,7 +57,6 @@ export function InboxScreen() {
     <InboxView
       cards={cards}
       records={records.items}
-      answered={records.answered}
       {...(records.more ? { onEnd: records.older } : {})}
       names={names}
       projects={projects}

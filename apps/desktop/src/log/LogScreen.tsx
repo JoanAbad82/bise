@@ -621,6 +621,7 @@ function Entry({
     >
       <div
         className="lg-h"
+        role="button"
         onClick={() => {
           onPick(key);
           if (folds(it)) onToggle(key);

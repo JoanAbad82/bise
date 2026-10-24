@@ -72,7 +72,12 @@
     },
     {
       "source": "/download",
-      "destination": "/desktop",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/desktop",
+      "destination": "/",
       "permanent": false
     },
     {

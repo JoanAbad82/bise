@@ -136,3 +136,59 @@ export function looseSpacing(css: string): LooseSpace[] {
   }
   return out;
 }
+
+/**
+ * The pointer law (his words: « chaque élément interactif ... devrait avoir un cursor pointer »):
+ * the hand comes from ds/css/base.css's root rule, which matches controls and roles. A plain
+ * element he clicks (a div, a span, an li with onClick) and no role is outside it: it shows the
+ * arrow. A double-click or a drag alone is no click: no hand (designer m_38970). One entry per
+ * such tag: its line and its tag. A native control (button,
+ * a, input, select, textarea, label, summary, option) is the rule's own. Pure.
+ */
+export function plainClicks(src: string): string[] {
+  const out: string[] = [];
+  const native = new Set(["button", "a", "input", "select", "textarea", "label", "summary", "option"]);
+  for (const m of src.matchAll(/<([a-z][a-z0-9]*)\b/g)) {
+    const tag = m[1] ?? "";
+    if (native.has(tag)) continue;
+    const text = openingTag(src, m.index);
+    if (!/\sonClick\s*=/.test(text) || /\srole=/.test(text)) continue;
+    out.push(`${String(src.slice(0, m.index).split("\n").length)} <${tag}>`);
+  }
+  return out;
+}
+
+/** The text of the JSX opening tag at `at` (its '<'), up to its '>' outside braces and strings. */
+function openingTag(src: string, at: number): string {
+  let depth = 0;
+  let quote = "";
+  for (let i = at + 1; i < src.length; i += 1) {
+    const c = src[i] ?? "";
+    if (quote !== "") {
+      if (c === quote && src[i - 1] !== "\\") quote = "";
+    } else if (c === "/" && src[i + 1] === "/") i = src.indexOf("\n", i) < 0 ? src.length : src.indexOf("\n", i);
+    else if (c === "/" && src[i + 1] === "*") i = src.indexOf("*/", i) < 0 ? src.length : src.indexOf("*/", i) + 1;
+    else if (c === '"' || c === "'" || c === "`") quote = c;
+    else if (c === "{") depth += 1;
+    else if (c === "}") depth -= 1;
+    else if (c === ">" && depth === 0) return src.slice(at, i + 1);
+  }
+  return "";
+}
+
+/**
+ * The rules of a stylesheet that put the arrow (cursor: default or auto) back on something: one
+ * selector each. A disabled state's (:disabled, [disabled], aria-disabled) is the root rule's own
+ * and left out. Any other would undo the hand the root gives a control. Pure.
+ */
+export function cursorFaults(css: string): string[] {
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out: string[] = [];
+  for (const m of body.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    if (!/(^|[;\s])cursor\s*:\s*(default|auto)\b/.test(m[2] ?? "")) continue;
+    for (const sel of (m[1] ?? "").split(",").map((s) => s.trim().replace(/\s+/g, " "))) {
+      if (sel !== "" && !/:disabled|\[disabled\]|aria-disabled/.test(sel)) out.push(sel);
+    }
+  }
+  return out;
+}

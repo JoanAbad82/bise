@@ -213,19 +213,58 @@
     "one": null,
     "text": "lands via PRs"
   },
-  "panel.live_count": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "{n} live"
-  },
   "panel.more": {
     "args": [
       "n"
     ],
     "one": null,
     "text": "{n} more"
+  },
+  "panel.more_all_idle": {
+    "args": [],
+    "one": null,
+    "text": "all idle"
+  },
+  "panel.more_all_working": {
+    "args": [],
+    "one": null,
+    "text": "all working"
+  },
+  "panel.more_idle": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} idle"
+  },
+  "panel.more_of": {
+    "args": [
+      "left"
+    ],
+    "one": null,
+    "text": "of {left}"
+  },
+  "panel.more_tip": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} agent not shown",
+    "text": "{n} agents not shown"
+  },
+  "panel.more_tip_plus": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "+ {n}"
+  },
+  "panel.more_tip_working": {
+    "args": [
+      "n",
+      "names"
+    ],
+    "one": null,
+    "text": "{n} working ({names})"
   },
   "panel.more_today": {
     "args": [

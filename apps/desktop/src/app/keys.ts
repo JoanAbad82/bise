@@ -10,7 +10,7 @@
 // Keys are read by `code` (⌥1 types '¡' on a Mac keyboard) and taken in the
 // capture phase, so the composer never gets the character.
 import type { Agent, ProjectRow } from '@/proto';
-import { assign, liveOf } from '@/agents/model';
+import { liveOf, rankedOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { projectsOf } from './Sidebar';
 
@@ -47,7 +47,7 @@ export interface KeyCtx {
   readonly agents: (project: string) => readonly Agent[];
   /** focus is in a field with text (the composer, find, a setting) */
   readonly typing: boolean;
-  /** the project's ⌥ numbers as the sidebar shows them (agents/model numbersOf); none: fresh ones */
+  /** the project's ⌥ numbers as the sidebar shows them (agents/model numbersOf); none: the hub's rank */
   readonly numbers?: (project: string) => ReadonlyMap<string, number>;
 }
 
@@ -77,7 +77,7 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     const p = here(c);
     if (p === undefined) return undefined;
     if (n === 0) return { go: { screen: 'thread', project: p, agent: MAIN } };
-    const nums = c.numbers?.(p) ?? assign(new Map(), liveOf(c.agents(p)));
+    const nums = c.numbers?.(p) ?? rankedOf(liveOf(c.agents(p)));
     const name = [...nums].find(([, k]) => k === n)?.[0];
     return name !== undefined ? { go: { screen: 'thread', project: p, agent: name } } : undefined;
   }

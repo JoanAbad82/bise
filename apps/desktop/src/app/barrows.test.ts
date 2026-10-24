@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { agentRows, archivedRows, pageRows, roleWords, watchRows, type ProjAgent } from './barrows';
+import { agentRows, agentsMore, archivedRows, pageRows, procRoots, procRows, roleWords, watchRows, type ProjAgent } from './barrows';
+import type { Proc } from '@/proto';
 
 const NOW = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
@@ -83,6 +84,27 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     expect(shown.map((r) => r.name)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a10']);
     expect(hidden).toBe(3);
   });
+  it("AGENTS' 'show N more' says how many folded agents work and rest (designer m_39151)", () => {
+    const busy = (i: number) => (i % 5 === 0 ? { status: 'working' as const } : i % 7 === 0 ? { waiting_on: { who: 'agent' as const, name: 'main' } } : {});
+    const rows = agentRows(Array.from({ length: 22 }, (_, i) => ag(`a${String(i + 1)}`, i >= 8 ? busy(i) : {})), NOW, false);
+    const p = pageRows(rows, 8, 0, agentsMore);
+    expect(p.more).toBe('show 14 more · 5 working · 9 idle');
+    expect(p.words?.parts.map((x) => x.tone)).toEqual(['mid', 'faint', 'mid', 'faint', 'dim']);
+    expect(p.words?.tip).toBe('14 agents not shown: 5 working (a11, a15, a16, + 2), 9 idle');
+    // the folded ones all at rest, all at work
+    const idle = agentRows(Array.from({ length: 11 }, (_, i) => ag(`b${String(i)}`)), NOW, false);
+    expect(pageRows(idle, 8, 0, agentsMore).more).toBe('show 3 more · all idle');
+    const work = agentRows(Array.from({ length: 11 }, (_, i) => ag(`w${String(i)}`, { status: 'working' })), NOW, false);
+    expect(pageRows(work, 8, 0, agentsMore)).toMatchObject({ more: 'show 3 more · all working' });
+    expect(pageRows(work, 8, 0, agentsMore).words?.tip).toBe('3 agents not shown: 3 working (w8, w9, w10)');
+    // past a page: 'show 50 more of 365 · 3 working', then 'of 315'
+    const many = agentRows(Array.from({ length: 372 }, (_, i) => ag(`m${String(i)}`, i === 100 || i === 200 || i === 300 ? { status: 'working' } : {})), NOW, false);
+    expect(pageRows(many, 7, 0, agentsMore).more).toBe('show 50 more of 365 · 3 working');
+    expect(pageRows(many, 7, 1, agentsMore).more).toBe('show 50 more of 315 · 3 working');
+    // what waits on him is never folded: never counted, never the accent
+    const asks = agentRows(Array.from({ length: 10 }, (_, i) => ag(`q${String(i)}`, i === 9 ? { waits: 1 } : {})), NOW, false);
+    expect(pageRows(asks, 8, 0, agentsMore)).toMatchObject({ hidden: 1, more: 'show 1 more · all idle' });
+  });
   it("'show 50 more' opens 50 at a time, 'show less' goes back to the cap (his m_26894): 370 rows, cap 5", () => {
     const rows = agentRows(Array.from({ length: 370 }, (_, i) => ag(`a${String(i + 1)}`, i === 300 ? { waits: 1 } : {})), NOW, false);
     const at = (p: number) => pageRows(rows, 5, p);
@@ -102,5 +124,24 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     expect(roleWords('fixing a < b in the parser')).toBe('fixing a < b in the parser');
     const rows = agentRows([ag('perf', { status: 'working', title: '<think>' })], NOW, false);
     expect(rows[0]?.sub).toBe('thinking');
+  });
+  it("PROCESSES (Gabriel's test, procs-bar): the program and its arguments, where it runs past the project or its worktree, a link only on a web page", () => {
+    const p = (id: string, over: Partial<Proc>): Proc => ({ id, agent: 'perf', kind: { is: 'bg', n: 3 }, cmd: 'pnpm dev', pid: 1, started_ms: NOW, ports: [], state: { is: 'running' }, cpu: 0, rss_mb: 0, procs: 1, out: 'bg', ...over });
+    const it = (x: Proc) => ({ project: 'shop', projectName: 'storefront', p: x });
+    const wt = '/Users/g/.bise/worktrees/shop-1/perf/shop';
+    const roots = procRoots([{ project: 'shop', path: '/Users/g/code/shop' }], [ag('perf', { worktree: wt }), ag('main', { main: true })]);
+    const items = [
+      it(p('bg3', { cmd: '/opt/homebrew/bin/python3 -m http.server 8000', cwd: `${wt}/site`, ports: [8000], url: 'http://127.0.0.1:8000' })),
+      it(p('p9.1', { kind: { is: 'detached' }, cmd: 'node --inspect=9229 /Users/g/code/shop/x.js', cwd: '/Users/g/code/shop/apps/api', ports: [9229] })),
+      it(p('bg4', { cmd: 'cargo watch', cwd: '/Users/g/code/shop' })),
+    ];
+    const rows = procRows(items, 'project', roots);
+    expect(rows.map((r) => [r.name, r.sub, r.end])).toEqual([
+      ['python3 -m http.server 8000', 'perf/site', 'localhost:8000 ↗'],
+      ['node --inspect=9229 x.js', 'apps/api', ':9229'],
+      ['cargo watch', '', ''],
+    ]);
+    expect(rows[0]?.title).toContain('by perf');
+    expect(procRows(items, 'all', roots).map((r) => r.sub)).toEqual(['storefront › perf/site', 'storefront › apps/api', 'storefront']);
   });
 });

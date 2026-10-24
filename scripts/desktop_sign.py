@@ -12,7 +12,8 @@ bend-jsrt, the native helper, Electron's dylibs and its .node modules), then the
 The signing core is scripts/mac_sign.py, the terminal release's too (scripts/dist_sign.py):
   - hardened runtime (--options runtime) on everything, a secure timestamp with a real identity
     (--timestamp; none with '-', the dry run's ad hoc identity: Apple's timestamp server only
-    stamps certificates);
+    stamps certificates); ad hoc, every executable and app also gets library validation off
+    (mac_sign.ad_hoc_entitlements): with no team, dyld would refuse Electron Framework at launch;
   - the entitlements (mac_sign.entitlements_for): the desktop's own
     (packaging/entitlements/desktop.plist: V8's JIT for Electron, the microphone, Apple Events)
     on its executables and apps, never on a library; the runtime's bise.app (dev.bise.cli),

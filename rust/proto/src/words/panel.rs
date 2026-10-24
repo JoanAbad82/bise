@@ -62,8 +62,6 @@ crate::words! { panel:
     inbox = "inbox";
     /// the archived section's folded row; the desktop's /archived and artifacts lists
     archived_count(n) = "{n} archived";
-    /// the desktop's /agents head: the live agents
-    live_count(n) = "{n} live";
     /// the desktop's /archived with none
     no_archived = "no archived agent";
     /// his messages held for after an agent's turn
@@ -150,6 +148,20 @@ crate::words! { panel:
     show_more(n) = "show {n} more";
     /// back to the cap
     show_less = "show less";
+    /// AGENTS' next page when more than a page is folded: after 'show 50 more', text-3 (designer m_39151)
+    more_of(left) = "of {left}";
+    /// AGENTS' folded agents at rest (idle or done), text-3
+    more_idle(n) = "{n} idle";
+    /// AGENTS' folded agents, none at work
+    more_all_idle = "all idle";
+    /// AGENTS' folded agents, all at work
+    more_all_working = "all working";
+    /// the tip of AGENTS' 'show N more': how many agents it folds
+    more_tip(n) = one "{n} agent not shown" | "{n} agents not shown";
+    /// the tip's agents at work, their first names
+    more_tip_working(n, names) = "{n} working ({names})";
+    /// the tip's names past the third
+    more_tip_plus(n) = "+ {n}";
     /// a new artifact's chip
     new_chip = "new";
     /// a browser-only artifact's mark

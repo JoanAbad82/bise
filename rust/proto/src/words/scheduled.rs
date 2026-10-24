@@ -59,8 +59,6 @@ crate::words! { scheduled:
     count_ended(n) = "{n} ended";
     /// the TUI head's count: the agents' alarms
     count_watching(n) = "{n} watching";
-    /// the desktop head's count
-    count_desktop(n) = "active · {n}";
     /// the TUI's search line, after `/ `
     find_hint = "find: an agent, a name, the words";
     /// the desktop's search field

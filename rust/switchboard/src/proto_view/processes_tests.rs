@@ -97,7 +97,8 @@ fn a_row_sums_its_tree_and_names_its_url_and_output() {
     let t = &trees(&rows, HUB, &[agent("perf", &[101], &[(3, 200, "pnpm dev")])], 100)[..2];
     let ports: BTreeMap<u32, Vec<u16>> = [(201, vec![24678, 5173]), (200, vec![5173])].into();
     let files: BTreeMap<u32, Files> = [(200, Files { cwd: Some("/w/perf".into()), out: None }), (300, Files { cwd: None, out: Some("/w/nohup.out".into()) })].into();
-    let found = Found { ports: &ports, files: &files };
+    let http: BTreeSet<u16> = [5173].into();
+    let found = Found { ports: &ports, files: &files, http: &http };
     let bg = row(&t[0], &by, &found).unwrap();
     assert_eq!((bg.id.as_str(), bg.pid, bg.procs, bg.rss_mb, bg.cpu), ("bg3.1791100200", 200, 2, 4, 2.5));
     assert_eq!((bg.ports.clone(), bg.url.as_deref(), bg.name.as_deref()), (vec![5173, 24678], Some("http://127.0.0.1:5173"), Some("dev server")));
@@ -106,7 +107,22 @@ fn a_row_sums_its_tree_and_names_its_url_and_output() {
     assert_eq!((d.id.as_str(), d.out, d.url.as_deref()), ("p300.1791100300", OutKind::File, None));
     let mut none = t[1].clone();
     none.root = 310;
-    assert_eq!(row(&none, &by, &Found { ports: &ports, files: &BTreeMap::new() }).unwrap().out, OutKind::None);
+    assert_eq!(row(&none, &by, &Found { ports: &ports, files: &BTreeMap::new(), http: &http }).unwrap().out, OutKind::None);
+    // a port that never answered HTTP is no link: no url, its port stays
+    let quiet = row(&t[0], &by, &Found { ports: &ports, files: &files, http: &BTreeSet::new() }).unwrap();
+    assert_eq!((quiet.ports, quiet.url), (vec![5173, 24678], None));
+    // the first port that answered, not the first port
+    let late: BTreeSet<u16> = [24678].into();
+    assert_eq!(row(&t[0], &by, &Found { ports: &ports, files: &files, http: &late }).unwrap().url.as_deref(), Some("http://127.0.0.1:24678"));
+}
+
+#[test]
+fn only_an_http_status_line_is_a_web_page() {
+    assert!(answers_http(b"HTTP/1.0 200 OK\r\n"));
+    assert!(answers_http(b"HTTP/1.1 404 Not Found"));
+    assert!(!answers_http(b""));
+    assert!(!answers_http(b"SSH-2.0-OpenSSH"));
+    assert!(!answers_http(b"{\"jsonrpc\":\"2.0\"}"));
 }
 
 #[test]
@@ -248,6 +264,25 @@ fn a_new_repl_and_bises_wrappers_are_never_detached() {
         "not the REPL (no sids yet), not the runner nor its watch loop in a group of its own"
     );
     assert_eq!(got[0].cmd, "python3 -u -m http.server 8000");
+}
+
+/// bise's plugins bridge forks away from its REPL (parent 1, the REPL's
+/// group) and keeps the agent's tag: never a detached row, nor what it
+/// runs; a `plugins serve` the agent typed without bise's `--parent` is.
+#[test]
+fn bises_plugins_bridge_is_never_listed() {
+    let t = Some("aa.perf.1");
+    let rows = vec![
+        r(1, 0, 1, 1, None, "launchd"),
+        r(100, 1, 100, 100, None, "bise sbd"),
+        r(101, 100, 101, 101, t, "/v/repl-live"),
+        r(320, 1, 101, 101, t, "/v/bise plugins serve --dir /h/run/50158/plugins --parent 101"),
+        r(321, 320, 101, 101, t, "node /h/plugins/x/server.js"),
+        r(330, 1, 330, 330, t, "bise plugins serve --dir /tmp/p"),
+        r(340, 1, 340, 340, t, "python3 -m http.server 8000"),
+    ];
+    let got = trees(&rows, HUB, &[agent("perf", &[101], &[])], 100);
+    assert_eq!(kinds(&got), vec![("perf".into(), ProcKind::Detached, 330, vec![330]), ("perf".into(), ProcKind::Detached, 340, vec![340])]);
 }
 
 #[test]

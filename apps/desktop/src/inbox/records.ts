@@ -13,8 +13,6 @@ export const PAGE_MAX = 200;
 
 export interface Records {
   readonly items: readonly InboxRecord[];
-  /** every hub's answered total */
-  readonly answered: number;
   /** some hub has older records */
   readonly more: boolean;
   /** asks every hub that has more for its next page */
@@ -61,7 +59,6 @@ export function useInboxRecords(rows: readonly ProjectRow[]): Records {
   return useMemo(
     () => ({
       items: mergeRecords(lists.map(([, l]) => l.items)),
-      answered: lists.reduce((n, [, l]) => n + l.answered, 0),
       more: lists.some(([, l]) => l.more),
       older,
     }),

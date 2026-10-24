@@ -18,7 +18,8 @@
 //! ports while one watches the list (`processes {watch: true}`); a
 //! follower's output every 200 ms. Ports: one lsof for the pids not
 //! asked yet (all of them while the list is watched); lsof missing: no
-//! ports.
+//! ports. Each port is asked once whether it answers HTTP (a no again
+//! after `HTTP_RETRY`): a row's `url` only then.
 //!
 //! How a row ends: its bg job's `.rc` (exited), his stop (stopped by
 //! you: the stop marks it before its signals), proc-cleanup's reap
@@ -186,6 +187,10 @@ struct State {
     /// agents reaped (by name), skipped by the scans for a while
     reaped: BTreeMap<String, std::time::Instant>,
     ports: BTreeMap<(u32, String), Vec<u16>>,
+    /// whether each listening port answered HTTP, and when it was asked
+    /// (by pid and start: a no is asked again after `HTTP_RETRY`, a
+    /// server still starting)
+    http: BTreeMap<((u32, String), u16), (bool, std::time::Instant)>,
     asked: BTreeSet<(u32, String)>,
     files: BTreeMap<(u32, String), Files>,
     counts: Counts,
@@ -200,6 +205,8 @@ const FOLLOW: Duration = Duration::from_millis(200);
 /// A reaped agent's rows are not scanned again for this long (its
 /// processes are being killed).
 const REAPED_FOR: Duration = Duration::from_secs(30);
+/// A port that did not answer HTTP is asked again after this long.
+const HTTP_RETRY: Duration = Duration::from_secs(10);
 
 impl State {
     fn new(paths: Paths, hub: String, project: String, out: Sender<Msg>, me: Sender<Ask>) -> State {
@@ -220,6 +227,7 @@ impl State {
             stopping: BTreeSet::new(),
             reaped: BTreeMap::new(),
             ports: BTreeMap::new(),
+            http: BTreeMap::new(),
             asked: BTreeSet::new(),
             files: BTreeMap::new(),
             counts: Counts::new(),
@@ -373,9 +381,11 @@ impl State {
         self.ports.retain(|k, _| alive.contains(k));
         self.asked.retain(|k| alive.contains(k));
         self.files.retain(|k, _| alive.contains(k));
+        self.probe_http();
+        let http: BTreeSet<u16> = self.http.iter().filter(|(_, (yes, _))| *yes).map(|((_, port), _)| *port).collect();
         let ports_by: BTreeMap<u32, Vec<u16>> = self.ports.iter().map(|((p, _), v)| (*p, v.clone())).collect();
         let files_by: BTreeMap<u32, Files> = self.files.iter().map(|((p, _), v)| (*p, v.clone())).collect();
-        let found = Found { ports: &ports_by, files: &files_by };
+        let found = Found { ports: &ports_by, files: &files_by, http: &http };
         let now: Vec<Seen> = trees.iter().filter_map(|t| self.seen(t, &by, &found)).collect();
         let now_rows: Vec<Proc> = now.iter().map(|s| s.row.clone()).collect();
         let was: BTreeMap<Key, Proc> = self.running.iter().map(|(k, s)| (k.clone(), s.row.clone())).collect();
@@ -400,6 +410,21 @@ impl State {
         if counts != self.counts {
             self.counts = counts.clone();
             let _ = self.out.send(Msg::ProcCounts(counts));
+        }
+    }
+
+    /// Asks each listening port whether it serves HTTP: once, a no again
+    /// after `HTTP_RETRY`; the ports of processes gone are forgotten.
+    fn probe_http(&mut self) {
+        let listening: BTreeSet<((u32, String), u16)> = self.ports.iter().flat_map(|(k, v)| v.iter().map(move |p| (k.clone(), *p))).collect();
+        self.http.retain(|k, _| listening.contains(k));
+        let now = std::time::Instant::now();
+        for k in listening {
+            if self.http.get(&k).is_some_and(|(yes, at)| *yes || now.duration_since(*at) < HTTP_RETRY) {
+                continue;
+            }
+            let yes = http_answers(k.1);
+            self.http.insert(k, (yes, now));
         }
     }
 
@@ -637,6 +662,29 @@ fn table() -> Vec<Row> {
         let (y, mo, d, h, mi, sec) = pv::lstart_parts(s)?;
         crate::every::mktime_s(y, mo, d, h, mi, sec)
     })
+}
+
+/// Whether 127.0.0.1:`port` answers HTTP (`pv::HTTP_PROBE`, its first
+/// bytes read by `pv::answers_http`); a short wait each way, so a port
+/// that takes the bytes and says nothing costs half a second, once.
+fn http_answers(port: u16) -> bool {
+    use std::io::Write as _;
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let Ok(mut s) = std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)) else { return false };
+    let _ = s.set_read_timeout(Some(Duration::from_millis(300)));
+    let _ = s.set_write_timeout(Some(Duration::from_millis(200)));
+    if s.write_all(pv::HTTP_PROBE).is_err() {
+        return false;
+    }
+    let mut buf = [0u8; 8];
+    let mut got = 0;
+    while got < 5 {
+        match s.read(&mut buf[got..]) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => got += n,
+        }
+    }
+    pv::answers_http(&buf[..got])
 }
 
 /// One lsof on `pids` with `what` (no lsof: nothing).

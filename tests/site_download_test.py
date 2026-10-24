@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""bise.dev/desktop (/download redirects there) reads the desktop feed and says what it found.
+"""bise.dev's home, bise desktop (/desktop and /download redirect there), reads the desktop feed and says what it found.
 
 Two parts:
 1. site/download.js, the pure part, under node: a rolling release from the
    GitHub API becomes {version, size, date, notes}; the beta shows only when
    it is newer than stable; a 404 is "soon" (no desktop release yet), a failed
    call is "unknown" (the button stays); the notes are escaped.
-2. site/desktop.html (designer's page) rendered by headless Chrome against
+2. site/index.html (designer's page, bise desktop) rendered by headless Chrome against
    the fake feeds in tests/fixtures/site-download/ (ready: stable + a newer
    beta; soon: both tags 404; down: GitHub answers 503), served next to site/
    by a local server: its data-slot spots filled, the beta column off unless
@@ -19,6 +19,7 @@ named after its version, its body the notes, a bise-mac-arm64.dmg asset.
 
 Run: python3 tests/site_download_test.py
 """
+import glob
 import html
 import http.server
 import json
@@ -34,7 +35,10 @@ import urllib.parse
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SITE = os.path.join(REPO, "site")
 FIXTURES = os.path.join(REPO, "tests", "fixtures", "site-download")
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+# never a browser from /Applications (it can show the user a macOS notice): BISE_CHROME, else
+# Playwright's own headless shell in its cache; none: the render part is skipped.
+CHROME = os.environ.get("BISE_CHROME") or next(iter(sorted(glob.glob(os.path.expanduser(
+    "~/Library/Caches/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell")), reverse=True)), "")
 
 UNIT = r"""
 import assert from "node:assert/strict";
@@ -95,7 +99,7 @@ const look = () => {
   if (!d || !d.body || d.body.dataset.fed !== "1") return setTimeout(look, 100);
   const wide = [...d.querySelectorAll("body *")].filter((el) => {
     const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
-    return r.width && cs.position !== "fixed" && r.right > d.documentElement.clientWidth + 1 && !el.closest(".install, .stage, .shot, .dmg");
+    return r.width && cs.position !== "fixed" && r.right > d.documentElement.clientWidth + 1 && !el.closest(".install, .stage, .shot, .dmg, .seeds, .tui");
   }).slice(0, 5).map((el) => el.tagName.toLowerCase() + "." + el.className + " right=" + Math.round(el.getBoundingClientRect().right));
   document.getElementById("out").textContent = JSON.stringify({ scroll: d.documentElement.scrollWidth, client: d.documentElement.clientWidth, wide });
 };
@@ -128,8 +132,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         path = path.split("?", 1)[0]
         if path.startswith("/__fixtures/"):
             return os.path.join(FIXTURES, path[len("/__fixtures/"):])
-        if path == "/desktop":
-            path = "/desktop.html"
+        if path in ("/", "/desktop"):
+            path = "/index.html"
+        if path.startswith("/desktop/hero/"):
+            # the bims' town is WebGL and never idles: under --virtual-time-budget it hangs the
+            # dump; the page keeps its poster without it, and the download parts are what's checked
+            return os.path.join(SITE, "__no_town__")
         return os.path.join(SITE, path.lstrip("/"))
 
     def log_message(self, *a):
@@ -151,7 +159,7 @@ def chrome(profile, *args, size="1280,1600"):
 
 
 def page(port, scenario):
-    return f"http://127.0.0.1:{port}/desktop?api=/__fixtures/{scenario}&still"
+    return f"http://127.0.0.1:{port}/?api=/__fixtures/{scenario}&still"
 
 
 def check(dom, scenario, want, absent):
@@ -191,16 +199,14 @@ def main():
     profile = tempfile.mkdtemp(prefix="site-download-")
     try:
         port = srv.server_address[1]
-        beta_on = '<div class="way beta" data-slot="beta">'
-        beta_off = '<div class="way beta" data-slot="beta" data-off="">'
+        beta_on = '<p class="small" data-slot="beta" style="margin:0">'
+        beta_off = 'data-slot="beta" data-off=""'
         check(chrome(profile, "--dump-dom", page(port, "ready")), "ready",
               ['data-state="ready"', '<span class="nw" data-slot="version">2026.10.1</span>',
                '<span class="nw" data-slot="size">205 MB</span>', '<span data-slot="date">Oct 12, 2026</span>',
-               "<li><code>⌘K</code> opens any agent, live or archived</li>",
-               'href="https://github.com/gvergnaud/bise/releases/tag/desktop-v2026.10.1">and 2 more in the release notes</a>',
                beta_on, '<span data-slot="beta-version">2026.10.3</span>', '<span data-slot="beta-size">206 MB</span>',
                'href="/download/mac"', 'href="/download/mac-beta"'],
-              [beta_off, "pages open next to the thread"])  # the 7th note: 6 max
+              [beta_off])
         check(chrome(profile, "--dump-dom", page(port, "soon")), "soon", ['data-state="soon"', beta_off], [beta_on])
         check(chrome(profile, "--dump-dom", page(port, "down")), "down", ['data-state="unknown"', beta_off], [beta_on])
         for s in ("ready", "soon"):

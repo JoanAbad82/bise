@@ -12,7 +12,9 @@ TUI shows its project's (`/running`).
 One row per process tree: `id` (`bg3.<start s>` for an agent's bg job 3,
 `p<pid>.<start s>` for a detached tree), `agent`, `kind` (`bg {n}` or
 `detached`), `cmd`, `cwd`, `pid` (the root; a bg job's process group),
-`started_ms`, `ports` and `url` (`http://127.0.0.1:<first port>`), `name`
+`started_ms`, `ports` and `url` (`http://127.0.0.1:<port>`, the first of its
+ports that answers HTTP; none when no port does: a port that is not a web
+page never opens an empty browser tab), `name`
 (a known server command), `state` (`running`, `exited {rc?}`,
 `stopped_by_you`, `stopped_with`), `ended_ms`, the tree's `cpu`, `rss_mb`,
 `procs`, and `out` (`bg`, `file`, `none`). Each agent row carries `procs`
@@ -38,7 +40,10 @@ REPL's session, docs/proc-cleanup.md), grouped in trees:
 
 Not listed: the REPL and what runs under it (the turn's own command, which
 the thread shows; MCP servers, the sandbox), bise's own job runner and its
-watch loop, the user's processes, the hub. Every bash command runs in a
+watch loop, its plugins bridge (`bise plugins serve --dir <run>/plugins
+--parent <repl>`: it forks away from its REPL, keeps the agent's tag and
+listens on a loopback port; Gabriel saw one row per live agent, procs-bar)
+and what it runs, the user's processes, the hub. Every bash command runs in a
 slot: one still under its REPL's wrapper is the turn's, not a bg job yet.
 A REPL is known by its session (`repl.sids`) or, just spawned, as the
 hub's own child; bise's wrappers by their script
@@ -64,7 +69,19 @@ or sb-core: it is an observation; a reload finds the running ones again
 Scans: every 60 s ps only (so an end is kept with no client), every 15 s
 while a typed client is connected, every 2 s with ports while one watches.
 Ports are asked once per new pid (all of them while watched); without lsof
-there are none (Linux's /proc/net/tcp is not read).
+there are none (Linux's /proc/net/tcp is not read). Each port is then asked
+once whether it serves HTTP (`HEAD /` on 127.0.0.1, its first bytes
+`HTTP/`; 200 ms to connect, 300 ms to answer); a no is asked again after
+10 s (a server still starting).
+
+## The right bar
+
+PROCESSES · N is the bar's last section, under ARTIFACTS and SCHEDULED &
+WATCHING. A row: `∿`, the program by name and its arguments (a path by its
+last part: `python3 -m http.server 8000`), where it runs (its folder past
+the project's root, or its worktree's name: `apps/web`, `perf/site`; never
+a home path), then `localhost:<port> ↗` as a link when its hub found HTTP
+there, else its port plain (`:9229`).
 
 ## How a row ends
 

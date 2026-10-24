@@ -177,7 +177,6 @@
   background: none;
   font: var(--t-12) var(--font-mono);
   color: var(--c-text-3);
-  cursor: default;
 }
 /* bise's answer while it streams and once done (LiveText, ambient's text-appearing spec): only
    the new words fade in, 180 ms ease-out, staggered (--d); no caret, the '∿' rides after the last

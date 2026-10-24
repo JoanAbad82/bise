@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>troubleshooting · bise docs</title>
-<meta name="description" content="bise doctor checks your machine, the install, your keys and models in one command. start there.">
+<meta name="description" content="start with the check: settings › setup in bise desktop, bise doctor in bise terminal. each says what is off and how to fix it.">
 <link rel="canonical" href="https://bise.dev/docs/troubleshooting">
 <meta name="theme-color" content="#f2ede2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -14,9 +14,10 @@
 <meta property="og:site_name" content="bise">
 <meta property="og:url" content="https://bise.dev/docs/troubleshooting">
 <meta property="og:title" content="troubleshooting · bise docs">
-<meta property="og:description" content="bise doctor checks your machine, the install, your keys and models in one command. start there.">
+<meta property="og:description" content="start with the check: settings › setup in bise desktop, bise doctor in bise terminal. each says what is off and how to fix it.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting" class="here" aria-current="page">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -73,8 +79,16 @@
         <h1>troubleshooting</h1>
         <button class="copymd" type="button" data-md="/docs/troubleshooting.md">copy as markdown</button>
       </div>
-      <p class="lede">bise doctor checks your machine, the install, your keys and models in one command. start there.</p>
-<h2 id="bise-doctor"><a class="anchor" href="#bise-doctor" aria-hidden="true">#</a>bise doctor</h2>
+      <p class="lede">start with the check: settings › setup in bise desktop, bise doctor in bise terminal. each says what is off and how to fix it.</p>
+
+<div class="scopes"><div class="scoped" data-app="desktop"><p class="tag">bise desktop</p><div class="body"><h2 id="settings-setup"><a class="anchor" href="#settings-setup" aria-hidden="true">#</a>settings › setup</h2>
+<p>settings › setup checks again what bise needs: a model (a plan signed in, or a key), bise's home folder, and the three permissions of <code>fn</code> (microphone, accessibility, screen recording). each row says what is off and what it costs, with the button that fixes it: <strong>sign in</strong>, <strong>allow</strong>, or <strong>open System Settings</strong>. <strong>check again</strong> reads them all again. <code class="key">/setup</code> in the composer opens it.</p>
+<h3 id="fn-does-nothing"><a class="anchor" href="#fn-does-nothing" aria-hidden="true">#</a>fn does nothing</h3>
+<p>settings › setup shows which permission is missing. without Accessibility, <code>fn</code> works only in bise's own windows; without the microphone, it can't hear you. settings › voice and fn also has a switch for hold and for <code class="key">fn fn</code>.</p>
+<h3 id="no-notifications"><a class="anchor" href="#no-notifications" aria-hidden="true">#</a>no notifications</h3>
+<p>settings › general › macOS notifications says whether macOS allows them, with <strong>turn on</strong> or <strong>open System Settings</strong>. notifications also wait during calls, screen shares, full screen and focus mode: see settings › quiet moments.</p>
+<h3 id="it-doesnt-update"><a class="anchor" href="#it-doesnt-update" aria-hidden="true">#</a>it doesn't update</h3>
+<p>bise updates itself only from Applications. settings › general says why an update didn't happen, and offers <strong>move to Applications</strong> when that is the reason. see <a href="/docs/updates">updates</a>.</p></div><button class="fold" type="button" data-to="desktop">in bise desktop: settings › setup ›</button></div><div class="scoped" data-app="terminal"><p class="tag">bise terminal</p><div class="body"><h2 id="bise-doctor"><a class="anchor" href="#bise-doctor" aria-hidden="true">#</a>bise doctor</h2>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise doctor</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>it checks this machine (macOS, or Linux: the distro and what is off there), the install, your keys, each role's model and the running bise, without the network and without printing a key. each line is <code>✓</code> (fine) or <code>?</code> (worth a look), and every <code>?</code> says how to fix it:</p>
 <div class="code"><div class="box"><pre><code class="lang-text">checking your setup
@@ -93,11 +107,12 @@
               fix: add ~/.local/bin to PATH (the installer does it; open a new terminal)
 
 ? 1 thing to check. it says how.</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
-<p><code>bise doctor --verbose</code> says more on each line.</p>
+<p><code>bise doctor --verbose</code> says more on each line.</p></div><button class="fold" type="button" data-to="terminal">in bise terminal: bise doctor ›</button></div></div>
 <h2 id="common-problems"><a class="anchor" href="#common-problems" aria-hidden="true">#</a>common problems</h2>
 <h3 id="bise-command-not-found"><a class="anchor" href="#bise-command-not-found" aria-hidden="true">#</a><code>bise: command not found</code></h3>
 <p><code>~/.local/bin</code> isn't on your <code>PATH</code> yet. open a new terminal, or run <code>~/.local/bin/bise</code>. the installer adds the line to your shell's rc file unless you passed <code>--no-modify-path</code>.</p>
 <h3 id="a-key-doesnt-work"><a class="anchor" href="#a-key-doesnt-work" aria-hidden="true">#</a>a key doesn't work</h3>
+<p>in bise desktop, settings › models says what the provider answered when it refused a key. from a terminal:</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise providers               <span class="c"># where each key comes from</span>
 bise auth check anthropic    <span class="c"># one tiny call; says what failed</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>a key saved in bise (<code>~/.bise/auth.json</code>) wins over the one in your environment. if you changed the key in your shell, <code>bise logout &lt;provider&gt;</code> drops the saved one. when the check says the account has no credit, it links the provider's billing page.</p>
@@ -105,26 +120,27 @@ bise auth check anthropic    <span class="c"># one tiny call; says what failed</
 <p>the part before the first <code>/</code> of a model name must be a provider bise knows, or one you added under <code>[providers.x]</code> in config.toml. <code>bise models</code> lists them. see <a href="/docs/gateways">gateways and local models</a>.</p>
 <h3 id="no-answer-from-a-local-model-or-a-gateway"><a class="anchor" href="#no-answer-from-a-local-model-or-a-gateway" aria-hidden="true">#</a>no answer from a local model or a gateway</h3>
 <p><code>no answer from localhost:11434 in 90 s (timeout)</code> means the server sent nothing for 90 s. a local model reading a long prompt can take longer: raise <code>idle_timeout_sec</code> for that provider. see <a href="/docs/gateways#a-slow-server-idle_timeout_sec">a slow server</a>.</p>
-<h3 id="a-key-doesnt-reach-bise-in-ghostty"><a class="anchor" href="#a-key-doesnt-reach-bise-in-ghostty" aria-hidden="true">#</a>a key doesn't reach bise in Ghostty</h3>
+<h3 id="a-key-doesnt-reach-bise-terminal-in-ghostty"><a class="anchor" href="#a-key-doesnt-reach-bise-terminal-in-ghostty" aria-hidden="true">#</a>a key doesn't reach bise terminal in Ghostty</h3>
 <p><code class="key">cmd+v</code> with an image, <code class="key">cmd+f</code>, <code class="key">cmd+k</code>, <code class="key">cmd+a</code> and <code class="key">cmd+↑↓</code> need one line each in Ghostty's config: <code>bise setup ghostty</code>, or <code class="key">/setup</code>.</p>
 <h3 id="a-remote-mcp-server-has-no-tools"><a class="anchor" href="#a-remote-mcp-server-has-no-tools" aria-hidden="true">#</a>a remote MCP server has no tools</h3>
-<p><code>bise plugins</code> (or <code class="key">/plugins</code>) shows each server's state. <code>needs a login</code>: run <code>bise plugins login &lt;server&gt;</code>. a header that uses an unset variable leaves the server out and names the variable.</p>
+<p>settings › plugins in bise desktop, <code>bise plugins</code> or <code class="key">/plugins</code> in bise terminal, show each server's state. <code>needs a login</code>: <strong>log in</strong> there, or <code>bise plugins login &lt;server&gt;</code>. a header that uses an unset variable leaves the server out and names the variable.</p>
 <h3 id="an-agent-seems-stuck"><a class="anchor" href="#an-agent-seems-stuck" aria-hidden="true">#</a>an agent seems stuck</h3>
-<p>look for <code>?</code> in the panel: it may wait for you in the inbox (<code class="key">ctrl+1</code>). <code class="key">/interrupt</code> in its view stops its turn, and a message starts the next one. <code class="key">/stop &lt;agent&gt;</code> also takes its hands off Chrome and your apps.</p>
+<p>look for <code>?</code> next to it: it may wait for you in the inbox (<code class="key">⌘I</code> in bise desktop, <code class="key">ctrl+1</code> in bise terminal). stopping its turn (<code class="key">⌘.</code>, or <code class="key">/interrupt</code> in bise terminal) and writing to it starts the next one. <code class="key">/stop &lt;agent&gt;</code> also takes its hands off Chrome and your apps.</p>
 <h2 id="logs"><a class="anchor" href="#logs" aria-hidden="true">#</a>logs</h2>
-<div class="code"><div class="box"><pre><code class="lang-sh">bise session show            <span class="c"># the newest session&#x27;s transcript</span>
+<div class="scopes"><div class="scoped" data-app="terminal"><p class="tag">bise terminal</p><div class="body"><div class="code"><div class="box"><pre><code class="lang-sh">bise session show            <span class="c"># the newest session&#x27;s transcript</span>
 bise session show &lt;id&gt;       <span class="c"># one session (a prefix of its id works)</span>
-bise session show --context  <span class="c"># what the model sees now</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
+bise session show --context  <span class="c"># what the model sees now</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div></div><button class="fold" type="button" data-to="terminal">in bise terminal: bise session show ›</button></div></div>
+<p><code class="key">/debug</code> in either app's composer shows the raw session of the agent in view.</p>
 <h2 id="still-stuck"><a class="anchor" href="#still-stuck" aria-hidden="true">#</a>still stuck</h2>
-<p>open an issue on <a href="https://github.com/gvergnaud/bise/issues" rel="noopener">GitHub</a> with the output of <code>bise doctor</code> and what you did. it never prints a key, so you can paste it as it is; check it holds no private path you'd rather keep.</p>
+<p>open an issue on <a href="https://github.com/gvergnaud/bise/issues" rel="noopener">GitHub</a> with what you did, and the output of <code>bise doctor</code> if you have bise terminal. it never prints a key, so you can paste it as it is; check it holds no private path you'd rather keep.</p>
     </article>
-    <nav class="pn"><a class="prev" href="/docs/keys"><span>previous</span>keys and commands</a><a class="next" href="/docs/updates"><span>next</span>updates</a></nav>
+    <nav class="pn"><a class="prev" href="/docs/cli"><span>previous</span>the bise command</a><a class="next" href="/docs/updates"><span>next</span>updates</a></nav>
     <footer>
       <p>for agents: <a href="/docs/troubleshooting.md">bise.dev/docs/troubleshooting.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/troubleshooting.md">edit this page on GitHub</a></p>
     </footer>
   </main>
-  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#bise-doctor">bise doctor</a></li><li class="l2"><a href="#common-problems">common problems</a></li><li class="l3"><a href="#bise-command-not-found">bise: command not found</a></li><li class="l3"><a href="#a-key-doesnt-work">a key doesn't work</a></li><li class="l3"><a href="#unknown-provider-x">unknown provider &#x27;x&#x27;</a></li><li class="l3"><a href="#no-answer-from-a-local-model-or-a-gateway">no answer from a local model or a gateway</a></li><li class="l3"><a href="#a-key-doesnt-reach-bise-in-ghostty">a key doesn't reach bise in Ghostty</a></li><li class="l3"><a href="#a-remote-mcp-server-has-no-tools">a remote MCP server has no tools</a></li><li class="l3"><a href="#an-agent-seems-stuck">an agent seems stuck</a></li><li class="l2"><a href="#logs">logs</a></li><li class="l2"><a href="#still-stuck">still stuck</a></li></ul></aside>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2" data-app="desktop"><a href="#settings-setup">settings › setup</a></li><li class="l3" data-app="desktop"><a href="#fn-does-nothing">fn does nothing</a></li><li class="l3" data-app="desktop"><a href="#no-notifications">no notifications</a></li><li class="l3" data-app="desktop"><a href="#it-doesnt-update">it doesn't update</a></li><li class="l2" data-app="terminal"><a href="#bise-doctor">bise doctor</a></li><li class="l2"><a href="#common-problems">common problems</a></li><li class="l3"><a href="#bise-command-not-found">bise: command not found</a></li><li class="l3"><a href="#a-key-doesnt-work">a key doesn't work</a></li><li class="l3"><a href="#unknown-provider-x">unknown provider &#x27;x&#x27;</a></li><li class="l3"><a href="#no-answer-from-a-local-model-or-a-gateway">no answer from a local model or a gateway</a></li><li class="l3"><a href="#a-key-doesnt-reach-bise-terminal-in-ghostty">a key doesn't reach bise terminal in Ghostty</a></li><li class="l3"><a href="#a-remote-mcp-server-has-no-tools">a remote MCP server has no tools</a></li><li class="l3"><a href="#an-agent-seems-stuck">an agent seems stuck</a></li><li class="l2"><a href="#logs">logs</a></li><li class="l2"><a href="#still-stuck">still stuck</a></li></ul></aside>
 </div>
 <script src="/docs/docs.js" defer></script>
 </body>

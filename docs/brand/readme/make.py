@@ -1384,4 +1384,10 @@ for mode, c in PAL.items():
     os.makedirs(os.path.join(HERE, "feat"), exist_ok=True)
     for name, f in FEATS:
         open(os.path.join(HERE, "feat", f"{name}-{mode}.svg"), "w").write(f(c))
+# the desktop scenes (desk.py): the same features drawn in bise desktop's look
+exec(open(os.path.join(HERE, "desk.py")).read())
+for mode in DPAL:
+    for name, f in DESK:
+        out = f"{name}-{mode}.svg" if name.startswith("demo-b") else os.path.join("feat", f"{name}-{mode}.svg")
+        open(os.path.join(HERE, out), "w").write(f(mode))
 print("ok")

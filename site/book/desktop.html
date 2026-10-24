@@ -7,6 +7,9 @@
 <link rel="icon" href="../favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Instrument+Sans:wght@400;500;600;700&family=Recursive:wght,CASL@300..800,0..1&family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
+  /* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.mjs) */
+  :where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
+  :is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
   :root { --page:#0b0a09; --bg:#141211; --soft:#1a1715; --raised:#221e1c; --hi:#2b2623; --text:#ece6da; --dim:#8f887d; --faint:#3d3935; --wind:#4a4540; --line:#2a2623; --acc:#f4a6b0; --err:#e8847a;
           --kw:#d7a6f0; --str:#b9d99a; --com:#857e74; --fn:#8fc4f0; }
   .light { --bg:#f7f4ee; --soft:#f0ebe3; --raised:#fbf8f3; --hi:#ebe4d8; --text:#1b1917; --dim:#77706a; --faint:#d6cfc4; --wind:#cbc3b6; --line:#e4ddd1; --acc:#b8416b; --err:#b8412e;

@@ -27,6 +27,8 @@ import { lookOf } from './maps';
 import type { MapLook } from './maps/look';
 import { makeUnlock } from './unlock';
 import { seatChair } from './furniture';
+import { POOF_S } from './poof';
+import { makePoofs, type Poof } from './poofs';
 import type { Style } from './style';
 
 /** the length on screen (css px) the loop and the zigzag are sized for, its office length for that; the shadow's own length (plane.ts) */
@@ -149,6 +151,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   const shownLast = new Set<string>();
   const appearing = new Map<string, number>();
   let primed = false;
+  // and a soft poof as it does (poof.ts, main m_38961): seen, never kitsch; none under reduced motion
+  const poofs = makePoofs(root, style);
+  const poofList: Poof[] = [];
 
   /** the office's map's look (the loft before an office) */
   function mapLook(): MapLook {
@@ -511,7 +516,10 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         const skater = look.reduced ? null : park ? skateRig(f.name, f.pose, park, b.outfit.phase) : gym ? climbRig(f.name, f.pose, gym) : null;
         const rig = eggRig(skater ?? rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt }), f.egg ?? null);
         b.apply(rig);
-        if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) appearing.set(f.name, t);
+        if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) {
+          appearing.set(f.name, t);
+          poofList.push({ x: rig.x, y: 0, z: rig.z, t0: t, seed: hash(f.name) });
+        }
         const since = appearing.get(f.name);
         if (since !== undefined) {
           const p = (t - since) / APPEAR_S;
@@ -528,6 +536,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       for (const name of seen) shownLast.add(name);
       if (frames.length > 0) primed = true;
       if (appearing.size > 0) motion = 'walk';
+      while (poofList.length > 0 && (poofList[0]?.t0 ?? t) + POOF_S <= t) poofList.shift();
+      if (poofs.draw(t, poofList, fit.scale)) motion = 'walk';
       // the halo reads on the floor as lit: the night's (light) when the lamps are on, in the office
       drawHalos(frames, themed ? look.night : (lamps ?? 0) >= 0.5);
       lightDesks();
@@ -577,6 +587,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       if (world) { root.remove(world.root); world.dispose(); world = null; }
       if (eggDecor) { eggDecor.dispose(); eggDecor = null; }
       unlock.dispose();
+      poofs.dispose();
       for (const b of bims.values()) b.dispose();
       bims.clear();
       for (const p of planes.values()) p.mesh.dispose();

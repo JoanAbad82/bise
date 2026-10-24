@@ -184,6 +184,7 @@ mod tests {
             turns: 0,
             procs: 0,
             procs_port: None,
+            rank: None,
         }
     }
 

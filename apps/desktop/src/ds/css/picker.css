@@ -92,7 +92,6 @@
   min-height: var(--h-row);
   padding: 0 var(--s-3);
   border-radius: var(--r-2);
-  cursor: default;
 }
 .b-picker-row.two {
   min-height: calc(var(--h-row) + var(--s-3));
@@ -207,7 +206,6 @@
   padding: 0 var(--s-2);
   border-radius: var(--r-2);
   color: var(--c-text-2);
-  cursor: default;
 }
 .b-picker-seg .it:hover {
   background: var(--c-hover);

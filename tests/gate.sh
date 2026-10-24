@@ -68,6 +68,9 @@
 #   gate.sh wait <bg .out file | pid>
 #                     the bash tool put a gate in the background: block until
 #                     it ends (at most 25 s), then show its end and exit code.
+#   gate.sh stop      stop the gate running in this checkout (and what it
+#                     started), not another agent's: never pkill a gate by
+#                     name, macOS pkill matches every agent's (repl-kill).
 # "Changed" = the tree vs GATE_BASE (default HEAD), untracked files included.
 # CARGO_TARGET_DIR is honoured (the e2e/tmux tests run its bise); unset,
 # in a task worktree the hub made (<task dir>/<repo> with <task dir>/owner)
@@ -131,6 +134,35 @@ seed_from() {  # in the repo root: the seed to clone, this deps key's, else the 
   echo "$from"
 }
 proc_start() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' _; }
+# the gate dir: runs <gpre><pid> (each with .owner, its start, and .root, its
+# checkout), the lock, a red step's log
+gate_dirs() {
+  if [ -n "${BISE_HOME:-}" ] || [ -f "$HOME/.bise/migrated.json" ]; then
+    gdir="${BISE_HOME:-$HOME/.bise}/gate" gpre="${BISE_HOME:-$HOME/.bise}/gate/"
+  else
+    gdir=/tmp gpre=/tmp/bise-gate-
+  fi
+}
+# gate.sh stop: the gates running in checkout $1 (a run whose .root is it and
+# whose pid still runs with the start in .owner) get a TERM; each one's exit
+# kills what its run started. Never pkill a gate by name: every agent's gate
+# matches (macOS pkill reads its options only before the pattern, so a -P or
+# -u after "gate.sh quick" narrows nothing: repl-kill, 2026-10-24).
+gate_stop() {
+  local d p n=0
+  gate_dirs
+  for d in "$gpre"[0-9]*; do
+    [ -d "$d" ] && [ "$(cat "$d/.root" 2>/dev/null)" = "$1" ] || continue
+    p="${d##*[-/]}"
+    kill -0 "$p" 2>/dev/null && [ "$(proc_start "$p")" = "$(cat "$d/.owner" 2>/dev/null)" ] || continue
+    kill -TERM "$p" 2>/dev/null || continue
+    n=$((n + 1)); echo "stopping the gate $p in $1"
+    for _ in $(seq 50); do kill -0 "$p" 2>/dev/null || break; sleep 0.2; done
+    kill -0 "$p" 2>/dev/null && echo "the gate $p still runs after 10 s"
+  done
+  [ $n -gt 0 ] || echo "no gate runs in $1"
+  return 0
+}
 older_than_a_minute() { [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }
 # whether this change runs desktop_check (tests/test_map.py desktop): its
 # why on stdout, nothing when it doesn't
@@ -358,7 +390,8 @@ if [ "$mode" = light ]; then
   if [ -z "$why" ]; then echo light; exit 0; fi
   echo "heavy:$why"; exit 1
 fi
-case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|light|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
+[ "$mode" = stop ] && { gate_stop "$(cd "$(dirname "$0")/.." && pwd)"; exit 0; }
+case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|light|new [name]|done [name]|wait <file|pid>|stop]" >&2; exit 2 ;; esac
 cd "$(dirname "$0")/.."
 root="$PWD"
 # a linked worktree has a .git file (the shared checkout a directory); a
@@ -416,18 +449,29 @@ gate_procs() {  # <marker> <pid whose descendants go too | ""> <worktree binary 
     }
     END {
       for (p = self; p > 1 && !(p in anc); p = pp[p]) anc[p] = 1
+      # the groups of our callers (a test pool, run_all, an orphaned hub that
+      # started this gate): a match in one of them dies alone, never with its
+      # group, or a gate inside a test kills the pool around it (release-52
+      # m_39422: run_all s xargs got a TERM while land_every_e2e ran)
+      for (a in anc) ag[pg[a]] = 1
       # this snapshot: the ps, its subshell and the subshell s children (awk)
       for (i = 1; i <= n; i++) if (cmd[ids[i]] == "ps -axww -o pid=,ppid=,pgid=,command=") sub_sh = pp[ids[i]]
       for (i = 1; i <= n; i++) { p = ids[i]; if (p == sub_sh || pp[p] == sub_sh) anc[p] = 1 }
       for (i = 1; i <= n; i++) { p = ids[i]
         # the tees of the run log (gate dir/logs): they end with its output
         if (tmux(cmd[p]) || (keep != "" && index(cmd[p], keep))) continue
-        if (index(cmd[p], m) || (me != "" && pp[p] == me) || orphan_bin(p)) { k[p] = 1; if (pg[p] != pg[self]) g[pg[p]] = 1 }
+        if (index(cmd[p], m) || (me != "" && pp[p] == me) || orphan_bin(p)) { k[p] = 1; if (pg[p] != pg[self] && !(pg[p] in ag)) g[pg[p]] = 1 }
       }
       for (i = 1; i <= n; i++) { p = ids[i]; if (pg[p] in g) k[p] = 1 }
       do { ch = 0; for (i = 1; i <= n; i++) { p = ids[i]; if (!(p in k) && (pp[p] in k)) { k[p] = 1; ch = 1 } } } while (ch)
       for (p in k) if (!(p in anc) && !tmux(cmd[p]) && !(keep != "" && index(cmd[p], keep))) print p
     }'
+}
+gate_nested() {  # the pid of the live gate this one runs under, or nothing
+  # (BISE_GATE_RUN and its start time, exported by every gate below)
+  [ -n "${BISE_GATE_RUN:-}" ] && [ "$BISE_GATE_RUN" != $$ ] && [ -n "${BISE_GATE_START:-}" ] \
+    && [ "$(proc_start "$BISE_GATE_RUN")" = "$BISE_GATE_START" ] && echo "$BISE_GATE_RUN"
+  return 0
 }
 gate_kill() {  # <pids>: TERM, then KILL what is left half a second later
   [ -n "$1" ] || return 0
@@ -437,18 +481,19 @@ gate_kill() {  # <pids>: TERM, then KILL what is left half a second later
 }
 # in a task's worktree, its own binaries left alone by a dead parent
 wt_bins=""
-if [ -f "$root/.git" ]; then
+# a gate started under a live gate (a test's land check: land_every_e2e's
+# worktree cases run gate.sh land under the tip gate's run_all) sweeps
+# nothing of its caller's: the dead runs and the orphans of its binaries are
+# the outer gate's to sweep. Its own run's processes still die with it.
+nested="$(gate_nested)"
+if [ -f "$root/.git" ] && [ -z "$nested" ]; then
   t="$(cd "${CARGO_TARGET_DIR:-rust/target}" 2>/dev/null && pwd -P)"
   wt_bins="$root/repl-live $root/repl-scripted $root/sb-core ${t:+$t/debug/bise}"
 fi
 # the leftovers of dead runs (a kill -9, a crash): their processes now; their
 # folder (the logs of a red run) after a day
 # the gate dir (above): runs <gpre><pid>, the lock, a red step's log
-if [ -n "${BISE_HOME:-}" ] || [ -f "$HOME/.bise/migrated.json" ]; then
-  gdir="${BISE_HOME:-$HOME/.bise}/gate" gpre="${BISE_HOME:-$HOME/.bise}/gate/"
-else
-  gdir=/tmp gpre=/tmp/bise-gate-
-fi
+gate_dirs
 mkdir -p "$gdir"
 # what a run's processes name in their command line: its folder (a /tmp
 # one without /tmp: python may show it as /private/tmp)
@@ -457,12 +502,12 @@ gate_mark() { case "$1" in /tmp/bise-gate-*) echo "/bise-gate-${1##*-}/" ;; *) e
 gate_prune() {
   find "$1" -mindepth 1 -maxdepth 1 ! -name 'sb-run-all.*' ! -name .owner -exec rm -rf {} + 2>/dev/null
   for l in "$1"/sb-run-all.*; do
-    [ -d "$l" ] && find "$l" -mindepth 1 -maxdepth 1 ! -name '*.log' -exec rm -rf {} + 2>/dev/null
+    [ -d "$l" ] && find "$l" -mindepth 1 -maxdepth 1 ! -name '*.log' ! -name '*.keep' -exec rm -rf {} + 2>/dev/null
   done
   return 0
 }
 for d in "$gpre"[0-9]* /tmp/bise-gate-[0-9]*; do
-  [ -d "$d" ] || continue
+  [ -z "$nested" ] && [ -d "$d" ] || continue
   p="${d##*[-/]}"
   kill -0 "$p" 2>/dev/null && [ "$(proc_start "$p")" = "$(cat "$d/.owner" 2>/dev/null)" ] && continue
   gate_kill "$(gate_procs "$(gate_mark "$d")" "")"
@@ -470,8 +515,9 @@ for d in "$gpre"[0-9]* /tmp/bise-gate-[0-9]*; do
 done
 [ -n "$wt_bins" ] && gate_kill "$(gate_procs "/bise-gate-none/" "" $wt_bins)"
 run="$gpre$$"
-rm -rf "$run"; mkdir -p "$run" && proc_start $$ >"$run/.owner" || { echo "gate: cannot write $run"; exit 1; }
-export TMPDIR="$run" BISE_GATE_RUN=$$
+rm -rf "$run"; mkdir -p "$run" && proc_start $$ >"$run/.owner" && echo "$root" >"$run/.root" || { echo "gate: cannot write $run"; exit 1; }
+echo "gate $mode (pid $$): stop it with tests/gate.sh stop, never pkill (it matches every agent's gate)"
+export TMPDIR="$run" BISE_GATE_RUN=$$ BISE_GATE_START="$(cat "$run/.owner")"
 # every quick/full/rerun keeps its output in <gate dir>/logs/ for 7 days,
 # whatever the caller did with it (a task's tmp goes at its drop, a green
 # run's folder at its end): the loop audit's record (scripts/loop_audit.py)
@@ -574,7 +620,7 @@ printf '%s\n' "$changed" | grep -qE '^bend/(hub|vendor)/' && hub_changed=1
 printf '%s\n' "$changed" | grep -qE '^bend/(core|hub|vendor|laws|proofs)/.*\.bend$' && bend_changed=1
 # a light run (heavy-run's light lane: HEAVY_SLOT 'light <pid>', no slot, no disk reserve) runs
 # no heavy step, whatever changed since heavy-run asked `gate.sh light` (review-gates m_37126)
-if [ "$mode" = quick ] && [ "${HEAVY_SLOT%% *}" = light ]; then
+if [ "$mode" = quick ] && [ "${HEAVY_SLOT:-}" != "" ] && [ "${HEAVY_SLOT%% *}" = light ]; then
   lw="$(map_paths $changed; heavy_why)"
   [ -n "$lw" ] && { echo "FAIL heavy step in a light run:$lw: rerun through heavy-run (HEAVY_NO_LIGHT=1)"; echo "GATE quick FAILED"; exit 1; }
 fi
@@ -850,6 +896,8 @@ python3 "$root/tests/include_map.py" --self-test >/dev/null || { python3 "$root/
 # on synthetic coverage (fast-try p2; review-gates m_29412)
 python3 -B "$root/tests/desktop_pick_test.py" >/dev/null || { python3 -B "$root/tests/desktop_pick_test.py"; echo "GATE quick FAILED"; exit 1; }
 # every build that ships a runtime checks it is whole for the viewer (the xlsx grid; xlsx-fix)
+python3 -B "$root/tests/gate_sweep_test.py" >/dev/null || { python3 -B "$root/tests/gate_sweep_test.py"; echo "GATE quick FAILED"; exit 1; }
+python3 -B "$root/tests/keep_logs_test.py" >/dev/null || { python3 -B "$root/tests/keep_logs_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/runtime_check_test.py" >/dev/null || { python3 -B "$root/tests/runtime_check_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 if [ -d "$root/apps/desktop" ]; then

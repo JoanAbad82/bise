@@ -14,7 +14,15 @@ an API key bills each call. a plan is a monthly price you may already pay. bise 
 | MiniMax M plan | the plan's API key | `bise login minimax` |
 | Claude Max or Team | its monthly API credits, through a key of a linked Console org | `bise login anthropic` |
 
-the first run asks how you want to pay for the models: Continue with ChatGPT, OpenRouter, an API key, or a coding plan key. later, `/provider` adds or changes any of them.
+the first run asks how you want to pay for the models: ChatGPT, OpenRouter, an API key, or a coding plan key. later:
+
+::: desktop settings › models
+settings › models has a row per plan: **sign in** opens your browser, and the row says `✓ signed in` when it's done. an expired sign-in says which agents wait on it, with **sign in again**.
+:::
+
+::: terminal /provider, bise login
+`/provider` adds or changes any of them, or `bise login <plan>` in a terminal, as in the table.
+:::
 
 ## ChatGPT Plus or Pro
 
@@ -22,7 +30,7 @@ bise signs in with OpenAI's "Sign in with ChatGPT": your ChatGPT plan pays for t
 
 ### sign in
 
-in bise, the first run's **Continue with ChatGPT**, or `/provider`, then ChatGPT. in a terminal:
+in bise, the first run's ChatGPT, or later settings › models (bise desktop) or `/provider` (bise terminal). in a terminal:
 
 ```sh
 bise login chatgpt

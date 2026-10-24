@@ -21,6 +21,7 @@ export function Pill({ name, pill, onOpen }: { name: string; pill: 'asks' | 'fai
   return (
     <span
       className={`bims-pill ${pill}`}
+      role="button"
       data-pill={pill}
       data-testid={`app.right.bims.pill.${name}`}
       {...tipAttrs(pill === 'asks' ? bims.pill_asks_tip({ agent: name }) : bims.pill_failed_tip({ agent: name }))}

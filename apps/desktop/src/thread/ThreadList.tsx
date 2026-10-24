@@ -73,6 +73,9 @@ export interface ThreadListProps {
   /** under the newest row, the scrollable list's end (its footer): drawn in
    * the same frame as the change that adds it (his sends before they land) */
   tail?: ReactNode;
+  /** over the list's bottom edge, under its last row, out of the layout (thread-loading's cue):
+   * nothing moves when it comes or goes */
+  cue?: ReactNode;
   testId?: string;
   ref?: Ref<ThreadListHandle>;
   /** where his scroll is kept across a reload (keep.ts 'scroll:<it>', 10 minutes); none: not kept */
@@ -152,7 +155,7 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
-export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart, reactKey, onReading, onRead }: ThreadListProps) {
+export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, ref, keepKey, holdPart, reactKey, onReading, onRead }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
   // "state from the previous render" pattern): no effect, no extra frame
@@ -646,6 +649,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         components={head !== undefined && more ? { Header: () => head, Footer: ListEnd } : END}
         increaseViewportBy={{ top: 600, bottom: 300 }}
       />
+      {cue}
       {!atBottom && !stuck && (
         <Press look="th-to-end" onClick={toEnd} data-testid="thread.to-end">
           ↓ back to the bottom{seen.unseen > 0 ? ` · ${String(seen.unseen)} new` : ''}

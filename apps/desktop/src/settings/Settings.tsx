@@ -132,6 +132,8 @@ export function Settings({ page, ports, prefs, ...data }: SettingsProps) {
         testId={`settings.page.${at.id}`}
         title={at.title}
         sub={at.sub}
+        // each section's hero card (designer's page-hero); plugins gets its own on the plugins feature
+        hero={at.id !== 'plugins'}
         nav={PAGES.map((p) => (
           <Row
             key={p.id}

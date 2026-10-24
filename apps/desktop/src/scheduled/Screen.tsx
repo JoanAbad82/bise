@@ -4,13 +4,14 @@
 // '‹ scheduled'). x stops one after asking in place. The keys are the shared list keys
 // (app/listkeys.ts) plus the TUI's r, x, / and esc (tui-parity m_22176). Owner: amb-mac (amb-kit's before).
 import { useState, type KeyboardEvent } from 'react';
-import { Button, Field } from '@/ds';
+import { Button, Field, PageHero } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
 import { useStore } from '@/store';
 import { useKeptScroll } from '@/app/keep';
 import { scheduled } from '@/proto/words_scheduled.gen';
 import { useAllScheduled } from './hooks';
-import { asks, bySoonest, matches, endsWords, howOften, keyOf, nextRunWords, nextWords, runsWords, wakes, type Task } from './model';
+import { asks, bySoonest, heroFacts, matches, endsWords, howOften, keyOf, nextRunWords, nextWords, runsWords, wakes, type Task } from './model';
 import './scheduled.css';
 
 export interface ScheduledPorts {
@@ -24,7 +25,7 @@ export interface ScheduledPorts {
 export function ScheduledScreen() {
   const store = useStore();
   const tasks = useAllScheduled();
-  useKeptScroll('scheduled', () => document.querySelector<HTMLElement>('[data-testid="scheduled.list"]'));
+  useKeptScroll('scheduled', () => document.querySelector<HTMLElement>('[data-testid="scheduled.scroll"]'));
   return (
     <ScheduledView
       tasks={tasks}
@@ -106,11 +107,9 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
       onKeyDown={onKeyDown}
     >
       <div className="sch-main">
-        <header className="sch-head">
-          <div className="sch-h1">{scheduled.heading}</div>
-          <div className="sch-h2">{scheduled.subtitle}</div>
-          <span className="sch-count" data-testid="scheduled.count">{scheduled.count_desktop({ n: list.length })}</span>
-        </header>
+        {/* one scroller: the hero scrolls away with the list (designer m_39330), the key line stays */}
+        <div className="sch-scroll" data-testid="scheduled.scroll">
+        <PageHero name={scheduled.heading} sentence={hero.scheduled_say} facts={heroFacts(list, now)} testId="scheduled.hero" />
         {list.length > 0 && (
           <span className="sch-search">
             <Field slash placeholder={scheduled.search_placeholder} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
@@ -140,6 +139,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
             ))}
           </div>
         )}
+        </div>
         <div className="sch-keys" data-testid="scheduled.keys">
           <span><b>⏎</b> {scheduled.key_open}</span>
           {ports.runNow && <span><b>r</b> {scheduled.key_run_now}</span>}

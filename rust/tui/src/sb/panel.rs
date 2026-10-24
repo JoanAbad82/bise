@@ -608,6 +608,8 @@ pub(crate) fn draw_panel(app: &App, frame: &mut Frame, area: Rect) {
     // the shared worktrees' sections, rows [start, end): never split by
     // the scroll (pr-design §4.1)
     let mut boxes: Vec<(usize, usize)> = Vec::new();
+    // agent-rank: the numbers hold still while ⌥ is held
+    sb.alt_held(crate::ctrlhint::held(app) == Some(crate::ctrlhint::Held::Alt));
     let numbers = sb.numbers();
     let held = crate::ctrlhint::words(app);
     let mut owners: Vec<(usize, Hit)> = Vec::new();
@@ -1028,9 +1030,10 @@ struct View {
 pub(crate) struct PanelHits {
     pub(super) area: Rect,
     rows: Vec<(u16, Hit)>,
-    /// The panel's numbers (Alt+N): agent name → number, kept while the
-    /// agent lives (see [`Sb::numbers`]).
-    slots: Vec<(String, usize)>,
+    /// The panel's numbers (Alt+N) as last shown: agent name → number
+    /// (see [`Sb::numbers`]), and when they hold still.
+    shown: Vec<(String, usize)>,
+    hold: super::numbers::Hold,
     /// The first body row you scrolled to (the wheel, a `↑`/`↓` row),
     /// and the selection's row then: a new selection (Alt+↑/↓, a card
     /// shown) drops it, the panel follows the selection again.
@@ -1046,43 +1049,39 @@ impl PanelHits {
 }
 
 impl Sb {
-    /// The number of every live agent: main 0; an agent keeps its number
-    /// while it lives (a drop does not renumber the others); a new one
-    /// takes the smallest free number, so the first agents get 1, 2, 3 in
-    /// creation order. Only 0-9 are shown and reachable with Alt+N.
+    /// The number of every live agent: the hub's rank (numbers.rs), main
+    /// 0; held as shown while ⌥ is down and a moment after an ⌥N jump.
+    /// Only 0-9 are shown and reachable with Alt+N.
     pub(crate) fn numbers(&self) -> Vec<(String, usize)> {
         let live: Vec<&Agent> = self.agents.iter().filter(|a| !a.archived()).collect();
+        let next = super::numbers::ranked(&live);
         let Ok(mut hits) = self.panel_hits.try_borrow_mut() else {
-            return assign(Vec::new(), &live);
+            return next;
         };
-        let slots = assign(std::mem::take(&mut hits.slots), &live);
-        hits.slots = slots.clone();
-        slots
+        let shown = if hits.hold.on(std::time::Instant::now()) { super::numbers::held(&hits.shown, next) } else { next };
+        hits.shown = shown.clone();
+        shown
     }
 
     /// The live agent with number `n`, if any.
     pub(crate) fn agent_numbered(&self, n: usize) -> Option<String> {
         self.numbers().into_iter().find(|(_, k)| *k == n).map(|(name, _)| name)
     }
-}
 
-/// `slots` brought up to date with the `live` agents (hub order): the
-/// gone ones free their number, main is 0, a newcomer takes the smallest
-/// free number from 1.
-fn assign(mut slots: Vec<(String, usize)>, live: &[&Agent]) -> Vec<(String, usize)> {
-    slots.retain(|(name, n)| live.iter().any(|a| a.name == *name && (a.main == (*n == 0))));
-    for a in live {
-        if slots.iter().any(|(name, _)| *name == a.name) {
-            continue;
+    /// ⌥ is held now or not (the frame's `ctrlhint::held`): the numbers
+    /// hold still while it is.
+    pub(crate) fn alt_held(&self, alt: bool) {
+        if let Ok(mut hits) = self.panel_hits.try_borrow_mut() {
+            hits.hold.alt = alt;
         }
-        let n = if a.main {
-            0
-        } else {
-            (1..).find(|k| !slots.iter().any(|(_, n)| n == k)).unwrap_or(1)
-        };
-        slots.push((a.name.clone(), n));
     }
-    slots
+
+    /// An ⌥N jump: the numbers hold still a moment ([`super::numbers::HOLD`]).
+    pub(crate) fn jumped(&self) {
+        if let Ok(mut hits) = self.panel_hits.try_borrow_mut() {
+            hits.hold.jumped = Some(std::time::Instant::now());
+        }
+    }
 }
 
 impl PanelHits {
@@ -1804,49 +1803,47 @@ mod tests {
         assert_eq!(viewed_working(&app).map(|w| w.motion), Some(Motion::Calm(3)));
     }
 
-    /// Numbers stay while an agent lives: a drop does not renumber the
-    /// others, Alt+N follows the number shown; a newcomer takes the free
-    /// number, and the rows go in number order (QA M).
+    /// agent-rank: the rows go in the hub's rank order and Alt+N follows
+    /// the number shown; after an Alt+N jump the numbers hold still while
+    /// the hub's order moves, a drop frees its number, a newcomer goes last.
     #[test]
-    fn numbers_survive_a_drop() {
+    fn numbers_follow_the_rank_and_hold_after_a_jump() {
         use crossterm::event::{KeyCode, KeyEvent};
         let mut app = bench::test_app_drained();
         {
             let sb = &mut app.sb;
-            sb.agents.push(Agent { name: "main".into(), main: true, status: "idle".into(), ..Agent::default() });
-            for n in ["a", "b", "c"] {
-                sb.agents.push(agent(n, "working"));
+            sb.agents.push(Agent { name: "main".into(), main: true, status: "idle".into(), rank: Some(0), ..Agent::default() });
+            for (n, r) in [("a", 3), ("b", 1), ("c", 2)] {
+                sb.agents.push(Agent { rank: Some(r), ..agent(n, "working") });
             }
         }
         let num = |app: &App, n: &str| app.sb.numbers().into_iter().find(|(x, _)| x == n).map(|(_, k)| k);
         let t = trimmed(&panel_rows(&app, 28, 10));
-        assert!(t.iter().any(|r| r.starts_with(&format!(" 3 {} c", G_WORKING))), "{}", t.join("\n"));
-        assert_eq!((num(&app, "a"), num(&app, "b"), num(&app, "c")), (Some(1), Some(2), Some(3)));
-        // a is dropped (archived): b and c keep 2 and 3
-        app.sb.agents[1].status = "archived".into();
-        let t = trimmed(&panel_rows(&app, 28, 10));
-        assert!(t.iter().any(|r| r.starts_with(&format!(" 2 {} b", G_WORKING))), "{}", t.join("\n"));
-        assert!(t.iter().any(|r| r.starts_with(&format!(" 3 {} c", G_WORKING))), "{}", t.join("\n"));
-        assert_eq!(num(&app, "a"), None);
-        // Alt+3 goes to c, Alt+1 to no one, Alt+0 to main
-        key(&mut app, &KeyEvent::new(KeyCode::Char('3'), KeyModifiers::ALT), false);
+        let row_of = |t: &[String], p: &str| t.iter().position(|r| r.trim_end().ends_with(p)).unwrap_or(usize::MAX);
+        assert!(row_of(&t, " b") < row_of(&t, " c") && row_of(&t, " c") < row_of(&t, " a"), "{}", t.join("\n"));
+        assert_eq!((num(&app, "a"), num(&app, "b"), num(&app, "c")), (Some(3), Some(1), Some(2)));
+        // Alt+2 goes to c, Alt+0 to main
+        key(&mut app, &KeyEvent::new(KeyCode::Char('2'), KeyModifiers::ALT), false);
         assert_eq!(app.sb.focus, "c");
+        // the hub moves a first and drops b: just after the jump, the numbers hold
+        app.sb.agents[1].rank = Some(1);
+        app.sb.agents[3].rank = Some(2);
+        app.sb.agents[2].status = "archived".into();
+        assert_eq!((num(&app, "a"), num(&app, "b"), num(&app, "c")), (Some(3), None, Some(2)));
+        key(&mut app, &KeyEvent::new(KeyCode::Char('3'), KeyModifiers::ALT), false);
+        assert_eq!(app.sb.focus, "a");
         key(&mut app, &KeyEvent::new(KeyCode::Char('1'), KeyModifiers::ALT), false);
-        assert_eq!(app.sb.focus, "c", "no agent 1 any more");
+        assert_eq!(app.sb.focus, "a", "no agent 1 while the numbers hold");
         key(&mut app, &KeyEvent::new(KeyCode::Char('0'), KeyModifiers::ALT), false);
         assert_eq!(app.sb.focus, "main");
-        // a newcomer takes the free number 1; the others keep theirs
-        app.sb.agents.push(agent("d", "starting"));
-        assert_eq!((num(&app, "d"), num(&app, "b"), num(&app, "c")), (Some(1), Some(2), Some(3)));
-        // QA M: its row is at its number, before b and c (not last)
-        let t = trimmed(&panel_rows(&app, 28, 10));
-        let row_of = |p: &str| t.iter().position(|r| r.starts_with(p)).unwrap_or(usize::MAX);
-        assert!(row_of(" 1 ") < row_of(" 2 ") && row_of(" 2 ") < row_of(" 3 "), "{}", t.join("\n"));
-        key(&mut app, &KeyEvent::new(KeyCode::Char('1'), KeyModifiers::ALT), false);
-        assert_eq!(app.sb.focus, "d");
-        // restored, a comes back with a free number (4)
-        app.sb.agents[1].status = "idle".into();
-        assert_eq!(num(&app, "a"), Some(4));
+        // a newcomer while they hold goes after the last
+        app.sb.agents.push(Agent { rank: Some(1), ..agent("d", "starting") });
+        assert_eq!(num(&app, "d"), Some(4));
+        // the hold over, the hub's order comes back
+        app.sb.panel_hits.borrow_mut().hold = Default::default();
+        app.sb.agents[1].rank = Some(2);
+        app.sb.agents[3].rank = Some(3);
+        assert_eq!((num(&app, "d"), num(&app, "a"), num(&app, "c")), (Some(1), Some(2), Some(3)));
     }
 
     /// sidebar-more: a click on `↓ n more` scrolls a page less one row

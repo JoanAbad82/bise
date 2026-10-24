@@ -1,6 +1,23 @@
-// bise.dev/docs: theme, copy buttons, search, the phone menu, "on this page".
+// bise.dev/docs: theme, the desktop / terminal switch, copy buttons, search, the phone menu, "on this page".
 (() => {
   const r = document.documentElement;
+
+  // the reader's app (page.tmpl's head script set app-desktop or app-terminal): the switch, a
+  // folded block's line, and an 'in bise terminal: … ›' link flip it; the block keeps its place
+  const app = () => (r.classList.contains('app-terminal') ? 'terminal' : 'desktop');
+  const pick = (a, keep) => {
+    r.classList.toggle('app-desktop', a === 'desktop');
+    r.classList.toggle('app-terminal', a === 'terminal');
+    try { localStorage.setItem('bise-docs-app', a); } catch {}
+    for (const b of document.querySelectorAll('.appswitch button')) b.setAttribute('aria-pressed', b.dataset.app === a);
+    if (keep) {
+      const before = keep.getBoundingClientRect().top;
+      scrollBy(0, keep.getBoundingClientRect().top - before);
+    }
+  };
+  pick(app());
+  for (const b of document.querySelectorAll('.appswitch button')) b.onclick = () => pick(b.dataset.app);
+  for (const b of document.querySelectorAll('.scoped .fold')) b.onclick = () => pick(b.dataset.to, b.closest('.scoped'));
 
   // ◐ and the d key, the same stored choice as the landing (bise-theme)
   const dark = (on, keep) => {
@@ -59,11 +76,13 @@
         else if (x.includes(w)) score += 1 + Math.min(3, x.split(w).length - 1) / 2;
         else return null;
       }
+      // the reader's app first: a hit of the other app only after the rest
+      if (e.app && e.app !== app()) score -= 100;
       return { e, score };
     }).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 8);
     on = 0;
     box.innerHTML = hits.length
-      ? hits.map(({ e }, i) => `<a href="${e.p}${e.a ? '#' + e.a : ''}" class="${i === 0 ? 'on' : ''}"><span>${esc(e.h || e.t)}</span>${e.h ? ` <span class="where">· ${esc(e.t)}</span>` : ''}<span class="snip">${snippet(e.x, words)}</span></a>`).join('')
+      ? hits.map(({ e }, i) => `<a href="${e.p}${e.a ? '#' + e.a : ''}" class="${i === 0 ? 'on' : ''}"><span>${esc(e.h || e.t)}</span>${e.h ? ` <span class="where">· ${esc(e.t)}</span>` : ''}${e.app ? ` <span class="tag">bise ${e.app}</span>` : ''}<span class="snip">${snippet(e.x, words)}</span></a>`).join('')
       : '<div class="none">nothing found. try another word.</div>';
     box.hidden = false;
   };
@@ -92,8 +111,10 @@
   if (links.length && 'IntersectionObserver' in window) {
     const heads = links.map((a) => document.getElementById(a.hash.slice(1))).filter(Boolean);
     const mark = () => {
-      let cur = heads[0];
-      for (const h of heads) if (h.getBoundingClientRect().top < 120) cur = h;
+      const shown = heads.filter((h) => h.offsetParent !== null);
+      let cur = shown[0];
+      if (!cur) return;
+      for (const h of shown) if (h.getBoundingClientRect().top < 120) cur = h;
       links.forEach((a) => a.classList.toggle('on', a.hash === '#' + cur.id));
     };
     addEventListener('scroll', mark, { passive: true });

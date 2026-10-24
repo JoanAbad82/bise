@@ -6,10 +6,10 @@ const row = (project: string, path: string): ProjectRow => ({ project, name: pat
 const BROKEN = "bise's runtime is missing: no repl-live in /Applications/bise.app/Contents/Resources/bin. reinstall bise";
 
 describe("the add sheet's waits never spin forever (ambient-lead m_18490)", () => {
-  it('the scan counts its seconds, then says what it found, or why not', () => {
+  it('the scan looks, then says what it found, or why not', () => {
     const s = { answered: false, n: 0, error: null, broken: null, ms: 0 };
     expect(scanSay(s)).toEqual({ kind: 'looking', text: 'looking in your folders…' });
-    expect(scanSay({ ...s, ms: 3_400 }).text).toBe('looking in your folders… · 3 s');
+    expect(scanSay({ ...s, ms: 3_400 }).text).toBe('looking in your folders…');
     expect(scanSay({ ...s, answered: true, n: 2 })).toEqual({ kind: 'found', n: 2, text: 'found in your folders · 2' });
     expect(scanSay({ ...s, answered: true, n: 0 }).text).toBe('nothing new in your folders');
     expect(scanSay({ ...s, error: 'no such folder' })).toEqual({ kind: 'failed', text: '▲ the look in your folders failed: no such folder' });

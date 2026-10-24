@@ -19,8 +19,7 @@
 .b-composer .box:focus-within{box-shadow:0 0 0 1px var(--c-focus)}
 .b-composer .in{min-width:0;caret-color:var(--c-text);color:var(--c-text)}
 .b-composer .in [contenteditable]{outline:0;white-space:pre-wrap;overflow-wrap:anywhere}
-.b-composer button.send{padding:0;border:0;font-family:var(--font-ui);cursor:default}
-.b-composer button.send:disabled{cursor:default}
+.b-composer button.send{padding:0;border:0;font-family:var(--font-ui)}
 .b-composer button.send:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
 
 /* the spotlight's real input */
@@ -68,7 +67,7 @@
    the editor shows no border or outline of its own on hover or focus (his round 2) */
 .b-composer .in .b-field:not(.is-focus):not(.is-error):not(:focus-within):hover,.b-composer .in .b-field.b-field:focus,.b-composer .in .b-field.b-field:focus-within{box-shadow:none;outline:0;border:0}
 .b-composer .box{cursor:text}
-.b-composer .box .send{cursor:default}
+.b-composer .box .send{cursor:pointer}
 .b-chip[role=button]:hover,.b-chip[role=button].is-hover{background:var(--c-active)}
 .b-tabs>span:not(.on):hover{background:var(--c-active)}
 .b-task:focus-visible{outline:0}

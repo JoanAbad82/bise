@@ -5,6 +5,7 @@
 // HubCmd scheduled {project} and scheduled_stop {project, id}).
 import type { ScheduledTask } from '@/proto';
 import { scheduled } from '@/proto/words_scheduled.gen';
+import { hero } from '@/proto/words_hero.gen';
 
 export type { ScheduledTask };
 
@@ -78,6 +79,13 @@ export const asks = (t: ScheduledTask): string => t.name?.trim() || (t.words.spl
 
 /** 'deploy-watch · storefront' (the project left out for one project's list). */
 export const wakes = (x: Task, withProject = true): string => (withProject && x.projectName !== '' ? `${x.t.agent} · ${x.projectName}` : x.t.agent);
+
+/** The hero's facts line (designer m_39021): how many run and the soonest run, '4 running · next at 07:30'. Pure. */
+export function heroFacts(items: readonly Task[], now: number): string {
+  const next = Math.min(...items.map((x) => x.t.next_ms ?? Number.MAX_SAFE_INTEGER));
+  const n = hero.running({ n: items.length });
+  return next === Number.MAX_SAFE_INTEGER || items.length === 0 ? n : `${n} · ${hero.next_at({ at: ahead(next, now) })}`;
+}
 
 /** The tasks by next run, soonest first (none due last). */
 export function bySoonest(items: readonly Task[]): Task[] {

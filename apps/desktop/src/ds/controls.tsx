@@ -160,7 +160,8 @@ export interface SheetProps {
   testId?: string;
 }
 /**
- * a modal over the window: a 40% scrim, a raised r-4 sheet 560 wide (90% under 700), its head
+ * a modal over the window: the ground at 62% (no blur), a raised r-3 sheet 520 wide (480 under
+ * 800) 12% from the top with --e-sheet, in with a fade and an 8 px rise (ds/css/controls.css), its head
  * (17/600) and sub (t-13, text-2), its body, its foot. Focus stays inside, esc closes, ⏎ runs the
  * primary, and focus goes back to what opened it (Radix Dialog).
  */

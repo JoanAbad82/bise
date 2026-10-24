@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Proc } from '@/proto';
-import { barProcs, procOfCall, countsOf, endWords, groupsOf, inScope, keyOf, markOf, matches, metaOf, shortCmd, shortCwd, stateOf, tipOf, urlWords, type ProcItem } from './model';
+import { barProcs, procOfCall, countsOf, endWords, groupsOf, inScope, keyOf, markOf, matches, metaOf, portWords, shortCmd, shortCwd, stateOf, tipOf, urlWords, whereOf, worktreeName, type ProcItem } from './model';
 
 const NOW = new Date(2026, 9, 23, 14, 6).getTime();
 const MIN = 60_000;
@@ -23,12 +23,25 @@ const proc = (over: Partial<Proc> & Pick<Proc, 'id' | 'agent'>): Proc => ({
 const item = (project: string, p: Proc): ProcItem => ({ project, projectName: project, p });
 
 describe('a row', () => {
-  it('runs: a dim ∿ and its age; listening: localhost:<port> ↗, opening 127.0.0.1', () => {
-    const p = proc({ id: 'bg3', agent: 'perf', ports: [5173, 24678] });
+  it('runs: a dim ∿ and its age; a web page: localhost:<port> ↗, opening 127.0.0.1', () => {
+    const p = proc({ id: 'bg3', agent: 'perf', ports: [5173, 24678], url: 'http://127.0.0.1:5173' });
     const s = stateOf(p);
     expect(markOf(s)).toEqual({ glyph: '∿', tone: 'dim' });
     expect(endWords(p, s, NOW)).toBe('14 min');
     expect(urlWords(p, s)).toEqual({ label: 'localhost:5173 ↗', url: 'http://127.0.0.1:5173' });
+    expect(portWords(p, s)).toBe('');
+    // the hub's url is the port that answered HTTP, not the first one
+    const late = proc({ id: 'bg3', agent: 'perf', ports: [5173, 24678], url: 'http://127.0.0.1:24678' });
+    expect(urlWords(late, stateOf(late))?.label).toBe('localhost:24678 ↗');
+  });
+
+  it("listening, no web page there (procs-bar: a click opened an empty tab): no link, its port plain", () => {
+    const p = proc({ id: 'p51829.1', agent: 'perf', kind: { is: 'detached' }, ports: [9229] });
+    expect(urlWords(p, stateOf(p))).toBeNull();
+    expect(portWords(p, stateOf(p))).toBe(':9229');
+    expect(portWords(proc({ id: 'bg3', agent: 'perf' }), stateOf(proc({ id: 'bg3', agent: 'perf' })))).toBe('');
+    const gone = proc({ id: 'bg3', agent: 'perf', ports: [9229], state: { is: 'exited', rc: 0 }, ended_ms: NOW });
+    expect(portWords(gone, stateOf(gone))).toBe('');
   });
 
   it('ended: ✓ for rc 0, ✗ (the only red) with its rc, – stopped by him or with its agent', () => {
@@ -71,7 +84,7 @@ describe('a row', () => {
   });
 
   it('the output head: state, address, pid, cpu and memory while it runs, folder', () => {
-    const p = proc({ id: 'bg3', agent: 'perf', ports: [5173] });
+    const p = proc({ id: 'bg3', agent: 'perf', ports: [5173], url: 'http://127.0.0.1:5173' });
     expect(metaOf(p, stateOf(p), NOW, '/Users/g')).toEqual(['∿ running · 14 min', 'localhost:5173', 'pid 48211', 'cpu 12% · 340 MB', '~/…/shop/perf']);
     const gone = proc({ id: 'bg3', agent: 'perf', ports: [5173], cwd: undefined, state: { is: 'exited', rc: 2 }, ended_ms: NOW - MIN });
     expect(metaOf(gone, stateOf(gone), NOW)).toEqual(['✗ ended 1 min ago · rc 2', 'pid 48211']);
@@ -83,10 +96,30 @@ describe('a row', () => {
     expect(shortCwd('/srv/a/b/c')).toBe('/…/b/c');
   });
 
-  it("the bar's command: past a package runner's exec, three words", () => {
+  it("the bar's command: past a package runner's exec, its program by name and its arguments, a path by its last part", () => {
     expect(shortCmd('pnpm exec playwright test --ui')).toBe('playwright test --ui');
     expect(shortCmd('pnpm dev')).toBe('pnpm dev');
-    expect(shortCmd('stripe listen --forward-to localhost:4242')).toBe('stripe listen --forward-to');
+    expect(shortCmd('stripe listen --forward-to localhost:4242')).toBe('stripe listen --forward-to localhost:4242');
+    expect(shortCmd('/opt/homebrew/bin/python3 -m http.server 8000')).toBe('python3 -m http.server 8000');
+    expect(shortCmd('node /Users/g/code/shop/server.js --port 3000 --watch')).toBe('node server.js --port 3000 --watch');
+    expect(shortCmd("sh -c 'while true; do date; done'")).toBe("sh -c 'while true; do");
+  });
+
+  it('where it runs: past the project root, a worktree by its name, elsewhere its last folder; never a home path', () => {
+    const roots = [
+      { path: '/Users/g/code/shop', name: '' },
+      { path: '/Users/g/.bise/worktrees/shop-1/perf/shop', name: worktreeName('/Users/g/.bise/worktrees/shop-1/perf/shop', 'shop') },
+    ];
+    expect(roots[1]?.name).toBe('perf');
+    expect(whereOf('/Users/g/code/shop', roots)).toBe('');
+    expect(whereOf('/Users/g/code/shop/apps/web/', roots)).toBe('apps/web');
+    expect(whereOf('/Users/g/.bise/worktrees/shop-1/perf/shop', roots)).toBe('perf');
+    expect(whereOf('/Users/g/.bise/worktrees/shop-1/perf/shop/apps/web', roots)).toBe('perf/apps/web');
+    expect(whereOf('/Users/g/.local/state/switchboard/versions/cea5f1d2a', roots)).toBe('cea5f1d2a');
+    // a sibling whose name starts like the root's is not under it
+    expect(whereOf('/Users/g/code/shop-old', roots)).toBe('shop-old');
+    expect(whereOf(undefined, roots)).toBe('');
+    expect(worktreeName('/w/trees/perf', 'shop')).toBe('perf');
   });
 });
 

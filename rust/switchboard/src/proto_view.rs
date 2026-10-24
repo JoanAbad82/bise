@@ -24,6 +24,7 @@ pub mod heads;
 mod merged;
 mod models;
 pub mod processes;
+pub mod rank;
 pub mod slash;
 mod worktrees;
 pub use diff_ask::DiffAsk;
@@ -249,6 +250,8 @@ fn agent(
         // running processes: Hub.procs, daemon/processes.rs's counts
         procs: a.procs.0,
         procs_port: a.procs.1,
+        // agent-rank: set over the whole list (rank::apply), never per row
+        rank: None,
         name,
     }
 }

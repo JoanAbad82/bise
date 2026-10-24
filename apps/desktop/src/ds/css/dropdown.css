@@ -17,7 +17,6 @@
   font: var(--t-13) / 1 var(--font-ui);
   color: var(--c-text-2);
   white-space: nowrap;
-  cursor: default;
   transition:
     background var(--d-fast) var(--ease-out),
     color var(--d-fast) var(--ease-out);

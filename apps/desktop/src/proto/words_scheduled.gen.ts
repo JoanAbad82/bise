@@ -52,8 +52,6 @@ export const scheduled = {
   count_ended: (a: { n: string | number }): string => String(a.n) + " ended",
   /** the TUI head's count: the agents' alarms */
   count_watching: (a: { n: string | number }): string => String(a.n) + " watching",
-  /** the desktop head's count */
-  count_desktop: (a: { n: string | number }): string => "active · " + String(a.n),
   /** the TUI's search line, after `/ ` */
   find_hint: "find: an agent, a name, the words",
   /** the desktop's search field */
