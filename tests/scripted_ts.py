@@ -197,8 +197,11 @@ def check_read_images_prompt():
                  "...self.readImages(['before.png', 'after.png'])"):
         if want not in text:
             sys.exit("FAIL tool-desc-run-typescript.txt lacks %r" % want)
-    if text.index("`self.compact`/`self.reload`") > text.index("`self.readImages(paths)`"):
-        sys.exit("FAIL self.readImages is not described after self.compact / self.reload")
+    for helper in ("`self.compact`", "`self.reload`"):
+        if helper not in text:
+            sys.exit("FAIL tool-desc-run-typescript.txt lacks %s" % helper)
+        if text.index(helper) > text.index("`self.readImages(paths)`"):
+            sys.exit("FAIL self.readImages is not described after %s" % helper)
     print("prompt: self.readImages described next to self.compact / self.reload")
 
 def atomic_script():
