@@ -107,6 +107,8 @@ crate::words! { running:
     search = "search";
     /// the output's head: open its address
     open = "open ↗";
+    /// the tip of a thread's `$` row whose command runs in the background (`∿ 14 min`)
+    tip_thread_row = "open its output";
     /// the output's head: stop it
     stop = "stop";
     /// the output's keys line, after ↓

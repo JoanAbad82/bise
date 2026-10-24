@@ -280,6 +280,11 @@
     "one": null,
     "text": "{n} running, in all your projects"
   },
+  "running.tip_thread_row": {
+    "args": [],
+    "one": null,
+    "text": "open its output"
+  },
   "running.url": {
     "args": [
       "port"

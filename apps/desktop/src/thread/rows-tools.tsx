@@ -1,9 +1,10 @@
 // A thread's tool rows (each call's state, time, error line, code and output on
 // open) and its thinking rows. Owner: amb-win. Split out of rows.tsx (pure move).
 import { useContext, useEffect } from 'react';
-import { Fold, Tool } from '@/ds';
+import { Fold, Tool, tipAttrs } from '@/ds';
 import type { Entry } from '@/proto';
 import { thread } from '@/proto/words.gen';
+import { running } from '@/proto/words_running.gen';
 import { useProcesses, useStore, useToolOut } from '@/store';
 import { RouterContext } from '@/app/router';
 import { useNow } from '@/app/clock';
@@ -137,7 +138,8 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
           go();
         }}>
           <span className="th-tool-mark">{l.mark}</span> <span className={l.said ? 'th-tool-text said' : 'th-tool-text'}>{l.text}</span>
-          <span className="th-tool-time" data-testid={`${id}.bg`}>{`∿ ${shortAge(now - bg.started_ms)}`}</span>
+          {/* its tip, like every compact mark (designer m_38604) */}
+          <span className="th-tool-time" data-testid={`${id}.bg`} {...tipAttrs(running.tip_thread_row)}>{`∿ ${shortAge(now - bg.started_ms)}`}</span>
         </div>
       </div>
     );
