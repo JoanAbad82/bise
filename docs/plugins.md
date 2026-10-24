@@ -347,8 +347,12 @@ in two steps so nothing of a plugin runs before his click:
   `<user root>/<name>` (the commit point; bise's own MCP folder of that name,
   `import::is_bise_mcp`, is moved aside and put back on a failure). A name he
   has is `AddError::Exists`. `add::discard` drops a preview.
-- The desktop core holds a `Staged` by token: `plugin_add` answers
-  `plugin_preview {token, preview}`, then `plugin_add_confirm {token}` or
+- The desktop core holds a `Staged` by token (`add::Held`): `plugin_add`
+  (`add::Request::from_wire`: an MCP server's secrets by name only) answers
+  `plugin_preview {token, preview}`, then `plugin_add_confirm {token,
+  secrets}` (his values for the preview's secret names, a
+  `bise_proto::app_cmd::Secret` that prints `•••`; a name the preview
+  doesn't list refuses, a name left out stays `${NAME}`) or
   `plugin_add_cancel {token}`. The terminal holds it in its own process.
 - Secrets (`bend_plugins::secrets`, the one owner of the layout):
   `<Home::mcp_secrets_dir()>/<escaped plugin id>.json` = `{"VAR": "value"}`
@@ -622,6 +626,14 @@ description, not a removed one).
   workspace, not the per-task bridge report.
 - No uninstall yet: `bend_plugins::secrets::remove` (a plugin's MCP
   secrets) waits for it, and the uninstall must call it.
+- Before plugins merges into main (architect m_39445), owner plug-catalog:
+  a test that sends `plugin_add_confirm` with a planted value through the
+  desktop core and finds it in no file under the test home but
+  `<mcp_secrets_dir>/<plugin>.json`, and a check that the core's command
+  log, its /debug ring and the TUI's /debug view never keep a confirm's
+  values. The desktop's recorder of sends: plug-desktop.
+- Changing a secret of a plugin already added (a rotated key): not yet;
+  today only `bise plugins add --mcp` again, or the add's confirm, writes one.
 - "Add an MCP server" does not try the server before his click (that
   would run it unseen); trying it right after his confirm (one start, its
   error on the row with a remove action) is open, with the core's confirm.

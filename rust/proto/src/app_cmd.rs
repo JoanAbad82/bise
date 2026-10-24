@@ -106,7 +106,14 @@ pub enum AppCmd {
     /// his click on a `plugin_preview`: the plugin goes into
     /// `~/.agents/plugins`, then `plugins` again; an unknown token is an
     /// error
-    PluginAddConfirm { token: String },
+    PluginAddConfirm {
+        token: String,
+        /// the values he typed for the preview's `secrets` (a name left
+        /// out stays `${NAME}`): written to bise's secrets before the
+        /// plugin goes in, never anywhere else
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        secrets: Vec<SecretValue>,
+    },
     /// the preview closed without adding: its staged folder goes
     PluginAddCancel { token: String },
     /// log in to a plugin's remote MCP server: opens his browser (his
@@ -400,6 +407,45 @@ pub enum PluginAddKind {
     Marketplace { url: String },
     /// make a plugin with an agent: his words, a request to main
     Agent { words: String },
+}
+
+/// A secret he typed, by its name (an env var's, a header's).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct SecretValue {
+    pub name: String,
+    pub value: Secret,
+}
+
+/// A secret's text: its `Debug` and `Display` print `•••`, so a log, a
+/// debug ring or a panic never shows it; the wire carries it as a plain
+/// string. Read it with [`Secret::expose`], only to store it.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(transparent)]
+pub struct Secret(String);
+
+impl Secret {
+    pub fn new(s: impl Into<String>) -> Secret {
+        Secret(s.into())
+    }
+
+    /// The text itself: only for the secrets store.
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("•••")
+    }
+}
+
+impl std::fmt::Display for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("•••")
+    }
 }
 
 /// Whose MCP servers an import reads.

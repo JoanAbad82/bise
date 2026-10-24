@@ -29,7 +29,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use bise_proto::app_cmd::ImportFrom;
+use bise_proto::app_cmd::{ImportFrom, SecretValue};
 use bise_proto::app_rows::{PluginPreview, PluginRun, RunTransport};
 use serde_json::{json, Map, Value};
 
@@ -73,6 +73,8 @@ pub enum AddError {
     /// `plugin_add_confirm`/`cancel` with a token the core doesn't hold
     /// (a preview already used, closed, or from before a restart)
     UnknownToken,
+    /// a value for a name the preview doesn't list: nothing written
+    UnknownSecret { name: String },
 }
 
 impl std::fmt::Display for AddError {
@@ -84,6 +86,7 @@ impl std::fmt::Display for AddError {
             AddError::Invalid { diagnostics } => write!(f, "not a valid plugin: {}", diagnostics.join("; ")),
             AddError::NoServer { why } => write!(f, "no server bise can run: {}", why.join("; ")),
             AddError::UnknownToken => write!(f, "that preview is gone: add it again"),
+            AddError::UnknownSecret { name } => write!(f, "{name} is not a secret of this plugin"),
             AddError::BadSource { why } | AddError::Git { why } | AddError::Secrets { why } | AddError::Io { why } => write!(f, "{why}"),
         }
     }
@@ -150,6 +153,29 @@ impl std::fmt::Debug for Request {
             Request::Folder { path } => write!(f, "Folder {{ path: {path:?} }}"),
             Request::Git { url, subdir } => write!(f, "Git {{ url: {url:?}, subdir: {subdir:?} }}"),
         }
+    }
+}
+
+impl Request {
+    /// The wire's `plugin_add` as a request (the desktop's core): an MCP
+    /// server's secrets come as names only, so `mcp.json` gets `${NAME}`
+    /// and no value is written (the bridge takes it from the environment
+    /// or the secrets store). None: a marketplace or an agent, not an add
+    /// of a plugin (`marketplace::add`, [`agent_brief`]).
+    pub fn from_wire(add: &bise_proto::app_cmd::PluginAddKind) -> Option<Request> {
+        use bise_proto::app_cmd::PluginAddKind as K;
+        Some(match add {
+            K::Mcp { name, command, url, secrets } => Request::Mcp {
+                name: name.clone(),
+                command: command.clone(),
+                url: url.clone(),
+                secrets: secrets.iter().map(|n| (n.clone(), String::new())).collect(),
+            },
+            K::Import { from } => Request::Import { from: *from, name: None },
+            K::Folder { path } => Request::Folder { path: PathBuf::from(path) },
+            K::Git { url, subdir } => Request::Git { url: url.clone(), subdir: subdir.clone() },
+            K::Marketplace { .. } | K::Agent { .. } => return None,
+        })
     }
 }
 
@@ -543,7 +569,9 @@ fn commit(staged: &Staged, ctx: &Ctx) -> Result<PathBuf, AddError> {
     if !staged.plugin.is_dir() {
         return Err(AddError::Io { why: "the staged plugin is gone: add it again".into() });
     }
-    crate::secrets::write(&ctx.secrets_dir, &PluginId::plugin(name.clone()), &staged.secrets).map_err(|e| AddError::Secrets { why: e.to_string() })?;
+    // a name without a value (the wire's): only its ${NAME} in mcp.json
+    let values: Vec<(String, String)> = staged.secrets.iter().filter(|(_, v)| !v.is_empty()).cloned().collect();
+    crate::secrets::write(&ctx.secrets_dir, &PluginId::plugin(name.clone()), &values).map_err(|e| AddError::Secrets { why: e.to_string() })?;
     let aside = staged.dir.join(".replaced");
     if replaces && dest.exists() {
         std::fs::rename(&dest, &aside).map_err(io)?;
@@ -579,9 +607,23 @@ impl Held {
         out
     }
 
-    /// His click: the held plugin installed.
-    pub fn confirm(&mut self, token: &str, ctx: &Ctx) -> Result<PathBuf, AddError> {
-        install(self.0.remove(token).ok_or(AddError::UnknownToken)?, ctx)
+    /// His click (`plugin_add_confirm {token, secrets}`): the values he
+    /// typed for the preview's secrets (a name left out stays `${NAME}`),
+    /// then the held plugin installed. A name the preview doesn't list
+    /// refuses and writes nothing; the preview stays held.
+    pub fn confirm(&mut self, token: &str, secrets: &[SecretValue], ctx: &Ctx) -> Result<PathBuf, AddError> {
+        let staged = self.0.get_mut(token).ok_or(AddError::UnknownToken)?;
+        if let Some(s) = secrets.iter().find(|s| !staged.preview.secrets.contains(&s.name)) {
+            return Err(AddError::UnknownSecret { name: s.name.clone() });
+        }
+        for s in secrets.iter().filter(|s| !s.value.expose().is_empty()) {
+            match staged.secrets.iter_mut().find(|(k, _)| *k == s.name) {
+                Some(slot) => slot.1 = s.value.expose().to_string(),
+                None => staged.secrets.push((s.name.clone(), s.value.expose().to_string())),
+            }
+        }
+        let staged = self.0.remove(token).ok_or(AddError::UnknownToken)?;
+        install(staged, ctx)
     }
 
     /// He closed the preview.

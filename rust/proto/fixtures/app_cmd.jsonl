@@ -28,6 +28,7 @@
 {"cmd":"plugin_add","add":{"kind":"marketplace","url":"https://github.com/openai/plugins.git"}}
 {"cmd":"plugin_add","add":{"kind":"agent","words":"a plugin that reads our Grafana dashboards"}}
 {"cmd":"plugin_add_confirm","token":"a1b2c3d4e5f60718"}
+{"cmd":"plugin_add_confirm","token":"a1b2c3d4e5f60718","secrets":[{"name":"LATEX_TOKEN","value":"fake-not-a-secret"}]}
 {"cmd":"plugin_add_cancel","token":"a1b2c3d4e5f60718"}
 {"cmd":"plugin_login","name":"linear"}
 {"cmd":"plugin_logout","project":"acme-1a2b3c4d","name":"notes"}

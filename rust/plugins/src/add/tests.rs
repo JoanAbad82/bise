@@ -359,13 +359,51 @@ fn the_core_holds_previews_by_token_until_his_answer() {
     let (tok, p) = h.hold(stage(&mcp("a", Some("npx a"), None, &[]), &ctx).unwrap());
     assert_eq!(p.name, "a");
     let (tok_b, _) = h.hold(stage(&mcp("b", Some("npx b"), None, &[]), &ctx).unwrap());
-    assert_eq!(h.confirm("nope", &ctx).unwrap_err(), AddError::UnknownToken);
-    assert!(h.confirm(&tok, &ctx).unwrap().join("mcp.json").is_file());
-    assert_eq!(h.confirm(&tok, &ctx).unwrap_err(), AddError::UnknownToken, "used once");
+    assert_eq!(h.confirm("nope", &[], &ctx).unwrap_err(), AddError::UnknownToken);
+    assert!(h.confirm(&tok, &[], &ctx).unwrap().join("mcp.json").is_file());
+    assert_eq!(h.confirm(&tok, &[], &ctx).unwrap_err(), AddError::UnknownToken, "used once");
     h.cancel(&tok_b).unwrap();
     assert_eq!(h.cancel(&tok_b).unwrap_err(), AddError::UnknownToken);
     assert!(!ctx.user_root.join("b").exists());
     h.hold(stage(&mcp("c", Some("npx c"), None, &[]), &ctx).unwrap());
     drop(h);
     assert!(staging_is_empty(&ctx), "a closed window leaves no staged folder");
+}
+
+#[test]
+fn the_wire_add_carries_secret_names_only_and_writes_no_value() {
+    use bise_proto::app_cmd::PluginAddKind as K;
+    let (_t, ctx) = tmp("wire");
+    let add = K::Mcp { name: "pay".into(), command: Some("npx pay-mcp".into()), url: None, secrets: vec!["PAY_TOKEN".into()] };
+    let req = Request::from_wire(&add).unwrap();
+    let s = stage(&req, &ctx).unwrap();
+    assert_eq!(s.preview.secrets, ["PAY_TOKEN"]);
+    let dir = install(s, &ctx).unwrap();
+    assert_eq!(json_of(&dir.join("mcp.json"))["mcpServers"]["pay"]["env"]["PAY_TOKEN"], "${PAY_TOKEN}");
+    assert!(!crate::secrets::path(&ctx.secrets_dir, &PluginId::plugin("pay")).exists(), "no empty value written");
+    assert_eq!(Request::from_wire(&K::Git { url: "a/b".into(), subdir: Some("p".into()) }), Some(Request::Git { url: "a/b".into(), subdir: Some("p".into()) }));
+    assert_eq!(Request::from_wire(&K::Agent { words: "x".into() }), None);
+    assert_eq!(Request::from_wire(&K::Marketplace { url: "a/b".into() }), None);
+}
+
+#[test]
+fn the_confirm_carries_the_values_of_the_preview_secrets_only() {
+    use bise_proto::app_cmd::{PluginAddKind as K, Secret};
+    let (_t, ctx) = tmp("confirm-secrets");
+    let mut h = Held::default();
+    let add = K::Mcp { name: "pay".into(), command: Some("npx pay-mcp".into()), url: None, secrets: vec!["PAY_TOKEN".into(), "PAY_ORG".into()] };
+    let (tok, _) = h.hold(stage(&Request::from_wire(&add).unwrap(), &ctx).unwrap());
+    let v = |n: &str, s: &str| SecretValue { name: n.into(), value: Secret::new(s) };
+    // a name the preview doesn't list: refused, nothing written, still held
+    assert_eq!(h.confirm(&tok, &[v("PAY_TOKEN", SECRET), v("OTHER", "x")], &ctx).unwrap_err(), AddError::UnknownSecret { name: "OTHER".into() });
+    assert!(!ctx.secrets_dir.exists() && !ctx.user_root.join("pay").exists());
+    // PAY_ORG left out: it stays ${PAY_ORG}
+    let dir = h.confirm(&tok, &[v("PAY_TOKEN", SECRET)], &ctx).unwrap();
+    let kept = crate::secrets::read(&ctx.secrets_dir, &PluginId::plugin("pay")).unwrap();
+    assert_eq!(kept.into_iter().collect::<Vec<_>>(), [("PAY_TOKEN".to_string(), SECRET.to_string())]);
+    let m = json_of(&dir.join("mcp.json"));
+    assert_eq!(m["mcpServers"]["pay"]["env"], json!({"PAY_ORG": "${PAY_ORG}", "PAY_TOKEN": "${PAY_TOKEN}"}));
+    // the only file holding the value is the secrets store's
+    assert!(!all_text(&ctx.user_root).contains(SECRET));
+    assert!(!format!("{:?}", v("PAY_TOKEN", SECRET)).contains(SECRET), "Debug never shows it");
 }

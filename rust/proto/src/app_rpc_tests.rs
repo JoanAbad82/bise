@@ -107,3 +107,14 @@ fn initialize_says_what_this_core_serves() {
     let p: AppInit = serde_json::from_value(serde_json::json!({"proto": 1, "client": {"name": "bise-desktop"}})).unwrap();
     assert_eq!(p.client.version, "");
 }
+
+#[test]
+fn a_confirm_never_prints_its_secret() {
+    let line = r#"{"cmd":"plugin_add_confirm","token":"t","secrets":[{"name":"K","value":"fake-planted-value"}]}"#;
+    let cmd: crate::app_cmd::AppCmd = serde_json::from_str(line).unwrap();
+    let shown = format!("{cmd:?} {:#?}", cmd);
+    assert!(!shown.contains("fake-planted-value"), "{shown}");
+    assert!(shown.contains("•••"));
+    // the wire still carries it, as a plain string
+    assert_eq!(serde_json::to_value(&cmd).unwrap()["secrets"][0]["value"], "fake-planted-value");
+}
