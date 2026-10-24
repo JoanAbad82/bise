@@ -326,6 +326,11 @@ def main():
         rc, log, last, red = night(NOW=at(23, 0))
         check(rc == 0 and "covmap checks --gate-dir %s --until %s" % (os.path.join(home, "gate"), at(6, 0, 1)) in calls(),
               "queued at 23:00: tomorrow's 06:00: rc %s, %r" % (rc, calls()))
+        # the DST night (2026-10-25 in Paris, a 25 h day): queued at 23:00 the 24th, the end is 06:00
+        # CET by the calendar, not 05:00 (+ 86400: the tip red on ca58673f6, run on the 24th)
+        rc, log, last, red = night(NOW="1792875600", TZ="Europe/Paris")
+        check(rc == 0 and "covmap checks --gate-dir %s --until 1792904400" % os.path.join(home, "gate") in calls(),
+              "the DST night: queued 2026-10-24 23:00 CEST, the end 2026-10-25 06:00 CET (1792904400): rc %s, %r" % (rc, calls()))
         # NIGHTLY_UNTIL empty (a run by hand in the day): no end
         rc, log, last, red = night(NOW=at(14, 0), NIGHTLY_UNTIL="")
         check(rc == 0 and red is None and not any("--until" in x for x in calls()), "no end: %r" % calls())

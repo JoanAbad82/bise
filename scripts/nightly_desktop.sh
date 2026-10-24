@@ -66,7 +66,8 @@ case "$until" in
   @*) end="${until#@}"; [[ "$end" =~ ^[0-9]+$ ]] || { echo "--until wants HH:MM or @<epoch>, got $until" >&2; return 2; }
       until="$(date -r "$end" +%H:%M)" ;;
   *) end="$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date -r "$(now)" +%F) $until:00" +%s 2>/dev/null)" || { echo "--until wants HH:MM or @<epoch>, got $until" >&2; return 2; }
-     [ "$end" -gt "$(now)" ] || end=$((end + 86400)) ;;
+     # tomorrow's HH:MM by the calendar, not + 86400 (25 h on a DST night, 2026-10-25)
+     [ "$end" -gt "$(now)" ] || end="$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date -j -r "$(now)" -v+1d +%F) $until:00" +%s)" ;;
 esac
 late() { [ -n "$end" ] && [ "$(now)" -ge "$end" ]; }
 on_battery() { [ -n "${NIGHTLY_DESKTOP_BATTERY:-}" ] && { [ "$NIGHTLY_DESKTOP_BATTERY" = 1 ]; return; }; /usr/bin/pmset -g batt 2>/dev/null | head -1 | grep -q "Battery Power"; }

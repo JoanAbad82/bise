@@ -134,7 +134,11 @@ night_end() {
   local t e
   t="$(now)"
   e="$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date -r "$t" +%F) $night_until:00" +%s 2>/dev/null)" || return 1
-  [ "$e" -le "$t" ] && [ $((e + 86400 - t)) -le 43200 ] && e=$((e + 86400))
+  # tomorrow's HH:MM by the calendar, never + 86400: on the night of a DST change (2026-10-25) a day
+  # is 25 h, and + 86400 ended the night at 05:00 (the tip red on ca58673f6, run on 2026-10-24)
+  local e2
+  e2="$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date -j -r "$t" -v+1d +%F) $night_until:00" +%s 2>/dev/null)" || return 1
+  [ "$e" -le "$t" ] && [ $((e2 - t)) -le 43200 ] && e=$e2
   echo "$e"
 }
 late() { [ -n "${NIGHTLY_END:-}" ] && [ "$(now)" -ge "$NIGHTLY_END" ]; }
