@@ -2,7 +2,8 @@
 // discs over the office, '1' over the lead's head, '2' on an empty desk (Office.ghosts), '3' on the
 // inbox tray of main's desk, each matched by its line in the legend under the office. Ink on the
 // page's colour, never the accent (bims law 3: the pills are the only UI colours on the office).
-// Placed by hand at each frame (Office.tsx's draw), so they follow a pinch. Owner: project-home.
+// Placed by hand at each frame (Office.tsx's draw), so they follow a pinch; drawn over the bims'
+// pills, and lifted 4 px clear of one they'd sit on (liftPins, designer m_38798). Owner: project-home.
 import type { OfficeRenderer } from './model';
 
 /** px over the lead's head the '1' sits (its disc's middle) */
@@ -34,8 +35,48 @@ export function pinPoints(r: Pick<OfficeRenderer, 'headOf' | 'pointOf'>, lead: s
   ];
 }
 
-/** the pins' elements to their points (hidden off view) */
-export function placePins(box: HTMLElement, at: readonly PinPoint[]): void {
+/** a pin's disc (office.css .bims-pin), and how clear of a pill it stops (tags.ts TAG_INSET) */
+const PIN = 18;
+const CLEAR = 4;
+
+export interface PillBox {
+  readonly left: number;
+  readonly top: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * The pins drawn over the bims' pills (designer m_38798: the lead's '?' hid its '1'): a pin that
+ * meets a pill lifts to stop 4 px above it, as a pill stops above the map chip. Pure.
+ */
+export function liftPins(at: readonly PinPoint[], pills: readonly PillBox[]): PinPoint[] {
+  return at.map((p) => {
+    if (p === null) return null;
+    let y = p.y;
+    // a lift can meet a pill placed above the first: try each in turn, highest last
+    for (const k of [...pills].sort((a, b) => b.top - a.top)) {
+      const meets = p.x - PIN / 2 < k.left + k.w && k.left < p.x + PIN / 2 && y - PIN / 2 < k.top + k.h && k.top < y + PIN / 2;
+      if (meets) y = k.top - CLEAR - PIN / 2;
+    }
+    return y === p.y ? p : { x: p.x, y };
+  });
+}
+
+/** the bims' '?' / '✗' pills in the office's overlay, css px from its top left */
+function pillsIn(box: HTMLElement): PillBox[] {
+  const overlay = box.parentElement;
+  if (overlay === null) return [];
+  const o = overlay.getBoundingClientRect();
+  return [...overlay.querySelectorAll<HTMLElement>('.bims-tag [data-pill]')].map((el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left - o.left, top: r.top - o.top, w: r.width, h: r.height };
+  });
+}
+
+/** the pins' elements to their points (hidden off view), lifted over the pills they'd sit under */
+export function placePins(box: HTMLElement, points: readonly PinPoint[]): void {
+  const at = liftPins(points, pillsIn(box));
   box.querySelectorAll<HTMLElement>('[data-pin]').forEach((el, i) => {
     const p = at[i] ?? null;
     el.style.visibility = p === null ? 'hidden' : '';

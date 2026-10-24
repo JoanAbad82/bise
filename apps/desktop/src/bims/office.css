@@ -548,6 +548,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* over the bims' labels and pills (.bims-tag 1, a pill 2): a pin is never hidden (designer m_38798) */
+  z-index: 3;
 }
 .bims-pin {
   position: absolute;
