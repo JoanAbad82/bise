@@ -20,6 +20,8 @@ pub(crate) struct App {
     pub(crate) artifacts: Option<crate::artifacts_screen::Screen>,
     /// `/scheduled`, the full screen of the scheduled tasks, when open
     pub(crate) scheduled: Option<crate::scheduled_screen::Screen>,
+    /// `/plugins` and `/skills`, the Plugins screen, when open
+    pub(crate) plugins: Option<crate::plugins::Open>,
     /// `/inbox`, what waits then his past answers, when open
     pub(crate) inbox: Option<crate::inbox_screen::Screen>,
     /// `/usage`, the full screen of what the calls cost, when open
@@ -300,6 +302,7 @@ impl App {
             logview: None,
             artifacts: None,
             scheduled: None,
+            plugins: None,
             inbox: None,
             usage: None,
             running: None,

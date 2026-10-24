@@ -894,12 +894,12 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
                 sb.call(method, params, then);
             }
         }
-        "/plugins" => {
-            let ws = std::path::PathBuf::from(&sb.workspace);
+        // the Plugins screen, or a line (plugins.rs)
+        "/plugins" | "/skills" => {
             // one line each: an Info line loses its newlines (designer:
             // the listing read as one paragraph)
-            for l in crate::plugins::command(&typed, &ws).lines() {
-                out.push(Ev::Info(l.to_string()));
+            for l in crate::plugins::slash(app, &typed) {
+                out.push(Ev::Info(l));
             }
         }
         "/clear" => {

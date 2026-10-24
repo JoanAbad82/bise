@@ -86,6 +86,8 @@ mod skills;
 mod files;
 mod keychain;
 mod plugins;
+mod plugins_add;
+mod plugins_screen;
 mod emoji;
 mod editor;
 mod undo;

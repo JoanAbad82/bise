@@ -2180,6 +2180,105 @@
     "one": null,
     "text": "fn sends your words without a capture without it"
   },
+  "settings.plugins_add_agent": {
+    "args": [],
+    "one": null,
+    "text": "make a plugin with an agent"
+  },
+  "settings.plugins_add_agent_what": {
+    "args": [],
+    "one": null,
+    "text": "say what it should do; an agent builds it"
+  },
+  "settings.plugins_add_import": {
+    "args": [],
+    "one": null,
+    "text": "import"
+  },
+  "settings.plugins_add_import_found": {
+    "args": [
+      "found"
+    ],
+    "one": null,
+    "text": "found on this Mac: {found}"
+  },
+  "settings.plugins_add_import_what": {
+    "args": [],
+    "one": null,
+    "text": "MCP servers of Claude Code, Codex and Cursor"
+  },
+  "settings.plugins_add_market": {
+    "args": [],
+    "one": null,
+    "text": "add a marketplace"
+  },
+  "settings.plugins_add_market_what": {
+    "args": [],
+    "one": null,
+    "text": "a git repo of plugins, like openai/plugins"
+  },
+  "settings.plugins_add_mcp": {
+    "args": [],
+    "one": null,
+    "text": "add an MCP server"
+  },
+  "settings.plugins_add_mcp_what": {
+    "args": [],
+    "one": null,
+    "text": "a command or a URL"
+  },
+  "settings.plugins_add_plugin": {
+    "args": [],
+    "one": null,
+    "text": "add a plugin"
+  },
+  "settings.plugins_add_plugin_what": {
+    "args": [],
+    "one": null,
+    "text": "a folder or a git URL"
+  },
+  "settings.plugins_add_question": {
+    "args": [],
+    "one": null,
+    "text": "what do you want to add?"
+  },
+  "settings.plugins_added": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "✓ {name} added · your agents get it at their next turn"
+  },
+  "settings.plugins_agent_field": {
+    "args": [],
+    "one": null,
+    "text": "what should it do?"
+  },
+  "settings.plugins_agent_started": {
+    "args": [],
+    "one": null,
+    "text": "✓ main starts an agent for it: it shows in your agents"
+  },
+  "settings.plugins_agent_sub": {
+    "args": [],
+    "one": null,
+    "text": "an agent writes it with the plugin-creator skill, tests it and asks you before it adds it"
+  },
+  "settings.plugins_all_on": {
+    "args": [],
+    "one": null,
+    "text": "all on unless you turn one off."
+  },
+  "settings.plugins_all_on_wide": {
+    "args": [],
+    "one": null,
+    "text": "all on unless you turn one off, in every project."
+  },
+  "settings.plugins_always_on": {
+    "args": [],
+    "one": null,
+    "text": "always on"
+  },
   "settings.plugins_bise_title": {
     "args": [],
     "one": null,
@@ -2190,6 +2289,64 @@
     "one": null,
     "text": "bise's own skills: pages, notes, the group"
   },
+  "settings.plugins_browse_add": {
+    "args": [],
+    "one": null,
+    "text": "⏎ adds it"
+  },
+  "settings.plugins_browse_connect": {
+    "args": [],
+    "one": null,
+    "text": "c connects it"
+  },
+  "settings.plugins_browse_empty": {
+    "args": [],
+    "one": null,
+    "text": "nothing to browse: a marks a marketplace"
+  },
+  "settings.plugins_browse_question": {
+    "args": [],
+    "one": null,
+    "text": "what can you add?"
+  },
+  "settings.plugins_browse_set_up": {
+    "args": [],
+    "one": null,
+    "text": "c opens its setup"
+  },
+  "settings.plugins_browse_sub": {
+    "args": [],
+    "one": null,
+    "text": "Mistral's connectors first, then your marketplaces."
+  },
+  "settings.plugins_built_in": {
+    "args": [],
+    "one": null,
+    "text": "built-in"
+  },
+  "settings.plugins_change_when": {
+    "args": [
+      "when"
+    ],
+    "one": null,
+    "text": "your agents get a change {when}"
+  },
+  "settings.plugins_choice_part": {
+    "args": [
+      "kind",
+      "owner",
+      "state"
+    ],
+    "one": null,
+    "text": "a {kind} of {owner} · {state}"
+  },
+  "settings.plugins_connect_done": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "✓ {name} connected · your agents get it at their next call"
+  },
   "settings.plugins_connected": {
     "args": [
       "n"
@@ -2197,15 +2354,107 @@
     "one": "connected · {n} tool",
     "text": "connected · {n} tools"
   },
+  "settings.plugins_connecting": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "connecting {name}: finish it in your browser"
+  },
+  "settings.plugins_count_on": {
+    "args": [
+      "on"
+    ],
+    "one": null,
+    "text": "{on} on"
+  },
+  "settings.plugins_count_on_off": {
+    "args": [
+      "on",
+      "off"
+    ],
+    "one": null,
+    "text": "{on} on · {off} off"
+  },
+  "settings.plugins_counts": {
+    "args": [
+      "installed",
+      "browsable"
+    ],
+    "one": null,
+    "text": "{installed} installed · {browsable} to browse"
+  },
   "settings.plugins_disabled": {
     "args": [],
     "one": null,
     "text": "turned off"
   },
+  "settings.plugins_done_off": {
+    "args": [
+      "name",
+      "when"
+    ],
+    "one": null,
+    "text": "✓ {name} off · your agents lose it {when}"
+  },
+  "settings.plugins_done_on": {
+    "args": [
+      "name",
+      "when"
+    ],
+    "one": null,
+    "text": "✓ {name} on · your agents get it {when}"
+  },
   "settings.plugins_enabled": {
     "args": [],
     "one": null,
     "text": "turned on"
+  },
+  "settings.plugins_err_bad_name": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "{name} can't be a plugin's name: letters, digits, - and _"
+  },
+  "settings.plugins_err_exists": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "{name} is already a plugin: pick another name"
+  },
+  "settings.plugins_err_gone": {
+    "args": [],
+    "one": null,
+    "text": "that preview is gone: add it again"
+  },
+  "settings.plugins_err_invalid": {
+    "args": [],
+    "one": null,
+    "text": "its plugin.json is wrong:"
+  },
+  "settings.plugins_err_no_plugin": {
+    "args": [],
+    "one": null,
+    "text": "no plugin.json there"
+  },
+  "settings.plugins_err_no_server": {
+    "args": [],
+    "one": null,
+    "text": "no MCP server in it"
+  },
+  "settings.plugins_err_why": {
+    "args": [
+      "why"
+    ],
+    "one": null,
+    "text": "it didn't work: {why}"
+  },
+  "settings.plugins_expired": {
+    "args": [],
+    "one": null,
+    "text": "sign-in expired"
   },
   "settings.plugins_failed": {
     "args": [
@@ -2214,10 +2463,244 @@
     "one": null,
     "text": "✗ {why}"
   },
+  "settings.plugins_field_env": {
+    "args": [],
+    "one": null,
+    "text": "environment"
+  },
+  "settings.plugins_field_env_hint": {
+    "args": [],
+    "one": null,
+    "text": "KEY=value, one per line, ; between them here"
+  },
+  "settings.plugins_field_market": {
+    "args": [],
+    "one": null,
+    "text": "git URL"
+  },
+  "settings.plugins_field_name": {
+    "args": [],
+    "one": null,
+    "text": "name"
+  },
+  "settings.plugins_field_source": {
+    "args": [],
+    "one": null,
+    "text": "a folder or a git URL"
+  },
+  "settings.plugins_field_target": {
+    "args": [],
+    "one": null,
+    "text": "a command or a URL"
+  },
+  "settings.plugins_filter_hint": {
+    "args": [],
+    "one": null,
+    "text": "type to filter"
+  },
+  "settings.plugins_group_mcp": {
+    "args": [],
+    "one": null,
+    "text": "MCP servers"
+  },
+  "settings.plugins_group_mistral": {
+    "args": [],
+    "one": null,
+    "text": "Mistral connectors"
+  },
   "settings.plugins_help": {
     "args": [],
     "one": null,
     "text": "a change applies to the agents' next sessions."
+  },
+  "settings.plugins_hint_connect_again": {
+    "args": [],
+    "one": null,
+    "text": "c connects it again"
+  },
+  "settings.plugins_hint_connect_short": {
+    "args": [],
+    "one": null,
+    "text": "c reconnects"
+  },
+  "settings.plugins_hint_login": {
+    "args": [],
+    "one": null,
+    "text": "l opens your browser"
+  },
+  "settings.plugins_hint_login_short": {
+    "args": [],
+    "one": null,
+    "text": "l logs in"
+  },
+  "settings.plugins_hint_set_up": {
+    "args": [],
+    "one": null,
+    "text": "c opens its setup"
+  },
+  "settings.plugins_hint_set_up_short": {
+    "args": [],
+    "one": null,
+    "text": "c sets it up"
+  },
+  "settings.plugins_import_added": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "already added as {name}"
+  },
+  "settings.plugins_import_head": {
+    "args": [],
+    "one": null,
+    "text": "import MCP servers"
+  },
+  "settings.plugins_import_none": {
+    "args": [],
+    "one": null,
+    "text": "no MCP server found in Claude Code, Codex or Cursor's settings"
+  },
+  "settings.plugins_import_sub": {
+    "args": [],
+    "one": null,
+    "text": "found in your other agents' settings. each becomes a plugin in ~/.agents/plugins; bise never changes their files"
+  },
+  "settings.plugins_is_mcp": {
+    "args": [],
+    "one": null,
+    "text": "MCP server"
+  },
+  "settings.plugins_is_mistral": {
+    "args": [],
+    "one": null,
+    "text": "Mistral connector"
+  },
+  "settings.plugins_is_plugin": {
+    "args": [],
+    "one": null,
+    "text": "plugin"
+  },
+  "settings.plugins_is_skills": {
+    "args": [],
+    "one": null,
+    "text": "skills folder"
+  },
+  "settings.plugins_key_add": {
+    "args": [],
+    "one": null,
+    "text": "add"
+  },
+  "settings.plugins_key_add_run": {
+    "args": [],
+    "one": null,
+    "text": "add and run it"
+  },
+  "settings.plugins_key_back": {
+    "args": [],
+    "one": null,
+    "text": "back"
+  },
+  "settings.plugins_key_browse": {
+    "args": [],
+    "one": null,
+    "text": "browse"
+  },
+  "settings.plugins_key_cancel": {
+    "args": [],
+    "one": null,
+    "text": "cancel"
+  },
+  "settings.plugins_key_choose": {
+    "args": [],
+    "one": null,
+    "text": "choose"
+  },
+  "settings.plugins_key_connect": {
+    "args": [],
+    "one": null,
+    "text": "connect"
+  },
+  "settings.plugins_key_field": {
+    "args": [],
+    "one": null,
+    "text": "next field"
+  },
+  "settings.plugins_key_fold": {
+    "args": [],
+    "one": null,
+    "text": "fold"
+  },
+  "settings.plugins_key_folder": {
+    "args": [],
+    "one": null,
+    "text": "open folder"
+  },
+  "settings.plugins_key_installed": {
+    "args": [],
+    "one": null,
+    "text": "installed"
+  },
+  "settings.plugins_key_kind": {
+    "args": [],
+    "one": null,
+    "text": "kind"
+  },
+  "settings.plugins_key_login": {
+    "args": [],
+    "one": null,
+    "text": "log in"
+  },
+  "settings.plugins_key_next": {
+    "args": [],
+    "one": null,
+    "text": "next"
+  },
+  "settings.plugins_key_open": {
+    "args": [],
+    "one": null,
+    "text": "open"
+  },
+  "settings.plugins_key_toggle": {
+    "args": [],
+    "one": null,
+    "text": "on/off"
+  },
+  "settings.plugins_key_try": {
+    "args": [],
+    "one": null,
+    "text": "try"
+  },
+  "settings.plugins_kind_all": {
+    "args": [],
+    "one": null,
+    "text": "all"
+  },
+  "settings.plugins_kind_mcp": {
+    "args": [],
+    "one": null,
+    "text": "MCP"
+  },
+  "settings.plugins_kind_mistral": {
+    "args": [],
+    "one": null,
+    "text": "Mistral"
+  },
+  "settings.plugins_kind_plugins": {
+    "args": [],
+    "one": null,
+    "text": "plugins"
+  },
+  "settings.plugins_kind_skills": {
+    "args": [],
+    "one": null,
+    "text": "skills"
+  },
+  "settings.plugins_locked": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "{name} is always on: bise's pages need it"
   },
   "settings.plugins_logged_in": {
     "args": [],
@@ -2257,6 +2740,16 @@
     "one": null,
     "text": "logging in, in your browser"
   },
+  "settings.plugins_login_waiting": {
+    "args": [],
+    "one": null,
+    "text": "your browser is open: finish the login there"
+  },
+  "settings.plugins_login_waiting_short": {
+    "args": [],
+    "one": null,
+    "text": "browser open"
+  },
   "settings.plugins_logins": {
     "args": [],
     "one": null,
@@ -2267,12 +2760,84 @@
     "one": null,
     "text": "looking at your plugins…"
   },
+  "settings.plugins_mark_off": {
+    "args": [],
+    "one": null,
+    "text": "off"
+  },
+  "settings.plugins_mark_on": {
+    "args": [],
+    "one": null,
+    "text": "on"
+  },
+  "settings.plugins_market_added": {
+    "args": [
+      "url"
+    ],
+    "one": null,
+    "text": "✓ {url} added: b browses it"
+  },
+  "settings.plugins_mcp_sub": {
+    "args": [],
+    "one": null,
+    "text": "a server gives your agents new tools. it runs on this Mac, or bise reaches it at a URL"
+  },
+  "settings.plugins_more_tools": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "▸ {n} more"
+  },
+  "settings.plugins_n_off": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} off"
+  },
+  "settings.plugins_n_servers": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} server",
+    "text": "{n} servers"
+  },
+  "settings.plugins_n_skills": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} skill",
+    "text": "{n} skills"
+  },
+  "settings.plugins_n_tools": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} tool",
+    "text": "{n} tools"
+  },
   "settings.plugins_needs_login": {
     "args": [
       "name"
     ],
     "one": null,
     "text": "{name} needs a login: /plugins login"
+  },
+  "settings.plugins_needs_setup": {
+    "args": [],
+    "one": null,
+    "text": "needs setting up"
+  },
+  "settings.plugins_next_call": {
+    "args": [],
+    "one": null,
+    "text": "at their next call"
+  },
+  "settings.plugins_next_turn": {
+    "args": [],
+    "one": null,
+    "text": "at their next turn"
   },
   "settings.plugins_no_login": {
     "args": [],
@@ -2284,15 +2849,74 @@
     "one": null,
     "text": "no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md)."
   },
+  "settings.plugins_none_match": {
+    "args": [],
+    "one": null,
+    "text": "nothing matches"
+  },
   "settings.plugins_not_logged_in": {
     "args": [],
     "one": null,
     "text": "not logged in"
   },
+  "settings.plugins_off_everywhere": {
+    "args": [],
+    "one": null,
+    "text": "off for every project"
+  },
+  "settings.plugins_on_everywhere": {
+    "args": [],
+    "one": null,
+    "text": "on for every project"
+  },
+  "settings.plugins_on_of_tools": {
+    "args": [
+      "on",
+      "n"
+    ],
+    "one": null,
+    "text": "{on} of {n} tools"
+  },
   "settings.plugins_part_needs_login": {
     "args": [],
     "one": null,
     "text": "needs a login"
+  },
+  "settings.plugins_part_server": {
+    "args": [],
+    "one": null,
+    "text": "server"
+  },
+  "settings.plugins_part_servers": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "MCP servers · {n}"
+  },
+  "settings.plugins_part_skill": {
+    "args": [],
+    "one": null,
+    "text": "skill"
+  },
+  "settings.plugins_part_skills": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "skills · {n}"
+  },
+  "settings.plugins_part_tool": {
+    "args": [],
+    "one": null,
+    "text": "tool"
+  },
+  "settings.plugins_part_tools": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "tools · {n}"
   },
   "settings.plugins_personal_title": {
     "args": [],
@@ -2303,6 +2927,59 @@
     "args": [],
     "one": null,
     "text": "~/.agents/skills"
+  },
+  "settings.plugins_preview_after": {
+    "args": [],
+    "one": null,
+    "text": "you can turn any part off after."
+  },
+  "settings.plugins_preview_from": {
+    "args": [
+      "from"
+    ],
+    "one": null,
+    "text": "from {from}. once on, this runs on your Mac with your rights:"
+  },
+  "settings.plugins_preview_head": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "add {name}?"
+  },
+  "settings.plugins_preview_label_dropped": {
+    "args": [],
+    "one": null,
+    "text": "left out"
+  },
+  "settings.plugins_preview_label_secrets": {
+    "args": [],
+    "one": null,
+    "text": "secrets"
+  },
+  "settings.plugins_preview_label_skills": {
+    "args": [],
+    "one": null,
+    "text": "skills"
+  },
+  "settings.plugins_preview_nothing": {
+    "args": [],
+    "one": null,
+    "text": "no MCP server, nothing that leaves your Mac."
+  },
+  "settings.plugins_preview_replaces": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "replaces {name}"
+  },
+  "settings.plugins_preview_skills": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} skill, text your agents read:",
+    "text": "{n} skills, text your agents read:"
   },
   "settings.plugins_project_title": {
     "args": [
@@ -2318,6 +2995,33 @@
     "one": null,
     "text": "{project}/.agents/skills · this project only"
   },
+  "settings.plugins_question": {
+    "args": [],
+    "one": null,
+    "text": "what can your agents use?"
+  },
+  "settings.plugins_refresh_failed": {
+    "args": [
+      "why"
+    ],
+    "one": null,
+    "text": "Mistral's connectors not read again ({why}): the last ones stay"
+  },
+  "settings.plugins_refreshed": {
+    "args": [],
+    "one": null,
+    "text": "Mistral's connectors read again"
+  },
+  "settings.plugins_screen": {
+    "args": [],
+    "one": null,
+    "text": "plugins"
+  },
+  "settings.plugins_secrets_where": {
+    "args": [],
+    "one": null,
+    "text": "kept in bise's secrets (your keychain if you turned it on), never in the repo"
+  },
   "settings.plugins_set": {
     "args": [
       "name",
@@ -2326,6 +3030,31 @@
     ],
     "one": null,
     "text": "{name} {state}{unchanged} — applies at the next /reload"
+  },
+  "settings.plugins_staging": {
+    "args": [],
+    "one": null,
+    "text": "looking at it…"
+  },
+  "settings.plugins_tools_folded": {
+    "args": [],
+    "one": null,
+    "text": "▸ tools"
+  },
+  "settings.plugins_tools_open": {
+    "args": [],
+    "one": null,
+    "text": "▾ tools"
+  },
+  "settings.plugins_try_head": {
+    "args": [],
+    "one": null,
+    "text": "try it · 1-3"
+  },
+  "settings.plugins_try_head_wide": {
+    "args": [],
+    "one": null,
+    "text": "try it · 1-3 puts it in main's composer"
   },
   "settings.plugins_unchanged": {
     "args": [],
@@ -3367,6 +4096,11 @@
     "args": [],
     "one": null,
     "text": "copy the link"
+  },
+  "settings.skills_usage": {
+    "args": [],
+    "one": null,
+    "text": "usage: /skills | /skills on ID | /skills off ID"
   },
   "settings.theme_dark": {
     "args": [],

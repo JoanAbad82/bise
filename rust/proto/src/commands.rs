@@ -129,17 +129,26 @@ pub const COMMANDS: &[Cmd] = &[
     Cmd { name: "/close", desc: "close an inbox item without answering: /close N [note]", args: &[Arg::Card, Arg::Note], client: false },
     Cmd {
         name: "/plugins",
-        desc: "the workspace's agent plugins: /plugins [list|on|off|login|logout] [<id>]",
+        desc: "open the plugins screen: what your agents can use, on or off: /plugins [on|off|add|connect|login|logout|list|refresh] [<id>]",
         args: &[
             Arg::Words(&[
-                ("list", "the plugins and their state"),
-                ("on", "turn a plugin on"),
-                ("off", "turn a plugin off"),
+                ("off", "turn a plugin or one of its parts off"),
+                ("on", "turn it back on"),
+                ("add", "an MCP server, an import, a plugin, a marketplace"),
+                ("connect", "connect a Mistral connector"),
                 ("login", "log in to a remote MCP server"),
                 ("logout", "forget a remote MCP server's login"),
+                ("list", "the plugins and their state, as text"),
+                ("refresh", "read Mistral's connectors again"),
             ]),
             Arg::Plugin,
         ],
+        client: true,
+    },
+    Cmd {
+        name: "/skills",
+        desc: "the plugins screen, skills only: /skills [on|off] [<id>]",
+        args: &[Arg::Words(&[("off", "turn a skill or a skills folder off"), ("on", "turn it back on")]), Arg::Plugin],
         client: true,
     },
     Cmd { name: "/artifacts", desc: "what your agents made: pages, docs, files, links", args: &[], client: true },
@@ -303,12 +312,12 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Law: 38 commands, each name once and a slash word; 21 the
+    /// Law: 39 commands, each name once and a slash word; 22 the
     /// client's own, the 17 others the hub's router parses.
     #[test]
-    fn the_catalog_holds_38_commands_21_of_them_the_clients() {
-        assert_eq!(COMMANDS.len(), 38);
-        assert_eq!(COMMANDS.iter().filter(|c| c.client).count(), 21);
+    fn the_catalog_holds_39_commands_22_of_them_the_clients() {
+        assert_eq!(COMMANDS.len(), 39);
+        assert_eq!(COMMANDS.iter().filter(|c| c.client).count(), 22);
         let hub: Vec<&str> = COMMANDS.iter().filter(|c| !c.client).map(|c| c.name).collect();
         assert_eq!(
             hub,

@@ -27,6 +27,7 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     crate::diffview::draw_full(app, frame);
     crate::artifacts_screen::draw(app, frame);
     crate::scheduled_screen::draw(app, frame);
+    crate::plugins::draw(app, frame);
     crate::running_screen::draw(app, frame);
     crate::inbox_screen::draw(app, frame);
     crate::usage_screen::draw(app, frame);

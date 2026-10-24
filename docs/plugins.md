@@ -2,7 +2,8 @@
 
 Status: implemented, 2026-09-28 (task `plugins`). Code: `rust/plugins`
 (`bend-plugins`), `runtime/plugins.bend`, `runtime/skills.bend`,
-`runtime/mcp.bend`, `rust/tui/src/plugins.rs`.
+`runtime/mcp.bend`, `rust/tui/src/plugins.rs`, `plugins_screen.rs`,
+`plugins_add.rs`.
 
 ## Goal
 
@@ -168,9 +169,10 @@ the bodies marked `todo!("plugins chunk ...")` come with their chunk.
   `plugin_login`, `plugin_logout`. Events: `plugins {project?, items}`,
   `browse {source, items}`. Fixtures: `rust/proto/fixtures/core_ev.jsonl`,
   `app_cmd.jsonl`.
-- **Slash**: `/plugins [list|on|off|login|logout] [<id>]` (and `bise
-  plugins on|off`); `connect`, `add`, `refresh` and `/skills` come with
-  the terminal chunk, with their handlers.
+- **Slash**: `/plugins [on|off|add|connect|login|logout|list|refresh]
+  [<id>]` and `/skills [on|off] [<id>]` (`bise_proto::commands`; and
+  `bise plugins on|off`). Bare, both open the Plugins screen (below);
+  `/plugins add` opens it on the add menu.
 
 ## Where the code goes
 
@@ -495,9 +497,24 @@ desktop flag, an off skill left out, `skills:bise` locked, the
 fingerprint on a change and a toggle, a FIFO and a stuck read) and
 `rust/tui/src/skills.rs`; `tests/skills_hang_e2e.py` (a stuck SKILL.md
 never stalls main's first call).
-- `/plugins` in the TUI prints the workspace's static listing (the
-  single-agent TUI, gone with BISE-113, also showed its session's
-  `D/report.txt`).
+- `/plugins` in the TUI opens the Plugins screen, full screen like
+  `/scheduled` (plugins-ui's terminal screens, page plugins §5-§6):
+  `rust/tui/src/plugins_screen.rs` is pure (its state, its lines from
+  `catalog::rows`' rows at 150 and 80 columns, what a key does as an
+  `Effect`), `plugins.rs` reads the rows (every 2 s while open) and runs
+  the effects: space turns a row or a part on or off through
+  `state::set` and the divider says when his agents see it (`at their
+  next turn` for a skill, `at their next call` for a tool, a server or a
+  connector), ⏎ opens a plugin's page (its parts, a server's tools
+  folded under it, `1-3` put a `dev.bise.prompts` line in main's
+  composer), `c` connects a connector (`connectors::connect_now` on its
+  own thread), `l` logs in to a server, `b` Browse (the connectors not
+  connected, then each marketplace), `a` the add menu
+  (`rust/tui/src/plugins_add.rs`: `add::stage` off the draw thread, the
+  preview, `add::install` on his ⏎). `/skills` is the same screen on the
+  skills folders. Marks read data (`on`, `action`, `parts[].login`,
+  `parts[].error`), never the status words. `/plugins list` still
+  prints the static listing.
 
 ## Tests
 
@@ -511,7 +528,11 @@ never stalls main's first call).
   over HTTP on one connection, a wrong token is a 404, `PLUGIN_DATA`
   written, the bridge stops with its parent; a failing server is a
   `plugin.mcp.connection_failed` diagnostic and the skill still loads.
-- `cargo test -p bend-tui plugins`: `/plugins` text.
+- `cargo test -p bend-tui plugins`: `/plugins` text, and the screen's
+  render tests (`plugins_screen_tests.rs`: each state at 150 and 80
+  columns, the keys' effects; `PLUGINS_SHOTS=<dir>` writes the frames).
+- `tests/tui_plugins_tmux.py`: the screen in a real TUI on a throwaway
+  hub and fake plugins (after the land, on the branch).
 - `tests/plugins_live.py` (live model): a real
   `bend-harness --headless` session on a throwaway workspace loads
   `hello_plugin:greet` and calls `tools.hello_plugin.shout` from
