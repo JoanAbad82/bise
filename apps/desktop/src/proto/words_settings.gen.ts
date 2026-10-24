@@ -947,11 +947,11 @@ export const settings = {
   /** a found key's mark */
   first_found: "found",
   /** Claude Code signed in with a Claude plan, no Anthropic key: the plan's monthly API credits (support.claude.com/en/articles/17154008) */
-  first_claude_plan: "your Claude plan runs only in Claude Code, but Max and Team come with monthly API credits that work here: $100 on Max 5x, $200 on Max 20x, up to $500 on Team. Pro has none.",
+  first_claude_plan: "your Claude plan works only in Claude Code. Max and Team include monthly API credits that bise can use: $100 on Max 5x, $200 on Max 20x, up to $500 on Team. Pro has none.",
   /** Claude's plan: how to use its credits (the first run's API key way) */
-  first_claude_credits_how: "to use them: on claude.ai, Settings › Billing › API credits › Link organization. then make a key in that Console org and paste it as an Anthropic key.",
+  first_claude_credits_how: "to use them: on claude.ai, open Settings › Billing › API credits › Link organization, then make a key in that Console organization and paste it here as an Anthropic key.",
   /** the Anthropic key step, a Claude plan seen: its credits pay for the key */
-  first_claude_credits_key: "on Max or Team? link this key's Console org on claude.ai (Settings › Billing › API credits) and your plan's monthly credits pay for it.",
+  first_claude_credits_key: "on Max or Team? link this key's Console organization on claude.ai (Settings › Billing › API credits): your plan's monthly credits pay for it.",
   /** a key not saved */
   first_save_failed: (a: { glyph: string | number; why: string | number }): string => String(a.glyph) + " couldn't save the key: " + String(a.why),
   /** signed in to a plan */
@@ -1103,11 +1103,11 @@ export const settings = {
   /** sign-out failed */
   signin_sign_out_failed: (a: { why: string | number }): string => "▲ couldn't sign out: " + String(a.why),
   /** `bise doctor` and `bise auth status`: Claude Code signed in with a Claude plan (detect.rs, presence only) */
-  claude_code_seen: (a: { cli: string | number }): string => "signed in with a Claude plan. it runs only in Claude Code; Max and Team include monthly API credits for bise: " + String(a.cli) + " login anthropic shows how.",
+  claude_code_seen: (a: { cli: string | number }): string => "Claude plan found in Claude Code. Max and Team include monthly API credits bise can use: " + String(a.cli) + " login anthropic shows how.",
   /** `bise login anthropic`: the row's label for a Claude plan's credits */
   login_claude_plan: "on Max or Team?",
   /** `bise login anthropic`: what to do with the plan's credits */
-  login_claude_credits: "your plan's monthly API credits pay for this key: on claude.ai, Settings › Billing › API credits › Link organization, then make the key in that Console org. Pro has none.",
+  login_claude_credits: "your plan's monthly API credits pay for this key: on claude.ai, Settings › Billing › API credits › Link organization, then make the key in that Console organization. Pro has none.",
   /** `bise login anthropic`: the help article's row label */
   login_claude_how: "how it works",
   /** a role in a sentence: main */

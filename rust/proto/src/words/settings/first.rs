@@ -232,11 +232,11 @@ crate::words! { settings:
     first_found = "found";
     /// Claude Code signed in with a Claude plan, no Anthropic key: the
     /// plan's monthly API credits (support.claude.com/en/articles/17154008)
-    first_claude_plan = "your Claude plan runs only in Claude Code, but Max and Team come with monthly API credits that work here: $100 on Max 5x, $200 on Max 20x, up to $500 on Team. Pro has none.";
+    first_claude_plan = "your Claude plan works only in Claude Code. Max and Team include monthly API credits that bise can use: $100 on Max 5x, $200 on Max 20x, up to $500 on Team. Pro has none.";
     /// Claude's plan: how to use its credits (the first run's API key way)
-    first_claude_credits_how = "to use them: on claude.ai, Settings › Billing › API credits › Link organization. then make a key in that Console org and paste it as an Anthropic key.";
+    first_claude_credits_how = "to use them: on claude.ai, open Settings › Billing › API credits › Link organization, then make a key in that Console organization and paste it here as an Anthropic key.";
     /// the Anthropic key step, a Claude plan seen: its credits pay for the key
-    first_claude_credits_key = "on Max or Team? link this key's Console org on claude.ai (Settings › Billing › API credits) and your plan's monthly credits pay for it.";
+    first_claude_credits_key = "on Max or Team? link this key's Console organization on claude.ai (Settings › Billing › API credits): your plan's monthly credits pay for it.";
     /// a key not saved
     first_save_failed(glyph, why) = "{glyph} couldn't save the key: {why}";
     /// signed in to a plan
