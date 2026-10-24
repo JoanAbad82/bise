@@ -88,30 +88,35 @@ export function facets(g: Gym): readonly Facet[] {
   return out;
 }
 
-/** the closest point of a triangle to p (Ericson, Real-Time Collision Detection 5.1.5) */
+/** the closest point of a triangle to p (Ericson, Real-Time Collision Detection 5.1.5); it allocates only its answer (the climb law calls it per vertex per frame) */
 export function closestOnTri(p: V3, a: V3, b: V3, c: V3): V3 {
-  const ab = sub(b, a);
-  const ac = sub(c, a);
-  const ap = sub(p, a);
-  const d1 = dot(ab, ap);
-  const d2 = dot(ac, ap);
+  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+  const acx = c.x - a.x, acy = c.y - a.y, acz = c.z - a.z;
+  const apx = p.x - a.x, apy = p.y - a.y, apz = p.z - a.z;
+  const d1 = abx * apx + aby * apy + abz * apz;
+  const d2 = acx * apx + acy * apy + acz * apz;
   if (d1 <= 0 && d2 <= 0) return a;
-  const bp = sub(p, b);
-  const d3 = dot(ab, bp);
-  const d4 = dot(ac, bp);
+  const bpx = p.x - b.x, bpy = p.y - b.y, bpz = p.z - b.z;
+  const d3 = abx * bpx + aby * bpy + abz * bpz;
+  const d4 = acx * bpx + acy * bpy + acz * bpz;
   if (d3 >= 0 && d4 <= d3) return b;
   const vc = d1 * d4 - d3 * d2;
-  if (vc <= 0 && d1 >= 0 && d3 <= 0) return add(a, mul(ab, d1 / (d1 - d3)));
-  const cp = sub(p, c);
-  const d5 = dot(ab, cp);
-  const d6 = dot(ac, cp);
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) { const t = d1 / (d1 - d3); return v(a.x + abx * t, a.y + aby * t, a.z + abz * t); }
+  const cpx = p.x - c.x, cpy = p.y - c.y, cpz = p.z - c.z;
+  const d5 = abx * cpx + aby * cpy + abz * cpz;
+  const d6 = acx * cpx + acy * cpy + acz * cpz;
   if (d6 >= 0 && d5 <= d6) return c;
   const vb = d5 * d2 - d1 * d6;
-  if (vb <= 0 && d2 >= 0 && d6 <= 0) return add(a, mul(ac, d2 / (d2 - d6)));
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) { const t = d2 / (d2 - d6); return v(a.x + acx * t, a.y + acy * t, a.z + acz * t); }
   const va = d3 * d6 - d5 * d4;
-  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) return add(b, mul(sub(c, b), (d4 - d3) / (d4 - d3 + (d5 - d6))));
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+    const t = (d4 - d3) / (d4 - d3 + (d5 - d6));
+    return v(b.x + (c.x - b.x) * t, b.y + (c.y - b.y) * t, b.z + (c.z - b.z) * t);
+  }
   const den = 1 / (va + vb + vc);
-  return add(a, add(mul(ab, vb * den), mul(ac, vc * den)));
+  const s = vb * den;
+  const u = vc * den;
+  return v(a.x + (abx * s + acx * u), a.y + (aby * s + acy * u), a.z + (abz * s + acz * u));
 }
 
 /**
