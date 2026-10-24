@@ -473,7 +473,7 @@ gate_mark() { case "$1" in /tmp/bise-gate-*) echo "/bise-gate-${1##*-}/" ;; *) e
 gate_prune() {
   find "$1" -mindepth 1 -maxdepth 1 ! -name 'sb-run-all.*' ! -name .owner -exec rm -rf {} + 2>/dev/null
   for l in "$1"/sb-run-all.*; do
-    [ -d "$l" ] && find "$l" -mindepth 1 -maxdepth 1 ! -name '*.log' -exec rm -rf {} + 2>/dev/null
+    [ -d "$l" ] && find "$l" -mindepth 1 -maxdepth 1 ! -name '*.log' ! -name '*.keep' -exec rm -rf {} + 2>/dev/null
   done
   return 0
 }
@@ -867,6 +867,7 @@ python3 "$root/tests/include_map.py" --self-test >/dev/null || { python3 "$root/
 python3 -B "$root/tests/desktop_pick_test.py" >/dev/null || { python3 -B "$root/tests/desktop_pick_test.py"; echo "GATE quick FAILED"; exit 1; }
 # every build that ships a runtime checks it is whole for the viewer (the xlsx grid; xlsx-fix)
 python3 -B "$root/tests/gate_sweep_test.py" >/dev/null || { python3 -B "$root/tests/gate_sweep_test.py"; echo "GATE quick FAILED"; exit 1; }
+python3 -B "$root/tests/keep_logs_test.py" >/dev/null || { python3 -B "$root/tests/keep_logs_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/runtime_check_test.py" >/dev/null || { python3 -B "$root/tests/runtime_check_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 if [ -d "$root/apps/desktop" ]; then

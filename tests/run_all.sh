@@ -177,7 +177,9 @@ one() {  # <test>: its last line; its whole output kept on failure
     # 2 bend at once: PROOF is one job of the pool
     /usr/bin/time -p -o "$out/$1.time" python3 tests/proof_run.py . 2 "$out/proof" >"$out/$1.log" 2>&1 || rc=1
   else
-    /usr/bin/time -p -o "$out/$1.time" python3 -u "tests/$1.py" >"$out/$1.log" 2>&1 || rc=$?
+    # RUN_ALL_KEEP: a red e2e.Env test copies its world's logs there (hub.log,
+    # an inner gate's...) before its tmp goes, so the red names its line
+    RUN_ALL_KEEP="$out/$1.keep" /usr/bin/time -p -o "$out/$1.time" python3 -u "tests/$1.py" >"$out/$1.log" 2>&1 || rc=$?
   fi
   cpu="$(awk '$1 == "user" || $1 == "sys" { c += $2 } END { printf "%d", c }' "$out/$1.time" 2>/dev/null)"
   local load; load="$(sysctl -n vm.loadavg 2>/dev/null | awk '{ print $2 }')"
@@ -186,7 +188,7 @@ one() {  # <test>: its last line; its whole output kept on failure
   [ $rc = 0 ] && [ "$1" = PROOF ] && touch "$proof_cache/$proof_key"
   [ $rc = 0 ] || echo "$1" >>"$out/failed"
   if [ $rc = 0 ]; then echo "ok   $1 ($((SECONDS - s))s, cpu ${cpu:-?}s): $(tail -1 "$out/$1.log")"
-  else echo "FAIL $1 ($((SECONDS - s))s, cpu ${cpu:-?}s): $out/$1.log"; fi
+  else echo "FAIL $1 ($((SECONDS - s))s, cpu ${cpu:-?}s): $out/$1.log$([ -d "$out/$1.keep" ] && echo ", its world's logs: $out/$1.keep")"; fi
   return $rc
 }
 export -f one; export out timings rev proof_cache proof_key

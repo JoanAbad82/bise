@@ -9,6 +9,7 @@ import os
 import queue
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -144,8 +145,61 @@ def line_has(line, needle):
     rec = feed_rec(line) or obs_lines.read(line)
     return bool(rec) and any(isinstance(v, str) and needle in v for v in rec[1].values())
 
+KEEP_EXT = (".log", ".err", ".out", ".jsonl", ".txt")
+KEEP_FILE_MAX = 2 << 20   # a file's last 2 MB
+KEEP_TOTAL_MAX = 20 << 20  # 20 MB a test
+
+
+def keep_logs(src, dest):
+    """Copy the logs of a red test's world (`src`: hub.log, journal, an inner
+    gate's logs...) to `dest` before the world goes: run_all's
+    RUN_ALL_KEEP, kept with the red run's logs (gate.sh's gate_prune). Each
+    file's last KEEP_FILE_MAX bytes, KEEP_TOTAL_MAX in all; the newest first.
+    The number of files copied."""
+    found = []
+    for d, dirs, files in os.walk(src):
+        dirs[:] = [x for x in dirs if x not in ("node_modules", "target", ".git")]
+        for f in files:
+            p = os.path.join(d, f)
+            if f.endswith(KEEP_EXT) and os.path.isfile(p) and not os.path.islink(p):
+                try:
+                    found.append((os.path.getmtime(p), p))
+                except OSError:
+                    pass
+    total = n = 0
+    for _, p in sorted(found, reverse=True):
+        if total >= KEEP_TOTAL_MAX:
+            break
+        try:
+            size = os.path.getsize(p)
+            take = min(size, KEEP_FILE_MAX, KEEP_TOTAL_MAX - total)
+            to = os.path.join(dest, os.path.relpath(p, src))
+            os.makedirs(os.path.dirname(to), exist_ok=True)
+            with open(p, "rb") as r, open(to, "wb") as w:
+                r.seek(size - take)
+                w.write(r.read(take))
+            total += take
+            n += 1
+        except OSError:
+            pass
+    return n
+
+
+def _term_is_exit(signum, frame):
+    # a TERM (the gate's sweep, a pool stopped) unwinds like an exit, so
+    # Env.close runs and keeps the red's logs; once: a second TERM kills
+    # as before, even if close blocks (a hub that won't stop)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    raise SystemExit(128 + signum)
+
+
 class Env:
     def __init__(self, fake_env=None):
+        try:
+            if signal.getsignal(signal.SIGTERM) == signal.SIG_DFL:
+                signal.signal(signal.SIGTERM, _term_is_exit)
+        except ValueError:  # not the main thread
+            pass
         self.tmp = tempfile.mkdtemp(prefix="sb-e2e-", dir=short_tmp())
         self.ws = os.path.join(self.tmp, "ws")
         self.state = os.path.join(self.tmp, "st")
@@ -210,6 +264,14 @@ class Env:
         self.hub = None
 
     def close(self):
+        # a red keeps its world's logs first, before the hub's stop: a swept
+        # test gets KILL 0.5 s after its TERM (gate.sh's gate_kill)
+        exc = sys.exc_info()[1]
+        red = os.environ.get("SB_KEEP") == "1" or (
+            exc is not None and not (isinstance(exc, SystemExit) and exc.code in (0, None)))
+        keep = os.environ.get("RUN_ALL_KEEP")
+        if red and keep:
+            print("kept %d log files of this world in %s" % (keep_logs(self.tmp, keep), keep), flush=True)
         if self.hub:
             try:
                 self.stop_hub()
@@ -218,7 +280,7 @@ class Env:
         self.fake.kill()
         # the HOME law, after the fact: its REPLs indexed none of his skills
         # (raised only when the test itself passed: never hides its failure)
-        if sys.exc_info()[0] is None:
+        if exc is None:
             refuse_real_skills(self.env["BEND_SKILLS_INDEX"])
         if os.environ.get("SB_KEEP") != "1":
             shutil.rmtree(self.tmp, ignore_errors=True)
