@@ -235,7 +235,7 @@
 }
 .th-sync-dots {
   display: inline-flex;
-  gap: 4px;
+  gap: var(--s-1);
 }
 .th-sync-dots > i {
   width: 3px;
