@@ -11,10 +11,11 @@ import * as office from "../../dist/office.js";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const lines = readFileSync(join(root, "rust/proto/fixtures/anchor.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 
-const refusal = (fn) => {
+const refusal = (fn: () => unknown): InstanceType<typeof office.OfficeError> => {
   try {
     fn();
   } catch (e) {
+    assert.ok(e instanceof office.OfficeError, `not an OfficeError: ${e}`);
     return e;
   }
   assert.fail("did not throw");
@@ -46,7 +47,8 @@ test("a known kind with a bad field is refused, naming the field", () => {
 });
 
 test("an anchor of another file type is refused", () => {
-  assert.equal(office.anchorFor("xlsx", { kind: "cell", sheet: "Q3", range: "B4" }).range, "B4");
+  const cell = office.anchorFor("xlsx", { kind: "cell", sheet: "Q3", range: "B4" });
+  assert.equal(cell.kind === "cell" ? cell.range : undefined, "B4");
   const e = refusal(() => office.anchorFor("xlsx", { kind: "shape", slide: 1, shape: "2" }));
   assert.equal(e.code, "anchor_kind_mismatch");
 });

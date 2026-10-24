@@ -23,6 +23,7 @@ export async function sample() {
   doc.add({ kind: "image", bytes: PNG, alt: "a chart" });
   doc.add({ kind: "pagebreak" });
   doc.add({ kind: "para", text: "Appendix.", align: "justify" });
+  if (!("comment" in p)) throw new Error("a para block gives a paragraph, not a table");
   p.comment("Is 4% the final number?", { quote: "4%" });
   p.replace("grew", "rose", { track: true });
   return doc;

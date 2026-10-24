@@ -7,7 +7,7 @@
 //      chrome are dark (no white cell in a dark grid), in light they are light.
 // Screens for designer, light and dark, in $OUT (default $TMPDIR/sheet-grid-shots).
 //
-//   ~/.bise/run/heavy-run --low node office/sdk/test/sheet-grid.offscreen.mjs
+//   ~/.bise/run/heavy-run --low node --experimental-strip-types office/sdk/test/sheet-grid.offscreen.ts
 //
 // Needs office/dist/office-sheet.js (scripts/bins.sh office-sheet). Fakes only: no hub, no
 // account, no window on screen (Chrome --headless=new, its own profile).
@@ -20,6 +20,18 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
+import { list, obj } from "./must.ts";
+
+// a cell's box in the page, as the page's script gives it
+type Box = { x: number; y: number; w: number; h: number };
+function asBox(v: unknown, what: string): Box {
+  const o = obj(v, what);
+  const { x, y, w, h } = o;
+  assert.ok(typeof x === "number" && typeof y === "number" && typeof w === "number" && typeof h === "number", `${what}: not a box`);
+  return { x, y, w, h };
+}
+// a pixel's [r, g, b], as the page's script gives it
+const asRgb = (v: unknown): number[] => list(v, "a pixel").map((c) => Number(c));
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
@@ -48,10 +60,10 @@ async function book() {
 }
 const ART = { id: "proj-xlsx", name: "projection.xlsx", bytes: await book() };
 const VERSION = 1;
-const posts = [];
+const posts: { path: string; bytes: number }[] = [];
 
 // view.rs's shell, its tags as it writes them (its Rust test pins the real one)
-const shell = (theme) => `<!doctype html>
+const shell = (theme: string | null) => `<!doctype html>
 <html lang="en"${theme ? ` data-theme="${theme}"` : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="bise-token" content="t0k"><title>${ART.name}</title>
 <link rel="stylesheet" href="/kit/tokens.css"><link rel="stylesheet" href="/kit/office/viewer.css"><link rel="stylesheet" href="/kit/office/select.css">
@@ -60,14 +72,14 @@ const shell = (theme) => `<!doctype html>
 </head><body><main id="bise-office" data-artifact="${ART.id}" data-kind="xlsx" data-version="${VERSION}" data-latest="${VERSION}" data-follows data-file="/a/${ART.id}/${VERSION}/${ART.name}" data-name="${ART.name}" data-agent="office-lead" data-title="${ART.name}">
 <p class="office-state" data-state="opening">opening ${ART.name}…</p></main></body></html>`;
 
-const types = { ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2", ".html": "text/html" };
+const types: Record<string, string> = { ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2", ".html": "text/html" };
 const server = http.createServer((req, res) => {
-  const u = new URL(req.url, "http://x");
+  const u = new URL(req.url ?? "/", "http://x");
   const segs = u.pathname.split("/").filter(Boolean);
-  const send = (status, type, body) => { res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store" }); res.end(body); };
+  const send = (status: number, type: string, body: string | Uint8Array) => { res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store" }); res.end(body); };
   if (req.method === "POST") {
-    const chunks = [];
-    req.on("data", (c) => chunks.push(c));
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
     req.on("end", () => {
       posts.push({ path: u.pathname, bytes: Buffer.concat(chunks).length });
       if (segs[3] === "save") return send(200, "application/json", JSON.stringify({ v: VERSION + posts.length, rev: 1 }));
@@ -94,35 +106,41 @@ const server = http.createServer((req, res) => {
   }
   send(404, "text/plain", "no");
 });
-await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
-const base = `http://127.0.0.1:${server.address().port}`;
+await new Promise<void>((ok) => server.listen(0, "127.0.0.1", () => ok()));
+const addr = server.address();
+assert.ok(addr !== null && typeof addr === "object", "the server listens on a port");
+const base = `http://127.0.0.1:${addr.port}`;
 
 // ---- Chrome over CDP
 const profile = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "chrome-"));
 const chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "--disable-site-isolation-trials", "--disable-features=IsolateOrigins,site-per-process", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
-const wsUrl = await new Promise((ok, no) => {
+const wsUrl = await new Promise<string>((ok, no) => {
   let err = "";
   chrome.stderr.on("data", (d) => { err += d; const m = /DevTools listening on (ws:\S+)/.exec(err); if (m) ok(m[1]); });
   setTimeout(() => no(new Error(`no devtools: ${err}`)), 15000);
 });
 const port = new URL(wsUrl).port;
-const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" })).json();
+const target: { webSocketDebuggerUrl: string } = JSON.parse(await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" })).text());
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((ok) => ws.addEventListener("open", ok));
+// what a CDP call answers: the fields these checks read
+type CdpReply = { result?: { value?: unknown }; data?: string; exceptionDetails?: { text?: string; exception?: { description?: string } } };
+type CdpMessage = { id?: number; error?: { message: string }; result: CdpReply };
 let seq = 0;
-const waiting = new Map();
+const waiting = new Map<number, (d: CdpMessage) => void>();
 ws.addEventListener("message", (m) => {
-  const d = JSON.parse(m.data);
-  if (d.id && waiting.has(d.id)) { waiting.get(d.id)(d); waiting.delete(d.id); }
+  const d: CdpMessage = JSON.parse(String(m.data));
+  const w = d.id ? waiting.get(d.id) : undefined;
+  if (d.id && w) { w(d); waiting.delete(d.id); }
 });
-const cdp = (method, params = {}) => new Promise((ok, no) => { const id = ++seq; waiting.set(id, (d) => (d.error ? no(new Error(`${method}: ${d.error.message}`)) : ok(d.result))); ws.send(JSON.stringify({ id, method, params })); });
-const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
-async function evaluate(expr) {
+const cdp = (method: string, params = {}) => new Promise<CdpReply>((ok, no) => { const id = ++seq; waiting.set(id, (d) => (d.error ? no(new Error(`${method}: ${d.error.message}`)) : ok(d.result))); ws.send(JSON.stringify({ id, method, params })); });
+const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+async function evaluate(expr: string) {
   const r = await cdp("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
   if (r.exceptionDetails) throw new Error(`${expr.slice(0, 80)}: ${r.exceptionDetails.exception?.description || r.exceptionDetails.text}`);
-  return r.result.value;
+  return r.result?.value;
 }
-async function until(expr, what, ms = 20000) {
+async function until(expr: string, what: string, ms = 20000) {
   const t = Date.now();
   while (Date.now() - t < ms) { if (await evaluate(expr).catch(() => false)) return; await sleep(100); }
   throw new Error(`timed out: ${what}`);
@@ -130,7 +148,7 @@ async function until(expr, what, ms = 20000) {
 const W = 1300, H = 760;
 const F = "document.querySelector('iframe')";
 const win = `${F}.contentWindow`;
-async function open(theme) {
+async function open(theme: string) {
   await cdp("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: false });
   await cdp("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: theme === "dark" ? "dark" : "light" }] });
   await cdp("Page.navigate", { url: `${base}/app?theme=${theme}` });
@@ -140,30 +158,35 @@ async function open(theme) {
   } catch (e) {
     // what the frame drew instead: the viewer's words (a failed import), or an older renderer
     const drew = await evaluate(`(() => { const d = ${win}.document; const s = d.querySelector('.office-state'); return s ? 'the viewer says: ' + s.textContent : d.querySelector('td[data-ref]') ? 'the old HTML table (no Univer: no column resize, white cells)' : 'nothing'; })()`).catch(() => "nothing");
-    throw new Error(`${e.message} (APP_ROOT ${APP}): ${drew}`);
+    throw new Error(`${e instanceof Error ? e.message : String(e)} (APP_ROOT ${APP}): ${drew}`);
   }
   // the grid drawn: a cell has a box
   await until(`(() => { const v = ${win}.biseOffice.view; const s = v.place().sheet; const r = v.where({ kind: 'cell', sheet: s, range: 'B1' }); if (!r || !r.els.length) return false; r.els[0].remove(); return true; })()`, "the grid's cells");
   await sleep(400);
 }
 // where a cell is in the page (the frame's offset added): from the grid's own geometry
-const cellBox = (ref) => evaluate(`(() => { const v = ${win}.biseOffice.view; const s = v.place().sheet; const r = v.where({ kind: 'cell', sheet: s, range: '${ref}' }); const b = r.els[0]; const o = ${F}.getBoundingClientRect(); const out = { x: o.left + parseFloat(b.style.left), y: o.top + parseFloat(b.style.top), w: parseFloat(b.style.width), h: parseFloat(b.style.height) }; b.remove(); return out; })()`);
-async function shot(name) {
+const cellBox = async (ref: string) => asBox(await cellBoxRaw(ref), `cell ${ref}'s box`);
+const cellBoxRaw = (ref: string) => evaluate(`(() => { const v = ${win}.biseOffice.view; const s = v.place().sheet; const r = v.where({ kind: 'cell', sheet: s, range: '${ref}' }); const b = r.els[0]; const o = ${F}.getBoundingClientRect(); const out = { x: o.left + parseFloat(b.style.left), y: o.top + parseFloat(b.style.top), w: parseFloat(b.style.width), h: parseFloat(b.style.height) }; b.remove(); return out; })()`);
+async function shot(name: string) {
   const r = await cdp("Page.captureScreenshot", { format: "png" });
-  writeFileSync(join(OUT, `${name}.png`), Buffer.from(r.data, "base64"));
-  return r.data;
+  const data = r.data ?? "";
+  writeFileSync(join(OUT, `${name}.png`), Buffer.from(data, "base64"));
+  return data;
 }
 // the color of a page pixel (from a screenshot of that one pixel)
-async function pixel(x, y) {
+async function pixel(x: number, y: number) {
   const r = await cdp("Page.captureScreenshot", { format: "png", clip: { x, y, width: 1, height: 1, scale: 1 } });
+  return asRgb(await pixelRaw(r));
+}
+function pixelRaw(r: CdpReply) {
   return evaluate(`new Promise((ok) => { const i = new Image(); i.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 1; const g = c.getContext('2d'); g.drawImage(i, 0, 0); ok([...g.getImageData(0, 0, 1, 1).data.slice(0, 3)]); }; i.src = 'data:image/png;base64,${r.data}'; })`);
 }
-const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+const luma = ([r, g, b]: number[]) => 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
 
 await cdp("Page.enable");
 await cdp("Runtime.enable");
-const results = [];
-const ok = (what) => { results.push(what); console.log(`ok · ${what}`); };
+const results: string[] = [];
+const ok = (what: string) => { results.push(what); console.log(`ok · ${what}`); };
 try {
   // ---- 1. a drag on column A's right edge, in the header, makes A wider
   await open("light");

@@ -1,23 +1,35 @@
 // The docs module (docx), on the built bundle: outline, edits by id that
 // keep what they do not touch, tracked changes, comments, tables, create,
-// check, diff. Fixtures: office/fixtures (make.mjs); the rest made here.
+// check, diff. Fixtures: office/fixtures (make.ts); the rest made here.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { docs, diff, flatten, core, OfficeError } from "../../dist/office.js";
-import { sample } from "./docs-sample.mjs";
+import { docs, diff, flatten, core, OfficeError, type Anchor, type OfficeErrorCode, type OutlineNode } from "../../dist/office.js";
+import { sample } from "./docs-sample.ts";
+import { list, must, obj } from "./must.ts";
 
+type Doc = Awaited<ReturnType<typeof docs.open>>;
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "fixtures");
-const fixture = (name) => new Uint8Array(readFileSync(join(fixtures, name)));
+const fixture = (name: string) => new Uint8Array(readFileSync(join(fixtures, name)));
 const now = () => new Date(Date.UTC(2026, 9, 14, 9, 0, 0));
 const tiny = () => docs.open(fixture("tiny.docx"), { author: "Ada", now });
-const para = (id, quote) => (quote ? { kind: "para", para: id, quote } : { kind: "para", para: id });
-const xmlOf = async (doc, part = "word/document.xml") => core.Zip.read(await doc.save()).text(part);
+const para = (id: string | undefined, quote?: string): Extract<Anchor, { kind: "para" }> => {
+  const p = must(id, "a paragraph id");
+  return quote ? { kind: "para", para: p, quote } : { kind: "para", para: p };
+};
+const xmlOf = async (doc: Doc, part = "word/document.xml") => must(core.Zip.read(await doc.save()).text(part), part);
 
-const rejects = async (fn, code) => {
+// a node's children and props, there or the test fails naming the node
+const kids = (n: OutlineNode | undefined, what: string) => must(n?.children, `${what}'s children`);
+const props = (n: OutlineNode | undefined, what: string) => must(n?.props, `${what}'s props`);
+const textOf = (zip: core.Zip, path: string) => must(zip.text(path), path);
+// an anchor's quote, whatever its kind
+const quoteOf = (a: Anchor | undefined) => (a && "quote" in a ? a.quote : undefined);
+
+const rejects = async (fn: () => unknown, code: OfficeErrorCode) => {
   try {
     await fn();
   } catch (e) {
@@ -50,7 +62,7 @@ test("inspect: paragraphs in document order, a table's paragraphs as its childre
   assert.deepEqual(o.nodes[0].anchor, { kind: "para", para: "10000001" });
   const t = o.nodes[2];
   assert.deepEqual(t.props, { rows: 2, cols: 2 });
-  assert.deepEqual(t.children.map((c) => [c.text, c.props.cell]), [["Region", { row: 1, col: 1 }], ["Revenue", { row: 1, col: 2 }], ["North", { row: 2, col: 1 }], ["120", { row: 2, col: 2 }]]);
+  assert.deepEqual(kids(t, "the table").map((c) => [c.text, props(c, "a cell").cell]), [["Region", { row: 1, col: 1 }], ["Revenue", { row: 1, col: 2 }], ["North", { row: 2, col: 1 }], ["120", { row: 2, col: 2 }]]);
   assert.equal(doc.text(), "Q3 review\nNet revenue grew 4% on the quarter.\nRegion\nRevenue\nNorth\n120\nNext: the pricing page.");
   assert.deepEqual(doc.check(), []);
 });
@@ -68,7 +80,7 @@ test("an edit keeps the parts it did not touch, and the attributes it did not to
   const before = core.Zip.read(fixture("tiny.docx"));
   const after = core.Zip.read(await doc.save());
   for (const p of before.list()) if (p !== "word/document.xml") assert.deepEqual(after.bytes(p), before.bytes(p), p);
-  const xml = after.text("word/document.xml");
+  const xml = textOf(after, "word/document.xml");
   assert.match(xml, /mc:Ignorable="w14"/);
   assert.match(xml, /<w:pgMar w:top="1440"[^>]*w:gutter="0"\/>/);
   assert.match(xml, /w14:paraId="10000002" w14:textId="77777777"/);
@@ -88,7 +100,7 @@ test("paragraphs with no id get one: the same for the same bytes, kept once save
   const doc = await docs.open(bytes);
   doc.at(para(a[1])).insert("!");
   const saved = await doc.save();
-  const xml = core.Zip.read(saved).text("word/document.xml");
+  const xml = textOf(core.Zip.read(saved), "word/document.xml");
   assert.match(xml, /xmlns:w14="http:\/\/schemas.microsoft.com\/office\/word\/2010\/wordml"/);
   assert.match(xml, /mc:Ignorable="w14"/);
   assert.deepEqual((await docs.open(saved)).inspect().nodes.map((n) => n.id), a);
@@ -122,7 +134,7 @@ test("insert, setText, format and style on a paragraph", async () => {
   s.style("Heading2");
   s.align("center");
   const n = doc.inspect().nodes.at(-1);
-  assert.deepEqual(n.props, { style: "Heading2", level: 2, align: "center" });
+  assert.deepEqual(n?.props, { style: "Heading2", level: 2, align: "center" });
   const xml = await xmlOf(doc);
   assert.match(xml, /<w:rPr><w:b\/><w:color w:val="1F4E79"\/><\/w:rPr><w:t[^>]*>pricing page<\/w:t>/);
   assert.match(xml, /<w:pPr><w:pStyle w:val="Heading2"\/><w:jc w:val="center"\/><\/w:pPr>/);
@@ -157,7 +169,7 @@ test("tracked edits: a replace is a deletion and an insertion; accept and reject
   // the outline shows the text as it reads with the changes in, and the changes as children
   const n2 = doc.inspect().nodes[1];
   assert.equal(n2.text, "Net revenue grew 5% on the quarter.");
-  assert.deepEqual(n2.children.map((c) => [c.type, c.props.kind]), [["change", "insert"], ["change", "delete"]]);
+  assert.deepEqual(kids(n2, "paragraph 2").map((c) => [c.type, props(c, "a change").kind]), [["change", "insert"], ["change", "delete"]]);
 
   const saved = await doc.save();
   const accepted = await docs.open(saved);
@@ -173,7 +185,7 @@ test("tracked edits: a replace is a deletion and an insertion; accept and reject
 
   // one change by id
   const one = await docs.open(saved);
-  const del = one.changes.list().find((c) => c.text === "4%");
+  const del = must(one.changes.list().find((c) => c.text === "4%"), "the deletion of 4%");
   assert.equal(one.changes.reject(del.id), 1);
   assert.equal(one.at(para("10000002")).text, "Net revenue grew 5%4% on the quarter.");
   await rejects(() => one.changes.accept("999"), "not_found");
@@ -209,12 +221,12 @@ test("comments: add on a quote, reply, resolve, read back after a save, remove",
   const list = again.comments.list();
   assert.deepEqual(list.map((x) => [x.id, x.author, x.replyTo ?? null, x.done]), [["0", "Ada", null, true], ["1", "Ada", null, false], ["2", "Bob", "0", false]]);
   const node = again.inspect().nodes[1];
-  assert.deepEqual(node.children.map((k) => [k.id, k.type, k.anchor.quote]), [["comment:0", "comment", "grew 4%"], ["comment:2", "comment", "grew 4%"]]);
+  assert.deepEqual(kids(node, "paragraph 2").map((k) => [k.id, k.type, quoteOf(k.anchor)]), [["comment:0", "comment", "grew 4%"], ["comment:2", "comment", "grew 4%"]]);
   assert.deepEqual(again.check(), []);
   const zip = core.Zip.read(await again.save());
-  assert.match(zip.text("[Content_Types].xml"), /comments\+xml/);
-  assert.match(zip.text("[Content_Types].xml"), /commentsExtended\+xml/);
-  assert.match(zip.text("word/_rels/document.xml.rels"), /relationships\/comments"/);
+  assert.match(textOf(zip, "[Content_Types].xml"), /comments\+xml/);
+  assert.match(textOf(zip, "[Content_Types].xml"), /commentsExtended\+xml/);
+  assert.match(textOf(zip, "word/_rels/document.xml.rels"), /relationships\/comments"/);
 
   again.comments.remove("0");
   assert.deepEqual(again.comments.list().map((x) => x.id), ["1"]);
@@ -238,8 +250,8 @@ test("tables: read, set a cell, add and remove rows, tracked or not", async () =
   assert.deepEqual(doc.changes.list().map((c) => c.kind), ["row-delete", "delete", "delete"]);
   doc.changes.accept();
   assert.deepEqual(t.rows, [["Region", "Revenue"], ["North", "125"]]);
-  assert.equal(t.node.props.rows, 2);
-  assert.equal(doc.at(para("10000006")).table().rows.length, 2);
+  assert.equal(props(t.node, "the table").rows, 2);
+  assert.equal(doc.at(para("10000006")).table()?.rows.length, 2);
   await rejects(() => t.cell(9, 9), "not_found");
   await rejects(() => doc.table(para("10000001")), "not_found");
   assert.deepEqual(doc.check(), []);
@@ -253,7 +265,9 @@ test("at(): by id, by quote when the id is gone, refusals with words", async () 
   assert.equal(doc.at(para("7FFFFFFF", "pricing page")).node.id, "10000007");
   await rejects(() => doc.at(para("7FFFFFFF")), "not_found");
   await rejects(() => doc.at({ kind: "cell", sheet: "Q3", range: "B4" }), "anchor_kind_mismatch");
-  await rejects(() => doc.at({ kind: "para" }), "anchor_shape");
+  // a para anchor with no id, as a caller's JSON could give it: at() reads it at run time
+  const loose: { at(anchor: unknown): unknown } = doc;
+  await rejects(() => loose.at({ kind: "para" }), "anchor_shape");
   assert.deepEqual(doc.find("the"), [para("10000002", "the"), para("10000007", "the")]);
 });
 
@@ -270,21 +284,22 @@ test("create: every block kind, a comment and a tracked change; check() says onl
     paras.map((n) => n.text),
     ["Q3 review", "Summary", "Revenue rose 4% on the quarter. Details", "North up 6%", "South flat", "Ship pricing", "Numbers", "Region", "Revenue", "North", "120", "South", "80", "Plain words win.", "", "", "Appendix."],
   );
-  const byText = (t) => paras.find((n) => n.text === t);
-  assert.deepEqual(byText("Q3 review").props, { style: "Title", level: 0 });
-  assert.deepEqual(byText("North up 6%").props.list, { level: 1, ordered: false });
-  assert.deepEqual(byText("South flat").props.list, { level: 2, ordered: false });
-  assert.deepEqual(byText("Ship pricing").props.list, { level: 1, ordered: true });
-  assert.deepEqual(byText("Revenue rose 4% on the quarter. Details").props.links, ["https://example.com/q3"]);
-  assert.equal(paras.find((n) => n.props?.images).props.images[0].alt, "a chart");
-  assert.deepEqual(byText("Appendix.").props.align, "justify");
+  const byText = (t: string) => props(paras.find((n) => n.text === t), t);
+  assert.deepEqual(byText("Q3 review"), { style: "Title", level: 0 });
+  assert.deepEqual(byText("North up 6%").list, { level: 1, ordered: false });
+  assert.deepEqual(byText("South flat").list, { level: 2, ordered: false });
+  assert.deepEqual(byText("Ship pricing").list, { level: 1, ordered: true });
+  assert.deepEqual(byText("Revenue rose 4% on the quarter. Details").links, ["https://example.com/q3"]);
+  const images = list(props(paras.find((n) => n.props?.images), "the image paragraph").images, "images");
+  assert.equal(obj(images[0], "the image").alt, "a chart");
+  assert.deepEqual(byText("Appendix.").align, "justify");
   assert.deepEqual(doc.check().map((p) => p.code), ["open_changes"]);
 
   const zip = core.Zip.read(await doc.save());
   assert.ok(zip.has("word/media/image1.png"));
-  assert.match(zip.text("[Content_Types].xml"), /Extension="png"/);
-  assert.match(zip.text("docProps/core.xml"), /<dc:title>Q3 review<\/dc:title>/);
-  assert.match(zip.text("word/numbering.xml"), /w:numFmt w:val="bullet"/);
+  assert.match(textOf(zip, "[Content_Types].xml"), /Extension="png"/);
+  assert.match(textOf(zip, "docProps/core.xml"), /<dc:title>Q3 review<\/dc:title>/);
+  assert.match(textOf(zip, "word/numbering.xml"), /w:numFmt w:val="bullet"/);
   // the reopened file reads the same
   const again = await docs.open(await doc.save());
   assert.deepEqual(diff(o, again.inspect()), { added: [], removed: [], changed: [] });
@@ -295,20 +310,20 @@ test("check(): the problems an agent must fix, each with where it is", async () 
   doc.add({ kind: "heading", text: "Deep", level: 3 });
   doc.add({ kind: "para", text: "Owner: TBD" });
   const zip = core.Zip.read(await doc.save());
-  let xml = zip.text("word/document.xml");
+  let xml = textOf(zip, "word/document.xml");
   xml = xml.replace('<w:pStyle w:val="Heading1"/>', '<w:pStyle w:val="Heading 1"/>');
   xml = xml.replace('w14:paraId="10000005"', 'w14:paraId="10000004"');
   xml = xml.replace("<w:t xml:space=\"preserve\">Next", '<w:t xml:space="preserve">Next</w:t></w:r><w:commentRangeStart w:id="7"/><w:r><w:t xml:space="preserve">');
   zip.set("word/document.xml", xml);
   const bad = await docs.open(zip.write());
-  const codes = bad.check().map((p) => [p.code, p.severity, p.at?.para ?? null]);
+  const codes = bad.check().map((p) => [p.code, p.severity, p.at?.kind === "para" ? p.at.para : null]);
   assert.deepEqual(codes.map((c) => c[0]).sort(), ["dangling_comment", "heading_skip", "missing_style", "para_id_renamed", "placeholder"]);
-  const renamed = bad.check().find((p) => p.code === "para_id_renamed");
+  const renamed = must(bad.check().find((p) => p.code === "para_id_renamed"), "para_id_renamed");
   assert.equal(renamed.severity, "info");
   assert.match(renamed.message, /10000004/);
-  assert.equal(bad.at(renamed.at).text, "North");
+  assert.equal(bad.at(must(renamed.at, "para_id_renamed's anchor")).text, "North");
   assert.deepEqual(codes.find((c) => c[0] === "missing_style"), ["missing_style", "warning", "10000001"]);
-  assert.equal(bad.check().find((p) => p.code === "placeholder").at.quote, "TBD");
+  assert.equal(quoteOf(must(bad.check().find((p) => p.code === "placeholder"), "placeholder").at), "TBD");
   // a paraId twice: the second paragraph gets a new id, anchors stay unambiguous
   const ids = flatten(bad.inspect()).filter((n) => n.type === "para").map((n) => n.id);
   assert.equal(new Set(ids).size, ids.length);
@@ -331,7 +346,9 @@ test("diff between two versions: by paragraph id, comments and changes as their 
 
 test("bad block specs are refused with what a block is", async () => {
   const doc = await docs.create();
-  await rejects(() => doc.add({ kind: "chart" }), "bad_arg");
+  // a block kind the types refuse, as a caller's JSON could give it: add() reads it at run time
+  const loose: { add(spec: unknown): unknown } = doc;
+  await rejects(() => loose.add({ kind: "chart" }), "bad_arg");
   await rejects(() => doc.add({ kind: "heading", text: "x", level: 9 }), "bad_arg");
   await rejects(() => doc.add({ kind: "table", rows: [] }), "bad_arg");
   await rejects(() => doc.add({ kind: "image", bytes: new Uint8Array([1, 2, 3]) }), "bad_arg");

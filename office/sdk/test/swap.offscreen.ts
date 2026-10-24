@@ -9,7 +9,7 @@
 // strip says the hub's words. Screenshots light + dark at 1400, 1100, 800 into $SHOTS (or the temp
 // folder) with an index.html contact sheet, for designer.
 //
-// node office/sdk/test/swap.offscreen.mjs   (under ~/.bise/run/heavy-run --low)
+// node --experimental-strip-types office/sdk/test/swap.offscreen.ts   (under ~/.bise/run/heavy-run --low)
 
 import http from "node:http";
 import net from "node:net";
@@ -20,10 +20,11 @@ import { fileURLToPath } from "node:url";
 import { homedir, tmpdir } from "node:os";
 import assert from "node:assert/strict";
 import { slides, sheets, changedAnchors } from "../../dist/office.js";
+import { must } from "./must.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
-const fixture = (n) => new Uint8Array(readFileSync(join(root, "office", "fixtures", n)));
+const fixture = (n: string) => new Uint8Array(readFileSync(join(root, "office", "fixtures", n)));
 const SHOTS = process.env.SHOTS || join(process.env.TMPDIR || tmpdir(), "swap-shots");
 mkdirSync(SHOTS, { recursive: true });
 
@@ -53,11 +54,13 @@ async function sheetSaves() {
 }
 
 // ---- the server: the shell, the kit, the bundles, the copies by version and rev, the stream
-const CT = { ".js": "text/javascript", ".css": "text/css", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" };
-const arts = new Map(); // id -> { kind, name, files: Map("n/rev" -> bytes), n, rev, streams: [] }
+const CT: Record<string, string> = { ".js": "text/javascript", ".css": "text/css", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" };
+type Art = { kind: string; name: string; files: Map<string, Uint8Array>; n: number; rev: number; streams: http.ServerResponse[] };
+const arts = new Map<string, Art>(); // id -> its files by "n/rev", its version and rev now, its open streams
+const art = (id: string) => must(arts.get(id), `artifact ${id}`);
 
-function shell(id) {
-  const a = arts.get(id);
+function shell(id: string) {
+  const a = art(id);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${a.name}</title>
 <link rel="stylesheet" href="/kit/tokens.css"><link rel="stylesheet" href="/kit/office/viewer.css">
 <script type="module" src="/kit/office/viewer.js"></script><script type="module" src="/kit/office/swap.js"></script></head>
@@ -65,37 +68,37 @@ function shell(id) {
 <p class="office-state" data-state="opening">opening ${a.name}…</p></main></body></html>`;
 }
 
-function frame(event, data) {
+function frame(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-function push(id, event, data) {
-  for (const s of arts.get(id).streams) s.write(frame(event, data));
+function push(id: string, event: string, data: unknown) {
+  for (const s of art(id).streams) s.write(frame(event, data));
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, "http://x");
+  const url = new URL(req.url ?? "/", "http://x");
   const p = url.pathname;
-  const send = (code, type, body) => {
+  const send = (code: number, type: string, body: string | Uint8Array) => {
     res.writeHead(code, { "content-type": type, "cache-control": "no-store" });
     res.end(body);
   };
   let m;
-  if ((m = /^\/a\/([a-z0-9-]+)\/view$/.exec(p))) return send(200, "text/html; charset=utf-8", shell(m[1]));
+  if ((m = /^\/a\/([a-z0-9-]+)\/view$/.exec(p))) return send(200, "text/html; charset=utf-8", shell(m[1] ?? ""));
   if ((m = /^\/a\/([a-z0-9-]+)\/events$/.exec(p))) {
-    const a = arts.get(m[1]);
+    const a = art(m[1] ?? "");
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store" });
     res.write(frame("version", { n: a.n, rev: a.rev, changed: null, rev_changed: null, live: null }));
     a.streams.push(res);
     return;
   }
   if ((m = /^\/a\/([a-z0-9-]+)\/(\d+)\/[^/]+$/.exec(p))) {
-    const a = arts.get(m[1]);
+    const a = art(m[1] ?? "");
     const rev = url.searchParams.get("rev") || String(a.n === Number(m[2]) ? a.rev : 1);
     const b = a.files.get(`${m[2]}/${rev}`) || a.files.get(`${m[2]}/1`);
     return b ? send(200, CT[extname(p)], Buffer.from(b)) : send(404, "text/plain", "no such version");
   }
-  if (p === "/kit/office/office.js" || p === "/kit/office/office-view.js") return send(200, CT[".js"], readFileSync(join(root, "office", "dist", p.split("/").pop())));
+  if (p === "/kit/office/office.js" || p === "/kit/office/office-view.js") return send(200, CT[".js"], readFileSync(join(root, "office", "dist", p.split("/").pop() ?? "")));
   if (p.startsWith("/kit/") && !p.includes("..")) {
     const f = join(root, p);
     if (existsSync(f)) return send(200, CT[extname(f)] || "text/plain", readFileSync(f));
@@ -104,10 +107,17 @@ const server = http.createServer((req, res) => {
 });
 
 // ---- headless Chrome over CDP
+// the port a listening server got
+function portOf(s: net.Server | http.Server): number {
+  const a = s.address();
+  assert.ok(a !== null && typeof a === "object", "a server listening on a port");
+  return a.port;
+}
+
 function freePort() {
-  return new Promise((ok) => {
+  return new Promise<number>((ok) => {
     const s = net.createServer().listen(0, "127.0.0.1", () => {
-      const { port } = s.address();
+      const port = portOf(s);
       s.close(() => ok(port));
     });
   });
@@ -115,28 +125,32 @@ function freePort() {
 
 function chromeBin() {
   const base = join(homedir(), "Library", "Caches", "ms-playwright");
-  const dir = readdirSync(base).filter((d) => d.startsWith("chromium_headless_shell")).sort().pop();
+  const dir = must(readdirSync(base).filter((d) => d.startsWith("chromium_headless_shell")).sort().pop(), "Playwright's headless shell");
   return join(base, dir, "chrome-headless-shell-mac-arm64", "chrome-headless-shell");
 }
 
-async function cdp(wsUrl) {
+// what a CDP call answers: the fields these checks read
+type CdpReply = { result?: { value?: unknown }; data?: string };
+type Waiter = { ok: (r: CdpReply) => void; no: (e: Error) => void };
+
+async function cdp(wsUrl: string) {
   const ws = new WebSocket(wsUrl);
   await new Promise((ok, no) => {
     ws.onopen = ok;
     ws.onerror = no;
   });
   let id = 0;
-  const waiting = new Map();
+  const waiting = new Map<number, Waiter>();
   ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    if (msg.id && waiting.has(msg.id)) {
-      const { ok, no } = waiting.get(msg.id);
+    const msg: { id?: number; error?: unknown; result: CdpReply } = JSON.parse(String(e.data));
+    const w = msg.id ? waiting.get(msg.id) : undefined;
+    if (msg.id && w) {
       waiting.delete(msg.id);
-      msg.error ? no(new Error(JSON.stringify(msg.error))) : ok(msg.result);
+      msg.error ? w.no(new Error(JSON.stringify(msg.error))) : w.ok(msg.result);
     }
   };
-  const call = (method, params = {}) =>
-    new Promise((ok, no) => {
+  const call = (method: string, params = {}) =>
+    new Promise<CdpReply>((ok, no) => {
       const n = ++id;
       waiting.set(n, { ok, no });
       ws.send(JSON.stringify({ id: n, method, params }));
@@ -144,58 +158,60 @@ async function cdp(wsUrl) {
   return { call, close: () => ws.close() };
 }
 
-const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 async function main() {
-  await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", () => ok()));
+  const base = `http://127.0.0.1:${portOf(server)}`;
   const deck = await deckSaves();
   const book = await sheetSaves();
   arts.set("q3-pptx", { kind: "pptx", name: "q3.pptx", files: new Map([["1/1", deck.v1], ["2/1", deck.r1], ["2/2", deck.r2]]), n: 1, rev: 1, streams: [] });
   arts.set("q3-xlsx", { kind: "xlsx", name: "q3.xlsx", files: new Map([["1/1", book.v1], ["2/1", book.r1]]), n: 1, rev: 1, streams: [] });
-  const deckRev1 = await changedAnchors(deck.v1, deck.r1);
-  const deckRev2 = await changedAnchors(deck.r1, deck.r2);
+  const deckRev1 = must(await changedAnchors(deck.v1, deck.r1), "rev 1's changes");
+  const deckRev2 = must(await changedAnchors(deck.r1, deck.r2), "rev 2's changes");
   const sheetRev1 = await changedAnchors(book.v1, book.r1);
 
   const port = await freePort();
   const profile = join(process.env.TMPDIR || tmpdir(), `swap-chrome-${process.pid}`);
   const chrome = spawn(chromeBin(), [`--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--no-first-run", "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
-  const shots = [];
-  const results = [];
+  const shots: string[] = [];
+  const results: string[] = [];
   try {
-    let targets = [];
+    let targets: { type: string; webSocketDebuggerUrl: string }[] = [];
     for (let i = 0; i < 50 && !targets.some((t) => t.type === "page"); i++) {
       await sleep(100);
-      targets = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json(), () => []);
+      targets = await fetch(`http://127.0.0.1:${port}/json`)
+        .then((r) => r.text())
+        .then((t): typeof targets => JSON.parse(t), () => []);
     }
-    const page = await cdp(targets.find((t) => t.type === "page").webSocketDebuggerUrl);
-    const js = async (expr) => (await page.call("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true })).result.value;
-    const until = async (expr, what) => {
+    const page = await cdp(must(targets.find((t) => t.type === "page"), "Chrome's page").webSocketDebuggerUrl);
+    const js = async (expr: string) => (await page.call("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true })).result?.value;
+    const until = async (expr: string, what: string) => {
       for (let i = 0; i < 100; i++) {
         if (await js(expr)) return;
         await sleep(50);
       }
       throw new Error(`timed out: ${what}`);
     };
-    const shot = async (name) => {
+    const shot = async (name: string) => {
       const { data } = await page.call("Page.captureScreenshot", { format: "png" });
-      writeFileSync(join(SHOTS, `${name}.png`), Buffer.from(data, "base64"));
+      writeFileSync(join(SHOTS, `${name}.png`), Buffer.from(must(data, "the screenshot"), "base64"));
       shots.push(name);
     };
-    const open = async (id, width, scheme) => {
+    const open = async (id: string, width: number, scheme: string) => {
       await page.call("Emulation.setDeviceMetricsOverride", { width, height: 760, deviceScaleFactor: 1, mobile: false });
       await page.call("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
-      const a = arts.get(id);
+      const a = art(id);
       a.n = 1;
       a.rev = 1;
       a.streams = [];
       await page.call("Page.navigate", { url: `${base}/a/${id}/view` });
       await until(`!!document.querySelector('.office-stage') && !!window.biseOffice?.view`, `${id} drawn`);
       await until(`${a.streams.length} >= 0 && true`, "stream");
-      for (let i = 0; i < 40 && arts.get(id).streams.length === 0; i++) await sleep(50);
+      for (let i = 0; i < 40 && art(id).streams.length === 0; i++) await sleep(50);
     };
-    const save = async (id, n, rev, data) => {
-      const a = arts.get(id);
+    const save = async (id: string, n: number, rev: number, data: Record<string, unknown>) => {
+      const a = art(id);
       a.n = n;
       a.rev = rev;
       push(id, "version", { n, rev, ...data });

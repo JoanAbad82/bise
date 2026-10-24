@@ -4,7 +4,7 @@
 // does not know (a custom XML part with a relationship), so the tests
 // prove edits keep it. Same bytes every run (fixed zip dates).
 //
-//   node office/fixtures/make.mjs     (after pnpm -C office/sdk build)
+//   node --experimental-strip-types office/fixtures/make.ts     (after pnpm -C office/sdk build)
 
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -17,12 +17,12 @@ const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const PKG_R = "http://schemas.openxmlformats.org/package/2006/relationships";
 const CT = "http://schemas.openxmlformats.org/package/2006/content-types";
 
-function rels(list) {
+function rels(list: [id: string, type: string, target: string][]): string {
   const rows = list.map(([id, type, target]) => `<Relationship Id="${id}" Type="${R}/${type}" Target="${target}"/>`).join("");
   return `${X}<Relationships xmlns="${PKG_R}">${rows}</Relationships>`;
 }
 
-function types(overrides) {
+function types(overrides: [part: string, type: string][]): string {
   const rows = overrides.map(([part, type]) => `<Override PartName="/${part}" ContentType="application/vnd.openxmlformats-officedocument.${type}"/>`).join("");
   return `${X}<Types xmlns="${CT}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${rows}</Types>`;
 }
@@ -30,7 +30,7 @@ function types(overrides) {
 // the part no module knows: a custom XML part, kept byte for byte
 const CUSTOM = `${X}<bise:fixture xmlns:bise="urn:bise:fixture" made="by office/fixtures/make.mjs"><bise:keep>keep me</bise:keep></bise:fixture>`;
 
-function write(name, parts) {
+function write(name: string, parts: [path: string, text: string][]): void {
   const zip = core.Zip.empty();
   for (const [path, text] of parts) zip.set(path, text);
   writeFileSync(join(here, name), zip.write());
@@ -61,9 +61,9 @@ write("tiny.xlsx", [
 const P = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const NSP = `xmlns:a="${A}" xmlns:r="${R}" xmlns:p="${P}"`;
-const tree = (shapes) =>
+const tree = (shapes: string): string =>
   `<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapes}</p:spTree></p:cSld>`;
-const box = (id, name, x, y, cx, cy, text) =>
+const box = (id: number, name: string, x: number, y: number, cx: number, cy: number, text: string): string =>
   `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr wrap="square"/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="2400"/><a:t>${text}</a:t></a:r></a:p></p:txBody></p:sp>`;
 const theme = `${X}<a:theme xmlns:a="${A}" name="bise"><a:themeElements><a:clrScheme name="bise"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F2328"/></a:dk2><a:lt2><a:srgbClr val="F6F8FA"/></a:lt2><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="bise"><a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="bise"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`;
 const clrMap = `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>`;
@@ -94,9 +94,9 @@ write("tiny.pptx", [
 // ---- tiny.docx: a heading, two paragraphs with paraIds, a table
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const W14 = "http://schemas.microsoft.com/office/word/2010/wordml";
-const para = (id, text, style) =>
+const para = (id: string, text: string, style?: string): string =>
   `<w:p w14:paraId="${id}" w14:textId="77777777">${style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : ""}<w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
-const cell = (id, text) => `<w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr>${para(id, text)}</w:tc>`;
+const cell = (id: string, text: string): string => `<w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr>${para(id, text)}</w:tc>`;
 write("tiny.docx", [
   ["[Content_Types].xml", types([
     ["word/document.xml", "wordprocessingml.document.main+xml"],

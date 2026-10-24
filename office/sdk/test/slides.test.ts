@@ -8,13 +8,25 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as office from "../../dist/office.js";
+import type { OutlineNode } from "../../dist/office.js";
+import { must, obj, list } from "./must.ts";
 
 const { slides, core, diff, OfficeError } = office;
+type Deck = Awaited<ReturnType<typeof slides.open>>;
+type Zip = office.core.Zip;
+// a node's props, there or the test fails naming the node
+const propsOf = (n: OutlineNode | undefined, what: string) => must(n?.props, `${what}'s props`);
+// a slide's shapes
+const shapesOf = (n: OutlineNode | undefined, what: string) => must(n?.children, `${what}'s shapes`);
+// a part's text
+const textOf = (zip: Zip, path: string) => must(zip.text(path), path);
+// a placeholder of a slide, there or the test fails naming it
+const ph = (s: ReturnType<Deck["addSlide"]>, type: string) => must(s.placeholder(type), `placeholder ${type}`);
 const here = dirname(fileURLToPath(import.meta.url));
 const tiny = () => new Uint8Array(readFileSync(join(here, "..", "..", "fixtures", "tiny.pptx")));
 const PNG = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
 
-const code = async (fn) => {
+const code = async (fn: () => unknown) => {
   try {
     await fn();
   } catch (e) {
@@ -23,21 +35,22 @@ const code = async (fn) => {
   }
   assert.fail("did not throw");
 };
-const codes = (deck) => deck.check().map((p) => p.code).sort();
+const codes = (deck: Deck) => deck.check().map((p) => p.code).sort();
 
 test("inspect: slides by stable id, shapes by cNvPr id, boxes in points", async () => {
   const deck = await slides.open(tiny());
   const o = deck.inspect();
   assert.equal(o.kind, "pptx");
-  assert.deepEqual(o.nodes.map((n) => [n.id, n.anchor.slide]), [["s256", 1], ["s257", 2]]);
-  const [title, body] = o.nodes[0].children;
+  assert.deepEqual(o.nodes.map((n) => [n.id, n.anchor.kind === "slide" ? n.anchor.slide : undefined]), [["s256", 1], ["s257", 2]]);
+  const [title, body] = shapesOf(o.nodes[0], "slide 1");
   assert.equal(title.id, "s256/2");
   assert.deepEqual(title.anchor, { kind: "shape", slide: 1, shape: "2" });
   assert.equal(title.text, "Q3 review");
-  assert.deepEqual(title.props.box, [48, 36, 864, 90]);
-  assert.equal(title.props.fontSize, 24);
+  assert.deepEqual(propsOf(title, "the title").box, [48, 36, 864, 90]);
+  assert.equal(propsOf(title, "the title").fontSize, 24);
   assert.equal(body.text, "Revenue up 4%");
-  assert.deepEqual([o.nodes[0].props.w, o.nodes[0].props.h], [960, 540]);
+  const slide1 = propsOf(o.nodes[0], "slide 1");
+  assert.deepEqual([slide1.w, slide1.h], [960, 540]);
   assert.deepEqual(deck.check(), []);
 });
 
@@ -53,14 +66,14 @@ test("a save with no edit keeps every part's bytes, the unknown one too", async 
 
 test("an edit keeps what it does not know: attributes, extensions, other parts", async () => {
   const zip = core.Zip.read(tiny());
-  const slide = zip.text("ppt/slides/slide1.xml")
+  const slide = textOf(zip, "ppt/slides/slide1.xml")
     .replace('<p:cNvPr id="3" name="Body"/>', '<p:cNvPr id="3" name="Body" bise:mark="kept" xmlns:bise="urn:bise:test"/>')
     .replace("</p:sld>", '<p:extLst><p:ext uri="{BISE-TEST}"><bise:x xmlns:bise="urn:bise:test">kept</bise:x></p:ext></p:extLst></p:sld>');
   zip.set("ppt/slides/slide1.xml", slide);
   const deck = await slides.open(zip.write());
   deck.at({ kind: "shape", slide: 1, shape: "3" }).replace("4%", "5%");
   const out = core.Zip.read(await deck.save());
-  const xml = out.text("ppt/slides/slide1.xml");
+  const xml = textOf(out, "ppt/slides/slide1.xml");
   assert.match(xml, /Revenue up 5%/);
   assert.match(xml, /bise:mark="kept"/);
   assert.match(xml, /<bise:x xmlns:bise="urn:bise:test">kept<\/bise:x>/);
@@ -73,7 +86,7 @@ test("replace works across runs and keeps each run's style; a missing word is no
   const zip = core.Zip.read(tiny());
   zip.set(
     "ppt/slides/slide2.xml",
-    zip.text("ppt/slides/slide2.xml").replace(
+    textOf(zip, "ppt/slides/slide2.xml").replace(
       '<a:r><a:rPr lang="en-US" sz="2400"/><a:t>Next steps</a:t></a:r>',
       '<a:r><a:rPr lang="en-US" sz="2400" b="1"/><a:t>Revenue Q</a:t></a:r><a:r><a:rPr lang="en-US" sz="2400"/><a:t>2 up</a:t></a:r>',
     ),
@@ -83,7 +96,7 @@ test("replace works across runs and keeps each run's style; a missing word is no
   assert.equal(sel.quote, "Q2");
   sel.replace(sel.quote, "Q3");
   assert.equal(sel.text(), "Revenue Q3 up");
-  const xml = core.Zip.read(await deck.save()).text("ppt/slides/slide2.xml");
+  const xml = textOf(core.Zip.read(await deck.save()), "ppt/slides/slide2.xml");
   assert.match(xml, /b="1"\/><a:t>Revenue Q3<\/a:t>/);
   assert.equal(await code(() => sel.replace("Q9", "x")), "not_found");
 });
@@ -95,7 +108,9 @@ test("at: the anchors of a deck, and words for the others", async () => {
   assert.equal(await code(() => deck.at({ kind: "slide", slide: 9 })), "not_found");
   assert.equal(await code(() => deck.at({ kind: "shape", slide: 1, shape: "99" })), "not_found");
   assert.equal(await code(() => deck.at({ kind: "cell", sheet: "Q3", range: "B4" })), "anchor_kind_mismatch");
-  assert.equal(await code(() => deck.at({ kind: "slide" })), "anchor_shape");
+  // a slide anchor with no slide, as a caller's JSON could give it: at() reads it at run time
+  const loose: { at(anchor: unknown): unknown } = deck;
+  assert.equal(await code(() => loose.at({ kind: "slide" })), "anchor_shape");
   const under = deck.at({ kind: "slide", slide: 1, rect: { x: 10, y: 30, w: 20, h: 20 } }).under();
   assert.deepEqual(under.map((s) => s.id), ["3"]);
 });
@@ -106,24 +121,26 @@ test("create: a 16:9 deck with six layouts; title and placeholders inherit the m
   assert.equal(deck.count, 0);
   assert.deepEqual(deck.layouts().map((l) => l.key), ["title", "title-body", "two-content", "section", "title-only", "blank"]);
   const s = deck.addSlide({ layout: "title" });
-  s.placeholder("title").setText("Q3 review");
-  s.placeholder("subTitle").setText("Finance, October");
+  ph(s, "title").setText("Q3 review");
+  ph(s, "subTitle").setText("Finance, October");
   const b = deck.addSlide();
-  b.placeholder("title").setText("Revenue");
-  b.placeholder("body").setText([{ text: "Up 4%" }, { text: "North leads", level: 2 }]);
+  ph(b, "title").setText("Revenue");
+  ph(b, "body").setText([{ text: "Up 4%" }, { text: "North leads", level: 2 }]);
   const o = deck.inspect();
-  const t = o.nodes[0].children[0];
-  assert.deepEqual([t.props.placeholder, t.props.fontSize, t.props.bold, t.props.align, t.props.font, t.props.color], ["ctrTitle", 48, true, "center", "Arial", "#1f2328"]);
-  assert.deepEqual(t.props.box, [96, 150, 768, 130]);
-  const body = o.nodes[1].children[1];
-  assert.deepEqual(body.props.paras.map((p) => [p.text, p.level, p.size, !!p.bullet]), [["Up 4%", 1, 24, true], ["North leads", 2, 20, true]]);
+  const t = propsOf(shapesOf(o.nodes[0], "slide 1")[0], "slide 1's title");
+  assert.deepEqual([t.placeholder, t.fontSize, t.bold, t.align, t.font, t.color], ["ctrTitle", 48, true, "center", "Arial", "#1f2328"]);
+  assert.deepEqual(t.box, [96, 150, 768, 130]);
+  const body = propsOf(shapesOf(o.nodes[1], "slide 2")[1], "slide 2's body");
+  assert.deepEqual(list(body.paras, "paras").map((x) => obj(x, "a para")).map((p) => [p.text, p.level, p.size, !!p.bullet]), [["Up 4%", 1, 24, true], ["North leads", 2, 20, true]]);
   assert.deepEqual(deck.check(), []);
   const bytes = await deck.save();
   assert.deepEqual(office.checkPackage(core.Zip.read(bytes)), []);
   const again = await slides.open(bytes);
   assert.deepEqual(diff(o, again.inspect()), { added: [], removed: [], changed: [] });
   assert.deepEqual((await slides.create({ size: "4:3" })).size, { w: 720, h: 540 });
-  assert.equal(await code(() => slides.create({ size: "21:9" })), "bad_arg");
+  // a size the types refuse, as a caller's JSON could give it: create() reads it at run time
+  const looseSlides: { create(opts: unknown): unknown } = slides;
+  assert.equal(await code(() => looseSlides.create({ size: "21:9" })), "bad_arg");
   assert.equal(await code(() => deck.addSlide({ layout: "nope" })), "not_found");
 });
 
@@ -139,45 +156,48 @@ test("check: overflow, off the slide, overlap, small text, empty placeholder, em
   deck.addSlide({ layout: "title-body" });
   deck.addSlide({ layout: "blank" });
   assert.deepEqual(codes(deck), ["empty_placeholder", "empty_placeholder", "empty_slide", "off_slide", "off_slide", "overflow", "overlap", "small_text"]);
-  const over = deck.check().find((p) => p.code === "overflow");
+  const over = must(deck.check().find((p) => p.code === "overflow"), "the overflow");
   assert.equal(over.severity, "error");
   assert.deepEqual(over.at, { kind: "shape", slide: 1, shape: "2" });
   // the fix: a taller box
-  deck.at(over.at).move({ h: 200 });
+  const at = must(over.at, "the overflow's anchor");
+  assert.ok(at.kind === "shape");
+  deck.at(at).move({ h: 200 });
   assert.ok(!codes(deck).includes("overflow"));
 });
 
 test("shapes, tables, charts and images round trip; removing them takes their parts", async () => {
   const deck = await slides.create();
   const s = deck.addSlide({ layout: "title-only" });
-  s.placeholder("title").setText("Revenue");
+  ph(s, "title").setText("Revenue");
   const shape = s.addShape("roundRect", [48, 120, 200, 80], { fill: "#1f6feb", text: "Up 4%", style: { size: 20, bold: true } });
   const table = s.addTable([["Region", "Revenue"], ["North", "120"], ["South", "80"]], [48, 220, 400, 120]);
   table.setCell(3, 2, "85");
   const chart = s.addChart({ type: "column", title: "By month", categories: ["Jul", "Aug", "Sep"], series: [{ name: "Revenue", values: [120, 140, 155] }] }, [480, 120, 432, 300]);
   const pic = s.addImage(PNG, [48, 360, 80]);
-  assert.deepEqual(pic.node.props.box, [48, 360, 80, 80]);
+  assert.deepEqual(propsOf(pic.node, "the picture").box, [48, 360, 80, 80]);
   const again = await slides.open(await deck.save());
-  const nodes = again.inspect().nodes[0].children;
-  const by = Object.fromEntries(nodes.map((n) => [n.id.split("/")[1], n]));
-  assert.equal(by[shape.id].props.fill, "#1f6feb");
-  assert.equal(by[shape.id].props.fontSize, 20);
-  assert.deepEqual(by[table.id].props.rows, [["Region", "Revenue"], ["North", "120"], ["South", "85"]]);
-  assert.deepEqual(by[chart.id].props.chart, { type: "column", title: "By month", categories: ["Jul", "Aug", "Sep"], series: [{ name: "Revenue", values: [120, 140, 155], color: "#4472c4" }] });
-  assert.equal(by[pic.id].props.image, "ppt/media/image1.png");
+  const nodes = shapesOf(again.inspect().nodes[0], "slide 1");
+  const byId = new Map(nodes.map((n) => [n.id.split("/")[1], n]));
+  const by = (id: string) => propsOf(byId.get(id), `shape ${id}`);
+  assert.equal(by(shape.id).fill, "#1f6feb");
+  assert.equal(by(shape.id).fontSize, 20);
+  assert.deepEqual(by(table.id).rows, [["Region", "Revenue"], ["North", "120"], ["South", "85"]]);
+  assert.deepEqual(by(chart.id).chart, { type: "column", title: "By month", categories: ["Jul", "Aug", "Sep"], series: [{ name: "Revenue", values: [120, 140, 155], color: "#4472c4" }] });
+  assert.equal(by(pic.id).image, "ppt/media/image1.png");
   assert.deepEqual(again.check(), []);
   const zip = core.Zip.read(await again.save());
   assert.ok(zip.has("ppt/charts/chart1.xml") && zip.has("ppt/media/image1.png"));
   // the chart's workbook, embedded as PowerPoint does: its cells are the chart's data
-  const wb = await office.sheets.open(zip.bytes("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"));
+  const wb = await office.sheets.open(must(zip.bytes("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"), "the chart's workbook"));
   assert.deepEqual(wb.range("Sheet1!A1:B4").values(), [["", "Revenue"], ["Jul", 120], ["Aug", 140], ["Sep", 155]]);
-  assert.match(zip.text("ppt/charts/chart1.xml"), /<c:externalData r:id="rId1">/);
-  assert.match(zip.text("[Content_Types].xml"), /Extension="png"/);
+  assert.match(textOf(zip, "ppt/charts/chart1.xml"), /<c:externalData r:id="rId1">/);
+  assert.match(textOf(zip, "[Content_Types].xml"), /Extension="png"/);
   again.at({ kind: "shape", slide: 1, shape: chart.id }).remove();
   again.at({ kind: "shape", slide: 1, shape: pic.id }).remove();
   const gone = core.Zip.read(await again.save());
   assert.ok(!gone.has("ppt/charts/chart1.xml") && !gone.has("ppt/media/image1.png") && !gone.has("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"));
-  assert.doesNotMatch(gone.text("[Content_Types].xml"), /chart1/);
+  assert.doesNotMatch(textOf(gone, "[Content_Types].xml"), /chart1/);
   assert.deepEqual(office.checkPackage(gone), []);
   assert.equal(await code(() => s.addChart({ type: "pie", categories: ["a"], series: [{ name: "x", values: [1] }, { name: "y", values: [2] }] }, [0, 0, 10, 10])), "bad_arg");
   assert.equal(await code(() => s.addImage(new Uint8Array([1, 2, 3]), [0, 0, 10, 10])), "bad_arg");
@@ -192,14 +212,14 @@ test("a chart's names with < & \" and a leading = reach its embedded workbook as
   const bytes = await deck.save();
   const zip = core.Zip.read(bytes);
   assert.deepEqual(office.checkPackage(zip), []);
-  const wb = await office.sheets.open(zip.bytes("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"));
+  const wb = await office.sheets.open(must(zip.bytes("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"), "the chart's workbook"));
   const cells = wb.range("Sheet1!A1:C3").values();
   assert.equal(cells[0][1], names[0]);
   assert.equal(cells[0][2], "'=SUM(A1)"); // Excel's quote prefix: text, not a formula
   assert.deepEqual(cells.slice(1).map((r) => r[0]), ["<a>", "b & c"]);
   // the chart itself keeps the names exactly
-  const chart = (await slides.open(bytes)).inspect().nodes[0].children[0].props.chart;
-  assert.deepEqual(chart.series.map((s) => s.name), names);
+  const chart = obj(propsOf(shapesOf((await slides.open(bytes)).inspect().nodes[0], "slide 1")[0], "the chart").chart, "the chart");
+  assert.deepEqual(list(chart.series, "series").map((s) => obj(s, "a series").name), names);
   assert.deepEqual(chart.categories, ["<a>", "b & c"]);
 });
 
@@ -217,7 +237,7 @@ test("slides move, duplicate (charts copied) and go; ids stay, diff says what ch
   assert.ok(zip.has("ppt/charts/chart1.xml") && zip.has("ppt/charts/chart2.xml"));
   // the copy has its own workbook
   assert.ok(zip.has("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx") && zip.has("ppt/embeddings/Microsoft_Excel_Worksheet2.xlsx"));
-  assert.match(zip.text("ppt/charts/_rels/chart2.xml.rels"), /Microsoft_Excel_Worksheet2\.xlsx/);
+  assert.match(textOf(zip, "ppt/charts/_rels/chart2.xml.rels"), /Microsoft_Excel_Worksheet2\.xlsx/);
   assert.deepEqual(office.checkPackage(zip), []);
   deck.slide(3).remove();
   deck.slide(2).remove();
@@ -233,16 +253,18 @@ test("slides move, duplicate (charts copied) and go; ids stay, diff says what ch
 
 test("a deck is made and saved with no timers and no TextEncoder (bise office run's V8)", async () => {
   const names = ["setTimeout", "setInterval", "setImmediate", "clearTimeout", "clearInterval", "TextEncoder", "TextDecoder"];
-  const saved = Object.fromEntries(names.map((n) => [n, globalThis[n]]));
-  for (const n of names) delete globalThis[n];
+  const saved = Object.fromEntries(names.map((n) => [n, Reflect.get(globalThis, n)]));
+  for (const n of names) Reflect.deleteProperty(globalThis, n);
   try {
-    const bare = await import("../../dist/office.js?slides-bare");
+    // a fresh copy of the bundle (the query makes it a new module), typed as the bundle
+    const fresh = new URL("../../dist/office.js?slides-bare", import.meta.url).href;
+    const bare: typeof office = await import(fresh);
     const deck = await bare.slides.create();
     const s = deck.addSlide({ layout: "title-body" });
-    s.placeholder("title").setText("Revue T3 — été");
+    ph(s, "title").setText("Revue T3 — été");
     s.addChart({ type: "pie", categories: ["a", "b"], series: [{ name: "x", values: [1, 2] }] }, [480, 120, 300, 300]);
     const again = await bare.slides.open(await deck.save());
-    assert.equal(again.inspect().nodes[0].children[0].text, "Revue T3 — été");
+    assert.equal(shapesOf(again.inspect().nodes[0], "slide 1")[0]?.text, "Revue T3 — été");
   } finally {
     Object.assign(globalThis, saved);
   }

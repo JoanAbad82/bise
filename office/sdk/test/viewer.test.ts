@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import type { UWorkbook } from "../../dist/office.js";
+import { list, must } from "./must.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
@@ -16,7 +18,7 @@ const root = join(here, "..", "..", "..");
 const PLAIN = new Set(["frame.js", "zoom.js"]);
 
 /** A kit/office module with its bundle imports cut (its helpers need none); zoom.js and frame.js kept. */
-async function helpers(name) {
+async function helpers(name: string) {
   const src = readFileSync(join(root, "kit", "office", name), "utf8").replace(/^import (.*) from "\/kit\/office\/([^"]+)";$/gm, (all, what, file) =>
     PLAIN.has(file) ? `import ${what} from ${JSON.stringify(pathToFileURL(join(root, "kit", "office", file)).href)};` : "",
   );
@@ -24,8 +26,8 @@ async function helpers(name) {
 }
 
 test("office.js loads with no window or document, and has no docx-preview in it", async () => {
-  assert.equal(typeof globalThis.window, "undefined");
-  assert.equal(typeof globalThis.document, "undefined");
+  assert.equal(typeof Reflect.get(globalThis, "window"), "undefined");
+  assert.equal(typeof Reflect.get(globalThis, "document"), "undefined");
   const office = await import("../../dist/office.js");
   assert.equal(typeof office.sheets.open, "function");
   const js = readFileSync(join(root, "office", "dist", "office.js"), "utf8");
@@ -62,9 +64,9 @@ test("the save's words: nothing at rest, then edited, saving, saved, or what he 
   assert.equal(saveState({ kind: "saved", v: 4 }).text, "saved · v4");
   const c = saveState({ kind: "conflict", v: 5, rev: 1 });
   assert.equal(c.text, "v5 came in while you edited");
-  assert.deepEqual(c.actions.map((a) => a.text), ["keep mine", "take v5"]);
+  assert.deepEqual(c.actions.map((a: { text: string }) => a.text), ["keep mine", "take v5"]);
   assert.equal(saveState({ kind: "conflict", v: 5, rev: 1, disk: true }).text, "the file changed on disk while you edited");
-  assert.deepEqual(saveState({ kind: "failed", why: "the file is gone" }).actions.map((a) => a.id), ["retry"]);
+  assert.deepEqual(saveState({ kind: "failed", why: "the file is gone" }).actions.map((a: { id: string }) => a.id), ["retry"]);
 });
 
 test("a slide's boxes are placed in % of the slide", async () => {
@@ -79,11 +81,12 @@ test("drawn paragraphs pair with the outline's, passing over what it skips", asy
     { id: "t", type: "table", children: [{ id: "p2", type: "para", text: "cell  one" }, { id: "c", type: "comment" }] },
     { id: "p3", type: "para", text: "Body" },
   ]);
-  assert.deepEqual(outline.map((n) => n.id), ["p1", "p2", "p3"], "a table's paragraphs in place, no comment");
+  type Para = { id: string; text: string };
+  assert.deepEqual(outline.map((n: Para) => n.id), ["p1", "p2", "p3"], "a table's paragraphs in place, no comment");
   // a text box's paragraph drawn between them is passed over; whitespace does not count
-  assert.deepEqual(matchParas(["Title", "in a text box", "cell one", "Body"], outline.map((n) => n.text)), [0, -1, 1, 2]);
+  assert.deepEqual(matchParas(["Title", "in a text box", "cell one", "Body"], outline.map((n: Para) => n.text)), [0, -1, 1, 2]);
   // a paragraph docx-preview did not draw: the next ones still pair
-  assert.deepEqual(matchParas(["Title", "Body"], outline.map((n) => n.text)), [0, 2]);
+  assert.deepEqual(matchParas(["Title", "Body"], outline.map((n: Para) => n.text)), [0, 2]);
 });
 
 // art-notes: the notes layer's pure parts (kit/office/select.js, image.js, kit/notes-anchors.js)
@@ -91,7 +94,8 @@ test("a note's anchor says its place in bise_proto's words (anchor_label.json)",
   const { createRequire } = await import("node:module");
   createRequire(import.meta.url)(join(root, "kit", "notes-anchors.js"));
   const rows = JSON.parse(readFileSync(join(root, "rust", "proto", "fixtures", "anchor_label.json"), "utf8"));
-  for (const r of rows) assert.equal(globalThis.BiseAnchors.label(r.anchor), r.label, JSON.stringify(r.anchor));
+  const { label } = Reflect.get(globalThis, "BiseAnchors");
+  for (const r of rows) assert.equal(label(r.anchor), r.label, JSON.stringify(r.anchor));
   const { message, typed } = await helpers("select.js");
   const m = message({ id: "q3-xlsx", version: 4, rev: 2 }, { kind: "cell", sheet: "Q3", range: "B4:D9" }, "1200 1350");
   // exactly its tag and the four facts (architect m_23971), nothing else from the frame
@@ -99,7 +103,7 @@ test("a note's anchor says its place in bise_proto's words (anchor_label.json)",
   assert.deepEqual(m, { bise: "anchor", artifact: "q3-xlsx", version: 4, anchor: { kind: "cell", sheet: "Q3", range: "B4:D9" }, quote: "1200 1350" });
   // his first typed character (architect m_24155): {bise, artifact, version, anchor, quote, key?}
   assert.deepEqual(Object.keys(message({ id: "q", version: 1 }, { kind: "slide", slide: 1 }, "", "w")).sort(), ["anchor", "artifact", "bise", "key", "quote", "version"]);
-  const k = (key, o = {}) => typed({ key, ...o });
+  const k = (key: string, o = {}) => typed({ key, ...o });
   assert.deepEqual([k("w"), k(" "), k("é"), k("👍🏽"), k("Enter"), k("Dead"), k("w", { metaKey: true }), k("w", { ctrlKey: true }), k("w", { altKey: true }), k("w", { isComposing: true }), k("\t")], ["w", " ", "é", "👍🏽", null, null, null, null, null, null, null]);
 });
 
@@ -174,7 +178,7 @@ test("a double-click goes to 100% and back to fit; a small image to 2×", async 
 
 test("esc and ⌘0 take a zoomed image back to fit; ⌥⌘0 and ⌘esc don't", async () => {
   const { isFitKey } = await zoom();
-  const key = (o) => ({ key: "", code: "", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...o });
+  const key = (o: Record<string, unknown>) => ({ key: "", code: "", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...o });
   assert.ok(isFitKey(key({ key: "Escape" })));
   assert.ok(isFitKey(key({ code: "Digit0", metaKey: true })));
   assert.ok(!isFitKey(key({ code: "Digit0", metaKey: true, altKey: true })), "⌥⌘0 stays the panel");
@@ -209,14 +213,14 @@ const anchors = async () => {
   return createRequire(import.meta.url)(join(root, "kit", "notes-anchors.js")).pdf;
 };
 // a page's text items as pdf.js gives them: a line's words, its end
-const items = (...lines) => lines.flatMap((l) => l.split("|").map((str, i, all) => ({ str, hasEOL: i === all.length - 1 })));
+const items = (...lines: string[]) => lines.flatMap((l) => l.split("|").map((str, i, all) => ({ str, hasEOL: i === all.length - 1 })));
 
 test("a pdf page's text: its items in order, a line's end a space, each item's place in it", async () => {
   const { pageText, itemsIn } = await anchors();
   const t = pageText(items("Net revenue | grew 4%", "in  Q3."));
   assert.equal(t.text, "Net revenue grew 4% in Q3.");
   assert.deepEqual(t.ranges, [{ i: 0, start: 0, end: 11 }, { i: 1, start: 12, end: 19 }, { i: 2, start: 20, end: 26 }]);
-  assert.equal(t.text, globalThis.BiseAnchors.block.norm("Net revenue  grew 4%\nin  Q3."), "the same text a selection gives once collapsed");
+  assert.equal(t.text, Reflect.get(globalThis, "BiseAnchors").block.norm("Net revenue  grew 4%\nin  Q3."), "the same text a selection gives once collapsed");
   assert.deepEqual(itemsIn(t.ranges, 4, 16), [0, 1]);
   assert.deepEqual(pageText([{ str: "", hasEOL: true }, { str: "  " }]), { text: "", ranges: [] });
 });
@@ -281,12 +285,12 @@ test("a video's player: its states, its keys, its moments", async () => {
   const { stateOf, keyAction, stepped, seekAt, nextRate, near, timeWords, screenHeight, RATES, JUMP_S } = await helpers("video.js");
   // the screen at the video's own ratio (designer m_32678): 16:9 in 737 px is 415 px tall
   assert.deepEqual([screenHeight(737, 1920, 1080), screenHeight(400, 1080, 1920), screenHeight(0, 16, 9), screenHeight(500, 0, 0)], [415, 711, 0, 0]);
-  const m = (o) => ({ error: null, readyState: 4, ended: false, paused: true, ...o });
+  const m = (o: Record<string, unknown>) => ({ error: null, readyState: 4, ended: false, paused: true, ...o });
   assert.deepEqual(
     [m({ readyState: 0 }), m({}), m({ paused: false }), m({ ended: true, paused: true }), m({ error: { code: 4 }, paused: false })].map(stateOf),
     ["loading", "paused", "playing", "ended", "failed"],
   );
-  const k = (key, o = {}) => keyAction({ key, ...o });
+  const k = (key: string, o = {}) => keyAction({ key, ...o });
   assert.deepEqual(k(" "), { do: "toggle" });
   assert.deepEqual(keyAction({ key: "", code: "Space" }), { do: "toggle" });
   assert.deepEqual([k("ArrowLeft"), k("ArrowRight")], [{ do: "jump", by: -JUMP_S }, { do: "jump", by: JUMP_S }]);
@@ -315,45 +319,48 @@ test("a column resized and a cell typed in the grid save as the next version, on
   const sdk = pathToFileURL(join(root, "office", "dist", "office.js")).href;
   const src = readFileSync(join(root, "kit", "office", "sheet.js"), "utf8").replace('from "/kit/office/office.js"', `from ${JSON.stringify(sdk)}`);
   const { saver, SAVE_AFTER_MS } = await import(`data:text/javascript;base64,${Buffer.from(src).toString("base64")}`);
-  const { sheets } = await import(sdk);
+  const { sheets }: typeof import("../../dist/office.js") = await import(sdk);
   const start = await sheets.create({ sheet: "Q3", rows: [["Item", "Amount"], ["a", 1200], ["Total", "=SUM(B2:B2)"]], date: new Date(Date.UTC(2026, 0, 1)) });
   const book = await sheets.open(await start.save());
   // the grid: Univer's snapshot of the book, changed the way his gestures change it
   let snap = book.univer();
   const grid = { snapshot: () => JSON.parse(JSON.stringify(snap)) };
-  const gesture = (fn) => {
+  type Sheet = UWorkbook["sheets"][string];
+  const gesture = (fn: (s: Sheet) => unknown) => {
     snap = JSON.parse(JSON.stringify(snap));
     fn(snap.sheets.sheet1);
     save.changed();
   };
-  const posts = [];
+  const posts: { head: unknown; bytes: Uint8Array }[] = [];
   let answer = { status: 200, answer: { v: 2, rev: 1 } };
-  const post = async (head, bytes) => {
+  const post = async (head: unknown, bytes: Uint8Array) => {
     posts.push({ head, bytes });
     return answer;
   };
-  const timers = [];
-  const later = (fn, ms) => {
+  type Timer = { fn: () => unknown; ms: number };
+  const timers: Timer[] = [];
+  const fire = async () => await must(timers.pop(), "a waiting save").fn();
+  const later = (fn: () => unknown, ms: number) => {
     const t = { fn, ms };
     timers.push(t);
     return () => timers.splice(timers.indexOf(t), 1);
   };
-  const states = [];
+  const states: string[] = [];
   const info = { id: "q3", version: 1, rev: 1 };
-  const save = saver({ book, grid, info, session: "s1", post, later, onState: (s) => states.push(s.kind), take: () => {} });
+  const save = saver({ book, grid, info, session: "s1", post, later, onState: (s: { kind: string }) => states.push(s.kind), take: () => {} });
 
   gesture((s) => (s.columnData[1] = { w: 180 })); // B dragged wider
   gesture((s) => (s.cellData[1][1] = { v: 5000, t: 2 })); // B2 typed
   gesture((s) => (s.cellData[2][1].v = 5000)); // the total, recomputed by the grid
   assert.equal(timers.length, 1, "one save waiting, pushed back by each edit");
   assert.equal(timers[0].ms, SAVE_AFTER_MS);
-  await timers.pop().fn();
+  await fire();
   assert.deepEqual(states, ["waiting", "waiting", "waiting", "saving", "saved"]);
   assert.equal(posts.length, 1);
   assert.deepEqual(posts[0].head, { base: 1, rev: 1, session: "s1", seq: 1, force: false });
   const o = (await sheets.open(posts[0].bytes)).inspect();
-  const cell = (id) => o.nodes[0].children.find((c) => c.id === id).props;
-  assert.equal(o.nodes[0].props.widths[1], 180, "the width he dragged");
+  const cell = (id: string) => must(must(o.nodes[0]?.children, "Q3's cells").find((c) => c.id === id)?.props, id);
+  assert.equal(list(must(o.nodes[0]?.props, "Q3's props").widths, "widths")[1], 180, "the width he dragged");
   assert.equal(cell("Q3!B2").value, 5000, "the value he typed");
   assert.deepEqual([cell("Q3!B3").formula, cell("Q3!B3").value], ["=SUM(B2:B2)", 5000], "the formula kept, its result the grid's");
   assert.deepEqual(info, { id: "q3", version: 2, latest: 2, rev: 1 });
@@ -362,14 +369,14 @@ test("a column resized and a cell typed in the grid save as the next version, on
   // the next edit of the sitting: seq 2, from the version he made
   answer = { status: 200, answer: { v: 2, rev: 2 } };
   gesture((s) => (s.rowData[0] = { h: 40 }));
-  await timers.pop().fn();
+  await fire();
   assert.deepEqual(posts[1].head, { base: 2, rev: 1, session: "s1", seq: 2, force: false });
 
   // an agent's v3 lands while he has an edit not saved: he picks, nothing is overwritten
   gesture((s) => (s.cellData[0][0] = { v: "Line", t: 1 }));
   assert.ok(save.hold({ n: 3, rev: 1 }), "not drawn over his edit");
   assert.deepEqual(save.state, { kind: "conflict", v: 3, rev: 1 });
-  await timers.pop().fn();
+  await fire();
   assert.equal(posts.length, 2, "no autosave while he has not picked");
   answer = { status: 200, answer: { v: 4, rev: 1 } };
   await save.keep();

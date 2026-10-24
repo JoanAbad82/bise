@@ -5,13 +5,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { sheets, core, diff, OfficeError, checkPackage } from "../../dist/office.js";
-import { richWorkbook, PNG } from "./sheets-rich.mjs";
+import { sheets, core, diff, OfficeError, checkPackage, type Outline } from "../../dist/office.js";
+import { richWorkbook, PNG } from "./sheets-rich.ts";
+import { list, must, obj } from "./must.ts";
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "fixtures");
 const DATE = new Date(Date.UTC(2026, 0, 1));
 
-async function codeOf(fn) {
+async function codeOf(fn: () => unknown) {
   try {
     await fn();
   } catch (e) {
@@ -22,7 +23,7 @@ async function codeOf(fn) {
 }
 
 /** No broken rel, no bad XML, every part has a content type. */
-function sound(bytes) {
+function sound(bytes: Uint8Array) {
   const zip = core.Zip.read(bytes);
   assert.deepEqual(checkPackage(zip), []);
   const ct = core.contentTypes(zip);
@@ -30,7 +31,13 @@ function sound(bytes) {
   return zip;
 }
 
-const cell = (outline, id) => outline.nodes.flatMap((s) => s.children ?? []).find((c) => c.id === id);
+const cell = (outline: Outline, id: string) => {
+  const node = must(outline.nodes.flatMap((s) => s.children ?? []).find((c) => c.id === id), id);
+  return { text: node.text, props: node.props ?? {} };
+};
+// a sheet's node by name, with its props
+const sheetOf = (outline: Outline, name: string) => must(outline.nodes.find((n) => n.name === name)?.props, `sheet ${name}'s props`);
+const chartTitles = (props: Record<string, unknown>) => list(props.charts, "charts").map((c) => obj(c, "a chart").title);
 
 test("create, style, save, open: values, formulas with values, styles, merges, widths come back", async () => {
   const book = await sheets.create({ sheet: "Q3", rows: [["Item", "Amount"], ["a", 1200], ["b", 300.5], ["Total", "=SUM(B2:B3)"]], date: DATE });
@@ -39,20 +46,21 @@ test("create, style, save, open: values, formulas with values, styles, merges, w
   book.range("A6:C6").merge().set("note row");
   book.range("A1").width(20);
   book.range("A2").height(30);
-  book.exceljs.getWorksheet("Q3").views = [{ state: "frozen", ySplit: 1, xSplit: 0 }];
+  must(book.exceljs.getWorksheet("Q3"), "sheet Q3").views = [{ state: "frozen", ySplit: 1, xSplit: 0 }];
   const bytes = await book.save();
   sound(bytes);
 
   const again = await sheets.open(bytes);
   assert.deepEqual(again.sheetNames, ["Q3"]);
   const o = again.inspect();
-  const sheet = o.nodes[0];
+  const sheet = must(o.nodes[0], "the first sheet");
   assert.equal(sheet.id, "Q3");
-  assert.equal(sheet.props.dims, "A1:C6");
-  assert.deepEqual(sheet.props.merged, ["A6:C6"]);
-  assert.deepEqual(sheet.props.frozen, { rows: 1, cols: 0 });
-  assert.equal(sheet.props.widths[0], 145);
-  assert.equal(sheet.props.heights["2"], 40);
+  const props = must(sheet.props, "Q3's props");
+  assert.equal(props.dims, "A1:C6");
+  assert.deepEqual(props.merged, ["A6:C6"]);
+  assert.deepEqual(props.frozen, { rows: 1, cols: 0 });
+  assert.equal(list(props.widths, "widths")[0], 145);
+  assert.equal(obj(props.heights, "heights")["2"], 40);
   assert.deepEqual(cell(o, "Q3!A1").props, { value: "Item", bold: true, color: "#1f6feb", fill: "#eeeeee", align: "center" });
   const total = cell(o, "Q3!B4");
   assert.equal(total.text, "1,500.50");
@@ -76,7 +84,9 @@ test("a file opened and saved without an edit comes back byte for byte", async (
 test("the same workbook saves to the same bytes (ids of conditional formats too)", async () => {
   const make = async () => {
     const b = await sheets.create({ rows: [[1], [2], [3]], date: DATE });
-    b.exceljs.getWorksheet("Sheet1").addConditionalFormatting({ ref: "A1:A3", rules: [{ type: "dataBar", cfvo: [{ type: "min" }, { type: "max" }], color: { argb: "FF638EC6" } }] });
+    // exceljs writes a data bar's color, though its types leave it out of DataBarRuleType
+    const dataBar = { type: "dataBar" as const, priority: 1, cfvo: [{ type: "min" as const }, { type: "max" as const }], color: { argb: "FF638EC6" } };
+    must(b.exceljs.getWorksheet("Sheet1"), "Sheet1").addConditionalFormatting({ ref: "A1:A3", rules: [dataBar] });
     return b;
   };
   const a = await make();
@@ -122,13 +132,13 @@ test("formulas get values on save; errors and what the SDK cannot compute are na
     [2, -1, 20],
   ]);
   const problems = book.check();
-  assert.deepEqual(problems.map((p) => [p.code, p.at?.range]), [["formula_error", "B2"], ["no_value", "B3"]]);
+  assert.deepEqual(problems.map((p) => [p.code, p.at?.kind === "cell" ? p.at.range : undefined]), [["formula_error", "B2"], ["no_value", "B3"]]);
   assert.match(problems[1].message, /XLOOKUP/);
 });
 
 test("number formats: the text is what Excel shows", async () => {
   const book = await sheets.create({ date: DATE });
-  const cases = [
+  const cases: [value: number, numFmt: string, shown: string][] = [
     [1234.5, "#,##0.00", "1,234.50"],
     [0.256, "0.0%", "25.6%"],
     [-42, "#,##0;(#,##0)", "(42)"],
@@ -141,7 +151,7 @@ test("number formats: the text is what Excel shows", async () => {
   ];
   cases.forEach(([v, fmt], i) => book.range(`A${i + 1}`).set(v).style({ numFmt: fmt }));
   const o = book.inspect();
-  cases.forEach(([, , want], i) => assert.equal(cell(o, `Sheet1!A${i + 1}`).text, want, cases[i][1]));
+  cases.forEach(([, fmt, want], i) => assert.equal(cell(o, `Sheet1!A${i + 1}`).text, want, fmt));
 });
 
 test("diff names the cells and sheets that changed between two outlines", async () => {
@@ -158,9 +168,9 @@ test("diff names the cells and sheets that changed between two outlines", async 
 test("an edit keeps what exceljs does not model: charts, pivots, external links, chartsheets, custom properties", async () => {
   const { bytes } = await richWorkbook();
   const book = await sheets.open(bytes);
-  const q3 = book.inspect().nodes.find((n) => n.name === "Q3");
-  assert.deepEqual(q3.props.charts.map((c) => c.title), ["Revenue by item"]);
-  assert.equal(q3.props.pivots, 1);
+  const q3 = sheetOf(book.inspect(), "Q3");
+  assert.deepEqual(chartTitles(q3), ["Revenue by item"]);
+  assert.equal(q3.pivots, 1);
   book.range("Q3!B2").set(1300);
   assert.deepEqual(book.check(), []);
   const out = await book.save();
@@ -169,26 +179,28 @@ test("an edit keeps what exceljs does not model: charts, pivots, external links,
   for (const p of ["xl/charts/chart1.xml", "xl/charts/chart2.xml", "xl/pivotTables/pivotTable1.xml", "xl/pivotCache/pivotCacheDefinition1.xml", "xl/pivotCache/pivotCacheRecords1.xml", "xl/externalLinks/externalLink1.xml", "xl/chartsheets/sheet1.xml", "docProps/custom.xml"]) {
     assert.deepEqual(zip.bytes(p), core.Zip.read(bytes).bytes(p), p);
   }
-  const wb = zip.text("xl/workbook.xml");
+  const wb = must(zip.text("xl/workbook.xml"), "xl/workbook.xml");
   const bookRels = core.rels(zip, "xl/workbook.xml");
-  const target = (id) => bookRels.find((r) => r.id === id)?.target;
-  assert.equal(target(/<pivotCache cacheId="1" r:id="(rId\d+)"/.exec(wb)[1]), "xl/pivotCache/pivotCacheDefinition1.xml");
-  assert.equal(target(/<externalReference r:id="(rId\d+)"/.exec(wb)[1]), "xl/externalLinks/externalLink1.xml");
+  const target = (id: string) => bookRels.find((r) => r.id === id)?.target;
+  // the first group of a match in a part's text
+  const group = (re: RegExp, text: string) => must(re.exec(text)?.[1], String(re));
+  assert.equal(target(group(/<pivotCache cacheId="1" r:id="(rId\d+)"/, wb)), "xl/pivotCache/pivotCacheDefinition1.xml");
+  assert.equal(target(group(/<externalReference r:id="(rId\d+)"/, wb)), "xl/externalLinks/externalLink1.xml");
   const names = [...wb.matchAll(/<sheet [^>]*name="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(names, ["Q3", "Totals chart", "Data"]);
   assert.match(wb, /<definedName name="DataBlock" localSheetId="2"/);
   assert.ok(wb.indexOf("<externalReferences") < wb.indexOf("<definedNames"), "schema order");
 
-  const sheetPart = target(/<sheet [^>]*name="Q3"[^>]*r:id="(rId\d+)"/.exec(wb)[1]);
+  const sheetPart = must(target(group(/<sheet [^>]*name="Q3"[^>]*r:id="(rId\d+)"/, wb)), "Q3's part");
   const sheetRels = core.rels(zip, sheetPart);
-  const drawingId = /<drawing r:id="(rId\d+)"\/>/.exec(zip.text(sheetPart))[1];
-  const drawing = sheetRels.find((r) => r.id === drawingId).target;
-  assert.equal(core.rels(zip, drawing)[0].target, "xl/charts/chart1.xml");
+  const drawingId = group(/<drawing r:id="(rId\d+)"\/>/, must(zip.text(sheetPart), sheetPart));
+  const drawing = must(sheetRels.find((r) => r.id === drawingId), drawingId).target;
+  assert.equal(core.rels(zip, drawing)[0]?.target, "xl/charts/chart1.xml");
   assert.ok(sheetRels.some((r) => r.target === "xl/pivotTables/pivotTable1.xml"));
   assert.ok(core.rels(zip, "").some((r) => r.target === "docProps/custom.xml"));
 
   // the picture on Data is exceljs's, and still there
-  const data = (await sheets.open(out)).exceljs.getWorksheet("Data");
+  const data = must((await sheets.open(out)).exceljs.getWorksheet("Data"), "sheet Data");
   assert.equal(data.getImages().length, 1);
 
   // and a second edit round keeps it all again
@@ -196,7 +208,7 @@ test("an edit keeps what exceljs does not model: charts, pivots, external links,
   twice.range("Data!B2").set(2);
   const zip2 = sound(await twice.save());
   assert.ok(zip2.has("xl/charts/chart1.xml") && zip2.has("xl/pivotTables/pivotTable1.xml"));
-  assert.deepEqual(twice.inspect().nodes.find((n) => n.name === "Q3").props.charts.map((c) => c.title), ["Revenue by item"]);
+  assert.deepEqual(chartTitles(sheetOf(twice.inspect(), "Q3")), ["Revenue by item"]);
 });
 
 test("a save that would lose a part refuses with its name, unless the script drops it", async () => {
@@ -217,7 +229,8 @@ test("a picture added to a sheet with a chart cannot be merged: would_lose names
   const { bytes } = await richWorkbook();
   const book = await sheets.open(bytes);
   const x = book.exceljs;
-  x.getWorksheet("Q3").addImage(x.addImage({ buffer: PNG, extension: "png" }), "A8:B9");
+  // PNG as exceljs's typed `Buffer`: see sheets-rich.ts
+  must(x.getWorksheet("Q3"), "sheet Q3").addImage(x.addImage({ buffer: PNG as unknown as ArrayBuffer, extension: "png" }), "A8:B9");
   assert.deepEqual(book.check().filter((p) => p.code === "would_lose").map((p) => p.message.split(":")[0]), ["xl/drawings/drawing9.xml"]);
   assert.equal(await codeOf(() => book.save()), "would_lose");
 });

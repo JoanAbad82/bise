@@ -7,22 +7,25 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { must } from "./must.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 test("the bundle runs with no TextEncoder or TextDecoder", async () => {
   const saved = { TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder };
-  delete globalThis.TextEncoder;
-  delete globalThis.TextDecoder;
+  Reflect.deleteProperty(globalThis, "TextEncoder");
+  Reflect.deleteProperty(globalThis, "TextDecoder");
   try {
-    const { core, openPackage } = await import(`../../dist/office.js?bare`);
+    // a fresh copy of the bundle (the query makes it a new module), typed as the bundle
+    const fresh = new URL("../../dist/office.js?bare", import.meta.url).href;
+    const { core, openPackage }: typeof import("../../dist/office.js") = await import(fresh);
     const bytes = new Uint8Array(readFileSync(join(here, "..", "..", "fixtures", "tiny.docx")));
     const { zip } = openPackage(bytes);
-    const doc = core.parseXml(zip.text("word/document.xml"), "word/document.xml");
+    const doc = core.parseXml(must(zip.text("word/document.xml"), "word/document.xml"), "word/document.xml");
     core.descendants(doc, core.NS.w, "t")[0].textContent = "Revue T3 — été 🌞";
     zip.set("word/document.xml", core.writeXml(doc));
     const again = core.Zip.read(zip.write()).text("word/document.xml");
-    assert.match(again, /Revue T3 — été 🌞/);
+    assert.match(must(again, "word/document.xml again"), /Revue T3 — été 🌞/);
   } finally {
     Object.assign(globalThis, saved);
   }

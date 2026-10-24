@@ -77,7 +77,7 @@ mod tests {
         String::from_utf8_lossy(&r.body).to_string()
     }
 
-    /// The repo's office fixtures (office/fixtures, made by office/fixtures/make.mjs).
+    /// The repo's office fixtures (office/fixtures, made by office/fixtures/make.ts).
     fn fixture(name: &str) -> Vec<u8> {
         std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../office/fixtures").join(name)).unwrap()
     }

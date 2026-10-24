@@ -11,9 +11,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sheets } from "../../dist/office.js";
 
-const V = (e) => ({ error: e });
+const V = (e: string) => ({ error: e });
 
-const TABLE = [
+const TABLE: [formula: string, want: unknown][] = [
   // arithmetic: blanks are 0, numeric text converts, other text is #VALUE!, TRUE is 1
   ["=A1+A2", 5],
   ["=A1+A4", 2],
@@ -129,7 +129,7 @@ test("each function the evaluator computes gives Excel's value, edge cases too",
   const got = book.range(`C1:C${TABLE.length}`).values().map((row) => row[0]);
   const wrong = TABLE.filter(([, want], i) => JSON.stringify(got[i]) !== JSON.stringify(want)).map(([f, want], i) => `${f}: want ${JSON.stringify(want)}`);
   assert.deepEqual(
-    TABLE.map(([f], i) => [f, got[i]]).filter(([f, g]) => JSON.stringify(g) !== JSON.stringify(TABLE.find((t) => t[0] === f)[1])),
+    TABLE.map(([f], i) => [f, got[i]]).filter(([f, g]) => JSON.stringify(g) !== JSON.stringify(TABLE.find((t) => t[0] === f)?.[1])),
     [],
     wrong.join("; "),
   );

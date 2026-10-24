@@ -2,7 +2,7 @@
 // runs in a fresh vm context that has only JavaScript's own globals (no
 // setTimeout, setImmediate, Buffer, process, TextEncoder/TextDecoder,
 // crypto): create, save, open, edit a workbook with charts and pivots, save
-// again. Every module build.mjs stubs throws when used, so a run that ends
+// again. Every module build.ts stubs throws when used, so a run that ends
 // well proves the open and save paths never touch one (architect m_23798);
 // the second test shows each stub does throw, with its words.
 
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { transformSync } from "esbuild";
 import { sheets } from "../../dist/office.js";
-import { richWorkbook } from "./sheets-rich.mjs";
+import { richWorkbook } from "./sheets-rich.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bundle = readFileSync(join(here, "..", "..", "dist", "office.js"), "utf8");
@@ -69,5 +69,5 @@ test("each stubbed module throws its own words when something uses it", async ()
   const x = book.exceljs;
   assert.throws(() => x.xlsx.writeBuffer(), /office: \.\.\/xlsx\/xlsx is not available/);
   assert.throws(() => x.csv.writeBuffer(), /office: \.\.\/csv\/csv is not available/);
-  await assert.rejects(async () => x.getWorksheet(1).protect("secret", {}), /office: \.\.\/utils\/encryptor is not available/);
+  await assert.rejects(async () => x.getWorksheet(1)?.protect("secret", {}), /office: \.\.\/utils\/encryptor is not available/);
 });

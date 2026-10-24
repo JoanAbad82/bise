@@ -5,7 +5,7 @@
 // link, chartsheet) after an edit, and tiny.xlsx after an edit. Each also
 // passes checkPackage and check().
 //
-//   ~/.bise/run/heavy-run --low node --test office/sdk/test/sheets.quicklook.mjs
+//   ~/.bise/run/heavy-run --low node --experimental-strip-types --test office/sdk/test/sheets.quicklook.ts
 //   OFFICE_QL_KEEP=<dir> keeps the workbooks and their thumbnails there.
 
 import { test } from "node:test";
@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sheets, checkPackage, core } from "../../dist/office.js";
-import { richWorkbook } from "./sheets-rich.mjs";
+import { richWorkbook } from "./sheets-rich.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const hasQl = process.platform === "darwin" && existsSync("/usr/bin/qlmanage");
