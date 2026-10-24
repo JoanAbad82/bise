@@ -73,6 +73,15 @@ test('thread/catching-up: a cue under his message while the newest page comes, n
     const row = await boxOf(page.getByText(answer.text));
     expect(row.y, 'the answer is under his message').toBeGreaterThanOrEqual(mineAfter.y + mineAfter.height - 1);
     await page.screenshot({ path: test.info().outputPath('thread-catching-up-newer.png') });
+
+    // dark (his prefs from the core): the cue's shot for designer
+    await core.send({ ev: 'prefs', prefs: { theme: 'dark' } } as never);
+    await leaveAndComeBack(page, core);
+    await expect.poll(() => cueOpacity(page), { timeout: 2000 }).toBe(1);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: test.info().outputPath('thread-catching-up-cue-dark.png') });
+    await core.release();
+    await expect.poll(() => cueOpacity(page), { timeout: 2000 }).toBe(0);
   } finally {
     await s.close();
     core.dispose();
