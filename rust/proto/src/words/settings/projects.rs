@@ -51,8 +51,6 @@ crate::words! { settings:
     no_answer(s) = "▲ bise didn't answer in {s} s";
     /// the scan under way
     scan_looking = "looking in your folders…";
-    /// the scan under way, its seconds
-    scan_looking_s(s) = "looking in your folders… · {s} s";
     /// the add button, nothing to add
     add = "add";
     /// the add button, one project

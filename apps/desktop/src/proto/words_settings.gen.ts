@@ -370,8 +370,6 @@ export const settings = {
   no_answer: (a: { s: string | number }): string => "▲ bise didn't answer in " + String(a.s) + " s",
   /** the scan under way */
   scan_looking: "looking in your folders…",
-  /** the scan under way, its seconds */
-  scan_looking_s: (a: { s: string | number }): string => "looking in your folders… · " + String(a.s) + " s",
   /** the add button, nothing to add */
   add: "add",
   /** the add button, one project */

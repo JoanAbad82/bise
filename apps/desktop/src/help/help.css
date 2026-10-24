@@ -12,6 +12,10 @@
   z-index: 20;
   animation: b-fade-in 120ms var(--ease-out);
 }
+.help-over.out {
+  animation: b-fade-out 120ms var(--ease-out) forwards;
+  pointer-events: none;
+}
 
 .help-box {
   display: flex;

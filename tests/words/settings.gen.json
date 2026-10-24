@@ -3172,13 +3172,6 @@
     "one": null,
     "text": "looking in your folders…"
   },
-  "settings.scan_looking_s": {
-    "args": [
-      "s"
-    ],
-    "one": null,
-    "text": "looking in your folders… · {s} s"
-  },
   "settings.scan_nothing": {
     "args": [],
     "one": null,

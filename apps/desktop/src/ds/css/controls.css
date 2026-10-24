@@ -60,6 +60,9 @@
 /* a Sheet is opaque (designer m_18975): the raised role laid on the solid one, so nothing behind shows
    through (the roles are translucent for the window's glass); no backdrop blur on the panel */
 @media (max-width:800px){.b-sheet{width:min(480px,calc(100vw - 2 * var(--s-6)))}}
+/* only the sheet floats: a surface inside it (a settings group, a pane) is flat, its 1 px line and
+   no drop (designer m_39043) */
+.b-sheet :is(.b-group,.b-pane){box-shadow:0 0 0 1px var(--c-line)}
 @keyframes b-fade-in{from{opacity:0}}
 @keyframes b-fade-out{to{opacity:0}}
 @keyframes b-sheet-in{from{opacity:0;transform:translateX(-50%) translateY(8px)}}
