@@ -142,7 +142,16 @@ title: string, what?: string | null,
 /**
  * its icon's name or address (none: the kind's own)
  */
-icon?: string | null, state: PluginState, 
+icon?: string | null, 
+/**
+ * a real plugin's manifest version (`0.1.0`)
+ */
+version?: string | null, 
+/**
+ * where it lives on his Mac: a plugin's root, a skills folder
+ * (absolute; none for a connector)
+ */
+path?: string | null, state: PluginState, 
 /**
  * turned on (plugins.json: everything on but the opt-in plugins)
  */
@@ -155,6 +164,11 @@ locked?: boolean,
  * what its button does (none: no button)
  */
 action?: PluginAction | null, parts?: Array<PluginPart>, 
+/**
+ * what to try it with: its manifest's `dev.bise.prompts` (at most
+ * 3, one line each); a click puts one in the composer, never sends it
+ */
+prompts?: Array<string>, 
 /**
  * its remote MCP servers that log in (the released app's reader;
  * the same servers are `mcp` parts with their `login`)
@@ -215,6 +229,12 @@ status?: string | null,
  * read this, never `status`)
  */
 login?: LoginState | null, 
+/**
+ * an MCP server that failed: why, in one line (`exited at start:
+ * DATABASE_URL is not set`). Some marks the failure; the text is for
+ * display only (no reader matches on it, nor on `status`)
+ */
+error?: string | null, 
 /**
  * an MCP server's tools (none: not listed yet, or not a server)
  */

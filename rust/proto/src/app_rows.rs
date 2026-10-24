@@ -178,6 +178,13 @@ pub struct Plugin {
     /// its icon's name or address (none: the kind's own)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// a real plugin's manifest version (`0.1.0`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// where it lives on his Mac: a plugin's root, a skills folder
+    /// (absolute; none for a connector)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     pub state: PluginState,
     /// turned on (plugins.json: everything on but the opt-in plugins)
     #[serde(default)]
@@ -190,6 +197,10 @@ pub struct Plugin {
     pub action: Option<PluginAction>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<PluginPart>,
+    /// what to try it with: its manifest's `dev.bise.prompts` (at most
+    /// 3, one line each); a click puts one in the composer, never sends it
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prompts: Vec<String>,
     /// its remote MCP servers that log in (the released app's reader;
     /// the same servers are `mcp` parts with their `login`)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -305,6 +316,11 @@ pub struct PluginPart {
     /// read this, never `status`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub login: Option<LoginState>,
+    /// an MCP server that failed: why, in one line (`exited at start:
+    /// DATABASE_URL is not set`). Some marks the failure; the text is for
+    /// display only (no reader matches on it, nor on `status`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
     /// an MCP server's tools (none: not listed yet, or not a server)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tools: Vec<PluginPart>,

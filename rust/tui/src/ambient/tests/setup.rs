@@ -143,6 +143,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 on: true,
                 status: None,
                 login: Some(if pending.iter().any(|p| p == name) { LoginState::Pending } else { LoginState::Needs }),
+                error: None,
                 tools: vec![],
                 tool_count: None,
             };
@@ -154,10 +155,13 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 title: name.into(),
                 what: Some(ws.to_string_lossy().into_owned()),
                 icon: None,
+                version: None,
+                path: None,
                 state: if on { PluginState::Loaded } else { PluginState::Disabled },
                 on,
                 locked: false,
                 action: None,
+                prompts: vec![],
                 logins: vec![],
                 parts,
             };

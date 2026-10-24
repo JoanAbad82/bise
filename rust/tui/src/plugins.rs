@@ -43,6 +43,8 @@ pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::app_
                 title: p.name.clone(),
                 what: p.description.clone().filter(|d| !d.trim().is_empty()),
                 icon: None,
+                version: p.version.clone(),
+                path: Some(p.root.to_string_lossy().into_owned()),
                 state: match p.state {
                     State::Loaded => PluginState::Loaded,
                     State::Disabled => PluginState::Disabled,
@@ -52,6 +54,7 @@ pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::app_
                 on: p.state == State::Loaded,
                 locked: false,
                 action: None,
+                prompts: vec![],
                 // TODO(plugin-logins): the released app's reader, the same
                 // parts in the released shape; goes in desktop-v2026.10.16
                 logins: parts.iter().filter_map(released_login).collect(),
@@ -90,6 +93,7 @@ fn login_part(owner: &bend_plugins::id::PluginId, t: &bend_plugins::login::Targe
         what: Some(host),
         on: true,
         login: Some(login),
+        error: None,
         tools: Vec::new(),
         tool_count: last.and_then(|s| s.tools.ok()).map(|n| n as u32),
     }
