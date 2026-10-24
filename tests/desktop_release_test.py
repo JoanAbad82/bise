@@ -300,18 +300,21 @@ def test_pack_and_dmg_settings():
             check(not [k for k in info if "Calendar" in k], "no calendar usage string: %s" % list(info))
             # an empty VERSION (no id) leaves Info.plist's versions to electron-builder
             check("bundleShortVersion" not in mac and "bundleVersion" not in mac, "no id, no plist version: %s" % mac)
-            # a release's VERSION names Info.plist's versions, never package.json's 0.0.0 (pr24)
-            with open(os.path.join(t, "VERSION"), "w") as f:
-                f.write(version())
-            r = subprocess.run(["node", "-e", js, "file://" + os.path.join(R.DESKTOP, "electron-builder.mjs")],
-                               capture_output=True, text=True,
-                               env=dict(R.pack_env({"PATH": os.environ.get("PATH", "")}, R.paths(t), t),
-                                        BISE_PACK_BISE=os.path.join(t, "bise"), BISE_PACK_HELPER=os.path.join(t, "helper"),
-                                        BISE_PACK_VERSION=os.path.join(t, "VERSION")))
-            check(r.returncode == 0, r.stderr)
-            mac = json.loads(r.stdout)
-            check(mac.get("bundleShortVersion") == "desktop-2026.10.1" and mac.get("bundleVersion") == "c" * 12,
-                  "Info.plist's versions from VERSION: %s" % {k: mac.get(k) for k in ("bundleShortVersion", "bundleVersion")})
+            # a release's VERSION names Info.plist's versions, never package.json's 0.0.0 (pr24), and
+            # its short one as About and the settings say it (shortVersion): '2026.10.1', from the
+            # app id (desktop-2026.10.1) or a tag-like version= (desktop-v2026.10.3)
+            for text, short in ((version(), "2026.10.1"), (version() + "version=desktop-v2026.10.3\n", "2026.10.3")):
+                with open(os.path.join(t, "VERSION"), "w") as f:
+                    f.write(text)
+                r = subprocess.run(["node", "-e", js, "file://" + os.path.join(R.DESKTOP, "electron-builder.mjs")],
+                                   capture_output=True, text=True,
+                                   env=dict(R.pack_env({"PATH": os.environ.get("PATH", "")}, R.paths(t), t),
+                                            BISE_PACK_BISE=os.path.join(t, "bise"), BISE_PACK_HELPER=os.path.join(t, "helper"),
+                                            BISE_PACK_VERSION=os.path.join(t, "VERSION")))
+                check(r.returncode == 0, r.stderr)
+                mac = json.loads(r.stdout)
+                check(mac.get("bundleShortVersion") == short and mac.get("bundleVersion") == "c" * 12,
+                      "Info.plist's versions from VERSION: %s" % {k: mac.get(k) for k in ("bundleShortVersion", "bundleVersion")})
     check(R.dmgbuild_argv("s.py", "bise", "o.dmg")[-4:] == ["-s", "s.py", "bise", "o.dmg"], "dmgbuild's argv")
 
 

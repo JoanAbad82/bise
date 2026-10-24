@@ -62,17 +62,21 @@ const version = process.env['BISE_PACK_VERSION'] ? need('BISE_PACK_VERSION') : n
 
 // Info.plist's versions from that VERSION (`key=value` lines), else package.json's 0.0.0 stays
 // in CFBundleShortVersionString and CFBundleVersion: Finder's Get Info, the crash reports, and the
-// About panel's build when main sets none. The short one is the build's name as VERSION says it
-// (`version=`, else `id=`: desktop-2026.10.2, the settings' update row); the build one is its
-// commit (12 chars), else that name again. A VERSION without an id leaves both alone. Pure.
+// About panel's build when main sets none. The short one is the build's name (`version=`, else
+// `id=`) as he reads it in About and the settings: src/shared/version.ts shortVersion's rule
+// ('desktop-2026.10.2' and 'desktop-v2026.10.2' → '2026.10.2'; this file runs in plain node, so it
+// can't import the .ts: change both together, version.test.ts and desktop_release_test.py check
+// each). The build one is its commit (12 chars), else that name again. A VERSION without an id
+// leaves both alone. Pure.
 export function bundleVersions(text) {
   const kv = new Map();
   for (const line of text.split('\u000a')) {
     const i = line.indexOf('=');
     if (i > 0) kv.set(line.slice(0, i).trim(), line.slice(i + 1).trim());
   }
-  const name = kv.get('version') || kv.get('id') || '';
-  if (name === '') return {};
+  const raw = kv.get('version') || kv.get('id') || '';
+  if (raw === '') return {};
+  const name = raw.replace(/^desktop-v?(?=\d)/, '').replace(/^v(?=\d)/, '');
   const commit = kv.get('commit') || '';
   return { bundleShortVersion: name, bundleVersion: commit === '' ? name : commit.slice(0, 12) };
 }

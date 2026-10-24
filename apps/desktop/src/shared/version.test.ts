@@ -6,6 +6,9 @@ describe('shortVersion (designer m_25699)', () => {
     expect(shortVersion('desktop-v2026.10.2')).toBe('2026.10.2');
     expect(shortVersion('v2026.10.2')).toBe('2026.10.2');
     expect(shortVersion('2026.10.2-26')).toBe('2026.10.2-26');
-    expect(shortVersion('desktop-2026.10.1')).toBe('desktop-2026.10.1');
+  });
+  it("the app's VERSION id (desktop_feed.py app_id) reads the same: never 'desktop-2026.10.2'", () => {
+    expect(shortVersion('desktop-2026.10.2')).toBe('2026.10.2');
+    expect(shortVersion('desktop-dry-5f9a429951ab')).toBe('desktop-dry-5f9a429951ab');
   });
 });

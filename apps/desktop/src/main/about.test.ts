@@ -8,7 +8,7 @@ describe("aboutPanel (the macOS About panel: his app's name, its real build)", (
   });
   it('the version as he reads it elsewhere (shortVersion, designer m_25699): the version, not the tag', () => {
     expect(aboutPanel('bise', 'v2026.10.2', null)).toMatchObject({ applicationName: 'bise', applicationVersion: '2026.10.2' });
-    expect(aboutPanel('bise', 'desktop-2026.10.1', null)).toMatchObject({ applicationName: 'bise', applicationVersion: 'desktop-2026.10.1' });
+    expect(aboutPanel('bise', 'desktop-2026.10.1', null)).toMatchObject({ applicationName: 'bise', applicationVersion: '2026.10.1' });
   });
   it("a packed app sets the build in parentheses too, never the bundle's 0.0.0: its commit, else its version", () => {
     expect(aboutPanel('bise', 'desktop-v2026.10.2', '5f9a429951ab0c1d2e3f4a5b6c7d8e9f00112233')).toEqual({
