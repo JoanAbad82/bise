@@ -65,7 +65,16 @@ pub(crate) struct Artifact {
     pub(crate) keys: Vec<String>,
     /// oldest first
     pub(crate) versions: Vec<Version>,
+    /// its folder's id, as the hub resolved it (a merged folder's reads
+    /// as the one it went into); none: unfiled
+    pub(crate) folder: Option<String>,
+    /// the project it belongs to, by name ("" for this hub's own rows)
+    pub(crate) project: String,
 }
+
+/// A folder of the library (`~/.bise/library/folders.json`, shared by
+/// every project): a theme, or a task folder inside one (`parent`).
+pub(crate) use bise_proto::rows::Folder;
 
 impl Artifact {
     /// The kind as a row says it: `PR` in capitals, the rest as is.
@@ -76,30 +85,6 @@ impl Artifact {
     /// Has more than one version: the row shows `v3`.
     pub(crate) fn versioned(&self) -> bool {
         self.v > 1 || self.versions.len() > 1
-    }
-
-    /// The agent's column: `subs-lead · archived`.
-    pub(crate) fn agent_words(&self) -> String {
-        let who = if self.agent.is_empty() { self.by.clone() } else { self.agent.clone() };
-        if self.archived {
-            format!("{} · archived", who)
-        } else {
-            who
-        }
-    }
-
-    /// The last column at 150: `v3 · 2 notes open`, `127.0.0.1:4747`,
-    /// `▲ gone from disk · bise kept a copy`.
-    pub(crate) fn last_words(&self) -> String {
-        if self.gone {
-            return gone_words(self.copy.is_some());
-        }
-        let v = self.versioned().then(|| format!("v{}", self.v));
-        match (v, self.detail.is_empty()) {
-            (Some(v), true) => v,
-            (Some(v), false) => format!("{} · {}", v, self.detail),
-            (None, _) => self.detail.clone(),
-        }
     }
 
     /// A link (http, https), not a file.
@@ -181,6 +166,10 @@ struct Store {
     new: u64,
     /// when you last looked (the hub's `seen_ms`; an older hub: none)
     seen_ms: Option<u64>,
+    /// the library's folders (the `artifacts` event's, every project's)
+    folders: Vec<Folder>,
+    /// the other projects' rows (`artifacts/library`), newest first
+    others: Vec<Artifact>,
 }
 
 thread_local! {
@@ -223,6 +212,8 @@ impl Artifact {
             pr: r.pr.as_ref().map(|p| Pr { repo: p.repo.clone(), number: p.number, branch: String::new() }),
             keys: r.keys.clone(),
             versions,
+            folder: r.folder.clone(),
+            project: String::new(),
         }
     }
 }
@@ -255,6 +246,64 @@ pub(crate) fn all() -> Vec<Artifact> {
 
 pub(crate) fn get(id: &str) -> Option<Artifact> {
     STORE.with(|st| st.borrow().rows.iter().find(|a| a.id == id).cloned())
+}
+
+/// The library (`/artifacts`): this project's rows and every other
+/// project's, newest first.
+pub(crate) fn library() -> Vec<Artifact> {
+    STORE.with(|st| {
+        let st = st.borrow();
+        let mut rows: Vec<Artifact> = st.rows.iter().chain(st.others.iter()).cloned().collect();
+        rows.sort_by_key(|a| std::cmp::Reverse(a.ts_ms));
+        rows
+    })
+}
+
+/// One row of the library by its key ([`Artifact::key`]).
+pub(crate) fn get_key(key: &str) -> Option<Artifact> {
+    STORE.with(|st| {
+        let st = st.borrow();
+        st.rows.iter().chain(st.others.iter()).find(|a| a.key() == key).cloned()
+    })
+}
+
+/// The library's folders.
+pub(crate) fn folders() -> Vec<Folder> {
+    STORE.with(|st| st.borrow().folders.clone())
+}
+
+pub(crate) fn set_folders(folders: Vec<Folder>) {
+    STORE.with(|st| st.borrow_mut().folders = folders);
+}
+
+/// The other projects' rows (`artifacts/library`'s answer).
+pub(crate) fn set_others(rows: Vec<Artifact>) {
+    STORE.with(|st| st.borrow_mut().others = rows);
+}
+
+/// The other projects' rows of `artifacts/library`'s answer, each with
+/// its project's name, newest first.
+pub(crate) fn of_library(projects: &[bise_proto::rows::LibraryProject]) -> Vec<Artifact> {
+    let mut rows: Vec<Artifact> = projects
+        .iter()
+        .flat_map(|p| {
+            p.items.iter().filter(|r| !r.id.is_empty()).map(|r| Artifact { project: p.name.clone(), ..Artifact::of_row(r) })
+        })
+        .collect();
+    rows.sort_by_key(|a| std::cmp::Reverse(a.ts_ms));
+    rows
+}
+
+impl Artifact {
+    /// Its key in the library: ids are a project's own, so another
+    /// project's row carries its project.
+    pub(crate) fn key(&self) -> String {
+        if self.project.is_empty() {
+            self.id.clone()
+        } else {
+            format!("{}/{}", self.project, self.id)
+        }
+    }
 }
 
 pub(crate) fn new_count() -> u64 {

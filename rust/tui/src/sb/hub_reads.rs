@@ -174,7 +174,7 @@ fn apply(app: &mut App, n: &Notification) {
     let Ok((ev, _)) = rpc::ev(n) else { return };
     match &ev {
         HubEv::Approvals { .. } => approvals(app, &ev, false),
-        HubEv::Artifacts { items, seen_ms, .. } => artifacts(app, items, *seen_ms),
+        HubEv::Artifacts { items, seen_ms, folders, .. } => artifacts(app, items, *seen_ms, folders),
         HubEv::Agents { agents: rows, places, archived, .. } => {
             let rows = app.sb.archived.merge(rows, archived.as_deref());
             agents(app, &rows, places)
@@ -385,8 +385,9 @@ pub(super) fn approvals(app: &mut App, ev: &HubEv, show: bool) {
 /// The artifacts (site/m/artifacts, docs/artifacts.md): the whole list;
 /// an open /artifacts marks what came new; the feed's chips are built
 /// again with the new titles.
-fn artifacts(app: &mut App, items: &[bise_proto::rows::Artifact], seen_ms: Option<u64>) {
+fn artifacts(app: &mut App, items: &[bise_proto::rows::Artifact], seen_ms: Option<u64>, folders: &[bise_proto::rows::Folder]) {
     crate::artifacts::set_rows(items, seen_ms);
+    crate::artifacts::set_folders(folders.to_vec());
     crate::artifacts_screen::on_list(app);
     app.cache.iter_mut().for_each(|c| *c = None);
 }

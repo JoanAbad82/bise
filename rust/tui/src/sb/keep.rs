@@ -48,7 +48,7 @@ pub(super) enum Popup {
     Palette(String),
     Find(Text),
     Help { shortcuts: bool, filter: String },
-    Artifacts { query: String, typing: bool, this_agent: bool },
+    Artifacts { query: String, typing: bool, place: String, project: String },
     Scheduled { query: String, typing: bool },
     Approvals,
     /// the diff of the agent in view
@@ -167,7 +167,7 @@ fn popup_of(app: &App) -> Option<Popup> {
         return Some(Popup::Help { shortcuts: h.page() == crate::help::Page::Shortcuts, filter: h.filter.clone() });
     }
     if let Some(s) = &app.artifacts {
-        return Some(Popup::Artifacts { query: s.query.clone(), typing: s.typing, this_agent: s.this_agent });
+        return Some(Popup::Artifacts { query: s.query.clone(), typing: s.typing, place: crate::artifacts_tree::place_word(&s.place), project: s.project.clone().unwrap_or_default() });
     }
     if let Some(s) = &app.scheduled {
         return Some(Popup::Scheduled { query: s.query.clone(), typing: s.typing });
@@ -219,8 +219,8 @@ pub(super) fn view_json(v: &View, now_ms: u64) -> Value {
             Popup::Palette(q) => json!({"kind": "palette", "query": q}),
             Popup::Find(t) => json!({"kind": "find", "query": t.0, "cursor": t.1}),
             Popup::Help { shortcuts, filter } => json!({"kind": "help", "shortcuts": shortcuts, "query": filter}),
-            Popup::Artifacts { query, typing, this_agent } => {
-                json!({"kind": "artifacts", "query": query, "typing": typing, "this_agent": this_agent})
+            Popup::Artifacts { query, typing, place, project } => {
+                json!({"kind": "artifacts", "query": query, "typing": typing, "place": place, "project": project})
             }
             Popup::Scheduled { query, typing } => json!({"kind": "scheduled", "query": query, "typing": typing}),
             Popup::Approvals => json!({"kind": "approvals"}),
@@ -257,7 +257,7 @@ pub(super) fn view_from(v: Option<&Value>, now_ms: u64) -> Option<View> {
         "find" => Some(Popup::Find((s(p, "query"), n(p, "cursor").unwrap_or(0) as usize))),
         "help" => Some(Popup::Help { shortcuts: b(p, "shortcuts"), filter: s(p, "query") }),
         "artifacts" => {
-            Some(Popup::Artifacts { query: s(p, "query"), typing: b(p, "typing"), this_agent: b(p, "this_agent") })
+            Some(Popup::Artifacts { query: s(p, "query"), typing: b(p, "typing"), place: s(p, "place"), project: s(p, "project") })
         }
         "scheduled" => Some(Popup::Scheduled { query: s(p, "query"), typing: b(p, "typing") }),
         "approvals" => Some(Popup::Approvals),
@@ -358,12 +358,13 @@ fn reopen(app: &mut App, p: Popup) {
             o.filter = filter;
             app.help = Some(o);
         }
-        Popup::Artifacts { query, typing, this_agent } => {
+        Popup::Artifacts { query, typing, place, project } => {
             crate::artifacts_screen::open(app);
             if let Some(s) = app.artifacts.as_mut() {
                 s.query = query;
                 s.typing = typing;
-                s.this_agent = this_agent;
+                s.place = crate::artifacts_tree::place_of(&place);
+                s.project = (!project.is_empty()).then_some(project);
             }
         }
         Popup::Scheduled { query, typing } => {

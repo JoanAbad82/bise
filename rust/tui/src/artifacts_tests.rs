@@ -36,13 +36,11 @@ fn the_hub_list_is_read_newest_first_with_its_versions() {
     assert_eq!(rows[2].title, "mine", "no title: its id");
     let p = &rows[0];
     assert_eq!(p.versions.iter().map(|x| x.v).collect::<Vec<_>>(), [1, 2, 3]);
-    assert_eq!(p.last_words(), "v3 · 2 notes open");
     assert!(p.is_link());
     assert_eq!(p.where_words("/w"), "127.0.0.1:47438/p/pricing-page");
     let doc = Artifact { target: "/w/acme/docs/q3-plan.md".into(), ..Default::default() };
     assert_eq!(doc.where_words("/w/acme"), "docs/q3-plan.md");
     assert_eq!(doc.where_words("/w/other"), "/w/acme/docs/q3-plan.md");
-    assert_eq!(rows[1].last_words(), "");
     mark_seen();
     assert_eq!(new_count(), 0);
 }
@@ -60,12 +58,8 @@ fn a_gone_file_says_so_and_opens_the_copy() {
         gone: true,
         ..Default::default()
     };
-    assert_eq!(a.agent_words(), "subs-lead · archived");
-    assert_eq!(a.last_words(), "▲ gone from disk · bise kept a copy");
     assert_eq!(a.open_target(None), "/store/subs.md");
     assert_eq!(how(&a, None, false), How::Editor("/store/subs.md".into()));
-    let none = Artifact { copy: None, ..a };
-    assert_eq!(none.last_words(), "▲ gone from disk");
 }
 
 #[test]

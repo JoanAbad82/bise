@@ -1,39 +1,41 @@
-//! `/artifacts` (site/m/artifacts, B): what your agents made, full
-//! screen, like /log. One list, newest first, grouped by day, the same
-//! at 80 and 150 columns (columns drop as it narrows); the line under
-//! the list says what the selected one is and where it lives. The rows
-//! new when it opened (the header's `↗ N new`) say `new` in the accent
-//! for the whole visit, and so do their new versions in the versions
-//! box ([`Fresh`]); the hub has them seen at once.
+//! `/artifacts` (site/m/artifacts; brief artifacts-folders part 6, page
+//! artifacts-gallery v7 block b-term): the library, full screen. The
+//! same library for every project (this hub's rows and the others',
+//! `artifacts/library`), in the same folders (artifacts_tree.rs). From
+//! 120 columns the folder tree is at the left (`•` in the accent:
+//! something new inside); under it, a crumb, and tab opens the tree in
+//! the list's place. The list of a place: newest first, grouped by day,
+//! a row says only what the place does not (its agent when it is not
+//! the folder's own, its folder in all artifacts); the kind stays a dim
+//! word (no kind glyphs: the designer's font audit). The rows new when
+//! it opened (the header's `↗ N new`) say `new` in the accent for the
+//! whole visit, and so do their new versions in the versions box
+//! ([`Fresh`]); the hub has them seen at once.
 //!
-//! Keys (designer, m_7193): the list holds them when it opens: ↑↓, ⏎
-//! open, space Quick Look, v versions, r show in Finder, c copy, @ put
-//! it in a message, tab the scope, esc close. `/` focuses the search:
-//! every letter, digit and space types, the list narrows live; ⏎ or ↑↓
-//! give the keys back to the list (the search keeps its text). esc
-//! clears the search, a second esc closes; `/` again edits it.
+//! Keys: the list holds them when it opens: ↑↓, ⏎ open, space Quick
+//! Look, v versions, r show in Finder, c copy, @ put it in a message,
+//! m move to… (artifacts_pick.rs), n new folder, p project, tab the
+//! folders, a archived, esc back. The tree's: ↑↓ the place (the list
+//! follows), →← open or shut a theme, ⏎ or tab back to the list. `/`
+//! focuses the search: it looks in every folder (`in:<project>` filters
+//! too); ⏎ or ↑↓ give the keys back to the list (the search keeps its
+//! text). esc clears the search, a second esc closes.
 
 use crate::app::App;
-use crate::artifacts::{self, Artifact, Group};
-use crate::theme::{self, accent, dim, faint, text};
+use crate::artifacts::{self, Artifact, Folder};
+use crate::artifacts_lines::{lines, Clock};
+use crate::artifacts_pick::{self as pick, Choice, Outcome, Pick};
+use crate::artifacts_tree::{self as tree, Place};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
-use std::time::{Duration, Instant};
-use unicode_width::UnicodeWidthStr;
+use std::time::Instant;
+
+pub(crate) use crate::artifacts_lines::cut;
 
 /// The url of the header's `↗ 3 new` (textlayer.rs opens the screen).
 pub(crate) const OPEN_URL: &str = "bise-artifacts:open";
-
-/// From this many columns of text the screen has its wide columns
-/// (agent before age, the last column's words, the long key bar).
-const WIDE_FROM: usize = 110;
-
-/// The mark of a row new on this visit, after its title.
-const NEW_TAG: &str = " new";
 
 /// The open screen.
 #[derive(Default)]
@@ -42,13 +44,25 @@ pub(crate) struct Screen {
     pub(crate) query: String,
     /// the search has the keys (after `/`)
     pub(crate) typing: bool,
-    /// the scope: the agent in view only (tab)
-    pub(crate) this_agent: bool,
-    /// the agent in view when it opened
-    pub(crate) agent: String,
+    /// where the list is (the tree's place)
+    pub(crate) place: Place,
+    /// the themes open in the tree, by id
+    pub(crate) open_themes: Vec<String>,
+    /// the tree has the keys (tab); under 120 columns it shows in the
+    /// list's place
+    pub(crate) in_tree: bool,
+    /// one project only (`p`); none: every project
+    pub(crate) project: Option<String>,
+    /// this hub's project, by name (its own rows carry none)
+    pub(crate) here: String,
+    /// the box that is up (`m`, `p`, `n`)
+    pub(crate) pick: Option<Pick>,
+    /// the folders you moved to on this visit (`m` offers them first)
+    pub(crate) moved: Vec<String>,
     /// the archived ones are shown instead (the `N archived` row, `a`)
     pub(crate) archived: bool,
-    /// the selected artifact, by id (stays on it when the list changes)
+    /// the selected artifact, by key ([`Artifact::key`]; stays on it
+    /// when the list changes)
     pub(crate) sel: Option<String>,
     /// the first body row shown
     pub(crate) top: usize,
@@ -57,14 +71,14 @@ pub(crate) struct Screen {
     pub(crate) versions: Option<usize>,
     /// Quick Look is up (macOS `qlmanage -p`)
     pub(crate) look: Option<Look>,
-    /// `c` copied, for 2 s
-    pub(crate) copied: Option<Instant>,
     /// what the last frame drew where (clicks): body row → target
     pub(crate) hits: Vec<(u16, Hit)>,
     /// the screen row of the search (a click focuses it)
     pub(crate) search_y: Option<u16>,
     /// the screen column where the rows start
     pub(crate) x0: u16,
+    /// the tree is at the left (the last frame was 120 columns or more)
+    pub(crate) wide: bool,
     /// what was new when it opened (and what came while it is open):
     /// marked `new` for this visit, though the hub has them seen
     pub(crate) fresh: Fresh,
@@ -103,9 +117,11 @@ impl Fresh {
 /// What a row of the last frame was.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Hit {
-    /// an artifact's row; the columns of its `v3` (a click opens the
-    /// versions)
+    /// an artifact's row, by key; the columns of its `v3` (a click
+    /// opens the versions)
     Row(String, Option<(u16, u16)>),
+    /// a row of the tree (from column 0 to its edge)
+    Tree(Place),
     /// a version's row in the versions box
     Version(usize),
     /// the quiet `N archived` row (a click opens them)
@@ -124,15 +140,20 @@ impl Drop for Look {
 
 /// `/artifacts` opens the screen (`add <path or link>` adds one).
 pub(crate) fn open(app: &mut App) {
-    let agent = app.sb.focus_name().to_string();
     // the header's `↗ designer · pricing page` opens on that one (the
     // newest new one), else on the newest
     let new = artifacts::new_rows();
-    let sel = new.first().or(artifacts::all().first()).map(|a| a.id.clone());
+    let sel = new.first().or(artifacts::all().first()).map(|a| a.key());
     // the new ones stay marked while it is open
     let mut fresh = Fresh::default();
     fresh.take(&new, artifacts::seen_ms());
-    app.artifacts = Some(Screen { agent, sel, fresh, ..Default::default() });
+    // this project's name until the library says it (`here`)
+    let here = crate::sb::workspace(app).and_then(|w| std::path::Path::new(&w).file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
+    // the theme of the new one is open in the tree
+    let folders = artifacts::folders();
+    let open_themes = new.first().and_then(|a| tree::theme_of(&Place::Folder(a.folder.clone().unwrap_or_default()), &folders)).into_iter().collect();
+    app.artifacts = Some(Screen { sel, fresh, here, open_themes, ..Default::default() });
+    ask_library(app);
     // you looked: the header's `↗ N new` goes
     artifacts::mark_seen();
     app.sb.call("artifacts/seen", artifacts::seen_params(), crate::sb::rpc::Then::Shown);
@@ -141,6 +162,11 @@ pub(crate) fn open(app: &mut App) {
 /// The hub's list came while the screen is open: what came new is
 /// marked too, and seen at once (you are looking at it).
 pub(crate) fn on_list(app: &mut App) {
+    if app.artifacts.is_none() {
+        return;
+    }
+    // folders.json may have moved (his edit in the app): the library again
+    ask_library(app);
     let Some(sc) = app.artifacts.as_mut() else { return };
     if artifacts::new_count() == 0 {
         return;
@@ -148,503 +174,6 @@ pub(crate) fn on_list(app: &mut App) {
     sc.fresh.take(&artifacts::new_rows(), None);
     artifacts::mark_seen();
     app.sb.call("artifacts/seen", artifacts::seen_params(), crate::sb::rpc::Then::Shown);
-}
-
-// ---- the list (pure) ----
-
-/// The artifacts the screen shows: the scope, then the search; with the
-/// title's letters that match.
-pub(crate) fn shown(sc: &Screen, all: &[Artifact]) -> Vec<(Artifact, Vec<usize>)> {
-    all.iter()
-        .filter(|a| a.archived_at.is_some() == sc.archived)
-        .filter(|a| !sc.this_agent || a.agent == sc.agent || (a.agent.is_empty() && a.by == sc.agent))
-        .filter_map(|a| artifacts::find(a, &sc.query).map(|h| (a.clone(), h)))
-        .collect()
-}
-
-/// The time of the clock: now, and the UTC offset at a time (tests fix it).
-pub(crate) struct Clock<'a> {
-    pub(crate) now: u64,
-    pub(crate) off: &'a dyn Fn(u64) -> i32,
-}
-
-impl Clock<'_> {
-    fn group(&self, ms: u64) -> Group {
-        artifacts::group(ms, (self.off)(ms), self.now, (self.off)(self.now))
-    }
-    fn age(&self, ms: u64, short: bool) -> String {
-        artifacts::age(ms, (self.off)(ms), self.now, (self.off)(self.now), short)
-    }
-    fn ago(&self, ms: u64) -> String {
-        artifacts::ago_at(ms, (self.off)(ms), self.now, (self.off)(self.now))
-    }
-}
-
-/// A body row.
-enum Body {
-    Group(Group),
-    Item(usize),
-    /// the versions box: its top edge, a version (index newest first),
-    /// its key row (wide only), its bottom edge
-    BoxTop,
-    Version(usize),
-    BoxKeys,
-    BoxBottom,
-}
-
-fn pad(s: &str, w: usize) -> String {
-    let s = cut(s, w);
-    let n = w.saturating_sub(s.width());
-    format!("{}{}", s, " ".repeat(n))
-}
-
-/// `s` in `w` columns at most, `…` at the cut.
-pub(crate) fn cut(s: &str, w: usize) -> String {
-    if s.width() <= w {
-        return s.to_string();
-    }
-    let mut out = String::new();
-    for c in s.chars() {
-        if out.width() + unicode_width::UnicodeWidthChar::width(c).unwrap_or(0) + 1 > w {
-            break;
-        }
-        out.push(c);
-    }
-    out.push_str(theme::ellipsis());
-    out
-}
-
-/// The columns of a row: (title, kind, agent, age) widths; wide puts the
-/// agent before the age and has the last column's words.
-struct Cols {
-    wide: bool,
-    title: usize,
-    kind: usize,
-    agent: usize,
-    age: usize,
-}
-
-fn cols(width: usize) -> Cols {
-    if width >= WIDE_FROM {
-        Cols { wide: true, title: 34, kind: 10, agent: 24, age: 11 }
-    } else {
-        // 80 columns: 74 of text; the title takes what the rest leaves
-        let fixed = 4 + 9 + 7 + 16 + 3;
-        Cols { wide: false, title: width.saturating_sub(fixed).clamp(12, 34), kind: 9, agent: 16, age: 7 }
-    }
-}
-
-/// The title as the thread's ↗ chips draw it (render::artifact_chip):
-/// tinted, the accent on the chip's light background with a blank on
-/// each side; bracketed (no tint), bold. Selected, bold; a gone file,
-/// struck through; the search's letters underlined. New on this visit:
-/// ` new` in the accent right after it. The rest of the column stays
-/// blank, out of the chip.
-fn title_spans(title: &str, hits: &[usize], w: usize, selected: bool, gone: bool, fresh: bool) -> Vec<Span<'static>> {
-    let tinted = matches!(crate::render::chip_form(), crate::render::ChipForm::Tinted);
-    let mut st = if tinted {
-        Style::default().fg(accent()).bg(theme::chip_bg())
-    } else {
-        Style::default().fg(text()).add_modifier(Modifier::BOLD)
-    };
-    if selected {
-        st = st.add_modifier(Modifier::BOLD);
-    }
-    if gone {
-        st = st.add_modifier(Modifier::CROSSED_OUT);
-    }
-    // tinted: a blank inside the chip on each side (the first one is the
-    // column the row's mark leaves, see `item_line`), one after it
-    let side = if tinted { " " } else { "" };
-    // the mark's column is kept on every row (new or blank, never title
-    // text): every title is cut at the same width (designer m_8783)
-    let tag = NEW_TAG.width();
-    let room = w.saturating_sub(2 * side.len() + 1 + tag).max(1);
-    let shown = cut(title, room);
-    let hit_st = st.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
-    let n = shown.chars().count() - usize::from(shown.width() < title.width());
-    let cells = side.chars().map(|c| (c, st)).chain(shown.chars().enumerate().map(|(i, c)| {
-        (c, if i < n && hits.contains(&i) { hit_st } else { st })
-    }));
-    let mut out: Vec<Span<'static>> = Vec::new();
-    for (c, s) in cells.chain(side.chars().map(|c| (c, st))) {
-        match out.last_mut() {
-            Some(last) if last.style == s => last.content.to_mut().push(c),
-            _ => out.push(Span::styled(c.to_string(), s)),
-        }
-    }
-    let used = shown.width() + 2 * side.len() + tag;
-    if fresh {
-        // the marks line up in one column: the padding goes before the mark,
-        // and the column's reserved blank after it
-        out.push(Span::raw(" ".repeat(w.saturating_sub(used + 1))));
-        out.push(Span::styled(NEW_TAG, Style::default().fg(accent()).add_modifier(Modifier::BOLD)));
-        out.push(Span::raw(" ".repeat(w.saturating_sub(used).min(1))));
-    } else {
-        out.push(Span::raw(" ".repeat(w.saturating_sub(used - tag))));
-    }
-    out.retain(|s| !s.content.is_empty());
-    out
-}
-
-/// One artifact's row, its `v3`'s columns (from the row's start).
-fn item_line(a: &Artifact, hits: &[usize], selected: bool, fresh: bool, c: &Cols, clock: &Clock, width: usize) -> (Line<'static>, Option<(u16, u16)>) {
-    let d = Style::default().fg(dim());
-    // tinted, the chip's first blank takes the mark's second column: the
-    // title's letters stay where they were
-    let chip = matches!(crate::render::chip_form(), crate::render::ChipForm::Tinted);
-    let after = if chip { "" } else { " " };
-    let mark = if selected {
-        Span::styled(format!("{}{}", theme::glyph(theme::G_YOU), after), Style::default().fg(accent()))
-    } else {
-        Span::raw(format!(" {}", after))
-    };
-    let mut spans = vec![mark];
-    spans.extend(title_spans(&a.title, hits, c.title + usize::from(chip), selected, a.gone, fresh));
-    spans.push(Span::styled(pad(&a.kind_word(), c.kind), d));
-    let age = Span::styled(pad(&clock.age(a.ts_ms, !c.wide), c.age), d);
-    let agent = Span::styled(pad(&a.agent_words(), c.agent), d);
-    if c.wide {
-        spans.push(agent);
-        spans.push(age);
-    } else {
-        spans.push(age);
-        spans.push(agent);
-    }
-    let x = spans.iter().map(|s| s.content.width()).sum::<usize>();
-    let last = if c.wide {
-        a.last_words()
-    } else if a.gone {
-        theme::glyph(theme::G_INTERRUPTED).to_string()
-    } else if a.versioned() {
-        format!("v{}", a.v)
-    } else {
-        String::new()
-    };
-    let room = width.saturating_sub(x);
-    let last = cut(&last, room);
-    let mut vhit = None;
-    if !last.is_empty() {
-        let gone = a.gone;
-        let lst = if gone { Style::default().fg(theme::error()) } else { d };
-        if a.versioned() && !gone {
-            let vw = format!("v{}", a.v).width();
-            vhit = Some((x as u16, (x + vw) as u16));
-        }
-        spans.push(Span::styled(last, lst));
-    }
-    (Line::from(spans), vhit)
-}
-
-/// The versions box's rows under the selected row.
-fn box_line(a: &Artifact, row: &Body, vsel: usize, fresh: &Fresh, clock: &Clock, wide: bool) -> Line<'static> {
-    let w: usize = if wide { 58 } else { 44 };
-    let edge = Style::default().fg(faint());
-    let lead = Span::raw("    ");
-    let versions: Vec<&artifacts::Version> = a.versions.iter().rev().collect();
-    match row {
-        Body::BoxTop => {
-            let head = format!("{} · {} versions", a.title, a.versions.len().max(a.v as usize));
-            let head = cut(&head, w.saturating_sub(4));
-            let fill = w.saturating_sub(head.width() + 3);
-            Line::from(vec![
-                lead,
-                Span::styled("╭─ ", edge),
-                Span::styled(head, Style::default().fg(text())),
-                Span::styled(format!(" {}╮", "─".repeat(fill.saturating_sub(1))), edge),
-            ])
-        }
-        Body::BoxBottom => Line::from(vec![lead, Span::styled(format!("╰{}╯", "─".repeat(w)), edge)]),
-        Body::BoxKeys => {
-            let k = Style::default().fg(text());
-            let words = vec![
-                Span::styled("⏎", k),
-                Span::styled(" open this one   ", Style::default().fg(dim())),
-                Span::styled("esc", k),
-                Span::styled(" back", Style::default().fg(dim())),
-            ];
-            let used: usize = words.iter().map(|s| s.content.width()).sum();
-            let mut spans = vec![lead, Span::styled("│ ", edge)];
-            spans.extend(words);
-            spans.push(Span::raw(" ".repeat(w.saturating_sub(used + 1))));
-            spans.push(Span::styled("│", edge));
-            Line::from(spans)
-        }
-        Body::Version(i) => {
-            let Some(v) = versions.get(*i) else { return Line::from("") };
-            let sel = *i == vsel;
-            let mark = if sel { Span::styled(format!("{} ", theme::glyph(theme::G_YOU)), Style::default().fg(accent())) } else { Span::raw("  ") };
-            let st = if sel { Style::default().fg(text()).add_modifier(Modifier::BOLD) } else { Style::default().fg(text()) };
-            // a new version: `new` right after its name, as the list has
-            // it (designer m_7579); the column only when one is new
-            let any_new = a.versions.iter().any(|x| fresh.version(a, x));
-            let mut body = vec![mark, Span::styled(pad(&format!("v{}", v.v), if any_new { 4 } else { 5 }), st)];
-            if any_new {
-                let tag = if fresh.version(a, v) { NEW_TAG.trim_start() } else { "" };
-                body.push(Span::styled(pad(tag, 6), Style::default().fg(accent()).add_modifier(Modifier::BOLD)));
-            }
-            body.push(Span::styled(pad(&clock.ago(v.ts_ms), 13), Style::default().fg(dim())));
-            body.push(Span::styled(pad(&v.note, 15), Style::default().fg(dim())));
-            if wide && v.v == a.v {
-                body.push(Span::styled("the current one", Style::default().fg(faint())));
-            }
-            let used: usize = body.iter().map(|s| s.content.width()).sum();
-            let mut spans = vec![lead, Span::styled("│ ", edge)];
-            spans.extend(body);
-            spans.push(Span::raw(" ".repeat(w.saturating_sub(used + 1))));
-            spans.push(Span::styled("│", edge));
-            Line::from(spans)
-        }
-        _ => Line::from(""),
-    }
-}
-
-/// One key and its words, for the key bar.
-fn keys(pairs: &[(&str, &str)]) -> Line<'static> {
-    let mut spans = Vec::new();
-    for (i, (k, w)) in pairs.iter().enumerate() {
-        if i > 0 {
-            spans.push(Span::raw("   "));
-        }
-        spans.push(Span::styled(k.to_string(), Style::default().fg(text())));
-        spans.push(Span::styled(format!(" {}", w), Style::default().fg(dim())));
-    }
-    Line::from(spans)
-}
-
-/// The key bar for the state the screen is in.
-/// `put_away`: there are archived ones (the bar says `a archived`).
-pub(crate) fn key_bar(sc: &Screen, sel: Option<&Artifact>, empty_list: bool, wide: bool, put_away: bool) -> Line<'static> {
-    if sc.typing {
-        return keys(&[("⏎", "done"), ("↑↓", "choose"), ("esc", "clear the search")]);
-    }
-    if sc.versions.is_some() {
-        return keys(&[("⏎", "open this version"), ("↑↓", "choose"), ("esc", "back to the list")]);
-    }
-    let esc = match (sc.query.is_empty(), sc.archived) {
-        (false, _) => "clear the search",
-        (true, true) => "back to the list",
-        (true, false) => "close",
-    };
-    if empty_list || sel.is_none() {
-        return keys(&[("esc", esc)]);
-    }
-    if sc.look.is_some() {
-        return keys(&[("space", "close the preview"), ("↑↓", "the next one, previewed"), ("⏎", "open"), ("esc", "close")]);
-    }
-    let a = sel.expect("checked above");
-    let copied = sc.copied.is_some_and(|t| t.elapsed() < Duration::from_secs(2));
-    let c = if copied { "copied" } else { "copy" };
-    if !wide {
-        return keys(&[("⏎", "open"), ("space", "look"), ("v", "versions"), ("esc", esc)]);
-    }
-    let mut pairs: Vec<(&str, &str)> = vec![("⏎", "open"), ("space", "quick look"), ("v", "versions")];
-    if a.pr.is_some() {
-        pairs.push(("o", "GitHub"));
-    } else if !a.is_link() {
-        pairs.push(("r", "show in Finder"));
-    }
-    pairs.extend([("c", c), ("@", "put it in a message")]);
-    if !sc.archived && put_away {
-        pairs.push(("a", "archived"));
-    }
-    pairs.push(("esc", esc));
-    keys(&pairs)
-}
-
-/// The line under the list: what the selected one is and where it lives.
-fn detail_line(a: &Artifact, clock: &Clock, wide: bool) -> Line<'static> {
-    let mut parts = vec![a.title.clone(), a.kind_word()];
-    if a.versioned() {
-        parts.push(format!("v{}", a.v));
-    }
-    let who = if a.agent.is_empty() { a.by.clone() } else { a.agent.clone() };
-    let when = clock.ago(a.ts_ms);
-    if wide {
-        let who = if a.archived { format!("{} (archived)", who) } else { who };
-        parts.push(format!("by {}, {}", who, when));
-        if a.gone && a.copy.is_some() {
-            parts.push(if a.archived { "its worktree is gone: ⏎ opens the copy bise kept".to_string() } else { "its file is gone: ⏎ opens the copy bise kept".to_string() });
-        } else if a.gone {
-            parts.push(artifacts::gone_words(false));
-        } else {
-            parts.push(a.where_words(&artifacts::workspace()));
-        }
-    } else {
-        parts.push(format!("{}, {}", who, when));
-    }
-    Line::from(Span::styled(parts.join(" · "), Style::default().fg(dim())))
-}
-
-/// The screen's lines in `width` × `height` (inside the frame's padding)
-/// and the body rows' targets (by line index).
-pub(crate) fn lines(sc: &mut Screen, all: &[Artifact], width: usize, height: usize, clock: &Clock) -> (Vec<Line<'static>>, Vec<(usize, Hit)>, usize) {
-    let c = cols(width);
-    let list = shown(sc, all);
-    if sc.sel.as_ref().is_none_or(|id| !list.iter().any(|(a, _)| &a.id == id)) {
-        sc.sel = list.first().map(|(a, _)| a.id.clone());
-        sc.versions = None;
-    }
-    let sel_i = sc.sel.as_ref().and_then(|id| list.iter().position(|(a, _)| &a.id == id));
-    let sel = sel_i.map(|i| &list[i].0);
-    let mut out: Vec<Line<'static>> = Vec::new();
-    let mut hits: Vec<(usize, Hit)> = Vec::new();
-    // the head: blank, title and scope, search, blank
-    out.push(Line::from(""));
-    let total = shown(&Screen { archived: sc.archived, ..Default::default() }, all).len();
-    let put_away = all.iter().filter(|a| a.archived_at.is_some()).count();
-    let in_scope = shown(&Screen { this_agent: sc.this_agent, agent: sc.agent.clone(), archived: sc.archived, ..Default::default() }, all).len();
-    let scope: Vec<Span<'static>> = if sc.this_agent {
-        let mut v = vec![Span::styled(format!("{} · {}", sc.agent, in_scope), Style::default().fg(text()))];
-        if c.wide {
-            v.push(Span::raw("   "));
-            v.push(Span::styled("tab", Style::default().fg(text())));
-            v.push(Span::styled(" all agents", Style::default().fg(dim())));
-        }
-        v
-    } else {
-        let mut v = vec![Span::styled(format!("all agents · {}", total), Style::default().fg(text()))];
-        if c.wide {
-            v.push(Span::raw("   "));
-            v.push(Span::styled("tab", Style::default().fg(text())));
-            v.push(Span::styled(" this agent", Style::default().fg(dim())));
-        }
-        v
-    };
-    let title = match (sc.archived, c.wide) {
-        (true, _) => "artifacts · archived",
-        (false, true) => "artifacts · what your agents made",
-        (false, false) => "artifacts",
-    };
-    let scope_w: usize = scope.iter().map(|s| s.content.width()).sum();
-    let gap = width.saturating_sub(title.width() + scope_w + 4).max(1);
-    let mut head = vec![Span::styled(title.to_string(), Style::default().fg(text()).add_modifier(Modifier::BOLD)), Span::raw(" ".repeat(gap))];
-    head.extend(scope);
-    out.push(Line::from(head));
-    let search = if sc.query.is_empty() && !sc.typing {
-        Line::from(Span::styled("/ find: a title, an agent, a kind", Style::default().fg(faint())))
-    } else {
-        let mut v = vec![
-            Span::styled("/ ", Style::default().fg(if sc.typing { accent() } else { dim() })),
-            Span::styled(sc.query.clone(), Style::default().fg(text())),
-        ];
-        if sc.typing {
-            v.push(Span::styled("▏", Style::default().fg(accent())));
-        }
-        if !sc.query.is_empty() {
-            v.push(Span::styled(format!("   {} of {}", list.len(), in_scope), Style::default().fg(dim())));
-        }
-        Line::from(v)
-    };
-    out.push(search);
-    out.push(Line::from(""));
-    // the body
-    let foot = 4; // blank, the detail line, blank, the key bar
-    let body_h = height.saturating_sub(out.len() + foot).max(1);
-    let mut body: Vec<Body> = Vec::new();
-    let mut last: Option<Group> = None;
-    let mut sel_row = 0usize;
-    let mut sel_end = 0usize;
-    for (i, (a, _)) in list.iter().enumerate() {
-        let g = clock.group(a.ts_ms);
-        if last != Some(g) {
-            body.push(Body::Group(g));
-            last = Some(g);
-        }
-        if Some(i) == sel_i {
-            sel_row = body.len();
-        }
-        body.push(Body::Item(i));
-        if Some(i) == sel_i && sc.versions.is_some() {
-            body.push(Body::BoxTop);
-            for k in 0..list[i].0.versions.len() {
-                body.push(Body::Version(k));
-            }
-            if c.wide {
-                body.push(Body::BoxKeys);
-            }
-            body.push(Body::BoxBottom);
-        }
-        if Some(i) == sel_i {
-            sel_end = body.len() - 1;
-        }
-    }
-    // keep the selection (and its open box) in view; the first rows
-    // with the group above the first row
-    if body.len() > body_h {
-        let room = body_h.saturating_sub(1); // the `↓ N more` row
-        if sel_row < sc.top {
-            sc.top = sel_row.saturating_sub(usize::from(sel_row > 0 && matches!(body[sel_row - 1], Body::Group(_))));
-        }
-        if sel_end >= sc.top + room {
-            sc.top = (sel_end + 1).saturating_sub(room).min(sel_row);
-        }
-        sc.top = sc.top.min(body.len().saturating_sub(room));
-    } else {
-        sc.top = 0;
-    }
-    let mut shown_rows = 0;
-    if list.is_empty() {
-        out.push(Line::from(""));
-        if total == 0 && sc.archived {
-            out.push(Line::from(Span::styled("  nothing archived. esc goes back.", Style::default().fg(text()))));
-        } else if all.is_empty() {
-            out.push(Line::from(Span::styled(
-                "  nothing yet. when an agent makes a page, a doc or a file for you, it lands here.",
-                Style::default().fg(text()),
-            )));
-        } else {
-            out.push(Line::from(Span::styled("  nothing matches. esc clears the search.", Style::default().fg(text()))));
-        }
-        shown_rows = out.len() - 4;
-    } else {
-        let more = body.len() > body_h;
-        let room = if more { body_h - 1 } else { body_h };
-        for (k, row) in body.iter().enumerate().skip(sc.top).take(room) {
-            let _ = k;
-            let line = match row {
-                Body::Group(g) => Line::from(Span::styled(format!("  {}", g.words()), Style::default().fg(dim()))),
-                Body::Item(i) => {
-                    let (a, h) = &list[*i];
-                    let (line, vhit) = item_line(a, h, Some(*i) == sel_i, sc.fresh.row(a), &c, clock, width);
-                    hits.push((out.len(), Hit::Row(a.id.clone(), vhit)));
-                    line
-                }
-                Body::Version(v) => {
-                    hits.push((out.len(), Hit::Version(*v)));
-                    box_line(sel.expect("a box is under the selection"), row, sc.versions.unwrap_or(0), &sc.fresh, clock, c.wide)
-                }
-                _ => box_line(sel.expect("a box is under the selection"), row, sc.versions.unwrap_or(0), &sc.fresh, clock, c.wide),
-            };
-            out.push(line);
-            shown_rows += 1;
-        }
-        if more {
-            let below = list.len().saturating_sub(
-                body.iter().take(sc.top + room).filter(|b| matches!(b, Body::Item(_))).count(),
-            );
-            if below > 0 {
-                out.push(Line::from(Span::styled(format!("   ↓ {} more", below), Style::default().fg(dim()))));
-                shown_rows += 1;
-            }
-        }
-    }
-    let _ = shown_rows;
-    // the quiet row that opens the archived ones, under the list
-    if !sc.archived && put_away > 0 && out.len() + 1 < height.saturating_sub(foot) {
-        out.push(Line::from(""));
-        hits.push((out.len(), Hit::Archived));
-        out.push(Line::from(Span::styled(format!("  {} archived", put_away), Style::default().fg(faint()))));
-    }
-    while out.len() < height.saturating_sub(foot) {
-        out.push(Line::from(""));
-    }
-    out.truncate(height.saturating_sub(foot));
-    out.push(Line::from(""));
-    out.push(sel.map(|a| detail_line(a, clock, c.wide)).unwrap_or_default());
-    out.push(Line::from(""));
-    out.push(key_bar(sc, sel, list.is_empty(), c.wide, put_away > 0));
-    (out, hits, list.len())
 }
 
 // ---- drawing ----
@@ -692,14 +221,16 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
         return;
     }
     let area = draw_frame(app, frame, full, "artifacts");
-    let all = artifacts::all();
+    let all = artifacts::library();
+    let folders = artifacts::folders();
     let now = crate::when::now_ms();
     let off = |ms: u64| crate::when::offset_at(ms);
     let clock = Clock { now, off: &off };
     let Some(sc) = app.artifacts.as_mut() else { return };
-    let (rows, hits, _) = lines(sc, &all, area.width as usize, area.height as usize, &clock);
+    let (rows, hits, _) = lines(sc, &all, &folders, area.width as usize, area.height as usize, &clock);
     sc.hits = hits.into_iter().map(|(i, h)| (area.y + i as u16, h)).collect();
-    sc.search_y = Some(area.y + 2);
+    sc.wide = area.width as usize >= crate::artifacts_lines::TREE_FROM;
+    sc.search_y = Some(area.y + if sc.wide { 1 } else { 2 });
     sc.x0 = area.x;
     frame.render_widget(Paragraph::new(rows), area);
     crate::textlayer::text(area);
@@ -709,18 +240,41 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     }
 }
 
+// ---- the library from the hub ----
+
+/// `artifacts/library`: the other projects' rows (the screen opens, the
+/// `artifacts` event came: folders.json may have moved). Its answer
+/// comes through sb/rpc.rs's `Then::Library` into [`on_library`].
+fn ask_library(app: &mut App) {
+    app.sb.call("artifacts/library", serde_json::json!({}), crate::sb::rpc::Then::Library);
+}
+
+/// The library came: the other projects' rows and the folders.
+pub(crate) fn on_library(app: &mut App, here: String, others: Vec<Artifact>, folders: Vec<Folder>) {
+    artifacts::set_others(others);
+    artifacts::set_folders(folders);
+    if let Some(sc) = app.artifacts.as_mut() {
+        sc.here = here;
+    }
+}
+
 // ---- keys and the mouse ----
 
-fn selected(sc: &mut Screen) -> (Vec<(Artifact, Vec<usize>)>, Option<usize>) {
-    let list = shown(sc, &artifacts::all());
-    let i = sc.sel.as_ref().and_then(|id| list.iter().position(|(a, _)| &a.id == id));
+/// The list as it is drawn, and the selected row's index in it.
+fn selected(sc: &Screen) -> (Vec<(Artifact, Vec<usize>)>, Option<usize>) {
+    let list = crate::artifacts_lines::view(sc, &artifacts::library(), &artifacts::folders()).list;
+    let i = sc.sel.as_ref().and_then(|k| list.iter().position(|(a, _)| &a.key() == k));
     (list, i)
 }
 
+fn sel_row(sc: &Screen) -> Option<Artifact> {
+    sc.sel.as_ref().and_then(|k| artifacts::get_key(k))
+}
+
 fn step(sc: &mut Screen, by: isize) {
-    if let Some(v) = sc.versions.as_mut() {
-        let n = sc.sel.as_ref().and_then(|id| artifacts::get(id)).map_or(0, |a| a.versions.len());
-        *v = (*v as isize + by).clamp(0, n.saturating_sub(1) as isize) as usize;
+    if let Some(v) = sc.versions {
+        let n = sel_row(sc).map_or(0, |a| a.versions.len());
+        sc.versions = Some((v as isize + by).clamp(0, n.saturating_sub(1) as isize) as usize);
         return;
     }
     let (list, i) = selected(sc);
@@ -731,7 +285,7 @@ fn step(sc: &mut Screen, by: isize) {
         Some(i) => (i as isize + by).clamp(0, list.len() as isize - 1) as usize,
         None => 0,
     };
-    sc.sel = Some(list[j].0.id.clone());
+    sc.sel = Some(list[j].0.key());
 }
 
 fn flash(app: &mut App, note: String) {
@@ -741,7 +295,7 @@ fn flash(app: &mut App, note: String) {
 /// Opens the selected artifact (its version when the box is open).
 fn open_selected(app: &mut App) {
     let Some(sc) = app.artifacts.as_ref() else { return };
-    let Some(a) = sc.sel.as_ref().and_then(|id| artifacts::get(id)) else { return };
+    let Some(a) = sel_row(sc) else { return };
     let v = sc.versions.and_then(|k| a.versions.iter().rev().nth(k)).map(|x| x.v);
     if v.is_none() {
         if let artifacts::How::Diff(n) = artifacts::how(&a, None, true) {
@@ -758,7 +312,7 @@ fn open_selected(app: &mut App) {
 /// opens like ⏎.
 fn quick_look(app: &mut App) {
     let Some(sc) = app.artifacts.as_mut() else { return };
-    let Some(a) = sc.sel.as_ref().and_then(|id| artifacts::get(id)) else { return };
+    let Some(a) = sel_row(sc) else { return };
     let target = a.open_target(None);
     if !cfg!(target_os = "macos") || artifacts::is_url(&target) || target.is_empty() {
         sc.look = None;
@@ -769,10 +323,10 @@ fn quick_look(app: &mut App) {
     sc.look = Some(Look);
 }
 
-/// `r`: the file in Finder (its folder elsewhere).
+/// `r`: the file in Finder (its folder elsewhere); `o`: a PR on GitHub.
 fn reveal(app: &mut App) {
     let Some(sc) = app.artifacts.as_ref() else { return };
-    let Some(a) = sc.sel.as_ref().and_then(|id| artifacts::get(id)) else { return };
+    let Some(a) = sel_row(sc) else { return };
     if let Some(pr) = &a.pr {
         let url = if a.is_link() { a.target.clone() } else { format!("https://github.com/{}/pull/{}", pr.repo, pr.number) };
         let ok = crate::links::open(&url);
@@ -790,20 +344,160 @@ fn reveal(app: &mut App) {
 
 /// `c`: the path or the link.
 fn copy(app: &mut App) {
-    let Some(sc) = app.artifacts.as_mut() else { return };
-    let Some(a) = sc.sel.as_ref().and_then(|id| artifacts::get(id)) else { return };
-    let what = a.open_target(None);
-    if crate::clipboard::copy(&what) {
-        sc.copied = Some(Instant::now());
+    let Some(sc) = app.artifacts.as_ref() else { return };
+    let Some(a) = sel_row(sc) else { return };
+    if crate::clipboard::copy(&a.open_target(None)) {
+        flash(app, "copied".to_string());
     }
 }
 
 /// `@`: the screen closes, the artifact's chip goes in your message.
 fn put_in_message(app: &mut App) {
     let Some(sc) = app.artifacts.as_ref() else { return };
-    let Some(a) = sc.sel.as_ref().and_then(|id| artifacts::get(id)) else { return };
+    let Some(a) = sel_row(sc) else { return };
     app.artifacts = None;
     crate::attach::insert_artifact(app, &a.id, &a.title);
+}
+
+/// The box a key opens: `m` on the selected row, `p`, `n` in the
+/// place's theme.
+fn open_pick(sc: &mut Screen, which: char) {
+    let folders = artifacts::folders();
+    sc.versions = None;
+    sc.pick = match which {
+        'm' => sel_row(sc).map(|a| Pick::Move { key: a.key(), title: a.title.clone(), from: tree::folder_of(&a, &folders).map(|f| f.id.clone()), query: String::new(), sel: 0 }),
+        'p' => Some(Pick::Project { query: String::new(), sel: 0 }),
+        _ => Some(Pick::NewFolder { parent: tree::theme_of(&sc.place, &folders), name: String::new() }),
+    };
+}
+
+/// What a box chose: the hub moves the row (its own project's hub
+/// writes it), makes the folder (then moves into it), or the list shows
+/// one project.
+fn run_choice(app: &mut App, c: Choice) {
+    let Some(sc) = app.artifacts.as_mut() else { return };
+    let moving = match &sc.pick {
+        Some(Pick::Move { key, .. }) => artifacts::get_key(key),
+        _ => None,
+    };
+    sc.pick = None;
+    match c {
+        Choice::Project(p) => {
+            sc.project = p;
+            sc.top = 0;
+        }
+        Choice::Folder(id) => {
+            if let Some(a) = moving {
+                sc.moved.retain(|m| m != &id);
+                sc.moved.push(id.clone());
+                move_to(app, &a, Some(id));
+            }
+        }
+        Choice::Unfiled => {
+            if let Some(a) = moving {
+                move_to(app, &a, None);
+            }
+        }
+        Choice::Make { name, parent, then_move } => {
+            let then = moving.filter(|_| then_move).map(|a| (a.project.clone(), a.id.clone()));
+            make_folder(app, name, parent, then);
+        }
+    }
+}
+
+/// `artifacts/move` to this hub with the row's project: the hub forwards
+/// it to that project's hub (projects::target), the only writer of its
+/// meta.json. The new list comes in the `artifacts` event.
+fn move_to(app: &mut App, a: &Artifact, folder: Option<String>) {
+    let params = serde_json::json!({"project": a.project, "ids": [a.id], "folder": folder});
+    app.sb.call("artifacts/move", params, crate::sb::rpc::Then::Shown);
+}
+
+/// `artifacts/folders` make (his edit: the hub writes folders.json);
+/// `then`: the row to move into it once it is made (its answer's
+/// `made`). A parent that is a name, not an id: the theme is made first
+/// by the hub (`theme/task`).
+fn make_folder(app: &mut App, name: String, parent: Option<String>, then: Option<(String, String)>) {
+    let folders = artifacts::folders();
+    let parent = parent.filter(|p| folders.iter().any(|f| &f.id == p));
+    let params = serde_json::json!({"op": {"make": {"name": name, "parent": parent}}});
+    app.sb.call("artifacts/folders", params, crate::sb::rpc::Then::FolderMade(then));
+}
+
+/// The folder was made: the tree opens its theme, the list goes there,
+/// and the row `m` was moving goes in.
+pub(crate) fn on_folder_made(app: &mut App, id: String, folders: Vec<Folder>, then: Option<(String, String)>) {
+    artifacts::set_folders(folders.clone());
+    if let Some(sc) = app.artifacts.as_mut() {
+        if let Some(t) = tree::theme_of(&Place::Folder(id.clone()), &folders) {
+            if !sc.open_themes.contains(&t) {
+                sc.open_themes.push(t);
+            }
+        }
+        sc.moved.push(id.clone());
+        if then.is_none() {
+            sc.place = Place::Folder(id.clone());
+        }
+    }
+    if let Some((project, aid)) = then {
+        let params = serde_json::json!({"project": project, "ids": [aid], "folder": id});
+        app.sb.call("artifacts/move", params, crate::sb::rpc::Then::Shown);
+    }
+}
+
+/// The tree's rows now (the keys move in them).
+fn tree_rows(sc: &Screen) -> Vec<tree::TreeRow> {
+    let all = artifacts::library();
+    let folders = artifacts::folders();
+    let v = crate::artifacts_lines::view(sc, &all, &folders);
+    let scoped = v.scoped(&sc.here);
+    let every: Vec<&Artifact> = v.every.iter().collect();
+    tree::tree(&folders, &scoped, &every, &sc.open_themes, &|a| sc.fresh.row(a))
+}
+
+/// A key while the tree has them: ↑↓ the place (the list follows), →
+/// opens a theme, ← shuts it (or goes up to it), ⏎ and tab give the
+/// keys back to the list.
+fn tree_key(sc: &mut Screen, k: &KeyEvent) -> bool {
+    let rows = tree_rows(sc);
+    let i = rows.iter().position(|r| r.place == sc.place).unwrap_or(0);
+    let go = |sc: &mut Screen, j: usize| {
+        if let Some(r) = rows.get(j) {
+            sc.place = r.place.clone();
+            sc.sel = None;
+            sc.top = 0;
+        }
+    };
+    match k.code {
+        KeyCode::Up | KeyCode::Char('k') => go(sc, i.saturating_sub(1)),
+        KeyCode::Down | KeyCode::Char('j') => go(sc, (i + 1).min(rows.len().saturating_sub(1))),
+        KeyCode::Right | KeyCode::Char('l') => {
+            if let (Some(true | false), Place::Folder(id)) = (rows[i].open, &rows[i].place) {
+                if !sc.open_themes.contains(id) {
+                    sc.open_themes.push(id.clone());
+                }
+            }
+        }
+        KeyCode::Left | KeyCode::Char('h') => {
+            let folders = artifacts::folders();
+            match (&rows[i].place, rows[i].open) {
+                (Place::Folder(id), Some(true)) => sc.open_themes.retain(|t| t != id),
+                (p @ Place::Folder(_), None) if rows[i].depth == 1 => {
+                    if let Some(t) = tree::theme_of(p, &folders) {
+                        sc.place = Place::Folder(t);
+                        sc.sel = None;
+                    }
+                }
+                _ => {}
+            }
+        }
+        KeyCode::Enter | KeyCode::Tab | KeyCode::BackTab => sc.in_tree = false,
+        KeyCode::Esc => sc.in_tree = false,
+        KeyCode::Char('n') => open_pick(sc, 'n'),
+        KeyCode::Char('p') => open_pick(sc, 'p'),
+        _ => return false,
+    }
+    true
 }
 
 /// Keys while the screen is open: it takes them all.
@@ -815,6 +509,22 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
     if ctrl && matches!(k.code, KeyCode::Char('c') | KeyCode::Char('g')) {
         app.artifacts = None;
+        return true;
+    }
+    // a box has the keys
+    if let Some(mut p) = sc.pick.clone() {
+        let folders = artifacts::folders();
+        let lib = artifacts::library();
+        let refs: Vec<&Artifact> = lib.iter().collect();
+        let choices = pick::rows(&p, &folders, &refs, &sc.moved, &sc.here);
+        match pick::key(&mut p, k, &choices, &folders) {
+            Outcome::Stay => sc.pick = Some(p),
+            Outcome::Close => sc.pick = None,
+            Outcome::Chose(c) => {
+                sc.pick = Some(p);
+                run_choice(app, c);
+            }
+        }
         return true;
     }
     // the search has the keys
@@ -858,6 +568,9 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
         }
         return true;
     }
+    if sc.in_tree && !ctrl && tree_key(sc, k) {
+        return true;
+    }
     match k.code {
         KeyCode::Esc if sc.versions.is_some() => sc.versions = None,
         KeyCode::Esc if !sc.query.is_empty() => sc.query.clear(),
@@ -876,12 +589,12 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
             sc.versions = None;
         }
         KeyCode::Tab | KeyCode::BackTab => {
-            sc.this_agent = !sc.this_agent;
+            sc.in_tree = true;
             sc.versions = None;
-            sc.top = 0;
         }
+        KeyCode::Char(c @ ('m' | 'n' | 'p')) if !ctrl => open_pick(sc, c),
         KeyCode::Char('v') if sc.versions.is_none() => {
-            let n = sc.sel.as_ref().and_then(|id| artifacts::get(id)).map_or(0, |a| a.versions.len());
+            let n = sel_row(sc).map_or(0, |a| a.versions.len());
             if n > 0 {
                 sc.versions = Some(0);
             } else {
@@ -907,8 +620,7 @@ fn show_archived(sc: &mut Screen, on: bool) {
 }
 
 /// The mouse while open: the wheel scrolls, a click opens, a click on
-/// `v3` opens the versions, a click on the search focuses it, on the
-/// scope switches it.
+/// a folder of the tree goes there, on the search focuses it.
 pub(crate) fn mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> bool {
     use crossterm::event::{MouseButton, MouseEventKind};
     let Some(sc) = app.artifacts.as_mut() else { return false };
@@ -920,19 +632,29 @@ pub(crate) fn mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> bool {
                 sc.typing = true;
                 return true;
             }
-            let hit = sc.hits.iter().find(|(y, _)| *y == m.row).map(|(_, h)| h.clone());
+            // the tree's rows from column 0 to its edge; the list's after it
+            let on_tree = (sc.wide || sc.in_tree) && m.column < sc.x0 + crate::artifacts_lines::TREE_W as u16;
+            let hit = sc.hits.iter().find(|(y, h)| *y == m.row && matches!(h, Hit::Tree(_)) == on_tree).map(|(_, h)| h.clone());
             match hit {
-                Some(Hit::Row(id, vcols)) => {
-                    sc.sel = Some(id);
-                    sc.typing = false;
-                    let x0 = sc.x0;
-                    let on_v = vcols.is_some_and(|(a, b)| m.column >= x0 + a && m.column < x0 + b);
-                    if on_v {
-                        sc.versions = Some(0);
-                    } else {
-                        sc.versions = None;
-                        open_selected(app);
+                Some(Hit::Tree(p)) => {
+                    if let Place::Folder(id) = &p {
+                        if sc.place == p && !sc.open_themes.contains(id) {
+                            sc.open_themes.push(id.clone());
+                        } else if sc.place == p {
+                            sc.open_themes.retain(|t| t != id);
+                        }
                     }
+                    sc.place = p;
+                    sc.sel = None;
+                    sc.top = 0;
+                    sc.in_tree = sc.wide && sc.in_tree;
+                }
+                Some(Hit::Row(key, _)) => {
+                    sc.sel = Some(key);
+                    sc.typing = false;
+                    sc.in_tree = false;
+                    sc.versions = None;
+                    open_selected(app);
                 }
                 Some(Hit::Version(k)) => {
                     sc.versions = Some(k);
@@ -950,3 +672,4 @@ pub(crate) fn mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> bool {
 #[cfg(test)]
 #[path = "artifacts_screen_tests.rs"]
 mod tests;
+
