@@ -5,9 +5,9 @@
 # feature, on the same paper card as the terminal scenes. the system sans (SF) like the app; mono only for code and keys.
 DPAL = {
   "dark":  dict(mode="dark", bg="#141211", text="#ece6da", dim="#a39c90", faint="#857d72", rule="#4a4540", acc="#f4a6b0", ok="#b9d99a", err="#ff5a52",
-                raised="#1f1c1a", chip="#262220", side="#191715", line="#2b2725", sel="#33292c", accsoft="#2e2326", win="#1a1816", shadow="#00000066"),
+                raised="#1f1c1a", chip="#262220", side="#191715", line="#2b2725", sel="#27241f", accsoft="#2e2326", win="#1a1816", shadow="#00000066"),
   "light": dict(mode="light", bg="#fdfbf7", text="#1b1917", dim="#6b645a", faint="#7d766c", rule="#cfc8bd", acc="#b8416b", ok="#3f7a2a", err="#b3261e",
-                raised="#f4f0e8", chip="#efe9df", side="#f7f3ec", line="#e9e3d9", sel="#fdeef2", accsoft="#f8e6ec", win="#f6f2ea", shadow="#5a4a3a33"),
+                raised="#f4f0e8", chip="#efe9df", side="#f7f3ec", line="#e9e3d9", sel="#e8e6e2", accsoft="#f8e6ec", win="#f6f2ea", shadow="#5a4a3a33"),
 }
 SANS = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif"
 
@@ -205,10 +205,7 @@ def d_artifacts(m):
         for l in wrap("the hero image went from 2.4 MB to 180 KB; first paint on a mid phone from 3.1 s to 0.9 s.", R - x0):
             b.append(t(x0, y, E(l), 13)); y += 20
         y += 10
-        label = "↗ product page, before / after"
-        cw = tw(label, 12.5) + tw("page · v2", 11.5) + 30
-        b.append(f'<rect x="{x0}" y="{y - 15}" width="{cw:.0f}" height="22" rx="6" fill="{c["accsoft"]}"/>'
-                 + t(x0 + 8, y, f'{E(label)}  <tspan fill="{c["dim"]}" font-size="11.5">page · v2</tspan>', 12.5, "acc"))
+        b.append(artchip(d, x0, y, "↗ product page, before / after", "page · v2"))
         return b, y
     ta, ya = thread(680)
     o.append(at(0, open_, "".join(ta), dur=.15))
@@ -337,7 +334,7 @@ def cols(d, TX, RB=680):
                f'<clipPath id="col-r"><rect x="{TX + 1}" y="0" width="{RB - TX - 9}" height="{d.H}"/></clipPath>')
     return (lambda b: f'<g clip-path="url(#col-t)">{b}</g>'), (lambda b: f'<g clip-path="url(#col-r)">{b}</g>')
 
-def rbar(d, TX, colR, working, agents, RB=680, project="storefront"):
+def rbar(d, TX, colR, working, agents, RB=680, project="storefront", sched=()):
     """the right bar: the project and 'n working' ([(t0, t1, n)]), AGENTS with their rows ([(t0, name, what, [(t, mark, color)])]),
     ARTIFACTS and SCHEDULED & WATCHING. returns the rows' baselines."""
     c, t, at, o = d.c, d.t, d.at, d.o
@@ -359,7 +356,15 @@ def rbar(d, TX, colR, working, agents, RB=680, project="storefront"):
         for j, (a, g, col) in enumerate(marks):
             b = marks[j + 1][0] if j + 1 < len(marks) else None
             o.append(at(a, b, t(rx, y, f'<tspan class="g">{g}</tspan>' if g == "∿" else g, 13, col), dur=.08))
-    o.append(lab(158, "ARTIFACTS · 0") + lab(186, "SCHEDULED &amp; WATCHING · 0"))
+    o.append(lab(158, "ARTIFACTS · 0"))
+    # SCHEDULED & WATCHING: [(t0, name, rhythm)], a '◷' row each from t0, the count with them
+    starts = sorted({s[0] for s in sched} | {0})
+    for i, s0 in enumerate(starts):
+        n = sum(1 for s in sched if s[0] <= s0)
+        o.append(at(s0, starts[i + 1] if i + 1 < len(starts) else None, lab(186, f"SCHEDULED &amp; WATCHING · {n}"), dur=.1))
+    for i, (s0, name, rhythm) in enumerate(sched):
+        y = 212 + i * 25
+        o.append(colR(at(s0, None, t(rx, y, "◷", 13, "dim") + t(rx + 18, y, f'<tspan font-weight="500">{E(name)}</tspan>  <tspan fill="{c["dim"]}" font-size="12">{E(rhythm)}</tspan>', 13))))
     return ys
 
 def ahead(d, name, role, chip=None, x=18):
@@ -642,10 +647,11 @@ def tip_box(d, x_right, y, lines, w=None):
             + "".join(d.t(x + 11, y + 20 + 19 * i, l, 11.5, "dim") for i, l in enumerate(lines)))
 
 def artchip(d, x, y, label, kind):
-    """an artifact's chip in the thread: '↗ <title>  <kind>' (accent soft: his to open)."""
-    c = d.c; cw = tw(label, 12.5) + tw(kind, 11.5) + 30
-    return (f'<rect x="{x}" y="{y - 15}" width="{cw:.0f}" height="22" rx="6" fill="{c["accsoft"]}"/>'
-            + d.t(x + 8, y, f'{E(label)}  <tspan fill="{c["dim"]}" font-size="11.5">{E(kind)}</tspan>', 12.5, "acc"))
+    """an artifact's or a PR's chip in the thread (thread.css .th-art): '↗ <title>  <kind>', a 1 px line, r 9, no fill,
+    the words text-2, the kind text-3. never the accent."""
+    c = d.c; cw = tw(label, 12.5) * 1.06 + tw(kind, 11.5) + 30
+    return (f'<rect x="{x}" y="{y - 16}" width="{cw:.0f}" height="24" rx="9" fill="none" stroke="{c["line"]}"/>'
+            + d.t(x + 9, y, f'{E(label)}  <tspan fill="{c["faint"]}" font-size="11.5">{E(kind)}</tspan>', 12.5, "dim"))
 
 def d_prs(m):
     """10 · pull requests: perf opens #409; '↑' on its row and the PR's chip in its thread; checks run, then pass; the tip names it."""
@@ -803,7 +809,114 @@ def d_screenshot(m):
     o.append(colT(at(6.6, None, toolrow(d, X, R, 246, f'± SizeFilter.css  {diffs(c, 3, 1)}', "✓ 0.1 s"))))
     return d.svg("14 in bise desktop: you drag a screenshot onto the composer; it becomes 'image 1' with its thumbnail in your text; you say the chips overlap the price on small phones and send; search sees it and fixes the CSS.")
 
+def d_quote(m):
+    """15 · quotes: he selects a sentence in perf's answer; 'type to ask perf about it'; he types: the quote goes into the composer; sends."""
+    c = DPAL[m]; T = 10.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")])])
+    hb, _ = ahead(d, "perf", "product page speed", "∿ working · 9 min")
+    o.append(colT(hb) + d.head(X, 64, "perf"))
+    o.append(colT(t(X, 84, "the hero went from 2.4 MB to 180 KB, as avif.", 13)))
+    s1 = "i kept a jpg fallback for old Safari."
+    sel0, ask, send = 1.0, 2.6, 4.6
+    sw = tw(s1, 13) * 1.04 + 6
+    o.append(at(sel0, send, f'<rect x="{X - 3}" y="{104 - 15}" width="{sw:.0f}" height="20" rx="3" fill="{c["sel"]}"/>', dur=.15))
+    o.append(colT(t(X, 104, E(s1), 13)))
+    # the pill under the selection (composer.bar_ask_who)
+    pw = tw("type to ask perf about it", 11.5) + 20
+    o.append(at(sel0 + .4, ask, f'<rect x="{X + 40}" y="{114}" width="{pw:.0f}" height="21" rx="10" fill="{c["text"]}"/>'
+                + t(X + 40 + pw / 2, 129, '<tspan font-weight="600">type</tspan> to ask perf about it', 11.5, "bg", anchor="middle"), dur=.15))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, to="perf", keys=WORKING_KEYS)
+    o.append(cb)
+    o.append(placeholder_at(d, cx, cy, ph, [(ask, send)]))
+    # the quote's chip: its speaker and its length (composer.quote_about: 'perf · 1 line')
+    qw = tw("“ perf · 1 line", 11.5) + 16
+    qchip = lambda x, y: d.chip(x, y, f'<tspan fill="{c["faint"]}">“</tspan> perf · 1 line', qw, size=11.5)
+    q = "which Safari versions?"
+    o.append(at(ask, send, qchip(cx - 2, cy) + d.typing(cx + qw + 4, cy, q, ask + .2, ask + 1.3), dur=.1))
+    o.append(d.key(R - 50, 402, "⏎", send - .4, send + .1))
+    # his bubble: the quote over his words
+    bw = max(tw(s1, 12) * 1.06 + 40, tw(q, 13) * 1.06 + 30); bx = R - bw; by = 156
+    bub = (f'<rect x="{bx:.0f}" y="{by}" width="{bw:.0f}" height="58" rx="12" fill="{c["raised"]}" stroke="{c["line"]}"/>'
+           + f'<path d="M{bx + 14:.0f} {by + 10} V{by + 28}" stroke="{c["rule"]}" stroke-width="2"/>' + t(bx + 22, by + 23, E(s1), 12, "dim")
+           + t(bx + 14, by + 46, E(q), 13))
+    o.append(colT(at(send, None, bub)))
+    o.append(colT(at(5.6, None, d.head(X, 240, "perf") + t(X, 260, "Safari 15 and older: about 2 % of last month's visits.", 13))))
+    return d.svg("15 in bise desktop: you select a sentence in perf's answer; the pill says type to ask perf about it; you type, and the quote goes into the composer with your question; perf answers it.")
+
+def d_model(m):
+    """16 · a model per agent: the composer's model chip; its menu (the models under their provider, then 'effort'); he picks."""
+    c = DPAL[m]; T = 11
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")])])
+    hb, _ = ahead(d, "perf", "product page speed", "∿ working · 9 min")
+    o.append(colT(hb) + d.head(X, 64, "perf") + colT(t(X, 84, "the hero is 180 KB now. next: the gallery's 14 images.", 13)))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, to="perf", keys=WORKING_KEYS)
+    o.append(cb + t(cx, cy, E(ph), 13, "faint"))
+    # the tools row inside the box: 'yolo ⌄' at the left after the +, the model and its effort before send
+    o.append(t(X + 30, 410, "yolo ⌄", 12, "dim"))
+    pick1, pick2 = 3.0, 6.6
+    right = R - 32
+    for a, b, html in [(0, pick1, '<tspan font-weight="600" fill="{text}">devstral medium</tspan> ⌄'),
+                       (pick1, pick2, '<tspan font-weight="600" fill="{text}">opus 5.5</tspan> high ⌄'),
+                       (pick2, None, '<tspan font-weight="600" fill="{text}">opus 5.5</tspan> max ⌄')]:
+        o.append(at(a, b, t(right, 410, html.format(text=c["text"]), 12, "dim", anchor="end"), dur=.1))
+    # the picker, opened above the chip: provider heads, the models (✓ the current one), then 'effort' and its row
+    def picker(cur, eff=None, hl=None):
+        w = 216; x = right - w + 10; rows = [("Anthropic", None), ("opus 5.5", "opus 5.5"), ("Mistral", None), ("devstral medium", "devstral medium")]
+        h = 24 * len(rows) + (62 if eff else 0) + 14; y = 392 - h
+        b = (f'<rect x="{x + 2}" y="{y + 4}" width="{w}" height="{h}" rx="10" fill="{c["shadow"]}"/>'
+             f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{c["raised"]}" stroke="{c["rule"]}"/>')
+        yy = y + 22
+        for name, mid in rows:
+            if mid is None:
+                b += t(x + 14, yy, name, 11, "faint", 600)
+            else:
+                if hl == mid: b += f'<rect x="{x + 6}" y="{yy - 16}" width="{w - 12}" height="22" rx="6" fill="{c["sel"]}"/>'
+                b += t(x + 14, yy, name, 13) + (t(x + w - 14, yy, "✓", 12, "dim", anchor="end") if mid == cur else "")
+            yy += 24
+        if eff:
+            b += f'<path d="M{x + 8} {yy - 12} H{x + w - 8}" stroke="{c["line"]}"/>' + t(x + 14, yy + 6, "effort", 11, "faint", 600)
+            sx = x + 12; sw = (w - 24) / 4
+            b += f'<rect x="{sx}" y="{yy + 16}" width="{w - 24}" height="24" rx="6" fill="none" stroke="{c["line"]}"/>'
+            for i, e in enumerate(["low", "medium", "high", "max"]):
+                if e == eff: b += f'<rect x="{sx + i * sw + 2:.0f}" y="{yy + 18}" width="{sw - 4:.0f}" height="20" rx="5" fill="{c["sel"]}"/>'
+                b += t(sx + i * sw + sw / 2, yy + 33, e, 11.5, "text" if e == eff else "dim", anchor="middle")
+        return b
+    o.append(ring(d, right - 50, 406, 0.8, 1.4, r=12))
+    o.append(at(1.3, 2.3, picker("devstral medium"), dur=.12))
+    o.append(at(2.3, pick1, picker("devstral medium", hl="opus 5.5"), dur=.05))
+    o.append(ring(d, right - 40, 406, 4.4, 5.0, r=12))
+    o.append(at(4.9, 5.9, picker("opus 5.5", "high"), dur=.12))
+    o.append(at(5.9, pick2, picker("opus 5.5", "max"), dur=.05))
+    return d.svg("16 in bise desktop: perf's composer shows its model, devstral medium; the menu lists the models under their provider; you pick opus 5.5, then open it again and set its effort to max: the chip reads opus 5.5 max.")
+
+def d_scheduled(m):
+    """17 · scheduled tasks: he asks bise to check the ingest lag every 2 minutes; the '◷' row; SCHEDULED & WATCHING gets it."""
+    c = DPAL[m]; T = 10
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    sch = 4.4
+    rbar(d, TX, colR, [(0, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")])], sched=[(sch, "ingest lag", "every 2 min")])
+    o.append(bise_head(d))
+    ask = "check the ingest lag every 2 minutes, tell me if it goes over 30 s"
+    send = 2.6
+    bl, bh = d.bubble(R, 54, wrap(ask, 270))
+    o.append(at(send, None, bl))
+    y = 54 + bh + 24
+    o.append(colT(at(3.4, None, d.head(X, y, "bise") + t(X, y + 20, "ok: every 2 min. you'll hear from me only if it's over 30 s.", 13))))
+    # the ◷ row (thread ScheduledRow: the hub's words, its rhythm as 'every 2 min', the next run)
+    o.append(colT(at(sch, None, t(X, y + 50, f'<tspan fill="{c["faint"]}">◷</tspan>  main scheduled the ingest lag check · every 2 min · next 10:44 <tspan fill="{c["faint"]}">▸</tspan>', 12.5, "dim"))))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
+    o.append(cb)
+    o.append(placeholder_at(d, cx, cy, ph, [(0.4, send)]))
+    o.append(at(0.35, send, d.typing(cx, cy, ask if tw(ask, 13) < R - X - 40 else "check the ingest lag every 2 min, tell me if it's over 30 s", 0.4, 2.2), dur=.05))
+    return d.svg("17 in bise desktop: you ask bise to check the ingest lag every 2 minutes and tell you only if it goes over 30 s; a ◷ row says it's scheduled, every 2 min, next 10:44; the right bar's SCHEDULED & WATCHING shows it.")
+
 DESK = [("demo-b-desktop", d_session), ("artifacts-desktop", d_artifacts), ("voicemode-desktop", d_voicemode),
         ("resume-desktop", d_resume), ("worktree-desktop", d_worktree), ("talk-desktop", d_talk),
         ("voice-desktop", d_dictation), ("card-desktop", d_card), ("sync-desktop", d_sync), ("direct-desktop", d_direct),
-        ("prs-desktop", d_prs), ("diff-desktop", d_diff), ("tokens-desktop", d_tokens), ("screenshot-desktop", d_screenshot)]
+        ("prs-desktop", d_prs), ("diff-desktop", d_diff), ("tokens-desktop", d_tokens), ("screenshot-desktop", d_screenshot),
+        ("quote-desktop", d_quote), ("model-desktop", d_model), ("scheduled-desktop", d_scheduled)]
