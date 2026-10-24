@@ -256,6 +256,7 @@ function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; 
   return (
     <span
       className={`app-rb-mark ${m.tone}${head ? ' head' : ''}`}
+      role="button"
       data-testid={`${r.testId}.mark`}
       data-tone={m.tone}
       aria-label={m.tip}

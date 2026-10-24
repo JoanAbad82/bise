@@ -27,6 +27,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 <style>
+  /* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.mjs) */
+  :where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
+  :is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
   :root, [data-theme="dark"] { --bg:#141211; --soft:#1a1715; --text:#ece6da; --dim:#c4bcaf; --faint:#3d3935; --kick:#6f685f; --wind:#4a4540; --acc:#f4a6b0; --err:#ff5a52; --raised:#221e1c; --chip:#262220; }
   [data-theme="light"] { --bg:#f7f4ee; --soft:#f0ebe3; --text:#1b1917; --dim:#4a443e; --faint:#d6cfc4; --kick:#9d958a; --wind:#cbc3b6; --acc:#b8416b; --err:#b3261e; --raised:#fbf8f3; --chip:#e8e2d8; }
   * { box-sizing:border-box; margin:0; padding:0; }

@@ -11,7 +11,7 @@
 /* 'what it does' (the names) is never dropped: it keeps 140 px; when the list narrows (a task's pane
    open at 1100, a small window) 'how often' goes first, then 'next run', then 'wakes', which is cut
    with … before it goes (designer m_16028, f5ff0e72's red) */
-.sch-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 190px) 170px 110px; gap: var(--gap-block); align-items: center; min-height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); font: var(--t-13) var(--font-ui); color: var(--c-text); cursor: default; }
+.sch-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 190px) 170px 110px; gap: var(--gap-block); align-items: center; min-height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); font: var(--t-13) var(--font-ui); color: var(--c-text); }
 .sch-row > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sch-cols { min-height: var(--h-row-tight); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
 /* a column's head takes its column's alignment: 'next run' ends where its times end */

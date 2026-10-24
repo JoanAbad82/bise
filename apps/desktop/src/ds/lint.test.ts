@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { classesOf, cssClasses, looseSpacing, menuDrawn, rawControls } from './lint';
+import { classesOf, cssClasses, cursorFaults, looseSpacing, menuDrawn, plainClicks, rawControls } from './lint';
 import { PENDING_CLASSES, PENDING_RAW } from './lint.pending';
 import { PENDING_SPACING } from './spacing.pending';
 
@@ -107,5 +107,46 @@ describe('the spacing law (designer desktop-spacing m_19568, ambient-lead m_1956
       if (loose.length > was) grown.push(`${r}: ${String(loose.length)} (was ${String(was)}): ${loose.map((l) => `${String(l.line)} ${l.prop}: ${l.value}`).join(' | ')}`);
     }
     expect(grown, 'a margin, padding, gap or inset is 0, a --s-*/--gap-*/--pad-* token or a calc() of them; a control or row height is an --h-* (src/ds/tokens.css)').toEqual([]);
+  });
+});
+
+describe('the pointer law (his words: « chaque chose sur laquelle tu peux cliquer ... cursor pointer »)', () => {
+  it('reads a plain element he clicks with no role, and a rule that puts the arrow back', () => {
+    expect(plainClicks(`<div onClick={go}>a</div>
+<span role="button" onClick={go} />
+<button onClick={go} />
+<li className={x ? "a>b" : "c"}
+  onClick={() => { if (a > b) go(); }}>x</li>
+<div onMouseDown={keep} />
+<div className="sash" onDoubleClick={reset} />
+<span
+  // the menu's esc: a comment's quote is not a string
+  onPointerDown={hold}
+>
+  <Press onClick={go} />
+</span>`)).toEqual(['1 <div>', '4 <li>']);
+    expect(cursorFaults('/* .no{cursor:default} */ .a{color:red;cursor:default} .b,.c:disabled{cursor: auto} .d[aria-disabled="true"]{cursor:default} .e{cursor:pointer} .f{cursor:text}')).toEqual(['.a', '.b']);
+  });
+
+  it('every plain element he clicks has a role, so the root rule gives it the hand', () => {
+    // Frame: the scrim, a click outside what floats over it, not a thing he aims at; MapChip: a
+    // wrapper that only stops the map's clicks; the office and the town: a map that picks what is
+    // under the mouse and sets the hand itself over a bim or a sign (data-pointer, office.css)
+    const may: Record<string, number> = { 'app/Frame.tsx': 1, 'bims/MapChip.tsx': 1, 'bims/Office.tsx': 1, 'bims/town/Town.tsx': 1 };
+    const found = screens.flatMap((p) => {
+      const hits = plainClicks(readFileSync(p, 'utf8'));
+      return hits.length > (may[rel(p)] ?? 0) ? hits.map((h) => `${rel(p)}:${h}`) : [];
+    });
+    expect(found, 'a div/span he clicks: give it its role (button, option, tab, link...) or use a ds control').toEqual([]);
+  });
+
+  it('no stylesheet puts the arrow back on a control (only a disabled state, or a thing that takes no click)', () => {
+    // labels that look like rows but take no click
+    const may = new Set(['app/app.css .app-rb-none', 'app/app.css .app-rb-none:hover']);
+    const found = files
+      .filter((f) => f.endsWith('.css'))
+      .flatMap((p) => cursorFaults(readFileSync(p, 'utf8')).map((s) => `${rel(p)} ${s}`))
+      .filter((s) => !may.has(s));
+    expect(found, 'cursor:default on a control undoes the hand (ds/css/base.css owns the cursor)').toEqual([]);
   });
 });

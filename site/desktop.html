@@ -19,6 +19,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 <script>{ const r = document.documentElement; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} const q = new URLSearchParams(location.search); if (q.has('dark') || (!q.has('light') && d === '1')) r.classList.add('pd'); }</script>
 <style>
+  /* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.mjs) */
+  :where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
+  :is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
   /* the landing's paper (landing-b) and dark paper (.pd) */
   :root { --bg:#f2ede2; --soft:#ebe4d6; --text:#1d1a17; --dim:#5a5349; --faint:#cfc5b4; --kick:#8a8174; --rule:#b8ad9a; --pen:#c8264a; --hl:#f4a6b099; --ink-btn:#1d1a17; --on-btn:#f7f2e8; --win:#fdfbf7; }
   html.pd { --bg:#171513; --soft:#1e1b18; --text:#ece6da; --dim:#b8b0a3; --faint:#3d3935; --kick:#8a8276; --rule:#4a4540; --pen:#f4a6b0; --hl:#f4a6b047; --ink-btn:#ece6da; --on-btn:#171513; --win:#1f1c19; }

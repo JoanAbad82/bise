@@ -5,6 +5,10 @@
    from tokens.css only. Reference: ambient's kit v0 mock (site/content/ambient/page.html). */
 
 *, *::before, *::after { box-sizing: border-box; }
+/* the hand on every thing he can click, the arrow when disabled: the desktop ds's root rule, the
+   same text (apps/desktop/src/ds/css/base.css; kit/pointer.check.mjs keeps them equal) */
+:where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
+:is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
 html { -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--surface-made); color: var(--ink);

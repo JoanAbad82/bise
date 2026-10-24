@@ -740,6 +740,7 @@ export function Town({
                 {tag.pill !== null && (
                   <span
                     className={`bims-pill ${tag.pill}`}
+                    role="button"
                     data-pill={tag.pill}
                     {...tipAttrs(tag.pill === 'asks' ? bims.pill_asks_tip({ agent: l.name }) : bims.pill_failed_tip({ agent: l.name }))}
                     onClick={(e) => {
@@ -762,6 +763,8 @@ export function Town({
               <div
                 key={p.id}
                 className="bims-sign"
+                // a sign dives into its project: a button, so the hand; the one he is in does nothing
+                role={here ? undefined : 'button'}
                 data-here={here || undefined}
                 data-testid={`app.right.bims.town.sign.${p.id}`}
                 aria-label={bims.town_sign_label({ project: s.name, at_work: s.working, asks: s.asks })}

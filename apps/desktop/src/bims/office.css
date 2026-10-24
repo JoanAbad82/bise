@@ -674,9 +674,6 @@
   height: auto;
   line-height: 1.5;
 }
-.bims-sign[data-here] {
-  cursor: default;
-}
 /* no room for the whole sign (town/signs.ts): its name and pills, without ∿ n; never a bare pill */
 .bims-sign[data-compact] .bims-sign-work {
   display: none;

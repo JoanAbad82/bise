@@ -1,5 +1,5 @@
 /* bise desktop window · primitives: button, kbd, chip, segmented, toggle, field, help, dot, pearl, bar, skeleton, empty, error */
-.b-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--gap-inline);height:var(--h-control-sm);padding:0 var(--pad-control-x);border-radius:var(--r-2);font:500 var(--t-13)/1 var(--font-ui);color:var(--c-text);background:var(--c-hover);border:0;box-shadow:inset 0 0 0 1px var(--c-line);transition:background var(--d-fast) var(--ease-out),transform var(--d-press) var(--ease-out),box-shadow var(--d-fast) var(--ease-out);cursor:default;white-space:nowrap}
+.b-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--gap-inline);height:var(--h-control-sm);padding:0 var(--pad-control-x);border-radius:var(--r-2);font:500 var(--t-13)/1 var(--font-ui);color:var(--c-text);background:var(--c-hover);border:0;box-shadow:inset 0 0 0 1px var(--c-line);transition:background var(--d-fast) var(--ease-out),transform var(--d-press) var(--ease-out),box-shadow var(--d-fast) var(--ease-out);white-space:nowrap}
 .b-btn:hover,.b-btn.is-hover{background:var(--c-active)}
 .b-btn:active,.b-btn.is-active{background:var(--c-press);transform:scale(.98)}
 .b-btn:focus-visible,.b-btn.is-focus{outline:0;box-shadow:inset 0 0 0 1px var(--c-line),0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
@@ -62,7 +62,7 @@
 .b-err{display:flex;gap:var(--gap-inline);align-items:flex-start;padding:var(--s-2) var(--pad-control-x);border-radius:var(--r-2);background:var(--c-err-soft);color:var(--c-text);font-size:var(--t-13)}
 .b-err .m{color:var(--c-err);font-weight:700}
 /* a chip with onClick is a real button (designer m_18626): the chip's look, the ds ring */
-button.b-chip{margin:0;border:0;font:inherit;font-size:var(--t-12);cursor:default}
+button.b-chip{margin:0;border:0;font:inherit;font-size:var(--t-12)}
 button.b-chip:hover,button.b-chip.is-hover{background:var(--c-active)}
 button.b-chip:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
 /* an artifact's name (desktop-agents-bar §5): pink for him, on a 10 % accent tint, 16 % on hover, a

@@ -186,6 +186,7 @@ function InlineChip({ chip, link, testId }: { chip: Chip; link: Linked; testId: 
     <span
       ref={host}
       className="th-inchip"
+      role="button"
       onMouseEnter={() => {
         link.hover(n);
       }}

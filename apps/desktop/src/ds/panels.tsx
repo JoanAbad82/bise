@@ -135,6 +135,7 @@ export function Group({ title, items, help, list, testId }: { title?: ReactNode;
       <div className={cx("b-group", list && "is-list")}>
         {items.map((it) => (
           <div key={it.id} className={cx("b-gi", it.sel && "is-sel")} data-testid={sub(testId, it.id)}
+            role={it.onPick === undefined ? undefined : list ? "option" : "button"}
             data-row={list ? it.id : undefined} aria-selected={list ? it.sel === true : undefined} onClick={it.onPick}>
             <span className="l">{it.check}{it.check != null && " "}{it.label}{it.sub != null && <span>{it.sub}</span>}</span>
             {it.control}{it.value != null && <span className="v">{it.value}</span>}

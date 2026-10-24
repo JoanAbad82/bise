@@ -892,7 +892,6 @@
   text-overflow: ellipsis;
 }
 .th-tool-line[role='button'] {
-  cursor: default;
   border-radius: 4px;
 }
 .th-tool-line[role='button']:hover {
@@ -1686,7 +1685,6 @@
   background: none;
   font: inherit;
   color: var(--c-text-2);
-  cursor: default;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
