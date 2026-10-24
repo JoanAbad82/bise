@@ -81,10 +81,11 @@ the bodies marked `todo!("plugins chunk ...")` come with their chunk.
 - **Shared data** (`bend_plugins::model`): `ConnectorEntry` (+
   `ConnectorAuth`), `ToolEntry`, `SkillEntry`, `StateV2` (the four lists
   of `plugins.json`: `disabled`, `enabled`, `parts_off`, `parts_on`).
-- **State** (`bend_plugins::state`, chunk "state"): `read(path) ->
-  StateV2`, `set(path, &PluginId, on)` (the one writer, same flock),
-  `StateV2::is_on(&id, opt_in)`. `set_enabled` and `is_on(path, name)`
-  stay until that chunk moves their callers.
+- **State** (`bend_plugins::state`, done): `read(path) -> StateV2`,
+  `set(path, &PluginId, on)` (the one writer, same flock),
+  `StateV2::is_on(&id, opt_in)`, `StateV2::locked(&id)` (`skills:bise`
+  and its parts: always on, `set` refuses to turn them off). See
+  "Enable state" below.
 - **Connectors** (`bend_plugins::connectors`, chunk "connectors"):
   `BUILTINS`, `TTL_MS`, `Catalog`, `load(cache, key, now_ms, force)`,
   `index_lines(&Catalog, &StateV2)`, `connect_url(key, &id)`. Cache:
@@ -163,13 +164,25 @@ live REPLs, so two sessions (or two Switchboard tasks) never share it.
 4. **Precedence.** Same `name` in both roots: the workspace one wins,
    the user one is listed as `shadowed`. Same `name` twice in one root:
    both dropped (`plugin.name.collision`).
-5. **Enable state.** `~/.bend-harness/plugins.json`:
-   `{"disabled": ["name", ...], "enabled": ["name", ...]}`. A disabled
-   plugin is listed, its components are not loaded. **Opt-in**: a
+5. **Enable state.** `~/.bend-harness/plugins.json` (v2, one writer:
+   `bend_plugins::state::set`, under a flock, tmp + rename, other keys
+   kept): `{"disabled": [...], "enabled": [...], "parts_off": [...],
+   "parts_on": [...]}`; `disabled`/`enabled` hold plugin ids (a real
+   plugin's bare name, `mistral:gmail`, `skills:vibe`), `parts_*` part
+   ids (`docs#skill:docs`, `linear#mcp:linear`,
+   `linear#tool:linear/create_issue`). Everything is on by default. A
+   disabled plugin is listed, its components are not loaded. **Opt-in**: a
    manifest with `"extensions": {"dev.bise": {"default": "off"}}` (bise's
    own extension, never reported as unsupported) loads only when its name
-   is in `enabled`; `disabled` still wins. `plugins on <name>` adds to
-   `enabled` and drops from `disabled`, `off` the reverse. The
+   is in `enabled`; `disabled` still wins. A part is on only when its
+   plugin is on, it is not in `parts_off`, and, for a plugin's tool, its
+   server's `#mcp:` part is not off (`parts_on` never overrides an off
+   owner or server). The resolver lists a loaded plugin's off skills and
+   off servers in `off_skills` / `off_servers` (Info
+   `plugin.skill.off`, `plugin.mcp.server_off`), never in `skills` /
+   `servers` / `remotes`. `skills:bise` is locked on. `plugins on <id>` adds to
+   `enabled` (`parts_on`) and drops from `disabled` (`parts_off`), `off`
+   the reverse. The
    built-in `computer` plugin is opt-in: `/computer-use` turns it on,
    `/computer-use off|uninstall` turns it off (docs/computer-use-ship.md
    §1).
@@ -270,8 +283,9 @@ tests use temp dirs.
   with scope, version, state (`loaded`, `disabled`, `shadowed`,
   `invalid`), root, skills, MCP servers, unsupported components, then the
   diagnostics. Static: it does not start servers.
-- `bend-harness plugins on|off <name>`: edits
-  `~/.bend-harness/plugins.json`; applies at the agents' next idle (below).
+- `bend-harness plugins on|off <id>`: a plugin or a part (any
+  `PluginId`), through `state::set`; applies at the agents' next idle
+  (below).
 
 ### Reload on change
 
@@ -279,7 +293,8 @@ A plugin installed, removed, enabled, disabled or edited while bise runs
 reaches every agent without a restart of the TUI (the user: a voice
 recording, a draft, the scroll must survive). The hub keeps, per live
 REPL, its workspace and `bend_plugins::resolve::fingerprint` of its roots
-(the enable state; in the built-in, user and workspace roots each plugin
+(the enable state's plugins and skill parts: a server or a tool turned
+on or off moves nothing, the session's bridge applies it; in the built-in, user and workspace roots each plugin
 folder and the size and mtime of its `plugin.json`, `mcp.json` and
 `skills/*/SKILL.md`), taken at spawn. Every 2 s on the tick, and when an
 agent goes idle, it compares: a REPL whose fingerprint moved relaunches

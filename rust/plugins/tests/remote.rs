@@ -262,8 +262,7 @@ fn a_plugin_with_an_http_server_goes_through_the_bridge() {
         user: None,
         workspace: Some(base.join("ws/.agents/plugins")),
         data: base.join("data"),
-        disabled: vec![],
-        enabled: vec![],
+        state: Default::default(),
     };
     let mut parent = Command::new("sleep").arg("60").spawn().unwrap();
     let opts = bridge::Opts { dir: dir.clone(), parent: Some(parent.id()), roots, status_dir: Some(status.clone()), secrets_dir: None, ready_wait: bridge::READY_WAIT };

@@ -675,11 +675,12 @@ mod arg_tests {
         let d = std::env::temp_dir().join(format!("cu-menu-{}", std::process::id()));
         let p = d.join("plugins.json");
         assert!(!crate::computer_use::on_in(&p), "off before /computer-use");
-        bend_plugins::state::set_enabled(&p, "computer", true).unwrap();
+        let cu = bend_plugins::id::PluginId::plugin("computer");
+        bend_plugins::state::set(&p, &cu, true).unwrap();
         assert!(crate::computer_use::on_in(&p));
-        bend_plugins::state::set_enabled(&p, "computer", false).unwrap();
+        bend_plugins::state::set(&p, &cu, false).unwrap();
         assert!(!crate::computer_use::on_in(&p), "off after /computer-use off");
-        bend_plugins::state::set_enabled(&p, "computer", true).unwrap();
+        bend_plugins::state::set(&p, &cu, true).unwrap();
         assert!(crate::computer_use::on_in(&p), "on again after the bare /computer-use");
         let _ = std::fs::remove_dir_all(&d);
     }

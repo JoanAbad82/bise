@@ -37,9 +37,14 @@ fn roots(t: &Tmp) -> Roots {
         user: Some(t.0.join("user")),
         workspace: Some(t.0.join("ws")),
         data: t.0.join("data"),
-        disabled: Vec::new(),
-        enabled: Vec::new(),
+        state: StateV2::default(),
     }
+}
+
+/// A state with these plugins off and opt-ins on, and these parts off.
+fn st(disabled: &[&str], enabled: &[&str], parts_off: &[&str]) -> StateV2 {
+    let s = |l: &[&str]| l.iter().map(|x| x.to_string()).collect();
+    StateV2 { disabled: s(disabled), enabled: s(enabled), parts_off: parts_off.iter().map(|x| PluginId::parse(x).unwrap()).collect(), parts_on: vec![] }
 }
 
 fn codes(r: &Resolution) -> Vec<&'static str> {
@@ -107,6 +112,48 @@ fn skills_and_partial_failure() {
     assert_eq!(codes(&res), vec!["plugin.skill.invalid"]);
 }
 
+/// A skill and a server (stdio and remote) turned off in plugins.json:
+/// listed in `off_*`, never in `skills`/`servers`/`remotes`; the other
+/// parts and the plugin load.
+#[test]
+fn off_parts_are_listed_not_loaded() {
+    let t = tmp("offparts");
+    let p = t.0.join("user/lin");
+    write(&p.join("plugin.json"), &manifest("linear"));
+    write(&p.join("skills/a/SKILL.md"), "---\nname: a\ndescription: A.\n---\n");
+    write(&p.join("skills/b/SKILL.md"), "---\nname: b\ndescription: B.\n---\n");
+    write(
+        &p.join("mcp.json"),
+        &serde_json::json!({"mcpServers": {"local": {"command": "x"}, "web": {"url": "https://x.test/mcp"}, "keep": {"command": "x"}}}).to_string(),
+    );
+    let mut r = roots(&t);
+    let all = resolve(&r);
+    assert_eq!((all.plugins[0].skills.len(), all.plugins[0].servers.len(), all.plugins[0].remotes.len()), (2, 2, 1));
+    let before = fingerprint(&r);
+    r.state = st(&[], &[], &["linear#skill:a", "linear#mcp:local", "linear#mcp:web", "linear#tool:keep/t"]);
+    let res = resolve(&r);
+    let pl = &res.plugins[0];
+    assert_eq!(pl.state, State::Loaded);
+    assert_eq!(pl.skills.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["linear:b"]);
+    assert_eq!(pl.off_skills.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["linear:a"]);
+    assert_eq!(pl.servers.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), ["keep"], "a tool off leaves its server on");
+    assert!(pl.remotes.is_empty());
+    let off: Vec<String> = pl.off_servers.iter().map(|i| i.to_string()).collect();
+    assert_eq!(off, ["linear#mcp:local", "linear#mcp:web"]);
+    assert_eq!(codes(&res), ["plugin.skill.off", "plugin.mcp.server_off", "plugin.mcp.server_off"]);
+    assert!(res.diagnostics.iter().all(|d| d.severity == Severity::Info));
+    // a skill toggle is in the prompt: the fingerprint moves; a server or
+    // a tool toggle is the bridge's: it does not (no relaunch)
+    assert_ne!(fingerprint(&r), before, "a skill off moves it");
+    r.state = st(&[], &[], &["linear#mcp:local", "linear#mcp:web", "linear#tool:keep/t"]);
+    assert_eq!(fingerprint(&r), before, "servers and tools off move nothing");
+    // the plugin off: nothing loads, whatever its parts say
+    r.state = st(&["linear"], &[], &[]);
+    let pl = &resolve(&r).plugins[0];
+    assert_eq!(pl.state, State::Disabled);
+    assert!(pl.skills.is_empty() && pl.servers.is_empty() && pl.off_skills.is_empty());
+}
+
 #[test]
 fn invalid_manifest_drops_the_plugin() {
     let t = tmp("invalid");
@@ -132,7 +179,7 @@ fn precedence_collisions_reserved_disabled() {
     write(&t.0.join("user/g/plugin.json"), &manifest("my.ns"));
     write(&t.0.join("user/h/plugin.json"), &manifest("off"));
     let mut r = roots(&t);
-    r.disabled = vec!["off".into()];
+    r.state = st(&["off"], &[], &[]);
     let res = resolve(&r);
     let st = |root: &str| res.plugins.iter().find(|p| p.root.ends_with(root)).unwrap().state;
     assert_eq!(st("user/a"), State::Shadowed);
@@ -247,7 +294,7 @@ fn built_in_root_loads_shadows_and_disables() {
     assert_eq!(other(&res, Scope::BuiltIn), State::Shadowed);
     assert_eq!(other(&res, Scope::User), State::Loaded);
     assert!(res.diagnostics.iter().any(|d| d.code == "plugin.shadowed" && d.message.contains("user plugin")));
-    r.disabled = vec!["computer".into()];
+    r.state = st(&["computer"], &[], &[]);
     let res = resolve(&r);
     assert_eq!(res.plugins.iter().find(|p| p.name == "computer").unwrap().state, State::Disabled);
 }
@@ -255,7 +302,7 @@ fn built_in_root_loads_shadows_and_disables() {
 #[test]
 fn the_repo_ships_the_computer_plugin() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins");
-    let r = Roots { builtin: Some(root), user: None, workspace: None, data: std::env::temp_dir(), disabled: vec![], enabled: vec!["computer".into()] };
+    let r = Roots { builtin: Some(root), user: None, workspace: None, data: std::env::temp_dir(), state: st(&[], &["computer"], &[]) };
     let res = resolve(&r);
     assert!(res.diagnostics.is_empty(), "{:?}", res.diagnostics);
     let p = res.plugins.iter().find(|p| p.name == "computer").expect("plugins/computer");
@@ -263,7 +310,7 @@ fn the_repo_ships_the_computer_plugin() {
     assert_eq!(p.servers.len(), 1);
     assert_eq!(p.servers[0].args, ["computer-use", "mcp"]);
     // opt-in: off for everyone until /computer-use enables it, nothing loaded
-    let off = Roots { enabled: vec![], ..r };
+    let off = Roots { state: StateV2::default(), ..r };
     let res = resolve(&off);
     let p = res.plugins.iter().find(|p| p.name == "computer").unwrap();
     assert_eq!(p.state, State::Disabled);
@@ -284,10 +331,10 @@ fn a_default_off_plugin_loads_only_once_enabled() {
     assert!(res.diagnostics.is_empty(), "the bise extension is known: {:?}", res.diagnostics);
     assert_eq!(res.plugins[0].state, State::Disabled);
     let before = fingerprint(&r);
-    r.enabled = vec!["opt".into()];
+    r.state = st(&[], &["opt"], &[]);
     assert_ne!(fingerprint(&r), before, "enabling moves the fingerprint");
     assert_eq!(resolve(&r).plugins[0].state, State::Loaded);
-    r.disabled = vec!["opt".into()];
+    r.state = st(&["opt"], &["opt"], &[]);
     assert_eq!(resolve(&r).plugins[0].state, State::Disabled, "disabled wins");
     let bad = manifest("opt").replacen('{', "{\"extensions\": {\"dev.bise\": {\"default\": \"maybe\"}},", 1);
     assert!(parse_manifest(&bad).is_err());
@@ -311,9 +358,9 @@ fn the_fingerprint_moves_when_a_plugin_comes_goes_or_changes() {
     write(&t.0.join("user/demo/mcp.json"), "{\"mcpServers\":{}}");
     assert_ne!(fingerprint(&r), skill, "mcp.json edited");
     let edited = fingerprint(&r);
-    r.disabled = vec!["demo".into()];
+    r.state = st(&["demo"], &[], &[]);
     assert_ne!(fingerprint(&r), edited, "disabled");
-    r.disabled.clear();
+    r.state = StateV2::default();
     // a file that isn't a plugin folder changes nothing
     write(&t.0.join("user/notes.txt"), "x");
     assert_eq!(fingerprint(&r), edited);

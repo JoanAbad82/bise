@@ -8,7 +8,7 @@ use crate::{bridge, report, resolve, state};
 
 pub const USAGE: &str = "usage:
   bise plugins [list] [--workspace DIR] [--json]
-  bise plugins on|off ID          (a plugin's name, as `bise plugins list` shows it)
+  bise plugins on|off ID          (a plugin or part id: docs, mistral:gmail, docs#skill:docs, linear#mcp:linear)
   bise plugins import-mcp NAME [--dry-run] < servers.json   (Claude Code's / Codex's MCP servers as one plugin)
   bise plugins login [SERVER]   log in to a remote MCP server in the browser (no SERVER: the list)
   bise plugins logout SERVER    forget its tokens
@@ -55,31 +55,29 @@ pub fn main(args: &[String]) -> i32 {
                 eprintln!("{}", USAGE);
                 return 2;
             };
-            let name = match crate::id::PluginId::parse(id) {
-                Ok(crate::id::PluginId::Plugin { name }) => name,
-                Ok(_) => {
-                    eprintln!("{}", Style::stderr().fail(&format!("{id} can't be turned on or off yet")));
-                    return 2;
-                }
+            let id = match crate::id::PluginId::parse(id) {
+                Ok(id) => id,
                 Err(e) => {
                     eprintln!("{}", Style::stderr().fail(&e));
                     return 2;
                 }
             };
-            let name = &name;
             let on = sub == "on";
             let path = state::state_path();
-            match state::set_enabled(&path, name, on) {
+            match state::set(&path, &id, on) {
                 Ok(changed) => {
-                    let known = resolve::resolve(&resolve::Roots::standard(Some(&workspace(args))))
-                        .plugins
-                        .iter()
-                        .any(|p| &p.name == name);
+                    // a real plugin (or its part) that no root holds: say so
+                    let unknown = match id.owner() {
+                        crate::id::PluginId::Plugin { name } => {
+                            !resolve::resolve(&resolve::Roots::standard(Some(&workspace(args)))).plugins.iter().any(|p| &p.name == name)
+                        }
+                        _ => false,
+                    };
                     let out = Style::stdout();
-                    let what = format!("{} {}{}", name, if changed { "turned" } else { "already" }, if on { " on" } else { " off" });
+                    let what = format!("{} {}{}", id, if changed { "turned" } else { "already" }, if on { " on" } else { " off" });
                     println!("{}", out.ok(&what));
-                    if !known {
-                        println!("{}", out.ask(&format!("no plugin named {} in the roots right now (bise plugins list)", name)));
+                    if unknown {
+                        println!("{}", out.ask(&format!("no plugin named {} in the roots right now (bise plugins list)", id.owner())));
                     }
                     println!("{}", out.dim("it applies at the next session start, or /reload in one."));
                     0

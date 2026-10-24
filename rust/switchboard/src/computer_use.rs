@@ -126,7 +126,7 @@ pub fn held(v: &Value, key: &str) -> bool {
 /// Whether computer use is on (the `computer` plugin, what /computer-use
 /// sets): off, his words never read state.json.
 pub fn is_on() -> bool {
-    bend_plugins::state::is_on(&bend_plugins::state::state_path(), "computer")
+    bend_plugins::state::read(&bend_plugins::state::state_path()).is_on(&bend_plugins::id::PluginId::plugin("computer"), true)
 }
 
 /// His words to the agent of `key`: when state.json holds it (stopped or

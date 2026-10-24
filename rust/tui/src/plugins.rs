@@ -99,16 +99,12 @@ fn login_part(owner: &bend_plugins::id::PluginId, t: &bend_plugins::login::Targe
     }
 }
 
-/// Turn plugin `id` on or off through bend_plugins' one writer. A part,
-/// a connector or a skills folder: refused until bend_plugins::state v2
-/// writes them.
+/// Turn plugin or part `id` (any `PluginId`) on or off through
+/// bend_plugins' one writer.
 pub(crate) fn set(id: &str, on: bool) -> Result<bool, String> {
-    let name = match bend_plugins::id::PluginId::parse(id)? {
-        bend_plugins::id::PluginId::Plugin { name } => name,
-        _ => return Err(format!("{id} can't be turned on or off yet")),
-    };
+    let id = bend_plugins::id::PluginId::parse(id)?;
     let path = bend_plugins::state::state_path();
-    bend_plugins::state::set_enabled(&path, &name, on).map_err(|e| format!("{}: {e}", path.display()))
+    bend_plugins::state::set(&path, &id, on).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Forget the login of server `name` (`/plugins logout NAME`).

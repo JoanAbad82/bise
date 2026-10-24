@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
 
+use crate::id::{PartKind, PluginId};
+use crate::model::StateV2;
+
 pub const PLUGIN_SCHEMA: &str = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
 pub const MCP_SCHEMA: &str = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
 pub const RESERVED: [&str; 6] = ["file_system", "process", "self", "skill", "subagent", "vibe"];
@@ -278,6 +281,12 @@ pub struct Plugin {
     pub servers: Vec<StdioServer>,
     /// remote servers (Streamable HTTP, SSE)
     pub remotes: Vec<HttpServer>,
+    /// its skills turned off in plugins.json (`<name>#skill:<skill>`):
+    /// listed, never in `skills`, so never in a prompt
+    pub off_skills: Vec<Skill>,
+    /// its MCP servers turned off in plugins.json (`<name>#mcp:<id>`,
+    /// stdio or remote): listed, never in `servers`/`remotes`
+    pub off_servers: Vec<crate::id::PluginId>,
     /// components present on disk but not supported yet
     pub unsupported: Vec<String>,
 }
@@ -303,11 +312,9 @@ pub struct Roots {
     pub workspace: Option<PathBuf>,
     /// where `${PLUGIN_DATA}` roots live (one folder per plugin name)
     pub data: PathBuf,
-    pub disabled: Vec<String>,
-    /// the opt-in plugins turned on (a manifest with
-    /// `"extensions": {"dev.bise": {"default": "off"}}` loads only when
-    /// its name is here)
-    pub enabled: Vec<String>,
+    /// the on/off state (`crate::state::read`): a plugin off is listed
+    /// as disabled, its skills and servers off are listed, not loaded
+    pub state: StateV2,
 }
 
 impl Roots {
@@ -325,8 +332,7 @@ impl Roots {
             user: Some(user),
             workspace: workspace.map(|w| w.join(".agents").join("plugins")),
             data,
-            disabled: crate::state::disabled(&crate::state::state_path()),
-            enabled: crate::state::enabled(&crate::state::state_path()),
+            state: crate::state::read(&crate::state::state_path()),
         }
     }
 }
@@ -340,8 +346,15 @@ impl Roots {
 pub fn fingerprint(roots: &Roots) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    roots.disabled.hash(&mut h);
-    roots.enabled.hash(&mut h);
+    // the plugins and the skills on or off (a skill is in the prompt); a
+    // server or a tool toggled moves nothing: the bridge applies it
+    let st = &roots.state;
+    st.disabled.hash(&mut h);
+    st.enabled.hash(&mut h);
+    for l in [&st.parts_off, &st.parts_on] {
+        l.iter().filter(|id| matches!(id, PluginId::Part { kind: PartKind::Skill, .. })).for_each(|id| id.hash(&mut h));
+        0u8.hash(&mut h);
+    }
     let stat = |p: &Path, h: &mut std::collections::hash_map::DefaultHasher| {
         if let Ok(m) = std::fs::metadata(p) {
             m.len().hash(h);
@@ -934,6 +947,8 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
             skills: Vec::new(),
             servers: Vec::new(),
             remotes: Vec::new(),
+            off_skills: Vec::new(),
+            off_servers: Vec::new(),
             unsupported: Vec::new(),
         };
         let parsed = std::fs::read_to_string(&manifest)
@@ -958,6 +973,35 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
         found.push(Candidate { plugin: p, extensions, default_off });
     }
     found
+}
+
+/// Move a loaded plugin's skills and MCP servers that `state` turns off
+/// to `off_skills` / `off_servers` (listed, not loaded), each with an
+/// Info diagnostic, like a server's own `"enabled": false`.
+fn parts_off(p: &mut Plugin, state: &StateV2, opt_in: bool, out: &mut Vec<Diagnostic>) {
+    let me = PluginId::plugin(&p.name);
+    let prefix = format!("{}:", p.namespace);
+    let (on, off): (Vec<Skill>, Vec<Skill>) = std::mem::take(&mut p.skills).into_iter().partition(|s| {
+        let bare = s.name.strip_prefix(&prefix).unwrap_or(&s.name);
+        state.is_on(&me.part(PartKind::Skill, None, bare), opt_in)
+    });
+    for s in &off {
+        out.push(diag("plugin.skill.off", Severity::Info, &p.name, format!("skill {:?} is off in plugins", s.name)));
+    }
+    (p.skills, p.off_skills) = (on, off);
+    let mut off_ids = Vec::new();
+    let mut keep = |id: &str| {
+        let part = me.part(PartKind::Mcp, None, id);
+        let on = state.is_on(&part, opt_in);
+        if !on {
+            out.push(diag("plugin.mcp.server_off", Severity::Info, &p.name, format!("mcp.json server {:?} is off in plugins", id)));
+            off_ids.push(part);
+        }
+        on
+    };
+    p.servers.retain(|s| keep(&s.id));
+    p.remotes.retain(|s| keep(&s.id));
+    p.off_servers = off_ids;
 }
 
 /// Discover, validate and load every plugin under `roots`.
@@ -1027,13 +1071,14 @@ pub fn resolve(roots: &Roots) -> Resolution {
     }
     // enable state, then components
     for c in cands.iter_mut() {
-        let off = roots.disabled.contains(&c.plugin.name) || (c.default_off && !roots.enabled.contains(&c.plugin.name));
+        let off = !roots.state.is_on(&PluginId::plugin(&c.plugin.name), c.default_off);
         if c.plugin.state == State::Loaded && off {
             c.plugin.state = State::Disabled;
         }
         if c.plugin.state == State::Loaded {
             load_skills(&mut c.plugin, &mut diags);
             load_mcp(&mut c.plugin, &mut diags);
+            parts_off(&mut c.plugin, &roots.state, c.default_off, &mut diags);
             if c.plugin.scope == Scope::BuiltIn {
                 for s in c.plugin.servers.iter_mut().filter(|s| s.command == "bise") {
                     s.command = bise_exe();

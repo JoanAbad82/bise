@@ -274,8 +274,7 @@ fn the_bridge_keeps_a_server_that_needs_a_login_and_connects_it_after() {
         user: None,
         workspace: Some(base.join("ws/.agents/plugins")),
         data: base.join("data"),
-        disabled: vec![],
-        enabled: vec![],
+        state: Default::default(),
     };
     let mut parent = Command::new("sleep").arg("60").spawn().unwrap();
     let opts = bridge::Opts { dir: dir.clone(), parent: Some(parent.id()), roots, status_dir: Some(sd.clone()), secrets_dir: Some(secrets.clone()), ready_wait: bridge::READY_WAIT };
@@ -292,8 +291,7 @@ fn the_bridge_keeps_a_server_that_needs_a_login_and_connects_it_after() {
         user: None,
         workspace: Some(base.join("ws/.agents/plugins")),
         data: base.join("data"),
-        disabled: vec![],
-        enabled: vec![],
+        state: Default::default(),
     });
     let listing = bend_plugins::report::text_with(&res, None, Some(&sd));
     assert!(listing.contains(&format!("  mcp fake · 127.0.0.1:{} · needs a login · /plugins login", f.port)), "{}", listing);

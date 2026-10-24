@@ -795,8 +795,7 @@ mod tests {
             user: None,
             workspace: None,
             data: std::env::temp_dir(),
-            disabled: vec![],
-            enabled: vec![],
+            state: Default::default(),
         };
         let note = plugins_note(&loaded_plugins_in(&roots)).unwrap();
         for (p, kind) in [("slides", "pptx"), ("sheets", "xlsx"), ("docs", "docx")] {

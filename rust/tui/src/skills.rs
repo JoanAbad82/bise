@@ -312,8 +312,7 @@ mcp-builder\tGuide for MCP servers\t/a/m/SKILL.md
                 user: Some(home.join(".agents/plugins")),
                 workspace: Some(ws.join(".agents/plugins")),
                 data: root.join("plugin-data"),
-                disabled: vec![],
-                enabled: vec![],
+                state: Default::default(),
             },
         };
         let find = |ws: &Path| scan(ws, &places).into_iter().find(|s| s.name == "gamma");

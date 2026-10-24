@@ -66,8 +66,7 @@ fn fixture_plugin_end_to_end() {
         user: Some(base.join("nothing-here")),
         workspace: Some(plugins.clone()),
         data: base.join("data"),
-        disabled: vec![],
-        enabled: vec![],
+        state: Default::default(),
     };
     let opts = bridge::Opts { dir: dir.clone(), parent: Some(parent.id()), roots, status_dir: None, secrets_dir: None, ready_wait: bridge::READY_WAIT };
     let server = std::thread::spawn(move || bridge::serve(opts));
@@ -146,8 +145,7 @@ fn failing_server_is_a_diagnostic() {
         user: None,
         workspace: Some(plugins),
         data: base.join("data"),
-        disabled: vec![],
-        enabled: vec![],
+        state: Default::default(),
     };
     // nothing to serve: returns once the files are written
     bridge::serve(bridge::Opts { dir: dir.clone(), parent: None, roots, status_dir: None, secrets_dir: None, ready_wait: bridge::READY_WAIT }).unwrap();
@@ -183,8 +181,7 @@ fn limits_filter_tools_bound_calls_and_late_servers_join() {
         user: None,
         workspace: Some(plugins),
         data: base.join("data"),
-        disabled: vec![],
-        enabled: vec![],
+        state: Default::default(),
     };
     let opts = bridge::Opts { dir: dir.clone(), parent: Some(parent.id()), roots, status_dir: None, secrets_dir: None, ready_wait: Duration::from_secs(4) };
     let server = std::thread::spawn(move || bridge::serve(opts));

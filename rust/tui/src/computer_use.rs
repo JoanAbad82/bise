@@ -67,17 +67,22 @@ fn json_of(args: &[&str]) -> Option<Value> {
 /// is off until /computer-use turns it on. The hub sees the plugins
 /// change and relaunches each agent at its next idle, prompt included.
 pub(crate) fn set_on(on: bool) {
-    let _ = bend_plugins::state::set_enabled(&bend_plugins::state::state_path(), "computer", on);
+    let _ = bend_plugins::state::set(&bend_plugins::state::state_path(), &plugin(), on);
 }
 
-/// Whether the plugin is on: named in `enabled` and not in `disabled`
-/// (what `set_on` writes; the `/computer-use` menu follows it).
+/// The built-in `computer` plugin.
+fn plugin() -> bend_plugins::id::PluginId {
+    bend_plugins::id::PluginId::plugin("computer")
+}
+
+/// Whether the plugin is on (opt-in: named in `enabled`, not in
+/// `disabled`; what `set_on` writes; the `/computer-use` menu follows it).
 pub(crate) fn is_on() -> bool {
     on_in(&bend_plugins::state::state_path())
 }
 
 pub(crate) fn on_in(state: &std::path::Path) -> bool {
-    bend_plugins::state::is_on(state, "computer")
+    bend_plugins::state::read(state).is_on(&plugin(), true)
 }
 
 /// /computer-use off|uninstall: the plugin off, then `bise computer-use
