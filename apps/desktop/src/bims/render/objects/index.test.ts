@@ -49,9 +49,9 @@ function outOfFoot(id: ObjId, o: MakeOpts): string[] {
 
 /** p1's objects: the 30 signed ones, the cat on a walk and its cushion; p2 adds to them, never drops one */
 const P1: readonly string[] = ['chess', 'pingpong', 'arcade', 'pinball', 'babyfoot', 'piano', 'jukebox', 'shelf', 'library', 'telescope', 'easel', 'printer', 'plant', 'campfire', 'cat', 'catwalk', 'cushion', 'dog', 'aquarium', 'mailbox', 'booth', 'visio', 'rack', 'macdesk', 'scooter', 'bike', 'calendar', 'files', 'trophies', 'extinguisher', 'charts', 'packing'];
-/** the collection table (page bims-plugins): 10 a family; animals keep their walk and cushion poses on top */
+/** the collection table (page bims-plugins): 10 a family; animals keep their walk and cushion poses on top, garden its potted plant (any plugin with no object of its own) */
 const PER_FAMILY = 10;
-const EXTRA: Partial<Record<keyof typeof FAMILIES, number>> = { animals: 2 };
+const EXTRA: Partial<Record<keyof typeof FAMILIES, number>> = { garden: 1, animals: 2 };
 
 describe('objects', () => {
   it('keeps every p1 object, each in one family, never more than the collection table holds', () => {
