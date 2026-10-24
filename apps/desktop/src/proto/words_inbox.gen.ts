@@ -44,8 +44,6 @@ export const inbox = {
   list_keys_past: "⏎ go to it   ↑↓ move   esc back",
   /** the TUI's keys with nothing selected */
   list_keys_none: "esc back",
-  /** the desktop screen's counts */
-  screen_counts: (a: { waiting: string | number; answered: string | number }): string => String(a.waiting) + " waiting · " + String(a.answered) + " answered",
   /** the desktop's project filter: every project */
   all_projects: "all projects",
   /** the desktop's agent filter: every agent */

@@ -45,7 +45,8 @@ describe('the scheduled screen', () => {
     // 'how often' holds only the rhythm; the count is the pane's 'its runs' (designer m_12105)
     expect(rows[0]?.textContent).toContain('every 5 min');
     expect(rows[0]?.textContent).not.toContain(scheduled.n_of({ count: 6, total: 24 }));
-    expect(screen.getByTestId('scheduled.count').textContent).toBe(scheduled.count_desktop({ n: 2 }));
+    // the hero's facts: how many run, then the soonest run
+    expect(screen.getByTestId('scheduled.hero').querySelector('.facts')?.textContent).toMatch(/^2 running · next at /);
     const root = screen.getByTestId('scheduled.screen');
     fireEvent.keyDown(root, { key: 'Enter' });
     // its name (else its words' first line), never its id; who it wakes beside it (designer m_15929)

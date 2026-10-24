@@ -56,8 +56,6 @@ export const panel = {
   inbox: "inbox",
   /** the archived section's folded row; the desktop's /archived and artifacts lists */
   archived_count: (a: { n: string | number }): string => String(a.n) + " archived",
-  /** the desktop's /agents head: the live agents */
-  live_count: (a: { n: string | number }): string => String(a.n) + " live",
   /** the desktop's /archived with none */
   no_archived: "no archived agent",
   /** his messages held for after an agent's turn */

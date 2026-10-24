@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { nextHit, type Hit } from './find';
 import type { Terminal as Xterm } from '@xterm/xterm';
-import { Field, Press, tipAttrs } from '@/ds';
+import { Field, PageHero, Press, tipAttrs } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
 import { useKeptScroll } from '@/app/keep';
 import { useStore } from '@/store';
@@ -181,13 +182,13 @@ export function RunningView({
   return (
     <section ref={ref} className={`run-screen${cur ? ' has-pane' : ''}`} data-testid="running.screen" tabIndex={-1} onKeyDown={onKeyDown}>
       <div className="run-main">
-        <header className="run-head">
-          <div className="run-h1">{running.heading}</div>
-          <div className="run-h2" data-testid="running.sub">
-            {/* 'in N projects' only on every project's list: a scoped one is one place (designer m_38700) */}
-            {`${scoped ? running.count_running({ n: counts.running }) : running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}
-          </div>
-        </header>
+        <PageHero
+          name={running.heading}
+          sentence={hero.processes_say}
+          // 'in N projects' only on every project's list: a scoped one is one place (designer m_38700)
+          facts={<span data-testid="running.sub">{`${scoped ? running.count_running({ n: counts.running }) : running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}</span>}
+          testId="running.hero"
+        />
         <div className="run-bar">
           <div className="run-filters" role="tablist">
             {(['running', 'ended'] as const).map((f) => (

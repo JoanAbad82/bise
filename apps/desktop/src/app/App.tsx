@@ -416,7 +416,7 @@ function ScreenOf({ route }: { route: Route }) {
     case 'thread':
       return <ProjectThread project={route.project} agent={route.agent} />;
     case 'agents':
-      return <Known project={route.project}>{(name) => <AgentsScreen project={route.project} projectName={name} archived={route.archived === true} />}</Known>;
+      return <Known project={route.project}>{() => <AgentsScreen project={route.project} archived={route.archived === true} />}</Known>;
     case 'changes':
       return <Known project={route.project}>{() => <ChangesScreen project={route.project} />}</Known>;
     case 'review':

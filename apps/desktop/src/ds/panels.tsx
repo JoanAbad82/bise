@@ -4,6 +4,7 @@
 // Capsule + Wave + Shot + Edge.
 import { memo, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx, sub } from "./cx";
+import { PageHero } from "./pagehero";
 import { Bar, Button, Chip, type ChipProps, Dot, Empty, Help, Kbd, Pearl, Skel, type DotState } from "./prim";
 
 // ---- the task board
@@ -147,12 +148,18 @@ export function Group({ title, items, help, list, testId }: { title?: ReactNode;
   );
 }
 
-/** the settings page: its nav (Row children) and the page */
-export function Settings({ nav, title, sub: subtitle, children, testId }: { nav: ReactNode; title: ReactNode; sub?: ReactNode; children: ReactNode; testId?: string }) {
+/**
+ * the settings page: its nav (Row children) and the page. `hero`: the section's name and sentence
+ * as its PageHero card (with `facts` when it has live numbers); without it the plain title and sub.
+ */
+export function Settings({ nav, title, sub: subtitle, hero, facts, children, testId }: { nav: ReactNode; title: ReactNode; sub?: ReactNode; hero?: boolean; facts?: ReactNode; children: ReactNode; testId?: string }) {
+  const head = hero === true && subtitle != null
+    ? <PageHero name={title} sentence={subtitle} {...(facts == null ? {} : { facts })} {...(testId === undefined ? {} : { testId: `${testId}.hero` })} />
+    : <><div className="b-h">{title}</div>{subtitle != null && <div className="b-sub">{subtitle}</div>}</>;
   return (
     <div className="b-set" data-testid={testId}>
       <div className="nav">{nav}</div>
-      <div className="pg"><div className="b-h">{title}</div>{subtitle != null && <div className="b-sub">{subtitle}</div>}{children}</div>
+      <div className="pg">{head}{children}</div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 // artifacts_screen.rs words): the rows across his projects, their kind's glyph and words, the day
 // groups, the filters. Pure. Owner: amb-kit.
 import type { Artifact } from '@/proto';
+import { hero } from '@/proto/words_hero.gen';
 
 /** One artifact with the project it belongs to (the artifacts event is per project). */
 export interface Item {
@@ -115,6 +116,12 @@ export const ALL: Filter = { project: '', agent: '', kinds: [], q: '' };
 
 /** Archived by him or an agent (art-archive's archived_at): out of the default list, behind 'N archived'. */
 export const isArchived = (a: Artifact): boolean => a.archived_at != null;
+
+/** The hero's facts line (designer m_39021): how many, and how many he hasn't opened, '41 · 3 new'. Pure. */
+export function heroFacts(live: readonly Item[]): string {
+  const fresh = live.filter((it) => it.a.new).length;
+  return fresh === 0 ? String(live.length) : `${String(live.length)} · ${hero.new_ones({ n: fresh })}`;
+}
 
 /** The list's items and how many archived ones it leaves behind (the TUI's faint '2 archived' row). Pure. */
 export function splitArchived(items: readonly Item[]): { live: Item[]; archived: Item[] } {

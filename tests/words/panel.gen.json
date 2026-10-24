@@ -213,13 +213,6 @@
     "one": null,
     "text": "lands via PRs"
   },
-  "panel.live_count": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "{n} live"
-  },
   "panel.more": {
     "args": [
       "n"

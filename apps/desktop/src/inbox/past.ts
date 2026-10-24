@@ -7,6 +7,7 @@
 import type { Card } from '@/proto';
 import type { InboxRecord, Where } from '@/proto/inbox';
 import { inbox } from '@/proto/words_inbox.gen';
+import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { dayOf, timeOf } from '@/artifacts/model';
 import { age, titleOf } from './InboxCard';
@@ -74,10 +75,14 @@ export function askersOf(cards: readonly Card[], records: readonly InboxRecord[]
   return [...new Set([...cards.map((c) => c.agent), ...records.map((r) => r.asker)])].sort();
 }
 
-/** The head's counts: '3 waiting · 41 answered' (the hubs' total when given; withdrawn ones are not 'answered'). Pure. */
-export function headWords(cards: readonly Card[], records: readonly InboxRecord[], total?: number): string {
-  const answered = total ?? records.filter((r) => r.state === 'answered').length;
-  return inbox.screen_counts({ waiting: cards.length, answered });
+/**
+ * The hero's facts line (designer m_39021): how many wait (the accent's part) and the oldest's age,
+ * '3 waiting · the oldest 2 h ago'; nothing waits: its words alone (no accent). Pure.
+ */
+export function heroFacts(cards: readonly Pick<Card, 'since_ms'>[], now: number): { wait?: string; rest: string } {
+  if (cards.length === 0) return { rest: hero.nothing_waits };
+  const oldest = Math.min(...cards.map((c) => c.since_ms));
+  return { wait: hero.waiting({ n: cards.length }), rest: hero.oldest({ age: age(now - oldest) }) };
 }
 
 /** The rows the filter keeps: what waits (in the hub's order, given), then the past by day, newest first. Pure. */

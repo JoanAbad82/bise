@@ -39,7 +39,10 @@ describe('the inbox screen', () => {
 
   it('shows what waits first, then the past by day, two lines each', () => {
     mount();
-    expect(screen.getByTestId('inbox.counts').textContent).toBe('1 waiting · 2 answered');
+    // the hero card: its name, its sentence, how many wait (the accent) and the oldest's age
+    const top = screen.getByTestId('inbox.hero');
+    expect(top.querySelector('.facts')?.textContent).toBe('1 waiting · the oldest 12 min ago');
+    expect(top.querySelector('.wait')?.textContent).toBe('1 waiting');
     expect(screen.getByTestId('inbox.waiting.head').textContent).toBe('waiting for you · 1');
     const rows = [...screen.getByTestId('inbox.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-row'));
     expect(rows).toEqual(['w:shop/3', 'p:shop/1', 'p:bise/2', 'p:shop/5']);

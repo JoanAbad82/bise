@@ -714,14 +714,6 @@
     "one": null,
     "text": "restart to update"
   },
-  "inbox.screen_counts": {
-    "args": [
-      "waiting",
-      "answered"
-    ],
-    "one": null,
-    "text": "{waiting} waiting · {answered} answered"
-  },
   "inbox.screen_empty": {
     "args": [],
     "one": null,

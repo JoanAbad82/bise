@@ -1,5 +1,5 @@
 // The inbox screen's view (designer's inbox-history pick A, m_24212 (2)-(6); route inbox/all,
-// sidebar row '? inbox'): the head ('inbox', '3 waiting · 41 answered'), the filters (projects,
+// sidebar row '? inbox'): the hero card ('inbox', its sentence, '3 waiting · the oldest 2 h ago'), the filters (projects,
 // agents, all / waiting / answered / withdrawn, '/' search), 'waiting for you · N' first (⏎ opens
 // the item above this screen's composer, as ⌘I), then the past by day, two lines each, read-only.
 // A past row's first action (his ask, inbox-open): ⏎, space or a click opens the whole item in the
@@ -13,13 +13,14 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
-import { Dropdown, Field, Press } from '@/ds';
+import { Dropdown, Field, HeroWait, PageHero, Press } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
 import { CardId } from './CardId';
 import { idOf } from './id';
 import { timeOf } from '@/artifacts/model';
-import { ALL, askersOf, closedMs, dayHead, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
+import { ALL, askersOf, closedMs, dayHead, heroFacts, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
 import './past.css';
 
 /** A state filter's words. */
@@ -37,8 +38,6 @@ export interface InboxPorts {
 export interface InboxViewProps {
   readonly cards: readonly Card[];
   readonly records: readonly InboxRecord[];
-  /** the hubs' answered total for the head (none: the records given) */
-  readonly answered?: number;
   /** older records wait in the hubs: called when he reaches the list's end */
   readonly onEnd?: () => void;
   /** project id → its name */
@@ -56,7 +55,7 @@ export interface InboxViewProps {
   readonly now?: number;
 }
 
-export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, onDetail, pageOf, now: pinned }: InboxViewProps) {
+export function InboxView({ cards, records, onEnd, names, projects, ports, nextOf, onDetail, pageOf, now: pinned }: InboxViewProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [f, setF] = useState<Filter>(ALL);
@@ -133,14 +132,12 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
     setF({ ...f, ...g });
   };
   const askers = askersOf(cards, records);
+  const facts = heroFacts(cards, now);
   const empty = cards.length === 0 && records.length === 0;
   const none = lists.order.length === 0;
   return (
     <section ref={ref} tabIndex={-1} className="ip-screen" data-testid="inbox.screen" onKeyDown={onKeyDown}>
-      <header className="ip-head">
-        <div className="ip-h1">{inbox.head}</div>
-        <div className="ip-h2" data-testid="inbox.counts">{headWords(cards, records, answered)}</div>
-      </header>
+      <PageHero name={inbox.head} sentence={hero.inbox_say} facts={<>{facts.wait !== undefined && <><HeroWait>{facts.wait}</HeroWait>{' · '}</>}{facts.rest}</>} testId="inbox.hero" />
       {(
         <div className="ip-filters">
           <Dropdown label={f.project === '' ? inbox.all_projects : (names[f.project] ?? f.project)} testId="inbox.projects"

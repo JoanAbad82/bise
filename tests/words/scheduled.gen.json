@@ -26,13 +26,6 @@
     "one": null,
     "text": "{n} active"
   },
-  "scheduled.count_desktop": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "active · {n}"
-  },
   "scheduled.count_ended": {
     "args": [
       "n"

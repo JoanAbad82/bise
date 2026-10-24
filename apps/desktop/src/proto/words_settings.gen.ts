@@ -6,48 +6,48 @@
 export const settings = {
   /** the nav's page: general */
   page_general: "general",
-  /** general's line under its title */
-  page_general_sub: "bise on your Mac.",
+  /** general's hero sentence (designer m_39021) */
+  page_general_sub: "how bise starts, updates and looks.",
   /** the nav's page: setup */
   page_setup: "setup",
-  /** setup's line under its title */
-  page_setup_sub: "what bise needs, checked again. /setup in the terminal.",
+  /** setup's hero sentence */
+  page_setup_sub: "what's set up and what's left: a model, the permissions, your first project.",
   /** the nav's page: voice */
   page_voice: "voice and fn",
-  /** voice's line under its title */
-  page_voice_sub: "how you talk to bise.",
+  /** voice's hero sentence */
+  page_voice_sub: "how bise hears you and answers: hold fn to talk from any app, ctrl+r to dictate in the composer.",
   /** the nav's page: context and privacy */
   page_privacy: "context and privacy",
-  /** privacy's line under its title */
-  page_privacy_sub: "what fn adds to your question. nothing is read unless you hold fn.",
+  /** privacy's hero sentence */
+  page_privacy_sub: "what bise sees when you hold fn, and what it never sends.",
   /** the nav's page: quiet moments */
   page_quiet: "quiet moments",
-  /** quiet's line under its title */
-  page_quiet_sub: "when notifications wait, and how they come back.",
+  /** quiet's hero sentence */
+  page_quiet_sub: "when bise keeps quiet: in a call, while you share your screen, in full screen.",
   /** the nav's page: models */
   page_models: "models",
-  /** models' line under its title */
-  page_models_sub: "your subscription is enough; an API key works too. /models and /provider in the terminal.",
+  /** models' hero sentence */
+  page_models_sub: "the models your agents use, and how you pay for them: a plan, a key, or both.",
   /** the nav's page: approvals */
   page_approvals: "approvals",
-  /** approvals' line under its title */
-  page_approvals_sub: "what runs without asking you. /approvals in the terminal.",
+  /** approvals' hero sentence */
+  page_approvals_sub: "what runs without asking, and what waits for your yes.",
   /** the nav's page: projects */
   page_projects: "projects",
-  /** projects' line under its title */
-  page_projects_sub: "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's.",
+  /** projects' hero sentence */
+  page_projects_sub: "the folders bise works in. each one has its own main.",
   /** the nav's page: plugins */
   page_plugins: "plugins",
   /** plugins' line under its title */
   page_plugins_sub: "what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.",
   /** the nav's page: computer use */
   page_computer: "computer use",
-  /** computer use's line under its title */
-  page_computer_sub: "agents drive Chrome and your apps, step by step. /computer-use in the terminal.",
+  /** computer use's hero sentence */
+  page_computer_sub: "your browser and your Mac apps, for your agents: set it up once, then see what they did.",
   /** the nav's page: keys */
   page_keys: "keys",
-  /** keys' line under its title */
-  page_keys_sub: "every terminal key works here too; ⌘ adds a Mac app's gestures. /help in the terminal.",
+  /** keys' hero sentence */
+  page_keys_sub: "your keys and sign-ins. they stay on this Mac.",
   /** general: the macOS notifications row's label */
   notify_label: "macOS notifications",
   /** notifications never asked */

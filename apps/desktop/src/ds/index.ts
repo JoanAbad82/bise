@@ -28,3 +28,4 @@ export * from "./gust";
 export * from "./slide";
 export { textWidth } from "./hooks";
 export * from "./ring";
+export * from "./pagehero";

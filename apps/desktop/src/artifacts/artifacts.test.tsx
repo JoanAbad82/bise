@@ -407,7 +407,7 @@ describe('archived artifacts (art-archive archived_at, the TUI artifacts screen)
     expect(screen.getByTestId('artifacts.archived').textContent).toBe('2 archived');
     expect(screen.getByTestId('artifacts.keys').textContent).toContain('a archived');
     fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'a' });
-    expect(screen.getByTestId('artifacts.screen').querySelector('.art-h1')?.textContent).toBe('artifacts · archived');
+    expect(screen.getByTestId('artifacts.screen').querySelector('.b-hero .name')?.textContent).toBe('artifacts · archived');
     expect(ids()).toEqual(['artifacts.list.row.old-deck', 'artifacts.list.row.old-doc']);
     expect(screen.queryByTestId('artifacts.archived')).toBeNull();
     expect(screen.getByTestId('artifacts.keys').textContent).toContain('esc back to the list');
