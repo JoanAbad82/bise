@@ -416,18 +416,29 @@ gate_procs() {  # <marker> <pid whose descendants go too | ""> <worktree binary 
     }
     END {
       for (p = self; p > 1 && !(p in anc); p = pp[p]) anc[p] = 1
+      # the groups of our callers (a test pool, run_all, an orphaned hub that
+      # started this gate): a match in one of them dies alone, never with its
+      # group, or a gate inside a test kills the pool around it (release-52
+      # m_39422: run_all s xargs got a TERM while land_every_e2e ran)
+      for (a in anc) ag[pg[a]] = 1
       # this snapshot: the ps, its subshell and the subshell s children (awk)
       for (i = 1; i <= n; i++) if (cmd[ids[i]] == "ps -axww -o pid=,ppid=,pgid=,command=") sub_sh = pp[ids[i]]
       for (i = 1; i <= n; i++) { p = ids[i]; if (p == sub_sh || pp[p] == sub_sh) anc[p] = 1 }
       for (i = 1; i <= n; i++) { p = ids[i]
         # the tees of the run log (gate dir/logs): they end with its output
         if (tmux(cmd[p]) || (keep != "" && index(cmd[p], keep))) continue
-        if (index(cmd[p], m) || (me != "" && pp[p] == me) || orphan_bin(p)) { k[p] = 1; if (pg[p] != pg[self]) g[pg[p]] = 1 }
+        if (index(cmd[p], m) || (me != "" && pp[p] == me) || orphan_bin(p)) { k[p] = 1; if (pg[p] != pg[self] && !(pg[p] in ag)) g[pg[p]] = 1 }
       }
       for (i = 1; i <= n; i++) { p = ids[i]; if (pg[p] in g) k[p] = 1 }
       do { ch = 0; for (i = 1; i <= n; i++) { p = ids[i]; if (!(p in k) && (pp[p] in k)) { k[p] = 1; ch = 1 } } } while (ch)
       for (p in k) if (!(p in anc) && !tmux(cmd[p]) && !(keep != "" && index(cmd[p], keep))) print p
     }'
+}
+gate_nested() {  # the pid of the live gate this one runs under, or nothing
+  # (BISE_GATE_RUN and its start time, exported by every gate below)
+  [ -n "${BISE_GATE_RUN:-}" ] && [ "$BISE_GATE_RUN" != $$ ] && [ -n "${BISE_GATE_START:-}" ] \
+    && [ "$(proc_start "$BISE_GATE_RUN")" = "$BISE_GATE_START" ] && echo "$BISE_GATE_RUN"
+  return 0
 }
 gate_kill() {  # <pids>: TERM, then KILL what is left half a second later
   [ -n "$1" ] || return 0
@@ -437,7 +448,12 @@ gate_kill() {  # <pids>: TERM, then KILL what is left half a second later
 }
 # in a task's worktree, its own binaries left alone by a dead parent
 wt_bins=""
-if [ -f "$root/.git" ]; then
+# a gate started under a live gate (a test's land check: land_every_e2e's
+# worktree cases run gate.sh land under the tip gate's run_all) sweeps
+# nothing of its caller's: the dead runs and the orphans of its binaries are
+# the outer gate's to sweep. Its own run's processes still die with it.
+nested="$(gate_nested)"
+if [ -f "$root/.git" ] && [ -z "$nested" ]; then
   t="$(cd "${CARGO_TARGET_DIR:-rust/target}" 2>/dev/null && pwd -P)"
   wt_bins="$root/repl-live $root/repl-scripted $root/sb-core ${t:+$t/debug/bise}"
 fi
@@ -462,7 +478,7 @@ gate_prune() {
   return 0
 }
 for d in "$gpre"[0-9]* /tmp/bise-gate-[0-9]*; do
-  [ -d "$d" ] || continue
+  [ -z "$nested" ] && [ -d "$d" ] || continue
   p="${d##*[-/]}"
   kill -0 "$p" 2>/dev/null && [ "$(proc_start "$p")" = "$(cat "$d/.owner" 2>/dev/null)" ] && continue
   gate_kill "$(gate_procs "$(gate_mark "$d")" "")"
@@ -471,7 +487,7 @@ done
 [ -n "$wt_bins" ] && gate_kill "$(gate_procs "/bise-gate-none/" "" $wt_bins)"
 run="$gpre$$"
 rm -rf "$run"; mkdir -p "$run" && proc_start $$ >"$run/.owner" || { echo "gate: cannot write $run"; exit 1; }
-export TMPDIR="$run" BISE_GATE_RUN=$$
+export TMPDIR="$run" BISE_GATE_RUN=$$ BISE_GATE_START="$(cat "$run/.owner")"
 # every quick/full/rerun keeps its output in <gate dir>/logs/ for 7 days,
 # whatever the caller did with it (a task's tmp goes at its drop, a green
 # run's folder at its end): the loop audit's record (scripts/loop_audit.py)
@@ -850,6 +866,7 @@ python3 "$root/tests/include_map.py" --self-test >/dev/null || { python3 "$root/
 # on synthetic coverage (fast-try p2; review-gates m_29412)
 python3 -B "$root/tests/desktop_pick_test.py" >/dev/null || { python3 -B "$root/tests/desktop_pick_test.py"; echo "GATE quick FAILED"; exit 1; }
 # every build that ships a runtime checks it is whole for the viewer (the xlsx grid; xlsx-fix)
+python3 -B "$root/tests/gate_sweep_test.py" >/dev/null || { python3 -B "$root/tests/gate_sweep_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/runtime_check_test.py" >/dev/null || { python3 -B "$root/tests/runtime_check_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 if [ -d "$root/apps/desktop" ]; then
