@@ -2,12 +2,13 @@
 // Each object is built at the origin on the floor (y 0), its front to +z (the camera sees +z and +x),
 // centred on its foot, in the office's clay look (style.ts), with a soft contact shadow under it.
 // Off (a disabled plugin): the same object in glass where it stood, in one neutral (ink, no hue:
-// designer m_40518), 30% opacity, no shadow cast and no contact shadow. A wall object (the calendar) hangs with its back on z = -d/2.
+// designer m_40518), 30% opacity, no shadow cast and no contact shadow, one flat layer (its depth
+// pre-pass, glassDepth: designer m_40607). A wall object (the calendar) hangs with its back on z = -d/2.
 //
 // A family file (games.ts, music.ts, ...) only builds with a Part: a box, a cylinder, a ball, a cone,
 // a pane of glass and a child group, so every object shares the materials, the glass rule and the
 // contact shadow. The registry (index.ts) is the only way in.
-import { Color, ConeGeometry, Group, type Material, Mesh, type Object3D } from 'three';
+import { Color, ConeGeometry, Group, type Material, Mesh, MeshBasicMaterial, type Object3D } from 'three';
 import { STYLE } from '../style';
 
 export interface ObjOpts {
@@ -71,6 +72,30 @@ export const darker = (c: string, k: number): string => '#' + new Color(c).multi
 export const lighter = (c: string, k: number): string => '#' + new Color(c).lerp(new Color('#ffffff'), k).getHexString();
 
 const cache = new Map<string, Material>();
+
+/**
+ * glass's depth pre-pass (designer m_40607): an off object reads as one flat 30% layer, never its
+ * own layers stacked (a globe's stand through its ball). Each glass mesh gets a twin that only writes
+ * depth, drawn after every opaque thing (renderOrder 1, so it hides nothing already drawn) and pushed
+ * back a hair (polygon offset); the glass then draws only where it is the object's front face.
+ */
+const DEPTH = new MeshBasicMaterial({ colorWrite: false, depthWrite: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+
+/** an off object's depth twins, one per mesh, as its child (it follows the mesh's moves and its last geometry) */
+export function glassDepth(root: Object3D): void {
+  const ms: Mesh[] = [];
+  root.traverse((m) => {
+    if (m instanceof Mesh && m.userData.depth !== true) ms.push(m);
+  });
+  for (const m of ms) {
+    const twin = new Mesh(m.geometry, DEPTH);
+    twin.userData.depth = true;
+    twin.renderOrder = 1;
+    twin.castShadow = false;
+    twin.receiveShadow = false;
+    m.add(twin);
+  }
+}
 
 /** a shared material: `opacity` a see-through one (glass, water), `glow` its emissive strength (never in glass) */
 function mat(colour: string, off: boolean, glow: number, opacity?: number): Material {

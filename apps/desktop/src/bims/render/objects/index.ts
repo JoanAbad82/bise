@@ -16,7 +16,7 @@ import { GAMES } from './games';
 import { GARDEN } from './garden';
 import { KITCHEN } from './kitchen';
 import { KNOWLEDGE } from './knowledge';
-import { type Foot, type Maker, partOf } from './kit';
+import { type Foot, glassDepth, type Maker, partOf } from './kit';
 import { MACHINES } from './machines';
 import { MUSIC } from './music';
 import { OFFICE } from './office';
@@ -107,6 +107,8 @@ export function makeObject(id: ObjId, opts: MakeOpts = {}): Made {
     for (const c of [...group.children]) inner.add(c);
     group.add(inner);
   }
+  // off: one flat 30% layer, its own layers never stacked (kit.ts glassDepth)
+  if (o.off) glassDepth(group);
   const foot = { w: s.w * k, d: s.d * k, h: s.h * k };
   return s.wall ? { group, foot, wall: true } : { group, foot };
 }

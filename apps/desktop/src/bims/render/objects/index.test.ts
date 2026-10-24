@@ -113,8 +113,17 @@ describe('objects', () => {
     });
 
     it('is glass when off: ink at 30% at most, no hue, no shadow, no contact shadow', () => {
-      const ms = meshes(makeObject(id, { off: true, night: 1 }).group);
+      const all = meshes(makeObject(id, { off: true, night: 1 }).group);
+      const ms = all.filter((m) => m.userData.depth !== true);
       expect(ms.length).toBeGreaterThan(0);
+      // one flat layer: every glass mesh has its depth twin, which draws no colour, after the opaque things (designer m_40607)
+      for (const m of ms) {
+        const twin = m.children.find((c) => c.userData.depth === true) as Mesh | undefined;
+        expect(twin, 'a glass mesh with no depth twin').toBeDefined();
+        expect(twin?.geometry).toBe(m.geometry);
+        expect(twin?.renderOrder).toBe(1);
+        for (const t of twin ? mats(twin) : []) expect(t.colorWrite === false && t.depthWrite && !t.transparent).toBe(true);
+      }
       for (const m of ms) {
         expect(m.castShadow, 'casts a shadow').toBe(false);
         expect(m.userData.contact, 'keeps its contact shadow').toBeUndefined();
