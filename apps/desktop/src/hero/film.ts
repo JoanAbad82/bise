@@ -22,6 +22,7 @@ import type { Launch } from './fold';
 import { makePage, type KilnLoader } from './page';
 import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, inFrame, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { easeInOut, ENTRY, feedOpacity, makeEntry, wordsAt } from './entry';
+import { askAt } from './ask';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
 import { advance, makeRuns, stepOf, type Run } from './run';
@@ -649,7 +650,10 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     }
     // the followed bim: its egg's words, else its name (labels.ts names a bim only while it walks);
     // no name while it plays an egg: its prop wins (the hop's coin pops where the name sits, bims m_31600)
-    if (f !== null && naming && bub === null && eggsAt(f.id, T).bims?.[f.name] === undefined) {
+    // a question's bubble (ask.ts): its '?' pill under it, no name meanwhile
+    const ask = askAt(T);
+    const asking = ask !== null && f !== null && ask.office === f.id && ask.bim === f.name;
+    if (f !== null && naming && bub === null && !asking && eggsAt(f.id, T).bims?.[f.name] === undefined) {
       const key = `${f.id}\u0000${f.name}`;
       const head = r.headOf(f.id, f.name);
       if (!own.some((x) => x.key === key) && inSafe(head) && steps.get(f.id)?.frames.some((x) => x.name === f.name) === true) {
@@ -662,6 +666,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     if (egg !== undefined) own.push({ key: egg.key, label: egg.label, head: egg.head, rank: 1 });
     const mine = new Set(own.map((x) => x.key));
     overlay.labels([...ls.filter((x) => !mine.has(x.key)), ...own]);
+    overlay.ask(ask === null ? null : { key: `${ask.office}\u0000${ask.bim}`, words: ask.words, scale: ask.scale, head: r.headOf(ask.office, ask.bim) });
     overlay.zzz(heads);
   }
 

@@ -25,6 +25,8 @@
   /* the paper plane's ink edge (bims render/plane.ts: WORLD.ink at 0.55, light only) */
   --bh-plane-ink: #1d1a178c;
   --bh-plane-ink-dart: #1d1a178c;
+  /* a question bubble's edge (ask.ts): ink, a comic's line */
+  --bh-ask-ink: #2b2723;
   /* the app's spacing tokens (src/ds/tokens.css) the page has none of: the tip look's */
   --s-1: 4px;
   --pad-pill: 3px;
@@ -41,6 +43,7 @@ html.pd .bims-hero {
   /* no ink on the dark page: the paper's own shade for its crease */
   --bh-plane-ink: #c9c1b2;
   --bh-plane-ink-dart: #c9c1b2;
+  --bh-ask-ink: #c9c1b2;
 }
 .bims-hero .bh-canvas {
   position: absolute;
@@ -101,6 +104,54 @@ html.pd .bims-hero {
 }
 .bims-hero .bh-pill.failed {
   background: var(--bh-err);
+}
+/* a bim's question, a comic bubble over its '?' pill (ask.ts): paper, an ink edge, its tail to the
+   bim at --tail (film.ts pops it by its scale, from the tail's tip) */
+.bims-hero .bh-ask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 3px 9px 4px;
+  border: 1.5px solid var(--bh-ask-ink);
+  border-radius: 12px;
+  background: var(--bh-win);
+  color: var(--bh-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  z-index: 3;
+  will-change: transform;
+}
+.bims-hero .bh-ask::before,
+.bims-hero .bh-ask::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  border-style: solid;
+  border-color: transparent;
+  border-bottom-width: 0;
+  transform-origin: top center;
+}
+.bims-hero .bh-ask::before {
+  left: calc(var(--tail) - 1.5px - 6px);
+  border-width: 8px 6px 0;
+  border-top-color: var(--bh-ask-ink);
+}
+.bims-hero .bh-ask::after {
+  left: calc(var(--tail) - 1.5px - 4px);
+  margin-top: -2px;
+  border-width: 6.5px 4px 0;
+  border-top-color: var(--bh-win);
+}
+/* beside its pill (no room over it): the tail leans to the bim */
+.bims-hero .bh-ask[data-side='right']::before,
+.bims-hero .bh-ask[data-side='right']::after {
+  transform: skewX(40deg);
+}
+.bims-hero .bh-ask[data-side='left']::before,
+.bims-hero .bh-ask[data-side='left']::after {
+  transform: skewX(-40deg);
 }
 .bims-hero .bims-zzzs {
   position: absolute;
