@@ -50,6 +50,14 @@ SENDS = int(os.environ.get("SEND_COUNT", "60"))
 FILES = int(os.environ.get("SEND_FILES", "8000"))
 BURN = int(os.environ.get("SEND_BURN", "0"))
 LIMIT_S = float(os.environ.get("SEND_LIMIT_S", "1.0"))
+# under load (main m_38608: 3 reds in 12 gate runs at load 50-83, each green alone): the 1 s p99 and
+# the 1 s hold scale by tests/wait.py's load factor (load per core, 1 to 4), as every e2e wait does;
+# an explicit SEND_LIMIT_S (the 300 ms release-build measure) is never scaled. What it guards stays:
+# his 90 s holds and minutes of 'sending...' are far past 4 s.
+SCALE = "SEND_LIMIT_S" not in os.environ
+HELD_S = 1.0
+# the whole run's cap (one gate run hung 14219 s): SEND_MAX_S (600) times the load factor
+MAX_S = float(os.environ.get("SEND_MAX_S", "600"))
 # what may never hold the hub's loop 1 s (hub.log's held/busy lines)
 NEVER_HELD = ("on state push", "on input Tick: idle check", "on client line")
 # SEND_OUT: a file for each send's times (default: sends.json in the
@@ -151,6 +159,19 @@ def queued_has(agent, text):
     return pred
 
 
+def held_s(line):
+    """The seconds of a hub.log 'hub loop held|busy|free after N s on ...' line, or None. Pure."""
+    import re
+    m = re.search(r"hub loop (?:held|busy|free after) ([0-9.]+) s on ", line)
+    return float(m.group(1)) if m else None
+
+
+def bounds(lf, scale=True):
+    """The p99 limit and the hold limit for load factor lf. Pure."""
+    f = lf if scale else 1.0
+    return LIMIT_S * f, HELD_S * f
+
+
 def heard(log, text):
     """When the REPL's fake read `text` (FLOOD_RECV_LOG), in s."""
     try:
@@ -215,6 +236,12 @@ def p99(xs):
 
 
 def main():
+    import signal
+
+    def hung(*_):
+        raise AssertionError("send_latency_e2e ran past %.0f s (SEND_MAX_S x the load factor): a hang" % (MAX_S * wait.load_factor()))
+    signal.signal(signal.SIGALRM, hung)
+    signal.alarm(int(MAX_S * wait.load_factor()))
     E = Env()
     burners = []
     stop = threading.Event()
@@ -304,18 +331,38 @@ def main():
         for l in busy[-12:]:
             print("  hub.log: " + l[:200])
         check(not late, "every send answered and echoed in 60 s: %r" % late[:5])
-        held = [l for l in busy if any(w in l for w in NEVER_HELD)]
-        check(not held, "no state push, idle check or send of his held the loop 1 s: %s" % held[:3])
-        check(p99(resp) < LIMIT_S, "send -> response p99 under %.0f ms: %s" % (LIMIT_S * 1000, stats(resp)))
-        check(p99(echo) < LIMIT_S, "send -> echo p99 under %.0f ms: %s" % (LIMIT_S * 1000, stats(echo)))
-        check(p99(repl) < LIMIT_S, "send -> REPL p99 under %.0f ms: %s" % (LIMIT_S * 1000, stats(repl)))
+        lf = wait.load_factor()
+        lim, hold = bounds(lf, SCALE)
+        # the measured numbers on every run, green too (review-gates m_38613: with bounds up to 4x
+        # looser on a loaded tip, a drift from 0.3 s to 2 s would pass silently; the audit reads this)
+        never = [held_s(l) or 0 for l in busy if any(w in l for w in NEVER_HELD)]
+        print("send_latency: load factor %.1f; p99 response %.3f s, echo %.3f s, REPL %.3f s (limit %.3f s); "
+              "longest NEVER_HELD hold %.1f s (limit %.1f s)" % (lf, p99(resp), p99(echo), p99(repl), lim, max(never or [0]), hold))
+        held = [l for l in busy if any(w in l for w in NEVER_HELD) and (held_s(l) or 0) >= hold]
+        check(not held, "no state push, idle check or send of his held the loop %.1f s: %s" % (hold, held[:3]))
+        check(p99(resp) < lim, "send -> response p99 under %.0f ms: %s" % (lim * 1000, stats(resp)))
+        check(p99(echo) < lim, "send -> echo p99 under %.0f ms: %s" % (lim * 1000, stats(echo)))
+        check(p99(repl) < lim, "send -> REPL p99 under %.0f ms: %s" % (lim * 1000, stats(repl)))
     finally:
+        signal.alarm(0)
         stop.set()
         for b in burners:
             b.kill()
         E.close()
 
 
+def self_test():
+    """The pure parts, offline: held_s and bounds."""
+    assert held_s("hub loop held 1.5 s on repl line t1 (shell 0.1 s)") == 1.5
+    assert held_s("hub loop busy 90 s on sb drop (x)") == 90.0 and held_s("hub loop free after 3 s on client line 3 (y)") == 3.0
+    assert held_s("hub started") is None
+    assert bounds(1.0) == (LIMIT_S, 1.0) and bounds(3.0) == (LIMIT_S * 3, 3.0) and bounds(3.0, scale=False) == (LIMIT_S, 1.0)
+    print("send_latency self-test ok")
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-test"]:
+        self_test()
+        sys.exit(0)
     main()
     print("PASS send_latency_e2e")
