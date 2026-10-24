@@ -1,7 +1,7 @@
 // The objects of the animals family: bise's office cat on its round :* cushion, the cat out on a walk and its empty cushion, the dog by its square basket, an aquarium, and the rest of page bims-plugins' collection table: a parrot on its perch, hens by their coop, a tortoise, a rabbit, a hamster in its cage, a goldfish bowl, ducks on a puddle. Pets are never bims (one bim = one agent); here they only sit still (their life is p6). No red: a hen's comb is amber.
 // A rounded box's bevel stands 0.4 r out of its w and d and its top sits r/4 low (style.ts roundBox): what sits on one is placed past it.
 // Built with the objects' kit (kit.ts): at the origin on the floor, front to +z, centred on the foot it returns.
-import { CylinderGeometry, type Mesh } from 'three';
+import { CylinderGeometry, type Mesh, TorusGeometry } from 'three';
 import { STYLE } from '../style';
 import { AMBER, CREAM, darker, glyph, INK, LEAF, LEAF_L, lighter, ORANGE, PANE, SKY, SLATE, SLATE_L, STEEL, TEAL, WOOD, WOOD_D, WOOD_L, YELLOW, type Maker, type Part } from './kit';
 
@@ -255,6 +255,10 @@ const goldfish: Maker = (g) => {
   // the bowl: a ball's cap turned over, 3/4 of its arc, so its rim sits at 85% of its height, open on top
   const bowl = rounded(g.pane(0.1, 0.1, 0.1, lighter(PANE, 0.4), 0.22, 0, y0, 0), STYLE.cap(r, 0.75));
   bowl.rotation.x = Math.PI;
+  // its lip: one thin pale ring of the same glass, so the cap's open edge never shows a dark back face (designer m_40638)
+  const rr = r * Math.sin(0.75 * Math.PI);
+  const lip = rounded(g.pane(0.1, 0.1, 0.1, lighter(PANE, 0.4), 0.22, 0, y0 - r * Math.cos(0.75 * Math.PI), 0), new TorusGeometry(rr, 0.008, 8, 40));
+  lip.rotation.x = Math.PI / 2;
   // the water: the same, inside it, up to 15% under the rim, its surface a disc
   const rw = r * 0.95, fw = 0.64;
   const water = rounded(g.pane(0.1, 0.1, 0.1, lighter(SKY, 0.45), 0.45, 0, y0, 0), STYLE.cap(rw, fw));
