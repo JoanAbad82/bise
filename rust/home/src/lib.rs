@@ -327,6 +327,14 @@ impl Home {
         self.root.join("cache")
     }
 
+    /// `<root>/cache/thumbs`: the desktop app's artifact card pictures, one
+    /// 480 px PNG per artifact version (`<project>/<id>-v<n>.<sig>.png`);
+    /// rebuildable, pruned by the app past its cap. The app gets it in
+    /// `initialize`'s result (`AppInitResult::thumbs_dir`).
+    pub fn thumbs_cache(&self) -> PathBuf {
+        self.cache_dir().join("thumbs")
+    }
+
     /// The MCP connector index (`$BEND_MCP_INDEX`).
     pub fn mcp_index(&self) -> PathBuf {
         let d = if self.is_bise() { self.cache_dir() } else { self.root.clone() };

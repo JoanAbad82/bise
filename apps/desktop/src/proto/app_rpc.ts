@@ -12,4 +12,10 @@ export type AppInit = { proto: number, client: AppClient, };
 /**
  * `initialize`'s result.
  */
-export type AppInitResult = { proto: number, methods: Array<string>, notifications: Array<string>, };
+export type AppInitResult = { proto: number, methods: Array<string>, notifications: Array<string>, 
+/**
+ * where the app keeps its artifact card pictures
+ * (`bise_home::Home::thumbs_cache`); '' from an older core: the app
+ * makes none
+ */
+thumbs_dir: string, };

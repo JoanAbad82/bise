@@ -77,7 +77,8 @@ impl Stdio {
                     return err(r.id, code::INVALID_PARAMS, format!("initialize: {e}"));
                 }
                 *phase = Phase::Answered;
-                let result = serde_json::to_value(AppInitResult::now()).unwrap_or(Value::Null);
+                let thumbs = bise_home::Home::from_env().thumbs_cache();
+                let result = serde_json::to_value(AppInitResult::now(&thumbs.to_string_lossy())).unwrap_or(Value::Null);
                 Took::Write(vec![Message::Response(Response::ok(r.id, result)).encode()])
             }
             Message::Request(r) if *phase == Phase::New => err(r.id, code::NOT_INITIALIZED, format!("{}: initialize first", r.method)),

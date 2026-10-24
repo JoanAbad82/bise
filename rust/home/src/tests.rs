@@ -330,6 +330,7 @@ fn the_migration_copies_the_user_files_and_moves_the_idle_hubs() {
     assert_eq!(read(h.images_dir().join("a.png")), "png");
     assert_eq!(read(h.mcp_index()), "idx");
     assert_eq!(read(h.cache_dir().join("models.toml")), "m");
+    assert_eq!(h.thumbs_cache(), bise.join("cache").join("thumbs"));
     assert_eq!(read(h.drafts_dir().join("ws.json")), "{}");
     assert!(!bise.join("run").exists());
     assert!(d.join(".bend-harness/config.toml").exists() && st.join("hints.json").exists(), "old files stay");

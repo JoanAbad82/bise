@@ -2,6 +2,7 @@
 // artifacts screen): only a path under his home or one of his project folders
 // (the core's projects rows), resolved first (no '..' escape, no relative
 // path). Pure, plus the project roots main keeps from the core's events.
+import { realpathSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { inside } from './testhome';
 
@@ -19,4 +20,25 @@ export function projectRoots(ev: Record<string, unknown>): string[] | null {
     const p = typeof r === 'object' && r !== null ? (r as Record<string, unknown>)['path'] : undefined;
     return typeof p === 'string' && isAbsolute(p) ? [p] : [];
   });
+}
+
+/** A path's realpath, or null (missing, unreadable). */
+const real = (p: string): string | null => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The fence on realpaths (art-thumbs' reads, architect m_39772): `raw` as allowedPath reads it,
+ * then its realpath inside one of the roots' realpaths, so a symlink in a project can't reach a
+ * file outside them. The realpath when it is, else null (outside, missing).
+ */
+export function realLookable(raw: unknown, roots: readonly string[]): string | null {
+  const p = allowedPath(raw, roots);
+  const rp = p === null ? null : real(p);
+  if (rp === null) return null;
+  return roots.some((r) => r !== '' && isAbsolute(r) && inside(rp, real(r) ?? r)) ? rp : null;
 }

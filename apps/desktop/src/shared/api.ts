@@ -113,6 +113,13 @@ export interface BiseApi {
    */
   readonly fileFacts: (path: string) => Promise<FileFacts | null>;
   /**
+   * An artifact card's picture (art-thumbs, src/main/thumbs): Quick Look's 480 px thumbnail of a
+   * file (same fence), a capture of a local page's first screen, a md/txt's first text, or the
+   * facts of a file Quick Look can't draw; kept per version in ~/Library/Caches/bise/thumbs.
+   * `want: false` only makes it (the background fill) and answers null. null: nothing to draw.
+   */
+  readonly thumb: (req: ThumbReq, want: boolean) => Promise<ThumbAnswer | null>;
+  /**
    * An image he pasted or dropped (its bytes) put in bise's image store, the
    * TUI's (src/main/images.ts): its absolute path for a send's files, so the
    * model sees it (R41). null: not a PNG, JPEG, GIF or WebP, too big, or unwritable.
@@ -379,6 +386,29 @@ export interface FileFacts {
   readonly thumb?: string;
 }
 
+/** window.bise.thumb's question: which version's picture, made from what (artifacts/thumbs/plan.ts's Made). */
+export interface ThumbReq {
+  /** 'file': an absolute path; 'page': a 127.0.0.1 / localhost url */
+  readonly how: 'file' | 'page';
+  readonly src: string;
+  readonly project: string;
+  readonly id: string;
+  readonly v: number;
+  /** the version's signature: the cached picture is kept only while it matches */
+  readonly sig: string;
+}
+
+/**
+ * window.bise.thumb's answer: a picture (a data URL, PNG), a text file's first 4 KB, the facts of
+ * a file with no picture (its extension and size), or a folder's file count; `secs`: a video's or
+ * a sound's length, when its header says it.
+ */
+export type ThumbAnswer =
+  | { readonly img: string; readonly secs?: number }
+  | { readonly text: string }
+  | { readonly none: { readonly ext: string; readonly bytes: number }; readonly secs?: number }
+  | { readonly files: number };
+
 /** The IPC channels between the preload and main (owner: amb-mac). */
 export const IPC = {
   openExternal: 'bise:open-external',
@@ -391,6 +421,7 @@ export const IPC = {
   probePage: 'bise:probe-page',
   fileIcon: 'bise:file-icon',
   fileFacts: 'bise:file-facts',
+  thumb: 'bise:thumb',
   saveImage: 'bise:save-image',
   copy: 'bise:copy',
   menu: 'bise:menu',
