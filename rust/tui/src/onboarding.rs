@@ -1387,6 +1387,11 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
             if !p.signup_url.is_empty() {
                 v.extend(link_lines(settings::first_no_account, &p.signup_url, w));
             }
+            // a Claude plan seen: its monthly API credits can pay for this key
+            if p.id == "anthropic" && o.seen.claude_plan {
+                v.push(Line::raw(""));
+                v.extend(words_in(settings::first_claude_credits_key, w as usize).into_iter().map(dim));
+            }
             blanks(&mut v, gap);
             v.push(Line::from(vec![s(format!("{} ", theme::glyph(theme::G_YOU)), theme::accent()), s(dots, theme::text()), s("█", theme::text())]));
             if o.note == Some(Note::NotAKey) {
@@ -1669,11 +1674,12 @@ fn model_list(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
             }
         }
     }
-    // Claude Code's plan, no Anthropic key: why it isn't one of the ways
+    // Claude Code's plan, no Anthropic key: its monthly API credits, and
+    // how a key uses them (the API key way)
     let anthropic = o.found.iter().any(|p| p.id == "anthropic");
     if o.seen.claude_plan && !anthropic {
         v.push(Line::raw(""));
-        for l in words_in(settings::first_claude_plan, w as usize) {
+        for l in [settings::first_claude_plan, settings::first_claude_credits_how].iter().flat_map(|t| words_in(t, w as usize)) {
             v.push(Line::from(s(l, theme::dim())));
         }
     }

@@ -28,7 +28,14 @@ pub enum CoreEv {
     /// his preferences (`bise_home::prefs`, its one owner): kept as JSON
     /// here until that module types them
     Prefs { prefs: Value },
-    Accounts { items: Vec<Account> },
+    /// `claude_plan`: Claude Code is signed in with a Claude plan
+    /// (bise_catalog::detect, presence only): the first run points at
+    /// its monthly API credits
+    Accounts {
+        items: Vec<Account>,
+        #[serde(default)]
+        claude_plan: bool,
+    },
     /// draft (V14): a sign-in started: the link it opened in his browser
     /// (the window copies it); once per sign-in, its end as before
     /// (accounts, or error {cmd: sign_in})

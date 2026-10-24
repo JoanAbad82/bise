@@ -12,6 +12,7 @@ an API key bills each call. a plan is a monthly price you may already pay. bise 
 | GLM Coding Plan (Z.ai) | the plan's API key | `bise login zai-coding` |
 | Kimi Code | the plan's API key | `bise login kimi-code` |
 | MiniMax M plan | the plan's API key | `bise login minimax` |
+| Claude Max or Team | its monthly API credits, through a key of a linked Console org | `bise login anthropic` |
 
 the first run asks how you want to pay for the models: Continue with ChatGPT, OpenRouter, an API key, or a coding plan key. later, `/provider` adds or changes any of them.
 
@@ -129,13 +130,36 @@ bise doctor             # also says how long the ChatGPT sign-in is good for
 bise looks whether Codex is signed in with ChatGPT, and whether Claude Code is signed in with a Claude plan. it looks only at whether their login is there (a file, or on a Mac a keychain entry), never at the tokens, to tell you the right next step:
 
 - Codex with ChatGPT: the first run marks **Continue with ChatGPT**, "you use it in Codex already". bise still signs in on its own.
-- Claude Code with a Claude plan: one line says that plan works only in Claude Code.
+- Claude Code with a Claude plan: the first run, `/provider`, `bise auth status` and `bise doctor` point at the plan's monthly API credits (below).
+
+## Claude Max or Team: the monthly API credits
+
+a Claude plan's sign-in works only in Claude Code and Anthropic's apps (Anthropic's terms), so bise never signs in with it. but Max and Team come with monthly API credits that work in any tool, bise included, through an API key:
+
+| plan | API credits each month |
+|---|---|
+| Max 5x | $100 |
+| Max 20x | $200 |
+| Team | up to $500 |
+| Pro | none |
+
+to use them:
+
+1. on claude.ai, open **Settings › Billing › API credits** and click **Link organization**: pick or create a Console organization.
+2. in that Console organization, make an API key.
+3. paste it in bise: the first run's **an API key** then Anthropic, `/provider`, or
+
+```sh
+bise login anthropic
+```
+
+`bise login anthropic` shows these steps too. the credits pay for that organization's API calls; past them, its usual API billing applies. Anthropic's help article: [support.claude.com/en/articles/17154008](https://support.claude.com/en/articles/17154008).
 
 ## not supported
 
 | plan | why |
 |---|---|
-| Claude Pro or Max | Anthropic's terms allow these plans only in Claude Code and Anthropic's apps. for Claude in bise, use an Anthropic API key, or Claude through OpenRouter |
+| Claude Pro or Max sign-in | Anthropic's terms allow a plan's sign-in only in Claude Code and Anthropic's apps. Max and Team have monthly API credits for a key ([above](#claude-max-or-team-the-monthly-api-credits)); Pro has none: use an Anthropic API key, or Claude through OpenRouter |
 | GitHub Copilot | Copilot's sign-in for other tools comes from partnerships with those tools (OpenCode has one). bise has none |
 | SuperGrok | the same: no partnership with xAI. an xAI API key works |
 | Gemini CLI, Antigravity | Google's terms keep these logins to Google's tools. a Google AI Studio key works |

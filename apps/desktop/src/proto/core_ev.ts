@@ -12,7 +12,7 @@ import type { Entry, PageRef } from './thread';
 /**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "provider_check", id: string, name: string, state: CheckState, model?: string, 
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, claude_plan: boolean, } | { "ev": "signing", id: string, url: string, } | { "ev": "provider_check", id: string, name: string, state: CheckState, model?: string, 
 /**
  * the model's name for people, as its chip says it (`opus 5.5`)
  */

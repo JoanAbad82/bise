@@ -5,7 +5,7 @@
 // amb-home.
 import { useEffect, useRef, useState } from 'react';
 import type { Artifact } from '@/proto';
-import { useAccounts, useArtifacts, useFound, usePrefs, useProjects, useProviderCheck, useStore } from '@/store';
+import { useAccounts, useArtifacts, useClaudePlan, useFound, usePrefs, useProjects, useProviderCheck, useStore } from '@/store';
 import { useRoute, useRouter } from '@/app/router';
 import { onboarded, prefsOf, useCmdError } from '@/settings';
 import { Onboarding } from './Onboarding';
@@ -19,6 +19,7 @@ export function OnboardingScreen() {
   return (
     <Onboarding
       accounts={useAccounts()}
+      claudePlan={useClaudePlan()}
       found={useFound()}
       home={(globalThis as { bise?: { home?: string } }).bise?.home ?? ''}
       perms={perms}

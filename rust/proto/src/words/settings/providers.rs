@@ -1,5 +1,7 @@
 //! The TUI's `/provider` (onboarding/provider.rs) and its sign-ins
-//! (onboarding/signin.rs: the designer's lines, docs/subscriptions-design.md).
+//! (onboarding/signin.rs: the designer's lines, docs/subscriptions-design.md),
+//! and the Claude plan lines of `bise login anthropic`, `bise auth status`
+//! and `bise doctor` (its monthly API credits, detect.rs).
 
 crate::words! { settings:
     /// a key not removed
@@ -119,4 +121,14 @@ crate::words! { settings:
     signin_signed_out_here = "✓ signed out here. ChatGPT didn't confirm: to be sure, remove bise in your ChatGPT settings.";
     /// sign-out failed
     signin_sign_out_failed(why) = "▲ couldn't sign out: {why}";
+
+    /// `bise doctor` and `bise auth status`: Claude Code signed in with a
+    /// Claude plan (detect.rs, presence only)
+    claude_code_seen(cli) = "signed in with a Claude plan. it runs only in Claude Code; Max and Team include monthly API credits for bise: {cli} login anthropic shows how.";
+    /// `bise login anthropic`: the row's label for a Claude plan's credits
+    login_claude_plan = "on Max or Team?";
+    /// `bise login anthropic`: what to do with the plan's credits
+    login_claude_credits = "your plan's monthly API credits pay for this key: on claude.ai, Settings › Billing › API credits › Link organization, then make the key in that Console org. Pro has none.";
+    /// `bise login anthropic`: the help article's row label
+    login_claude_how = "how it works";
 }

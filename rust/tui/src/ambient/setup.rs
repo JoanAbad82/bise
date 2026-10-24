@@ -118,6 +118,9 @@ pub struct SetupPorts {
     pub prefs: Box<dyn Fn() -> Option<Value>>,
     pub write_prefs: WriteFn,
     pub accounts: Box<dyn Fn() -> Vec<Account>>,
+    /// Claude Code is signed in with a Claude plan (bise_catalog::detect,
+    /// presence only): the accounts event says so
+    pub claude_plan: Box<dyn Fn() -> bool>,
     pub provider_use: ProviderUseFn,
     pub key_remove: IdFn,
     /// only a provider that signs in; its browser flow, `Done::SignedIn`
@@ -498,6 +501,7 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             }
             v
         }),
+        claude_plan: Box::new(move || bise_catalog::detect::claude_plan(home().user_home(), &env)),
         // the key step's one path (firstkey.rs): checked live on its own
         // thread, saved only once it works
         provider_use: Box::new(move |id, key, seq, tx| {

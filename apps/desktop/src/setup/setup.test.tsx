@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, AppCmd, Found } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
+import { settings } from '@/proto/words.gen';
 import { firstSend, fnAct, ideas, next, START, stepOf, STEPS, ticked } from './model';
 
 // the first message's composer: its props (the real one is ProseMirror's, tested in src/composer)
@@ -160,6 +161,22 @@ describe('Onboarding', () => {
     expect(screen.getByTestId('setup.step.model').textContent).toContain('checking your plan');
     rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} />);
     expect(p.sent.length).toBe(2);
+  });
+
+  it("the model step: a Claude plan seen in Claude Code points at its monthly API credits, only without an Anthropic key", () => {
+    const out = accounts().map((a) => ({ ...a, state: 'signed_out' as const }));
+    const { rerender } = render(<Onboarding accounts={out} claudePlan found={[]} perms={{}} ports={ports()} now={NOW} />);
+    fireEvent.keyDown(screen.getByTestId('setup.root'), { key: 'Enter' });
+    const note = screen.getByTestId('setup.pay.claude').textContent;
+    expect(note).toContain(settings.first_claude_plan);
+    expect(note).toContain(settings.first_claude_credits_how);
+    // an Anthropic key set up: nothing to say
+    const keyed = out.map((a) => (a.id === 'anthropic-key' ? { ...a, provider: 'anthropic', state: 'signed_in' as const } : a));
+    rerender(<Onboarding accounts={keyed} claudePlan found={[]} perms={{}} ports={ports()} now={NOW} />);
+    expect(screen.queryByTestId('setup.pay.claude')).toBeNull();
+    // no Claude plan: nothing either
+    rerender(<Onboarding accounts={out} found={[]} perms={{}} ports={ports()} now={NOW} />);
+    expect(screen.queryByTestId('setup.pay.claude')).toBeNull();
   });
 
   it('the model step lists a key found first, and checks it with no key sent', () => {

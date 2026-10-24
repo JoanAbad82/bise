@@ -115,6 +115,10 @@ export class StoreReads extends StoreBase {
   accounts(): readonly Account[] {
     return this.slice("accounts", EMPTY);
   }
+  /** Claude Code is signed in with a Claude plan (the accounts event): the first run points at its API credits */
+  claudePlan(): boolean {
+    return this.slice<boolean>("claude_plan", false);
+  }
   found(): readonly Found[] {
     return this.slice("found", EMPTY);
   }

@@ -14,6 +14,8 @@ export interface PayProps {
   /** the Onb frame's step dots and test id */
   frame: { steps: number; step: number; testId: string };
   accounts: readonly Account[];
+  /** Claude Code is signed in with a Claude plan: the list says its monthly API credits work here (no Anthropic key yet) */
+  claudePlan?: boolean;
   check: ProviderCheck | null;
   s: PayState;
   set: (s: PayState) => void;
@@ -26,7 +28,7 @@ export interface PayProps {
   signInError?: string | null;
 }
 
-export function PayStep({ frame, accounts, check, s, set, send, go, open, signInError = null }: PayProps) {
+export function PayStep({ frame, accounts, claudePlan = false, check, s, set, send, go, open, signInError = null }: PayProps) {
   const run = (r: { s: PayState; cmd: AppCmd | null }) => {
     if (r.cmd !== null) send(r.cmd);
     set(r.s);
@@ -188,11 +190,19 @@ export function PayStep({ frame, accounts, check, s, set, send, go, open, signIn
   }
 
   const items: GroupItem[] = rows(accounts).map((r) => rowItem(r, () => { run(pickRow(s, r, check)); }));
+  // Claude Code's plan, no Anthropic key: its monthly API credits, and how a key uses them (the TUI's words)
+  const credits = claudePlan && !accounts.some((a) => a.provider === 'anthropic' && a.state === 'signed_in');
   return (
     <Onb {...frame} title={settings.onb_model_title} sub={settings.onb_pay_sub} cta={cont}>
       <div className="setup-list">
         <Group list testId="setup.pay" items={items} />
       </div>
+      {credits && (
+        <div className="setup-works" data-testid="setup.pay.claude">
+          <p className="setup-dim">{settings.first_claude_plan}</p>
+          <p className="setup-dim">{settings.first_claude_credits_how}</p>
+        </div>
+      )}
     </Onb>
   );
 }

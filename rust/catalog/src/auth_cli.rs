@@ -805,7 +805,7 @@ pub fn render_status(list: &[Status], d: &crate::detect::Detected, st: &Style) -
         found.push(format!("codex: signed in with ChatGPT. bise signs in on its own: {} login chatgpt", CLI));
     }
     if d.claude_plan {
-        found.push("claude code: signed in with a Claude plan. that plan doesn't run in bise (Anthropic's terms): use an Anthropic API key.".to_string());
+        found.push(format!("claude code: {}", bise_proto::words::settings::claude_code_seen(CLI)));
     }
     if !found.is_empty() {
         o.push('\n');
@@ -943,6 +943,7 @@ pub fn login_main(args: &[String], paths: &Paths, check: Checker) -> i32 {
         if !p.signup_url.is_empty() {
             rows.push(("no account yet?", err.link(&p.signup_url)));
         }
+        rows.extend(claude_credit_rows(&p.id, &err));
         rows.push(("saved in", format!("{}, only you can read it", tilde(&paths.auth_file, paths.home.as_deref()))));
         eprint!("{}", err.rows(2, &rows));
         eprintln!();
@@ -1025,6 +1026,21 @@ pub fn login_main(args: &[String], paths: &Paths, check: Checker) -> i32 {
         println!("{}", out.next(&next_after_login(&setup, p, model.as_deref(), credit.is_some())));
     }
     0
+}
+
+/// Anthropic's help article on the Max and Team plans' monthly API credits.
+pub const CLAUDE_CREDITS_URL: &str = "https://support.claude.com/en/articles/17154008";
+
+/// `bise login anthropic`'s rows on a Claude plan's monthly API credits
+/// (a Console org linked on claude.ai pays for its keys); none for the
+/// other providers. The text wraps under its column.
+pub fn claude_credit_rows(id: &str, st: &Style) -> Vec<(&'static str, String)> {
+    use bise_proto::words::settings;
+    if id != "anthropic" {
+        return Vec::new();
+    }
+    let text = bise_home::style::wrap(settings::login_claude_credits, 60).join("\n");
+    vec![(settings::login_claude_plan, text), (settings::login_claude_how, st.link(CLAUDE_CREDITS_URL))]
 }
 
 /// "mistral-medium-latest" of "mistral/mistral-medium-latest".

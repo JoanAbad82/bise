@@ -36,6 +36,8 @@ export interface OnboardingPorts {
 
 export interface OnboardingProps {
   accounts: readonly Account[];
+  /** Claude Code is signed in with a Claude plan: the model step points at its monthly API credits */
+  claudePlan?: boolean;
   found: readonly Found[];
   perms: Perms;
   /** the helper's last fn act (talk_start, talk_end...), with a counter so the same act twice counts */
@@ -57,7 +59,7 @@ const FIRST_KISS = 48;
 /** A fn sentinel in onb_first_fn's words, where the key chip goes. */
 const FN_HOLE = '\u0000';
 
-export function Onboarding({ accounts, found, perms, fn = null, check = null, signInError = null, ports, now: pinned, home = '' }: OnboardingProps) {
+export function Onboarding({ accounts, claudePlan = false, found, perms, fn = null, check = null, signInError = null, ports, now: pinned, home = '' }: OnboardingProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [st, setSt] = useState<OnbState>(START);
@@ -126,6 +128,7 @@ export function Onboarding({ accounts, found, perms, fn = null, check = null, si
         <PayStep
           frame={frame}
           accounts={accounts}
+          claudePlan={claudePlan}
           check={check}
           s={pay}
           set={setPay}

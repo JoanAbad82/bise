@@ -186,6 +186,7 @@ export function applyTyped(s: Store, ev: Ev): void {
       return;
     case "accounts":
       s.put("accounts", ev.items);
+      s.put("claude_plan", ev.claude_plan);
       // a sign-in's end: its link is no longer open
       if (s.signing() !== null) s.put("signing", null);
       return;

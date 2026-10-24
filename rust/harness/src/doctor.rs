@@ -213,7 +213,7 @@ pub(crate) fn detected_checks(d: &bise_catalog::detect::Detected) -> Vec<Check> 
         v.push(info("codex", format!("signed in with ChatGPT. bise signs in on its own: {} login chatgpt", bise_catalog::CLI)));
     }
     if d.claude_plan {
-        v.push(info("claude code", "signed in with a Claude plan. that plan doesn't run in bise (Anthropic's terms): use an Anthropic API key."));
+        v.push(info("claude code", bise_proto::words::settings::claude_code_seen(bise_catalog::CLI)));
     }
     v
 }

@@ -406,6 +406,13 @@
     "one": null,
     "text": "off · every command asks you"
   },
+  "settings.claude_code_seen": {
+    "args": [
+      "cli"
+    ],
+    "one": null,
+    "text": "signed in with a Claude plan. it runs only in Claude Code; Max and Team include monthly API credits for bise: {cli} login anthropic shows how."
+  },
   "settings.cu_apps": {
     "args": [],
     "one": null,
@@ -660,10 +667,20 @@
     "one": null,
     "text": "checking your plan…"
   },
+  "settings.first_claude_credits_how": {
+    "args": [],
+    "one": null,
+    "text": "to use them: on claude.ai, Settings › Billing › API credits › Link organization. then make a key in that Console org and paste it as an Anthropic key."
+  },
+  "settings.first_claude_credits_key": {
+    "args": [],
+    "one": null,
+    "text": "on Max or Team? link this key's Console org on claude.ai (Settings › Billing › API credits) and your plan's monthly credits pay for it."
+  },
   "settings.first_claude_plan": {
     "args": [],
     "one": null,
-    "text": "your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key."
+    "text": "your Claude plan runs only in Claude Code, but Max and Team come with monthly API credits that work here: $100 on Max 5x, $200 on Max 20x, up to $500 on Team. Pro has none."
   },
   "settings.first_coding": {
     "args": [],
@@ -1608,6 +1625,21 @@
     "args": [],
     "one": null,
     "text": "log out"
+  },
+  "settings.login_claude_credits": {
+    "args": [],
+    "one": null,
+    "text": "your plan's monthly API credits pay for this key: on claude.ai, Settings › Billing › API credits › Link organization, then make the key in that Console org. Pro has none."
+  },
+  "settings.login_claude_how": {
+    "args": [],
+    "one": null,
+    "text": "how it works"
+  },
+  "settings.login_claude_plan": {
+    "args": [],
+    "one": null,
+    "text": "on Max or Team?"
   },
   "settings.login_in": {
     "args": [

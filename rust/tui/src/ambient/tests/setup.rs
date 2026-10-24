@@ -78,6 +78,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 coding: false,
             }]
         }),
+        claude_plan: Box::new(|| true),
         // the live port checks on a thread (firstkey.rs); this one answers
         // at once: "sk-bad…" is refused, nothing saved; any other key works
         provider_use: Box::new(move |id, key, seq, tx| {
@@ -229,6 +230,8 @@ fn the_window_gets_prefs_and_accounts_and_sets_a_known_pref() {
     assert_eq!(prefs.len(), 1);
     assert!(prefs[0]["prefs"]["excluded_apps"].as_array().is_some_and(|a| a.contains(&json!("com.apple.MobileSMS"))), "the seed");
     assert_eq!(evs(&out, "accounts")[0]["items"][0]["state"], "signed_out");
+    // Claude Code's plan seen: the first run points at its API credits
+    assert_eq!(evs(&out, "accounts")[0]["claude_plan"], true);
 
     app(&mut t, r#"{"cmd":"prefs_set","key":"quiet.call","value":false}"#);
     assert_eq!(w.borrow().prefs, Some(json!({"quiet": {"call": false}})));

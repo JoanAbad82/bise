@@ -238,20 +238,38 @@ fn codex_signed_in_marks_the_chatgpt_row() {
 }
 
 #[test]
-fn claude_code_plan_says_why_once_and_only_without_an_anthropic_key() {
+fn claude_code_plan_points_at_its_api_credits_once_and_only_without_an_anthropic_key() {
+    use bise_proto::words::settings;
     let h = tmp("claude");
     let e = home_env(&h, &[]);
-    let line = "your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key.";
+    let lines = [settings::first_claude_plan, settings::first_claude_credits_how];
     script(PlanState::NotSetUp, Detected { codex_chatgpt: false, claude_plan: true }, vec![]);
     let o = first_run(&e);
     let sc = screen(&o);
-    has(&sc, &[line]);
+    has(&sc, &lines);
     assert_eq!(flat(&sc).matches("Claude Code").count(), 1, "{sc}");
-    has(&screen_at(&o, 80, 36), &[line]);
+    has(&screen_at(&o, 80, 36), &lines);
     // an Anthropic key: nothing to say
     let e = home_env(&h, &[("ANTHROPIC_API_KEY", "sk-ant-x")]);
     let o = first_run(&e);
     assert!(!flat(&screen(&o)).contains("Claude Code"), "{}", screen(&o));
+}
+
+#[test]
+fn the_anthropic_key_step_says_a_claude_plan_s_credits_pay_for_it_only_when_one_is_seen() {
+    use bise_proto::words::settings;
+    let h = tmp("claude-key");
+    let e = home_env(&h, &[]);
+    for (seen, shown) in [(true, true), (false, false)] {
+        script(PlanState::NotSetUp, Detected { codex_chatgpt: false, claude_plan: seen }, vec![]);
+        let mut o = first_run(&e);
+        o.sub = Sub::Paste(o.every_of("anthropic"), String::new(), String::new());
+        let sc = screen(&o);
+        assert_eq!(flat(&sc).contains(settings::first_claude_credits_key), shown, "{sc}");
+        // another provider's key: nothing about Claude
+        o.sub = Sub::Paste(o.every_of("openai"), String::new(), String::new());
+        assert!(!flat(&screen(&o)).contains(settings::first_claude_credits_key));
+    }
 }
 
 #[test]

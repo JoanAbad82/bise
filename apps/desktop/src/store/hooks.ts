@@ -91,6 +91,8 @@ export const useNotice = (project: string): HubLine | null => useSlice(`notice:$
 export const useApprovals = (project: string): EvOf<'approvals'> | null => useSlice(`approvals:${project}`, (s) => s.approvals(project));
 export const usePrefs = (): JsonValue | null => useSlice('prefs', (s) => s.prefs());
 export const useAccounts = (): readonly Account[] => useSlice('accounts', (s) => s.accounts());
+/** Claude Code is signed in with a Claude plan (presence only, the accounts event). */
+export const useClaudePlan = (): boolean => useSlice('claude_plan', (s) => s.claudePlan());
 /** V14: the sign-in open in his browser, {id, url} (copy the link), null at its end. */
 export const useSigning = (): { readonly id: string; readonly url: string } | null => useSlice('signing', (s) => s.signing());
 /** provider_use's last answer (checking, then works or failed), null before any. */

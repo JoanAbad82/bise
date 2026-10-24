@@ -263,7 +263,8 @@ impl Core {
     fn emit_accounts(&mut self) {
         let Some(s) = &self.setup else { return };
         let items = (s.ports.accounts)();
-        self.emit(json!({"ev": "accounts", "items": items}));
+        let claude_plan = (s.ports.claude_plan)();
+        self.emit(json!({"ev": "accounts", "items": items, "claude_plan": claude_plan}));
         self.replay_held();
     }
 
