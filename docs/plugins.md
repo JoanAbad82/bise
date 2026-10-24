@@ -305,7 +305,11 @@ tests use temp dirs.
   a server that keeps state between calls loses it then. Its status
   (`status::Status::idle`) says listed, not running (the Plugins list:
   "N tools · starts when used"), never an error. Remote servers hold no
-  local process and connect at start as before.
+  local process and connect at start as before. Measured (24 session
+  bridges, 6 node + 1 python fake plugins, a throwaway home): before,
+  168 server processes, 6424 MB RSS, with no call; after, 0 processes
+  and 0 MB, every bridge still listing all 7 servers' tools; one call:
+  1 process, 41 MB.
 - Spawns every remote server of every enabled plugin (and a stdio one
   to list it, on a cache miss) in parallel, sends
   `initialize` (protocol `2025-06-18`), `notifications/initialized`,
