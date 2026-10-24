@@ -383,7 +383,10 @@ def toolrow(d, x, R, y, html, done):
     return d.t(x, y, html, 12.5, "dim") + d.t(R, y, done, 11.5, "faint", anchor="end")
 
 def diffs(c, plus, minus):
-    return f'<tspan fill="{c["ok"]}">+{plus}</tspan> <tspan fill="{c["err"]}">−{minus}</tspan>'
+    """'+18 −6': the counts show only what's there (no '−0', no '+0')."""
+    p = f'<tspan fill="{c["ok"]}">+{plus}</tspan>' if plus else ""
+    m_ = f'<tspan fill="{c["err"]}">−{minus}</tspan>' if minus else ""
+    return " ".join(x for x in (p, m_) if x)
 
 def landrow(d, x, y, who="perf", sha="a1b2c3d", files="3 files", plus=42, minus=18):
     """'✓ perf landed on main · a1b2c3d', the files as their own quiet chip (green only for the diff's +)."""
@@ -908,7 +911,7 @@ def d_scheduled(m):
     y = 54 + bh + 24
     o.append(colT(at(3.4, None, d.head(X, y, "bise") + t(X, y + 20, "ok: every 2 min. you'll hear from me only if it's over 30 s.", 13))))
     # the ◷ row (thread ScheduledRow: the hub's words, its rhythm as 'every 2 min', the next run)
-    o.append(colT(at(sch, None, t(X, y + 50, f'<tspan fill="{c["faint"]}">◷</tspan>  main scheduled the ingest lag check · every 2 min · next 10:44 <tspan fill="{c["faint"]}">▸</tspan>', 12.5, "dim"))))
+    o.append(colT(at(sch, None, t(X, y + 50, f'<tspan fill="{c["faint"]}">◷</tspan>  bise scheduled the ingest lag check · every 2 min · next 10:44 <tspan fill="{c["faint"]}">▸</tspan>', 12.5, "dim"))))
     cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
     o.append(cb)
     o.append(placeholder_at(d, cx, cy, ph, [(0.4, send)]))
