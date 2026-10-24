@@ -242,6 +242,37 @@ def fake_root(t):
     return root
 
 
+def test_ad_hoc_loads_its_own_libraries():
+    """Ad hoc has no team: under the hardened runtime, library validation refuses every library of
+    the bundle (dyld's SIGABRT at launch, 'different Team IDs': bise.app 10-20 to 10-24). An ad
+    hoc signing turns it off on executables and apps, never on a library."""
+    A = M.ad_hoc_entitlements
+    off = {M.LIBRARY_VALIDATION_OFF: True}
+    check(A("bin/sb-core", "exec", None) == off, "an executable without entitlements gets only that key")
+    check(A(".", "bundle", {"com.apple.security.cs.allow-jit": True}) == dict(off, **{"com.apple.security.cs.allow-jit": True}),
+          "an app keeps its own keys")
+    check(A("Contents/Frameworks/X.framework", "bundle", None) is None and A("lib/x.dylib", "lib", None) is None,
+          "a framework or a library: unchanged")
+    if sys.platform != "darwin" or not shutil.which("clang"):
+        return
+    with tempfile.TemporaryDirectory() as t:
+        with open(os.path.join(t, "f.c"), "w") as f:
+            f.write("int f(void){return 42;}\n")
+        with open(os.path.join(t, "m.c"), "w") as f:
+            f.write("int f(void);\nint main(void){return f() == 42 ? 0 : 1;}\n")
+        root = os.path.join(t, "root")
+        os.makedirs(root)
+        subprocess.run(["clang", "-dynamiclib", "-o", os.path.join(root, "libf.dylib"), os.path.join(t, "f.c"),
+                        "-install_name", "@rpath/libf.dylib"], check=True)
+        subprocess.run(["clang", "-o", os.path.join(root, "m"), os.path.join(t, "m.c"), "-L" + root, "-lf",
+                        "-Wl,-rpath,@executable_path"], check=True)
+        M.sign_tree(root, "-", outer=False)
+        dv = subprocess.run(["codesign", "-dv", os.path.join(root, "m")], capture_output=True, text=True).stderr
+        check("runtime" in dv, "still hardened: %s" % dv)
+        r = subprocess.run([os.path.join(root, "m")], capture_output=True, text=True)
+        check(r.returncode == 0, "the ad hoc executable loads its own library: %s" % r.stderr.strip()[:300])
+
+
 def test_signs_a_fake_root():
     if sys.platform != "darwin":
         return
