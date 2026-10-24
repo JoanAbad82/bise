@@ -116,11 +116,6 @@ pub fn row(f: &Facts, order: u32, c: &Checkout) -> ProjectRow {
         working: agents.iter().filter(|a| a.status.working()).count() as u32,
         waits: f.view.as_ref().map_or(0, |v| v.cards.len() as u32),
         running: f.running,
-        // what its agents left running, only while its hub runs (architect m_38378)
-        procs: match f.running {
-            true => f.view.as_ref().map_or(0, |v| v.agents.iter().filter(|a| !a.archived).map(|a| u32::from(a.procs)).sum()),
-            false => 0,
-        },
         missing: f.missing,
         cards: f.view.as_ref().map(|v| v.cards.clone()).unwrap_or_default(),
         web,
@@ -244,19 +239,6 @@ mod tests {
         assert_eq!(p.web.as_deref(), Some("https://github.com/acme/api"));
         let h = row(&f[0], 0, &Checkout::default());
         assert!(h.home && h.agents == 0 && !h.git && h.web.is_none());
-    }
-
-    /// The sidebar's '∿ running N' (architect m_38378): the live agents'
-    /// procs while its hub runs; a stopped hub's view.json counts 0.
-    #[test]
-    fn a_rows_running_processes_count_only_while_its_hub_runs() {
-        let mut view = ProjectView { v: 1, project: "api".into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: vec![], cards: vec![], artifacts: vec![], artifacts_total: 0, scheduled: vec![], growth: None };
-        let with = |name: &str, main: bool, archived: bool, n: u16| Agent { procs: n, ..agent(name, main, Status::Working, archived) };
-        view.agents = vec![with("main", true, false, 1), with("p99", false, false, 2), with("old", false, true, 5)];
-        let mut f = Facts { row: r("api", "/c/api", false), missing: false, running: true, view: Some(view) };
-        assert_eq!(row(&f, 0, &Checkout::default()).procs, 3);
-        f.running = false;
-        assert_eq!(row(&f, 0, &Checkout::default()).procs, 0);
     }
 
     #[test]

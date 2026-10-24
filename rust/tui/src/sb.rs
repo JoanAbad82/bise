@@ -843,7 +843,8 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             return out;
         }
         // running-procs: what the agents left running, full screen
-        Some("/running") => {
+        // (/processes, designer m_38642; /running its old name, kept)
+        Some("/processes" | "/running") => {
             crate::running_screen::open(app);
             return out;
         }

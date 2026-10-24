@@ -144,7 +144,7 @@ pub const COMMANDS: &[Cmd] = &[
     },
     Cmd { name: "/artifacts", desc: "what your agents made: pages, docs, files, links", args: &[], client: true },
     Cmd { name: "/scheduled", desc: "your scheduled tasks: list, open, run now, stop", args: &[], client: true },
-    Cmd { name: "/running", desc: "what your agents left running: its output, open, stop", args: &[], client: true },
+    Cmd { name: "/processes", desc: "what your agents left running: its output, open, stop (also /running)", args: &[], client: true },
     Cmd {
         name: "/diff",
         desc: "a branch's changes against main, in a panel on the right: /diff [<branch>]",

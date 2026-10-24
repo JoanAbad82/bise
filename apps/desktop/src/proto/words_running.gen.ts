@@ -4,8 +4,8 @@
 // bise_proto::words::running: rust/proto/src/words/running.rs, never a word typed here.
 
 export const running = {
-  /** the sidebar row, the screen's title, the slash command's word */
-  heading: "running",
+  /** the screen's title (both apps), the slash command's word, ⌘K's row */
+  heading: "processes",
   /** a group of rows: `storefront › perf` */
   group: (a: { project: string | number; agent: string | number }): string => String(a.project) + " › " + String(a.agent),
   /** the output's head: whose and where, `perf · storefront` */
@@ -74,12 +74,12 @@ export const running = {
   already_ended: "it has ended already.",
   /** `o` on one that has ended */
   ended_no_open: "it has ended: nothing to open.",
-  /** the right bar's section head */
-  bar: "RUNNING",
+  /** the right bar's section head (`PROCESSES · 2`) */
+  bar: "PROCESSES",
   /** the right bar's scope line on an agent's thread: `by perf` */
   by: (a: { agent: string | number }): string => "by " + String(a.agent),
-  /** the sidebar row's count tip */
-  tip_sidebar: (a: { n: string | number }): string => String(a.n) + " running, in all your projects",
+  /** ⌘K's row for the screen: the words it is found by too */
+  find_words: "running · dev servers · background",
   /** the screen's head under its title: how many run, in how many projects (`3 running in 1 project`) */
   running_in: (a: { count: string | number; n: number }): string => a.n === 1 ? String(a.count) + " running in " + String(a.n) + " project" : String(a.count) + " running in " + String(a.n) + " projects",
   /** the screen's filter: the running ones */

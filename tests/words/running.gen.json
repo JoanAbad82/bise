@@ -15,7 +15,7 @@
   "running.bar": {
     "args": [],
     "one": null,
-    "text": "RUNNING"
+    "text": "PROCESSES"
   },
   "running.by": {
     "args": [
@@ -86,6 +86,11 @@
     "one": null,
     "text": "running · {n}"
   },
+  "running.find_words": {
+    "args": [],
+    "one": null,
+    "text": "running · dev servers · background"
+  },
   "running.group": {
     "args": [
       "project",
@@ -97,7 +102,7 @@
   "running.heading": {
     "args": [],
     "one": null,
-    "text": "running"
+    "text": "processes"
   },
   "running.key_back": {
     "args": [],
@@ -272,13 +277,6 @@
     ],
     "one": null,
     "text": "{id} · started {at}"
-  },
-  "running.tip_sidebar": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "{n} running, in all your projects"
   },
   "running.tip_thread_row": {
     "args": [],

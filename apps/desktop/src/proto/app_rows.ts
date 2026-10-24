@@ -25,12 +25,6 @@ home: boolean, order: number, agents: number, working: number, waits: number,
  */
 running: boolean, 
 /**
- * the processes its agents left running (the sum of their
- * `Agent.procs`): the sidebar's '∿ running N'; 0 when its hub doesn't
- * run, whatever its view.json says (a hub that quit killed them)
- */
-procs?: number, 
-/**
  * its folder is gone (moved or deleted)
  */
 missing?: boolean, 

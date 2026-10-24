@@ -1,16 +1,17 @@
 //! The running area's UI words (see [`super`]: the rules, how to read
 //! them): the processes the agents leave running (dev servers, watchers,
-//! background jobs) and the ones that ended today, in the TUI's /running
-//! panel, its output and the agents panel's faint line (running.rs,
-//! running_screen.rs), and the desktop's right bar RUNNING section, its
-//! sidebar row and its running screen. Words from designer's page
-//! running-procs. Ages (`14 min`, `1 h`) and clock times stay Rust/TS fns;
-//! the glyphs (∿ ✓ ✗ –) are the clients' own.
+//! background jobs) and the ones that ended today, in the TUI's /processes
+//! panel (/running its alias), its output and the agents panel's faint line
+//! (running.rs, running_screen.rs), and the desktop's right bar PROCESSES
+//! section and its processes screen. Words from designer's page
+//! running-procs, the noun 'processes' his m_38642 (Gabriel's ask). Ages
+//! (`14 min`, `1 h`) and clock times stay Rust/TS fns; the glyphs
+//! (∿ ✓ ✗ –) are the clients' own.
 
 crate::words! { running:
     // ---- names
-    /// the sidebar row, the screen's title, the slash command's word
-    heading = "running";
+    /// the screen's title (both apps), the slash command's word, ⌘K's row
+    heading = "processes";
     /// a group of rows: `storefront › perf`
     group(project, agent) = "{project} › {agent}";
     /// the output's head: whose and where, `perf · storefront`
@@ -90,13 +91,13 @@ crate::words! { running:
     /// `o` on one that has ended
     ended_no_open = "it has ended: nothing to open.";
 
-    // ---- the desktop (apps/desktop/src/running, the right bar, the sidebar)
-    /// the right bar's section head
-    bar = "RUNNING";
+    // ---- the desktop (apps/desktop/src/running, the right bar)
+    /// the right bar's section head (`PROCESSES · 2`)
+    bar = "PROCESSES";
     /// the right bar's scope line on an agent's thread: `by perf`
     by(agent) = "by {agent}";
-    /// the sidebar row's count tip
-    tip_sidebar(n) = "{n} running, in all your projects";
+    /// ⌘K's row for the screen: the words it is found by too
+    find_words = "running · dev servers · background";
     /// the screen's head under its title: how many run, in how many projects (`3 running in 1 project`)
     running_in(count, n) = one "{count} running in {n} project" | "{count} running in {n} projects";
     /// the screen's filter: the running ones

@@ -15,7 +15,7 @@ import { useKeptScroll } from '@/app/keep';
 import { useStore } from '@/store';
 import { useRoute } from '@/app/router';
 import { useAllProcesses } from './hooks';
-import { countsOf, endWords, groupsOf, isRunning, keyOf, markOf, matches, metaOf, stateOf, tipOf, urlWords, type Filter, type ProcItem } from './model';
+import { countsOf, endWords, groupsOf, inScope, isRunning, keyOf, markOf, matches, metaOf, stateOf, tipOf, urlWords, type Filter, type ProcItem } from './model';
 import { Output } from './Output';
 import { running } from '@/proto/words_running.gen';
 import './running.css';
@@ -52,7 +52,10 @@ export function RunningScreen() {
   const route = useRoute();
   const o = route.screen === 'running' ? route.open : undefined;
   const opened = o === undefined ? undefined : `${o.project}/${o.agent}/${o.id}`;
-  return <RunningView items={items} ports={ports} home={home} opened={opened} />;
+  // the bar's 'all ›' keeps its scope: a project's, an agent's; none: every project's
+  const scope = route.screen === 'running' ? route.scope : undefined;
+  const shown = useMemo(() => inScope(items, scope), [items, scope]);
+  return <RunningView items={shown} ports={ports} home={home} opened={opened} />;
 }
 
 /** How often the shown screen says it again: the core lets its hold go 30 s after the last (LISTS_LEASE). */

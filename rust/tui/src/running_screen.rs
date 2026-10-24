@@ -1,4 +1,4 @@
-//! `/running` (designer's page running-procs): the project's processes
+//! `/processes` (`/running` its old name; designer's page running-procs): the project's processes
 //! full screen, grouped by agent: the running ones (one that ends while
 //! it is open keeps its place, its new state), tab the ones ended today
 //! (running.rs draws the rows). In an agent's view it opens on that agent's rows.
@@ -82,7 +82,7 @@ pub(crate) struct Out {
 
 const NOTE_FOR: Duration = Duration::from_secs(6);
 
-/// `/running` opens the screen and follows the list.
+/// `/processes` (or `/running`) opens the screen and follows the list.
 pub(crate) fn open(app: &mut App) {
     let want = app.sb.focused_task();
     app.running = Some(Screen { want, ..Default::default() });

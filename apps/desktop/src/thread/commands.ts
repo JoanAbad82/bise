@@ -122,6 +122,9 @@ export function windowRun(name: string, args: string, at: { project: string; age
       return arg === 'off' || arg === 'uninstall' ? { app: { cmd: 'computer_use', act: arg } } : go({ screen: 'settings', page: 'computer' });
     case 'scheduled':
       return go({ screen: 'scheduled' });
+    case 'processes':
+      // every project's processes, as bise's thread's 'all ›' (Gabriel, main m_38648)
+      return go({ screen: 'running' });
     case 'keychain':
       // N1 (the TUI's /keychain [on|off]): on/off moves his keys and sign-ins as settings · keys'
       // switch does; bare: that page, which says where they are

@@ -513,9 +513,11 @@ export function RightBar({ project, name, over, column }: { project: string; nam
     scope.level === 'agent'
       ? [...scheduledRows(tasks.filter((x) => inScope(scope, x.t.agent)), now), ...watchRows(agents.filter((x) => inScope(scope, x.a.name)), now, all)]
       : allLater;
-  // RUNNING follows the bar's scope: an agent's thread, what it started; main, the project's
+  // PROCESSES follows the bar's scope: an agent's thread, what it started; a project's main, the
+  // project's; bise's thread, every project's (designer m_38642); its 'all ›' keeps that scope
   const runningAgent = scope.level === 'agent' ? scope.agent : null;
-  const runs = procRows(all ? procItems.filter((x) => isRunning(x.p)) : barProcs(procItems, project, runningAgent), runningAgent !== null);
+  const runs = procRows(all ? procItems.filter((x) => isRunning(x.p)) : barProcs(procItems, project, runningAgent), all ? 'all' : runningAgent !== null ? 'agent' : 'project');
+  const procScope = all ? undefined : runningAgent === null ? { project } : { project, agent: runningAgent };
   const store = useStore();
   // the alarm whose detail is open (one at a time; a click on its row again closes it)
   const [watchOpen, setWatchOpen] = useState<string | null>(null);
@@ -641,8 +643,8 @@ export function RightBar({ project, name, over, column }: { project: string; nam
             )
           }
         </Section>
-        {/* what the scope left running, under AGENTS (designer's running-procs): a row opens its
-            output on the running screen, its port its address; nothing at 0 */}
+        {/* PROCESSES: what the scope left running, under AGENTS (designer's running-procs): a row
+            opens its output on the processes screen, its port its address; nothing at 0 */}
         {runs.length > 0 && (
           <Section
             id="running"
@@ -653,7 +655,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
             scope={runningAgent === null ? null : { words: running.by({ agent: runningAgent }), tip: running.by({ agent: runningAgent }), empty: '' }}
             summary={runs[0] === undefined ? '' : `∿ ${runs[0].name}`}
             onAll={() => {
-              router.go({ screen: 'running' });
+              router.go(procScope === undefined ? { screen: 'running' } : { screen: 'running', scope: procScope });
             }}
           >
             {(r) => {

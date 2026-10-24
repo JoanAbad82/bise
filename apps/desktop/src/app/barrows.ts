@@ -12,6 +12,7 @@ import { shortAge, shownName } from '@/agents/model';
 import { alarms, pauseLine, waitLen } from '@/thread/wake';
 import type { Agent, Card, ComputerAgent, Place } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
+import { running } from '@/proto/words_running.gen';
 import { asksMerge, livePr, markOf, orphanPlaces, placeLabel, placeOf, sharedPlaces, tipWords, type Mark } from './barplaces';
 import { computerDot, signOf, type Sign, type Tone } from './side';
 import { archivedAgeTip, madeTip, pctTip, signTip, stateWord, timeTip } from './tipwords';
@@ -357,12 +358,13 @@ export function scheduledRows(tasks: readonly Task[], now: number): BarRow[] {
 }
 
 /**
- * RUNNING (designer's running-procs): what the bar's scope left running, oldest first (barProcs):
- * a dim '∿', its command short and mono, the agent's name dim on a project's thread (an agent's
- * own thread: none), ':5173 ↗' at the end while it listens; the tip says its id, start and folder.
- * A click opens its output on the running screen; the port its address. No numbers. Pure.
+ * PROCESSES (designer's running-procs, its name m_38642): what the bar's scope left running, oldest
+ * first (barProcs): a dim '∿', its command short and mono, then whose, dim: on a project's thread
+ * its agent, on bise's 'project › agent', on an agent's own thread none; ':5173 ↗' at the end
+ * while it listens; the tip says its id, start and folder. A click opens its output on the
+ * processes screen; the port its address. No numbers. Pure.
  */
-export function procRows(items: readonly ProcItem[], agentScoped: boolean, home?: string): BarRow[] {
+export function procRows(items: readonly ProcItem[], scope: 'agent' | 'project' | 'all', home?: string): BarRow[] {
   return items.map((x) => {
     const port = x.p.ports?.[0];
     return {
@@ -372,7 +374,7 @@ export function procRows(items: readonly ProcItem[], agentScoped: boolean, home?
       glyph: '∿',
       tone: 'dim',
       name: shortCmd(x.p.cmd),
-      sub: agentScoped ? '' : x.p.agent,
+      sub: scope === 'agent' ? '' : scope === 'project' ? x.p.agent : running.group({ project: x.projectName, agent: x.p.agent }),
       end: port === undefined ? '' : `:${String(port)} ↗`,
       endTone: 'dim',
       title: procTip(x.p, home),

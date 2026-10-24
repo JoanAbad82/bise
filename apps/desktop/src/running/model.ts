@@ -197,6 +197,15 @@ export function barProcs(items: readonly ProcItem[], project: string, agent: str
     .sort((a, b) => a.p.started_ms - b.p.started_ms);
 }
 
+/**
+ * The screen's list in the bar's scope ('all ›', designer m_38642): a project's, an agent's in it;
+ * none: every project's. Running and ended alike: the screen's filters split them. Pure.
+ */
+export function inScope(items: readonly ProcItem[], scope: { readonly project: string; readonly agent?: string } | undefined): readonly ProcItem[] {
+  if (scope === undefined) return items;
+  return items.filter((x) => x.project === scope.project && (scope.agent === undefined || x.p.agent === scope.agent));
+}
+
 /** The bar's row command, short: its first two words past a package runner ('pnpm dev', 'playwright test --ui'). */
 export function shortCmd(cmd: string): string {
   const w = cmd.trim().split(/\s+/u);
@@ -215,15 +224,4 @@ export function procOfCall(procs: readonly Proc[], agent: string, code: string):
   const same = procs.filter((p) => p.agent === agent && p.kind.is === 'bg' && p.cmd.trim() === c);
   const pick = (xs: readonly Proc[]) => [...xs].sort((a, b) => b.started_ms - a.started_ms)[0] ?? null;
   return pick(same.filter(isRunning)) ?? pick(same);
-}
-
-/**
- * All of bise's running count: each project row's `procs` (the core's sum of its agents' procs),
- * only where its hub runs: a hub that quit killed its processes, whatever its view.json says
- * (architect m_38378).
- */
-export function runningCount(rows: readonly { readonly running: boolean; readonly procs?: number }[]): number {
-  let n = 0;
-  for (const r of rows) if (r.running) n += r.procs ?? 0;
-  return n;
 }

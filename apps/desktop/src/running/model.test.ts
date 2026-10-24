@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Proc } from '@/proto';
-import { barProcs, procOfCall, countsOf, endWords, groupsOf, keyOf, markOf, matches, metaOf, runningCount, shortCmd, shortCwd, stateOf, tipOf, urlWords, type ProcItem } from './model';
+import { barProcs, procOfCall, countsOf, endWords, groupsOf, inScope, keyOf, markOf, matches, metaOf, shortCmd, shortCwd, stateOf, tipOf, urlWords, type ProcItem } from './model';
 
 const NOW = new Date(2026, 9, 23, 14, 6).getTime();
 const MIN = 60_000;
@@ -127,6 +127,12 @@ describe('the list', () => {
     expect(barProcs(all, 'shop', null).map(keyOf)).toEqual([keyOf(stripe), keyOf(dev), keyOf(pw)]);
   });
 
+  it("the screen in the bar's scope ('all ›'): a project's, an agent's, or every project's, ended ones too", () => {
+    expect(inScope(all, undefined)).toBe(all);
+    expect(inScope(all, { project: 'tele' }).map(keyOf)).toEqual(all.filter((x) => x.project === 'tele').map(keyOf));
+    expect(inScope(all, { project: 'shop', agent: 'checkout' }).map(keyOf)).toEqual([keyOf(stripe), keyOf(test)]);
+  });
+
   it("a thread's '$' call finds the bg job it left running: its agent's, its command, the running one first", () => {
     const procs = all.filter((x) => x.project === 'shop').map((x) => x.p);
     expect(procOfCall(procs, 'perf', '  pnpm dev\n')).toBe(dev.p);
@@ -136,9 +142,5 @@ describe('the list', () => {
     const again = { ...dev.p, id: 'bg7', kind: { is: 'bg' as const, n: 7 }, started_ms: NOW - MIN, state: { is: 'exited' as const, rc: 0 }, ended_ms: NOW };
     expect(procOfCall([...procs, again], 'perf', 'pnpm dev')).toBe(dev.p);
     expect(procOfCall([again], 'perf', 'pnpm dev')).toBe(again);
-  });
-
-  it("the sidebar's count: every agent's procs, only where the hub runs (architect m_38378)", () => {
-    expect(runningCount([{ running: true, procs: 3 }, { running: false, procs: 4 }, { running: true }])).toBe(3);
   });
 });

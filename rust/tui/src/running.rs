@@ -1,4 +1,4 @@
-//! `/running` (designer's page running-procs): the processes the
+//! `/processes` (designer's page running-procs): the processes the
 //! project's agents leave running (dev servers, watchers, background
 //! jobs) and the ones that ended today, in rows. Pure: the list's order,
 //! a row's words at 150 and 80 columns, the agents panel's faint line

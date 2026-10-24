@@ -118,7 +118,7 @@ pub(crate) const ROWS: &[Row] = &[
     FIND,
     r(FEED, "/artifacts", "what your agents made, full screen: / find, ⏎ open, space quick look, v versions, @ put it in a message").top(),
     r(FEED, "/scheduled", "scheduled tasks: what agents run on a schedule, full screen: ⏎ open, r run now, x stop, tab ended too"),
-    r(FEED, "/running", "what the agents left running (dev servers, watchers), full screen: ⏎ its output, o open, s stop, a its agent, tab ended today"),
+    r(FEED, "/processes|/running", "what the agents left running (dev servers, watchers), full screen: ⏎ its output, o open, s stop, a its agent, tab ended today"),
     r(FEED, "click ↗", "an artifact's chip: open it (a page in the browser, a .md in your editor, a file in its app)"),
     r(FEED, "ctrl+g|/diff", "the diff panel: the agent in view's changes against main (/diff <branch>: any branch); ctrl+g again closes it"),
     r(FEED, "click ± 3 files|click ψ", "the diff of what an agent landed, or of its branch (the composer keeps the keys; a click in the panel takes them)"),

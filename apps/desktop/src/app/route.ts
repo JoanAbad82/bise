@@ -44,8 +44,12 @@ export type Route =
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'scheduled' }
-  /** what his agents left running, every project's (designer's running-procs); `open`: that one's output beside the list */
-  | { screen: 'running'; open?: { project: string; agent: string; id: string } }
+  /**
+   * the processes his agents left running (designer's running-procs): every project's, or the bar's
+   * scope (`scope`: a project's, an agent's; its 'all ›', designer m_38642); `open`: that one's
+   * output beside the list
+   */
+  | { screen: 'running'; scope?: { project: string; agent?: string }; open?: { project: string; agent: string; id: string } }
   /** every project's waiting items, then what he answered or what was withdrawn (inbox-history pick A) */
   | { screen: 'inbox' }
   /** the last crash report, opened in the window (designer's voice-window part 2); `log: 'restart'`
@@ -78,7 +82,10 @@ export function formatRoute(r: Route): string {
     case 'onboarding':
       return r.screen;
     case 'running':
-      return r.open === undefined ? 'running' : `running/${r.open.project}/${r.open.agent}/${r.open.id}`;
+      // its output open: 3 names; a scope: 'in/<project>[/<agent>]'
+      if (r.open !== undefined) return `running/${r.open.project}/${r.open.agent}/${r.open.id}`;
+      if (r.scope === undefined) return 'running';
+      return r.scope.agent === undefined ? `running/in/${r.scope.project}` : `running/in/${r.scope.project}/${r.scope.agent}`;
     case 'report':
       return r.log === 'restart' ? 'report/restart' : 'report';
     case 'inbox':
@@ -134,6 +141,11 @@ export function parseRoute(path: string): Route {
       return args.length === 0 ? { screen: head } : nf;
     case 'running': {
       if (args.length === 0) return { screen: 'running' };
+      if (args[0] === 'in') {
+        const [, p, ag] = args;
+        if (p === undefined || !NAME.test(p) || args.length > 3 || (ag !== undefined && !NAME.test(ag))) return nf;
+        return { screen: 'running', scope: ag === undefined ? { project: p } : { project: p, agent: ag } };
+      }
       const [project, agent, id] = take(3) ?? [];
       return project !== undefined && agent !== undefined && id !== undefined ? { screen: 'running', open: { project, agent, id } } : nf;
     }

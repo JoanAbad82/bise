@@ -1,7 +1,7 @@
-"""/running in a real terminal (tmux), on a throwaway hub with the fake
+"""/processes in a real terminal (tmux), on a throwaway hub with the fake
 provider (running-procs, chunk C): main backgrounds a `python3 -m
 http.server` (BEND_BG_AFTER 2 s); the agents panel's faint line counts
-it with its port; /running lists it under main with localhost:<port>;
+it with its port; /processes lists it under main with localhost:<port>;
 ⏎ shows its output as it grows (process/output + process/follow from
 the real .out), esc brings the list back; s stops it with no question
 and the row says `stopped by you`. The KEEP: the hub's scan finds a real
@@ -42,7 +42,7 @@ def main():
         c.wait_idle("main")
         # the panel's faint line under main once the scan sees it
         t.wait("%s · %s" % (w("running.count_running", n=1), w("running.port_short", port=port)), 60)
-        t.typed("/running")
+        t.typed("/processes")
         t.keys("Enter")
         sc = t.wait_all([cmd, w("running.url", port=port).replace(" ↗", ""), w("running.keys_list")], 30)
         assert " › main" in sc, sc

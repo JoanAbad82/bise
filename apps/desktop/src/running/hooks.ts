@@ -1,10 +1,9 @@
 // The processes across his projects, from the store's processes:<project> slices (HubEv processes,
 // one per project; the core asks every running hub while the list is open: core cmd
-// processes_all, architect m_38378), and all of bise's running count from the projects rows.
-// Owner: procs-desktop.
+// processes_all, architect m_38378). Owner: procs-desktop.
 import { useSyncExternalStore } from 'react';
 import { useProjects, useStore, type Store } from '@/store';
-import { runningCount, type Proc, type ProcItem } from './model';
+import type { Proc, ProcItem } from './model';
 
 const procsOf = (store: Store, project: string): readonly Proc[] => store.processes(project);
 
@@ -40,9 +39,4 @@ export function useAllProcesses(only?: string): readonly ProcItem[] {
       return items;
     },
   );
-}
-
-/** All of bise's running processes: the sidebar's count (its agents' procs, where the hub runs). */
-export function useRunningCount(): number {
-  return runningCount(useProjects());
 }
