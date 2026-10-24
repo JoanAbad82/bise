@@ -1,3 +1,7 @@
+> **Fork notice:** This repository is a reference fork of [gvergnaud/bise](https://github.com/gvergnaud/bise), the authoritative upstream project.
+>
+> This fork has no published synchronization commitment and may be outdated. Consult upstream for current documentation, installation instructions, releases, and maintenance information.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/hero-dark.svg">
