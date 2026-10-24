@@ -63,12 +63,45 @@ pub fn set(path: &Path, id: &PluginId, on: bool) -> std::io::Result<bool> {
     }
     doc[off_key] = json!(off_list);
     doc[on_key] = json!(on_list);
+    save(path, &doc)?;
+    Ok(true)
+}
+
+/// Drop `plugin` (its owner when a part is given) and every part under
+/// it from the four lists: a removed plugin leaves no state behind, and
+/// one of the same name added later starts fresh. Returns whether the
+/// file changed.
+pub fn forget(path: &Path, plugin: &PluginId) -> std::io::Result<bool> {
+    let owner = plugin.owner().clone();
+    let name = owner.to_string();
+    if !path.exists() {
+        return Ok(false);
+    }
+    let _lock = lock(&path.with_extension("json.lock"))?;
+    let mut doc = doc(path);
+    let mut changed = false;
+    for key in ["disabled", "enabled", "parts_off", "parts_on"] {
+        let before = list(&doc, key);
+        let gone = |s: &String| *s == name || PluginId::parse(s).is_ok_and(|id| id.is_part() && *id.owner() == owner);
+        if before.iter().any(gone) {
+            doc[key] = json!(before.into_iter().filter(|s| !gone(s)).collect::<Vec<_>>());
+            changed = true;
+        }
+    }
+    if changed {
+        save(path, &doc)?;
+    }
+    Ok(changed)
+}
+
+/// `doc` written to `path` through a tmp file and a rename (under the
+/// caller's lock).
+fn save(path: &Path, doc: &Value) -> std::io::Result<()> {
     let tmp = path.with_extension(format!("json.tmp-{}-{}", std::process::id(), TMP.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
-    std::fs::write(&tmp, serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n")?;
+    std::fs::write(&tmp, serde_json::to_string_pretty(doc).unwrap_or_default() + "\n")?;
     std::fs::rename(&tmp, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
-    })?;
-    Ok(true)
+    })
 }
 
 impl StateV2 {
@@ -256,6 +289,25 @@ mod tests {
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
         assert_eq!(v["other"], json!(1));
         assert_eq!(v["parts_off"], json!(["not an id#"]), "kept, never lost");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn forget_drops_a_plugin_and_its_parts_only() {
+        let dir = tmp("forget");
+        let p = dir.join("plugins.json");
+        assert!(!forget(&p, &id("pay")).unwrap(), "no file: nothing written");
+        assert!(!p.exists());
+        std::fs::create_dir_all(&dir).unwrap();
+        let v = json!({"disabled": ["pay", "docs"], "enabled": ["pay"], "parts_off": ["pay#mcp:pay", "docs#skill:docs", "payx#skill:s"],
+                       "parts_on": ["pay#tool:pay/send"], "other": 1});
+        std::fs::write(&p, v.to_string()).unwrap();
+        assert!(forget(&p, &id("pay#skill:x")).unwrap(), "a part names its owner");
+        let s = read(&p);
+        assert_eq!(s, state(&["docs"], &[], &["docs#skill:docs", "payx#skill:s"], &[]));
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
+        assert_eq!(v["other"], json!(1));
+        assert!(!forget(&p, &id("pay")).unwrap(), "already gone");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

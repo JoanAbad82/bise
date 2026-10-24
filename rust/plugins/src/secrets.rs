@@ -85,6 +85,29 @@ pub fn write(dir: &Path, id: &PluginId, values: &[(String, String)]) -> Result<(
     bise_secrets::write(&file, &text, &|| bise_secrets::write_private(&file, &text)).map_err(io)
 }
 
+/// The one rule for a `${NAME}` of `plugin`'s servers (URL, headers,
+/// env): the environment's value when non-empty, else the one he typed
+/// in ([`read`] of `dir`, once, at the first name the environment lacks;
+/// a locked keychain or no `dir` reads as none). The bridge, the logins
+/// and the remove all expand through it.
+pub fn lookup(dir: Option<&Path>, plugin: &PluginId) -> impl Fn(&str) -> Option<String> {
+    let (id, dir) = (plugin.owner().clone(), dir.map(Path::to_path_buf));
+    let saved = std::cell::OnceCell::new();
+    move |k: &str| {
+        std::env::var(k).ok().filter(|v| !v.is_empty()).or_else(|| {
+            saved
+                .get_or_init(|| dir.as_deref().and_then(|d| read(d, &id).ok()).unwrap_or_default())
+                .get(k)
+                .cloned()
+        })
+    }
+}
+
+/// One `${name}` of `plugin`'s servers ([`lookup`]'s rule).
+pub fn var(dir: &Path, plugin: &PluginId, name: &str) -> Option<String> {
+    lookup(Some(dir), plugin)(name)
+}
+
 /// Forget `id`'s secrets (its file and its keychain items).
 pub fn remove(dir: &Path, id: &PluginId) -> Result<(), SecretsError> {
     let file = path(dir, id);
@@ -128,6 +151,10 @@ mod tests {
         // a part's id keys its plugin's file
         let part = id.part(crate::id::PartKind::Mcp, None, "pay");
         assert_eq!(path(&d, &part), path(&d, &id));
+        // a ${VAR}: the env's value when set, else the saved one
+        assert_eq!(var(&d, &part, "A").as_deref(), Some("1"));
+        assert_eq!(var(&d, &id, "NOPE_BP_SECRETS_VAR"), None);
+        assert_eq!(var(&d, &id, "PATH"), std::env::var("PATH").ok());
         remove(&d, &id).unwrap();
         assert!(!path(&d, &id).exists());
         assert_eq!(read(&d, &id).unwrap(), BTreeMap::new());

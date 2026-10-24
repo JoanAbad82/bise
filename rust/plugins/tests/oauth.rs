@@ -89,6 +89,7 @@ impl Fake {
             plugin: "oauth-one".into(),
             server: HttpServer { id: "fake".into(), transport: Transport::Streamable, url: self.url("/mcp"), headers: vec![], oauth, limits: Default::default() },
             name: "fake".into(),
+            env_dir: None,
         }
     }
 }

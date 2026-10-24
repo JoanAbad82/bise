@@ -25,18 +25,29 @@ pub struct Target {
     /// what the server is called in messages: its id, or
     /// `plugin/server` when two plugins have a server of that id
     pub name: String,
+    /// his typed `${VAR}` values (`Home::mcp_secrets_dir()`): a URL or a
+    /// header of the server may use one ([`crate::secrets::lookup`])
+    pub env_dir: Option<std::path::PathBuf>,
+}
+
+impl Target {
+    /// Its `${VAR}`s: [`crate::secrets::lookup`], the bridge's rule.
+    fn env(&self) -> impl Fn(&str) -> Option<String> {
+        crate::secrets::lookup(self.env_dir.as_deref(), &crate::id::PluginId::plugin(self.plugin.as_str()))
+    }
 }
 
 /// The loaded plugins' remote servers that can log in.
 pub fn targets(ws: &Path) -> Vec<Target> {
     let res = resolve::resolve(&resolve::Roots::standard(Some(ws)));
+    let env_dir = bise_home::Home::from_env().mcp_secrets_dir();
     let mut out: Vec<Target> = res
         .loaded()
         .flat_map(|p| {
             p.remotes
                 .iter()
                 .filter(|s| s.may_login())
-                .map(|s| Target { plugin: p.name.clone(), server: s.clone(), name: s.id.clone() })
+                .map(|s| Target { plugin: p.name.clone(), server: s.clone(), name: s.id.clone(), env_dir: Some(env_dir.clone()) })
         })
         .collect();
     let ids: Vec<String> = out.iter().map(|t| t.server.id.clone()).collect();
@@ -61,8 +72,7 @@ pub fn find<'a>(ts: &'a [Target], name: &str) -> Result<&'a Target, String> {
 
 /// The store holds tokens for this server.
 pub fn logged_in(t: &Target, secrets: &Path) -> bool {
-    let env = |k: &str| std::env::var(k).ok();
-    remote::target(&t.server, &env)
+    remote::target(&t.server, &t.env())
         .ok()
         .and_then(|(u, _)| oauth::load(secrets, &oauth::resource_of(&u)))
         .is_some_and(|s| s.access_token.is_some())
@@ -99,7 +109,7 @@ pub fn run(
     cancel: Option<&AtomicBool>,
     paste: Option<&oauth::Paste<'_>>,
 ) -> Result<usize, String> {
-    let env = |k: &str| std::env::var(k).ok();
+    let env = t.env();
     let (url, _) = remote::target(&t.server, &env)?;
     let none: remote::OnChange = Arc::new(|| {});
     // the server's challenge names its login metadata
@@ -138,8 +148,7 @@ pub fn run(
 /// Forget a server's tokens (its app registration stays), revoked at
 /// the login server first when it can (RFC 7009).
 pub fn logout(t: &Target, secrets: &Path, status_dir: Option<&Path>) -> Result<(), String> {
-    let env = |k: &str| std::env::var(k).ok();
-    let (url, _) = remote::target(&t.server, &env)?;
+    let (url, _) = remote::target(&t.server, &t.env())?;
     oauth::logout(secrets, &oauth::resource_of(&url), &t.server.oauth.clone().unwrap_or_default());
     if let Some(d) = status_dir {
         status::write(d, &t.plugin, &t.server.id, &Status::login_needed(t.server.transport.as_str(), &t.server.host()));
@@ -281,6 +290,51 @@ pub fn main(args: &[String], ws: &Path, logout_cmd: bool) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// architect m_40282: a server whose URL uses a `${VAR}` he saved
+    /// (not in the env) logs out: its tokens go, its client stays.
+    #[test]
+    fn logout_expands_a_saved_var_of_the_url() {
+        let d = std::env::temp_dir().join(format!("bp-login-var-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let (env_dir, store) = (d.join("env"), d.join("oauth"));
+        let plugin = crate::id::PluginId::plugin("pay");
+        crate::secrets::write(&env_dir, &plugin, &[("BP_LOGIN_HOST".into(), "mcp.pay.test".into())]).unwrap();
+        let server = HttpServer {
+            id: "pay".into(),
+            transport: resolve::Transport::Streamable,
+            url: "https://${BP_LOGIN_HOST}/mcp".into(),
+            headers: vec![],
+            oauth: None,
+            limits: Default::default(),
+        };
+        let resource = oauth::resource_of(&crate::http::Url::parse("https://mcp.pay.test/mcp").unwrap());
+        let saved = oauth::Saved {
+            resource: resource.clone(),
+            issuer: "https://login.test".into(),
+            token_endpoint: "https://login.test/token".into(),
+            client_id: "c".into(),
+            client_secret: None,
+            redirect_port: None,
+            access_token: Some("at".into()),
+            refresh_token: Some("rt".into()),
+            expires_at: None,
+            scope: None,
+            wanted_scope: None,
+            revocation_endpoint: None,
+        };
+        oauth::save(&store, &saved).unwrap();
+        let t = Target { plugin: "pay".into(), server, name: "pay".into(), env_dir: Some(env_dir) };
+        assert!(logged_in(&t, &store));
+        logout(&t, &store, None).unwrap();
+        let after = oauth::load(&store, &resource).unwrap();
+        assert!(after.access_token.is_none() && after.refresh_token.is_none());
+        assert_eq!(after.client_id, "c", "the client stays");
+        // with no saved values the URL can't expand: an error, nothing forgotten
+        let none = Target { env_dir: None, ..t };
+        assert!(logout(&none, &store, None).is_err());
+        let _ = std::fs::remove_dir_all(&d);
+    }
 
     #[test]
     fn the_paste_lines_say_the_designers_words() {

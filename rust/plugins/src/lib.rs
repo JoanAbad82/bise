@@ -25,6 +25,8 @@
 //!   one plugin (BISE-273);
 //! - `add`: the add menu (an MCP server, an import found on disk, a
 //!   folder, a git URL): staged, previewed, installed on his click;
+//! - `remove`: a plugin he added removed, with its secrets, logins,
+//!   statuses and on/off ids;
 //! - `marketplace`: his plugin marketplaces and what they offer;
 //! - `secrets`: the values of an MCP server's `${VAR}` he typed in.
 
@@ -44,6 +46,7 @@ pub mod marketplace;
 pub mod model;
 pub mod oauth;
 pub mod remote;
+pub mod remove;
 pub mod report;
 pub mod resolve;
 pub mod secrets;

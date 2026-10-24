@@ -324,6 +324,8 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"plugin_add_cancel","token":"a1b2c3d4e5f60718"},
   {"cmd":"plugin_login","name":"linear"},
   {"cmd":"plugin_logout","name":"notes","project":"acme-1a2b3c4d"},
+  {"cmd":"plugin_remove","name":"notes"},
+  {"cmd":"plugin_remove","name":"pay","project":"acme-1a2b3c4d"},
   {"act":"on","cmd":"computer_use"},
   {"act":"check","cmd":"computer_use"},
   {"act":"fix","cmd":"computer_use","fix":"add_extension"},

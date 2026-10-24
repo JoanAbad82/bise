@@ -785,7 +785,7 @@ mod arg_tests {
         let n = items(&mut app, "/new ");
         assert_eq!((labels(&n), n[0].fill.as_str()), (vec!["-w".to_string()], "/new -w "));
         assert!(items(&mut app, "/new fix the tests").is_empty());
-        assert_eq!(labels(&items(&mut app, "/plugins ")), ["off", "on", "add", "connect", "login", "logout", "list", "refresh"]);
+        assert_eq!(labels(&items(&mut app, "/plugins ")), ["off", "on", "add", "connect", "login", "logout", "remove", "list", "refresh"]);
         assert_eq!(labels(&items(&mut app, "/skills ")), ["off", "on"]);
         let v = items(&mut app, "/restart ");
         assert_eq!(v[0].label, "current");

@@ -129,7 +129,7 @@ pub const COMMANDS: &[Cmd] = &[
     Cmd { name: "/close", desc: "close an inbox item without answering: /close N [note]", args: &[Arg::Card, Arg::Note], client: false },
     Cmd {
         name: "/plugins",
-        desc: "open the plugins screen: what your agents can use, on or off: /plugins [on|off|add|connect|login|logout|list|refresh] [<id>]",
+        desc: "open the plugins screen: what your agents can use, on or off: /plugins [on|off|add|connect|login|logout|remove|list|refresh] [<id>]",
         args: &[
             Arg::Words(&[
                 ("off", "turn a plugin or one of its parts off"),
@@ -138,6 +138,7 @@ pub const COMMANDS: &[Cmd] = &[
                 ("connect", "connect a Mistral connector"),
                 ("login", "log in to a remote MCP server"),
                 ("logout", "forget a remote MCP server's login"),
+                ("remove", "remove a plugin you added, and its saved secrets"),
                 ("list", "the plugins and their state, as text"),
                 ("refresh", "read Mistral's connectors again"),
             ]),

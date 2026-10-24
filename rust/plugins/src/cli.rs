@@ -11,6 +11,7 @@ pub const USAGE: &str = "usage:
   bise plugins on|off ID          (a plugin or part id: docs, mistral:gmail, docs#skill:docs, linear#mcp:linear)
   bise plugins import-mcp NAME [--dry-run] < servers.json   (Claude Code's / Codex's MCP servers as one plugin)
   bise plugins add FOLDER|GIT-URL|--mcp NAME|--import AGENT [--yes]   (shows what it runs first: bise plugins add --help)
+  bise plugins remove NAME [--yes]   remove a plugin you added and its saved secrets (asks first; --yes off a terminal)
   bise plugins marketplace [list|add URL|remove URL|show URL]
   bise plugins login [SERVER]   log in to a remote MCP server in the browser (no SERVER: the list)
   bise plugins logout SERVER    forget its tokens
@@ -38,6 +39,50 @@ pub fn workspace(args: &[String]) -> PathBuf {
 /// The static listing for a workspace (no server started).
 pub fn listing(ws: &std::path::Path) -> String {
     report::text_with(&resolve::resolve(&resolve::Roots::standard(Some(ws))), None, Some(&crate::status::dir()))
+}
+
+/// `bise plugins remove NAME [--yes]`: asks y/n on a terminal, needs
+/// `--yes` otherwise (as add does).
+fn main_remove(args: &[String], ws: &std::path::Path) -> i32 {
+    use std::io::{BufRead, IsTerminal, Write};
+    let (out, err) = (Style::stdout(), Style::stderr());
+    let names: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+    let [name] = names.as_slice() else {
+        eprintln!("{}", USAGE);
+        return 2;
+    };
+    let id = match crate::id::PluginId::parse(name) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("{}", err.fail(&e));
+            return 2;
+        }
+    };
+    if !args.iter().any(|a| a == "--yes") {
+        if !std::io::stdin().is_terminal() {
+            println!("{}", out.ask(&format!("nothing removed: run it again with --yes to remove {name} and its saved secrets")));
+            return 0;
+        }
+        print!("remove {name} and its saved secrets? [y/N] ");
+        let _ = std::io::stdout().flush();
+        let mut line = String::new();
+        let _ = std::io::stdin().lock().read_line(&mut line);
+        if !matches!(line.trim(), "y" | "Y" | "yes") {
+            println!("{}", out.dim("nothing removed."));
+            return 0;
+        }
+    }
+    match crate::remove::remove(&crate::add::Ctx::standard(), Some(ws), &id) {
+        Ok(()) => {
+            println!("{}", out.ok(&format!("removed {name} and its saved secrets")));
+            println!("{}", out.dim("your agents lose its tools within a few seconds."));
+            0
+        }
+        Err(e) => {
+            eprintln!("{}", err.fail(&e.to_string()));
+            1
+        }
+    }
 }
 
 /// Returns the process exit code.
@@ -96,6 +141,7 @@ pub fn main(args: &[String]) -> i32 {
         "connect" => crate::connectors::main_connect(args.get(1).map(String::as_str)),
         "login" | "logout" => crate::login::main(&args[1..], &workspace(args), sub == "logout"),
         "add" => crate::add::main(&args[1..]),
+        "remove" => main_remove(&args[1..], &workspace(args)),
         "marketplace" => crate::marketplace::main(&args[1..]),
         "import-mcp" => {
             let root = resolve::Roots::standard(None).user.unwrap_or_else(|| resolve::home().join(".agents/plugins"));

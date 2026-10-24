@@ -258,7 +258,8 @@ fn remote_part(i: &Inputs, owner: &PluginId, p: &resolve::Plugin, s: &HttpServer
 }
 
 fn logged_in(p: &resolve::Plugin, s: &HttpServer, oauth_dir: &Path) -> bool {
-    let t = crate::login::Target { plugin: p.name.clone(), server: s.clone(), name: s.id.clone() };
+    let env_dir = Some(bise_home::Home::from_env().mcp_secrets_dir());
+    let t = crate::login::Target { plugin: p.name.clone(), server: s.clone(), name: s.id.clone(), env_dir };
     crate::login::logged_in(&t, oauth_dir)
 }
 

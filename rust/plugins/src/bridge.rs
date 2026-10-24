@@ -35,7 +35,7 @@ use crate::id::{PartKind, PluginId};
 use crate::model::StateV2;
 use crate::remote::{Fail, OnChange, Remote};
 use crate::report::{self, ServerStatus};
-use crate::resolve::{self, Diagnostic, HttpServer, Resolution, Severity, StdioServer};
+use crate::resolve::{self, Diagnostic, HttpServer, Plugin, Resolution, Severity, StdioServer};
 use crate::state;
 use crate::status;
 use crate::tools_cache::{self, Cache, Listed};
@@ -258,20 +258,9 @@ enum Outcome {
     Failed(String),
 }
 
-/// `${VAR}` in a server's env and headers: the env's value, else the one
-/// he typed in for this plugin (`crate::secrets`, read once, at the first
-/// variable the env lacks; a locked keychain reads as none).
+/// `${VAR}` in a server's env and headers: [`crate::secrets::lookup`].
 fn env_lookup(plugin: &str, dir: Option<&Path>) -> impl Fn(&str) -> Option<String> {
-    let (id, dir) = (PluginId::plugin(plugin), dir.map(Path::to_path_buf));
-    let saved = std::cell::OnceCell::new();
-    move |k: &str| {
-        std::env::var(k).ok().filter(|v| !v.is_empty()).or_else(|| {
-            saved
-                .get_or_init(|| dir.as_deref().and_then(|d| crate::secrets::read(d, &id).ok()).unwrap_or_default())
-                .get(k)
-                .cloned()
-        })
-    }
+    crate::secrets::lookup(dir, &PluginId::plugin(plugin))
 }
 
 /// One server of one plugin, as the bridge holds it.
@@ -316,6 +305,81 @@ struct Entry {
 }
 
 impl Entry {
+    /// Server `spec` of `p`, not started; its stderr log in `log_dir`.
+    /// `dirs`: the OAuth store, his typed secrets, the status dir.
+    fn new(p: &Plugin, spec: Spec, log_dir: &Path, on_change: OnChange, dirs: (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>)) -> Entry {
+        let (secrets, env_dir, status_dir) = dirs;
+        let cache_key = match &spec {
+            Spec::Stdio(s) => {
+                let saved = env_dir.as_deref().map(|d| crate::secrets::path(d, &PluginId::plugin(p.name.as_str())));
+                Some(tools_cache::key(&p.name, &p.root, s, saved.as_deref()))
+            }
+            Spec::Http(_) => None,
+        };
+        Entry {
+            log: log_dir.join(format!("{}.{}.log", p.name, spec.id())),
+            key: format!("{}/{}", p.name, spec.id()),
+            plugin_name: p.name.clone(),
+            opt_in: p.opt_in,
+            namespace: p.namespace.clone(),
+            spec,
+            plugin_root: p.root.clone(),
+            data_root: p.data_root.clone(),
+            on_change,
+            secrets,
+            env_dir,
+            status_dir,
+            login: Mutex::new(None),
+            client: Mutex::new(None),
+            pid: Mutex::new(None),
+            outcome: Mutex::new(Outcome::Starting),
+            off: AtomicBool::new(false),
+            tools: Mutex::new(Vec::new()),
+            names: Mutex::new(HashMap::new()),
+            cache_key,
+            init: Mutex::new(None),
+            last_call: Mutex::new(Instant::now()),
+        }
+    }
+
+    /// Its start, handshake and first `tools/list` within its startup
+    /// timeout. Err: one line (a local server's last stderr lines in it),
+    /// and whether a login would help (a 401 or 403 of a server that
+    /// may log in).
+    fn first_start(&self) -> Result<(Conn, Vec<Value>), (String, bool)> {
+        self.start_listed().map_err(|e| self.with_stderr(e))
+    }
+
+    /// [`Entry::first_start`] without the stderr lines.
+    fn start_listed(&self) -> Result<(Conn, Vec<Value>), (String, bool)> {
+        let timeout = self.spec.startup_timeout();
+        self.start()
+            .map_err(|f| {
+                let login = matches!(f, Fail::Auth { .. } | Fail::Scope { .. }) && self.login_file().is_some();
+                let why = if matches!(f, Fail::Locked { .. }) { crate::remote::locked_line(self.spec.id()) } else { f.to_string() };
+                (why, login)
+            })
+            .and_then(|c| match c.list_tools(timeout) {
+                Ok(ts) => Ok((c, ts)),
+                Err(err) => Err((format!("tools/list: {}", err), false)),
+            })
+    }
+
+    /// A failed start's line with a local server's last stderr lines.
+    fn with_stderr(&self, (why, login): (String, bool)) -> (String, bool) {
+        if matches!(self.spec, Spec::Http(_)) {
+            return (why, login);
+        }
+        let tail = std::fs::read_to_string(&self.log).unwrap_or_default();
+        let tail: Vec<&str> = tail.lines().rev().take(3).collect();
+        if tail.is_empty() {
+            (why, login)
+        } else {
+            let t: Vec<&str> = tail.into_iter().rev().collect();
+            (format!("{} (stderr: {})", why, t.join(" | ")), login)
+        }
+    }
+
     fn owner(&self) -> PluginId {
         PluginId::plugin(self.plugin_name.as_str())
     }
@@ -641,37 +705,8 @@ impl Live {
                 let on_change: OnChange = Arc::new(move || {
                     let _ = lock(&tx).send(k.clone());
                 });
-                let cache_key = match &spec {
-                    Spec::Stdio(s) => {
-                        let secrets = self.env_dir.as_deref().map(|d| crate::secrets::path(d, &PluginId::plugin(p.name.as_str())));
-                        Some(tools_cache::key(&p.name, &p.root, s, secrets.as_deref()))
-                    }
-                    Spec::Http(_) => None,
-                };
-                let e = Arc::new(Entry {
-                    log: self.dir.join(format!("{}.{}.log", p.name, spec.id())),
-                    key,
-                    plugin_name: p.name.clone(),
-                    opt_in: p.opt_in,
-                    namespace: p.namespace.clone(),
-                    spec,
-                    plugin_root: p.root.clone(),
-                    data_root: p.data_root.clone(),
-                    on_change,
-                    secrets: self.secrets_dir.clone(),
-                    env_dir: self.env_dir.clone(),
-                    status_dir: self.status_dir.clone(),
-                    login: Mutex::new(None),
-                    client: Mutex::new(None),
-                    pid: Mutex::new(None),
-                    outcome: Mutex::new(Outcome::Starting),
-                    off: AtomicBool::new(false),
-                    tools: Mutex::new(Vec::new()),
-                    names: Mutex::new(HashMap::new()),
-                    cache_key,
-                    init: Mutex::new(None),
-                    last_call: Mutex::new(Instant::now()),
-                });
+                let dirs = (self.secrets_dir.clone(), self.env_dir.clone(), self.status_dir.clone());
+                let e = Arc::new(Entry::new(p, spec, &self.dir, on_change, dirs));
                 launch(self.clone(), e.clone());
                 next.push(e);
             }
@@ -744,6 +779,49 @@ impl Live {
 
 /// Start `e` in its own thread: up, it joins the index (its tools
 /// listed); a login wanted or a failure is said in `/plugins`.
+/// Each server of `p` started once with the bridge's own start
+/// ([`Entry::first_start`]), then stopped (a local one's process
+/// killed), its state written to `status_dir` for the Plugins list: the
+/// try right after his add confirm (architect m_39333). `log_dir`: the
+/// servers' stderr logs; `secrets`: the OAuth store; `env_dir`: his typed
+/// secrets. Never before his click, never on a timer.
+pub(crate) fn try_plugin(p: &Plugin, log_dir: &Path, secrets: Option<&Path>, env_dir: Option<&Path>, status_dir: &Path) -> Vec<(String, status::Status)> {
+    let _ = std::fs::create_dir_all(log_dir);
+    let specs: Vec<Spec> = p.servers.iter().cloned().map(Spec::Stdio).chain(p.remotes.iter().cloned().map(Spec::Http)).collect();
+    let none: OnChange = Arc::new(|| {});
+    let dirs = (secrets.map(Path::to_path_buf), env_dir.map(Path::to_path_buf), None);
+    let threads: Vec<_> = specs
+        .into_iter()
+        .map(|spec| {
+            let e = Entry::new(p, spec, log_dir, none.clone(), dirs.clone());
+            std::thread::spawn(move || {
+                let (transport, host) = match &e.spec {
+                    Spec::Stdio(_) => ("stdio".to_string(), String::new()),
+                    Spec::Http(s) => (s.transport.as_str().to_string(), s.host()),
+                };
+                let st = match e.first_start() {
+                    Ok((mut c, tools)) => {
+                        c.stop();
+                        let listed = tools
+                            .iter()
+                            .filter_map(|t| Some((t.get("name")?.as_str()?.to_string(), t.get("description").and_then(Value::as_str).unwrap_or("").to_string())))
+                            .collect();
+                        status::Status::now(&transport, &host, Ok(tools.len())).listed(listed)
+                    }
+                    Err((_, true)) => status::Status::login_needed(&transport, &host),
+                    Err((why, false)) => status::Status::now(&transport, &host, Err(why)),
+                };
+                (e.spec.id().to_string(), st)
+            })
+        })
+        .collect();
+    let out: Vec<(String, status::Status)> = threads.into_iter().filter_map(|t| t.join().ok()).collect();
+    for (id, st) in &out {
+        status::write(status_dir, &p.name, id, st);
+    }
+    out
+}
+
 fn launch(live: Arc<Live>, e: Arc<Entry>) {
     std::thread::spawn(move || {
         let timeout = e.spec.startup_timeout();
@@ -766,31 +844,9 @@ fn launch(live: Arc<Live>, e: Arc<Entry>) {
             })
             .map_err(|why| (why, false))
         } else {
-            e.start()
-                .map_err(|f| {
-                    let login = matches!(f, Fail::Auth { .. } | Fail::Scope { .. }) && e.login_file().is_some();
-                    let why = if matches!(f, Fail::Locked { .. }) { crate::remote::locked_line(e.spec.id()) } else { f.to_string() };
-                    (why, login)
-                })
-                .and_then(|c| match c.list_tools(timeout) {
-                    Ok(ts) => Ok((Some(c), ts)),
-                    Err(err) => Err((format!("tools/list: {}", err), false)),
-                })
+            e.start_listed().map(|(c, ts)| (Some(c), ts))
         };
-        let result = result.map_err(|(why, login)| {
-            if matches!(e.spec, Spec::Http(_)) {
-                return (why, login);
-            }
-            let tail = std::fs::read_to_string(&e.log).unwrap_or_default();
-            let tail: Vec<&str> = tail.lines().rev().take(3).collect();
-            if tail.is_empty() {
-                (why, login)
-            } else {
-                let t: Vec<&str> = tail.into_iter().rev().collect();
-                (format!("{} (stderr: {})", why, t.join(" | ")), login)
-            }
-        });
-        match result {
+        match result.map_err(|err| e.with_stderr(err)) {
             Ok((None, tools)) => {
                 *lock(&e.tools) = tools;
                 *lock(&e.outcome) = Outcome::Listed;

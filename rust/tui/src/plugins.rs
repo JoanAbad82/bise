@@ -10,6 +10,9 @@
 //!   (bend_plugins::login), in the background: its lines come back
 //!   through [`pump`]; every agent's bridge sees the new tokens and
 //!   connects the server. `/plugins logout NAME` forgets them.
+//! - `/plugins remove NAME`: asks once; `/plugins remove NAME yes`
+//!   removes a plugin of his folder with its secrets
+//!   (bend_plugins::remove).
 //! - [`pump`] also says once per server and per TUI run, when a session
 //!   found that one needs a login: `linear needs a login: /plugins login`.
 
@@ -91,6 +94,13 @@ pub(crate) fn logout(workspace: &Path, name: &str) -> Result<String, String> {
     let t = bend_plugins::login::find(&ts, name)?;
     bend_plugins::login::logout(t, &bend_plugins::oauth::store_dir(), Some(&bend_plugins::status::dir()))?;
     Ok(t.name.clone())
+}
+
+/// Remove plugin `name` of his plugins folder (`/plugins remove NAME
+/// yes`): bend_plugins::remove, its refusals as their words.
+pub(crate) fn remove(workspace: &Path, name: &str) -> Result<(), String> {
+    let id = bend_plugins::id::PluginId::parse(name)?;
+    bend_plugins::remove::remove(&bend_plugins::add::Ctx::standard(), Some(workspace), &id).map_err(|e| e.to_string())
 }
 
 /// The plugins of `workspace` matching `q` (the `/plugins on|off`
@@ -345,6 +355,14 @@ pub(crate) fn command(typed: &str, workspace: &Path) -> String {
         (Some("logout"), Some(name)) => match logout(workspace, name) {
             Ok(n) => settings::plugins_logged_out(n),
             Err(e) => e,
+        },
+        // asked once: the same line with `yes` removes it
+        (Some("remove"), Some(name)) => match words.next() {
+            Some("yes") => match remove(workspace, name) {
+                Ok(()) => settings::plugins_removed(name),
+                Err(e) => e,
+            },
+            _ => settings::plugins_remove_ask(name),
         },
         (Some(sub @ ("on" | "off")), Some(name)) => match set(name, sub == "on") {
             Ok(changed) => settings::plugins_set(
@@ -720,6 +738,9 @@ mod tests {
         assert!(command("/plugins login", &dir).starts_with("no remote MCP server that logs in"));
         assert!(command("/plugins login nope", &dir).starts_with("no remote MCP server named nope"));
         assert!(choices(&dir, "", "/plugins login ").is_empty());
+        // remove asks once and refuses what isn't his
+        assert_eq!(command("/plugins remove pay", &dir), settings::plugins_remove_ask("pay"));
+        assert!(command("/plugins remove mistral:gmail yes", &dir).contains("Mistral connector"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

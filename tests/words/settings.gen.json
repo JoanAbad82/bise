@@ -3019,6 +3019,20 @@
     "one": null,
     "text": "Mistral's connectors read again"
   },
+  "settings.plugins_remove_ask": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "remove {name} and its saved secrets? /plugins remove {name} yes removes it."
+  },
+  "settings.plugins_removed": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "removed {name} and its saved secrets — your agents lose its tools within a few seconds"
+  },
   "settings.plugins_screen": {
     "args": [],
     "one": null,
@@ -3071,7 +3085,7 @@
   "settings.plugins_usage": {
     "args": [],
     "one": null,
-    "text": "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME"
+    "text": "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME | /plugins remove NAME"
   },
   "settings.plugins_vibe_title": {
     "args": [],

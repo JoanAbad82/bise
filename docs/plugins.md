@@ -415,7 +415,11 @@ in two steps so nothing of a plugin runs before his click:
   (`.codex-plugin/plugin.json`) or Claude Code (`.claude-plugin/plugin.json`)
   plugin is converted: a 1.0 `plugin.json`, its `.mcp.json` through
   `import::plan_for(.., Home::Plugin)` (`${CLAUDE_PLUGIN_ROOT}` read as
-  `${PLUGIN_ROOT}`), every key left out listed. Its `Preview`
+  `${PLUGIN_ROOT}`), every key left out listed; Codex's
+  `interface.defaultPrompt` (a string or a list) becomes
+  `extensions.dev.bise.prompts`, cut by the resolver's own rule
+  (`resolve::cut_prompts`: 3 of 120 characters; a cut is listed), its
+  other `interface` keys listed by name. Its `Preview`
   (`bise_proto::app_rows::PluginPreview`): each server's exact argv (with its
   installed paths) or transport and host, its skills, the names of its
   secrets, what was dropped, notes (a built-in it shadows), `replaces`.
@@ -423,6 +427,27 @@ in two steps so nothing of a plugin runs before his click:
   `<user root>/<name>` (the commit point; bise's own MCP folder of that name,
   `import::is_bise_mcp`, is moved aside and put back on a failure). A name he
   has is `AddError::Exists`. `add::discard` drops a preview.
+- Right after his confirm (never before: the preview forbids running it
+  unseen; never on a timer), `add::try_servers(&dir, &Ctx)` starts each of
+  its MCP servers once with the bridge's own start (`bridge::try_plugin`:
+  initialize + tools/list within its startup timeout), stops it, and
+  writes its status: the row shows `connected · N tools`, `✗ <why>`, or
+  `needs a login` on a 401. A failed try keeps the plugin installed and
+  on. The desktop core runs it on a thread after `plugin_add_confirm`
+  (`SetupPorts::plugin_try`, `Done::Tried`: the list again).
+- Remove (`bend_plugins::remove::remove(&Ctx, workspace, &PluginId)`;
+  `plugin_remove {project?, name}`, `/plugins remove NAME` then `… yes`,
+  `bise plugins remove NAME [--yes]`): only a plugin of his plugins folder.
+  A built-in, a repo's own plugin, a Mistral connector, a skills folder or
+  a part is `RemoveError::Refused` with its kind. The folder is renamed
+  into `.staging` first (it never resolves half-removed; a crash is swept
+  with the stale previews), then `secrets::remove` (a failure puts the
+  folder back), then best effort: `state::forget` (its ids and its parts'
+  out of `plugins.json`), its remote servers' logins through
+  `login::logout` (kept when another plugin calls the same server),
+  `status::forget`, the folder deleted. `${PLUGIN_DATA}` stays. Live
+  sessions: each bridge's next poll retires its servers (a call gets
+  `off_error`'s words), no `/reload`.
 - The desktop core holds a `Staged` by token (`add::Held`): `plugin_add`
   (`add::Request::from_wire`: an MCP server's secrets by name only) answers
   `plugin_preview {token, preview}`, then `plugin_add_confirm {token,
@@ -739,8 +764,6 @@ never stalls main's first call).
   `/reload` (the prompt lists them).
 - The Switchboard `/plugins` shows the static listing of the hub
   workspace, not the per-task bridge report.
-- No uninstall yet: `bend_plugins::secrets::remove` (a plugin's MCP
-  secrets) waits for it, and the uninstall must call it.
 - Before plugins merges into main (architect m_39445), owner plug-catalog:
   a test that sends `plugin_add_confirm` with a planted value through the
   desktop core and finds it in no file under the test home but
@@ -749,11 +772,8 @@ never stalls main's first call).
   values. The desktop's recorder of sends: plug-desktop.
 - Changing a secret of a plugin already added (a rotated key): not yet;
   today only `bise plugins add --mcp` again, or the add's confirm, writes one.
-- "Add an MCP server" does not try the server before his click (that
-  would run it unseen); trying it right after his confirm (one start, its
-  error on the row with a remove action) is open, with the core's confirm.
-- A Codex plugin's `interface.defaultPrompt` is dropped until the resolver
-  takes `dev.bise.prompts`.
+- The desktop's remove button on a user plugin's row (and its confirm
+  dialog) is plug-desktop's; the core's `plugin_remove` is there.
 
 ## Later
 

@@ -96,7 +96,7 @@ fn an_openai_like_marketplace_reads_into_browse_rows_and_installs_through_the_pr
     // install: the git path with its folder, previewed first
     let req = request(&m, i);
     assert_eq!(req, add::Request::Git { url: url.clone(), subdir: Some("plugins/linear".into()) });
-    let ctx = Ctx { user_root: d.join("plugins"), home: d.clone(), secrets_dir: d.join("secrets"), builtin: None, data: d.join("data") };
+    let ctx = Ctx { home: d.clone(), ..Ctx::under(&d) };
     let s = stage(&req, &ctx).unwrap();
     assert_eq!(s.preview.runs[0].host.as_deref(), Some("mcp.linear.app"));
     assert!(!d.join("plugins/linear").exists());

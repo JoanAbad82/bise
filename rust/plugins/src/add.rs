@@ -110,6 +110,14 @@ pub struct Ctx {
     pub builtin: Option<PathBuf>,
     /// where `${PLUGIN_DATA}` roots live
     pub data: PathBuf,
+    /// `plugins.json` ([`crate::state::state_path`]): a removed
+    /// plugin's ids go
+    pub state: PathBuf,
+    /// the servers' last states ([`crate::status::dir`]): the try after
+    /// his confirm writes there, a remove drops them
+    pub status_dir: PathBuf,
+    /// remote servers' logins ([`crate::oauth::store_dir`])
+    pub oauth_dir: PathBuf,
 }
 
 impl Ctx {
@@ -121,6 +129,23 @@ impl Ctx {
             secrets_dir: bise_home::Home::from_env().mcp_secrets_dir(),
             builtin: roots.builtin,
             data: roots.data,
+            state: crate::state::state_path(),
+            status_dir: crate::status::dir(),
+            oauth_dir: crate::oauth::store_dir(),
+        }
+    }
+
+    /// Every path under `root` (tests and throwaway hubs).
+    pub fn under(root: &Path) -> Ctx {
+        Ctx {
+            user_root: root.join("plugins"),
+            home: root.join("home"),
+            secrets_dir: root.join("secrets"),
+            builtin: None,
+            data: root.join("data"),
+            state: root.join("plugins.json"),
+            status_dir: root.join("mcp-status"),
+            oauth_dir: root.join("mcp-oauth"),
         }
     }
 }
@@ -427,14 +452,37 @@ fn convert(m: &Value, dir: &Path) -> Result<Converted, AddError> {
             k2 if MANIFEST_KEYS.contains(&k2) && v.is_string() => {
                 out.insert(k.clone(), v.clone());
             }
-            "mcpServers" | "skills" | "$schema" | "keywords" => {}
+            "mcpServers" | "skills" | "$schema" | "keywords" | "interface" => {}
             _ => dropped.push(format!("plugin.json: {k}")),
         }
     }
-    if !out.contains_key("description") {
-        if let Some(d) = o.get("interface").and_then(|i| i.get("shortDescription")).and_then(Value::as_str) {
-            out.insert("description".into(), json!(d));
+    let iface = o.get("interface").and_then(Value::as_object);
+    if let Some(i) = iface {
+        let described = !out.contains_key("description");
+        if described {
+            if let Some(d) = i.get("shortDescription").and_then(Value::as_str) {
+                out.insert("description".into(), json!(d));
+            }
         }
+        let (prompts, cut) = codex_prompts(i.get("defaultPrompt"));
+        if !prompts.is_empty() {
+            out.insert("extensions".into(), json!({ resolve::BISE_EXTENSION: { "prompts": prompts } }));
+        }
+        if cut {
+            dropped.push(format!(
+                "plugin.json: interface.defaultPrompt beyond {} prompts of {} characters",
+                resolve::MAX_PROMPTS,
+                resolve::PROMPT_CHARS
+            ));
+        }
+        for k in i.keys() {
+            let kept = k == "defaultPrompt" || (k == "shortDescription" && described && out.contains_key("description"));
+            if !kept {
+                dropped.push(format!("plugin.json: interface.{k}"));
+            }
+        }
+    } else if o.contains_key("interface") {
+        dropped.push("plugin.json: interface".into());
     }
     // the MCP servers: a file of the plugin's, or the map itself
     let servers: Option<Value> = match o.get("mcpServers") {
@@ -458,6 +506,20 @@ fn convert(m: &Value, dir: &Path) -> Result<Converted, AddError> {
     std::fs::write(dir.join("plugin.json"), manifest).map_err(io)?;
     let note = if dir.join(".codex-plugin").is_dir() { "a Codex plugin, made an Agent Plugin" } else { "a Claude Code plugin, made an Agent Plugin" };
     Ok(Converted { dropped, note: note.into() })
+}
+
+/// Codex's `interface.defaultPrompt` (a string or a list of strings) as
+/// `dev.bise.prompts`, cut by the resolver's own rule
+/// ([`resolve::cut_prompts`]): the prompts kept, and whether any was cut.
+fn codex_prompts(v: Option<&Value>) -> (Vec<String>, bool) {
+    let list: Vec<String> = match v {
+        Some(Value::String(s)) => vec![s.clone()],
+        Some(Value::Array(a)) => a.iter().filter_map(Value::as_str).map(str::to_string).collect(),
+        _ => Vec::new(),
+    };
+    // one line each: a prompt is a one-liner on the row
+    let lines: Vec<String> = list.iter().map(|p| p.split_whitespace().collect::<Vec<_>>().join(" ")).collect();
+    resolve::cut_prompts(&lines)
 }
 
 /// The JSON file at `rel` inside `dir` (never outside it).
@@ -590,6 +652,27 @@ pub fn discard(staged: Staged) {
     let _ = std::fs::remove_dir_all(&staged.dir);
 }
 
+/// Right after his confirm installed `plugin_dir`: each of its MCP
+/// servers started once with the bridge's own start (initialize +
+/// tools/list within its startup timeout), then stopped, its state
+/// written for the Plugins list (`connected · N tools`, `✗ <why>`, or
+/// `needs a login` on a 401). Blocks up to the slowest server's
+/// timeout: the apps call it off their UI thread. Never before his
+/// click (that would run it unseen), never on a timer.
+pub fn try_servers(plugin_dir: &Path, ctx: &Ctx) -> Vec<(String, crate::status::Status)> {
+    let name = plugin_dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let state = StateV2 { enabled: vec![name], ..StateV2::default() };
+    let roots = Roots { builtin: None, user: Some(ctx.user_root.clone()), workspace: None, data: ctx.data.clone(), state };
+    let Some(p) = resolve::resolve(&roots).plugins.into_iter().find(|p| p.root == plugin_dir && p.state == State::Loaded) else {
+        return Vec::new();
+    };
+    // the stderr logs go with the stale previews (swept after a day)
+    let logs = staging_dir(&ctx.user_root).join(format!("try-{}", token()));
+    let out = crate::bridge::try_plugin(&p, &logs, Some(&ctx.oauth_dir), Some(&ctx.secrets_dir), &ctx.status_dir);
+    let _ = std::fs::remove_dir_all(&logs);
+    out
+}
+
 /// The previews a process shows, by token (the desktop's core:
 /// `plugin_preview` -> `plugin_add_confirm`/`cancel`). Dropped whole when
 /// the window closes or the core stops ([`Held::clear`], and on drop).
@@ -676,7 +759,7 @@ fn sweep(staging: &Path, ttl: Duration) {
 }
 
 /// 16 hex digits from the system's random source.
-fn token() -> String {
+pub(crate) fn token() -> String {
     use ring::rand::SecureRandom;
     let mut b = [0u8; 8];
     if ring::rand::SystemRandom::new().fill(&mut b).is_err() {

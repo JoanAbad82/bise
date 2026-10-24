@@ -109,6 +109,13 @@ pub fn write(dir: &Path, plugin: &str, server: &str, s: &Status) {
     }
 }
 
+/// Every server's status of `plugin` gone (the plugin was removed).
+pub fn forget(dir: &Path, plugin: &str) {
+    if let Some(d) = file(dir, plugin, "x").parent() {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
 pub fn read(dir: &Path, plugin: &str, server: &str) -> Option<Status> {
     let v: Value = serde_json::from_str(&std::fs::read_to_string(file(dir, plugin, server)).ok()?).ok()?;
     let tools = match (v.get("tools").and_then(Value::as_u64), v.get("error").and_then(Value::as_str)) {
@@ -153,6 +160,10 @@ mod tests {
         let l = read(&d, "p", "linear").unwrap();
         assert!(l.login);
         assert_eq!(l.line(), "needs a login · /plugins login");
+        write(&d, "q", "linear", &Status::now("http", "mcp.linear.app", Ok(1)));
+        forget(&d, "p");
+        assert!(read(&d, "p", "linear").is_none() && !d.join("p").exists());
+        assert!(read(&d, "q", "linear").is_some(), "another plugin's kept");
         let _ = std::fs::remove_dir_all(&d);
     }
 }

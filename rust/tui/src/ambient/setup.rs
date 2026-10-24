@@ -59,6 +59,9 @@ pub enum Done {
     Connecting { id: String, project: Option<String>, said: Option<String>, res: Option<Result<(), String>> },
     /// the Mistral catalog fetched again (Err: its problem)
     Refreshed { project: Option<String>, res: Result<(), String> },
+    /// the servers of a plugin he just added were tried once: their
+    /// states are in the status files, the list is sent again
+    Tried,
 }
 
 /// A staged plugin on its way back to the core (compared by its token).
@@ -112,6 +115,10 @@ pub type PluginStageFn = Box<dyn Fn(bend_plugins::add::Request, Sender<Done>)>;
 /// Adds a marketplace to his list and reads it on its own thread (a git
 /// clone), `Done::Market` at its end
 pub type MarketFn = Box<dyn Fn(String, Sender<Done>)>;
+/// (the plugin he just added, where adds read and write, the channel):
+/// its MCP servers tried once on their own thread
+/// (bend_plugins::add::try_servers), `Done::Tried` at its end
+pub type PluginTryFn = Box<dyn Fn(PathBuf, bend_plugins::add::Ctx, Sender<Done>)>;
 /// (connector id, the project it was asked for, the channel): its connect
 /// on its own thread (his browser, then a poll up to 5 min),
 /// `Done::Connecting` at each step and at its end (never run by a test)
@@ -186,6 +193,8 @@ pub struct SetupPorts {
     /// where an add reads and writes (`add::Ctx::standard`, a temp one in
     /// tests): what a confirmed preview installs into
     pub add_ctx: Box<dyn Fn() -> bend_plugins::add::Ctx>,
+    /// right after his confirm installed a plugin (never before)
+    pub plugin_try: PluginTryFn,
     pub plugin_connect: PluginConnectFn,
     pub plugins_refresh: PluginsRefreshFn,
     /// why his Mistral connectors may be missing or old (their cache's)
@@ -638,6 +647,12 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             });
         }),
         add_ctx: Box::new(bend_plugins::add::Ctx::standard),
+        plugin_try: Box::new(|dir, ctx, tx| {
+            std::thread::spawn(move || {
+                bend_plugins::add::try_servers(&dir, &ctx);
+                let _ = tx.send(Done::Tried);
+            });
+        }),
         // the TUI's own threads (crate::plugins), never the core loop
         plugin_connect: Box::new(|id, project, tx| {
             let (tx2, p2, id1, id2) = (tx.clone(), project.clone(), id.to_string(), id.to_string());

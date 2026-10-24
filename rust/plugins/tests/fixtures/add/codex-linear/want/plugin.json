@@ -5,6 +5,13 @@
     "url": "https://linear.app/"
   },
   "description": "Search, create and update Linear issues.",
+  "extensions": {
+    "dev.bise": {
+      "prompts": [
+        "Triage my issues"
+      ]
+    }
+  },
   "homepage": "https://linear.app/",
   "license": "MIT",
   "name": "linear",

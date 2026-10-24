@@ -385,6 +385,39 @@ fn connectors_and_toggles_reach_the_index_within_a_poll() {
     let _ = std::fs::remove_dir_all(&base);
 }
 
+/// A plugin he removes (bend_plugins::remove) while its server runs:
+/// within a poll its tools leave the index, and the next call gets the
+/// off words (architect m_39853).
+#[test]
+fn a_removed_plugins_server_is_retired_within_a_poll() {
+    let (base, plugins) = fixture_root("removed");
+    let dir = base.join("run/plugins");
+    let mut parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+    let ctx = bend_plugins::add::Ctx { user_root: plugins.clone(), ..bend_plugins::add::Ctx::under(&base) };
+    let roots = resolve::Roots { builtin: None, user: Some(plugins.clone()), workspace: None, data: base.join("data"), state: StateV2::default() };
+    let opts = bridge::Opts {
+        state_path: Some(ctx.state.clone()),
+        poll: Duration::from_millis(100),
+        grace: Duration::from_millis(500),
+        ..bridge::Opts::new(dir.clone(), Some(parent.id()), roots)
+    };
+    let server = std::thread::spawn(move || bridge::serve(opts));
+    wait_until("the bridge ready", || dir.join("ready").exists());
+    let (mut r, path) = route(&dir, "shout");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+
+    bend_plugins::remove::remove(&ctx, None, &PluginId::plugin("hello-plugin")).unwrap();
+    wait_until("shout out of the index", || !index(&dir).contains(" shout "));
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains(&bridge::off_error("hello_plugin.shout")), "{b}");
+
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    server.join().unwrap().unwrap();
+    let _ = std::fs::remove_dir_all(&base);
+}
+
 /// No plugin server: the bridge stays (it keeps the connectors' lines
 /// fresh) and stops with its parent.
 #[test]

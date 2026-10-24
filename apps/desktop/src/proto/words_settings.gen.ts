@@ -1236,8 +1236,12 @@ export const settings = {
   plugins_disabled: "turned off",
   /** a plugin already in that state */
   plugins_unchanged: " (unchanged)",
+  /** /plugins remove NAME: the one question before it goes */
+  plugins_remove_ask: (a: { name: string | number }): string => "remove " + String(a.name) + " and its saved secrets? /plugins remove " + String(a.name) + " yes removes it.",
+  /** /plugins remove NAME yes: done */
+  plugins_removed: (a: { name: string | number }): string => "removed " + String(a.name) + " and its saved secrets — your agents lose its tools within a few seconds",
   /** /plugins with a wrong argument */
-  plugins_usage: "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME",
+  plugins_usage: "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME | /plugins remove NAME",
   /** release row: the first release */
   release_first: "the first release",
   /** release row: commits since the last tag */

@@ -19,7 +19,7 @@ fn tmp(tag: &str) -> (Tmp, Ctx) {
     let _ = fs::remove_dir_all(&d);
     fs::create_dir_all(d.join("home")).unwrap();
     let d = d.canonicalize().unwrap();
-    let ctx = Ctx { user_root: d.join("plugins"), home: d.join("home"), secrets_dir: d.join("secrets"), builtin: Some(d.join("builtin")), data: d.join("data") };
+    let ctx = Ctx { builtin: Some(d.join("builtin")), ..Ctx::under(&d) };
     (Tmp(d), ctx)
 }
 
@@ -204,10 +204,150 @@ fn a_codex_plugin_becomes_its_expected_agent_plugin() {
     let s = stage(&Request::Folder { path: fixture("codex-linear/in") }, &ctx).unwrap();
     assert_eq!(s.preview.runs, [PluginRun { server: "linear".into(), transport: RunTransport::Http, argv: vec![], host: Some("mcp.linear.app".into()) }]);
     assert_eq!(s.preview.skills, ["linear:triage"]);
-    assert_eq!(s.preview.dropped, ["plugin.json: apps", "plugin.json: interface", "linear: oauth_resource"]);
+    // defaultPrompt became dev.bise.prompts; the other interface keys are named
+    assert_eq!(
+        s.preview.dropped,
+        ["plugin.json: apps", "plugin.json: interface.category", "plugin.json: interface.displayName", "plugin.json: interface.shortDescription", "linear: oauth_resource"]
+    );
     let dir = install(s, &ctx).unwrap();
     assert_eq!(json_of(&dir.join("plugin.json")), json_of(&fixture("codex-linear/want/plugin.json")));
     assert_eq!(json_of(&dir.join("mcp.json")), json_of(&fixture("codex-linear/want/mcp.json")));
+}
+
+/// A Codex plugin `name` whose `interface.defaultPrompt` is `prompt`
+/// (none: no key), staged and installed: its preview's dropped list and
+/// the resolver's plugin.
+fn codex_with(ctx: &Ctx, name: &str, prompt: Option<Value>) -> (Vec<String>, resolve::Plugin, Vec<resolve::Diagnostic>) {
+    let src = ctx.home.join(format!("src-{name}"));
+    let mut iface = json!({ "displayName": "X" });
+    if let Some(p) = prompt {
+        iface["defaultPrompt"] = p;
+    }
+    write(&src.join(".codex-plugin/plugin.json"), &json!({ "name": name, "description": "d", "interface": iface }).to_string());
+    write(&src.join("skills/s/SKILL.md"), "---\nname: s\ndescription: a skill\n---\nbody\n");
+    let s = stage(&Request::Folder { path: src }, ctx).unwrap();
+    let dropped = s.preview.dropped.clone();
+    install(s, ctx).unwrap();
+    let state = StateV2 { enabled: vec![name.into()], ..StateV2::default() };
+    let r = resolve::resolve(&Roots { builtin: None, user: Some(ctx.user_root.clone()), workspace: None, data: ctx.data.clone(), state });
+    let p = r.plugins.into_iter().find(|p| p.name == name).unwrap();
+    let mine = r.diagnostics.into_iter().filter(|d| d.plugin == name).collect();
+    (dropped, p, mine)
+}
+
+#[test]
+fn codex_default_prompts_become_bise_prompts_cut_by_the_resolver_rule() {
+    let (_t, ctx) = tmp("prompts");
+    // a string
+    let (dropped, p, diags) = codex_with(&ctx, "one", Some(json!("Triage my\n  issues")));
+    assert_eq!(p.prompts, ["Triage my issues"]);
+    assert_eq!(p.state, State::Loaded, "{diags:?}");
+    assert_eq!(dropped, ["plugin.json: interface.displayName"]);
+    // a list of 5: the first 3, and the cut named
+    let five = json!(["a", "b", "", "c", "d", 7]);
+    let (dropped, p, _) = codex_with(&ctx, "five", Some(five));
+    assert_eq!(p.prompts, ["a", "b", "c"]);
+    assert_eq!(dropped, ["plugin.json: interface.defaultPrompt beyond 3 prompts of 120 characters", "plugin.json: interface.displayName"]);
+    // a 300-character prompt: cut as the resolver cuts, never a load warning after
+    let long = "word ".repeat(60);
+    let (dropped, p, diags) = codex_with(&ctx, "long", Some(json!(long)));
+    assert_eq!(p.prompts, resolve::cut_prompts(&[long.trim().to_string()]).0);
+    assert!(p.prompts[0].chars().count() <= resolve::PROMPT_CHARS);
+    assert!(dropped[0].starts_with("plugin.json: interface.defaultPrompt beyond"), "{dropped:?}");
+    assert!(!diags.iter().any(|d| d.code == "plugin.prompts.cut"), "{diags:?}");
+    // none, and an empty one: no extensions written
+    for (name, prompt) in [("none", None), ("blank", Some(json!(["  "])))] {
+        let (_, p, _) = codex_with(&ctx, name, prompt);
+        assert!(p.prompts.is_empty());
+        assert!(json_of(&ctx.user_root.join(name).join("plugin.json")).get("extensions").is_none(), "{name}");
+    }
+}
+
+/// A stdio MCP server listing two tools (`pid_file`: its pid, to check
+/// the process is gone after the try).
+const TWO_TOOLS: &str = r#"
+import json, os, sys
+open(sys.argv[1], "w").write(str(os.getpid()))
+for line in sys.stdin:
+    m = json.loads(line)
+    if "id" not in m:
+        continue
+    if m["method"] == "initialize":
+        r = {"protocolVersion": "2025-06-18", "capabilities": {"tools": {}}, "serverInfo": {"name": "two", "version": "1"}}
+    elif m["method"] == "tools/list":
+        r = {"tools": [{"name": "a", "description": "first", "inputSchema": {"type": "object"}},
+                       {"name": "b", "description": "second", "inputSchema": {"type": "object"}}]}
+    else:
+        r = {}
+    print(json.dumps({"jsonrpc": "2.0", "id": m["id"], "result": r}), flush=True)
+"#;
+
+/// The fake remote server (tests/fake_mcp_http.py), killed on drop.
+struct FakeHttp(std::process::Child, u16);
+impl Drop for FakeHttp {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn fake_http(dir: &Path, args: &[&str]) -> FakeHttp {
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fake_mcp_http.py");
+    let port_file = dir.join("port");
+    let child = std::process::Command::new("python3").arg(&script).arg("--port-file").arg(&port_file).args(args).spawn().unwrap();
+    // owned at once: its drop kills and waits on every path
+    let mut fake = FakeHttp(child, 0);
+    let t0 = std::time::Instant::now();
+    while fake.1 == 0 {
+        match fs::read_to_string(&port_file).ok().and_then(|s| s.trim().parse().ok()) {
+            Some(p) => fake.1 = p,
+            None => {
+                assert!(t0.elapsed() < Duration::from_secs(20), "the fake server never started");
+                std::thread::sleep(Duration::from_millis(30));
+            }
+        }
+    }
+    fake
+}
+
+#[test]
+fn the_servers_are_tried_once_right_after_the_confirm_and_stopped() {
+    let (_t, ctx) = tmp("try");
+    let http = fake_http(&ctx.home, &["--mode", "streamable", "--require-header", "X-Key=right"]);
+    let src = ctx.home.join("src");
+    let pid_file = ctx.home.join("two.pid");
+    write(&src.join("plugin.json"), &manifest("tried"));
+    write(&src.join("two.py"), TWO_TOOLS);
+    let mcp = json!({ "$schema": resolve::MCP_SCHEMA, "mcpServers": {
+        "two": { "command": "python3", "args": ["-B", "${PLUGIN_ROOT}/two.py", pid_file.display().to_string()] },
+        "dies": { "command": "sh", "args": ["-c", "echo no DATABASE_URL >&2; exit 3"], "startup_timeout_sec": 5 },
+        "web": { "url": format!("http://127.0.0.1:{}/mcp", http.1), "startup_timeout_sec": 5 }
+    }});
+    write(&src.join("mcp.json"), &mcp.to_string());
+    let s = stage(&Request::Folder { path: src }, &ctx).unwrap();
+    // staged and previewed: nothing ran
+    assert!(!pid_file.exists() && !ctx.status_dir.exists(), "nothing runs before his click");
+    let dir = install(s, &ctx).unwrap();
+    assert!(!pid_file.exists(), "the install runs nothing either");
+
+    let mut got = try_servers(&dir, &ctx);
+    got.sort_by(|a, b| a.0.cmp(&b.0));
+    let ids: Vec<&str> = got.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(ids, ["dies", "two", "web"]);
+    let read = |id: &str| crate::status::read(&ctx.status_dir, "tried", id).unwrap();
+    let two = read("two");
+    assert_eq!(two.tools, Ok(2));
+    assert_eq!(two.listed, vec![("a".to_string(), "first".to_string()), ("b".to_string(), "second".to_string())]);
+    let dies = read("dies").tools.unwrap_err();
+    assert!(dies.contains("no DATABASE_URL"), "{dies}");
+    let web = read("web");
+    assert!(web.login, "a 401 is a login, not an error: {web:?}");
+    // the server's process is gone after the try
+    let pid: i32 = fs::read_to_string(&pid_file).unwrap().trim().parse().unwrap();
+    assert!(unsafe { libc::kill(pid, 0) } != 0, "the tried server still runs");
+    // the plugin stays installed, and nothing is left in staging
+    assert!(dir.join("plugin.json").is_file());
+    assert!(staging_is_empty(&ctx));
 }
 
 #[test]

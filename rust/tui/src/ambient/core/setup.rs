@@ -75,6 +75,7 @@ pub const TAGS: &[&str] = &[
     "plugin_add",
     "plugin_add_confirm",
     "plugin_add_cancel",
+    "plugin_remove",
     "computer_use",
     "setup_check",
     "role_set",
@@ -458,11 +459,26 @@ impl Core {
             AppCmd::PluginAddConfirm { token, secrets } => {
                 let ctx = (p.add_ctx)();
                 let res = match self.setup.as_mut() {
-                    Some(s) => s.staged.confirm(&token, &secrets, &ctx).map(|_| ()).map_err(|e| e.to_string()),
+                    Some(s) => s.staged.confirm(&token, &secrets, &ctx).map_err(|e| e.to_string()),
                     None => Err("this core has no setup".into()),
                 };
+                // installed: its servers tried once, after his click only
+                let res = res.map(|dir| {
+                    if let Some(s) = self.setup.as_ref() {
+                        (s.ports.plugin_try)(dir, ctx, s.tx.clone());
+                    }
+                });
                 let shown = self.emit_plugins(None);
                 ("plugin_add_confirm", res.and(shown))
+            }
+            AppCmd::PluginRemove { project, name } => {
+                let ctx = (p.add_ctx)();
+                let res = self.workspace_of(project.as_deref()).and_then(|ws| {
+                    let id = bend_plugins::id::PluginId::parse(&name)?;
+                    bend_plugins::remove::remove(&ctx, Some(&ws), &id).map_err(|e| e.to_string())
+                });
+                let shown = self.emit_plugins(project);
+                ("plugin_remove", res.and(shown))
             }
             AppCmd::PluginAddCancel { token } => {
                 let res = match self.setup.as_mut() {
@@ -700,6 +716,9 @@ impl Core {
                         s.logins.retain(|n| *n != id);
                     }
                     let _ = self.emit_plugins(project);
+                }
+                Done::Tried => {
+                    let _ = self.emit_plugins(None);
                 }
                 Done::Refreshed { project, res } => {
                     if let Err(e) = res {

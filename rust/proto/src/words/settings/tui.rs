@@ -20,8 +20,12 @@ crate::words! { settings:
     plugins_disabled = "turned off";
     /// a plugin already in that state
     plugins_unchanged = " (unchanged)";
+    /// /plugins remove NAME: the one question before it goes
+    plugins_remove_ask(name) = "remove {name} and its saved secrets? /plugins remove {name} yes removes it.";
+    /// /plugins remove NAME yes: done
+    plugins_removed(name) = "removed {name} and its saved secrets — your agents lose its tools within a few seconds";
     /// /plugins with a wrong argument
-    plugins_usage = "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME";
+    plugins_usage = "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME | /plugins remove NAME";
 
     /// release row: the first release
     release_first = "the first release";

@@ -51,17 +51,15 @@ struct World {
     connecting: Option<std::sync::mpsc::Sender<Done>>,
     pending_seen: Vec<Vec<String>>,
     add_root: PathBuf,
+    /// the plugins whose servers were tried after a confirm, and the
+    /// last try's channel
+    tries: Vec<PathBuf>,
+    trying: Option<std::sync::mpsc::Sender<Done>>,
 }
 
 /// Where the add menu reads and writes in a test: all under `root`.
 fn add_ctx(root: &Path) -> bend_plugins::add::Ctx {
-    bend_plugins::add::Ctx {
-        user_root: root.join("plugins"),
-        home: root.join("home"),
-        secrets_dir: root.join("secrets"),
-        builtin: None,
-        data: root.join("data"),
-    }
+    bend_plugins::add::Ctx::under(root)
 }
 
 fn rows() -> Vec<Row> {
@@ -77,7 +75,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (x, y, z) = (w.clone(), w.clone(), w.clone());
     let mf = w.clone();
     let (ad, am, ac, pc) = (w.clone(), w.clone(), w.clone(), w.clone());
-    let (kn, ks) = (w.clone(), w.clone());
+    let (kn, ks, pt) = (w.clone(), w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -216,6 +214,12 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             w.staging = Some(tx);
         }),
         add_ctx: Box::new(move || add_ctx(&ac.borrow().add_root)),
+        // no server runs here: the test ends the try itself (Done::Tried)
+        plugin_try: Box::new(move |dir, _ctx, tx| {
+            let mut w = pt.borrow_mut();
+            w.tries.push(dir);
+            w.trying = Some(tx);
+        }),
         // a connect never runs here (his browser); a refresh ends at once
         plugin_connect: Box::new(move |_id, _project, tx| {
             pc.borrow_mut().connecting = Some(tx);
@@ -562,11 +566,18 @@ fn the_add_menu_previews_then_installs_on_his_click() {
     t.until(|o| !evs(o, "plugin_preview").is_empty());
     let token = evs(&t.take(), "plugin_preview")[0]["token"].as_str().unwrap().to_string();
     assert!(!root.join("plugins/hello").exists(), "nothing installed before his click");
+    assert!(w.borrow().tries.is_empty(), "nothing tried before his click");
 
     app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}"}}"#));
     let out = t.take();
     assert!(root.join("plugins/hello/plugin.json").exists(), "installed on his click");
     assert_eq!(evs(&out, "plugins").len(), 1, "the list again");
+    // its servers tried once right after, the list again at the try's end
+    assert_eq!(w.borrow().tries, vec![root.join("plugins/hello")]);
+    let tx = w.borrow_mut().trying.take().expect("tried after the confirm");
+    tx.send(Done::Tried).unwrap();
+    t.until(|o| !evs(o, "plugins").is_empty());
+    t.take();
     app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}"}}"#));
     assert_eq!(evs(&t.take(), "error")[0]["cmd"], "plugin_add_confirm", "a token works once");
 
@@ -631,6 +642,33 @@ fn a_typed_secret_reaches_the_secrets_store_only() {
     assert_eq!(holders, vec![store], "the value is in the secrets store and nowhere else");
     let mcp = std::fs::read_to_string(root.join("plugins/pg/mcp.json")).unwrap();
     assert!(mcp.contains("${DATABASE_URL}"), "{mcp}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// `plugin_remove`: a plugin of his folder goes with its secrets, the
+/// list again; a connector is refused as an error, nothing touched.
+#[test]
+fn plugin_remove_takes_his_plugin_and_its_secrets_and_refuses_a_connector() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    let root = std::env::temp_dir().join(format!("amb-remove-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("plugins/pay")).unwrap();
+    w.borrow_mut().add_root = root.clone();
+    let manifest = format!(r#"{{"$schema": "{}", "name": "pay"}}"#, bend_plugins::resolve::PLUGIN_SCHEMA);
+    std::fs::write(root.join("plugins/pay/plugin.json"), manifest).unwrap();
+    let pay = bend_plugins::id::PluginId::plugin("pay");
+    bend_plugins::secrets::write(&root.join("secrets"), &pay, &[("KEY".into(), "v".into())]).unwrap();
+
+    app(&mut t, r#"{"cmd":"plugin_remove","name":"mistral:gmail"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "error")[0]["cmd"], "plugin_remove");
+    app(&mut t, r#"{"cmd":"plugin_remove","name":"pay"}"#);
+    let out = t.take();
+    assert!(evs(&out, "error").is_empty(), "{out:?}");
+    assert_eq!(evs(&out, "plugins").len(), 1, "the list again");
+    assert!(!root.join("plugins/pay").exists());
+    assert!(!bend_plugins::secrets::path(&root.join("secrets"), &pay).exists());
     let _ = std::fs::remove_dir_all(&root);
 }
 

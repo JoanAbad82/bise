@@ -128,6 +128,15 @@ pub enum AppCmd {
         project: Option<Project>,
         name: String,
     },
+    /// remove a plugin of his plugins folder with its saved secrets,
+    /// logins and on/off ids (after the UI's own confirm), then
+    /// `plugins` again; a built-in, a repo's own plugin, a connector, a
+    /// skills folder or a part is refused (`bend_plugins::remove`)
+    PluginRemove {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        name: String,
+    },
     /// a role's model (V17, config.toml's `[roles]`, written by the same
     /// locked writer as the TUI's roles screen): `model` none = it
     /// follows its fallback again, `effort` none = the model's default;
@@ -482,6 +491,7 @@ impl AppCmd {
         "plugin_add_cancel",
         "plugin_login",
         "plugin_logout",
+        "plugin_remove",
         "computer_use",
         "shown",
         "processes_all",
