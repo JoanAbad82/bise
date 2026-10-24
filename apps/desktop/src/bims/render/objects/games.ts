@@ -1,4 +1,4 @@
-// The objects of the games family: what the bims play on a break (Hacker News' arcade, Reddit's ping-pong table, a chess table, a pinball, a table football: ping-pong's compact one).
+// The objects of the games family: what the bims play on a break (Hacker News' arcade, Reddit's ping-pong table, a chess table, a pinball, a table football: ping-pong's compact one; p2: a pool table, a go board, a giant tumbling tower, a claw machine, a card table).
 // Built with the objects' kit (kit.ts): at the origin on the floor, front to +z, centred on the foot it returns.
 import { CREAM, darker, GREEN, INK, ORANGE, PANE, SCREEN, SKY, SLATE, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, type Maker } from './kit';
 
@@ -126,4 +126,151 @@ const babyfoot: Maker = (g) => {
   return { w, d: d + 0.45, h: 1.1 };
 };
 
-export const GAMES = { chess, pingpong, arcade, pinball, babyfoot } satisfies Record<string, Maker>;
+/** a pool table: green cloth in wooden rails, six pockets, the balls racked, the cue ball and a cue lying on the cloth */
+const billiards: Maker = (g) => {
+  const w = 2.2, d = 1.24;
+  g.contact(w, d);
+  for (const x of [-w / 2 + 0.22, w / 2 - 0.22]) for (const z of [-d / 2 + 0.2, d / 2 - 0.2]) { g.box(0.14, 0.56, 0.14, WOOD_D, x, 0.28, z, 0.03); g.cyl(0.1, 0.04, INK, x, 0.02, z); }
+  g.box(w - 0.04, 0.2, d - 0.04, WOOD_D, 0, 0.62, 0, 0.04);
+  g.box(w - 0.2, 0.03, d - 0.2, '#2f8f5a', 0, 0.735, 0, 0.005);
+  // the rails: long ones end to end, short ones between them, a cream sight dot on each long one
+  for (const z of [-d / 2 + 0.05, d / 2 - 0.05]) { g.box(w, 0.07, 0.1, WOOD, 0, 0.755, z, 0.02); for (const x of [-0.5, 0.5]) g.cyl(0.012, 0.006, CREAM, x, 0.792, z); }
+  for (const x of [-w / 2 + 0.05, w / 2 - 0.05]) g.box(0.1, 0.07, d - 0.2, WOOD, x, 0.755, 0, 0.02);
+  for (const [x, z] of [[-w / 2 + 0.07, -d / 2 + 0.07], [w / 2 - 0.07, -d / 2 + 0.07], [-w / 2 + 0.07, d / 2 - 0.07], [w / 2 - 0.07, d / 2 - 0.07], [0, -d / 2 + 0.06], [0, d / 2 - 0.06]] as const) g.cyl(0.055, 0.012, INK, x, 0.796, z);
+  // the rack: five rows, the eight ball in the middle; never a red ball
+  const cols = [YELLOW, SKY, VIOLET, ORANGE, GREEN, TEAL, WOOD_D, INK, darker(YELLOW, 0.8), darker(SKY, 0.75), darker(VIOLET, 0.8), CREAM, darker(GREEN, 0.75), darker(ORANGE, 0.8), darker(TEAL, 0.8)];
+  let k = 0;
+  for (let r = 0; r < 5; r++) for (let i = 0; i <= r; i++) {
+    const c = r === 2 && i === 1 ? INK : (cols[k % cols.length] as string);
+    k++;
+    g.ball(0.034, c, 0.42 + r * 0.06, 0.785, (i - r / 2) * 0.07);
+  }
+  g.ball(0.034, CREAM, -0.1, 0.785, 0.16);
+  // the cue: a pale shaft and a dark butt, lying on the cloth, aimed at the cue ball
+  const cue = g.at(-0.62, 0.766, 0.1); cue.root.rotation.y = -0.12;
+  cue.cyl(0.011, 0.9, WOOD_L, 0, 0, 0).rotation.z = Math.PI / 2;
+  cue.cyl(0.016, 0.34, INK, -0.2, 0, 0).rotation.z = Math.PI / 2;
+  g.box(0.03, 0.03, 0.03, SKY, w / 2 - 0.05, 0.806, -0.3, 0.005);
+  return { w, d, h: 0.83 };
+};
+
+/** a go board: a thick goban on its short legs, a game half played, two bowls of stones, two floor cushions */
+const go: Maker = (g) => {
+  g.contact(0.62, 0.62);
+  for (const x of [-0.22, 0.22]) for (const z of [-0.22, 0.22]) g.cyl(0.045, 0.1, WOOD_D, x, 0.05, z);
+  g.box(0.6, 0.22, 0.6, WOOD_L, 0, 0.21, 0, 0.02);
+  // a 9 x 9 grid, the two directions 3 mm apart in height
+  for (let i = 0; i < 9; i++) {
+    const t = -0.24 + i * 0.06;
+    g.box(0.49, 0.004, 0.006, INK, 0, 0.321, t, 0);
+    g.box(0.006, 0.004, 0.49, INK, t, 0.324, 0, 0);
+  }
+  const stones: readonly (readonly [number, number, boolean])[] = [[2, 2, true], [6, 6, false], [2, 6, true], [6, 2, false], [3, 3, false], [4, 2, true], [5, 3, false], [4, 4, true], [3, 5, false], [5, 5, true], [2, 4, true], [6, 4, false], [4, 6, false], [5, 6, true]];
+  for (const [i, j, black] of stones) g.ball(0.026, black ? INK : CREAM, -0.24 + i * 0.06, 0.334, -0.24 + j * 0.06).scale.y = 0.4;
+  // the players kneel on either side: a cushion and their bowl, its lid against it
+  for (const [s, c, black] of [[-1, VIOLET, true], [1, TEAL, false]] as const) {
+    g.box(0.46, 0.08, 0.46, c, s * 0.62, 0.04, 0, 0.04);
+    g.cyl(0.085, 0.09, WOOD_D, s * 0.42, 0.045, 0.24);
+    for (let i = 0; i < 4; i++) g.ball(0.026, black ? INK : CREAM, s * 0.42 + (i - 1.5) * 0.03, 0.093 + (i % 2) * 0.006, 0.24 + (i % 2 ? 0.02 : -0.02)).scale.y = 0.4;
+    g.cyl(0.085, 0.02, WOOD_D, s * 0.42, 0.01, -0.24);
+  }
+  return { w: 1.74, d: 0.66, h: 0.35 };
+};
+
+/** a giant tumbling tower: 16 layers of three pale blocks, a few pushed out or gone, two on the floor */
+const jenga: Maker = (g) => {
+  const L = 0.3, t = 0.098, h = 0.06;
+  g.contact(0.42, 0.42);
+  // the pushed ones (layer, block, how far) and the gone ones
+  const pushed = new Map<string, number>([['3,1', 0.09], ['7,0', -0.07], ['10,1', 0.12], ['13,2', 0.06]]);
+  const gone = new Set(['5,1', '8,1', '11,0', '12,1']);
+  for (let l = 0; l < 16; l++) {
+    const y = h / 2 + l * h;
+    for (let b = 0; b < 3; b++) {
+      if (gone.has(`${l},${b}`)) continue;
+      const off = pushed.get(`${l},${b}`) ?? 0;
+      const c = (l + b) % 3 === 0 ? WOOD : (l + b) % 3 === 1 ? WOOD_L : '#dcae74';
+      const across = (b - 1) * (t + 0.003);
+      if (l % 2 === 0) g.box(L, h - 0.003, t, c, off, y, across, 0.01);
+      else g.box(t, h - 0.003, L, c, across, y, off, 0.01);
+    }
+  }
+  // the one just pulled, laid on top across, and two that fell
+  g.box(L, h - 0.003, t, WOOD_L, 0.02, h / 2 + 16 * h, 0.04, 0.01).rotation.y = 0.3;
+  g.box(L, h - 0.003, t, WOOD, 0.36, h / 2, 0.22, 0.01).rotation.y = 0.7;
+  const lean = g.box(L, h - 0.003, t, '#dcae74', -0.32, 0.075, 0.16, 0.01); lean.rotation.y = -0.4; lean.rotation.z = 0.35;
+  return { w: 1.0, d: 0.59, h: 1.02, x: 0.015, z: 0.068 };
+};
+
+/** a claw machine: a glass case full of plush, the claw on its gantry, a lit marquee, the stick and the prize door */
+const claw: Maker = (g, o) => {
+  const w = 0.8, d = 0.8;
+  g.contact(w, d);
+  g.box(w, 0.8, d, TEAL, 0, 0.4, 0, 0.04);
+  g.box(0.24, 0.2, 0.02, INK, -0.2, 0.3, d / 2 + 0.03, 0.02);
+  g.box(0.12, 0.1, 0.02, YELLOW, 0.22, 0.52, d / 2 + 0.03, 0.01, 0.4 + o.night);
+  // the stick and the button on a ledge
+  const deck = g.at(0, 0.84, d / 2 + 0.06); deck.root.rotation.x = 0.25;
+  deck.box(w - 0.06, 0.06, 0.18, SLATE, 0, 0, 0, 0.02);
+  deck.cyl(0.035, 0.012, INK, -0.15, 0.035, 0); deck.box(0.018, 0.1, 0.018, STEEL, -0.15, 0.08, 0, 0.005); deck.ball(0.04, ORANGE, -0.15, 0.14, 0);
+  deck.cyl(0.04, 0.03, SKY, 0.15, 0.04, 0, 0.3 + o.night * 0.6);
+  // the case: four posts and four panes, a pile of plush on its floor
+  for (const x of [-w / 2 + 0.03, w / 2 - 0.03]) for (const z of [-d / 2 + 0.03, d / 2 - 0.03]) g.box(0.06, 0.8, 0.06, SLATE, x, 1.2, z, 0.015);
+  for (const z of [-d / 2 + 0.03, d / 2 - 0.03]) g.pane(w - 0.12, 0.76, 0.01, PANE, 0.18, 0, 1.2, z, 0.005);
+  for (const x of [-w / 2 + 0.03, w / 2 - 0.03]) g.pane(0.01, 0.76, d - 0.12, PANE, 0.18, x, 1.2, 0, 0.005);
+  const plush = [YELLOW, SKY, VIOLET, GREEN, ORANGE, CREAM, TEAL, YELLOW, SKY];
+  for (let i = 0; i < 9; i++) {
+    const x = -0.2 + (i % 3) * 0.2 + (i % 2 ? 0.02 : -0.02), z = -0.2 + Math.floor(i / 3) * 0.2, y = 0.87 + ((i * 7) % 3) * 0.025, c = plush[i] as string;
+    g.ball(0.075, c, x, y, z);
+    for (const e of [-1, 1]) g.ball(0.024, c, x + e * 0.045, y + 0.065, z);
+    g.ball(0.012, INK, x - 0.022, y + 0.015, z + 0.066); g.ball(0.012, INK, x + 0.022, y + 0.015, z + 0.066);
+  }
+  // the gantry, the carriage, the string and the claw's three fingers
+  g.box(w - 0.1, 0.04, 0.04, STEEL, 0, 1.54, -0.08, 0.01);
+  g.box(0.1, 0.06, 0.1, SLATE, 0.08, 1.52, -0.08, 0.02);
+  g.cyl(0.006, 0.22, INK, 0.08, 1.38, -0.08);
+  g.cyl(0.035, 0.05, STEEL, 0.08, 1.25, -0.08);
+  for (let i = 0; i < 3; i++) {
+    const a = (i * 2 * Math.PI) / 3, f = g.at(0.08 + Math.cos(a) * 0.035, 1.2, -0.08 + Math.sin(a) * 0.035);
+    f.root.rotation.y = -a; f.root.rotation.z = 0.35;
+    f.box(0.015, 0.1, 0.015, STEEL, 0, -0.04, 0, 0.005);
+  }
+  // the top: a box with its lit marquee and a row of bulbs
+  g.box(w, 0.26, d, VIOLET, 0, 1.73, 0, 0.04);
+  g.box(w - 0.1, 0.16, 0.02, YELLOW, 0, 1.73, d / 2 + 0.03, 0.02, 0.4 + o.night * 0.9);
+  for (let i = 0; i < 5; i++) g.ball(0.022, [ORANGE, SKY, GREEN, SKY, ORANGE][i] as string, -0.28 + i * 0.14, 1.73, d / 2 + 0.045, 0.4 + o.night);
+  return { w: 0.84, d: 0.98, h: 1.86, z: 0.07 };
+};
+
+/** a card table: a round green baize, four stools, the hands fanned out, chips stacked, the deck in the middle */
+const cards: Maker = (g) => {
+  g.contact(1.4, 1.4);
+  g.cyl(0.28, 0.04, WOOD_D, 0, 0.02, 0); g.cyl(0.06, 0.66, WOOD_D, 0, 0.36, 0);
+  g.cyl(0.5, 0.06, WOOD_D, 0, 0.72, 0);
+  g.cyl(0.44, 0.012, '#2f8f5a', 0, 0.754, 0);
+  for (let s = 0; s < 4; s++) {
+    const a = Math.PI / 4 + (s * Math.PI) / 2, cx = Math.cos(a), sz = Math.sin(a);
+    // a stool
+    g.cyl(0.16, 0.05, s % 2 ? VIOLET : ORANGE, cx * 0.72, 0.45, sz * 0.72); g.cyl(0.03, 0.42, STEEL, cx * 0.72, 0.22, sz * 0.72); g.cyl(0.12, 0.02, STEEL, cx * 0.72, 0.01, sz * 0.72);
+    // the player's hand: five cards fanned, each 3 mm over the last, the backs up
+    for (let c = 0; c < 5; c++) {
+      const card = g.at(cx * 0.3 + -sz * (c - 2) * 0.03, 0.763 + c * 0.003, sz * 0.3 + cx * (c - 2) * 0.03);
+      card.root.rotation.y = -a + Math.PI / 2 + (c - 2) * 0.2;
+      card.box(0.06, 0.002, 0.09, s === 0 ? CREAM : SKY, 0, 0, 0, 0);
+    }
+    // the player's chips: two stacks
+    for (const [k, col] of [[-1, YELLOW], [1, s % 2 ? INK : TEAL]] as const) {
+      const x = cx * 0.36 + -sz * k * 0.12, z = sz * 0.36 + cx * k * 0.12;
+      for (let i = 0; i < 3 + s; i++) g.cyl(0.024, 0.008, i % 2 ? CREAM : col, x, 0.765 + i * 0.008, z);
+    }
+  }
+  // the deck and two face-up cards
+  g.box(0.07, 0.03, 0.1, SKY, 0, 0.775, 0, 0.005);
+  for (const [x, r] of [[-0.12, 0.2], [0.12, -0.15]] as const) {
+    const c = g.at(x, 0.762, 0.04); c.root.rotation.y = r;
+    c.box(0.06, 0.002, 0.09, CREAM, 0, 0, 0, 0); c.box(0.02, 0.002, 0.02, INK, 0, 0.003, 0, 0);
+  }
+  return { w: 1.34, d: 1.34, h: 0.82 };
+};
+
+export const GAMES = { chess, pingpong, arcade, pinball, babyfoot, billiards, go, jenga, claw, cards } satisfies Record<string, Maker>;

@@ -47,10 +47,19 @@ function outOfFoot(id: ObjId, o: MakeOpts): string[] {
   return bad;
 }
 
+/** p1's objects: the 30 signed ones, the cat on a walk and its cushion; p2 adds to them, never drops one */
+const P1: readonly string[] = ['chess', 'pingpong', 'arcade', 'pinball', 'babyfoot', 'piano', 'jukebox', 'shelf', 'library', 'telescope', 'easel', 'printer', 'plant', 'campfire', 'cat', 'catwalk', 'cushion', 'dog', 'aquarium', 'mailbox', 'booth', 'visio', 'rack', 'macdesk', 'scooter', 'bike', 'calendar', 'files', 'trophies', 'extinguisher', 'charts', 'packing'];
+/** the collection table (page bims-plugins): 10 a family; animals keep their walk and cushion poses on top */
+const PER_FAMILY = 10;
+const EXTRA: Partial<Record<keyof typeof FAMILIES, number>> = { animals: 2 };
+
 describe('objects', () => {
-  it('has the 30 signed objects, the cat on a walk and its cushion, each in one family', () => {
-    expect(OBJ_IDS.length).toBe(32);
+  it('keeps every p1 object, each in one family, never more than the collection table holds', () => {
+    expect(P1.filter((id) => !OBJ_IDS.includes(id as ObjId))).toEqual([]);
     expect(new Set(OBJ_IDS).size).toBe(OBJ_IDS.length);
+    for (const [f, makers] of Object.entries(FAMILIES)) {
+      if (f !== 'office') expect(Object.keys(makers).length, f).toBeLessThanOrEqual(PER_FAMILY + (EXTRA[f as keyof typeof FAMILIES] ?? 0));
+    }
     expect(Object.keys(FAMILIES)).toEqual(['games', 'music', 'knowledge', 'workshop', 'kitchen', 'garden', 'animals', 'comms', 'machines', 'travel', 'office']);
     expect(familyOf('arcade')).toBe('games');
     expect(familyOf('calendar')).toBe('office');
@@ -120,11 +129,13 @@ describe('objects', () => {
     });
   });
 
-  it('hangs the calendar on a wall, its back on z = -d/2', () => {
-    const { group, foot, wall } = makeObject('calendar');
-    expect(wall).toBe(true);
-    const b = new Box3().setFromObject(group);
-    expect(Math.abs(b.min.z + foot.d / 2)).toBeLessThan(SLACK);
-    expect(OBJ_IDS.filter((id) => makeObject(id).wall)).toEqual(['calendar']);
+  it('hangs every wall object (the calendar among them) with its back on z = -d/2', () => {
+    const walls = OBJ_IDS.filter((id) => makeObject(id).wall);
+    expect(walls).toContain('calendar');
+    for (const id of walls) {
+      const { group, foot } = makeObject(id);
+      const b = new Box3().setFromObject(group);
+      expect(Math.abs(b.min.z + foot.d / 2), id).toBeLessThan(SLACK);
+    }
   });
 });
