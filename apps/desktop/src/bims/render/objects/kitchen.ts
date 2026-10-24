@@ -196,8 +196,15 @@ const teaset: Maker = (g) => {
     g.cyl(0.032, 0.005, AMBER, x, 0.44, z);
   }
   g.cyl(0.05, 0.06, SKY, 0.02, 0.41, 0.2); g.ball(0.02, CREAM, 0.02, 0.45, 0.2);
-  for (const x of [-0.5, 0.5]) { g.box(0.32, 0.1, 0.32, x < 0 ? VIOLET : YELLOW, x, 0.05, 0.14, 0.05); }
-  return { w: 1.38, d: 0.86, h: 0.64, z: 0.0 };
+  // two floor cushions (designer m_40562): flat, round-cornered, puffed either side of a sunk button
+  for (const x of [-0.5, 0.5]) {
+    const c = x < 0 ? VIOLET : YELLOW;
+    const cu = g.at(x, 0, 0.14); cu.root.rotation.y = x * 0.4;
+    cu.box(0.34, 0.05, 0.34, c, 0, 0.03, 0, 0.1);
+    for (const [dx, dz] of [[-0.08, -0.08], [0.08, -0.08], [-0.08, 0.08], [0.08, 0.08]] as const) cu.ball(0.09, c, dx, 0.05, dz).scale.set(1, 0.3, 1);
+    cu.ball(0.018, darker(c, 0.7), 0, 0.064, 0);
+  }
+  return { w: 1.44, d: 0.86, h: 0.64 };
 };
 
 /** a candy dispenser: a glass globe of sweets on a sky-blue body and a stand, its coin knob and chute */

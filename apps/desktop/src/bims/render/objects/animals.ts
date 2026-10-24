@@ -1,6 +1,8 @@
 // The objects of the animals family: bise's office cat on its round :* cushion, the cat out on a walk and its empty cushion, the dog by its square basket, an aquarium, and the rest of page bims-plugins' collection table: a parrot on its perch, hens by their coop, a tortoise, a rabbit, a hamster in its cage, a goldfish bowl, ducks on a puddle. Pets are never bims (one bim = one agent); here they only sit still (their life is p6). No red: a hen's comb is amber.
 // A rounded box's bevel stands 0.4 r out of its w and d and its top sits r/4 low (style.ts roundBox): what sits on one is placed past it.
 // Built with the objects' kit (kit.ts): at the origin on the floor, front to +z, centred on the foot it returns.
+import { CylinderGeometry, type Mesh } from 'three';
+import { STYLE } from '../style';
 import { AMBER, CREAM, darker, glyph, INK, LEAF, LEAF_L, lighter, ORANGE, PANE, SKY, SLATE, SLATE_L, STEEL, TEAL, WOOD, WOOD_D, WOOD_L, YELLOW, type Maker, type Part } from './kit';
 
 const STRAW = '#e8d3a8';
@@ -113,15 +115,15 @@ const aquarium: Maker = (g, o) => {
   return { w, d, h: 1.35 };
 };
 
-/** a blue and yellow parrot on its perch stand: a base, a pole, the bar, a seed cup, its long tail down */
+/** a blue and yellow parrot on its T perch at a bim's head height (designer m_40562): a round base, a pole, the bar, a seed cup on one arm, its long tail down */
 const parrot: Maker = (g) => {
-  g.contact(0.7, 0.5);
-  g.cyl(0.22, 0.05, SLATE, 0, 0.025, 0);
-  g.box(0.05, 1.12, 0.05, WOOD, 0, 0.6, 0, 0.015);
-  const bar = g.cyl(0.025, 0.62, WOOD_D, 0, 1.17, 0); bar.rotation.z = Math.PI / 2;
-  g.cyl(0.06, 0.06, STEEL, 0.26, 1.22, 0);
-  for (let i = 0; i < 4; i++) g.ball(0.015, i % 2 ? YELLOW : STRAW, 0.24 + (i % 2) * 0.03, 1.25, -0.02 + i * 0.012);
-  const p = g.at(-0.08, 1.19, 0); p.root.rotation.y = 0.5;
+  g.contact(0.8, 0.5);
+  g.cyl(0.24, 0.05, SLATE, 0, 0.025, 0);
+  g.box(0.06, 0.92, 0.06, WOOD, 0, 0.5, 0, 0.02);
+  const bar = g.cyl(0.03, 0.74, WOOD_D, 0, 0.98, 0); bar.rotation.z = Math.PI / 2;
+  g.cyl(0.075, 0.07, STEEL, 0.3, 1.04, 0);
+  for (let i = 0; i < 4; i++) g.ball(0.018, i % 2 ? YELLOW : STRAW, 0.28 + (i % 2) * 0.035, 1.075, -0.02 + i * 0.014);
+  const p = g.at(-0.1, 1.0, 0); p.root.rotation.y = 0.5; p.root.scale.setScalar(1.5);
   const body = p.ball(0.09, SKY, 0, 0.12, 0); body.scale.set(0.85, 1.3, 0.85);
   p.ball(0.065, YELLOW, 0, 0.1, 0.04).scale.set(0.9, 1.3, 0.6);
   for (const dx of [-0.07, 0.07]) { const w = p.box(0.03, 0.16, 0.1, darker(SKY, 0.8), dx, 0.13, -0.01, 0.015); w.rotation.z = -dx * 1.5; }
@@ -131,7 +133,7 @@ const parrot: Maker = (g) => {
   const beak = p.cone(0.025, 0.06, INK, 0, 0.27, 0.085); beak.rotation.x = 2.2;
   for (const dx of [-0.035, 0.035]) p.ball(0.012, INK, dx, 0.31, 0.06);
   for (const dx of [-0.03, 0.03]) p.ball(0.018, SLATE_L, dx, 0.0, 0.02);
-  return { w: 0.66, d: 0.46, h: 1.57 };
+  return { w: 0.8, d: 0.5, h: 1.57 };
 };
 
 /** a hen: plump, a tail up, an amber comb and wattle, a yellow beak and legs */
@@ -233,27 +235,49 @@ const hamster: Maker = (g) => {
   return { w: 0.82, d: 0.5, h: 0.94 };
 };
 
-/** a goldfish bowl on a little round table: water, gravel, a weed, the goldfish */
+/**
+ * a part's pane (its glass rule, its 30% when off) given a round shape: the kit's panes are boxes, a
+ * bowl is a ball cut flat at the top (style.ts cap, turned over: open at the top, its edge a thin lip)
+ */
+function rounded(m: Mesh, geo: Mesh['geometry']): Mesh {
+  m.geometry.dispose();
+  m.geometry = geo;
+  return m;
+}
+
+/** a goldfish bowl on a small round side table (designer m_40562): a round glass bowl cut flat at the top, pale water 15% under its lip, a pebble bed, one big goldfish against the front glass */
 const goldfish: Maker = (g) => {
-  g.contact(0.5, 0.5);
-  for (const [x, z] of [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]] as const) g.box(0.04, 0.6, 0.04, WOOD_D, x, 0.3, z, 0.012);
-  g.cyl(0.24, 0.04, WOOD, 0, 0.62, 0);
-  g.cyl(0.11, 0.03, CREAM, 0, 0.655, 0);
-  g.pane(0.36, 0.34, 0.36, PANE, 0.3, 0, 0.84, 0, 0.17);
-  g.box(0.3, 0.22, 0.3, WATER, 0, 0.8, 0, 0.12);
-  for (let i = 0; i < 6; i++) g.ball(0.025, i % 2 ? STRAW : lighter(SKY, 0.4), -0.07 + (i % 3) * 0.07, 0.69, -0.04 + Math.floor(i / 3) * 0.08);
-  for (const [dx, h] of [[-0.08, 0.16], [-0.05, 0.12]] as const) g.box(0.015, h, 0.015, LEAF, dx, 0.7 + h / 2, -0.06, 0);
-  const f = g.at(0.03, 0.84, 0.05); f.root.rotation.y = 0.3;
-  f.ball(0.04, ORANGE, 0, 0, 0).scale.set(1.5, 1, 0.7);
-  const t = f.box(0.05, 0.06, 0.012, AMBER, -0.07, 0, 0, 0); t.rotation.z = 0.78;
-  f.ball(0.008, INK, 0.04, 0.01, 0.022);
-  return { w: 0.5, d: 0.5, h: 1.01 };
+  g.contact(0.56, 0.56);
+  g.cyl(0.18, 0.03, WOOD_D, 0, 0.015, 0);
+  g.cyl(0.04, 0.46, WOOD, 0, 0.26, 0);
+  g.cyl(0.27, 0.04, WOOD, 0, 0.5, 0);
+  const r = 0.21, y0 = 0.52 + r;
+  // the bowl: a ball's cap turned over, 3/4 of its arc, so its rim sits at 85% of its height, open on top
+  const bowl = rounded(g.pane(0.1, 0.1, 0.1, lighter(PANE, 0.4), 0.22, 0, y0, 0), STYLE.cap(r, 0.75));
+  bowl.rotation.x = Math.PI;
+  // the water: the same, inside it, up to 15% under the rim, its surface a disc
+  const rw = r * 0.95, fw = 0.64;
+  const water = rounded(g.pane(0.1, 0.1, 0.1, lighter(SKY, 0.45), 0.45, 0, y0, 0), STYLE.cap(rw, fw));
+  water.rotation.x = Math.PI;
+  const rs = rw * Math.sin(fw * Math.PI);
+  rounded(g.pane(0.1, 0.1, 0.1, lighter(SKY, 0.6), 0.4, 0, y0 - rw * Math.cos(fw * Math.PI), 0), new CylinderGeometry(rs, rs, 0.004, 28));
+  for (let i = 0; i < 9; i++) { const a = i * 2.3, d = 0.03 + (i % 3) * 0.035; g.ball(0.026, [STRAW, lighter(SKY, 0.4), '#c9c2b6'][i % 3] as string, Math.cos(a) * d, 0.56, Math.sin(a) * d).scale.set(1, 0.6, 1); }
+  for (const [dx, h] of [[-0.07, 0.15], [-0.04, 0.11]] as const) g.box(0.015, h, 0.015, LEAF, dx, 0.57 + h / 2, -0.07, 0);
+  const f = g.at(0.0, y0 - 0.01, 0.1); f.root.rotation.y = 0.15;
+  f.ball(0.06, ORANGE, 0, 0, 0).scale.set(1.5, 1, 0.6);
+  const t = f.box(0.07, 0.08, 0.012, AMBER, -0.1, 0, 0, 0); t.rotation.z = 0.78;
+  const fin = f.box(0.04, 0.03, 0.01, AMBER, 0, 0.055, 0, 0); fin.rotation.z = -0.3;
+  f.ball(0.012, INK, 0.06, 0.015, 0.03);
+  return { w: 0.56, d: 0.56, h: 0.9 };
 };
 
-/** a duck and her three ducklings in a line by a puddle */
+/** a duck and her three ducklings in a line behind her (designer m_40562: 1.5x), by a pond-blue puddle with a stone edge */
 const ducks: Maker = (g) => {
-  g.contact(1.1, 0.7);
-  g.pane(0.5, 0.03, 0.4, WATER, 0.75, -0.25, 0.015, -0.05, 0.015);
+  g.contact(1.3, 0.9);
+  const px = -0.2, pz = -0.18;
+  g.box(0.62, 0.02, 0.3, darker(WATER, 0.7), px, 0.012, pz, 0.005);
+  g.pane(0.66, 0.05, 0.34, WATER, 0.75, px, 0.025, pz, 0.025);
+  for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; g.ball(0.05 + (i % 3) * 0.01, i % 2 ? '#c9c2b6' : '#9aa7b2', px + Math.cos(a) * 0.36, 0.035, pz + Math.sin(a) * 0.2).scale.set(1.3, 0.6, 1); }
   const duck = (x: number, z: number, face: number, k: number, c: string, bill: string): void => {
     const d = g.at(x, 0, z); d.root.rotation.y = face; d.root.scale.setScalar(k);
     for (const dz of [-0.035, 0.035]) d.box(0.06, 0.012, 0.04, bill, 0.02, 0.006, dz, 0);
@@ -265,9 +289,9 @@ const ducks: Maker = (g) => {
     for (const dz of [-0.035, 0.035]) d.ball(0.011, INK, 0.15, 0.3, dz);
     const w = d.ball(0.06, darker(c, 0.92), -0.01, 0.16, 0.07); w.scale.set(1.5, 0.7, 0.4);
   };
-  duck(0.25, 0.02, -0.15, 1, CREAM, ORANGE);
-  for (const [i, z] of [[0, 0.16], [1, 0.22], [2, 0.18]] as const) duck(-0.02 - i * 0.15, z, -0.2, 0.5, YELLOW, AMBER);
-  return { w: 1.1, d: 0.66, h: 0.36 };
+  duck(0.32, 0.16, -0.25, 1.5, CREAM, ORANGE);
+  for (let i = 0; i < 3; i++) duck(0.02 - i * 0.2, 0.24 - i * 0.02, -0.15, 0.75, YELLOW, AMBER);
+  return { w: 1.3, d: 0.86, h: 0.54 };
 };
 
 export const ANIMALS = { cat, catwalk, cushion, dog, aquarium, parrot, hens, tortoise, rabbit, hamster, goldfish, ducks } satisfies Record<string, Maker>;
