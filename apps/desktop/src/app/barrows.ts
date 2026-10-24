@@ -6,7 +6,7 @@
 import type { Item } from '@/artifacts/model';
 import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
-import { keyOf, shortCmd, tipOf as procTip, type ProcItem } from '@/running/model';
+import { keyOf, portWords, shortCmd, stateOf, tipOf as procTip, urlWords, whereOf, worktreeName, type ProcItem, type Root } from '@/running/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge, shownName } from '@/agents/model';
 import { alarms, pauseLine, waitLen } from '@/thread/wake';
@@ -358,15 +358,20 @@ export function scheduledRows(tasks: readonly Task[], now: number): BarRow[] {
 }
 
 /**
- * PROCESSES (designer's running-procs, its name m_38642): what the bar's scope left running, oldest
- * first (barProcs): a dim '∿', its command short and mono, then whose, dim: on a project's thread
- * its agent, on bise's 'project › agent', on an agent's own thread none; ':5173 ↗' at the end
- * while it listens; the tip says its id, start and folder. A click opens its output on the
- * processes screen; the port its address. No numbers. Pure.
+ * PROCESSES (designer's running-procs, its name m_38642; Gabriel's test, procs-bar): what the bar's
+ * scope left running, oldest first (barProcs): a dim '∿', its program and arguments, short and mono
+ * ('python3 -m http.server 8000'), then where it runs, dim: its folder past the project's root or
+ * its worktree's name (whereOf: 'apps/desktop', 'perf'), on bise's thread 'project › where'; at the
+ * end 'localhost:5173 ↗' only when its hub found a web page there (`url`), else its port plain
+ * (':9229'). The tip says its id, start, folder and whose. A click opens its output on the
+ * processes screen; the address its browser tab. `roots`: each project's root and its agents'
+ * worktrees, by project. Pure.
  */
-export function procRows(items: readonly ProcItem[], scope: 'agent' | 'project' | 'all', home?: string): BarRow[] {
+export function procRows(items: readonly ProcItem[], scope: 'agent' | 'project' | 'all', roots: ReadonlyMap<string, readonly Root[]> = new Map(), home?: string): BarRow[] {
   return items.map((x) => {
-    const port = x.p.ports?.[0];
+    const st = stateOf(x.p);
+    const url = urlWords(x.p, st);
+    const where = whereOf(x.p.cwd, roots.get(x.project) ?? []);
     return {
       key: `p:${keyOf(x)}`,
       project: x.project,
@@ -374,10 +379,11 @@ export function procRows(items: readonly ProcItem[], scope: 'agent' | 'project' 
       glyph: '∿',
       tone: 'dim',
       name: shortCmd(x.p.cmd),
-      sub: scope === 'agent' ? '' : scope === 'project' ? x.p.agent : running.group({ project: x.projectName, agent: x.p.agent }),
-      end: port === undefined ? '' : `:${String(port)} ↗`,
+      sub: scope === 'all' ? (where === '' ? x.projectName : running.group({ project: x.projectName, agent: where })) : where,
+      end: url !== null ? url.label : portWords(x.p, st),
       endTone: 'dim',
-      title: procTip(x.p, home),
+      title: scope === 'agent' ? procTip(x.p, home) : `${procTip(x.p, home)}
+${running.by({ agent: x.p.agent })}`,
       testId: `app.right.running.${keyOf(x)}`,
       waits: false,
       mono: true,
@@ -443,4 +449,22 @@ export function pageRows(rows: readonly BarRow[], cap: number, pages = 0): Paged
   const hidden = rows.length - shown.length;
   const more = hidden === 0 ? '' : hidden > PAGE ? panel.show_more_left({ n: PAGE, left: hidden }) : panel.show_more({ n: hidden });
   return { shown, hidden, pages: p, more, less: p > 0 };
+}
+
+/**
+ * Where a project's processes run (whereOf's roots, procs-bar): its root, named '' (a folder past
+ * it says only its path inside), and each of its agents' own worktrees by name. Pure.
+ */
+export function procRoots(projects: readonly { readonly project: string; readonly path: string }[], agents: readonly ProjAgent[]): Map<string, Root[]> {
+  const m = new Map<string, Root[]>();
+  for (const p of projects) m.set(p.project, p.path === '' ? [] : [{ path: p.path, name: '' }]);
+  for (const x of agents) {
+    const wt = x.a.worktree ?? '';
+    if (wt === '') continue;
+    const repo = projects.find((p) => p.project === x.project)?.path.split('/').filter((y) => y !== '').pop() ?? '';
+    const list = m.get(x.project) ?? [];
+    if (!list.some((r) => r.path === wt)) list.push({ path: wt, name: worktreeName(wt, repo) });
+    m.set(x.project, list);
+  }
+  return m;
 }

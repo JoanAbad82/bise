@@ -98,12 +98,59 @@ export function endWords(p: Proc, s: St, now: number): string {
   }
 }
 
-/** Its address while it listens: 'localhost:5173 ↗' (opens 127.0.0.1); none when it doesn't or ended. */
+/**
+ * Its address while it serves web pages: 'localhost:5173 ↗' (opens 127.0.0.1). Only when its hub
+ * found HTTP there (`url`, procs-bar: a port that isn't a web page opened an empty tab); none when
+ * it doesn't listen, isn't HTTP, or ended.
+ */
 export function urlWords(p: Proc, s: St): { readonly label: string; readonly url: string } | null {
   if (s.k !== 'running' && s.k !== 'stopping') return null;
-  const port = portsOf(p)[0];
+  const url = p.url ?? '';
+  const port = /^https?:\/\/[^/]*:(\d+)/u.exec(url)?.[1];
   if (port === undefined) return null;
-  return { label: `localhost:${String(port)} ↗`, url: p.url ?? `http://127.0.0.1:${String(port)}` };
+  return { label: `localhost:${port} ↗`, url };
+}
+
+/** A port it listens on that isn't a web page: ':9229', plain (no link); none when it has a url or no port. */
+export function portWords(p: Proc, s: St): string {
+  if (s.k !== 'running' && s.k !== 'stopping') return '';
+  if (urlWords(p, s) !== null) return '';
+  const port = portsOf(p)[0];
+  return port === undefined ? '' : `:${String(port)}`;
+}
+
+/** A folder that names where a process runs: the project's root (name ''), an agent's worktree. */
+export interface Root {
+  readonly path: string;
+  readonly name: string;
+}
+
+/**
+ * Where it runs, as the bar says it (procs-bar, Gabriel: the full path says nothing): its folder
+ * under the deepest root that holds it, past the project's root ('apps/desktop', '' at the root
+ * itself), a worktree by its name ('perf', 'perf/apps/desktop'); elsewhere its last folder. Never a
+ * home path. Pure.
+ */
+export function whereOf(cwd: string | null | undefined, roots: readonly Root[]): string {
+  if (cwd == null || cwd === '') return '';
+  const clean = (x: string) => x.replace(/\/+$/u, '');
+  const at = clean(cwd);
+  const root = roots
+    .filter((r) => r.path !== '' && (at === clean(r.path) || at.startsWith(`${clean(r.path)}/`)))
+    .sort((a, b) => b.path.length - a.path.length)[0];
+  if (root === undefined) return at.split('/').filter((x) => x !== '').pop() ?? '/';
+  const rel = at.slice(clean(root.path).length).replace(/^\//u, '');
+  return [root.name, rel].filter((x) => x !== '').join('/');
+}
+
+/**
+ * A worktree's name from its path: its folder, or the one above when the folder is the repo's own
+ * name (bise's `worktrees/<hub>/<task>/<repo>`: the task). Pure.
+ */
+export function worktreeName(path: string, repo: string): string {
+  const parts = path.split('/').filter((x) => x !== '');
+  const last = parts.at(-1) ?? '';
+  return last === repo && parts.length > 1 ? (parts.at(-2) ?? last) : last;
 }
 
 /** A folder as the tip says it: '~/…/worktrees/perf' (home as ~, the last two folders). */
@@ -206,11 +253,16 @@ export function inScope(items: readonly ProcItem[], scope: { readonly project: s
   return items.filter((x) => x.project === scope.project && (scope.agent === undefined || x.p.agent === scope.agent));
 }
 
-/** The bar's row command, short: its first two words past a package runner ('pnpm dev', 'playwright test --ui'). */
+/**
+ * The bar's row command, short (procs-bar): past a package runner's exec, its program by name and
+ * its arguments, a path by its last part ('python3 -m http.server 8000', 'node server.js'), five
+ * words at most. Never a home path.
+ */
 export function shortCmd(cmd: string): string {
   const w = cmd.trim().split(/\s+/u);
   const runner = ['pnpm', 'npx', 'npm', 'yarn'].includes(w[0] ?? '') && w[1] === 'exec' ? 2 : 0;
-  return w.slice(runner, runner + 3).join(' ');
+  const base = (x: string) => (x.includes('/') && /^['"]?[~/.]/u.test(x) ? (x.replace(/['"]/gu, '').split('/').filter((y) => y !== '').pop() ?? x) : x);
+  return w.slice(runner, runner + 5).map(base).join(' ');
 }
 
 /**

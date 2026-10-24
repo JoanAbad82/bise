@@ -55,7 +55,7 @@ fn at_150_columns_groups_rows_tip_and_keys() {
     assert_eq!(sel, Some(1));
     // the selected row's tip under it, then the next row
     assert!(t[2].trim_start().starts_with("bg3 · started "), "{}", t[2]);
-    assert!(t[3].starts_with("  ∿ node scripts/watch.mjs"), "{}", t[3]);
+    assert!(t[3].starts_with("  ∿ node --inspect=9229 scripts/watch.mjs"), "{}", t[3]);
     assert!(t.iter().any(|l| l == &running::group("acme", "docs")));
     // the running view: no ended row (designer m_38556)
     assert!(t.iter().all(|l| !l.contains("cargo test") && !l.contains("mkdocs")), "{t:#?}");
@@ -211,7 +211,7 @@ fn enter_reads_the_output_from_the_hub_and_follows() {
     let o = sc.out.as_ref().unwrap();
     let p = sc.items.as_ref().unwrap().iter().find(|p| p.id == "p48990.1791100150").cloned();
     let t = texts(&out_lines(o, p.as_ref(), "acme", false, 146, 20, NOW));
-    assert!(t[0].starts_with("node scripts/watch.mjs  ") && t[0].contains(&running::whose("perf", "acme")), "{}", t[0]);
+    assert!(t[0].starts_with("node --inspect=9229 scripts/watch.mjs  ") && t[0].contains(&running::whose("perf", "acme")), "{}", t[0]);
     assert_eq!(&t[2..5], ["watching src", "built in 12 ms", "rebuilt"]);
     assert_eq!(t.last().unwrap(), running::keys_output);
     // esc: back to the list, the follow off

@@ -29,7 +29,7 @@ const proc = (over: Partial<Proc> & Pick<Proc, 'id' | 'agent'>): Proc => ({
 });
 const at = (project: string, p: Proc): ProcItem => ({ project, projectName: project === 'shop' ? 'storefront' : project, p });
 
-const dev = at('shop', proc({ id: 'bg3', agent: 'perf', ports: [5173] }));
+const dev = at('shop', proc({ id: 'bg3', agent: 'perf', ports: [5173], url: 'http://127.0.0.1:5173' }));
 const stripe = at('shop', proc({ id: 'bg1', agent: 'checkout', cmd: 'stripe listen', started_ms: NOW - 22 * MIN }));
 const failed = at('shop', proc({ id: 'bg2', agent: 'checkout', cmd: 'pnpm test checkout', state: { is: 'exited', rc: 1 }, ended_ms: NOW - 3 * MIN }));
 const nohup = at('tele', proc({ id: 'p9.1', agent: 'p99', kind: { is: 'detached' }, cmd: 'grafana-server', out: 'none' }));

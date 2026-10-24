@@ -117,13 +117,15 @@ pub(crate) fn status(p: &Proc, now: u64, stopping: bool, wide: bool) -> String {
     }
 }
 
-/// Its port's words, when it runs and listens: `localhost:5173` (wide) or
-/// `:5173`. The `↗` is the desktop's (the TUI's `o` opens it).
+/// Its port's words, when it runs and listens: `localhost:5173` (wide)
+/// when its hub found a web page there (`url`, procs-bar), else `:5173`.
+/// The `↗` is the desktop's (the TUI's `o` opens it).
 pub(crate) fn port_words(p: &Proc, wide: bool) -> Option<String> {
     let port = p.ports.first().filter(|_| is_running(p))?;
-    Some(match wide {
-        true => running::url(port).trim_end_matches(" ↗").to_string(),
-        false => running::port_short(port),
+    let web = p.url.as_deref().and_then(|u| u.rsplit_once(':')).and_then(|(_, n)| n.trim_end_matches('/').parse::<u16>().ok());
+    Some(match (wide, web) {
+        (true, Some(w)) => running::url(w).trim_end_matches(" ↗").to_string(),
+        _ => running::port_short(port),
     })
 }
 

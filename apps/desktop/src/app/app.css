@@ -841,10 +841,29 @@ body:has(.app-shell) {
 .app-rb-end.app-rb-link:hover {
   color: var(--c-text);
 }
-/* a command (RUNNING's rows): mono, a step smaller so it sits on the sans rows' line */
+/* a command (PROCESSES' rows): mono, a step smaller so it sits on the sans rows' line; it takes the
+   room its row leaves, cut only where the row ends (designer m_38897: no 'where' and no port, never
+   cut short) */
 .app-rb-name.mono {
-  max-width: 70%;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
   font: var(--t-12) var(--font-mono);
+}
+/* a command's where: whole or gone, it gives way before the command cuts (designer m_38942): it
+   shrinks first (1000) and, short of room, wraps onto a hidden second line (the 0-wide first item
+   keeps it from staying on its line alone, as .app-rb-cols) */
+.app-rb-where {
+  display: flex;
+  flex: 0 1000 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  height: var(--h-row);
+  overflow: hidden;
+  line-height: var(--h-row);
+}
+.app-rb-where .app-rb-sub {
+  flex: none;
 }
 /* a browser-only artifact: '↗' 4 px after its title (designer m_21742) */
 .app-rb-out {

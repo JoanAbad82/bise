@@ -269,6 +269,16 @@ fn bise_wrapper(args: &str, dir: &str) -> bool {
     args.contains(&format!("/agents/{dir}/run/bend-sh-"))
 }
 
+/// bise's plugins bridge for a REPL (`<bise> plugins serve --dir <run>/plugins
+/// --parent <repl>`, plugins/src/bridge.rs): it forks away from its REPL
+/// (its parent is 1) and ends with it, and its port is bise's loopback
+/// API, never the agent's server (Gabriel's 13 rows, procs-bar).
+fn bise_bridge(args: &str) -> bool {
+    let mut w = args.split_whitespace();
+    let bin = w.next().unwrap_or("");
+    (bin == "bise" || bin.ends_with("/bise")) && w.next() == Some("plugins") && w.next() == Some("serve") && args.contains(" --parent ")
+}
+
 fn descendants(from: &[u32], kids: &BTreeMap<u32, Vec<u32>>) -> BTreeSet<u32> {
     let mut out = BTreeSet::new();
     let mut todo: Vec<u32> = from.to_vec();
@@ -337,7 +347,12 @@ pub fn trees(rows: &[Row], hub: &str, agents: &[AgentIn], me: u32) -> Vec<Tree> 
         // bise's wrappers left after a handoff (a runner, its watch loop
         // and its sleeps) are bise's, never the agent's: whatever its
         // bg job's group or the session they sit in
-        let wrappers: Vec<u32> = rows.iter().filter(|r| !r.zombie && !taken.contains(&r.pid) && bise_wrapper(&r.args, &a.dir)).map(|r| r.pid).collect();
+        // and its plugins bridge (with the servers it runs)
+        let wrappers: Vec<u32> = rows
+            .iter()
+            .filter(|r| !r.zombie && !taken.contains(&r.pid) && (bise_wrapper(&r.args, &a.dir) || (mine.contains(&r.pid) && bise_bridge(&r.args))))
+            .map(|r| r.pid)
+            .collect();
         out_of_list.extend(descendants(&wrappers, &kids).into_iter().filter(|p| !taken.contains(p)));
         let left: BTreeSet<u32> = mine.iter().copied().filter(|p| !out_of_list.contains(p) && !taken.contains(p) && by_pid.get(p).is_some_and(|r| !r.zombie)).collect();
         for root in left.iter().copied().filter(|p| by_pid.get(p).is_some_and(|r| !left.contains(&r.ppid))) {
@@ -363,7 +378,22 @@ pub fn id_of(kind: ProcKind, root: u32, started_ms: u64) -> String {
 #[derive(Clone, Debug)]
 pub struct Found<'a> {
     pub ports: &'a BTreeMap<u32, Vec<u16>>,
+    /// the ports that answered HTTP ([`answers_http`]): a row's `url`
+    /// is the first of its ports there, else none (a port that is not a
+    /// web page never opens an empty browser tab)
+    pub http: &'a BTreeSet<u16>,
     pub files: &'a BTreeMap<u32, Files>,
+}
+
+/// What the shell's probe sends a port (`daemon/processes.rs`): a HEAD
+/// of `/`, the connection closed after it.
+pub const HTTP_PROBE: &[u8] = b"HEAD / HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+
+/// A port answered HTTP: the first bytes it sent back are a status line
+/// (`HTTP/1.1 200 OK`, a 404 or a 500 too: something serves pages
+/// there); nothing, a TLS alert or another protocol's greeting is not.
+pub fn answers_http(first: &[u8]) -> bool {
+    first.starts_with(b"HTTP/")
 }
 
 /// A running tree's row: its sums from the same table, its ports, the
@@ -389,7 +419,7 @@ pub fn row(t: &Tree, rows: &BTreeMap<u32, &Row>, found: &Found) -> Option<Proc> 
         cwd: files.and_then(|f| f.cwd.clone()),
         pid: t.root,
         started_ms: root.started_ms,
-        url: ports.first().map(|p| format!("http://127.0.0.1:{p}")),
+        url: ports.iter().find(|p| found.http.contains(p)).map(|p| format!("http://127.0.0.1:{p}")),
         ports,
         name: server_name(&t.cmd),
         state: ProcState::Running,

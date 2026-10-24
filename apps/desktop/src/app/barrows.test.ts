@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { agentRows, archivedRows, pageRows, roleWords, watchRows, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, pageRows, procRoots, procRows, roleWords, watchRows, type ProjAgent } from './barrows';
+import type { Proc } from '@/proto';
 
 const NOW = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
@@ -102,5 +103,24 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     expect(roleWords('fixing a < b in the parser')).toBe('fixing a < b in the parser');
     const rows = agentRows([ag('perf', { status: 'working', title: '<think>' })], NOW, false);
     expect(rows[0]?.sub).toBe('thinking');
+  });
+  it("PROCESSES (Gabriel's test, procs-bar): the program and its arguments, where it runs past the project or its worktree, a link only on a web page", () => {
+    const p = (id: string, over: Partial<Proc>): Proc => ({ id, agent: 'perf', kind: { is: 'bg', n: 3 }, cmd: 'pnpm dev', pid: 1, started_ms: NOW, ports: [], state: { is: 'running' }, cpu: 0, rss_mb: 0, procs: 1, out: 'bg', ...over });
+    const it = (x: Proc) => ({ project: 'shop', projectName: 'storefront', p: x });
+    const wt = '/Users/g/.bise/worktrees/shop-1/perf/shop';
+    const roots = procRoots([{ project: 'shop', path: '/Users/g/code/shop' }], [ag('perf', { worktree: wt }), ag('main', { main: true })]);
+    const items = [
+      it(p('bg3', { cmd: '/opt/homebrew/bin/python3 -m http.server 8000', cwd: `${wt}/site`, ports: [8000], url: 'http://127.0.0.1:8000' })),
+      it(p('p9.1', { kind: { is: 'detached' }, cmd: 'node --inspect=9229 /Users/g/code/shop/x.js', cwd: '/Users/g/code/shop/apps/api', ports: [9229] })),
+      it(p('bg4', { cmd: 'cargo watch', cwd: '/Users/g/code/shop' })),
+    ];
+    const rows = procRows(items, 'project', roots);
+    expect(rows.map((r) => [r.name, r.sub, r.end])).toEqual([
+      ['python3 -m http.server 8000', 'perf/site', 'localhost:8000 ↗'],
+      ['node --inspect=9229 x.js', 'apps/api', ':9229'],
+      ['cargo watch', '', ''],
+    ]);
+    expect(rows[0]?.title).toContain('by perf');
+    expect(procRows(items, 'all', roots).map((r) => r.sub)).toEqual(['storefront › perf/site', 'storefront › apps/api', 'storefront']);
   });
 });
