@@ -82,3 +82,6 @@
 {"cmd":"stop","agent":"perf"}
 {"cmd":"archive","agent":"perf","stop_first":true}
 {"cmd":"unarchive","agent":"perf"}
+{"cmd":"folders","op":{"merge":{"from":"f-abcdefghij","into":"f-klmnopqrst"}}}
+{"cmd":"folders","op":"undo"}
+{"cmd":"folders_move","items":[{"project":"acme-1a2b3c4d","id":"perf-notes","from":"f-abcdefghij"},{"project":"site-9f8e7d6c","id":"hero"}],"folder":"f-klmnopqrst"}

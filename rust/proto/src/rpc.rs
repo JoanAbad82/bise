@@ -111,6 +111,10 @@ pub const METHODS: &[MethodRow] = &[
     // client-protocol step 3: the terminal's ops, typed (architect m_13313)
     m("scheduled/run", "scheduled_run", None),
     m("artifacts/add", "artifacts_add", None),
+    // artifacts in folders (docs/artifacts.md, "Folders")
+    m("artifacts/move", "artifacts_move", Some("artifacts_moved")),
+    m("artifacts/folders", "artifacts_folders", Some("folders")),
+    m("artifacts/library", "artifacts_library", Some("library")),
     m("branches/list", "branches", Some("branches")),
     m("client/focus", "focus", None),
     m("versions/list", "versions", Some("versions")),

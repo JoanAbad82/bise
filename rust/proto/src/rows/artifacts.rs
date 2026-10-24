@@ -75,6 +75,84 @@ pub struct Artifact {
     /// `/a/<id>/events` sends); none for a page, a link, or v1 at rest
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub live: Option<ArtifactLive>,
+    /// its folder in the library (a [`Folder`]'s id), resolved by the hub
+    /// (a merged folder's artifacts read as the one it went into, a
+    /// deleted one's as none): the one field a reader reads. None: unfiled
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub folder: Option<String>,
+    /// when the turn that made its current version started (ms), one turn
+    /// of its agent: the grid stacks one agent's turn; none for his adds,
+    /// a page, a row from before it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub turn: Option<u64>,
+}
+
+/// A folder of the artifacts library (`bise_home::library`, one list for
+/// every project): a theme (no parent) or a task folder in one.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Folder {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub parent: Option<String>,
+    /// `you`, or the agent that made it
+    pub by: String,
+    /// he made or renamed it: an agent never renames it
+    #[serde(default)]
+    pub named_by_you: bool,
+}
+
+/// An artifact his move moved, and its folder before (`artifacts/move`'s
+/// answer, for his undo).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ArtifactMoved {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub from: Option<String>,
+}
+
+/// A change of the library's folders (`artifacts/folders`, the desktop
+/// core's `folders`): his, so it takes the undo slot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum FolderOp {
+    Make {
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        parent: Option<String>,
+    },
+    Rename { id: String, name: String },
+    /// a folder into a theme (none: to the top)
+    Nest {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        parent: Option<String>,
+    },
+    Merge { from: String, into: String },
+    /// its artifacts read as unfiled; none is deleted
+    Delete { id: String },
+    /// his last change, back
+    Undo,
+}
+
+/// Another project's artifacts (`artifacts/library`'s answer).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct LibraryProject {
+    /// its hub id
+    pub project: String,
+    /// its name in the projects registry
+    pub name: String,
+    pub items: Vec<Artifact>,
 }
 
 /// The words a window draws over an artifact its maker saves while he

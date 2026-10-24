@@ -8,6 +8,18 @@ use crate::{decode, parse, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// An artifact a `folders_move` moves: its project, its id, its folder
+/// before (the window's row's).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct FolderItem {
+    pub project: Project,
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub from: Option<String>,
+}
+
 /// What the app asks the core itself (never forwarded to a hub).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -119,6 +131,19 @@ pub enum AppCmd {
     /// each route change): the core holds their hubs and sends their
     /// `projects`/`agents`/`cards` only after the first one (core/hubs.rs)
     Shown { projects: Vec<Project> },
+    /// his change of the artifacts library's folders (one list for every
+    /// project, `bise_home::library`, written here): `library_folders` answers;
+    /// an undo of a move sends the artifacts back through their hubs
+    Folders { op: crate::rows::FolderOp },
+    /// his move of artifacts (any projects) to a library folder (none:
+    /// unfiled): each project's `artifacts_move` (its hub started if
+    /// needed); `from` each one's folder before, the undo slot's
+    FoldersMove {
+        items: Vec<FolderItem>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        folder: Option<String>,
+    },
     /// the window's running screen (all of bise) is shown (`on`) or left:
     /// while on, the core asks every project hub that runs for its
     /// `processes` (watched: again every 2 s) and holds those hubs, never
@@ -362,6 +387,8 @@ impl AppCmd {
         "plugin_logout",
         "computer_use",
         "shown",
+        "folders",
+        "folders_move",
         "processes_all",
         "talk_start",
         "talk_end",

@@ -15,6 +15,7 @@ mod home;
 mod home_switch;
 mod hubs;
 mod index;
+mod library;
 mod picks;
 mod voice_answer;
 mod setup;
@@ -523,6 +524,8 @@ impl Core {
                 self.app_start();
             }
             Cmd::ProcessesAll { on } => self.processes_all(on),
+            Cmd::Folders { op } => self.folders(op),
+            Cmd::FoldersMove { items, folder } => self.folders_move(items, folder),
             Cmd::Typed(v) => self.typed_cmd(v),
             Cmd::App(c) => self.app_cmd(c),
             Cmd::Computer { act, key, max_width } => self.computer_cmd(&act, &key, max_width, now),

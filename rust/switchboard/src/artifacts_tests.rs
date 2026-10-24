@@ -603,3 +603,85 @@ fn his_save_writes_the_file_and_refuses_a_gone_folder() {
     std::fs::remove_dir_all(&work).unwrap();
     assert!(s.write_source(&m, b"PK three").unwrap_err().contains("is gone"));
 }
+
+fn filed(store: &Store, cwd: &Path, target: &str, folder: Option<Filed>, now: u64) -> Added {
+    let a = Add { target: target.into(), agent: "s1".into(), by: "s1".into(), cwd: cwd.to_string_lossy().to_string(), folder, ..Default::default() };
+    store.add(&a, now).unwrap()
+}
+
+#[test]
+fn law_a_default_folder_files_only_a_new_artifact() {
+    let root = tmp("filed");
+    let (state, work) = (root.join("state"), root.join("work"));
+    std::fs::create_dir_all(&work).unwrap();
+    let store = Store::new(&state);
+    std::fs::write(work.join("plan.md"), "a").unwrap();
+    let a = filed(&store, &work, "plan.md", Some(Filed::Default("f-task".into())), 10);
+    assert_eq!(a.meta.folder.as_deref(), Some("f-task"));
+    // he moved it; the agent's next version keeps his place
+    store.move_to(std::slice::from_ref(&a.meta.id), Some("f-his")).unwrap();
+    std::fs::write(work.join("plan.md"), "ab").unwrap();
+    let b = filed(&store, &work, "plan.md", Some(Filed::Default("f-task".into())), 20);
+    assert_eq!((b.meta.versions.len(), b.meta.folder.as_deref()), (2, Some("f-his")));
+    // an asked folder moves it, a next version too
+    std::fs::write(work.join("plan.md"), "abc").unwrap();
+    let c = filed(&store, &work, "plan.md", Some(Filed::Asked("f-asked".into())), 30);
+    assert_eq!(c.meta.folder.as_deref(), Some("f-asked"));
+    // none asked: it stays
+    std::fs::write(work.join("plan.md"), "abcd").unwrap();
+    assert_eq!(filed(&store, &work, "plan.md", None, 40).meta.folder.as_deref(), Some("f-asked"));
+}
+
+#[test]
+fn law_move_is_one_folder_per_artifact_all_or_none() {
+    let root = tmp("move");
+    let (state, work) = (root.join("state"), root.join("work"));
+    std::fs::create_dir_all(&work).unwrap();
+    let store = Store::new(&state);
+    std::fs::write(work.join("a.md"), "a").unwrap();
+    let a = filed(&store, &work, "a.md", Some(Filed::Asked("f-1".into())), 10).meta.id;
+    page(&state, "pricing", "pricing", &[(1, 5)], json!([]));
+    // an unknown id: nothing moves
+    assert_eq!(store.move_to(&[a.clone(), "nope".into()], Some("f-2")), Err("no artifact nope".into()));
+    assert_eq!(store.get(&a).unwrap().folder.as_deref(), Some("f-1"));
+    // a stored one and a page together; each one's folder before comes back
+    let moved = store.move_to(&[a.clone(), "pricing".into()], Some("f-2")).unwrap();
+    assert_eq!(moved, vec![(a.clone(), Some("f-1".into())), ("pricing".into(), None)]);
+    assert_eq!(store.get(&a).unwrap().folder.as_deref(), Some("f-2"), "the move replaced its one folder");
+    assert_eq!(store.get("pricing").unwrap().folder.as_deref(), Some("f-2"), "a page's folder is in filed.json");
+    let page_meta = std::fs::read_to_string(state.join("pages/pricing/meta.json")).unwrap();
+    assert!(!page_meta.contains("f-2"), "the page store's file is not touched");
+    store.move_to(&["pricing".into()], None).unwrap();
+    assert_eq!(store.get("pricing").unwrap().folder, None);
+}
+
+#[test]
+fn law_rows_read_the_folder_through_the_library() {
+    use bise_home::library::{self, Library, YOU};
+    let root = tmp("join");
+    let (state, work) = (root.join("state"), root.join("work"));
+    std::fs::create_dir_all(&work).unwrap();
+    let mut lib = Library::default();
+    let docs = library::make(&mut lib, "docs", None, YOU).unwrap().folder().id.clone();
+    let task = library::make(&mut lib, "pricing", Some(&docs), "main").unwrap().folder().id.clone();
+    let shots = library::make(&mut lib, "shots", None, YOU).unwrap().folder().id.clone();
+    let store = Store::new(&state);
+    for (f, folder) in [("a.md", &task), ("b.md", &shots)] {
+        std::fs::write(work.join(f), f).unwrap();
+        filed(&store, &work, f, Some(Filed::Asked(folder.clone())), 10);
+    }
+    let folder_of = |lib: &Library, title: &str| {
+        let rows = rows_of(&state, "", lib);
+        rows.iter().find(|r| r["title"] == title).unwrap()["folder"].as_str().map(String::from)
+    };
+    assert_eq!(folder_of(&lib, "a.md"), Some(task.clone()));
+    // merge: read as the folder it went into, no meta rewritten
+    let before = std::fs::read_to_string(state.join("artifacts/a-md/meta.json")).unwrap();
+    library::merge(&mut lib, &task, &shots).unwrap();
+    assert_eq!(folder_of(&lib, "a.md"), Some(shots.clone()));
+    // delete: unfiled, the artifact still listed, no meta rewritten
+    library::delete(&mut lib, &shots).unwrap();
+    assert_eq!((folder_of(&lib, "a.md"), folder_of(&lib, "b.md")), (None, None));
+    assert_eq!(rows_of(&state, "", &lib).len(), 2, "delete never deletes an artifact");
+    assert_eq!(std::fs::read_to_string(state.join("artifacts/a-md/meta.json")).unwrap(), before);
+}

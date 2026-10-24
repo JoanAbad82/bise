@@ -48,6 +48,8 @@ pub(super) struct Art {
     /// backstop move them (crate::store_gen, send-fast): the state push
     /// and the view ask for them up to 10 times a second.
     memo: std::cell::RefCell<crate::store_gen::Memo<(u64, u64, u64, u64), ArtView>>,
+    /// The library's folders, read by its mtime (daemon/art_folders.rs).
+    pub(super) lib: super::art_folders::LibCache,
 }
 
 /// What the artifacts event is built from (the memo's value).
@@ -74,7 +76,7 @@ enum Where {
 }
 
 impl Shell {
-    fn art_store(&self) -> Store {
+    pub(super) fn art_store(&self) -> Store {
         Store::new(&self.opts.paths.state)
     }
 
@@ -188,11 +190,16 @@ impl Shell {
             }
         });
         self.art_live_rows(&view.stored, &mut view.rows);
+        // the library joined at send time (his rename in the desktop core
+        // moves no store stamp): each row's folder resolved, the folders
+        let lib = self.art_library();
+        artifacts::resolve_folders(&mut view.rows, &lib);
         json!({
             "ev": "artifacts",
             "rows": view.rows,
             "new": view.new,
             "seen_ms": view.seen_ms,
+            "folders": super::art_folders::folder_rows(&lib),
         })
     }
 
@@ -232,8 +239,14 @@ impl Shell {
     /// (artifacts/add and command/run): the store's add,
     /// its thread lines, and the words for the one who asked (`↗ added:
     /// <title>`) or the store's refusal. The caller sends them and then
-    /// `artifacts_refresh(true)`.
-    pub(super) fn art_add(&mut self, agent: &str, target: &str, title: Option<String>) -> Result<String, String> {
+    /// `artifacts_refresh(true)`. `folder`: a library folder (id or name)
+    /// he picked: it goes there.
+    pub(super) fn art_add(&mut self, agent: &str, target: &str, title: Option<String>, folder: Option<String>) -> Result<String, String> {
+        let lib = self.art_library();
+        let folder = match folder.filter(|f| !f.trim().is_empty()) {
+            Some(f) => Some(artifacts::Filed::Asked(bise_home::library::find(&lib, &f).ok_or_else(|| format!("no folder {f}"))?.id.clone())),
+            None => None,
+        };
         let agent = match agent {
             "" => MAIN.to_string(),
             a => a.to_string(),
@@ -248,7 +261,7 @@ impl Shell {
                 Where::Checkout { dir, .. } | Where::Shared { dir, .. } => dir.to_string_lossy().to_string(),
             })
             .unwrap_or_else(|| self.hub.workspace.clone());
-        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd, known_only: false, ..Default::default() };
+        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd, known_only: false, folder, ..Default::default() };
         let a = self.art_store().add(&add, now_ms())?;
         if a.new_version {
             self.art_lines(&a);
@@ -309,7 +322,11 @@ impl Shell {
         use bise_proto::sb::Artifact;
         let store = self.art_store();
         match r {
-            Artifact::Add { target, cwd, title, kind, known_only, changed } => {
+            Artifact::Add { target, cwd, title, kind, known_only, changed, folder } => {
+                let folder = match self.art_folder(from, folder.as_deref()) {
+                    Ok(f) => f,
+                    Err(e) => return json!({"ok": false, "error": e}),
+                };
                 let add = Add {
                     target,
                     title,
@@ -322,6 +339,7 @@ impl Shell {
                     turn: self.art_turn(from),
                     sitting: None,
                     changed: changed.as_ref().and_then(bise_proto::office::Changed::of_value).map(|c| c.0),
+                    folder,
                 };
                 match store.add(&add, now_ms()) {
                     Ok(a) => {
@@ -344,6 +362,11 @@ impl Shell {
             }
             Artifact::Archive(p) => self.artifact_pick(true, p),
             Artifact::Unarchive(p) => self.artifact_pick(false, p),
+            Artifact::Move { ids, folder } => self.artifact_move_cmd(from, &ids, folder.as_deref()),
+            Artifact::Folders => {
+                let lib = self.art_library();
+                json!({"ok": true, "text": super::art_folders::folders_text(&lib, &store.all())})
+            }
         }
     }
 

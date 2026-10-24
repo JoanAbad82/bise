@@ -367,7 +367,105 @@ agents on it.
   while its panel is open.
 - JSON-RPC `branches/list {project}`: a `branches`.
 
+## Folders (artifacts-in-folders, architect m_39651 / m_39721)
+
+The artifacts page is one library for all his projects, in folders like
+Drive (design: page `artifacts-gallery` v7). The artifacts stay where
+they are: each hub is still the only writer of its own
+`<state>/artifacts`. Only the folder list is shared.
+
+- **The library** (`bise_home::library`, `rust/home/src/library.rs`):
+  `<root>/library/folders.json` (`Home::library_folders()`, bise layout
+  only), `{"v":1,"folders":[{id, name, parent?, by, named_by_you,
+  into?}],"undo"?}`. An id is `f-` + 10 random base32, stable: a rename
+  touches no artifact. Two levels at most (theme › task), checked by one
+  pure fn, `check`, after every change. `by`: `you` or the agent that
+  made it; `named_by_you`: he made or renamed it, so an agent never
+  renames it (`<name> was named by you: an agent never renames it`).
+  Unknown keys are kept; a `v` > 1 file is never written over.
+- **One writer**, `library::update(home, his, f)`: flock on
+  `folders.json.lock`, read, change, check, tmp + rename. Called by
+  whichever process acts: the desktop core for his edits, a hub for an
+  agent's (`sb artifact add --folder theme/task` makes a missing path)
+  and for the terminal's (`artifacts/folders`). The TUI and the `sb` CLI
+  never write it.
+- **An artifact's folder** is `folder` (an id) in its meta.json, written
+  only by its own hub (`Store::move_to`, all or none). A page's meta.json
+  is the page store's, so a page's folder is in
+  `<state>/artifacts/filed.json` (`{"<page id>": "<folder id>"}`).
+  `sb artifact add` files a new artifact; `Filed::Asked` (`--folder`)
+  files a next version too, `Filed::Default` (its task's folder, part 5)
+  only a new one: a next version stays where he put it.
+- **Readers join** through `library::resolve`, the one follower:
+  `artifacts::resolve_folders` sets each row's `folder` to the live folder
+  it reads as. A **merge** is a redirect (`into` on the merged folder,
+  hidden from every list): its artifacts read as in the target, no
+  meta.json rewritten, one atomic write. A **delete** takes the folder
+  and its sub-folders out: their artifacts read as unfiled, no meta.json
+  rewritten, no artifact deleted. Every reader (TS, TUI) reads only the
+  row's `folder`, already resolved by the hub.
+- **Undo**: his changes (`his = true`) keep their inverse in the one
+  undo slot (folders his change made are taken out, folders it changed or
+  took out are put back as they were); an agent's change never touches
+  it, and his undo never undoes an agent's change made in between. His
+  move of artifacts keeps each one's folder before (`remember_moves`);
+  `library::undo` gives those back to the caller, which sends them to
+  their hubs.
+- **Events**: `artifacts` carries `folders` (the live ones, read at send
+  time, cached by the file's mtime) and each item's `folder` and `turn`
+  (when the turn that made its current version started: one turn of its
+  agent, for the grid's stacks). A hub stats the file on its tick while a
+  typed client is connected and sends `artifacts` again when it moved
+  (his rename in the desktop reaches the terminal).
+
+Hub methods (JSON-RPC, `bise_proto::hub`):
+
+```
+artifacts/move    {project, ids, folder?, to?, keep_undo?} -> artifacts_moved {moved:[{id, from?}]}
+                  folder: an id or a name (none: unfiled); to: another project (forwarded to its
+                  hub as {"op":"xartmove"}, started if needed); keep_undo: the caller keeps the undo
+artifacts/folders {project, op} -> folders {folders, made?}
+                  op: {make:{name,parent?}} | {rename:{id,name}} | {nest:{id,parent?}}
+                      | {merge:{from,into}} | {delete:{id}} | "undo"
+artifacts/library {project} -> library {here, projects:[{project, name, items}], folders}
+                  the other registered projects' rows, read from their stores (never watched)
+artifacts/add     ... folder?
+```
+
+The desktop core (`rust/tui/src/ambient/core/library.rs`): `folders
+{op}` and `folders_move {items:[{project, id, from?}], folder?}` (the undo
+slot from `from`, then one `artifacts_move` per project with
+`keep_undo`), answered by the core event `folders {folders, made?,
+notice?}`.
+
+`sb`:
+
+```
+sb artifact add <path or link> ... --folder <name|id|theme/task>
+sb artifact move <id>... <folder>|--unfiled
+  -> moved plan to docs/pricing
+sb artifact folders
+  -> docs · f-abc · 2 artifacts
+     docs/pricing · f-def · 5 artifacts
+     unfiled · 12 artifacts
+```
+
+The project filter is read-side only (`in:<project>`, the scope menu):
+no state.
+
 ## Laws (tests)
+
+- `rust/home/src/library_tests.rs`: one folder per artifact; delete
+  never deletes an artifact (its artifacts read unfiled, its sub-folders
+  go); merge = move all + remove (the join after a merge equals the join
+  after moving every artifact by hand and deleting); a folder he named is
+  never renamed by an agent; every op from every folder to every folder
+  keeps 2 levels; undo puts back each op, once, and never an agent's
+  change in between; the file keeps unknown keys; a bad change writes
+  nothing. `artifacts_tests.rs`: a default folder files only a new
+  artifact; a move is all or none and gives each one's folder before; a
+  page's folder is in filed.json; rows read the folder through the
+  library (merged, deleted) with no meta.json rewritten.
 
 - `artifacts_tests.rs`: a file gets in with a copy and its id; the same
   path again is a new version (never a second row), unchanged stays,

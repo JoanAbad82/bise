@@ -69,6 +69,9 @@ impl Shell {
             }
             // S10: bise's `sb follow <p>/<agent>`: main's follow here, its
             // answer (ok or why not) back to bise's hub at once
+            // his move here of this hub's artifacts, from another hub
+            // (daemon/art_folders.rs)
+            "xartmove" => self.xartmove(stream, &v),
             "xfollow" => {
                 self.replies.insert(token, stream);
                 // J: `hub` asked: the job's end goes back there (its outbox)
@@ -193,6 +196,11 @@ pub(super) fn is_home(ws: &Path) -> bool {
     bise_home::projects::canonical(ws) == bise_home::projects::canonical(&crate::paths::home_workspace())
 }
 
+/// One request to the registered hub `id` (started when none runs).
+pub(super) fn call_hub(id: &str, exe: &Path, root: &Path, req: &Value) -> Result<Value, String> {
+    hub_paths(id).and_then(|paths| call(&paths, exe, root, req))
+}
+
 /// The paths of the registered hub `id` (its workspace from the registry).
 fn hub_paths(id: &str) -> Result<Paths, String> {
     let home = bise_home::Home::from_env();
@@ -205,7 +213,7 @@ fn hub_paths(id: &str) -> Result<Paths, String> {
 }
 
 /// This workspace's name in the registry (its folder's when absent).
-fn own_name(ws: &Path) -> String {
+pub(super) fn own_name(ws: &Path) -> String {
     let home = bise_home::Home::from_env();
     let id = crate::paths::workspace_id(ws);
     bise_home::projects::list(&home, &crate::paths::home_workspace())

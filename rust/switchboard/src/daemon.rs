@@ -22,6 +22,7 @@ mod accept;
 mod agent_req;
 mod answers;
 mod art;
+mod art_folders;
 mod attach;
 mod boot;
 mod capsule;

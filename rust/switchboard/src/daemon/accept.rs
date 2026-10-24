@@ -207,7 +207,7 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
             let asker = asker.unwrap_or_else(|| doors.asker(pid, sock));
             let _ = tx.send(Msg::Version { stream, v, asker });
         }
-        "xin" | "xreply" | "xfollow" => {
+        "xin" | "xreply" | "xfollow" | "xartmove" => {
             let _ = tx.send(Msg::XHub { token: id, stream, v });
         }
         "notice" => {

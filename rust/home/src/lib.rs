@@ -4,6 +4,7 @@
 //! Every bise environment variable and the environment of each bise child
 //! process: [`env`] (issue 11). A workspace's hub id: [`hub_id`]. The
 //! projects registry (`projects.json`, bise layout only): [`projects`].
+//! The artifacts library's folders (`library/folders.json`): [`library`].
 //!
 //! Two layouts:
 //!
@@ -38,6 +39,7 @@ pub mod clock;
 pub mod env;
 pub mod hub_id;
 pub mod hub_state;
+pub mod library;
 pub mod migrate;
 pub mod prefs;
 pub mod projects;

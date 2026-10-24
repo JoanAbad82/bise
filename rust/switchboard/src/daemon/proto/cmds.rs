@@ -388,14 +388,18 @@ impl Shell {
                 self.step_typed(id, &tag, Input::EveryRun { id: timer });
             }
             // the `artifacts` op's add (art_add): its words are the result
-            HubCmd::ArtifactsAdd { agent, target, title, .. } => {
+            HubCmd::ArtifactsAdd { agent, target, title, folder, .. } => {
                 let title = title.filter(|t| !t.trim().is_empty());
-                match self.art_add(&agent, &target, title) {
+                match self.art_add(&agent, &target, title, folder) {
                     Ok(text) => self.proto_send(id, &HubEv::Notice { project, cmd: Some(tag.clone()), text, cid: None }),
                     Err(e) => self.proto_error(id, &tag, &e),
                 }
                 self.artifacts_refresh(true);
             }
+            // artifacts in folders (daemon/art_folders.rs)
+            HubCmd::ArtifactsMove { ids, folder, to, keep_undo, .. } => self.art_move_typed(id, &tag, ids, folder, to, !keep_undo),
+            HubCmd::ArtifactsFolders { op, .. } => self.art_folders_typed(id, &tag, op),
+            HubCmd::ArtifactsLibrary { .. } => self.art_library_typed(id),
             // `bise stop` (client::stop): the `stop_hub` op's path; its
             // `{}` goes out before the loop ends
             HubCmd::StopHub { keep_agents, .. } => {
@@ -650,7 +654,7 @@ impl Shell {
             }
             // the TUI's `artifacts` op's add (art_add), in this agent's view
             Slash::Artifacts(Some(target)) => {
-                match self.art_add(&agent, &target, None) {
+                match self.art_add(&agent, &target, None, None) {
                     Ok(text) => self.proto_send(id, &HubEv::Notice { project, cmd: Some(tag.to_string()), text, cid }),
                     Err(e) => self.proto_error_cid(id, tag, &e, cid, refused),
                 }
