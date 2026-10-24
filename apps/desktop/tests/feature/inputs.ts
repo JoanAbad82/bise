@@ -4,7 +4,7 @@
 // in src/proto/fixtures.gen.ts (rust/proto/fixtures), never a hand-kept value, so a proto change
 // breaks a builder or a test at typecheck and the compiler shows what to fix. Test-only (never in
 // the bundle): a feature test imports this and run.ts, nothing else of the app (eslint).
-import type { AnswerResult, Card, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, SendReason } from './app';
+import type { AnswerResult, Artifact, Card, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, SendReason } from './app';
 import { core_ev, hub_ev } from './app';
 
 export type Ev = HubEv | CoreEv;
@@ -58,6 +58,21 @@ export function row(over: Partial<ProjectRow> & Pick<ProjectRow, 'project' | 'na
 
 /** The core's `projects` event with these rows. */
 export const projects = (...rows: ProjectRow[]): EvOf<'projects'> => ev('projects', { projects: rows });
+
+/** The first artifact of the fixtures' `artifacts` event. */
+const ARTIFACT: Artifact = (() => {
+  const a = fixtureOf('artifacts')?.items[0];
+  if (a === undefined) throw new Error('rust/proto/fixtures has no artifacts event with an item');
+  return a;
+})();
+
+/** An artifact: the fixtures' first, then `over` (give `id`); one version, no history, not new. */
+export function artifact(over: Partial<Artifact> & Pick<Artifact, 'id'>): Artifact {
+  return { ...ARTIFACT, versions: [], path: null, version: 1, new: false, title: over.id, ...over };
+}
+
+/** A hub's `artifacts` event: every artifact of that project. */
+export const artifacts = (project: string, ...items: Artifact[]): EvOf<'artifacts'> => ev('artifacts', { project, items });
 
 // ---- the window-local answers (main's ipc.ts sends them to the window that asked; not in the
 // core's protocol, so typed here from the proto's result types)

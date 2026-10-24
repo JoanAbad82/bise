@@ -1,0 +1,119 @@
+import { describe, expect, it } from 'vitest';
+import type { Artifact } from '@/proto';
+import { cardsOf, chipsOf, colsFor, gridStep, lineOf, lineTip, listKind, listName, ownerOf, rowsOf, sheetItems, sheetLine, splitTitle, whenOf, type Card, type Stack } from './gallery';
+import type { Item } from './model';
+
+const NOW = new Date(2026, 9, 22, 19, 0).getTime();
+const at = (daysAgo: number, h: number, m: number) => new Date(2026, 9, 22 - daysAgo, h, m).getTime();
+const TURN = at(0, 14, 0);
+type A = Artifact;
+const art = (id: string, extra: Partial<A> = {}): A => ({ id, kind: 'file', title: id, agent: 'amb-home', version: 1, at_ms: at(0, 14, 2), url: '', new: false, ...extra });
+const item = (a: A, project = 'harness-1', projectName = 'harness'): Item => ({ project, projectName, a });
+const shot = (n: number, words: string, extra: Partial<A> = {}) =>
+  item(art(`s${String(n)}`, { kind: 'shot', title: `agent view step 2 · ${words}`, turn: TURN, path: `/x/${words.replaceAll(' · ', '-')}.png`, at_ms: at(0, 14, 2) + 100 - n, ...extra }));
+const keys = (cards: readonly Card[]) => cards.map((c) => (c.kind === 'one' ? c.it.a.id : `[${c.title} ${String(c.items.length)}]`));
+
+describe('the cards: one agent, one turn, one title prefix make one stack', () => {
+  const shots = [shot(1, 'dark · 1400 · perf'), shot(2, 'dark · 800 · perf'), shot(3, 'light · 1400 · perf'), shot(4, 'light · 800 · search')];
+
+  it('stacks a turn\'s shots where its newest is, keeps the rest as cards', () => {
+    const notes = item(art('notes', { at_ms: at(0, 16, 0) }));
+    const older = item(art('older', { at_ms: at(0, 9, 0) }));
+    expect(keys(cardsOf([notes, ...shots, older]))).toEqual(['notes', '[agent view step 2 4]', 'older']);
+  });
+
+  it('never stacks across agents, turns, prefixes, projects, nor without a turn; one alone is a card', () => {
+    const other = [
+      shot(1, 'a · x'),
+      shot(2, 'b · y', { agent: 'architect' }),
+      shot(3, 'c · z', { turn: TURN + 1 }),
+      item(art('s4', { title: 'agent view step 3 · w', turn: TURN })),
+      item(art('s5', { title: 'agent view step 2 · v' })),
+      { ...shot(6, 'u'), project: 'ai-docs-2' },
+    ];
+    expect(keys(cardsOf(other))).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+  });
+
+  it('splits a title at its first separator, else drops a trailing number', () => {
+    expect(splitTitle('agent view step 2 · dark · 1400')).toEqual({ head: 'agent view step 2', rest: 'dark · 1400' });
+    expect(splitTitle('poof variant 12')).toEqual({ head: 'poof variant', rest: 'poof variant 12' });
+    expect(splitTitle('DPE 36 rue de Montreuil')).toEqual({ head: 'DPE 36 rue de Montreuil', rest: '' });
+  });
+
+  it('a stack opens as a sheet: its line, chips from its names (some share them, not all), one chip keeps its items', () => {
+    const s = cardsOf(shots)[0] as Stack;
+    expect(sheetLine(s, NOW)).toBe('4 shots amb-home saved in one turn, today 14:02');
+    expect(chipsOf(s)).toEqual(['dark', '1400', 'perf', '800', 'light']);
+    expect(sheetItems(s, 'dark').map((it) => it.a.id)).toEqual(['s1', 's2']);
+    expect(sheetItems(s, null)).toHaveLength(4);
+    expect(listName(s)).toBe('agent view step 2 · 4 shots');
+  });
+});
+
+describe('the line under a card says only what the place does not (density rule 1)', () => {
+  const mine = item(art('step', { at_ms: at(0, 14, 2) }));
+  const theirs = item(art('target', { agent: 'agent-target', at_ms: at(0, 9, 12) }));
+  const old = item(art('folds', { agent: 'amb-win', at_ms: at(9, 11, 0) }));
+  const his = item(art('offre', { by: 'you', agent: 'main', at_ms: at(0, 10, 0) }), 'ai-docs-2', 'ai-docs');
+  const one = (it: Item): Card => ({ kind: 'one', key: it.a.id, it });
+  const folderOf = (it: Item) => (it.a.id === 'step' ? 'desktop app / agent view' : '');
+
+  it("in a task's folder: the time alone, another agent's name first, a date for an older day", () => {
+    const place = { kind: 'folder' as const, owner: 'amb-home' };
+    expect(lineOf(one(mine), place, NOW)).toBe('14:02');
+    expect(lineOf(one(theirs), place, NOW)).toBe('agent-target · 09:12');
+    expect(lineOf(one(old), place, NOW)).toBe('amb-win · oct 13');
+  });
+
+  it('in recent: the folder and the time; unfiled: who and the time; the project only in its tip', () => {
+    expect(lineOf(one(mine), { kind: 'recent', folderOf }, NOW)).toBe('desktop app / agent view · 14:02');
+    expect(lineOf(one(his), { kind: 'unfiled' }, NOW)).toBe('you · 10:00');
+    expect(lineTip(one(his))).toBe('added by you in ai-docs');
+    expect(lineTip(one(theirs))).toBe('made by agent-target in harness');
+    expect(whenOf(at(1, 23, 59), NOW)).toBe('oct 21');
+  });
+
+  it("a folder's owner is the agent that made most of it", () => {
+    expect(ownerOf([mine, theirs, item(art('x'))])).toBe('amb-home');
+    expect(ownerOf([])).toBeUndefined();
+  });
+
+  it("the list's kind in words: the list says it, the card never", () => {
+    expect(listKind(one(item(art('a', { path: '/x/a.png' }))))).toBe('image');
+    expect(listKind(one(item(art('r', { path: '/x/review.md' }))))).toBe('doc · md');
+    expect(listKind(one(item(art('p', { kind: 'page' }))))).toBe('page');
+    expect(listKind(one(item(art('pr', { kind: 'pr', url: 'https://github.com/x/y/pull/3' }))))).toBe('PR');
+  });
+});
+
+describe('the grid: day groups, cols across, the move keys', () => {
+  const day = (n: number, d: number) => Array.from({ length: n }, (_, i) => item(art(`d${String(d)}-${String(i)}`, { at_ms: at(d, 12, 0) - i })));
+  const cards = cardsOf([...day(5, 0), ...day(2, 9)]);
+  const rows = rowsOf(cards, 4, NOW);
+
+  it('cuts each day into rows of cols cards under its title', () => {
+    expect(rows.map((r) => (r.kind === 'day' ? r.title : r.cards.length))).toEqual(['today', 4, 1, 'tue 13 oct', 2]);
+    expect(rowsOf(cards, 4, NOW, false).map((r) => (r.kind === 'day' ? r.title : r.cards.length))).toEqual([4, 3]);
+  });
+
+  it('3 across at 800, 4 at 1100, 5 at 1400', () => {
+    expect([800, 1100, 1400].map(colsFor)).toEqual([3, 4, 5]);
+  });
+
+  it('←→ one card across rows and days, ↑↓ one row in its column (the shorter row\'s last), clamped', () => {
+    const k = (id: string) => `harness-1/${id}`;
+    const step = (from: string | null, dir: Parameters<typeof gridStep>[2]) => gridStep(rows, from === null ? null : k(from), dir);
+    expect(step('d0-3', 'right')).toBe(k('d0-4'));
+    expect(step('d0-4', 'right')).toBe(k('d9-0'));
+    expect(step('d0-0', 'left')).toBe(k('d0-0'));
+    expect(step('d0-2', 'down')).toBe(k('d0-4'));
+    expect(step('d0-4', 'down')).toBe(k('d9-0'));
+    expect(step('d9-1', 'up')).toBe(k('d0-4'));
+    expect(step('d0-1', 'up')).toBe(k('d0-1'));
+    expect(step(null, 'down')).toBe(k('d0-0'));
+    // two full rows: ↓ keeps the column
+    const full = rowsOf(cardsOf(day(8, 0)), 4, NOW);
+    expect(gridStep(full, k('d0-2'), 'down')).toBe(k('d0-6'));
+    expect(gridStep(full, k('d0-7'), 'up')).toBe(k('d0-3'));
+  });
+});
