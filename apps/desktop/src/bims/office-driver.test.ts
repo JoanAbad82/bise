@@ -49,17 +49,6 @@ describe('office-driver: one office brain', () => {
     expect(d.step(clock(T + 3 + UNLOCK_WALK + UNLOCK_LABEL), NO_ATTENTION)?.look.unlock).toBeUndefined();
   });
 
-  it('his plugins objects go to the step as heard; none: an empty list; no desk moves', () => {
-    const d = makeDriver(parts);
-    d.rows(snap, crew, 'loft');
-    expect(d.step(clock(T), NO_ATTENTION)?.objects).toEqual([]);
-    const objects = [{ key: 'docs', obj: 'printer', n: 1, glass: false, pill: null, picked: false }] as const;
-    d.objects(objects);
-    const s = d.step(clock(T + 1), NO_ATTENTION);
-    expect(s?.objects).toEqual(objects);
-    expect(s?.reshaped).toBe(false);
-  });
-
   it('the row under his pointer and the followed bim get a halo', () => {
     const d = makeDriver(parts);
     d.rows(snap, crew, 'loft');

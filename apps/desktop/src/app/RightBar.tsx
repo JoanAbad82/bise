@@ -23,7 +23,7 @@ import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { barProcs, isRunning, keyOf, stateOf, urlWords, useAllProcesses } from '@/running';
 import { running } from '@/proto/words_running.gen';
-import { useCards, useComputerLive, useGrowth, usePlaces, usePlugins, usePrefs, useProjects, useStore, type Store } from '@/store';
+import { useCards, useComputerLive, useGrowth, usePlaces, usePrefs, useProjects, useStore, type Store } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -46,7 +46,6 @@ import { Town } from '@/bims/town/Town';
 import { townParts } from '@/bims/town/feed';
 import { useTownProjects } from '@/bims/town/useTown';
 import { mapOf, mapPrefKey } from '@/bims/maps/ids';
-import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
 import { getPref, type Prefs } from '@/settings/prefs';
 import { showsWide, useBimsView, wideMode } from '@/bims/view';
 import { bimsLit, followOf, useBimsLit } from '@/bims/focus';
@@ -508,16 +507,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const cards = useCards(project);
   const growth = useGrowth(project);
   // the office's map he picked with /bims for this project (his prefs, every window reads them)
-  const prefs = usePrefs() as Prefs | null;
-  const officeMap = mapOf(getPref(prefs, mapPrefKey(project)));
-  // his plugins' objects in the office (plugin-objects.ts): the project's plugins, asked once here
-  // (the core sends them again on each change), and his picks (prefs bims.objects.<project>)
-  const plugins = usePlugins(all ? undefined : project);
-  useEffect(() => {
-    if (!all) askStore.command({ cmd: 'plugins', project });
-  }, [askStore, all, project]);
-  const picks = getPref(prefs, objectsPrefKey(project));
-  const officeObjs = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
+  const officeMap = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
   // the hub's rank as ⌥ numbers, held while ⌥ is (agents/model numbersOf): the rows' order and ⌥N (a project's only; bise's thread keeps start order)
@@ -633,7 +623,6 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                 agents={officeAgents}
                 cards={cards}
                 places={places}
-                objects={officeObjs}
                 growth={growth}
                 map={officeMap}
                 parts={bimsParts}
