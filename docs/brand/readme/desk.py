@@ -346,7 +346,12 @@ def rbar(d, TX, colR, working, agents, RB=680, project="storefront"):
     for a, b, n in working:
         o.append(at(a, b, t(rx + tw(project, 13) + 10, 25, f"{n} working", 12, "dim"), dur=.1))
     lab = lambda y, s_: t(rx, y, s_, 11.5, "faint", 600, extra=' letter-spacing=".06em"')
-    o.append(lab(64, f"AGENTS · {len(agents)}") + t(RB - 16, 64, "all ›", 11.5, "faint", anchor="end"))
+    # AGENTS · n counts the rows shown so far (an agent that starts later adds one)
+    starts = sorted({a[0] for a in agents} | {0})
+    for i, s0 in enumerate(starts):
+        n = sum(1 for a in agents if a[0] <= s0)
+        o.append(at(s0, starts[i + 1] if i + 1 < len(starts) else None, lab(64, f"AGENTS · {n}"), dur=.1))
+    o.append(t(RB - 16, 64, "all ›", 11.5, "faint", anchor="end"))
     ys = []
     for i, (t0, name, what, marks) in enumerate(agents):
         y = 90 + i * 25; ys.append(y)
@@ -520,7 +525,9 @@ def d_dictation(m):
     c = DPAL[m]; T = 10.5
     d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
     TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
-    rbar(d, TX, colR, [(0, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")])])
+    # search starts when bise sends it the task (the ✉ row, 7.1 s): the right bar counts it
+    rbar(d, TX, colR, [(0, 7.1, 1), (7.1, None, 2)], [(0, "perf", "product page speed", [(0, "∿", "dim")]),
+                                                      (7.1, "search", "size filter", [(7.1, "∿", "dim")])])
     o.append(bise_head(d) + d.head(X, 62, "bise") + colT(t(X, 82, "morning. perf is on the product page; nothing waits on you.", 13, "dim")))
     on, stop, words_at, send = 1.0, 4.2, 4.9, 6.4
     said = "search needs a size filter, EU sizes only"
@@ -627,6 +634,176 @@ def d_direct(m):
     o.append(d.key(R - 60, 402, "esc", back - .5, back + .1))
     return d.svg("9 in bise desktop: you click search in the right bar; its thread opens; you tell it to skip US sizes and it answers; esc brings you back to bise's thread.")
 
+def tip_box(d, x_right, y, lines, w=None):
+    """a hover tip: raised, a hairline, its shadow; lines: [html], right edge at x_right."""
+    c = d.c; w = w or max(tw(l, 11.5) for l in lines) * 1.1 + 24; h = 14 + 19 * len(lines); x = x_right - w
+    return (f'<rect x="{x + 2:.0f}" y="{y + 3}" width="{w:.0f}" height="{h}" rx="8" fill="{c["shadow"]}"/>'
+            f'<rect x="{x:.0f}" y="{y}" width="{w:.0f}" height="{h}" rx="8" fill="{c["raised"]}" stroke="{c["rule"]}"/>'
+            + "".join(d.t(x + 11, y + 20 + 19 * i, l, 11.5, "dim") for i, l in enumerate(lines)))
+
+def artchip(d, x, y, label, kind):
+    """an artifact's chip in the thread: '↗ <title>  <kind>' (accent soft: his to open)."""
+    c = d.c; cw = tw(label, 12.5) + tw(kind, 11.5) + 30
+    return (f'<rect x="{x}" y="{y - 15}" width="{cw:.0f}" height="22" rx="6" fill="{c["accsoft"]}"/>'
+            + d.t(x + 8, y, f'{E(label)}  <tspan fill="{c["dim"]}" font-size="11.5">{E(kind)}</tspan>', 12.5, "acc"))
+
+def d_prs(m):
+    """10 · pull requests: perf opens #409; '↑' on its row and the PR's chip in its thread; checks run, then pass; the tip names it."""
+    c = DPAL[m]; T = 10.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX, RB = 448, 680; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    pr, ok_ = 2.2, 5.0
+    ys = rbar(d, TX, colR, [(0, None, 1)], [(0, "perf", "product page speed", [(0, "∿", "dim")])])
+    # its mark, last on its row: 'ψ' (its worktree), then '↑' text-2 once its PR is open (barplaces.markOf)
+    o.append(at(0, pr, t(RB - 16, ys[0], "ψ", 13, "dim", anchor="end"), dur=.1))
+    o.append(at(pr, None, t(RB - 16, ys[0], "↑", 13, "dim", anchor="end"), dur=.1))
+    o.append(ring(d, RB - 20, ys[0] - 4, 5.8, 8.4))
+    # the tip goes on top of everything: drawn last
+    tip_ = at(6.0, 8.4, tip_box(d, RB - 10, ys[0] + 12, ["#409 · faster product page · ψ worktree on",
+                                                         f'<tspan fill="{c["text"]}" style="font-family:{MONO}">sb/perf</tspan>'],
+                                        w=tw("#409 · faster product page · ψ worktree on", 11.5) * 1.1 + 24), dur=.15)
+    hb, end = ahead(d, "perf", "product page speed")
+    o.append(colT(hb + t(end - 4, 25, f'<tspan fill="{c["faint"]}">ψ</tspan> sb/perf', 12.5, "dim")))
+    o.append(d.head(X, 64, "perf"))
+    o.append(colT(toolrow(d, X, R, 84, f'± Hero.tsx  {diffs(c, 18, 6)}', "✓ 0.3 s") + toolrow(d, X, R, 104, "$ run lighthouse on a mid phone", "✓ 38 s")))
+    o.append(colT(at(1.2, None, toolrow(d, X, R, 124, "$ open a pull request", "✓ 2 s"))))
+    o.append(colT(at(pr, None, t(X, 154, "first paint is 0.9 s on a mid phone now. the PR is up for review.", 13) + artchip(d, X, 186, "↗ #409 faster product page", "PR"))))
+    o.append(colT(at(pr + .3, ok_, t(X, 216, '<tspan class="g">∿</tspan> checks running', 12, "dim"), dur=.1)))
+    o.append(colT(at(ok_, None, t(X, 216, "✓ checks pass", 12, "dim"), dur=.1)))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, to="perf", where="ψ sb/perf", keys=WORKING_KEYS)
+    o.append(cb + t(cx, cy, E(ph), 13, "faint"))
+    o.append(tip_)
+    return d.svg("10 in bise desktop: perf opens pull request #409; its chip shows in perf's thread and '↑' on its row in the right bar; the checks run, then pass; the row's tip names the PR and its branch.")
+
+def d_diff(m):
+    """12 · diffs beside the thread: '± 3 files +41 −7' under perf's message; a click opens the changes beside the thread; he selects two lines; 'type to ask perf about it'."""
+    c = DPAL[m]; T = 11
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    open_ = 2.0; PX = 320
+    def thread(w, x0=22):
+        R = w - 22
+        hb, _ = ahead(d, "perf", "product page speed") if w > 400 else ahead(d, "perf", "product page")
+        b = [hb, f'<path d="M0 38 H{w}" stroke="{c["line"]}"/>', d.head(x0, 64, "perf")]
+        y = 84
+        for l in wrap("the hero is 180 KB now and the gallery loads lazily. first paint 0.9 s on a mid phone.", R - x0):
+            b.append(t(x0, y, E(l), 13)); y += 20
+        fw = tw("± 3 files +41 −7", 12) * 1.06 + 16
+        b.append(d.chip(x0, y + 10, f'± 3 files {diffs(c, 41, 7)}', fw))
+        return "".join(b), y + 10
+    ta, ya = thread(680)
+    o.append(at(0, open_, ta, dur=.15))
+    o.append(ring(d, 60, ya - 4, 1.5, open_ + .1, r=13))
+    tb, _ = thread(PX)
+    cb, ph, (cx, cy) = d.composer(18, 360, PX - 36, to="perf", keys=WORKING_KEYS)
+    o.append(at(open_, None, tb + cb, dur=.15))
+    ask = 5.0
+    o.append(placeholder_at(d, cx, cy, ph, [(ask, T)]))
+    # the quote of the two lines lands in the composer as he types; then his words
+    qw = tw("Hero.tsx:13-14 · 2 lines", 11.5) + 16
+    o.append(at(ask, None, d.chip(cx - 2, cy, "Hero.tsx:13-14 · 2 lines", qw, size=11.5), dur=.1))
+    o.append(at(ask, None, d.typing(cx + qw + 4, cy, "why keep the jpg?", ask + .2, ask + 1.4), dur=.05))
+    # the changes panel slides in
+    W = 680 - PX
+    pan = [f'<rect x="{PX}" y="0" width="{W}" height="{d.H}" fill="{c["side"]}"/><path d="M{PX} 0 V{d.H}" stroke="{c["line"]}"/>',
+           t(PX + 16, 25, f'<tspan font-weight="600">changes</tspan>  <tspan fill="{c["dim"]}">3 files</tspan> {diffs(c, 41, 7)}', 13),
+           t(664, 25, "✕", 12, "dim", anchor="end"), f'<path d="M{PX} 38 H680" stroke="{c["line"]}"/>']
+    y = 64
+    pan.append(t(PX + 16, y, f'<tspan font-weight="600" fill="{c["text"]}">Hero.tsx</tspan>  {diffs(c, 18, 6)}', 12, "dim"))
+    rows = [(10, " ", "export function Hero() {"), (11, " ", "  return ("), (12, "-", '    <img src="/hero.jpg" />'),
+            (12, "+", "    <picture>"), (13, "+", '      <source srcSet="/hero.avif" />'), (14, "+", '      <img src="/hero.jpg" width={800} />'),
+            (15, "+", "    </picture>"), (16, " ", "  );")]
+    y += 12
+    sel0 = 4.0
+    for i, (n, sgn, code) in enumerate(rows):
+        yy = y + 19 * i
+        if sgn != " ":
+            pan.append(f'<rect x="{PX + 8}" y="{yy}" width="{W - 16}" height="19" fill="{c["ok"] if sgn == "+" else c["err"]}" opacity=".09"/>')
+        if n in (13, 14) and sgn == "+":
+            pan.append(at(sel0, None, f'<rect x="{PX + 8}" y="{yy}" width="{W - 16}" height="19" fill="{c["sel"]}"/>', dur=.15))
+        col = "ok" if sgn == "+" else "err" if sgn == "-" else "faint"
+        pan.append(t(PX + 30, yy + 14, str(n), 11, "faint", mono=True, anchor="end")
+                   + t(PX + 40, yy + 14, sgn, 11.5, col, mono=True) + t(PX + 54, yy + 14, E(code), 11.5, "text" if sgn != " " else "dim", mono=True))
+    # the pill under the hunk, below his selection: 'type to ask perf about it' (composer.bar_ask_who)
+    pw = tw("type to ask perf about it", 11.5) + 20; py = y + 19 * len(rows) + 8
+    y += 19 * len(rows) + 52
+    pan.append(t(PX + 16, y, f'<tspan font-weight="600" fill="{c["text"]}">Gallery.tsx</tspan>  {diffs(c, 16, 1)}', 12, "dim"))
+    pan.append(t(PX + 16, y + 26, f'<tspan font-weight="600" fill="{c["text"]}">fonts.css</tspan>  {diffs(c, 7, 0)}', 12, "dim"))
+    pan.append(at(sel0 + .3, ask, f'<rect x="{PX + 54}" y="{py}" width="{pw:.0f}" height="21" rx="10" fill="{c["text"]}"/>'
+                  + t(PX + 54 + pw / 2, py + 15, f'<tspan font-weight="600">type</tspan> to ask perf about it', 11.5, "bg", anchor="middle"), dur=.15))
+    body = "".join(pan)
+    sl = f"sl{d.tl.n + 1}"; d.tl.n += 1
+    d.keyframes(sl, f"0%,{d.p(open_)}{{transform:translateX({W}px)}}{d.p(open_ + .4)},{d.p(T - .3)}{{transform:translateX(0)}}100%{{transform:translateX({W}px)}}", "cubic-bezier(.2,0,0,1)")
+    o.append(at(open_, None, f'<g class="{sl}">{body}</g>', dur=.05))
+    return d.svg("12 in bise desktop: under perf's message, '± 3 files +41 −7'; a click opens the changes beside the thread; you select two lines and type: the quote of those lines goes into the composer with your question to perf.")
+
+def d_tokens(m):
+    """13 · agents only when needed: a one-number change; bise does it itself (its tool rows, its land); no agent starts."""
+    c = DPAL[m]; T = 10
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 2)], [(0, "perf", "product page speed", [(0, "∿", "dim")]), (0, "search", "size filter", [(0, "∿", "dim")])])
+    o.append(bise_head(d))
+    ask = "free shipping from 60 € instead of 50"
+    send = 2.4
+    bl, bh = d.bubble(R, 54, [ask])
+    o.append(at(send, None, bl))
+    y = 54 + bh + 24
+    o.append(colT(at(3.0, None, d.head(X, y, "bise"))))
+    o.append(colT(at(3.3, None, toolrow(d, X, R, y + 20, f'± shipping.ts  {diffs(c, 1, 1)}', "✓ 0.1 s"))))
+    o.append(colT(at(3.9, None, toolrow(d, X, R, y + 40, "$ run the shipping tests", "✓ 4 s"))))
+    o.append(colT(at(4.6, None, t(X, y + 70, "done: free shipping starts at 60 € now. one number, so i did it myself.", 13))))
+    o.append(colT(at(5.4, None, landrow(d, X, y + 104, who="bise", sha="3c9d0e2", files="1 file", plus=1, minus=1))))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
+    o.append(cb)
+    o.append(placeholder_at(d, cx, cy, ph, [(0.4, send)]))
+    o.append(at(0.35, send, d.typing(cx, cy, ask, 0.4, 2.0), dur=.05))
+    return d.svg("13 in bise desktop: you ask for free shipping from 60 € instead of 50; bise changes the one number itself, runs the tests and lands it; no agent starts: the right bar still shows the same two.")
+
+def d_screenshot(m):
+    """14 · images: he drags a screenshot onto the composer; 'image 1' with its thumbnail in his text; sends; search answers about it."""
+    c = DPAL[m]; T = 10.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    TX = 448; colT, colR = cols(d, TX); X, R = 22, TX - 22
+    rbar(d, TX, colR, [(0, None, 1)], [(0, "search", "size filter", [(0, "∿", "dim")])])
+    hb, _ = ahead(d, "search", "size filter", "∿ working · 12 min")
+    o.append(colT(hb) + d.head(X, 64, "search"))
+    o.append(colT(toolrow(d, X, R, 84, f'± SizeFilter.tsx  {diffs(c, 54, 0)}', "✓ 0.2 s") + t(X, 114, "the size filter is in. EU sizes, one chip per size.", 13)))
+    drop, send = 1.9, 4.8
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, to="search", keys=WORKING_KEYS)
+    o.append(cb)
+    o.append(placeholder_at(d, cx, cy, ph, [(drop, send)]))
+    # the 16 px thumbnail of the shot: a phone screen with a row of chips
+    def thumb(x, y, s=16):
+        k = s / 16
+        return (f'<rect x="{x}" y="{y}" width="{s}" height="{s}" rx="{3 * k:.1f}" fill="{c["bg"]}" stroke="{c["line"]}"/>'
+                + "".join(f'<rect x="{x + 2.5 * k + 4 * j * k:.1f}" y="{y + 6 * k:.1f}" width="{3 * k:.1f}" height="{3 * k:.1f}" rx="{1 * k:.1f}" fill="{c["faint"]}"/>' for j in range(3))
+                + f'<rect x="{x + 2.5 * k:.1f}" y="{y + 11 * k:.1f}" width="{9 * k:.1f}" height="{1.5 * k:.1f}" fill="{c["faint"]}"/>')
+    # the shot, dragged from the top right onto the composer
+    sh = (f'<g opacity=".92"><rect x="0" y="0" width="96" height="120" rx="8" fill="{c["bg"]}" stroke="{c["rule"]}"/>'
+          + "".join(f'<rect x="{10 + 26 * j}" y="40" width="22" height="16" rx="4" fill="{c["chip"]}" stroke="{c["line"]}"/>' for j in range(3))
+          + f'<rect x="10" y="50" width="40" height="10" rx="2" fill="{c["err"]}" opacity=".35"/>'
+          + "".join(f'<rect x="10" y="{72 + 12 * j}" width="{70 - 14 * j}" height="5" rx="2.5" fill="{c["line"]}"/>' for j in range(3)) + '</g>')
+    dr = f"dr{d.tl.n + 1}"; d.tl.n += 1
+    d.keyframes(dr, f"0%,{d.p(.5)}{{transform:translate(330px,60px)}}{d.p(drop)}{{transform:translate({cx + 30}px,{cy - 60}px) scale(.5)}}100%{{transform:translate({cx + 30}px,{cy - 60}px) scale(.5)}}", "cubic-bezier(.3,0,.2,1)")
+    o.append(at(.5, drop, f'<g class="{dr}">{sh}</g>', dur=.1))
+    iw = tw("image 1", 12) + 34
+    chip = (f'<rect x="{cx - 2}" y="{cy - 15}" width="{iw:.0f}" height="21" rx="6" fill="{c["chip"]}"/>' + thumb(cx + 3, cy - 12)
+            + t(cx + 24, cy, "image 1", 12, "dim"))
+    o.append(at(drop, send, chip, dur=.1))
+    q = "the chips overlap the price on small phones"
+    o.append(at(drop, send, d.typing(cx + iw + 6, cy, q, drop + .3, 3.9), dur=.05))
+    o.append(d.key(R - 50, 402, "⏎", send - .4, send + .1))
+    # his bubble: the image chip, then his words
+    bw = tw("image 1  " + q, 13) * 1.06 + 56; bx = R - bw; by = 142
+    bub = (f'<rect x="{bx:.0f}" y="{by}" width="{bw:.0f}" height="35" rx="12" fill="{c["raised"]}" stroke="{c["line"]}"/>'
+           + f'<rect x="{bx + 10:.0f}" y="{by + 7}" width="{iw:.0f}" height="21" rx="6" fill="{c["chip"]}"/>' + thumb(bx + 15, by + 10)
+           + t(bx + 36, by + 22, "image 1", 12, "dim") + t(bx + 16 + iw, by + 22, E(q), 13))
+    o.append(colT(at(send, None, bub)))
+    o.append(colT(at(5.8, None, d.head(X, 206, "search") + t(X, 226, "i see it: at 360 px the chips wrap under the price.", 13))))
+    o.append(colT(at(6.6, None, toolrow(d, X, R, 246, f'± SizeFilter.css  {diffs(c, 3, 1)}', "✓ 0.1 s"))))
+    return d.svg("14 in bise desktop: you drag a screenshot onto the composer; it becomes 'image 1' with its thumbnail in your text; you say the chips overlap the price on small phones and send; search sees it and fixes the CSS.")
+
 DESK = [("demo-b-desktop", d_session), ("artifacts-desktop", d_artifacts), ("voicemode-desktop", d_voicemode),
         ("resume-desktop", d_resume), ("worktree-desktop", d_worktree), ("talk-desktop", d_talk),
-        ("voice-desktop", d_dictation), ("card-desktop", d_card), ("sync-desktop", d_sync), ("direct-desktop", d_direct)]
+        ("voice-desktop", d_dictation), ("card-desktop", d_card), ("sync-desktop", d_sync), ("direct-desktop", d_direct),
+        ("prs-desktop", d_prs), ("diff-desktop", d_diff), ("tokens-desktop", d_tokens), ("screenshot-desktop", d_screenshot)]
