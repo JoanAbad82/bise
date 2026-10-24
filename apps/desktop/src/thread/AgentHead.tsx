@@ -113,7 +113,10 @@ export function AgentHead({ project, a, more, note, starting = false, restore, n
             wherever the crumb doesn't: a maker beside its artifact, live or archived, at 1400 and in
             the 800 slide-over (crumb 'storefront › artifacts'; designer m_27230) */}
         {(restore !== undefined || named) && (
-          <b className="ah-name" data-testid="thread.head.name" title={a.name} style={{ minWidth: arch.nameMin }}>
+          // only an archived maker's name cuts (to its first 12 chars, useArchivedFit); a live one
+          // keeps its whole width and the role cuts with '…' after it: a min-width of 0 here let it
+          // shrink under its own text, drawn over the role (Gabriel, art-gallery's head)
+          <b className="ah-name" data-testid="thread.head.name" title={a.name} style={restore === undefined ? undefined : { minWidth: arch.nameMin }}>
             {a.name}
           </b>
         )}
