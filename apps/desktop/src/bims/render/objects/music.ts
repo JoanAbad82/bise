@@ -1,6 +1,6 @@
 // The objects of the music family: an upright piano and a jukebox (the piano's compact one).
 // Built with the objects' kit (kit.ts): at the origin on the floor, front to +z, centred on the foot it returns.
-import { CREAM, darker, GREEN, INK, ORANGE, SCREEN, SKY, SLATE, SLATE_L, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, type Maker } from './kit';
+import { CREAM, darker, GREEN, INK, lighter, ORANGE, SCREEN, SKY, SLATE, SLATE_L, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, type Maker } from './kit';
 
 /** an upright piano, its lid open on a score, a stool */
 const piano: Maker = (g, o) => {
@@ -146,12 +146,13 @@ const drums: Maker = (g) => {
 const synth: Maker = (g, o) => {
   const w = 1.0;
   g.contact(w, 0.5);
-  // the stand: two X frames, the bars of each 3 cm apart so they never share a face, a bar between
-  for (const z of [-0.1, 0.1]) for (const [s, dz] of [[1, -0.015], [-1, 0.015]] as const) {
-    const b = g.box(0.035, 0.92, 0.025, INK, 0, 0.37, z + dz, 0.01); b.rotation.z = s * 0.95;
-    for (const e of [-1, 1]) g.box(0.06, 0.03, 0.035, SLATE, e * 0.3, 0.015, z + dz, 0.01);
+  // the stand, one piece: two crossed legs (4 cm apart, never a shared face) from a foot bar on the
+  // floor up to the instrument's underside, their pivot between them
+  for (const [s, z] of [[1, -0.03], [-1, 0.03]] as const) {
+    g.box(0.04, 0.93, 0.04, INK, 0, 0.385, z, 0.012).rotation.z = s * 0.7;
+    g.box(0.05, 0.03, 0.4, SLATE, -s * 0.3, 0.015, 0, 0.01);
   }
-  g.cyl(0.015, 0.24, STEEL, 0, 0.37, 0).rotation.x = Math.PI / 2;
+  g.cyl(0.02, 0.12, STEEL, 0, 0.385, 0).rotation.x = Math.PI / 2;
   // the instrument: the body, the white keys, the black keys over them, the panel at the back
   g.box(w, 0.08, 0.36, SLATE, 0, 0.78, 0, 0.02);
   g.box(w - 0.14, 0.03, 0.15, CREAM, 0.03, 0.83, 0.09, 0.004);
@@ -164,9 +165,9 @@ const synth: Maker = (g, o) => {
   g.box(0.24, 0.07, 0.12, darker(SLATE, 0.85), -0.24, 0.84, -0.1, 0.01);
   for (let i = 0; i < 8; i++) g.cyl(0.018, 0.03, [YELLOW, CREAM, TEAL, CREAM][i % 4] as string, -0.06 + (i % 4) * 0.06, 0.835, -0.12 + Math.floor(i / 4) * 0.07);
   for (let i = 0; i < 4; i++) g.box(0.05, 0.016, 0.05, [ORANGE, SKY, GREEN, VIOLET][i] as string, 0.24 + (i % 2) * 0.07, 0.828, -0.12 + Math.floor(i / 2) * 0.07, 0.008, 0.3 + o.night * 0.7);
-  // the pedal on the floor, in front
-  g.box(0.1, 0.03, 0.16, INK, 0.25, 0.015, 0.2, 0.01);
-  return { w: 1.02, d: 0.48, h: 0.9, z: 0.048 };
+  // the sustain pedal by the stand, nothing else on the floor
+  g.box(0.08, 0.03, 0.12, INK, 0.1, 0.015, 0.26, 0.01);
+  return { w: 1.02, d: 0.53, h: 0.9, z: 0.06 };
 };
 
 /** a gramophone on a little round table: its crank, the record, the brass horn opening up and out */
@@ -179,15 +180,19 @@ const gramophone: Maker = (g) => {
   g.cyl(0.15, 0.015, STEEL, 0, 0.788, 0); g.cyl(0.14, 0.006, INK, 0, 0.798, 0); g.cyl(0.04, 0.004, YELLOW, 0, 0.803, 0);
   // the crank out of its side
   g.cyl(0.012, 0.08, STEEL, 0.215, 0.7, 0).rotation.z = Math.PI / 2; g.box(0.012, 0.08, 0.012, STEEL, 0.258, 0.67, 0, 0.004); g.ball(0.016, WOOD_D, 0.258, 0.62, 0);
-  // the arm, the elbow and the horn
-  g.cyl(0.02, 0.12, BRASS, 0.13, 0.84, -0.13);
-  const neck = g.cyl(0.018, 0.2, BRASS, 0.07, 0.92, -0.08); neck.rotation.z = 0.9;
+  // one horn: a single flared cone, its tip on a curved neck out of the box's back, its mouth up and
+  // out to the front, the rim a shade lighter, the inside dark
   const horn = g.at(0, 1.08, -0.04); horn.root.rotation.x = 0.75;
   horn.cone(0.24, 0.4, BRASS, 0, 0, 0).rotation.x = Math.PI;
-  horn.cyl(0.255, 0.03, darker(BRASS, 0.85), 0, -0.2, 0);
-  horn.cyl(0.21, 0.01, darker(BRASS, 0.55), 0, -0.22, 0);
-  horn.cyl(0.03, 0.08, BRASS, 0, 0.2, 0);
-  return { w: 0.56, d: 0.66, h: 1.4, z: -0.047 };
+  horn.cyl(0.25, 0.025, lighter(BRASS, 0.3), 0, 0.2, 0);
+  horn.cyl(0.2, 0.01, darker(BRASS, 0.4), 0, 0.216, 0);
+  // the neck: up out of the box, an elbow, then on to the horn's tip (0, 0.934, -0.176)
+  g.cyl(0.022, 0.12, BRASS, 0.12, 0.84, -0.12);
+  g.ball(0.03, BRASS, 0.12, 0.9, -0.12);
+  const tube = g.at(0.06, 0.917, -0.148); tube.root.lookAt(0, 0.934, -0.176);
+  tube.cyl(0.02, 0.15, BRASS, 0, 0, 0).rotation.x = Math.PI / 2;
+  g.ball(0.026, BRASS, 0, 0.934, -0.176);
+  return { w: 0.56, d: 0.64, h: 1.41, z: -0.032 };
 };
 
 /** a cello standing on its spike, a wooden chair beside it, the bow on the seat */
@@ -228,10 +233,12 @@ const mic: Maker = (g, o) => {
   g.cyl(0.14, 0.02, INK, -0.05, 0.17, 0.05); g.cyl(0.012, 1.2, STEEL, -0.05, 0.78, 0.05);
   const m = g.at(-0.05, 1.42, 0.08); m.root.rotation.x = 0.45;
   m.cyl(0.02, 0.16, INK, 0, -0.04, 0); m.ball(0.045, STEEL, 0, 0.06, 0); m.cyl(0.03, 0.008, darker(STEEL, 0.7), 0, 0.03, 0);
-  // the floor monitor: a wedge at the front edge, its cone up to the singer
-  const mon = g.at(0.1, 0.3, 0.3); mon.root.rotation.x = -0.6;
-  mon.box(0.42, 0.24, 0.24, INK, 0, 0, 0, 0.03);
-  mon.cyl(0.07, 0.02, SLATE_L, -0.08, 0, 0.122).rotation.x = Math.PI / 2; mon.cyl(0.03, 0.02, SLATE_L, 0.12, 0, 0.122).rotation.x = Math.PI / 2;
+  // the floor monitor: a wedge at the front edge, its face up to the singer
+  // (clay charcoal, a step over ink, so it never reads as a hole; its light grille faces the mic)
+  const mon = g.at(0.1, 0.33, 0.3); mon.root.rotation.x = 0.6;
+  mon.box(0.42, 0.24, 0.24, SLATE, 0, 0, 0, 0.03);
+  mon.box(0.36, 0.18, 0.01, lighter(SLATE_L, 0.35), 0, 0, -0.138, 0);
+  for (const [x, r] of [[-0.08, 0.065], [0.12, 0.03]] as const) mon.cyl(r, 0.012, SLATE, x, 0, -0.147).rotation.x = Math.PI / 2;
   // the spotlight at the back right on its pole, its lens lit
   g.cyl(0.11, 0.02, INK, 0.44, 0.17, -0.3); g.cyl(0.015, 0.9, STEEL, 0.44, 0.62, -0.3);
   const sp = g.at(0.44, 1.1, -0.28); sp.root.rotation.x = 0.9; sp.root.rotation.z = 0.3;
