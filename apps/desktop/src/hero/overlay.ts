@@ -49,7 +49,9 @@ export function makeOverlay(box: HTMLElement): Overlay {
   box.append(root);
   const els = new Map<string, HTMLDivElement>();
   /** each shown tag's rect as placed (css px): the ask's bubble sits over its bim's */
-  const placed = new Map<string, { left: number; top: number; w: number; h: number }>();
+  const placed = new Map<string, { left: number; top: number; w: number; h: number; pill: boolean }>();
+  const meets = (a: { left: number; top: number; w: number; h: number }, b: { left: number; top: number; w: number; h: number }): boolean =>
+    a.left < b.left + b.w && b.left < a.left + a.w && a.top < b.top + b.h && b.top < a.top + a.h;
 
   return {
     root,
@@ -101,7 +103,7 @@ export function makeOverlay(box: HTMLElement): Overlay {
         el.style.visibility = p === undefined ? 'hidden' : '';
         if (p !== undefined) {
           el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
-          placed.set(t.name, { left: p.left, top: p.top, w: t.w, h: t.h });
+          placed.set(t.name, { left: p.left, top: p.top, w: t.w, h: t.h, pill: el.querySelector('.bh-pill') !== null });
         }
       }
     },
@@ -119,6 +121,13 @@ export function makeOverlay(box: HTMLElement): Overlay {
       bubble.style.setProperty('--tail', `${b.tail.toFixed(1)}px`);
       bubble.style.transformOrigin = `${b.tail.toFixed(1)}px ${h.toFixed(1)}px`;
       bubble.style.transform = `translate(${b.left.toFixed(1)}px, ${b.top.toFixed(1)}px) scale(${a.scale.toFixed(3)})`;
+      // another bim's name under it hides, as the followed bim's does; a pill never (bims-plugins m_39584)
+      const over = { left: b.left, top: b.top, w, h };
+      for (const [k, r] of placed) {
+        if (k === a.key || r.pill || !meets(r, over)) continue;
+        const el = els.get(k);
+        if (el !== undefined) el.style.visibility = 'hidden';
+      }
     },
     zzz(heads) {
       placeZzz(zz, heads);

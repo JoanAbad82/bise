@@ -35,9 +35,10 @@ const backOut = (x: number): number => {
 export function askAt(T: number): Ask | null {
   for (const l of FEED) {
     if (l.who !== 'ask' || T < l.at) continue;
+    // gone on the catch: the pop out ends there, so the catch reads as 'answered' (designer m_39582)
     const end = heardAt(l);
-    if (T >= end + ASK_OUT_S) continue;
-    const scale = T < end ? backOut(Math.min(1, (T - l.at) / ASK_IN_S)) : 1 - (T - end) / ASK_OUT_S;
+    if (T >= end) continue;
+    const scale = Math.min(backOut(Math.min(1, (T - l.at) / ASK_IN_S)), (end - T) / ASK_OUT_S);
     return { office: KILN, bim: l.bim, words: l.words, scale };
   }
   return null;

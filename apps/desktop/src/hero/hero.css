@@ -116,7 +116,8 @@ html.pd .bims-hero {
   border-radius: 12px;
   background: var(--bh-win);
   color: var(--bh-text);
-  font-size: 12.5px;
+  /* 13 px at least, as the feed's bubbles (designer m_39582) */
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.35;
   white-space: nowrap;

@@ -8,7 +8,7 @@ const meets = (a: { left: number; top: number; w: number; h: number }, b: { left
   a.left < b.left + b.w && b.left < a.left + a.w && a.top < b.top + b.h && b.top < a.top + a.h;
 
 describe('the ask bubble', () => {
-  it('holds checkout’s question from its feed line until his answer’s plane is caught (0:32.8), then pops out', () => {
+  it('holds checkout’s question from its feed line until his answer’s plane is caught (0:32.8): gone on the catch', () => {
     const l = FEED.find((x) => x.who === 'ask' && x.words === 'ship worldwide or EU only?');
     if (l === undefined || l.who !== 'ask') throw new Error('no ask line');
     expect(heardAt(l)).toBeCloseTo(32.8, 5);
@@ -16,9 +16,9 @@ describe('the ask bubble', () => {
     expect(askAt(l.at)).toMatchObject({ bim: 'checkout', words: 'ship worldwide or EU only?' });
     expect(askAt(l.at)?.scale).toBeCloseTo(0, 5);
     expect(askAt(30)?.scale).toBe(1);
-    expect(askAt(32.79)?.scale).toBe(1);
-    expect(askAt(32.8 + ASK_OUT_S / 2)?.scale).toBeCloseTo(0.5, 5);
-    expect(askAt(32.8 + ASK_OUT_S)).toBeNull();
+    expect(askAt(32.8 - ASK_OUT_S - 0.01)?.scale).toBe(1);
+    expect(askAt(32.8 - ASK_OUT_S / 2)?.scale).toBeCloseTo(0.5, 5);
+    expect(askAt(32.8)).toBeNull();
   });
 
   it('shows none at the loop’s seam, and one question at a time', () => {
