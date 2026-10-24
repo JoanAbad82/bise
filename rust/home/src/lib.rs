@@ -354,6 +354,14 @@ impl Home {
         self.cache_dir().join("mcp-tools")
     }
 
+    /// `<cache>/mcp-tools.salt`: the per-home salt of the tools cache's
+    /// keyed hash of a server's env values (bend_plugins::tools_cache),
+    /// 32 random bytes, 0600, made on first use. Deleted: every key
+    /// changes, each server is listed once again.
+    pub fn mcp_tools_salt(&self) -> PathBuf {
+        self.cache_dir().join("mcp-tools.salt")
+    }
+
     /// An MCP server's env and header values he typed in: `secrets/mcp-env/`,
     /// kept by bise_secrets.
     pub fn mcp_secrets_dir(&self) -> PathBuf {

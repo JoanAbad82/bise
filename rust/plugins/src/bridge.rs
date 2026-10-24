@@ -88,10 +88,10 @@ pub struct Opts {
     pub poll: Duration,
     /// [`STOP_GRACE`]
     pub grace: Duration,
-    /// the stdio servers' tool lists shared by the sessions
-    /// (`Home::mcp_tools_cache`); None: each bridge lists by starting the
-    /// server once and stopping it
-    pub tools_cache: Option<PathBuf>,
+    /// the stdio servers' tool lists shared by the sessions and their key's
+    /// salt ([`tools_cache::Place::of`]); None: each bridge lists by
+    /// starting the server once and stopping it
+    pub tools_cache: Option<tools_cache::Place>,
     /// a stdio server with no call for this long is stopped
     /// ([`tools_cache::IDLE_STOP`])
     pub idle_stop: Duration,
@@ -116,6 +116,21 @@ impl Opts {
             tools_cache: None,
             idle_stop: tools_cache::IDLE_STOP,
         }
+    }
+}
+
+/// At most this many tool names ride on an "unknown tool" answer.
+pub const NAMES_SHOWN: usize = 50;
+
+/// The line an "unknown tool" answer gets: the server's tools as just
+/// listed, the first [`NAMES_SHOWN`] of them.
+pub fn tools_now(namespace: &str, published: &[String]) -> String {
+    let shown: Vec<String> = published.iter().take(NAMES_SHOWN).map(|n| format!("{}.{}", namespace, n)).collect();
+    let more = published.len().saturating_sub(NAMES_SHOWN);
+    let list = if shown.is_empty() { "none".to_string() } else { shown.join(", ") };
+    match more {
+        0 => format!("its tools now: {}", list),
+        n => format!("its tools now: {} and {} more", list, n),
     }
 }
 
@@ -295,8 +310,12 @@ struct Entry {
     tools: Mutex<Vec<Value>>,
     /// published tool name -> the server's own name
     names: Mutex<HashMap<String, String>>,
-    /// a stdio server's key in the tools cache ([`tools_cache::key`])
+    /// a stdio server's key in the tools cache ([`tools_cache::key`]):
+    /// Some = a lazy server
     cache_key: Option<String>,
+    /// the shared tools cache ([`Live::tools_cache`]): written from a
+    /// cold list only (`crate::tools_cache` rule 1)
+    cache: Option<Cache>,
     /// a lazy server's `initialize` result, answered while it is not
     /// running
     init: Mutex<Option<Value>>,
@@ -307,12 +326,23 @@ struct Entry {
 impl Entry {
     /// Server `spec` of `p`, not started; its stderr log in `log_dir`.
     /// `dirs`: the OAuth store, his typed secrets, the status dir.
-    fn new(p: &Plugin, spec: Spec, log_dir: &Path, on_change: OnChange, dirs: (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>)) -> Entry {
+    /// `cache`: the shared tools cache, its key's salt and inherited env.
+    fn new(
+        p: &Plugin,
+        spec: Spec,
+        log_dir: &Path,
+        on_change: OnChange,
+        dirs: (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>),
+        cache: (Option<Cache>, &[u8], &[(String, String)]),
+    ) -> Entry {
         let (secrets, env_dir, status_dir) = dirs;
+        let (cache, salt, inherited) = cache;
         let cache_key = match &spec {
             Spec::Stdio(s) => {
-                let saved = env_dir.as_deref().map(|d| crate::secrets::path(d, &PluginId::plugin(p.name.as_str())));
-                Some(tools_cache::key(&p.name, &p.root, s, saved.as_deref()))
+                // its env as its start resolves it: a token from the hub's
+                // env or his secrets is in the key, hashed (rule 2)
+                let declared = tools_cache::declared(s, &env_lookup(&p.name, env_dir.as_deref()));
+                Some(tools_cache::key(&p.name, &p.root, s, &tools_cache::env_mac(salt, &declared, inherited)))
             }
             Spec::Http(_) => None,
         };
@@ -336,6 +366,7 @@ impl Entry {
             off: AtomicBool::new(false),
             tools: Mutex::new(Vec::new()),
             names: Mutex::new(HashMap::new()),
+            cache: cache_key.as_ref().and(cache),
             cache_key,
             init: Mutex::new(None),
             last_call: Mutex::new(Instant::now()),
@@ -501,18 +532,56 @@ impl Entry {
         if dead {
             let c = self.start().map_err(said)?;
             *lock(&self.pid) = c.pid();
-            *guard = Some(c);
             if self.cache_key.is_some() {
-                // a lazy server's real start: list again (the refresh
-                // loop, once this call lets go of the client), so a
-                // changed list reaches the cache and the index
+                // a lazy server's real start: its list before the first
+                // call is a cold one, the shared cache's (rule 1); the
+                // index follows (the refresh loop)
+                self.cold_list(&c);
                 *lock(&self.outcome) = Outcome::Up;
                 (self.on_change)();
             }
+            *guard = Some(c);
         }
         let c = guard.as_ref().ok_or("no server")?;
         let answer = c.request_raw(method, params, self.spec.call_timeout()).map_err(said);
         *lock(&self.last_call) = Instant::now();
+        match (answer, tool) {
+            (Ok(a), Some(src)) if a.pointer("/error/code").and_then(Value::as_i64) == Some(tools_cache::UNKNOWN_TOOL) => Ok(self.unknown_tool(c, a, &src)),
+            (answer, _) => answer,
+        }
+    }
+
+    /// A real start's list, before its first call: the index's, and the
+    /// shared cache's when there is one. A failed list keeps the old one.
+    fn cold_list(&self, c: &Conn) {
+        let Ok(tools) = c.list_tools(self.spec.startup_timeout()) else { return };
+        let listed = Listed { tools, init: c.init() };
+        if let (Some(cache), Some(key)) = (&self.cache, self.cache_key.as_deref()) {
+            cache.write(key, &listed, SystemTime::now());
+        }
+        *lock(&self.init) = Some(listed.init);
+        *lock(&self.tools) = listed.tools;
+    }
+
+    /// The server answered `src`'s call with -32602 (rule 3, read from
+    /// the typed code): list once again for this session (its index
+    /// follows); `src` missing from it, the shared entry was stale and is
+    /// dropped. The answer is the server's error with the fresh names.
+    fn unknown_tool(&self, c: &Conn, mut answer: Value, src: &str) -> Value {
+        let Ok(tools) = c.list_tools(self.spec.startup_timeout()) else { return answer };
+        let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(Value::as_str)).collect();
+        if !names.contains(&src) {
+            if let (Some(cache), Some(key)) = (&self.cache, self.cache_key.as_deref()) {
+                cache.remove(key);
+            }
+        }
+        let published: Vec<String> = names.iter().filter(|n| self.spec.limits().allows(n)).map(|n| resolve::identifier(n)).collect();
+        if let Some(m) = answer.pointer_mut("/error/message") {
+            let said = m.as_str().unwrap_or("").to_string();
+            *m = json!(format!("{} ({})", said, tools_now(&self.namespace, &published)));
+        }
+        *lock(&self.tools) = tools;
+        (self.on_change)();
         answer
     }
 
@@ -643,8 +712,12 @@ struct Live {
     status_dir: Option<PathBuf>,
     secrets_dir: Option<PathBuf>,
     env_dir: Option<PathBuf>,
-    /// the stdio servers' shared tool lists ([`Opts::tools_cache`])
+    /// the stdio servers' shared tool lists ([`Opts::tools_cache`]);
+    /// None with no salt too (never shared unkeyed)
     tools_cache: Option<Cache>,
+    /// the cache key's salt and this bridge's inherited env
+    /// ([`tools_cache::inherited`]), read once
+    key_env: (Vec<u8>, Vec<(String, String)>),
     /// [`Opts::idle_stop`]
     idle_stop: Duration,
     /// `<plugin>/<server>` when a server says its tools changed, or a
@@ -706,7 +779,8 @@ impl Live {
                     let _ = lock(&tx).send(k.clone());
                 });
                 let dirs = (self.secrets_dir.clone(), self.env_dir.clone(), self.status_dir.clone());
-                let e = Arc::new(Entry::new(p, spec, &self.dir, on_change, dirs));
+                let cache = (self.tools_cache.clone(), self.key_env.0.as_slice(), self.key_env.1.as_slice());
+                let e = Arc::new(Entry::new(p, spec, &self.dir, on_change, dirs, cache));
                 launch(self.clone(), e.clone());
                 next.push(e);
             }
@@ -793,7 +867,8 @@ pub(crate) fn try_plugin(p: &Plugin, log_dir: &Path, secrets: Option<&Path>, env
     let threads: Vec<_> = specs
         .into_iter()
         .map(|spec| {
-            let e = Entry::new(p, spec, log_dir, none.clone(), dirs.clone());
+            // a try lists by a real start: no cache read, none written
+            let e = Entry::new(p, spec, log_dir, none.clone(), dirs.clone(), (None, &[], &[]));
             std::thread::spawn(move || {
                 let (transport, host) = match &e.spec {
                     Spec::Stdio(_) => ("stdio".to_string(), String::new()),
@@ -834,7 +909,8 @@ fn launch(live: Arc<Live>, e: Arc<Entry>) {
                 c.stop();
                 ts.map(|tools| Listed { tools, init })
             };
-            match &live.tools_cache {
+            // a cold list: the one write besides a real start's (rule 1)
+            match &e.cache {
                 Some(cache) => cache.tools_of(key, timeout, list),
                 None => list(),
             }
@@ -932,8 +1008,9 @@ fn refresh_loop(rx: Receiver<String>, live: Arc<Live>) {
             };
             match listed {
                 Ok(ts) => {
-                    if let (Some(cache), Some(key)) = (&live.tools_cache, e.cache_key.as_deref()) {
-                        cache.write(key, &Listed { tools: ts.clone(), init: init.clone() }, SystemTime::now());
+                    // after list_changed or a call: this session's own
+                    // list, its index only, never the shared cache (rule 1)
+                    if e.cache_key.is_some() {
                         *lock(&e.init) = Some(init);
                     }
                     *lock(&e.tools) = ts;
@@ -1152,6 +1229,13 @@ pub fn serve(opts: Opts) -> std::io::Result<()> {
     let mut seen = Seen { state: roots.state.clone(), fingerprint: resolve::fingerprint(&roots) };
     let res = resolve::resolve(&roots);
     let (changed_tx, changed_rx) = channel();
+    // no salt: nothing cached (a key without it would be a bare hash of
+    // his env values)
+    let place = opts.tools_cache.as_ref().and_then(|p| Some((p.dir.clone(), tools_cache::salt(&p.salt)?)));
+    let (tools_cache, salt) = match place {
+        Some((dir, salt)) => (Some(Cache::new(dir)), salt),
+        None => (None, Vec::new()),
+    };
     let live = Arc::new(Live {
         dir: opts.dir.clone(),
         base: format!("http://127.0.0.1:{}/{}", port, token),
@@ -1161,7 +1245,8 @@ pub fn serve(opts: Opts) -> std::io::Result<()> {
         status_dir: opts.status_dir.clone(),
         secrets_dir: opts.secrets_dir.clone(),
         env_dir: opts.env_dir.clone(),
-        tools_cache: opts.tools_cache.clone().map(Cache::new),
+        tools_cache,
+        key_env: (salt, tools_cache::inherited(std::env::vars_os())),
         idle_stop: opts.idle_stop,
         changed: changed_tx.clone(),
         entries: RwLock::new(Vec::new()),

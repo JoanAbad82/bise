@@ -161,7 +161,7 @@ pub fn main(args: &[String]) -> i32 {
                 status_dir: Some(crate::status::dir()),
                 secrets_dir: Some(crate::oauth::store_dir()),
                 env_dir: Some(home.mcp_secrets_dir()),
-                tools_cache: Some(home.mcp_tools_cache()),
+                tools_cache: Some(crate::tools_cache::Place::of(&home)),
                 ..bridge::Opts::new(PathBuf::from(dir), parent, resolve::Roots::standard(Some(&ws)))
             };
             match bridge::serve(opts) {

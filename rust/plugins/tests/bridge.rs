@@ -537,7 +537,7 @@ fn lazy_servers_start_once_for_n_cold_bridges_and_on_a_call() {
     let start = |dir: &Path| {
         let parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
         let opts = bridge::Opts {
-            tools_cache: Some(cache.clone()),
+            tools_cache: Some(place(&cache)),
             status_dir: Some(sd.clone()),
             idle_stop: Duration::from_secs(2),
             ..bridge::Opts::new(dir.to_path_buf(), Some(parent.id()), roots_of(&base, Some(plugins.clone())))
@@ -588,5 +588,159 @@ fn lazy_servers_start_once_for_n_cold_bridges_and_on_a_call() {
         stop(b);
     }
     stop(warm);
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+// ---- the tools cache's rules (bend_plugins::tools_cache, architect t_40590) ----
+
+/// The cache at `dir`, its salt next to it (as `Home::mcp_tools_salt`).
+fn place(dir: &Path) -> bend_plugins::tools_cache::Place {
+    bend_plugins::tools_cache::Place { dir: dir.to_path_buf(), salt: dir.with_extension("salt") }
+}
+
+/// Every list in the cache at `dir`.
+fn cached(dir: &Path) -> Vec<String> {
+    let Ok(rd) = std::fs::read_dir(dir) else { return Vec::new() };
+    rd.flatten().filter(|e| e.path().extension().is_some_and(|x| x == "json")).map(|e| std::fs::read_to_string(e.path()).unwrap()).collect()
+}
+
+/// One bridge on the shared cache `cache` of the plugin `hello-plugin`
+/// in `plugins`; `env_dir`: his typed secrets.
+fn cached_bridge(base: &Path, plugins: &Path, cache: &Path, dir: &Path, env_dir: Option<PathBuf>) -> (std::process::Child, std::thread::JoinHandle<std::io::Result<()>>) {
+    let parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+    let opts = bridge::Opts {
+        tools_cache: Some(place(cache)),
+        env_dir,
+        ..bridge::Opts::new(dir.to_path_buf(), Some(parent.id()), roots_of(base, Some(plugins.to_path_buf())))
+    };
+    let server = std::thread::spawn(move || bridge::serve(opts));
+    wait_until("the bridge ready", || dir.join("ready").exists());
+    (parent, server)
+}
+
+fn stop_bridge((mut parent, server): (std::process::Child, std::thread::JoinHandle<std::io::Result<()>>)) {
+    parent.kill().unwrap();
+    parent.wait().unwrap();
+    server.join().unwrap().unwrap();
+}
+
+/// The echo server, its starts counted in `starts` (its pid, one line
+/// each), with `env`.
+fn counted_server(plugins: &Path, starts: &Path, env: &str) {
+    std::fs::write(
+        plugins.join("hello-plugin/mcp.json"),
+        format!(
+            r#"{{"mcpServers":{{"echo":{{"command":"sh","args":["-c","echo $$ >> {}; exec python3 -B \"$0\"","${{PLUGIN_ROOT}}/server.py"],"env":{}}}}}}}"#,
+            starts.display(),
+            env
+        ),
+    )
+    .unwrap();
+}
+
+/// Rule 2: a server whose tools depend on an env value (a token's
+/// scopes, GITHUB_TOOLSETS) gets one cache entry per value: another
+/// value is listed by its own start, never served the first one's list;
+/// the same value again is served from the cache.
+#[test]
+fn a_server_listed_with_another_env_value_is_listed_again_not_served_from_the_cache() {
+    let (base, plugins) = fixture_root("cache-env");
+    let starts = base.join("starts.txt");
+    counted_server(&plugins, &starts, r#"{"HELLO_TOOLS":"${BP_CACHE_TOOLSET}"}"#);
+    let cache = base.join("cache/mcp-tools");
+    let count = || std::fs::read_to_string(&starts).unwrap_or_default().lines().count();
+    let with = |set: &str| {
+        let d = base.join(format!("secrets-{set}"));
+        secrets::write(&d, &PluginId::plugin("hello-plugin"), &[("BP_CACHE_TOOLSET".to_string(), set.to_string())]).unwrap();
+        Some(d)
+    };
+    let run = |n: &str, set: &str| {
+        let dir = base.join(format!("{n}/plugins"));
+        let b = cached_bridge(&base, &plugins, &cache, &dir, with(set));
+        wait_until("listed", || index(&dir).contains(" shout :"));
+        let i = index(&dir);
+        stop_bridge(b);
+        i
+    };
+    let a = run("a", "alpha");
+    assert!(a.contains(" alpha :"), "{a}");
+    let b = run("b", "beta");
+    assert!(b.contains(" beta :") && !b.contains(" alpha :"), "the other value's list: {b}");
+    assert_eq!(count(), 2, "one start per value");
+    let a2 = run("a2", "alpha");
+    assert!(a2.contains(" alpha :") && !a2.contains(" beta :"), "{a2}");
+    assert_eq!(count(), 2, "the same value: served from the cache");
+    for l in cached(&cache) {
+        assert!(!l.contains("BP_CACHE_TOOLSET"), "a value or its name in the cache: {l}");
+    }
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// Rule 1: a server that grows its list for one session after a call
+/// (`list_changed`, like FastMCP's enable_components): that session's
+/// index gets the new tool, the shared cache keeps the cold list, and
+/// another session never sees it.
+#[test]
+fn a_list_after_list_changed_reaches_its_session_never_the_cache() {
+    let (base, plugins) = fixture_root("cache-changed");
+    let starts = base.join("starts.txt");
+    counted_server(&plugins, &starts, r#"{"HELLO_GROW":"1"}"#);
+    let cache = base.join("cache/mcp-tools");
+    let dir = base.join("one/plugins");
+    let one = cached_bridge(&base, &plugins, &cache, &dir, None);
+    wait_until("listed", || index(&dir).contains(" shout :"));
+    let (mut r, path) = route(&dir, "shout");
+    let (_, b) = post(&mut r, &path, SHOUT);
+    assert!(b.contains("HELLO-PLUGIN:X"), "{b}");
+    wait_until("grown in its session's index", || index(&dir).contains(" grown :"));
+    let lists = cached(&cache);
+    assert_eq!(lists.len(), 1, "{lists:?}");
+    assert!(lists[0].contains("\"shout\"") && !lists[0].contains("grown"), "a session's list in the cache: {}", lists[0]);
+    // another session, warm: the cold list
+    let dir2 = base.join("two/plugins");
+    let two = cached_bridge(&base, &plugins, &cache, &dir2, None);
+    wait_until("listed", || index(&dir2).contains(" shout :"));
+    assert!(!index(&dir2).contains(" grown :"), "{}", index(&dir2));
+    stop_bridge(one);
+    stop_bridge(two);
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// Rule 3: a cached list gone stale (the server's tools changed without
+/// a word): the call to a tool it lost is answered with the server's
+/// -32602 and its tools now, the session's index is listed again and
+/// the cache entry dropped; a -32602 for a bad argument of a tool it
+/// still has keeps the entry.
+#[test]
+fn an_unknown_tool_relists_the_session_and_drops_a_stale_entry_once() {
+    let (base, plugins) = fixture_root("cache-unknown");
+    let (starts, tools) = (base.join("starts.txt"), base.join("tools.txt"));
+    std::fs::write(&tools, "old").unwrap();
+    counted_server(&plugins, &starts, &format!(r#"{{"HELLO_TOOLS_FILE":"{}"}}"#, tools.display()));
+    let cache = base.join("cache/mcp-tools");
+    let count = || std::fs::read_to_string(&starts).unwrap_or_default().lines().count();
+    let cold = base.join("cold/plugins");
+    stop_bridge(cached_bridge(&base, &plugins, &cache, &cold, None));
+    assert_eq!(count(), 1);
+    // the server's list changes; a warm bridge still lists "old"
+    std::fs::write(&tools, "new").unwrap();
+    let dir = base.join("warm/plugins");
+    let warm = cached_bridge(&base, &plugins, &cache, &dir, None);
+    wait_until("listed", || index(&dir).contains(" old :"));
+    assert_eq!(count(), 1, "served from the cache");
+    let (mut r, path) = route(&dir, "old");
+    let (_, b) = post(&mut r, &path, &SHOUT.replace("\"shout\"", "\"old\""));
+    assert!(b.contains("-32602") && b.contains("Unknown tool: old"), "the server's error: {b}");
+    assert!(b.contains("its tools now: hello_plugin.shout, hello_plugin.new"), "the fresh names: {b}");
+    assert!(cached(&cache).is_empty(), "the stale entry is dropped");
+    wait_until("the session's index listed again", || index(&dir).contains(" new :") && !index(&dir).contains(" old :"));
+    assert_eq!(count(), 2, "one start: the call's");
+    // a cold bridge writes it again; a bad argument keeps it
+    stop_bridge(cached_bridge(&base, &plugins, &cache, &base.join("again/plugins"), None));
+    assert_eq!(cached(&cache).len(), 1);
+    let (_, b) = post(&mut r, &path, r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"shout","arguments":{}}}"#);
+    assert!(b.contains("-32602") && b.contains("text is required"), "{b}");
+    assert_eq!(cached(&cache).len(), 1, "a bad argument dropped the entry");
+    stop_bridge(warm);
     let _ = std::fs::remove_dir_all(&base);
 }

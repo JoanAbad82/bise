@@ -59,6 +59,7 @@ fn bise_home_moves_everything() {
     assert_eq!(h.marketplaces(), p("/b/marketplaces.json"));
     assert_eq!(h.marketplace_cache(), p("/b/cache/marketplaces"));
     assert_eq!(h.mcp_tools_cache(), p("/b/cache/mcp-tools"));
+    assert_eq!(h.mcp_tools_salt(), p("/b/cache/mcp-tools.salt"));
     assert_eq!(h.mcp_secrets_dir(), p("/b/secrets/mcp-env"));
     assert_eq!(h.run_dir(), p("/b/run"));
     assert_eq!(h.drafts_dir(), p("/b/drafts"));

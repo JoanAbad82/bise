@@ -293,14 +293,42 @@ tests use temp dirs.
 
 - Lazy stdio servers (`bend_plugins::tools_cache`): a stdio server runs
   only while an agent uses it. Its tools come from the cache every
-  session shares (`Home::mcp_tools_cache()`, one file per server spec,
-  keyed by plugin, server, command, args, cwd, env names, never a value,
-  and the mtimes of mcp.json, plugin.json and his typed-in secrets; 24 h
-  TTL). A miss: one bridge starts it, lists, stops it and writes the
+  session shares (`Home::mcp_tools_cache()`, one file per server spec;
+  24 h TTL). The cache's four rules (architect, t_40590; the holes were
+  found by the mcp-cache-audit page):
+  1. **Writes, cold lists only.** The cache is written by the launch's
+     start-list-stop, or by a real start's `tools/list` taken before its
+     first call is forwarded. A list after `list_changed` or after a call
+     can be that session's own (FastMCP `enable_components`, the TS SDK's
+     enable/disable): it updates that session's index only.
+  2. **The key is what can change the list.** Plugin, server, command,
+     args, cwd, the mtimes of mcp.json and plugin.json, our `initialize`
+     params (`stdio::init_params`), and an HMAC-SHA256 (a per-home salt,
+     `Home::mcp_tools_salt()`, 0600, made on first use) of the env the
+     server starts with: each declared env value resolved as the start
+     does (`secrets::lookup`: the env, then his typed-in secrets) and the
+     inherited env minus `bise_home::env`'s internal and test names, the
+     per-agent temp names (`env::PER_CHILD_NAMES`) and the bridge's
+     `/bin/sh` names (`tools_cache::SHELL_NAMES`). A token or a
+     `GITHUB_TOOLSETS` from the hub's env is in it (GitHub filters its
+     tools by a classic PAT's scopes at startup); every agent of one hub
+     shares one key; a hub restarted from another shell pays one cold
+     start. A value is never stored or logged, only the hash. The env is
+     not stripped (`env_clear`): users rely on inherited tokens.
+  3. **A stale list is fixed once.** A `tools/call` answered -32602
+     (`tools_cache::UNKNOWN_TOOL`, read from the typed code, never the
+     text) lists that server again for the session (its index follows);
+     the cache entry is dropped only when the called tool is missing from
+     the fresh list (a bad argument keeps it), so the next cold start
+     writes it again. The call gets the server's error plus `its tools
+     now: ...` (at most `bridge::NAMES_SHOWN`, then `and N more`). Once
+     per call, never a retry loop.
+  4. **The shared host** (Later, below) is keyed by this key.
+  A miss: one bridge starts it, lists, stops it and writes the
   cache under the key's flock; the other cold bridges wait at most the
   server's startup timeout, then read the list (or leave the server out,
-  logged). The first call starts it; every real start lists again and
-  rewrites the cache and the index. No call for 10 min
+  logged). The first call starts it, lists it (rule 1) and only then
+  forwards the call. No call for 10 min
   (`tools_cache::IDLE_STOP`): stopped, the next call starts it again, so
   a server that keeps state between calls loses it then. Its status
   (`status::Status::idle`) says listed, not running (the Plugins list:
@@ -634,7 +662,8 @@ never stalls main's first call).
 - **`tools/list`** follows `nextCursor`. On
   `notifications/tools/list_changed` (remote or stdio) the bridge lists
   that server again and rewrites `D/mcp-index.txt` (the REPL reads it at
-  each search and call).
+  each search and call): that session's index only, never the shared
+  tools cache (its rule 1).
 - **Errors** are one line naming the host: `mcp.example.com refused the
   connection`, `HTTP 403 from mcp.example.com: forbidden`,
   `mcp.example.com answered 401: it needs a login or a token in
@@ -791,7 +820,10 @@ never stalls main's first call).
   `Paths` (the hub dir), handed over in an internal env var row. Only a
   server that declares itself shareable (a `dev.bise` manifest flag,
   default per session) is shared: one with per-session state
-  (PLUGIN_DATA, cwd, a login) stays per session.
+  (PLUGIN_DATA, cwd, a login) stays per session. Its key is the tools
+  cache's key (rule 2 above); "shareable" also means it sends no
+  `list_changed` after a call; the host forwards a `list_changed` to
+  every bridge it serves.
 - An inbox item when a remote server needs a login.
 - `ai.mistral.vibe` extension: `toolNamespace`, `toolOverrides`.
 - A `/plugins` picker with per-server toggles (mcp.json's `"enabled":

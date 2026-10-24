@@ -419,12 +419,15 @@ pub fn session_note(path: &str, workspace: &Path) -> String {
 /// `TMUX_TMPDIR` only when a tmux socket fits there: tmux puts it at
 /// `<realpath>/tmux-<uid>/<name>` and a unix socket path is at most 103
 /// bytes on macOS; a folder too deep leaves tmux on /tmp, as before.
+/// The four names are `bise_home::env::PER_CHILD_NAMES`, the one list of
+/// them (the plugins' tools cache leaves them out of its key).
 pub fn temp_env(tmp: &Path, run: &Path) -> Vec<(&'static str, PathBuf)> {
-    let mut keys = vec!["TMPDIR", "TMP", "TEMP"];
-    if tmux_fits(tmp) {
-        keys.push("TMUX_TMPDIR");
-    }
-    let mut v: Vec<(&'static str, PathBuf)> = keys.into_iter().map(|k| (k, tmp.to_path_buf())).collect();
+    let fits = tmux_fits(tmp);
+    let mut v: Vec<(&'static str, PathBuf)> = bise_home::env::PER_CHILD_NAMES
+        .iter()
+        .filter(|k| fits || **k != "TMUX_TMPDIR")
+        .map(|k| (*k, tmp.to_path_buf()))
+        .collect();
     v.push(("BEND_BG_DIR", bise_home::hub_state::bg_dir_of_tmp(tmp)));
     v.push(("BEND_AGENT_RUN", run.to_path_buf()));
     v
@@ -588,6 +591,14 @@ mod tests {
         assert_eq!(get("TMUX_TMPDIR"), tmux_fits(&t).then(|| t.clone()));
         assert_eq!(get("BEND_BG_DIR"), Some(t.join("bg")));
         assert_eq!(get("BEND_AGENT_RUN"), Some(r.clone()));
+        // per agent and not bise's: only PER_CHILD_NAMES (the tools
+        // cache's key leaves exactly those out); the rest are registered
+        for (k, _) in &env {
+            assert!(
+                bise_home::env::PER_CHILD_NAMES.contains(k) || bise_home::env::kind(k) == Some(bise_home::env::Kind::Internal),
+                "{k} is set per agent but is neither in PER_CHILD_NAMES nor an internal bise name"
+            );
+        }
         let _ = std::fs::remove_dir_all(&d);
     }
 

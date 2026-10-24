@@ -16,6 +16,14 @@ use crate::resolve::StdioServer;
 
 pub const PROTOCOL: &str = "2025-06-18";
 
+/// The params of our `initialize`: what a server may answer by (its
+/// tools too), so the tools cache's key holds them
+/// (`crate::tools_cache::key`).
+pub fn init_params() -> Value {
+    json!({"protocolVersion": PROTOCOL, "capabilities": {},
+           "clientInfo": {"name": "bend-harness", "version": "1.0"}})
+}
+
 type Pending = Arc<Mutex<HashMap<u64, Sender<Value>>>>;
 
 pub struct Client {
@@ -130,12 +138,7 @@ impl Client {
             next: Mutex::new(1),
             init: Value::Null,
         };
-        let init = c.request(
-            "initialize",
-            json!({"protocolVersion": PROTOCOL, "capabilities": {},
-                   "clientInfo": {"name": "bend-harness", "version": "1.0"}}),
-            timeout,
-        );
+        let init = c.request("initialize", init_params(), timeout);
         match init {
             Ok(v) => c.init = v,
             Err(e) => {
