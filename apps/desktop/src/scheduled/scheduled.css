@@ -1,10 +1,12 @@
 /* src/scheduled (amb-kit): the scheduled screen (desktop-screens v6, designer m_11837). ds tokens only. */
 .sch-screen { display: flex; height: 100%; min-height: 0; outline: none; }
 .sch-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: var(--s-5) var(--pad-column) 0; box-sizing: border-box; container-type: inline-size; container-name: sch-list; }
-.sch-main > .b-hero { flex: none; }
+/* the hero, the search and the list in one scroller, the key line under it (designer m_39330) */
+.sch-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.sch-scroll > * { flex: none; }
 /* one left edge (designer m_21274): the heads, the row text and the key line sit on the title's edge;
    the list runs --pad-row-x out on both sides so a row's tint and hover hang 8 px past the content */
-.sch-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 calc(-1 * var(--pad-row-x)); }
+.sch-list { margin: 0 calc(-1 * var(--pad-row-x)); }
 /* 'what it does' (the names) is never dropped: it keeps 140 px; when the list narrows (a task's pane
    open at 1100, a small window) 'how often' goes first, then 'next run', then 'wakes', which is cut
    with … before it goes (designer m_16028, f5ff0e72's red) */

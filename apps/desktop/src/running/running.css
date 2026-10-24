@@ -1,7 +1,9 @@
 /* src/running: the running screen (designer's running-procs). ds tokens only, 4 px grid, no accent. */
 .run-screen { display: flex; height: 100%; min-height: 0; outline: none; }
 .run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: var(--s-5) var(--pad-column) 0; box-sizing: border-box; }
-.run-main > .b-hero { flex: none; }
+/* the hero, the filters and the list in one scroller (designer m_39330: the hero scrolls away) */
+.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.run-scroll > * { flex: none; }
 .run-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--gap-block); margin-bottom: var(--s-2); }
 .run-filters { display: flex; gap: var(--s-1); }
 .run-filter { height: var(--h-control-sm); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: 999px; background: transparent; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
@@ -10,7 +12,7 @@
 .run-search { width: 220px; }
 .run-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }
 /* one left edge: the heads and the row text on the title's; rows hang 8 px past for their tint */
-.run-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 calc(-1 * var(--pad-row-x)); padding-bottom: var(--s-4); }
+.run-list { margin: 0 calc(-1 * var(--pad-row-x)); padding-bottom: var(--s-4); }
 .run-group + .run-group { margin-top: var(--s-3); }
 .run-ghead { min-height: var(--h-row-tight); display: flex; align-items: center; gap: var(--s-1); padding: 0 var(--pad-row-x); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
 .run-gsep { font-weight: 400; }

@@ -25,7 +25,7 @@ export interface ScheduledPorts {
 export function ScheduledScreen() {
   const store = useStore();
   const tasks = useAllScheduled();
-  useKeptScroll('scheduled', () => document.querySelector<HTMLElement>('[data-testid="scheduled.list"]'));
+  useKeptScroll('scheduled', () => document.querySelector<HTMLElement>('[data-testid="scheduled.scroll"]'));
   return (
     <ScheduledView
       tasks={tasks}
@@ -107,6 +107,8 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
       onKeyDown={onKeyDown}
     >
       <div className="sch-main">
+        {/* one scroller: the hero scrolls away with the list (designer m_39330), the key line stays */}
+        <div className="sch-scroll" data-testid="scheduled.scroll">
         <PageHero name={scheduled.heading} sentence={hero.scheduled_say} facts={heroFacts(list, now)} testId="scheduled.hero" />
         {list.length > 0 && (
           <span className="sch-search">
@@ -137,6 +139,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
             ))}
           </div>
         )}
+        </div>
         <div className="sch-keys" data-testid="scheduled.keys">
           <span><b>⏎</b> {scheduled.key_open}</span>
           {ports.runNow && <span><b>r</b> {scheduled.key_run_now}</span>}

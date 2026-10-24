@@ -22,6 +22,10 @@ export const hero = {
   oldest: (a: { age: string | number }): string => "the oldest " + String(a.age) + " ago",
   /** inbox: nothing waits */
   nothing_waits: "nothing waits for you",
+  /** artifacts: how many, `41 artifacts` */
+  artifacts_n: (a: { n: number }): string => a.n === 1 ? String(a.n) + " artifact" : String(a.n) + " artifacts",
+  /** artifacts: none yet */
+  nothing_yet: "nothing yet",
   /** artifacts: how many he hasn't opened yet (the sidebar's 'new'), `3 new` */
   new_ones: (a: { n: string | number }): string => String(a.n) + " new",
   /** scheduled: how many still run */
@@ -31,7 +35,7 @@ export const hero = {
   /** agents: how many work now */
   working: (a: { n: string | number }): string => String(a.n) + " working",
   /** agents: how many wait for his answer (the accent) */
-  wait_for_you: (a: { n: number }): string => a.n === 1 ? "1 waits for you" : String(a.n) + " wait for you",
+  wait_for_you: (a: { n: number }): string => a.n === 1 ? String(a.n) + " waits for you" : String(a.n) + " wait for you",
   /** archived: how many */
   archived: (a: { n: string | number }): string => String(a.n) + " archived",
   /** archived: the age of the newest, `the newest 2 h ago` */

@@ -23,7 +23,7 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const all = useAllArtifacts();
   const projects = useProjects();
   // back from an open artifact (esc, ‹): the list where he left it (designer's desktop-history)
-  useKeptScroll(`artifacts:${project}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.list"]'));
+  useKeptScroll(`artifacts:${project}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.scroll"]'));
   const [f, setF] = useState<Filter>({ ...ALL, project });
   const [now] = useState(() => Date.now());
   // the archived ones leave the list behind a faint 'N archived' row; a (or a click) shows them
@@ -96,6 +96,8 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   };
   return (
     <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} onKeyDown={onKeyDown}>
+      {/* one scroller: the hero scrolls away with the list (designer m_39330) */}
+      <div className="art-scroll" data-testid="artifacts.scroll">
       <PageHero name={archivedOn ? 'artifacts · archived' : 'artifacts'} sentence={hero.artifacts_say} facts={heroFacts(splitArchived(all).live)} testId="artifacts.hero" />
       <div className="art-filters">
         <Dropdown label={f.project === '' ? 'all projects' : projectName} testId="artifacts.projects"
@@ -137,6 +139,7 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
           <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={open} onLook={look} onPut={putIt} form="screen" testId="artifacts.list" />
         )}
       </AddDrop>
+      </div>
       {!archivedOn && archived.length > 0 && (
         <Press look="art-archived" onClick={() => { showArchived(true); }} data-testid="artifacts.archived">
           {archived.length} archived

@@ -34,7 +34,7 @@ export interface RunningPorts {
 export function RunningScreen() {
   const store = useStore();
   const items = useAllProcesses();
-  useKeptScroll('running', () => document.querySelector<HTMLElement>('[data-testid="running.list"]'));
+  useKeptScroll('running', () => document.querySelector<HTMLElement>('[data-testid="running.scroll"]'));
   const ports: RunningPorts = useMemo(
     () => ({
       watch: (on) => {
@@ -182,6 +182,8 @@ export function RunningView({
   return (
     <section ref={ref} className={`run-screen${cur ? ' has-pane' : ''}`} data-testid="running.screen" tabIndex={-1} onKeyDown={onKeyDown}>
       <div className="run-main">
+        {/* one scroller: the hero scrolls away with the list (designer m_39330) */}
+        <div className="run-scroll" data-testid="running.scroll">
         <PageHero
           name={running.heading}
           sentence={hero.processes_say}
@@ -269,6 +271,7 @@ export function RunningView({
             ))}
           </div>
         )}
+        </div>
       </div>
       {cur && (
         <Pane

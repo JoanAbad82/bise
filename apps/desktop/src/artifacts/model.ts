@@ -117,10 +117,12 @@ export const ALL: Filter = { project: '', agent: '', kinds: [], q: '' };
 /** Archived by him or an agent (art-archive's archived_at): out of the default list, behind 'N archived'. */
 export const isArchived = (a: Artifact): boolean => a.archived_at != null;
 
-/** The hero's facts line (designer m_39021): how many, and how many he hasn't opened, '41 · 3 new'. Pure. */
+/** The hero's facts line (designer m_39021, m_39330): how many, and how many he hasn't opened, '41 artifacts · 3 new'. Pure. */
 export function heroFacts(live: readonly Item[]): string {
+  if (live.length === 0) return hero.nothing_yet;
   const fresh = live.filter((it) => it.a.new).length;
-  return fresh === 0 ? String(live.length) : `${String(live.length)} · ${hero.new_ones({ n: fresh })}`;
+  const n = hero.artifacts_n({ n: live.length });
+  return fresh === 0 ? n : `${n} · ${hero.new_ones({ n: fresh })}`;
 }
 
 /** The list's items and how many archived ones it leaves behind (the TUI's faint '2 archived' row). Pure. */

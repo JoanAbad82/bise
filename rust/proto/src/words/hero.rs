@@ -28,6 +28,10 @@ crate::words! { hero:
     oldest(age) = "the oldest {age} ago";
     /// inbox: nothing waits
     nothing_waits = "nothing waits for you";
+    /// artifacts: how many, `41 artifacts`
+    artifacts_n(n) = one "{n} artifact" | "{n} artifacts";
+    /// artifacts: none yet
+    nothing_yet = "nothing yet";
     /// artifacts: how many he hasn't opened yet (the sidebar's 'new'), `3 new`
     new_ones(n) = "{n} new";
     /// scheduled: how many still run
@@ -37,7 +41,7 @@ crate::words! { hero:
     /// agents: how many work now
     working(n) = "{n} working";
     /// agents: how many wait for his answer (the accent)
-    wait_for_you(n) = one "1 waits for you" | "{n} wait for you";
+    wait_for_you(n) = one "{n} waits for you" | "{n} wait for you";
     /// archived: how many
     archived(n) = "{n} archived";
     /// archived: the age of the newest, `the newest 2 h ago`

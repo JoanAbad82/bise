@@ -17,6 +17,13 @@
     "one": null,
     "text": "agents whose work is done. their threads stay here to read; restore one to talk to it again."
   },
+  "hero.artifacts_n": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} artifact",
+    "text": "{n} artifacts"
+  },
   "hero.artifacts_say": {
     "args": [],
     "one": null,
@@ -53,6 +60,11 @@
     "one": null,
     "text": "nothing waits for you"
   },
+  "hero.nothing_yet": {
+    "args": [],
+    "one": null,
+    "text": "nothing yet"
+  },
   "hero.oldest": {
     "args": [
       "age"
@@ -81,7 +93,7 @@
     "args": [
       "n"
     ],
-    "one": "1 waits for you",
+    "one": "{n} waits for you",
     "text": "{n} wait for you"
   },
   "hero.waiting": {

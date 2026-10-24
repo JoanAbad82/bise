@@ -137,6 +137,13 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
   const none = lists.order.length === 0;
   return (
     <section ref={ref} tabIndex={-1} className="ip-screen" data-testid="inbox.screen" onKeyDown={onKeyDown}>
+      {/* one scroller: the hero and the filters scroll away with the list (designer m_39330); the
+          key line stays at the screen's foot */}
+      <div className="ip-scroll" data-testid="inbox.scroll"
+        onScroll={onEnd === undefined ? undefined : (e) => {
+          const el = e.currentTarget;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) onEnd();
+        }}>
       <PageHero name={inbox.head} sentence={hero.inbox_say} facts={<>{facts.wait !== undefined && <><HeroWait>{facts.wait}</HeroWait>{' · '}</>}{facts.rest}</>} testId="inbox.hero" />
       {(
         <div className="ip-filters">
@@ -184,11 +191,7 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
       ) : none ? (
         <div className="ip-empty" data-testid="inbox.none">{inbox.screen_none}</div>
       ) : (
-        <div className="ip-list" role="listbox" data-testid="inbox.list"
-          onScroll={onEnd === undefined ? undefined : (e) => {
-            const el = e.currentTarget;
-            if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) onEnd();
-          }}>
+        <div className="ip-list" role="listbox" data-testid="inbox.list">
           {lists.waiting.length > 0 && (
             <>
               <div className="ip-day-h ip-wait-h" data-testid="inbox.waiting.head">{inbox.list_waiting({ n: lists.waiting.length })}</div>
@@ -215,6 +218,7 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
           onClose={() => { setPaned(false); ref.current?.focus({ preventScroll: true }); }}
           {...(ports.openPage === undefined ? {} : { onPage: ports.openPage })} />
       )}
+      </div>
       </div>
       <div className="ip-keys" data-testid="inbox.keys">
         {cur ? (
