@@ -1,8 +1,8 @@
 // The objects' builders' kit (bims-plugins plan p1): a plugin is a real thing in the bims' office.
 // Each object is built at the origin on the floor (y 0), its front to +z (the camera sees +z and +x),
 // centred on its foot, in the office's clay look (style.ts), with a soft contact shadow under it.
-// Off (a disabled plugin): the same object in glass where it stood, in one neutral (ink, no hue:
-// designer m_40518), 30% opacity, no shadow cast and no contact shadow, one flat layer (its depth
+// Off (a disabled plugin): the same object in glass where it stood, in one neutral, the theme's text
+// (ink by day, cream at night: designer m_40518, m_40667), 30% opacity, no shadow cast and no contact shadow, one flat layer (its depth
 // pre-pass, glassDepth: designer m_40607). A wall object (the calendar) hangs with its back on z = -d/2.
 //
 // A family file (games.ts, music.ts, ...) only builds with a Part: a box, a cylinder, a ball, a cone,
@@ -98,9 +98,16 @@ export function glassDepth(root: Object3D): void {
 }
 
 /** a shared material: `opacity` a see-through one (glass, water), `glow` its emissive strength (never in glass) */
-function mat(colour: string, off: boolean, glow: number, opacity?: number): Material {
+/** night glass: the night theme's text cream (tokens.css --p-text, dark), so an off object is a pale ghost on the night floor (designer m_40667) */
+export const NIGHT_GLASS = '#ece6da';
+
+/** an off object's one colour: the theme's text, ink by day, cream at night; null: not off */
+export const glassOf = (o: Pick<ObjOpts, 'off' | 'night'>): string | null => (o.off ? (o.night >= 0.5 ? NIGHT_GLASS : INK) : null);
+
+function mat(colour: string, glass: string | null, glow: number, opacity?: number): Material {
   // glass loses its hue: one neutral for every part, so it reads off, not faded (designer m_40518)
-  const color = off ? INK : colour;
+  const off = glass !== null;
+  const color = glass ?? colour;
   const op = opacity ?? (off ? GLASS : undefined);
   const ei = off ? 0 : glow;
   const key = `${color}|${op ?? 1}|${ei}`;
@@ -142,12 +149,12 @@ export function partOf(root: Object3D, o: ObjOpts): Part {
   return {
     root,
     o,
-    box: (w, h, d, color, x, y, z, r, glow = 0) => put(new Mesh(STYLE.box(w, h, d, r), mat(color, o.off, glow)), x, y, z, true),
-    cyl: (r, h, color, x, y, z, glow = 0) => put(new Mesh(STYLE.cylinder(r, h), mat(color, o.off, glow)), x, y, z, true),
-    ball: (r, color, x, y, z, glow = 0) => put(new Mesh(STYLE.ball(r), mat(color, o.off, glow)), x, y, z, true),
-    cone: (r, h, color, x, y, z) => put(new Mesh(new ConeGeometry(r, h, 12), mat(color, o.off, 0)), x, y, z, true),
+    box: (w, h, d, color, x, y, z, r, glow = 0) => put(new Mesh(STYLE.box(w, h, d, r), mat(color, glassOf(o), glow)), x, y, z, true),
+    cyl: (r, h, color, x, y, z, glow = 0) => put(new Mesh(STYLE.cylinder(r, h), mat(color, glassOf(o), glow)), x, y, z, true),
+    ball: (r, color, x, y, z, glow = 0) => put(new Mesh(STYLE.ball(r), mat(color, glassOf(o), glow)), x, y, z, true),
+    cone: (r, h, color, x, y, z) => put(new Mesh(new ConeGeometry(r, h, 12), mat(color, glassOf(o), 0)), x, y, z, true),
     pane: (w, h, d, color, opacity, x, y, z, r, glow = 0) =>
-      put(new Mesh(STYLE.box(w, h, d, r), mat(color, o.off, glow, o.off ? Math.min(opacity, GLASS) : opacity)), x, y, z, false),
+      put(new Mesh(STYLE.box(w, h, d, r), mat(color, glassOf(o), glow, o.off ? Math.min(opacity, GLASS) : opacity)), x, y, z, false),
     at(x, y, z) {
       const g = new Group();
       g.position.set(x, y, z);
@@ -158,7 +165,7 @@ export function partOf(root: Object3D, o: ObjOpts): Part {
       if (o.off) return;
       // two layers (a soft edge), their tops apart (a box is 0.01 tall at least, style.ts)
       for (const [k, dw, y, op] of [[1, 0.12, 0.004, 0.13], [0.85, 0, 0.011, 0.12]] as const) {
-        const m = new Mesh(STYLE.box(w * k + dw, 0.004, d * k + dw, Math.min(w, d) * 0.4 * k), mat(INK, false, 0, op));
+        const m = new Mesh(STYLE.box(w * k + dw, 0.004, d * k + dw, Math.min(w, d) * 0.4 * k), mat(INK, null, 0, op));
         m.position.set(x, y, z);
         m.userData.contact = true;
         root.add(m);

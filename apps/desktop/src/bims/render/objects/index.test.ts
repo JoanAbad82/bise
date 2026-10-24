@@ -9,7 +9,7 @@ import { Box3, type Material, Mesh, type MeshStandardMaterial, type Object3D } f
 import { describe, expect, it } from 'vitest';
 import { coplanarClashes } from '../coplanar';
 import { readsAsAttention } from '../palette.testkit';
-import { GLASS, INK } from './kit';
+import { GLASS, INK, NIGHT_GLASS } from './kit';
 import { COMPACT, familyOf, FAMILIES, MAKER_IDS, makeObject, type MakeOpts, OBJ_IDS, type ObjId } from './index';
 
 /** float noise and a rounded edge */
@@ -130,9 +130,13 @@ describe('objects', () => {
         for (const mat of mats(m)) {
           expect(mat.transparent && mat.opacity <= GLASS + 1e-6, `opacity ${mat.opacity}`).toBe(true);
           expect((mat as MeshStandardMaterial).emissiveIntensity, 'glows in glass').toBe(0);
-          // glass loses its hue: one neutral, ink (designer m_40518)
-          expect('#' + (mat as MeshStandardMaterial).color.getHexString(), 'a hue in glass').toBe(INK);
+          // glass loses its hue: one neutral, the night text cream at night (designer m_40518, m_40667)
+          expect('#' + (mat as MeshStandardMaterial).color.getHexString(), 'a hue in glass').toBe(NIGHT_GLASS);
         }
+      }
+      // by day the glass is ink
+      for (const m of meshes(makeObject(id, { off: true, night: 0 }).group).filter((x) => x.userData.depth !== true)) {
+        for (const mat of mats(m)) expect('#' + (mat as MeshStandardMaterial).color.getHexString(), 'day glass').toBe(INK);
       }
       // on the floor, a contact shadow under it (nothing floats); a wall object hangs, none
       const made = makeObject(id);
