@@ -86,10 +86,45 @@ the bodies marked `todo!("plugins chunk ...")` come with their chunk.
   `StateV2::is_on(&id, opt_in)`, `StateV2::locked(&id)` (`skills:bise`
   and its parts: always on, `set` refuses to turn them off). See
   "Enable state" below.
-- **Connectors** (`bend_plugins::connectors`, chunk "connectors"):
-  `BUILTINS`, `TTL_MS`, `Catalog`, `load(cache, key, now_ms, force)`,
-  `index_lines(&Catalog, &StateV2)`, `connect_url(key, &id)`. Cache:
-  `Home::connectors_cache()` (`~/.bise/connectors/bootstrap.json`).
+- **Connectors** (`bend_plugins::connectors`, landed): the one owner of
+  Mistral's catalog for every agent and the UI. `load(cache, key,
+  now_ms, force)` fetches `GET /v1/connectors/bootstrap?supports_mcp=true
+  &include_auth_actionable_connectors=true&builtin_connectors=…` (one
+  param per `BUILTINS`: web_search, image_generation) when the cache is
+  older than `TTL_MS` (10 min), under the cache's flock (two bridges
+  never fetch at once; the second reads the fresh file), through a tmp
+  file. A failed fetch (no answer, a non-200, a body with no
+  `connectors` list) keeps the last good connectors, sets
+  `Catalog::error` (`Problem::Fetch`) and is not tried again for
+  `FAIL_BACKOFF_MS` (30 s) unless forced. `cached(cache)`: the file as
+  is, no network (a list that opens now). `key() -> Key`: auth.json's
+  `mistral` API key, else `MISTRAL_API_KEY`, else `NoKey`; auth.json in
+  a locked keychain is `Locked` (never "no key": `load` keeps the
+  cache, writes nothing and says `Problem::Locked`). Never in the
+  cache. Each connector is a `ConnectorEntry` (name = its alias:
+  vibe's normalize, then `_2`, `_3` against the earlier aliases;
+  `auth` Ready, OAuth, NoAuthConnect, CredentialsSetup, or Unknown: not
+  ready and no auth_action bise knows, not connectable from bise; each
+  tool's input schema as serde_json's compact text, keys sorted).
+  `index_lines(&Catalog, &StateV2)`: the ready connectors' tools minus
+  an off connector or tool, in the index format
+  `<cid> <alias> <tool> : #<desc>[ | input: <schema>]`, with bise's
+  note after image_generation's descriptions (`IMAGE_NOTE`); the same
+  lines as `mcp.bend` wrote (`connectors/fixtures/index.txt`, a schema
+  compared as JSON: a float may be written another way), except two
+  bug fixes: a not-ready connector lists no tool (mcp.bend wrote them
+  with an empty alias) and no two connectors share an alias (mcp.bend
+  gave `a_2` twice for `a`, `a`, `a_2`).
+  `connect(&World, &id)` (`bise plugins connect mistral:<name>`, his
+  click; `connect_now` runs it on the caller's own thread, never a draw
+  or core loop): an OAuth or credentials connector opens
+  `GET /v1/connectors/{id}/auth_url`'s `auth_url` (`BISE_OPEN`, else
+  the system opener), a no-auth one POSTs his default connection
+  (`/v1/connectors/{id}/user/credentials`); then a forced fetch every
+  3 s until it is ready, 5 min at most. `bise plugins refresh`: a
+  forced fetch. `BISE_MISTRAL_URL`: a fake Mistral in tests
+  (`tests/fake_bootstrap.py`). Cache: `Home::connectors_cache()`
+  (`~/.bise/connectors/bootstrap.json`).
 - **List** (`bend_plugins::catalog::rows(&Inputs) -> Vec<app_rows::Plugin>`,
   chunk "catalog + hub"): pure; the TUI and the desktop's core call it in
   their own process.

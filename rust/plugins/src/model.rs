@@ -33,6 +33,9 @@ pub enum ConnectorAuth {
     NoAuthConnect,
     /// credentials typed on Mistral's page (`credentials_setup`)
     CredentialsSetup,
+    /// not ready, and no `auth_action` bise knows: not connectable from
+    /// bise
+    Unknown,
 }
 
 /// A tool of a connector or an MCP server, as the session's tool index

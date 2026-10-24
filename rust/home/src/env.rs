@@ -151,6 +151,7 @@ pub const VARS: &[Var] = &[
     test("BISE_HOME_WORKSPACE", "bise's home workspace (tests); a hub passes it to its agents"),
     user("BISE_HYPERLINKS", "terminal hyperlinks on or off"),
     user("BISE_IDLE_EXIT", "how long a hub without a UI waits before it quits"),
+    test("BISE_MISTRAL_URL", "Mistral's API base for the connectors' catalog and connect (a fake Mistral in tests)"),
     user("BISE_MODEL", "the main model"),
     internal("BISE_MODELS_FILE", "the merged model catalog, for the REPLs"),
     user("BISE_NO_MIGRATE", "never move ~/.bend-harness to ~/.bise"),

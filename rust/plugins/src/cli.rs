@@ -14,6 +14,8 @@ pub const USAGE: &str = "usage:
   bise plugins marketplace [list|add URL|remove URL|show URL]
   bise plugins login [SERVER]   log in to a remote MCP server in the browser (no SERVER: the list)
   bise plugins logout SERVER    forget its tokens
+  bise plugins refresh          fetch your Mistral connectors' catalog now
+  bise plugins connect mistral:NAME   connect a Mistral connector (its page opens in your browser)
   bise plugins serve --dir DIR [--workspace DIR] [--parent PID]   (internal: the session bridge)
 
 Roots: bise's built-in plugins (<app root>/plugins), ~/.agents/plugins (or $BEND_PLUGINS_HOME)
@@ -90,6 +92,8 @@ pub fn main(args: &[String]) -> i32 {
                 }
             }
         }
+        "refresh" => crate::connectors::main_refresh(),
+        "connect" => crate::connectors::main_connect(args.get(1).map(String::as_str)),
         "login" | "logout" => crate::login::main(&args[1..], &workspace(args), sub == "logout"),
         "add" => crate::add::main(&args[1..]),
         "marketplace" => crate::marketplace::main(&args[1..]),
