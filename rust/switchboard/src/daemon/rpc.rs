@@ -241,7 +241,7 @@ impl Shell {
         }
         crate::util::timing(&format!("rpc initialize from {} {}", p.client.name, p.client.version));
         self.rpc.conns.insert(id, Conn { init: true, ..Default::default() });
-        self.proto.typed(id, p.reads_archived_list());
+        self.proto.typed(id);
         let ws = self.opts.paths.workspace.clone();
         let result = InitializeResult {
             project: self.project(),

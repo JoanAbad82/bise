@@ -49,10 +49,6 @@ pub(super) struct Proto {
     /// the last `agents` (the live rows, agents-light) and `cards` sent
     /// (sent again only when changed)
     last: (String, String),
-    /// the last full `agents` (archived rows inside) sent to the older
-    /// clients. TODO(agents-full-archived): goes in a later release with
-    /// the shape (tests/shims.txt)
-    full: String,
     /// the agents' statuses and folders at the last `worktrees` scan
     worktrees: String,
     /// the last `jobs` sent (S10: sent again only when changed)
@@ -110,9 +106,6 @@ struct Stepping {
 struct Conn {
     /// its subscribed threads, by agent
     subs: BTreeMap<String, Live>,
-    /// agents-light: it said `capabilities.archived_list` (else the
-    /// older full shape)
-    light: bool,
     /// the archived list it got last (its hash; none yet: the next
     /// agents event carries it)
     archived: Option<u64>,
@@ -125,16 +118,15 @@ impl Proto {
     }
 
     /// A JSON-RPC connection after `initialize`: it gets typed events.
-    pub(super) fn typed(&mut self, id: ClientId, light: bool) {
-        self.conns.entry(id).or_default().light = light;
+    pub(super) fn typed(&mut self, id: ClientId) {
+        self.conns.entry(id).or_default();
     }
 
     /// agents-light: the archived list for connection `id` when it hasn't
     /// got this one yet (always on its first agents event), and notes it
-    /// sent; `None`: it has it. An older client: always none (its rows are
-    /// in `agents`).
+    /// sent; `None`: it has it.
     fn archived_for(&mut self, id: ClientId, list: &[bise_proto::rows::ArchivedAgent], hash: u64) -> Option<Vec<bise_proto::rows::ArchivedAgent>> {
-        let c = self.conns.get_mut(&id).filter(|c| c.light)?;
+        let c = self.conns.get_mut(&id)?;
         (c.archived != Some(hash)).then(|| {
             c.archived = Some(hash);
             list.to_vec()
@@ -147,16 +139,6 @@ impl Proto {
         if let Some(c) = self.conns.get_mut(&id) {
             c.archived = None;
         }
-    }
-
-    /// Whether some connection reads the older full shape.
-    fn any_full(&self) -> bool {
-        self.conns.values().any(|c| !c.light)
-    }
-
-    /// Connection `id` reads the light shape.
-    fn light(&self, id: ClientId) -> bool {
-        self.conns.get(&id).is_some_and(|c| c.light)
     }
 }
 
@@ -343,12 +325,11 @@ mod tests {
     /// agents-light (architect m_37000 2., m_37220 1.): a light
     /// connection's first agents event carries the list, a live tick with
     /// the same list doesn't, a changed one does, a resync (hub/read) does
-    /// again; an older client never gets the list (its rows are in full).
+    /// again; a connection that never said `initialize` gets nothing.
     #[test]
     fn the_archived_list_goes_once_per_change_and_on_each_first_event() {
         let mut p = Proto::default();
-        p.typed(1, true);
-        p.typed(2, false);
+        p.typed(1);
         let list = vec![row("old")];
         assert_eq!(p.archived_for(1, &list, 7), Some(list.clone()), "its first: the list");
         assert_eq!(p.archived_for(1, &list, 7), None, "a usage tick: unchanged, not resent");
@@ -358,7 +339,6 @@ mod tests {
         assert_eq!(p.archived_for(1, &two, 8), Some(two), "hub/read: again");
         p.forget_archived(1);
         assert_eq!(p.archived_for(1, &[], 0), Some(vec![]), "an empty list is said too");
-        assert_eq!(p.archived_for(2, &list, 7), None, "an older client: never the list");
-        assert!(p.any_full() && p.light(1) && !p.light(2));
+        assert_eq!(p.archived_for(2, &list, 7), None, "not a typed connection: nothing");
     }
 }
