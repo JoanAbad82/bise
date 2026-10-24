@@ -20,6 +20,7 @@ import { absolute } from './paths';
 import { FoldsContext } from './folds';
 import { FindMarkContext } from './findmark';
 import { GapRow, isGapKey, withGap } from './gap';
+import { SyncCue } from './syncCue';
 import { useGoArtifact } from '@/artifacts/leave';
 import { IntroRow } from '@/welcome/Welcome';
 import { introShows } from '@/welcome/rule';
@@ -274,8 +275,15 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
       ))}
     </div>
   );
-  if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
+  // his thread's newest page on its way: the cue under its last row (thread-loading, syncCue.tsx)
+  const cue = <SyncCue tkey={tkey} />;
+  if (!view.loaded && keys.length === 0 && tail === undefined)
+    return (
+      <div className="th-list th-loading" data-testid="thread.loading">
+        {cue}
+      </div>
+    );
   // one list per thread (key): another agent's thread is a new mount, so it opens at its end or
   // where he left it (keep.ts), never with the last thread's scroll, stick or opened rows
-  return <ThreadList key={tkey} ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>{thread.older_messages}</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} onRead={onRead} {...(onReading === undefined ? {} : { onReading })} />;
+  return <ThreadList key={tkey} ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>{thread.older_messages}</Marker>} tail={tail} cue={cue} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} onRead={onRead} {...(onReading === undefined ? {} : { onReading })} />;
 });

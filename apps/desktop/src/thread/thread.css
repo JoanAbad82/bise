@@ -207,6 +207,67 @@
   flex: 1 1 auto;
 }
 
+/* the catching-up cue (thread-loading, syncCue.tsx): his thread's newest page is on its way. Three
+   3 px dots in text-3 under the last row, on the column's left edge, in the band between the list's
+   end and the composer (the list's own 12 px end and its padding): absolute, over the list, never
+   in its layout, so nothing moves when it comes or goes. Shown after 300 ms (a page in time never
+   flashes it), faded out at once; still for reduced motion. */
+.th-sync {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* the band from the last row's end to the list's bottom edge */
+  height: calc(var(--s-thread-end, var(--s-3)) - var(--th-row-end));
+  width: var(--th-col, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  /* over the bottom fade, under the '↓ back to the bottom' pill */
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+.th-sync[data-on='true'] {
+  opacity: 1;
+  transition: opacity var(--d-base) var(--ease-out) 300ms;
+}
+.th-sync-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.th-sync-dots > i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--c-text-3);
+  animation: th-sync 1.2s var(--ease-io) infinite;
+}
+.th-sync:not([data-on='true']) .th-sync-dots > i {
+  animation-play-state: paused;
+}
+.th-sync-dots > i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.th-sync-dots > i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes th-sync {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .th-sync-dots > i {
+    animation: none;
+  }
+}
+
 /* the list's place: the list fills it; the first-run block over an empty list sits in its middle,
    on the column's axis (the composer's), both ways (his try d94b7996: bottom-left at x 0) */
 .th-main {

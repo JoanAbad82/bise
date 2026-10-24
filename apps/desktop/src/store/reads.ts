@@ -291,6 +291,10 @@ export class StoreReads extends StoreBase {
   threadOrder(key: string): ThreadOrder {
     return this.threads.get(key)?.view ?? EMPTY_ORDER;
   }
+  /** Subscribed, its newest page not in yet: the thread may have newer entries than it shows (thread-loading). */
+  threadSyncing(key: string): boolean {
+    return this.threads.get(key)?.syncing === true;
+  }
   /** The hub's newest answer to ⌘F in thread `key` (findInThread); hits null: the hub can't search (older hub). */
   threadHits(key: string): ThreadHits | null {
     return this.slice<ThreadHits | null>(`hits:${key}`, null);

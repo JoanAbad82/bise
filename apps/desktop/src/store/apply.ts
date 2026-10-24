@@ -272,6 +272,11 @@ export function applyTyped(s: Store, ev: Ev): void {
       // from where he answered and stayed after the hub took it late): the window that sent it gets
       // 'card_refused' for that very card and says so on the card (store.ts cardRefused, refused.ts)
       if (ev.cmd === "answer" || ev.cmd === "close") return;
+      // a refused subscribe (no such agent): no page comes, its thread's cue goes (thread-loading)
+      if (ev.cmd === "subscribe" && ev.project != null) {
+        s.subscribeFailed(ev.project);
+        return;
+      }
       // ⌘F over a whole thread on a hub without thread/find (older): find searches what is loaded
       if (ev.cmd === "find" && ev.project != null) {
         const f = s.finding.get(ev.project);
