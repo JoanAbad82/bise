@@ -4,7 +4,7 @@
 use super::*;
 use crate::ambient::setup::{CuPorts, Done, Entry, KeychainPort, RegistryOp, SetupPorts};
 use bise_home::projects::Row;
-use bise_proto::app_rows::{Account, Plugin, PluginLogin, RoleRow};
+use bise_proto::app_rows::{Account, LoginState, PartKind, Plugin, PluginKind, PluginPart, PluginScope, PluginState, RoleRow};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -135,9 +135,33 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
         }),
         plugins: Box::new(move |ws, pending| {
             let off = j.borrow().plugin_sets.iter().rev().find(|(n, _)| n == "computer").is_none_or(|(_, on)| !on);
-            let login = |name: &str| PluginLogin { name: name.into(), host: "mcp.linear.app".into(), state: if pending.iter().any(|p| p == name) { "pending" } else { "needs" }.into(), tools: None };
-            let p = |name: &str, state: &str, logins| Plugin { name: name.into(), state: state.into(), scope: "user".into(), what: Some(ws.to_string_lossy().into_owned()), logins };
-            vec![p("linear", "loaded", vec![login("linear")]), p("computer", if off { "disabled" } else { "loaded" }, vec![])]
+            let login = |name: &str| PluginPart {
+                id: format!("{name}#mcp:{name}"),
+                kind: PartKind::Mcp,
+                name: name.into(),
+                what: Some("mcp.linear.app".into()),
+                on: true,
+                status: None,
+                login: Some(if pending.iter().any(|p| p == name) { LoginState::Pending } else { LoginState::Needs }),
+                tools: vec![],
+                tool_count: None,
+            };
+            let p = |name: &str, on: bool, parts: Vec<PluginPart>| Plugin {
+                id: name.into(),
+                name: name.into(),
+                kind: PluginKind::Plugin,
+                scope: PluginScope::User,
+                title: name.into(),
+                what: Some(ws.to_string_lossy().into_owned()),
+                icon: None,
+                state: if on { PluginState::Loaded } else { PluginState::Disabled },
+                on,
+                locked: false,
+                action: None,
+                logins: vec![],
+                parts,
+            };
+            vec![p("linear", true, vec![login("linear")]), p("computer", !off, vec![])]
         }),
         plugin_set: Box::new(move |name, on| {
             if name == "nope" {
@@ -450,7 +474,7 @@ fn the_window_lists_toggles_and_logs_in_to_plugins() {
 
     app(&mut t, r#"{"cmd":"plugin_login","name":"linear"}"#);
     let out = t.take();
-    assert_eq!(evs(&out, "plugins")[0]["items"][0]["logins"][0]["state"], "pending");
+    assert_eq!(evs(&out, "plugins")[0]["items"][0]["parts"][0]["login"], "pending");
     app(&mut t, r#"{"cmd":"plugin_login","name":"linear"}"#);
     assert!(evs(&t.take(), "error")[0]["text"].as_str().is_some_and(|e| e.contains("still open")));
     assert_eq!(w.borrow().plugin_logins.len(), 1, "one login at a time");
@@ -460,7 +484,7 @@ fn the_window_lists_toggles_and_logs_in_to_plugins() {
     t.until(|o| !evs(o, "plugins").is_empty());
     let out = t.take();
     assert!(evs(&out, "error")[0]["text"].as_str().is_some_and(|e| e.contains("linear: the browser closed")));
-    assert_eq!(evs(&out, "plugins")[0]["items"][0]["logins"][0]["state"], "needs", "no longer pending");
+    assert_eq!(evs(&out, "plugins")[0]["items"][0]["parts"][0]["login"], "needs", "no longer pending");
 }
 
 /// P.2: computer use's page polls only while open (check), its rows are

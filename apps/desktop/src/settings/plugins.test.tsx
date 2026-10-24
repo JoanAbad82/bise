@@ -10,9 +10,9 @@ import { Plugins } from './plugins';
 afterEach(cleanup);
 
 const items: Plugin[] = [
-  { name: 'docs', state: 'loaded', scope: 'built-in' },
-  { name: 'sheets', state: 'disabled', scope: 'user' },
-  { name: 'old', state: 'shadowed', scope: 'workspace' },
+  { id: 'docs', name: 'docs', kind: 'plugin', title: 'docs', state: 'loaded', on: true, scope: 'built-in' },
+  { id: 'sheets', name: 'sheets', kind: 'plugin', title: 'sheets', state: 'disabled', on: false, scope: 'user' },
+  { id: 'old', name: 'old', kind: 'plugin', title: 'old', state: 'shadowed', on: false, scope: 'workspace' },
 ];
 
 describe('the plugins page', () => {

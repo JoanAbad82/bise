@@ -16,6 +16,17 @@
 {"cmd":"plugins"}
 {"cmd":"plugins","project":"acme-1a2b3c4d"}
 {"cmd":"plugin_set","name":"computer","on":true}
+{"cmd":"plugin_set","project":"acme-1a2b3c4d","name":"mistral:gmail#tool:send_email","on":false}
+{"cmd":"plugin_connect","id":"mistral:notion"}
+{"cmd":"plugins_refresh"}
+{"cmd":"plugins_refresh","project":"acme-1a2b3c4d"}
+{"cmd":"plugin_add","add":{"kind":"mcp","name":"payflows","command":"npx -y payflows-mcp","secrets":["PAYFLOWS_TOKEN"]}}
+{"cmd":"plugin_add","project":"acme-1a2b3c4d","add":{"kind":"mcp","name":"notes","url":"https://notes.example.com/mcp"}}
+{"cmd":"plugin_add","add":{"kind":"import","from":"claude"}}
+{"cmd":"plugin_add","add":{"kind":"folder","path":"/Users/me/plugins/acme"}}
+{"cmd":"plugin_add","add":{"kind":"git","url":"https://github.com/acme/plugins.git","subdir":"plugins/acme"}}
+{"cmd":"plugin_add","add":{"kind":"marketplace","url":"https://github.com/openai/plugins.git"}}
+{"cmd":"plugin_add","add":{"kind":"agent","words":"a plugin that reads our Grafana dashboards"}}
 {"cmd":"plugin_login","name":"linear"}
 {"cmd":"plugin_logout","project":"acme-1a2b3c4d","name":"notes"}
 {"cmd":"computer_use","act":"on"}

@@ -113,39 +113,127 @@ known: boolean, };
 export type AwayProject = { project: string, done: number, questions: number, failed: number, };
 
 /**
- * An agent plugin of his (P.1, the TUI's `/plugins`): bend_plugins'
- * resolution of a workspace, user and built-in plugins included.
+ * One row of the Plugins list (the TUI's `/plugins`, the app's
+ * plugins place): a real plugin, a Mistral connector, a local MCP server
+ * or a skills folder, with its parts. Built by
+ * `bend_plugins::catalog::rows`, its one builder. `id` is a
+ * `bend_plugins::id::PluginId` as written (`docs`, `mistral:gmail`,
+ * `skills:personal`), never split by a reader.
+ *
+ * The wire rule (lib.rs): `name`, `state`, `scope`, `what` and `logins`
+ * keep the meaning v2026.10.2-28 gave them (the released app reads
+ * them); the unified list's facts came on top, each with a default, so a
+ * released line still reads.
  */
-export type Plugin = { name: string, 
+export type Plugin = { 
 /**
- * loaded | disabled | shadowed | invalid
+ * its id as a string (a real plugin's: its name)
  */
-state: string, 
+id: string, 
 /**
- * built-in | user | workspace
+ * what `plugin_set` and the released app take: a real plugin's name,
+ * else its id
  */
-scope: string, what?: string | null, 
+name: string, kind: PluginKind, scope: PluginScope, 
 /**
- * its remote MCP servers that log in (none: nothing to log in to)
+ * what he reads (`Gmail`, `Personal skills`, `docs`)
+ */
+title: string, what?: string | null, 
+/**
+ * its icon's name or address (none: the kind's own)
+ */
+icon?: string | null, state: PluginState, 
+/**
+ * turned on (plugins.json: everything on but the opt-in plugins)
+ */
+on: boolean, 
+/**
+ * not his to turn off (the `skills:bise` folder: pages need it)
+ */
+locked?: boolean, 
+/**
+ * what its button does (none: no button)
+ */
+action?: PluginAction | null, parts?: Array<PluginPart>, 
+/**
+ * its remote MCP servers that log in (the released app's reader;
+ * the same servers are `mcp` parts with their `login`)
  */
 logins?: Array<PluginLogin>, };
 
 /**
- * A plugin's remote MCP server that logs in through his browser.
+ * A plugin's remote MCP server that logs in through his browser (the
+ * released row's).
  */
 export type PluginLogin = { 
 /**
  * what `plugin_login` takes (its id, or plugin/server)
  */
-name: string, host: string, 
-/**
- * needs | in | out | pending (its browser is open)
- */
-state: string, 
+name: string, host: string, state: LoginState, 
 /**
  * its tools, once a session connected it
  */
 tools?: number | null, };
+
+/**
+ * What a Plugins row is (its tag in the list).
+ */
+export type PluginKind = "plugin" | "mistral" | "mcp" | "skills" | "unknown";
+
+/**
+ * Where a Plugins row comes from.
+ */
+export type PluginScope = "built-in" | "user" | "workspace" | "mistral" | "unknown";
+
+/**
+ * Whether a Plugins row loads.
+ */
+export type PluginState = "loaded" | "disabled" | "shadowed" | "invalid" | "available" | "unknown";
+
+/**
+ * What a Plugins row's button does.
+ */
+export type PluginAction = "connect" | "set_up" | "log_in" | "unknown";
+
+/**
+ * A part of a plugin, each turned on or off by its `id` (a
+ * `bend_plugins::id::PluginId` part: `docs#skill:docs`,
+ * `linear#mcp:linear`, `mistral:gmail#tool:send_email`).
+ */
+export type PluginPart = { id: string, kind: PartKind, 
+/**
+ * its own name (a remote server's: what `plugin_login` takes)
+ */
+name: string, what?: string | null, on: boolean, 
+/**
+ * how it is, in his words (`connected · 23 tools`, `needs a login`,
+ * `✗ exited at start: …`)
+ */
+status?: string | null, 
+/**
+ * a remote MCP server that logs in: its login, as data (the buttons
+ * read this, never `status`)
+ */
+login?: LoginState | null, 
+/**
+ * an MCP server's tools (none: not listed yet, or not a server)
+ */
+tools?: Array<PluginPart>, 
+/**
+ * how many tools an MCP server has, once a session connected it
+ * (known before its `tools` are listed)
+ */
+tool_count?: number | null, };
+
+/**
+ * What a plugin part is.
+ */
+export type PartKind = "skill" | "mcp" | "tool" | "unknown";
+
+/**
+ * A remote MCP server's login.
+ */
+export type LoginState = "needs" | "in" | "out" | "pending" | "unknown";
 
 /**
  * A step of computer use's setup (P.2, the TUI's `/computer-use`

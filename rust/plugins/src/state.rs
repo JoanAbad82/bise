@@ -3,10 +3,44 @@
 //! unreadable file means every plugin is enabled. One writer,
 //! [`set_enabled`], under a flock (the TUI and the desktop's core both
 //! toggle).
+//!
+//! v2 (the unified plugins, docs/plugins.md "Contract"): the same file
+//! and lock gain `parts_off` / `parts_on`, read as a
+//! [`StateV2`](crate::model::StateV2) by [`read`], written by [`set`] for
+//! any [`PluginId`], and answered by [`StateV2::is_on`]. Signatures only
+//! until the chunk "state" fills them in and moves the callers of
+//! [`set_enabled`] and [`is_on`] to them (rule 7).
 
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
+
+use crate::id::PluginId;
+use crate::model::StateV2;
+
+/// `plugins.json` as read: its four lists (a missing or unreadable file:
+/// all empty, so everything is on but the opt-in plugins).
+pub fn read(path: &Path) -> StateV2 {
+    let _ = path;
+    todo!("plugins chunk `state`: read disabled, enabled, parts_off, parts_on")
+}
+
+/// Turn a plugin or a part on or off, under the same flock as
+/// [`set_enabled`]; other keys kept. Returns whether the file changed.
+pub fn set(path: &Path, id: &PluginId, on: bool) -> std::io::Result<bool> {
+    let _ = (path, id, on);
+    todo!("plugins chunk `state`: one writer for every PluginId")
+}
+
+impl StateV2 {
+    /// Whether `id` is on: everything is on by default but an opt-in
+    /// plugin (`opt_in`: its manifest's `"dev.bise": {"default": "off"}`);
+    /// a part of a plugin that is off is off.
+    pub fn is_on(&self, id: &PluginId, opt_in: bool) -> bool {
+        let _ = (id, opt_in);
+        todo!("plugins chunk `state`: the on/off rule")
+    }
+}
 
 /// `$BEND_PLUGINS_STATE`, else bise's `plugins.json` (`bise_home`).
 pub fn state_path() -> PathBuf {

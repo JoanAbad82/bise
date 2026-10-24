@@ -2183,12 +2183,12 @@
   "settings.plugins_disabled": {
     "args": [],
     "one": null,
-    "text": "disabled"
+    "text": "turned off"
   },
   "settings.plugins_enabled": {
     "args": [],
     "one": null,
-    "text": "enabled"
+    "text": "turned on"
   },
   "settings.plugins_help": {
     "args": [],
@@ -2260,7 +2260,7 @@
   "settings.plugins_usage": {
     "args": [],
     "one": null,
-    "text": "usage: /plugins [list] | /plugins enable NAME | /plugins disable NAME | /plugins login [NAME] | /plugins logout NAME"
+    "text": "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME"
   },
   "settings.privacy_add": {
     "args": [],

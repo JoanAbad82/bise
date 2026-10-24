@@ -147,35 +147,202 @@ pub struct Found {
     pub known: bool,
 }
 
-/// An agent plugin of his (P.1, the TUI's `/plugins`): bend_plugins'
-/// resolution of a workspace, user and built-in plugins included.
+/// One row of the Plugins list (the TUI's `/plugins`, the app's
+/// plugins place): a real plugin, a Mistral connector, a local MCP server
+/// or a skills folder, with its parts. Built by
+/// `bend_plugins::catalog::rows`, its one builder. `id` is a
+/// `bend_plugins::id::PluginId` as written (`docs`, `mistral:gmail`,
+/// `skills:personal`), never split by a reader.
+///
+/// The wire rule (lib.rs): `name`, `state`, `scope`, `what` and `logins`
+/// keep the meaning v2026.10.2-28 gave them (the released app reads
+/// them); the unified list's facts came on top, each with a default, so a
+/// released line still reads.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Plugin {
+    /// its id as a string (a real plugin's: its name)
+    #[serde(default)]
+    pub id: String,
+    /// what `plugin_set` and the released app take: a real plugin's name,
+    /// else its id
     pub name: String,
-    /// loaded | disabled | shadowed | invalid
-    pub state: String,
-    /// built-in | user | workspace
-    pub scope: String,
+    #[serde(default)]
+    pub kind: PluginKind,
+    pub scope: PluginScope,
+    /// what he reads (`Gmail`, `Personal skills`, `docs`)
+    #[serde(default)]
+    pub title: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub what: Option<String>,
-    /// its remote MCP servers that log in (none: nothing to log in to)
+    /// its icon's name or address (none: the kind's own)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    pub state: PluginState,
+    /// turned on (plugins.json: everything on but the opt-in plugins)
+    #[serde(default)]
+    pub on: bool,
+    /// not his to turn off (the `skills:bise` folder: pages need it)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub locked: bool,
+    /// what its button does (none: no button)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<PluginAction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<PluginPart>,
+    /// its remote MCP servers that log in (the released app's reader;
+    /// the same servers are `mcp` parts with their `login`)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub logins: Vec<PluginLogin>,
 }
 
-/// A plugin's remote MCP server that logs in through his browser.
+/// A plugin's remote MCP server that logs in through his browser (the
+/// released row's).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PluginLogin {
     /// what `plugin_login` takes (its id, or plugin/server)
     pub name: String,
     pub host: String,
-    /// needs | in | out | pending (its browser is open)
-    pub state: String,
+    pub state: LoginState,
     /// its tools, once a session connected it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<u32>,
+}
+
+/// What a Plugins row is (its tag in the list).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PluginKind {
+    /// a folder with a plugin.json
+    #[default]
+    Plugin,
+    /// a connector of his Mistral account
+    Mistral,
+    /// a local MCP server (a plugin folder bise wrote for it)
+    Mcp,
+    /// a folder of loose skills
+    Skills,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
+/// Where a Plugins row comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "kebab-case")]
+pub enum PluginScope {
+    /// shipped with bise
+    BuiltIn,
+    /// his (`~/.agents/...`, `~/.vibe/skills`)
+    User,
+    /// this project's (`<repo>/.agents/...`)
+    Workspace,
+    /// his Mistral account
+    Mistral,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
+/// Whether a Plugins row loads.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PluginState {
+    /// it loads (when on)
+    Loaded,
+    /// turned off
+    Disabled,
+    /// a plugin of the same name wins (workspace over user over built-in)
+    Shadowed,
+    /// its manifest is wrong (the diagnostics say why)
+    Invalid,
+    /// not connected yet: a connector in Browse
+    Available,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
+/// What a Plugins row's button does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PluginAction {
+    /// connect a Mistral connector (`plugin_connect`: his browser, or one
+    /// click)
+    Connect,
+    /// set it up on Mistral's page (credentials)
+    SetUp,
+    /// log in to a remote MCP server (`plugin_login`)
+    LogIn,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
+/// A part of a plugin, each turned on or off by its `id` (a
+/// `bend_plugins::id::PluginId` part: `docs#skill:docs`,
+/// `linear#mcp:linear`, `mistral:gmail#tool:send_email`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PluginPart {
+    pub id: String,
+    pub kind: PartKind,
+    /// its own name (a remote server's: what `plugin_login` takes)
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub what: Option<String>,
+    pub on: bool,
+    /// how it is, in his words (`connected · 23 tools`, `needs a login`,
+    /// `✗ exited at start: …`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// a remote MCP server that logs in: its login, as data (the buttons
+    /// read this, never `status`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<LoginState>,
+    /// an MCP server's tools (none: not listed yet, or not a server)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<PluginPart>,
+    /// how many tools an MCP server has, once a session connected it
+    /// (known before its `tools` are listed)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_count: Option<u32>,
+}
+
+/// What a plugin part is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PartKind {
+    Skill,
+    Mcp,
+    Tool,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
+/// A remote MCP server's login.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum LoginState {
+    /// it said it needs one
+    Needs,
+    /// logged in
+    In,
+    /// not logged in
+    Out,
+    /// its browser is open
+    Pending,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
 }
 
 /// A step of computer use's setup (P.2, the TUI's `/computer-use`

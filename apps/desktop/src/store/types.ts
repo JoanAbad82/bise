@@ -51,6 +51,9 @@ export const TAGS = {
   found: true,
   away_summary: true,
   plugins: true,
+  // a source's plugins to add (the Mistral catalog, a marketplace): known, not applied until
+  // the plugins place reads it (the unified plugins, desktop chunk)
+  browse: true,
   computer_use: true,
   dictation: true,
   voice_mode: true,

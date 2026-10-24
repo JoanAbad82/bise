@@ -1228,16 +1228,16 @@ export const settings = {
   plugins_no_login: "no remote MCP server that logs in (one without an Authorization header in its mcp.json)",
   /** /plugins logout: done */
   plugins_logged_out: (a: { name: string | number }): string => "logged out of " + String(a.name) + ".",
-  /** /plugins enable|disable: done (state: enabled or disabled; unchanged: plugins_unchanged or nothing) */
+  /** /plugins on|off: done (state: turned on or turned off; unchanged: plugins_unchanged or nothing) */
   plugins_set: (a: { name: string | number; state: string | number; unchanged: string | number }): string => String(a.name) + " " + String(a.state) + String(a.unchanged) + " — applies at the next /reload",
   /** a plugin turned on */
-  plugins_enabled: "enabled",
+  plugins_enabled: "turned on",
   /** a plugin turned off */
-  plugins_disabled: "disabled",
+  plugins_disabled: "turned off",
   /** a plugin already in that state */
   plugins_unchanged: " (unchanged)",
   /** /plugins with a wrong argument */
-  plugins_usage: "usage: /plugins [list] | /plugins enable NAME | /plugins disable NAME | /plugins login [NAME] | /plugins logout NAME",
+  plugins_usage: "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME",
   /** release row: the first release */
   release_first: "the first release",
   /** release row: commits since the last tag */

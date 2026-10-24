@@ -62,6 +62,56 @@ fixtures in `vibe_sdk/harness/plugins/`.
 | Hooks, knowledge, agents, views, connectors, libraries | loaded (some broken locally, see the plugin-creator skill) | listed as unsupported |
 | Inspect | `/plugins`, `/reload-plugins` (behind `--experimental-harness`) | `/plugins` (TUI), `bend-harness plugins` (CLI), `/reload` re-resolves |
 
+## Contract (the unified Plugins list)
+
+Plan: page `plugins` (how-* blocks, architect m_38884, m_38890,
+m_38967). One list for real plugins, Mistral connectors, local MCP
+servers and skills folders; each plugin and each part on or off; all on
+by default but the opt-in plugins. The state stays his files
+(`plugins.json`), no hub.sock method. What exists now is the contract;
+the bodies marked `todo!("plugins chunk ...")` come with their chunk.
+
+- **Ids** (`bend_plugins::id::PluginId`, parsed and written there only):
+  `docs` (a real plugin, its bare name: today's `plugins.json` names stay
+  valid), `mistral:gmail`, `skills:personal|vibe|workspace|bise`; parts
+  `docs#skill:docs`, `linear#mcp:linear`,
+  `linear#tool:linear/create_issue`, `mistral:gmail#tool:send_email` (a
+  connector is its own server). `: / # %` and the space are
+  percent-escaped in every name; `parse(display(id)) == id`.
+- **Shared data** (`bend_plugins::model`): `ConnectorEntry` (+
+  `ConnectorAuth`), `ToolEntry`, `SkillEntry`, `StateV2` (the four lists
+  of `plugins.json`: `disabled`, `enabled`, `parts_off`, `parts_on`).
+- **State** (`bend_plugins::state`, chunk "state"): `read(path) ->
+  StateV2`, `set(path, &PluginId, on)` (the one writer, same flock),
+  `StateV2::is_on(&id, opt_in)`. `set_enabled` and `is_on(path, name)`
+  stay until that chunk moves their callers.
+- **Connectors** (`bend_plugins::connectors`, chunk "connectors"):
+  `BUILTINS`, `TTL_MS`, `Catalog`, `load(cache, key, now_ms, force)`,
+  `index_lines(&Catalog, &StateV2)`, `connect_url(key, &id)`. Cache:
+  `Home::connectors_cache()` (`~/.bise/connectors/bootstrap.json`).
+- **List** (`bend_plugins::catalog::rows(&Inputs) -> Vec<app_rows::Plugin>`,
+  chunk "catalog + hub"): pure; the TUI and the desktop's core call it in
+  their own process.
+- **Paths** (`bise_home::Home`): `connectors_cache()`, `marketplaces()`
+  (`~/.bise/marketplaces.json`), `mcp_secrets_dir()`
+  (`~/.bise/secrets/mcp-env/`).
+- **Wire** (`bise_proto`, the desktop core's protocol):
+  `app_rows::Plugin {id, name, kind, scope, title, what?, icon?, state,
+  on, locked, action?, parts[], logins[]}`, `app_rows::PluginPart {id,
+  kind, name, what?, on, status?, login?, tools[], tool_count?}`.
+  `name`, `state`, `scope`, `what` and `logins` keep their released
+  meaning (the wire rule); `logins` is the released app's only (shim
+  `plugin-logins`, tests/shims.txt): new clients read `parts[].login`.
+  Commands: `plugins`, `plugin_set {name, on}` (`name`: any id; a bare
+  name is that plugin), `plugin_connect {id}`, `plugins_refresh`,
+  `plugin_add {add: mcp|import|folder|git|marketplace|agent}`,
+  `plugin_login`, `plugin_logout`. Events: `plugins {project?, items}`,
+  `browse {source, items}`. Fixtures: `rust/proto/fixtures/core_ev.jsonl`,
+  `app_cmd.jsonl`.
+- **Slash**: `/plugins [list|on|off|login|logout] [<id>]` (and `bise
+  plugins on|off`); `connect`, `add`, `refresh` and `/skills` come with
+  the terminal chunk, with their handlers.
+
 ## Where the code goes
 
 The Bend REPL cannot hold a child process open: Base `Process.run`
@@ -118,8 +168,8 @@ live REPLs, so two sessions (or two Switchboard tasks) never share it.
    plugin is listed, its components are not loaded. **Opt-in**: a
    manifest with `"extensions": {"dev.bise": {"default": "off"}}` (bise's
    own extension, never reported as unsupported) loads only when its name
-   is in `enabled`; `disabled` still wins. `plugins enable <name>` adds to
-   `enabled` and drops from `disabled`, `disable` the reverse. The
+   is in `enabled`; `disabled` still wins. `plugins on <name>` adds to
+   `enabled` and drops from `disabled`, `off` the reverse. The
    built-in `computer` plugin is opt-in: `/computer-use` turns it on,
    `/computer-use off|uninstall` turns it off (docs/computer-use-ship.md
    §1).
@@ -220,7 +270,7 @@ tests use temp dirs.
   with scope, version, state (`loaded`, `disabled`, `shadowed`,
   `invalid`), root, skills, MCP servers, unsupported components, then the
   diagnostics. Static: it does not start servers.
-- `bend-harness plugins enable|disable <name>`: edits
+- `bend-harness plugins on|off <name>`: edits
   `~/.bend-harness/plugins.json`; applies at the agents' next idle (below).
 
 ### Reload on change

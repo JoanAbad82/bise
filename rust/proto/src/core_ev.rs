@@ -81,14 +81,17 @@ pub enum CoreEv {
     /// his cards (questions and approvals) that came; `projects`: each
     /// project where one of those happened, in his projects' order
     AwaySummary { since_ms: u64, done: u32, questions: u32, failed: u32, projects: Vec<AwayProject> },
-    /// his agent plugins for `project`'s workspace (none: bise's home),
-    /// the answer to `plugins` and to each change; a change applies to
-    /// the sessions that start after it (the TUI's `/reload`)
+    /// the Plugins list for `project`'s workspace (none: bise's home),
+    /// whole, the answer to `plugins` and to each plugin command
+    /// (`bend_plugins::catalog::rows`)
     Plugins {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         project: Option<Project>,
         items: Vec<Plugin>,
     },
+    /// what a source offers to add: `source` is `mistral` (the connectors
+    /// not connected yet) or a marketplace's address
+    Browse { source: String, items: Vec<Plugin> },
     /// computer use (P.2): on (the built-in `computer` plugin), its setup's
     /// steps while the window's page checks them (none until a check
     /// came), ready (browser, extension and live test done), `said`: what
@@ -381,7 +384,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "send_answered", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "browse", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "send_answered", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

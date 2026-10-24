@@ -74,12 +74,34 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         project: Option<Project>,
     },
-    /// turn a plugin on or off (plugins.json, bend_plugins' one writer)
+    /// turn a plugin or a part on or off (plugins.json, bend_plugins' one
+    /// writer): `plugins` again. `name`: any PluginId as written (`docs`,
+    /// `mistral:gmail#tool:send_email`); a bare name is that plugin, as
+    /// the released app sends it (the wire rule: never renamed)
     PluginSet {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         project: Option<Project>,
         name: String,
         on: bool,
+    },
+    /// connect a Mistral connector (`mistral:<name>`): opens his browser
+    /// on Mistral's page (his click only, never a test), then the catalog
+    /// is read again until it is ready: `plugins` at each change
+    PluginConnect {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        id: String,
+    },
+    /// read the Mistral catalog again now: `plugins` and `browse`
+    PluginsRefresh {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+    },
+    /// add a plugin (the add menu): `plugins` again at its end
+    PluginAdd {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        add: PluginAddKind,
     },
     /// log in to a plugin's remote MCP server: opens his browser (his
     /// click only, never a test), `plugins` again at its end
@@ -341,6 +363,49 @@ pub struct TalkPage {
     pub url: Option<String>,
 }
 
+/// What the Plugins add menu adds.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PluginAddKind {
+    /// an MCP server: a command, or a remote server's address; `secrets`:
+    /// the names of its env and header values he typed in (their values go
+    /// to the secrets store, never on this line)
+    Mcp {
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        command: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        secrets: Vec<String>,
+    },
+    /// another agent's MCP servers, found on disk
+    Import { from: ImportFrom },
+    /// a plugin folder on his Mac
+    Folder { path: String },
+    /// a plugin in a git repo (`subdir`: its folder in the repo)
+    Git {
+        url: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        subdir: Option<String>,
+    },
+    /// a marketplace (a git repo with a marketplace.json)
+    Marketplace { url: String },
+    /// make a plugin with an agent: his words, a request to main
+    Agent { words: String },
+}
+
+/// Whose MCP servers an import reads.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum ImportFrom {
+    Claude,
+    Codex,
+    Cursor,
+}
+
 impl AppCmd {
     pub const TAGS: &'static [&'static str] = &[
         "open",
@@ -358,6 +423,9 @@ impl AppCmd {
         "app_version",
         "plugins",
         "plugin_set",
+        "plugin_connect",
+        "plugins_refresh",
+        "plugin_add",
         "plugin_login",
         "plugin_logout",
         "computer_use",

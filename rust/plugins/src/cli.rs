@@ -8,7 +8,7 @@ use crate::{bridge, report, resolve, state};
 
 pub const USAGE: &str = "usage:
   bise plugins [list] [--workspace DIR] [--json]
-  bise plugins enable|disable NAME
+  bise plugins on|off ID          (a plugin's name, as `bise plugins list` shows it)
   bise plugins import-mcp NAME [--dry-run] < servers.json   (Claude Code's / Codex's MCP servers as one plugin)
   bise plugins login [SERVER]   log in to a remote MCP server in the browser (no SERVER: the list)
   bise plugins logout SERVER    forget its tokens
@@ -16,7 +16,7 @@ pub const USAGE: &str = "usage:
 
 Roots: bise's built-in plugins (<app root>/plugins), ~/.agents/plugins (or $BEND_PLUGINS_HOME)
 and <workspace>/.agents/plugins.
-Enable state: ~/.bend-harness/plugins.json. Changes apply at the next session start or /reload.";
+On/off state: ~/.bise/plugins.json. Changes apply at the next session start or /reload.";
 
 fn val(args: &[String], k: &str) -> Option<String> {
     args.iter().position(|a| a == k).and_then(|i| args.get(i + 1)).cloned()
@@ -50,12 +50,24 @@ pub fn main(args: &[String]) -> i32 {
             }
             0
         }
-        "enable" | "disable" => {
-            let Some(name) = args.get(1) else {
+        "on" | "off" => {
+            let Some(id) = args.get(1) else {
                 eprintln!("{}", USAGE);
                 return 2;
             };
-            let on = sub == "enable";
+            let name = match crate::id::PluginId::parse(id) {
+                Ok(crate::id::PluginId::Plugin { name }) => name,
+                Ok(_) => {
+                    eprintln!("{}", Style::stderr().fail(&format!("{id} can't be turned on or off yet")));
+                    return 2;
+                }
+                Err(e) => {
+                    eprintln!("{}", Style::stderr().fail(&e));
+                    return 2;
+                }
+            };
+            let name = &name;
+            let on = sub == "on";
             let path = state::state_path();
             match state::set_enabled(&path, name, on) {
                 Ok(changed) => {
@@ -64,7 +76,7 @@ pub fn main(args: &[String]) -> i32 {
                         .iter()
                         .any(|p| &p.name == name);
                     let out = Style::stdout();
-                    let what = format!("{} {}{}", name, if on { "enabled" } else { "disabled" }, if changed { "" } else { " already" });
+                    let what = format!("{} {}{}", name, if changed { "turned" } else { "already" }, if on { " on" } else { " off" });
                     println!("{}", out.ok(&what));
                     if !known {
                         println!("{}", out.ask(&format!("no plugin named {} in the roots right now (bise plugins list)", name)));

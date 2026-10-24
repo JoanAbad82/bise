@@ -1,9 +1,16 @@
 //! bend-plugins: Agent Plugins 1.0 (the portable base) for the Bend
 //! harness. Design: docs/plugins.md.
 //!
+//! - `id`: [`id::PluginId`], the one typed id of a plugin or a part;
+//! - `model`: the plain data the modules share (connectors, tools,
+//!   skills, the on/off file as read);
 //! - `resolve`: discovery, manifest validation, precedence, components,
 //!   diagnostics (pure over the file system, no process started);
-//! - `state`: the enable/disable file;
+//! - `state`: the on/off file (`plugins.json`);
+//! - `connectors`: his Mistral connectors' catalog, its cache and index
+//!   lines;
+//! - `catalog`: the one builder of the unified Plugins list (the wire
+//!   rows, `bise_proto::app_rows::Plugin`);
 //! - `report`: the human and JSON listings;
 //! - `stdio`: a stdio MCP client (one child process, JSON-RPC lines);
 //! - `http`, `remote`: a remote MCP client (Streamable HTTP, SSE);
@@ -19,10 +26,14 @@
 bise_home::test_home!();
 
 pub mod bridge;
+pub mod catalog;
 pub mod cli;
+pub mod connectors;
 pub mod http;
+pub mod id;
 pub mod import;
 pub mod login;
+pub mod model;
 pub mod oauth;
 pub mod remote;
 pub mod report;

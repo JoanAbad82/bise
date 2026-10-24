@@ -269,7 +269,7 @@ describe('plugins', () => {
     view('plugins', ports(), { plugins: null });
     expect(screen.getByTestId('settings.page.plugins').textContent).toContain('looking at your plugins');
     cleanup();
-    const pending = plugins().map((x) => ({ ...x, logins: (x.logins ?? []).map((l) => ({ ...l, state: 'pending' })) }));
+    const pending = plugins().map((x) => ({ ...x, parts: (x.parts ?? []).map((l) => (l.login == null ? l : { ...l, login: 'pending' as const })) }));
     view('plugins', ports(), { plugins: pending });
     expect(screen.getByTestId('settings.login.linear').getAttribute('aria-busy')).toBe('true');
   });

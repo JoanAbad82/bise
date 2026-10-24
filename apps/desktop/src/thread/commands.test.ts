@@ -68,8 +68,8 @@ describe('a command line runs as the TUI runs it', () => {
     expect(slashOf('compact', '', at)).toEqual(slash('/compact'));
   });
   it("a window command's words act as its settings switch (R2, R3): the same AppCmd settings sends", () => {
-    expect(windowRun('/plugins', 'disable notes', at)).toEqual({ app: { cmd: 'plugin_set', name: 'notes', on: false } });
-    expect(windowRun('/plugins', 'enable computer', at)).toEqual({ app: { cmd: 'plugin_set', name: 'computer', on: true } });
+    expect(windowRun('/plugins', 'off notes', at)).toEqual({ app: { cmd: 'plugin_set', name: 'notes', on: false } });
+    expect(windowRun('/plugins', 'on computer', at)).toEqual({ app: { cmd: 'plugin_set', name: 'computer', on: true } });
     expect(windowRun('/plugins', 'login linear', at)).toEqual({ app: { cmd: 'plugin_login', name: 'linear' } });
     expect(windowRun('/plugins', 'logout linear', at)).toEqual({ app: { cmd: 'plugin_logout', name: 'linear' } });
     expect(windowRun('/plugins', 'list', at), 'list: the page').toEqual({ go: { screen: 'settings', page: 'plugins' } });

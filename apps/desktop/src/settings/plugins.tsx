@@ -2,9 +2,10 @@
 // (built-in, user, workspace) with their state, each one turned on or off
 // (plugins.json through bend_plugins' one writer; it applies to the
 // sessions that start after it, as /reload), and each remote MCP server
-// that logs in, with log in (his browser, only on his click) and log out.
-// The core answers every act with `plugins` again. Owner: amb-home.
-import type { AppCmd, Plugin, PluginLogin } from '@/proto';
+// that logs in (an `mcp` part with its login), with log in (his browser,
+// only on his click) and log out. The core answers every act with `plugins`
+// again. Owner: amb-home.
+import type { AppCmd, Plugin, PluginPart } from '@/proto';
 import { Act, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
 import { settings } from '@/proto/words.gen';
 
@@ -13,17 +14,18 @@ export function isOn(p: Plugin): boolean {
   return p.state === 'loaded';
 }
 
-/** What a server's login state reads as. */
-export function loginWords(l: PluginLogin): string {
-  switch (l.state) {
+/** What a server's login state reads as (`what`: its host). */
+export function loginWords(l: PluginPart): string {
+  const host = l.what ?? l.name;
+  switch (l.login) {
     case 'needs':
-      return settings.login_needs({ host: l.host });
+      return settings.login_needs({ host });
     case 'in':
-      return l.tools == null ? settings.login_in({ host: l.host }) : settings.login_in_tools({ host: l.host, n: l.tools });
+      return l.tool_count == null ? settings.login_in({ host }) : settings.login_in_tools({ host, n: l.tool_count });
     case 'pending':
-      return settings.login_pending({ host: l.host });
+      return settings.login_pending({ host });
     default:
-      return settings.login_out({ host: l.host });
+      return settings.login_out({ host });
   }
 }
 
@@ -49,7 +51,7 @@ export function Plugins({ items, project, send }: { items: readonly Plugin[] | n
         <Chip tone="err">{p.state}</Chip>
       ),
   }));
-  const logins = items.flatMap((p) => p.logins ?? []);
+  const logins = items.flatMap((p) => (p.parts ?? []).filter((x) => x.kind === 'mcp' && x.login != null));
   return (
     <>
       <Group testId="settings.plugins" items={rows} help={settings.plugins_help} />
@@ -62,13 +64,13 @@ export function Plugins({ items, project, send }: { items: readonly Plugin[] | n
             label: l.name,
             sub: loginWords(l),
             control:
-              l.state === 'in' ? (
+              l.login === 'in' ? (
                 <Act tone="err" onClick={() => { send({ cmd: 'plugin_logout', ...at, name: l.name }); }} testId={`settings.login.${l.name}.out`}>
                   {settings.log_out}
                 </Act>
               ) : (
                 <Button
-                  state={l.state === 'pending' ? 'loading' : undefined}
+                  state={l.login === 'pending' ? 'loading' : undefined}
                   onClick={() => {
                     send({ cmd: 'plugin_login', ...at, name: l.name });
                   }}

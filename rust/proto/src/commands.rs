@@ -129,12 +129,12 @@ pub const COMMANDS: &[Cmd] = &[
     Cmd { name: "/close", desc: "close an inbox item without answering: /close N [note]", args: &[Arg::Card, Arg::Note], client: false },
     Cmd {
         name: "/plugins",
-        desc: "the workspace's agent plugins: /plugins [list|enable|disable|login|logout] [<name>]",
+        desc: "the workspace's agent plugins: /plugins [list|on|off|login|logout] [<id>]",
         args: &[
             Arg::Words(&[
                 ("list", "the plugins and their state"),
-                ("enable", "turn a plugin on"),
-                ("disable", "turn a plugin off"),
+                ("on", "turn a plugin on"),
+                ("off", "turn a plugin off"),
                 ("login", "log in to a remote MCP server"),
                 ("logout", "forget a remote MCP server's login"),
             ]),

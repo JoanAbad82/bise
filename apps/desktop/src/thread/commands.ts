@@ -3,7 +3,7 @@
 // each ready or greyed 'not yet', never a silent gap. How one runs:
 // - runs 'window': it opens its screen here (the window owns readiness:
 //   ready when the screen exists), or with its words does what that screen's
-//   switch does (/theme light, /plugins disable x, /computer-use off: the
+//   switch does (/theme light, /plugins off x, /computer-use off: the
 //   same AppCmd settings sends), or quits (/quit);
 // - runs 'hub': his line as he typed it, HubCmd slash (the TUI's router and
 //   handlers run it in the hub; architect m_11011).
@@ -29,7 +29,7 @@ export const windowCommands: readonly PickCommand[] = [
 /**
  * What a window command does here: a screen, the key list over the window,
  * one of the core's own commands (the one settings sends for the same
- * switch: /plugins disable x, /theme light, /computer-use off), or quit.
+ * switch: /plugins off x, /theme light, /computer-use off), or quit.
  */
 export type WindowRun = { readonly go: Route } | { readonly inbox: true } | { readonly help: true } | { readonly app: AppCmd } | { readonly quit: true };
 
@@ -48,9 +48,9 @@ function pluginsRun(args: string): AppCmd | undefined {
   const [sub, name] = [at0(args), at1(args)];
   if (name === '') return undefined;
   switch (sub) {
-    case 'enable':
-    case 'disable':
-      return { cmd: 'plugin_set', name, on: sub === 'enable' };
+    case 'on':
+    case 'off':
+      return { cmd: 'plugin_set', name, on: sub === 'on' };
     case 'login':
       return { cmd: 'plugin_login', name };
     case 'logout':
@@ -89,7 +89,7 @@ export function windowRun(name: string, args: string, at: { project: string; age
       if (sub !== 'completion' || extra !== undefined) return undefined;
       return go(prov === undefined ? { ...base, tab: 'completion' } : { ...base, tab: 'completion', provider: prov });
     }
-    // a window command with words of its own (/artifacts add <url>, /plugins enable <x>) is the hub's
+    // a window command with words of its own (/artifacts add <url>, /plugins on <x>) is the hub's
     case 'artifacts':
       return arg === '' ? go({ screen: 'artifacts', project: at.project }) : undefined;
     case 'inbox':
@@ -111,7 +111,7 @@ export function windowRun(name: string, args: string, at: { project: string; age
     case 'setup':
       return go({ screen: 'settings', page: 'setup' });
     case 'plugins': {
-      // '/plugins disable x' acts as settings · plugins' switch; 'list' or bare: the page;
+      // '/plugins off x' acts as settings · plugins' switch; 'list' or bare: the page;
       // anything else goes to the hub, whose line says the usage
       if (arg === '' || arg === 'list') return go({ screen: 'settings', page: 'plugins' });
       const c = pluginsRun(args);

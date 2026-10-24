@@ -342,6 +342,23 @@ impl Home {
         self.or("BEND_PLUGINS_STATE", self.root.join("plugins.json"))
     }
 
+    /// The Mistral connectors' catalog cache: `<root>/connectors/bootstrap.json`
+    /// (bend_plugins::connectors, its one writer, under a lock).
+    pub fn connectors_cache(&self) -> PathBuf {
+        self.root.join("connectors").join("bootstrap.json")
+    }
+
+    /// The plugin marketplaces he added: `<root>/marketplaces.json`.
+    pub fn marketplaces(&self) -> PathBuf {
+        self.root.join("marketplaces.json")
+    }
+
+    /// An MCP server's env and header values he typed in: `secrets/mcp-env/`,
+    /// kept by bise_secrets.
+    pub fn mcp_secrets_dir(&self) -> PathBuf {
+        self.secrets_dir().join("mcp-env")
+    }
+
     /// The plugins' data (`$BEND_PLUGINS_DATA`).
     pub fn plugin_data_dir(&self) -> PathBuf {
         self.or("BEND_PLUGINS_DATA", self.root.join("plugin-data"))
