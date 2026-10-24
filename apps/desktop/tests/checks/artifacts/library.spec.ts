@@ -1,0 +1,162 @@
+// artifacts/library · the artifacts page in folders (artifacts-folders brief part 4, page
+// artifacts-gallery v7): the shots the designer agent signs, every tab of the page, at 1400, 1100
+// and 800, light and dark, on FakeCore with the fake library (library-world.ts). Passes when, at
+// each size and theme: the column (or, under 900, the crumb) lists the folders; a theme opens onto
+// its task tiles; a task's folder, unfiled, the m picker (typing filters and offers '+ new folder'),
+// a card's right-click menu, three picked with the selection bar, a folder's menu, the merge picker,
+// the delete dialog, the inline new folder, a search grouped by folder, a search that finds
+// nothing, the scope menu, one project ('14 of 74'), and the empty pages each show. It sends
+// nothing to a hub but what his gestures send. Shots: lib-<tab>-<w>-<theme>.png. art-grid adds its
+// card tabs. Owner: art-folders.
+import type { Page } from '@playwright/test';
+import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { library } from '../../../src/proto/words_library.gen';
+import { libraryWorld, P } from './library-world';
+
+const NOW = Date.now();
+const SIZES = ['1400x900', '1100x820', '800x820'] as const;
+const THEMES = ['light', 'dark'] as const;
+
+const id = (page: Page, testId: string) => page.getByTestId(testId);
+const narrowOf = (size: string) => Number(size.split('x')[0]) < 900;
+
+for (const theme of THEMES) {
+  for (const size of SIZES) {
+    const w = size.split('x')[0] ?? '';
+    test(`artifacts/library: every tab of the folders page (${w}, ${theme})`, async () => {
+      const core = new FakeCore(libraryWorld(theme, NOW) as never);
+      const s = await launchDesktop({ core, route: 'artifacts', size });
+      const page = s.page;
+      const shot = async (tab: string) => {
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: test.info().outputPath(`lib-${tab}-${w}-${theme}.png`) });
+      };
+      // the column, or under 900 the crumb that opens it
+      const go = async (testId: string) => {
+        if (narrowOf(size)) {
+          await id(page, 'artifacts.fold').click();
+          await id(page, 'artifacts.fold.pop').getByTestId(testId).click();
+        } else await id(page, testId).click();
+      };
+      try {
+        await expect(id(page, 'artifacts.hero')).toContainText(library.say);
+        await expect(id(page, 'artifacts.tiles')).toBeVisible();
+        await shot('home');
+
+        if (narrowOf(size)) {
+          await id(page, 'artifacts.fold').click();
+          await expect(id(page, 'artifacts.fold.pop')).toContainText('desktop app');
+          await shot('fold-open');
+          await page.keyboard.press('Escape');
+        }
+
+        // the scope at the search, then one project: the folders say 'n of m'
+        await id(page, 'artifacts.projects').click();
+        await expect(id(page, 'artifacts.projects.menu')).toContainText('ai-docs');
+        await shot('scope');
+        await id(page, `artifacts.projects.${P.ai}`).click();
+        await expect(id(page, 'artifacts.hero')).toContainText('ai-docs');
+        await shot('one-project');
+        await id(page, 'artifacts.projects.clear').click();
+
+        // a theme: its task tiles, then its cards
+        await go('artifacts.col.f.f-desktop00');
+        await expect(id(page, 'artifacts.tasks')).toBeVisible();
+        await shot('theme');
+
+        // a task's folder, its menu, the merge picker, the delete dialog
+        await go('artifacts.col.f.f-agentview');
+        await expect(id(page, 'artifacts.head')).toContainText('agent view');
+        await shot('task');
+        // art-grid's tabs: a card hovered (its marks), the stack open with a chip on, the ☰ list
+        const card0 = page.locator('[data-testid^="artifacts.grid.card."]').first();
+        await card0.hover();
+        await shot('card-hover');
+        await page.locator('[data-testid^="artifacts.grid.card.stack:"]').first().dblclick();
+        await expect(id(page, 'artifacts.sheet')).toBeVisible();
+        await page.locator('[data-testid^="artifacts.sheet.chip."]').nth(1).click();
+        await shot('stack-open');
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape');
+        await id(page, 'artifacts.view.list').click();
+        await shot('list');
+        await id(page, 'artifacts.view.grid').click();
+        await id(page, 'artifacts.head.more').click();
+        await expect(id(page, 'artifacts.fmenu')).toContainText(library.menu_merge);
+        await shot('folder-menu');
+        await id(page, 'artifacts.fmenu.merge').click();
+        await expect(id(page, 'artifacts.merge')).toBeVisible();
+        await shot('merge');
+        await page.keyboard.press('Escape');
+        await id(page, 'artifacts.head.more').click();
+        await id(page, 'artifacts.fmenu.delete').click();
+        await expect(id(page, 'artifacts.delete.go')).toBeVisible();
+        await shot('delete');
+        await id(page, 'artifacts.delete.cancel').click();
+
+        // the m picker on the first card, then typing
+        const first = page.locator('[data-testid="artifacts.grid"] [data-row]').first();
+        await first.click();
+        await page.keyboard.press('m');
+        await expect(id(page, 'artifacts.move')).toContainText(library.all_folders);
+        await shot('move');
+        await id(page, 'artifacts.move.field').fill('pa');
+        await expect(id(page, 'artifacts.move.new')).toBeVisible();
+        await shot('move-typing');
+        await page.keyboard.press('Escape');
+
+        // a card's right-click menu; three picked and the bar
+        await first.click({ button: 'right' });
+        await expect(id(page, 'artifacts.menu')).toContainText(library.menu_move);
+        await shot('card-menu');
+        await page.keyboard.press('Escape');
+        const cards = page.locator('[data-testid="artifacts.grid"] [data-row]');
+        await cards.nth(0).click();
+        await cards.nth(1).click({ modifiers: ['Meta'] });
+        await cards.nth(2).click({ modifiers: ['Meta'] });
+        await expect(id(page, 'artifacts.selbar')).toContainText(library.picked({ n: 3 }));
+        await shot('picked');
+        await page.keyboard.press('Escape');
+
+        // a new folder in the column, inline
+        if (!narrowOf(size)) {
+          await id(page, 'artifacts.col.new').click();
+          await expect(id(page, 'artifacts.col.field')).toBeFocused();
+          await shot('new-folder');
+          await page.keyboard.press('Escape');
+        }
+
+        // unfiled; a folder he just made, empty
+        await go('artifacts.col.unfiled');
+        await expect(id(page, 'artifacts.head')).toContainText(library.unfiled_say);
+        await shot('unfiled');
+        await go('artifacts.col.f.f-offre0000');
+        await expect(id(page, 'artifacts.none')).toContainText(library.empty_folder_title);
+        await shot('empty-folder');
+
+        // search across folders, and nothing found
+        await id(page, 'artifacts.search').fill('dark');
+        await expect(id(page, 'artifacts.results.head')).toContainText('"dark"');
+        await shot('search');
+        await id(page, 'artifacts.search').fill('pitch v3');
+        await expect(id(page, 'artifacts.nothing')).toContainText('bise pitch investisseurs');
+        await shot('nothing-found');
+      } finally {
+        await s.close();
+      }
+    });
+  }
+}
+
+for (const theme of THEMES) {
+  test(`artifacts/library: the first run says what fills it (${theme})`, async () => {
+    const core = new FakeCore(libraryWorld(theme, NOW, true) as never);
+    const s = await launchDesktop({ core, route: 'artifacts', size: '1100x820' });
+    try {
+      await expect(s.page.getByTestId('artifacts.empty')).toContainText(library.first_title);
+      await s.page.screenshot({ path: test.info().outputPath(`lib-first-run-1100-${theme}.png`) });
+    } finally {
+      await s.close();
+    }
+  });
+}

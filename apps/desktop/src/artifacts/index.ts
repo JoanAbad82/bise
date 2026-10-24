@@ -9,4 +9,5 @@ export { StackSheet, type SheetProps } from './Sheet';
 export { useCols, useGridKeys, type GridKeys, type GridKeysOpts, type View } from './gridKeys';
 export * from './gallery';
 export { useAllArtifacts, useNewArtifacts } from './hooks';
+export { usePlaceCrumb } from './crumb';
 export * from './model';

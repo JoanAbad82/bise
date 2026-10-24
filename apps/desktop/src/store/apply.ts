@@ -63,6 +63,14 @@ export function applyTyped(s: Store, ev: Ev): void {
     case "artifacts":
       // the hubs' facts several slices read (machine/types.ts HubFacts): one copy, as it came
       s.factsCame(ev, `artifacts:${ev.project}`);
+      // the library's folders, one list for every project (~/.bise/library/folders.json): each hub
+      // sends it with its artifacts, the newest wins (artifacts/folders.ts)
+      if (ev.folders !== undefined) s.put("library:folders", ev.folders);
+      return;
+    case "folders":
+    case "library_folders":
+      // the library's folders after an edit: a hub's answer (an agent's), the core's (his)
+      s.put("library:folders", ev.folders);
       return;
     case "processes":
       // a project's processes, whole each time: running, then ended in the last 24 h (src/running)

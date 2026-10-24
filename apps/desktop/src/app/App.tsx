@@ -443,7 +443,7 @@ function ScreenOf({ route }: { route: Route }) {
       // every project's (project ''), one project's, or one artifact open (amb-kit's src/artifacts)
       // a project's artifact by id: the maker's thread in the centre, the artifact in the right column
       // (App's shell), or the artifact alone under 1000 px (ArtifactView.tsx)
-      if (route.id === undefined) return <ArtifactsScreen project={route.project} />;
+      if (route.id === undefined) return <ArtifactsScreen project={route.project} at={route.at} />;
       return route.project === '' ? <ArtifactOpen project={route.project} id={route.id} /> : <ArtifactCentre project={route.project} id={route.id} />;
     case 'scheduled':
       // every project's live scheduled tasks (amb-kit's src/scheduled)

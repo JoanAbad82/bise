@@ -4,7 +4,7 @@
 // in src/proto/fixtures.gen.ts (rust/proto/fixtures), never a hand-kept value, so a proto change
 // breaks a builder or a test at typecheck and the compiler shows what to fix. Test-only (never in
 // the bundle): a feature test imports this and run.ts, nothing else of the app (eslint).
-import type { AnswerResult, Artifact, Card, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, SendReason } from './app';
+import type { AnswerResult, Artifact, Card, Folder, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, SendReason } from './app';
 import { core_ev, hub_ev } from './app';
 
 export type Ev = HubEv | CoreEv;
@@ -73,6 +73,17 @@ export function artifact(over: Partial<Artifact> & Pick<Artifact, 'id'>): Artifa
 
 /** A hub's `artifacts` event: every artifact of that project. */
 export const artifacts = (project: string, ...items: Artifact[]): EvOf<'artifacts'> => ev('artifacts', { project, items });
+
+/** A folder of the library: a theme (no parent) or a task folder in one; main's unless `by`. */
+export function folder(over: Partial<Folder> & Pick<Folder, 'id' | 'name'>): Folder {
+  return { by: 'main', named_by_you: false, ...over };
+}
+
+/** A hub's `artifacts` event carrying the library's folders (each hub sends the one list). */
+export const withFolders = (e: EvOf<'artifacts'>, folders: Folder[]): EvOf<'artifacts'> => ({ ...e, folders });
+
+/** The core's `library_folders`: the folder list after his edit. */
+export const libraryFolders = (folders: Folder[]): EvOf<'library_folders'> => ev('library_folders', { folders });
 
 // ---- the window-local answers (main's ipc.ts sends them to the window that asked; not in the
 // core's protocol, so typed here from the proto's result types)

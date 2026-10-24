@@ -198,3 +198,12 @@ describe('resize (designer m_19374)', () => {
     expect(keptWidth(999, 200, 400, 240)).toBe(400);
   });
 });
+
+describe('the artifacts library in the crumb', () => {
+  const place = (at: string) => (at === 'f/f-view' ? [{ name: 'desktop app', at: 'f/f-desk' }, { name: 'agent view', at: 'f/f-view' }] : []);
+  it('says the place after artifacts, each earlier part going to its place', () => {
+    const route = { screen: 'artifacts', project: '', at: 'f/f-view' } as const;
+    expect(crumbOf(route, (p) => p, place)).toEqual(['artifacts', 'desktop app', 'agent view']);
+    expect(crumbGoOf(route, (p) => p, place).map((s) => s.go)).toEqual([{ screen: 'artifacts', project: '' }, { screen: 'artifacts', project: '', at: 'f/f-desk' }]);
+  });
+});

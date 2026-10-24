@@ -150,7 +150,10 @@ export function panelProject(route: Route, home: string | undefined, projects: n
 }
 
 /** The titlebar's crumb: where he is, 'storefront › perf' (a project's main is the project). Pure. */
-export function crumbOf(route: Route, name: (project: string) => string): string[] {
+/** The library's crumb after 'artifacts': each part's words and its place ('desktop app' f/<theme>, 'agent view' f/<task>). */
+export type PlaceCrumb = (at: string) => readonly { name: string; at: string }[];
+
+export function crumbOf(route: Route, name: (project: string) => string, place: PlaceCrumb = () => []): string[] {
   switch (route.screen) {
     case 'bise':
       return [panel.bise];
@@ -174,7 +177,8 @@ export function crumbOf(route: Route, name: (project: string) => string): string
     case 'branch':
       return [name(route.project), route.branch];
     case 'artifacts':
-      return route.project === '' ? [panel.artifacts] : [name(route.project), panel.artifacts];
+      // the library's place after it: 'artifacts › desktop app › agent view' (artifacts/folders.ts crumbOf)
+      return [...(route.project === '' ? [panel.artifacts] : [name(route.project), panel.artifacts]), ...(route.at === undefined ? [] : place(route.at).map((c) => c.name))];
     case 'settings':
       return route.page === undefined ? [panel.crumb_settings] : [panel.crumb_settings, route.page];
     case 'notfound':
@@ -200,8 +204,15 @@ export function crumbOf(route: Route, name: (project: string) => string): string
  * settings' word → its root; a screen's own word ('agents', 'changes'…) is where he is, and the
  * words that name one thing of the project (a feature, a commit, a branch) stay plain. Pure.
  */
-export function crumbGoOf(route: Route, name: (project: string) => string): { c: string; go?: Route }[] {
-  return crumbOf(route, name).slice(0, -1).map((c, i) => {
+export function crumbGoOf(route: Route, name: (project: string) => string, place: PlaceCrumb = () => []): { c: string; go?: Route }[] {
+  return crumbOf(route, name, place).slice(0, -1).map((c, i) => {
+    // the library's crumb: 'artifacts' goes to all artifacts, a theme to its folder
+    if (route.screen === 'artifacts' && route.at !== undefined) {
+      const root = route.project === '' ? 0 : 1;
+      if (i === root) return { c, go: { screen: 'artifacts', project: route.project } };
+      const part = place(route.at)[i - root - 1];
+      if (part !== undefined) return { c, go: { screen: 'artifacts', project: route.project, at: part.at } };
+    }
     if ('project' in route && route.project !== '' && i === 0 && c === name(route.project))
       return { c, go: { screen: 'thread', project: route.project, agent: MAIN } };
     if ((route.screen === 'review' || route.screen === 'debug') && i === 1)

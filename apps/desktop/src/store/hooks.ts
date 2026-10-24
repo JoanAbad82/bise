@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree, Folder } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import type { Proc } from '@/proto';
 import { keep } from '@/app/keep';
@@ -101,6 +101,8 @@ export const useFound = (): readonly Found[] => useSlice('found', (s) => s.found
 export const useComputerUse = (): EvOf<'computer_use'> | null => useSlice('computer_use', (s) => s.computerUse());
 export const usePlugins = (project?: string): readonly Plugin[] | null => useSlice(`plugins:${project ?? ''}`, (s) => s.plugins(project));
 export const useArtifacts = (project: string): readonly Artifact[] => useSlice(`artifacts:${project}`, (s) => s.artifacts(project));
+/** the library's folders, the same for every project (artifacts/folders.ts reads them) */
+export const useFolders = (): readonly Folder[] => useSlice('library:folders', (s) => s.folders());
 export const useScheduled = (project: string): readonly ScheduledTask[] => useSlice(`scheduled:${project}`, (s) => s.scheduled(project));
 export const useWorktrees = (project: string): readonly Worktree[] => useSlice(`worktrees:${project}`, (s) => s.worktrees(project));
 /** a project's processes (HubEv processes): running, then ended in the last 24 h; none until its hub said */

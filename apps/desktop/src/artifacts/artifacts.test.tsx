@@ -77,45 +77,39 @@ function mount(node: React.ReactNode, start: Route = { screen: 'artifacts', proj
 }
 
 describe('artifacts screens', () => {
-  it('the screen lists every project by day, the new chip, filters by kind and words, ⏎ opens one', () => {
+  it('all artifacts: every project\'s newest as cards, the new chip; words search every folder, ⏎ in the search opens the first', () => {
     const router = mount(<ArtifactsScreen />);
-    const list = screen.getByTestId('artifacts.list');
-    expect(list.querySelectorAll('[role=option]').length).toBe(3);
-    expect(screen.getByTestId('artifacts.list.row.notes.new').textContent).toBe('new');
-    expect(screen.getByTestId('artifacts.list.row.notes').textContent).toContain('perf · storefront');
-    fireEvent.click(screen.getByTestId('artifacts.kind.pr'));
-    expect(screen.getByTestId('artifacts.list').querySelectorAll('[role=option]').length).toBe(1);
-    fireEvent.click(screen.getByTestId('artifacts.kind.pr'));
-    fireEvent.change(screen.getByTestId('artifacts.search').querySelector('input') ?? screen.getByTestId('artifacts.search'), { target: { value: 'checkout' } });
-    const rows = screen.getByTestId('artifacts.list').querySelectorAll('[role=option]');
-    expect(rows.length).toBe(1);
-    fireEvent.keyDown(screen.getByTestId('artifacts.list'), { key: 'Enter' });
+    expect(screen.getByTestId('artifacts.grid').querySelectorAll('[data-row]').length).toBe(3);
+    expect(screen.getByTestId('artifacts.grid.card.shop-1/notes.new').textContent).toBe('new');
+    const field = screen.getByTestId('artifacts.search').querySelector('input') ?? screen.getByTestId('artifacts.search');
+    fireEvent.change(field, { target: { value: 'checkout' } });
+    expect(screen.getByTestId('artifacts.results.head').textContent).toContain('1 found for "checkout"');
+    fireEvent.keyDown(field, { key: 'Enter' });
     expect(router.get()).toEqual({ screen: 'artifacts', project: 'acme-2', id: 'pr-12' });
   });
 
-  it("his keys (main m_22146), the TUI's /artifacts: the screen has them when it opens; ↓↓⏎ opens the 3rd, ↑ at the top stays, / searches", () => {
+  it("his keys (main m_22146), the TUI's /artifacts: the screen has them when it opens; →→⏎ opens the 3rd, ↑ at the top stays, / searches", () => {
     window.localStorage.clear();
     const router = mount(<ArtifactsScreen />);
     const scr = screen.getByTestId('artifacts.screen');
     expect(document.activeElement).toBe(scr);
-    const on = () => [...screen.getByTestId('artifacts.list').querySelectorAll('[aria-selected=true]')].map((r) => r.getAttribute('data-testid'));
-    expect(on()).toEqual(['artifacts.list.row.notes']);
+    const on = () => [...scr.querySelectorAll('[data-row][aria-selected=true]')].map((r) => r.getAttribute('data-row'));
+    expect(on()).toEqual(['shop-1/notes']);
     fireEvent.keyDown(document.activeElement ?? scr, { key: 'ArrowUp' });
-    expect(on()).toEqual(['artifacts.list.row.notes']);
-    // / : the search has the keys; the words narrow the list; ↓ gives the keys back and moves
+    expect(on()).toEqual(['shop-1/notes']);
+    // / : the search has the keys; ↓ gives them back
     fireEvent.keyDown(scr, { key: '/' });
     const field = screen.getByTestId('artifacts.search');
     expect(document.activeElement).toBe(field);
     fireEvent.change(field, { target: { value: 'e' } });
     fireEvent.keyDown(field, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(scr);
-    expect(on()).toEqual(['artifacts.list.row.pr-12']);
-    // esc clears the search, and the list is whole again
+    // esc clears the search, and the cards are whole again
     fireEvent.keyDown(scr, { key: 'Escape' });
     expect((field as HTMLInputElement).value).toBe('');
     fireEvent.keyDown(scr, { key: 'Home' });
-    fireEvent.keyDown(scr, { key: 'ArrowDown' });
-    fireEvent.keyDown(scr, { key: 'ArrowDown' });
+    fireEvent.keyDown(scr, { key: 'ArrowRight' });
+    fireEvent.keyDown(scr, { key: 'ArrowRight' });
     fireEvent.keyDown(scr, { key: 'Enter' });
     expect(router.get()).toEqual({ screen: 'artifacts', project: 'shop-1', id: 'bench' });
   });
@@ -279,14 +273,13 @@ describe('artifacts screens', () => {
     }
   });
 
-  it("the keys line says only what works: '⏎ open', 'v versions', '@ put it in a message', '⌘C copy'; v opens with the versions shown, ⌘C copies the link", () => {
+  it('on a card, v opens it with the versions shown, ⌘C copies the link', () => {
     const copied: string[] = [];
     const g = globalThis as { bise?: unknown };
     g.bise = { copy: (t: string) => { copied.push(t); } };
     try {
       const router = mount(<ArtifactsScreen />);
-      expect(screen.getByTestId('artifacts.keys').textContent).toBe('⏎ openspace quick lookv versions@ put it in a message⌘C copy');
-      const list = screen.getByTestId('artifacts.list');
+      const list = screen.getByTestId('artifacts.screen');
       fireEvent.keyDown(list, { key: 'c', metaKey: true });
       expect(copied).toEqual(['http://127.0.0.1:47123/p/notes']);
       fireEvent.keyDown(list, { key: 'v' });
@@ -402,25 +395,22 @@ describe('archived artifacts (art-archive archived_at, the TUI artifacts screen)
 
   it("the screen leaves them behind a faint '2 archived' row; a (or a click) shows them alone, esc goes back", () => {
     mountWith(archivedWorld(), <ArtifactsScreen />);
-    const ids = () => [...screen.getByTestId('artifacts.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-testid'));
-    expect(ids()).not.toContain('artifacts.list.row.old-deck');
+    const ids = () => [...screen.getByTestId('artifacts.screen').querySelectorAll('[data-row]')].map((r) => r.getAttribute('data-row'));
+    expect(ids()).not.toContain('shop-1/old-deck');
     expect(screen.getByTestId('artifacts.archived').textContent).toBe('2 archived');
-    expect(screen.getByTestId('artifacts.keys').textContent).toContain('a archived');
     fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'a' });
     expect(screen.getByTestId('artifacts.screen').querySelector('.b-hero .name')?.textContent).toBe('artifacts · archived');
-    expect(ids()).toEqual(['artifacts.list.row.old-deck', 'artifacts.list.row.old-doc']);
+    expect(ids()).toEqual(['shop-1/old-deck', 'shop-1/old-doc']);
     expect(screen.queryByTestId('artifacts.archived')).toBeNull();
-    expect(screen.getByTestId('artifacts.keys').textContent).toContain('esc back to the list');
     fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'Escape' });
-    expect(ids()).not.toContain('artifacts.list.row.old-deck');
+    expect(ids()).not.toContain('shop-1/old-deck');
     fireEvent.click(screen.getByTestId('artifacts.archived'));
-    expect(ids()).toEqual(['artifacts.list.row.old-deck', 'artifacts.list.row.old-doc']);
+    expect(ids()).toEqual(['shop-1/old-deck', 'shop-1/old-doc']);
   });
 
   it("nothing archived: no row, and the archived view says the TUI's words", () => {
     mountWith(world(), <ArtifactsScreen />);
     expect(screen.queryByTestId('artifacts.archived')).toBeNull();
-    expect(screen.getByTestId('artifacts.keys').textContent).not.toContain('archived');
     fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'a' });
     expect(screen.getByTestId('artifacts.none').textContent).toBe('nothing archived. esc goes back.');
   });

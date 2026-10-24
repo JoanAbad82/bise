@@ -14,6 +14,8 @@ const every: Route[] = [
   { screen: 'commit', project: 'p', sha: '155ffb0' },
   { screen: 'artifacts', project: 'p' },
   { screen: 'artifacts', project: 'p', id: 'a-1' },
+  { screen: 'artifacts', project: '', at: 'unfiled' },
+  { screen: 'artifacts', project: 'p', at: 'f/f-abcdefghij' },
   { screen: 'environments', project: 'p' },
   { screen: 'scheduled' },
   { screen: 'settings' },
