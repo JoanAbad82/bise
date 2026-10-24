@@ -44,6 +44,11 @@
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
+  /* a dialog's shadow (designer's dialogs rules): a short soft drop; --e-3's wide halo is only for
+     what floats over other apps (spotlight, capsule, palette). --sheet-shadow is 12% in light */
+  --e-sheet: 0 0 0 1px var(--c-line), 0 1px 2px color-mix(in srgb, var(--p-shadow) 8%, transparent), 0 12px 32px -12px color-mix(in srgb, var(--p-shadow) var(--sheet-shadow, 22%), transparent);
+  /* the dim behind a dialog: the window's own ground at 62%, the page stays sharp (never a blur) */
+  --c-scrim: color-mix(in srgb, var(--c-solid) 62%, transparent);
   --glass: blur(30px) saturate(1.4);
   --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
   --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
@@ -56,8 +61,6 @@
 :root {
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
   --s-10: 40px; --s-12: 48px; --s-16: 64px;
-  /* the dim behind a Sheet: 40% black in both themes (controls.css reads the role, never a color) */
-  --c-scrim: rgb(0 0 0 / 0.4);
   /* between things */
   --gap-tight: var(--s-1);    /* a label over its control; a section head and its first row */
   --gap-inline: var(--s-2);   /* an icon and its text, a name and its meta, two buttons or chips side by side */
@@ -135,6 +138,8 @@
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
+  --e-sheet: 0 0 0 1px var(--c-line), 0 1px 2px color-mix(in srgb, var(--p-shadow) 8%, transparent), 0 12px 32px -12px color-mix(in srgb, var(--p-shadow) var(--sheet-shadow, 22%), transparent);
+  --c-scrim: color-mix(in srgb, var(--c-solid) 62%, transparent);
   --glass: blur(30px) saturate(1.4);
   --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
   --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
@@ -144,10 +149,12 @@
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
   --c-accent-soft: color-mix(in srgb, var(--p-accent) 7%, var(--p-bg));
   --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
+  --sheet-shadow: 12%;
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
 } }
 [data-theme="light"] {
   --c-accent-soft: color-mix(in srgb, var(--p-accent) 7%, var(--p-bg));
   --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
+  --sheet-shadow: 12%;
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
 }

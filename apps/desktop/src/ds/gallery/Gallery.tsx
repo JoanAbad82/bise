@@ -425,7 +425,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
         <Row kind="ag" name="perf" dot="wk" end="4 min" on onClick={() => undefined} />
         <Row kind="ag" name="alerts" dot="ok" end="done" state="hover" onClick={() => undefined} />
       </div>
-      {/* the Sheet's own markup, drawn in place (live it is a modal over a 40% scrim, Radix Dialog) */}
+      {/* the Sheet's own markup, drawn in place (live it is a modal over the ground at 62%, Radix Dialog) */}
       <div className="b-sheet still" data-testid="ds.sheet">
         <div className="b-sheet-head"><h2 className="t">add a project</h2><p className="sub">a folder, a git repo. its main starts right away.</p></div>
         <div className="b-sheet-body"><Field defaultValue="~/code/shop" readOnly /></div>
