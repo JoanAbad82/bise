@@ -68,6 +68,9 @@
 #   gate.sh wait <bg .out file | pid>
 #                     the bash tool put a gate in the background: block until
 #                     it ends (at most 25 s), then show its end and exit code.
+#   gate.sh stop      stop the gate running in this checkout (and what it
+#                     started), not another agent's: never pkill a gate by
+#                     name, macOS pkill matches every agent's (repl-kill).
 # "Changed" = the tree vs GATE_BASE (default HEAD), untracked files included.
 # CARGO_TARGET_DIR is honoured (the e2e/tmux tests run its bise); unset,
 # in a task worktree the hub made (<task dir>/<repo> with <task dir>/owner)
@@ -131,6 +134,35 @@ seed_from() {  # in the repo root: the seed to clone, this deps key's, else the 
   echo "$from"
 }
 proc_start() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' _; }
+# the gate dir: runs <gpre><pid> (each with .owner, its start, and .root, its
+# checkout), the lock, a red step's log
+gate_dirs() {
+  if [ -n "${BISE_HOME:-}" ] || [ -f "$HOME/.bise/migrated.json" ]; then
+    gdir="${BISE_HOME:-$HOME/.bise}/gate" gpre="${BISE_HOME:-$HOME/.bise}/gate/"
+  else
+    gdir=/tmp gpre=/tmp/bise-gate-
+  fi
+}
+# gate.sh stop: the gates running in checkout $1 (a run whose .root is it and
+# whose pid still runs with the start in .owner) get a TERM; each one's exit
+# kills what its run started. Never pkill a gate by name: every agent's gate
+# matches (macOS pkill reads its options only before the pattern, so a -P or
+# -u after "gate.sh quick" narrows nothing: repl-kill, 2026-10-24).
+gate_stop() {
+  local d p n=0
+  gate_dirs
+  for d in "$gpre"[0-9]*; do
+    [ -d "$d" ] && [ "$(cat "$d/.root" 2>/dev/null)" = "$1" ] || continue
+    p="${d##*[-/]}"
+    kill -0 "$p" 2>/dev/null && [ "$(proc_start "$p")" = "$(cat "$d/.owner" 2>/dev/null)" ] || continue
+    kill -TERM "$p" 2>/dev/null || continue
+    n=$((n + 1)); echo "stopping the gate $p in $1"
+    for _ in $(seq 50); do kill -0 "$p" 2>/dev/null || break; sleep 0.2; done
+    kill -0 "$p" 2>/dev/null && echo "the gate $p still runs after 10 s"
+  done
+  [ $n -gt 0 ] || echo "no gate runs in $1"
+  return 0
+}
 older_than_a_minute() { [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }
 # whether this change runs desktop_check (tests/test_map.py desktop): its
 # why on stdout, nothing when it doesn't
@@ -358,7 +390,8 @@ if [ "$mode" = light ]; then
   if [ -z "$why" ]; then echo light; exit 0; fi
   echo "heavy:$why"; exit 1
 fi
-case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|light|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
+[ "$mode" = stop ] && { gate_stop "$(cd "$(dirname "$0")/.." && pwd)"; exit 0; }
+case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|light|new [name]|done [name]|wait <file|pid>|stop]" >&2; exit 2 ;; esac
 cd "$(dirname "$0")/.."
 root="$PWD"
 # a linked worktree has a .git file (the shared checkout a directory); a
@@ -460,11 +493,7 @@ fi
 # the leftovers of dead runs (a kill -9, a crash): their processes now; their
 # folder (the logs of a red run) after a day
 # the gate dir (above): runs <gpre><pid>, the lock, a red step's log
-if [ -n "${BISE_HOME:-}" ] || [ -f "$HOME/.bise/migrated.json" ]; then
-  gdir="${BISE_HOME:-$HOME/.bise}/gate" gpre="${BISE_HOME:-$HOME/.bise}/gate/"
-else
-  gdir=/tmp gpre=/tmp/bise-gate-
-fi
+gate_dirs
 mkdir -p "$gdir"
 # what a run's processes name in their command line: its folder (a /tmp
 # one without /tmp: python may show it as /private/tmp)
@@ -486,7 +515,8 @@ for d in "$gpre"[0-9]* /tmp/bise-gate-[0-9]*; do
 done
 [ -n "$wt_bins" ] && gate_kill "$(gate_procs "/bise-gate-none/" "" $wt_bins)"
 run="$gpre$$"
-rm -rf "$run"; mkdir -p "$run" && proc_start $$ >"$run/.owner" || { echo "gate: cannot write $run"; exit 1; }
+rm -rf "$run"; mkdir -p "$run" && proc_start $$ >"$run/.owner" && echo "$root" >"$run/.root" || { echo "gate: cannot write $run"; exit 1; }
+echo "gate $mode (pid $$): stop it with tests/gate.sh stop, never pkill (it matches every agent's gate)"
 export TMPDIR="$run" BISE_GATE_RUN=$$ BISE_GATE_START="$(cat "$run/.owner")"
 # every quick/full/rerun keeps its output in <gate dir>/logs/ for 7 days,
 # whatever the caller did with it (a task's tmp goes at its drop, a green
