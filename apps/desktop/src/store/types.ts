@@ -17,6 +17,12 @@ export const TAGS = {
   typing: true,
   partial: true,
   artifacts: true,
+  // the library (artifacts-folders): a hub's folders after an agent's edit, the core's after his;
+  // a hub's answer to artifacts/move and to artifacts/library (the terminal's reads)
+  folders: true,
+  library_folders: true,
+  artifacts_moved: true,
+  library: true,
   scheduled: true,
   worktrees: true,
   dev_servers: true,
