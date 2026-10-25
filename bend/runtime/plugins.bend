@@ -67,7 +67,9 @@ def skills_index_path() -> IO(String):
 # wrapper execs the script, so the REPL is its parent. The bridge
 # touches ready once its files are written (at most 12 s: a server
 # still starting then joins the index later); the wait gives up after
-# 15 s.
+# 15 s. The sh exits, so the bridge has ppid 1 from birth, by design:
+# its owner is its --parent (it exits on that pid's exit event,
+# rust/plugins/src/parent.rs), never its ppid.
 
 def start_script() -> String:
   "d=\"$1\"

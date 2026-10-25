@@ -6,7 +6,10 @@
 //! then serves each server over loopback HTTP (the JSON-response subset of
 //! MCP Streamable HTTP) until the REPL is gone, with no server too: its
 //! exit is an event ([`crate::parent`]), and then every server is stopped
-//! at once.
+//! at once. The bridge is reparented to launchd at birth by design (the
+//! REPL starts it with `nohup ... &` from a sh that exits:
+//! bend/runtime/plugins.bend): in a ps log its ppid is 1 while its REPL
+//! lives, and its owner is its `--parent`, never its ppid.
 //!
 //! Every [`POLL`] it reads `plugins.json` ([`state::read`]), the plugin
 //! roots' fingerprint and the connectors' catalog ([`shared_catalog`], the

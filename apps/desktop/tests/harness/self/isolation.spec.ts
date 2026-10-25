@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import os from 'node:os';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { adoptHome, breaches, harnessEnv, homeProblem, noteSeen, realHome, testHome } from '../isolation';
+import { adoptHome, breaches, declaredOwner, harnessEnv, homeProblem, inWorld, noteSeen, realHome, testHome } from '../isolation';
 import { launchDesktop } from '../launch';
 
 const REAL = realHome();
@@ -56,6 +56,32 @@ test('breaches: only the run is judged; his processes and other agents\' never a
   const lctl = breaches([...table.slice(0, 2), { pid: 111, ppid: 101, command: 'launchctl bootstrap gui/501 /x/dev.bise.hub.plist' }], new Set([50]), app, h, REAL);
   expect(lctl.some((b) => b.includes('pid 111:') && b.includes('launchctl outside'))).toBe(true);
   expect(breaches(table, new Set([50, 108, 110]), app, h, REAL)).toEqual([]); // there before the run
+  rmSync(h.root, { recursive: true, force: true });
+});
+
+test('inWorld: a detached helper belongs to the world of the owner it declares with --parent (bridge-exit, agents/new)', () => {
+  const h = testHome();
+  const bridge = (pid: number, owner: number) => ({ pid, ppid: 1, command: `/x/bise plugins serve --dir ${h.home}/.bise/run/${owner}/plugins --parent ${owner}`, home: h.home });
+  const table = [
+    // the world's hub (up before the run) and its REPL
+    { pid: 200, ppid: 1, command: `/x/bise sbd --workspace ${h.home}/code/telemetry`, home: h.home },
+    { pid: 201, ppid: 200, command: '/x/repl-live', home: h.home },
+    // a REPL the run started under its own core (not a world's)
+    { pid: 300, ppid: 1, command: '/x/bise ambient-core', home: h.home },
+    { pid: 301, ppid: 300, command: '/x/repl-live', home: h.home },
+    bridge(210, 201), // owner in the world: kept
+    bridge(310, 301), // owner outside any world: left by the run
+    bridge(410, 401), // owner gone: left by the run
+  ];
+  const baseline = new Set([200]);
+  expect(inWorld(201, table, baseline, h)).toBe(true);
+  expect(inWorld(210, table, baseline, h)).toBe(true);
+  expect(inWorld(310, table, baseline, h)).toBe(false);
+  expect(inWorld(410, table, baseline, h)).toBe(false);
+  expect(declaredOwner('/x/bise plugins serve --dir /d --parent 201')).toBe(201);
+  expect(declaredOwner('/x/tool --parent=42 --x')).toBe(42);
+  expect(declaredOwner('/x/tool --parents 42')).toBeUndefined();
+  expect(declaredOwner('/x/tool --parent 1')).toBeUndefined();
   rmSync(h.root, { recursive: true, force: true });
 });
 

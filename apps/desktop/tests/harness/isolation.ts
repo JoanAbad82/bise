@@ -161,6 +161,39 @@ export function breaches(procs: Proc[], baseline: Set<number>, appPid: number, h
   return out;
 }
 
+/** The pid a process names as its owner with `--parent <pid>` in its command line. Pure. */
+export function declaredOwner(command: string): number | undefined {
+  const m = /(?:^|\s)--parent(?:=|\s+)(\d+)(?=\s|$)/.exec(command);
+  const pid = m ? Number(m[1]) : NaN;
+  return pid > 1 ? pid : undefined;
+}
+
+/**
+ * The process belongs to an adopted world (up before the run): a baseline ancestor of it carries
+ * the run's home, or the owner it declares with `--parent <pid>` is such a world process or has
+ * one above it. A helper started detached (`nohup ... &` from a sh that exits: the plugins bridge,
+ * bend/runtime/plugins.bend) has ppid 1 from birth, so only its declared owner ties it to the
+ * world whose REPL started it (bridge-exit, agents/new on 1a7160891). An owner gone, or outside
+ * any world: not in one, so killed as left by the run. Pure (self/isolation.spec.ts).
+ */
+export function inWorld(pid: number, procs: Proc[], baseline: Set<number>, h: TestHome): boolean {
+  const byPid = new Map(procs.map((p) => [p.pid, p]));
+  const world = (q: number): boolean => {
+    const a = byPid.get(q);
+    return baseline.has(q) && a !== undefined && carriesRun(a, h);
+  };
+  // up from the process: its parent, or (reparented to launchd) the owner it declares
+  const up = (p: Proc): number => (p.ppid > 1 ? p.ppid : declaredOwner(p.command) ?? 0);
+  let q = byPid.get(pid);
+  for (let i = 0; q && i < 64; i++) {
+    const next = up(q);
+    if (next <= 1) return false;
+    if (world(next)) return true;
+    q = byPid.get(next);
+  }
+  return false;
+}
+
 /** Every process under `root` in one table. Pure. */
 export function descendants(procs: Proc[], root: number): number[] {
   const kids = new Map<number, number[]>();
@@ -261,17 +294,7 @@ export class Sentinel {
     for (const pid of tree) if (mine.has(pid) || !now.some((p) => p.pid === pid)) mine.add(pid);
     for (const pid of mine) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
     const after = await processes();
-    const parent = new Map(after.map((p) => [p.pid, p.ppid]));
-    const byPid = new Map(after.map((p) => [p.pid, p]));
-    const worlds = (pid: number): boolean => {
-      for (let q = parent.get(pid) ?? 0, i = 0; q > 1 && i < 64; i++) {
-        const a = byPid.get(q);
-        if (this.baseline.has(q) && a && carriesRun(a, this.h)) return true;
-        q = parent.get(q) ?? 0;
-      }
-      return false;
-    };
-    const left = after.filter((p) => p.pid !== process.pid && !this.baseline.has(p.pid) && carriesRun(p, this.h) && !worlds(p.pid));
+    const left = after.filter((p) => p.pid !== process.pid && !this.baseline.has(p.pid) && carriesRun(p, this.h) && !inWorld(p.pid, after, this.baseline, this.h));
     const cleaned: string[] = [];
     if (left.length) {
       const pids = new Set(left.map((p) => p.pid));
