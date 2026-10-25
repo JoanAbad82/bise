@@ -114,6 +114,15 @@ mod tests {
         Anchor::Slide { slide: n, rect: None }
     }
 
+    /// The file a save adds, written with its own mtime (`at` s): the
+    /// store's unchanged check is size and mtime, and two saves of the
+    /// same size in the same millisecond would read as one unchanged file.
+    fn put(p: &std::path::Path, bytes: &str, at: u64) {
+        std::fs::write(p, bytes).unwrap();
+        let f = std::fs::File::options().write(true).open(p).unwrap();
+        f.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000 + at)).unwrap();
+    }
+
     /// A deck saved three times in one turn and once in the next: the
     /// streams of `a/<id>` get each save as `version {n, rev, changed}`,
     /// a page's streams with the same id get none; a new stream starts
@@ -131,7 +140,7 @@ mod tests {
         p.subscribe(&key("q3-pptx"), tx);
         p.subscribe("q3-pptx", page_tx);
         let save = |bytes: &str, turn: u64, changed: Vec<Anchor>, at: u64| {
-            std::fs::write(work.join("q3.pptx"), bytes).unwrap();
+            put(&work.join("q3.pptx"), bytes, at);
             let a = Add {
                 target: "q3.pptx".into(),
                 agent: "deck".into(),
@@ -185,7 +194,7 @@ mod tests {
         std::fs::create_dir_all(&work).unwrap();
         let store = Store::new(&d);
         for (bytes, at) in [("one", 1), ("two", 2)] {
-            std::fs::write(work.join("q3.pptx"), bytes).unwrap();
+            put(&work.join("q3.pptx"), bytes, at);
             let turn = Some(Turn { agent: "deck".into(), started_ms: at * 100 });
             let a = Add { target: "q3.pptx".into(), agent: "deck".into(), by: "deck".into(), cwd: work.to_string_lossy().to_string(), turn, changed: Some(vec![slide(2)]), ..Default::default() };
             store.add(&a, at).unwrap();
