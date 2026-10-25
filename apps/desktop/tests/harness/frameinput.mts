@@ -7,21 +7,36 @@
 // step itself: before each pointer event, the parent's elementFromPoint at those page coordinates
 // must be the iframe, else it throws with what is on top (an overlay over the frame still fails,
 // as it would for him). Same-origin frames route fine under offscreen rendering: refused here.
-// Plain .mjs so the as-he-does driver (dev/plugins/ambient-qa/as-he-does/driver.ts) and the
-// checks (inputs.ts re-exports it) read one copy. Coordinates are the page's, as page.mouse's.
+// The checks read it through inputs.ts. Coordinates are the page's, as page.mouse's.
+import type { Frame, Page } from "@playwright/test";
 
 const KEYS = {
   Escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
   Space: { key: " ", code: "Space", windowsVirtualKeyCode: 32 },
 };
 
-/**
- * @param {import('@playwright/test').Page} page
- * @param {import('@playwright/test').Frame} frame
- */
-export async function frameInput(page, frame) {
+export type FrameKey = keyof typeof KEYS;
+export interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+export interface FrameInput {
+  move(x: number, y: number): Promise<void>;
+  wheel(x: number, y: number, dx: number, dy: number, o?: { ctrl?: boolean }): Promise<void>;
+  down(x: number, y: number): Promise<void>;
+  up(x: number, y: number): Promise<void>;
+  click(x: number, y: number): Promise<void>;
+  dblclick(x: number, y: number): Promise<void>;
+  drag(a: Point, b: Point, steps?: number): Promise<void>;
+  keyDown(name: FrameKey): Promise<void>;
+  keyUp(name: FrameKey): Promise<void>;
+  press(name: FrameKey): Promise<void>;
+  detach(): Promise<void>;
+}
+
+export async function frameInput(page: Page, frame: Frame): Promise<FrameInput> {
   const el = await frame.frameElement();
-  const origin = (u) => {
+  const origin = (u: string) => {
     try {
       return new URL(u).origin;
     } catch {
@@ -34,9 +49,9 @@ export async function frameInput(page, frame) {
   const cdp = await page.context().newCDPSession(frame);
   let held = false;
   /** The browser's hit test, done here: the iframe must be on top at (x, y); its frame coordinates. */
-  const at = async (x, y) => {
+  const at = async (x: number, y: number) => {
     const top = await el.evaluate((f, p) => {
-      const e = f.ownerDocument.elementFromPoint(p.x, p.y);
+      const e = f.ownerDocument?.elementFromPoint(p.x, p.y) ?? null;
       if (e === f) return null;
       return e ? `${e.tagName.toLowerCase()}${e.getAttribute("data-testid") ? `[data-testid=${e.getAttribute("data-testid")}]` : ""}${e.className && typeof e.className === "string" ? `.${e.className.split(/\s+/).join(".")}` : ""}` : "nothing";
     }, { x, y });
@@ -45,13 +60,16 @@ export async function frameInput(page, frame) {
     if (b === null) throw new Error("frameInput: the frame is not on screen");
     return { x: x - b.x, y: y - b.y };
   };
-  const mouse = async (type, x, y, o = {}) => {
+  type MouseType = "mouseMoved" | "mousePressed" | "mouseReleased" | "mouseWheel";
+  type MouseMore = { button?: "left"; buttons?: number; clickCount?: number; deltaX?: number; deltaY?: number; modifiers?: number };
+  const mouse = async (type: MouseType, x: number, y: number, o: MouseMore = {}) => {
     const p = await at(x, y);
-    await cdp.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, ...(held ? { button: "left", buttons: 1 } : {}), ...o });
+    await cdp.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, ...(held ? { button: "left" as const, buttons: 1 } : {}), ...o });
   };
-  const key = async (type, name, modifiers = 0) => {
+  const key = async (type: "rawKeyDown" | "keyUp", name: FrameKey, modifiers = 0) => {
+    // a caller in plain JS may name a key that isn't there
+    if (!Object.hasOwn(KEYS, name)) throw new Error(`frameInput: no key ${name} (${Object.keys(KEYS).join(", ")})`);
     const k = KEYS[name];
-    if (!k) throw new Error(`frameInput: no key ${name} (${Object.keys(KEYS).join(", ")})`);
     await cdp.send("Input.dispatchKeyEvent", { type, modifiers, ...k });
   };
   return {

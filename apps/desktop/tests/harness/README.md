@@ -27,10 +27,10 @@ Run: `pnpm test:e2e` (self-tests + `tests/checks/**`), one worker. Ask amb-tools
 | what | how |
 |---|---|
 | the app (`apps/desktop/out`, `BISE_DESKTOP_TEST=1`) | `launchDesktop()`, fixture `desktop` |
-| any HTML file (the harness's self-tests on `fixtures/`) | `launchPage(file)`, in `pageapp/main.js` |
+| any HTML file (the harness's self-tests on `fixtures/`) | `launchPage(file)`, in `pageapp/main.js` (emitted from `pageapp/main.ts` by `scripts/ts_emit.ts`) |
 | fake microphone | `launch*({ micWav: 'x.wav' })` (Chromium's fake capture device) |
-| the scripted core | `launchDesktop({ core: new FakeCore() })`: its start world is every fixture of `rust/proto/fixtures` (or `new FakeCore([...events])`, or `'none'`). `core.send(ev)` sends more events, and `core.cmds()` / `core.waitCmd(pred)` read what the app sent the core (`fakes/core-stub.mjs`). Without it, the core stays `down`. |
-| the scripted Mac helper | `launchDesktop({ helper: new FakeHelper() })`: hello at start. `helper.send({ev:'fn',act:'talk_start',by:'fn'})` sends events, and `helper.cmds()` / `waitCmd` read the app's commands (`fakes/helper-stub.mjs`). Without it, there is no helper. |
+| the scripted core | `launchDesktop({ core: new FakeCore() })`: its start world is every fixture of `rust/proto/fixtures` (or `new FakeCore([...events])`, or `'none'`). `core.send(ev)` sends more events, and `core.cmds()` / `core.waitCmd(pred)` read what the app sent the core (`fakes/core-stub.mts`). Without it, the core stays `down`. |
+| the scripted Mac helper | `launchDesktop({ helper: new FakeHelper() })`: hello at start. `helper.send({ev:'fn',act:'talk_start',by:'fn'})` sends events, and `helper.cmds()` / `waitCmd` read the app's commands (`fakes/helper-stub.mts`). Without it, there is no helper. |
 | a start screen | `launchDesktop({ route: 'settings' })` (BISE_DESKTOP_ROUTE, read by amb-mac's main in test mode); `'inbox'` / `'inbox?card=<p>/<id>'` open the inbox block in place on the kept screen (there is no inbox screen) |
 
 The session's `page` is the app's main window (`window.bise.surface === 'window'`). Use `surfacePage(app, 'capsule')` for the capsule; any window is in `session.app.windows()`.
@@ -63,14 +63,14 @@ Or point `BISE_HARNESS_ELECTRON_DIST` at a folder holding an Electron.app that i
 ## Test ids (guarantee 4)
 Checks find things only by `data-testid`. In components, pass the id as the `testId` prop, and the ds puts it on the element.
 - Name: `<area>.<thing>[.<id>]`, lowercase kebab-case parts joined by dots: `composer.editor`, `inbox.card.c-search`,
-  `thread.msg.42`. A sub-part adds `.<i>` (`sub(testId, i)`). Areas are listed in `lint/testid.mjs`: `AREAS`.
-- Lint: `lint/testid.mjs` is the ESLint plugin `bise-testid`. `name` checks literal and template ids. `present`
+  `thread.msg.42`. A sub-part adds `.<i>` (`sub(testId, i)`). Areas are listed in `lint/testid.mts`: `AREAS`.
+- Lint: `lint/testid.mts` is the ESLint plugin `bise-testid`. `name` checks literal and template ids. `present`
   flags what a person can act on without an id: a native control, a click/key/change handler, an interactive
   role, `contentEditable`. A spread counts as present.
-- The list: `node tests/harness/lint/testids.mjs [--md]` prints every id in `src/**/*.tsx` with its file:line.
+- The list: `node tests/harness/lint/testids.mts [--md]` (with type stripping: `NODE_OPTIONS=--experimental-strip-types`) prints every id in `src/**/*.tsx` with its file:line.
 
 ## Show me
-`node tests/harness/showme/showme.mjs <surface> [state] [--frames <ms>] [--out <dir>] [--size <w>x<h>]` shows one screen
+`node tests/harness/showme/showme.mts <surface> [state] [--frames <ms>] [--out <dir>] [--size <w>x<h>]` shows one screen
 in one state, out of his sight. It writes `shot.png` and `meta.json` (with the proof), and with `--frames` also every
 drawn frame (`frames/NNNN.png`, `frames.json`: times and change per frame).
 - `desktop [route]`: the app from `out/` (`pnpm build` first), on the scripted core (the fixture world) and

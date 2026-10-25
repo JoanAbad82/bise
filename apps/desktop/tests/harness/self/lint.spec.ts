@@ -1,7 +1,7 @@
 // The test-id lint checks itself: good names pass, bad names and unnamed controls are reported.
 import { ESLint } from 'eslint';
 import { expect, test } from '@playwright/test';
-import testid, { badId } from '../lint/testid.mjs';
+import testid, { badId } from '../lint/testid.mts';
 
 test('badId: <area>.<thing>[.<id>] in lowercase kebab parts, a known area', () => {
   expect(badId('composer.editor')).toBeNull();

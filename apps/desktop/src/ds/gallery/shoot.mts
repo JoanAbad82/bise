@@ -3,7 +3,7 @@
 // theme, and check the pixels: every pane draws something, and each light pane is lighter than its
 // dark one (the tokens switch with data-theme). Then stop the browser and the server.
 //
-//   node src/ds/gallery/shoot.mjs <out dir> [section,section…]
+//   node src/ds/gallery/shoot.mts <out dir> [section,section…]
 //
 // Stills: ?motion=0 stops every animation and transition. Exit 1 on a failed pane.
 /* global getComputedStyle -- used inside page.$$eval, which runs in the page */
@@ -15,16 +15,17 @@ import { createServer } from "vite";
 
 const here = import.meta.dirname;
 const out = process.argv[2];
-if (!out) { console.error("usage: node src/ds/gallery/shoot.mjs <out dir> [sections]"); process.exit(2); }
+if (!out) { console.error("usage: node src/ds/gallery/shoot.mts <out dir> [sections]"); process.exit(2); }
 mkdirSync(out, { recursive: true });
 const only = process.argv[3] ?? "";
 
 // mean luminance (0..255) and its spread over a PNG
-function stats(file) {
+function stats(file: string) {
   const png = PNG.sync.read(readFileSync(file));
   let sum = 0, sq = 0, n = 0;
+  const at = (i: number) => png.data[i] ?? 0;
   for (let i = 0; i < png.data.length; i += 4) {
-    const y = 0.2126 * png.data[i] + 0.7152 * png.data[i + 1] + 0.0722 * png.data[i + 2];
+    const y = 0.2126 * at(i) + 0.7152 * at(i + 1) + 0.0722 * at(i + 2);
     sum += y; sq += y * y; n++;
   }
   const mean = sum / n;
@@ -46,12 +47,12 @@ try {
     els.map((e) => e.getAttribute("data-testid") ?? "").filter((id) => id.split(".").length === 3));
   for (const id of sections) {
     const name = id.split(".")[2];
-    const s = {};
-    for (const theme of ["dark", "light"]) {
+    const shot = async (theme: "dark" | "light") => {
       const file = join(out, `${name}-${theme}.png`);
       await page.locator(`[data-testid='${id}.${theme}']`).screenshot({ path: file });
-      s[theme] = stats(file);
-    }
+      return stats(file);
+    };
+    const s = { dark: await shot("dark"), light: await shot("light") };
     const ok = s.dark.sd > 4 && s.light.sd > 4 && s.light.mean > s.dark.mean + 40;
     if (!ok) failed++;
     console.log(`  ${ok ? "✓" : "✗"} ${name}: dark ${s.dark.mean.toFixed(0)}±${s.dark.sd.toFixed(0)}, light ${s.light.mean.toFixed(0)}±${s.light.sd.toFixed(0)}`);
@@ -64,10 +65,10 @@ try {
   // group must NOT pass (the check sees color-only cues), else it proves nothing.
   if (sections.includes("ds.gallery.contrast")) {
     const signatures = () => page.$$eval("[data-testid^='ds.contrast.']", (els) => {
-      const strip = (s) => s.replace(/(rgba?|hsla?|color|oklch|oklab|lab|lch|color-mix)\([^()]*(\([^()]*\)[^()]*)*\)/g, "C").replace(/#[0-9a-f]{3,8}\b/gi, "C");
-      const sig = (el) => {
-        const parts = [el.textContent ?? ""];
-        for (const n of [el, ...el.querySelectorAll("*")]) {
+      const strip = (s: string) => s.replace(/(rgba?|hsla?|color|oklch|oklab|lab|lch|color-mix)\([^()]*(\([^()]*\)[^()]*)*\)/g, "C").replace(/#[0-9a-f]{3,8}\b/gi, "C");
+      const sig = (el: Element) => {
+        const parts = [el.textContent];
+        for (const n of [el, ...Array.from(el.querySelectorAll("*"))]) {
           for (const pseudo of ["::before", "::after"]) {
             const c = getComputedStyle(n, pseudo).content;
             if (c && c !== "none" && c !== "normal") parts.push(pseudo + c);
@@ -81,9 +82,9 @@ try {
       return els.filter((e) => (e.getAttribute("data-testid") ?? "").split(".").length === 4 && e.closest("[data-theme='dark']"))
         .map((e) => { const [, , group, state] = (e.getAttribute("data-testid") ?? "").split("."); return { group, state, sig: sig(e) }; });
     });
-    const clashes = (items) => {
-      const out = [];
-      for (const a of items) for (const b of items) if (a.group === b.group && a.state < b.state && a.sig === b.sig) out.push(`${a.group}: ${a.state} = ${b.state}`);
+    const clashes = (items: { group?: string; state?: string; sig: string }[]) => {
+      const out: string[] = [];
+      for (const a of items) for (const b of items) if (a.group === b.group && (a.state ?? "") < (b.state ?? "") && a.sig === b.sig) out.push(`${a.group}: ${a.state} = ${b.state}`);
       return out;
     };
     const plain = clashes(await signatures());

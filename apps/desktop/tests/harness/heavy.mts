@@ -1,6 +1,6 @@
 // One heavy job on this Mac (main m_13151, ambient-lead m_13161): the argv that runs a command in a
-// heavy slot (~/.bise/run/heavy-run, the first free of two), shared by test:land (land.mjs) and the
-// coverage-map run (coverage/covmap.mjs).
+// heavy slot (~/.bise/run/heavy-run, the first free of two), shared by test:land (land.mts) and the
+// coverage-map run (coverage/covmap.mts).
 import { mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
@@ -28,7 +28,7 @@ export function underHeavySlot(env = process.env) {
     if (!line) return false;
     const [ppid, ...rest] = line.split(/\s+/);
     const cmd = rest.join(' ');
-    if (cmd.split(' ')[0].endsWith('lockf') && SLOT_LOCK.test(cmd)) return true;
+    if ((cmd.split(' ')[0] ?? '').endsWith('lockf') && SLOT_LOCK.test(cmd)) return true;
     pid = Number(ppid) || 0;
   }
   return false;
@@ -37,7 +37,7 @@ export function underHeavySlot(env = process.env) {
 /** One heavy job (main m_13151, ambient-lead m_13161): already in a slot, nice 10 alone (never a
  * second slot, never nested); else through ~/.bise/run/heavy-run (its first free slot of two);
  * else, without heavy-run, the old single lock. */
-export function heavyArgv(cmd) {
+export function heavyArgv(cmd: string[]): [string, string[]] {
   mkdirSync(run, { recursive: true });
   if (underHeavySlot()) return ['nice', ['-n', '10', ...cmd]];
   const heavyRun = path.join(run, 'heavy-run');

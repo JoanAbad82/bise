@@ -4,9 +4,9 @@
 // off-screen like every harness run, one app at a time, in one heavy slot (~/.bise/run/heavy-run:
 // the first free of heavy.lock / heavy2.lock, nice 10; none taken again when already in one). Each check takes under 30 s; the set,
 // under 3 min. Needs `pnpm build` first (pnpm check builds).
-//   node tests/harness/land.mjs [--list]
+//   node tests/harness/land.mts [--list]   (pnpm test:land: it sets NODE_OPTIONS for type stripping)
 import { spawnSync } from 'node:child_process';
-import { heavyArgv } from './heavy.mjs';
+import { heavyArgv } from './heavy.mts';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -54,15 +54,17 @@ process.exit(r.status ?? 1);
 
 /** The red checks of a Playwright JSON report, by spec name (`history-perf` for
  * checks/app/history-perf.spec.ts): known_reds.txt's names. */
-function redChecks(file) {
-  let data;
+function redChecks(file: string): string[] {
+  // Playwright's JSON report: the fields this walk reads
+  type Suite = { file?: string; specs?: { file?: string; tests?: { status: string }[] }[]; suites?: Suite[] };
+  let data: { suites?: Suite[] };
   try {
-    data = JSON.parse(readFileSync(file, 'utf8'));
+    data = JSON.parse(readFileSync(file, 'utf8')) as { suites?: Suite[] };
   } catch {
     return [];
   }
-  const red = new Set();
-  const walk = (suite) => {
+  const red = new Set<string>();
+  const walk = (suite: Suite) => {
     for (const spec of suite.specs ?? []) {
       const bad = (spec.tests ?? []).some((t) => !['expected', 'skipped', 'flaky'].includes(t.status));
       if (bad) red.add(path.basename(spec.file ?? suite.file ?? '').replace(/\.spec\.ts$/, ''));

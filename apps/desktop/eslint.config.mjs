@@ -7,10 +7,12 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['out/', 'dist/', 'node_modules/', '.harness-cache/', 'src/proto/', 'tests/nightly/rec/'] },
+  { ignores: ['out/', 'dist/', 'node_modules/', '.harness-cache/', 'src/proto/', 'tests/nightly/rec/',
+    // emitted from their .ts (scripts/ts_emit.ts): the .ts is linted
+    'tests/harness/coverage/hook.js', 'tests/harness/pageapp/main.js'] },
   js.configs.recommended,
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['**/*.ts', '**/*.tsx', '**/*.mts'],
     extends: [...tseslint.configs.strictTypeChecked],
     languageOptions: {
       parserOptions: {

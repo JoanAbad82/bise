@@ -6,6 +6,6 @@
     "types": [],
     "tsBuildInfoFile": "node_modules/.tmp/tsconfig.web.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/feature/**/*.ts", "tests/nightly/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/ds/purity.mts", "tests/feature/**/*.ts", "tests/nightly/*.ts"],
   "exclude": ["src/main/**"]
 }

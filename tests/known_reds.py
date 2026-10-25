@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The known reds (issue 28): tests/known_reds.txt is the one list of the tests that are red on
 main now, each with who fixes it. The full gate (e2e/tmux, run_all.sh's red list) and apps/
-desktop's test:land (land.mjs, its red checks) split their reds with it: a red in the file is
+desktop's test:land (land.mts, its red checks) split their reds with it: a red in the file is
 known (its owner is on it), any other one is NEW, yours until shown otherwise. The rc of the
 gate stays what it was: a known red is still red. The land check (gate.sh land) reads nothing
 here: its steps are always green.

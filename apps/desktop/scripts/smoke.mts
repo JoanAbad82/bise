@@ -12,14 +12,16 @@ const READY_LINE = 'bise-desktop: ready'; // src/shared/api.ts READY_LINE
 const TIMEOUT_MS = 30_000;
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const child = spawn(String(electron), [root], {
+// in node (not in Electron), the electron package exports the binary's path; its types are Electron's
+const bin: unknown = electron;
+const child = spawn(String(bin), [root], {
   env: { ...process.env, BISE_DESKTOP_TEST: '1', ELECTRON_RENDERER_URL: '' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
 let out = '';
 let done = false;
-const finish = (code, why) => {
+const finish = (code: number, why: string) => {
   if (done) return;
   done = true;
   clearTimeout(timer);

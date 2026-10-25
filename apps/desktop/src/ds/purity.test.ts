@@ -1,7 +1,7 @@
 // src/ds purity (architect m_26213): a ds file that reaches the store, the app or holds its own
 // state outside hooks.ts goes red; hooks.ts may hold state, never the app.
 import { describe, expect, it } from "vitest";
-import { purityFaults } from "./purity.mjs";
+import { purityFaults } from "./purity.mts";
 
 const faults = (files: Record<string, string>): string[] => purityFaults(files);
 

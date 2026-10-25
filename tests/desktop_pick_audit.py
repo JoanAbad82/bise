@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The nightly audit of the desktop checks' selection (fast-try p2; architect m_29198 m_29411,
 review-gates m_29412 #7). Run by the nightly right after the coverage map
-(apps/desktop/tests/harness/coverage/covmap.mjs run), on the gate dir:
+(apps/desktop/tests/harness/coverage/covmap.mts run), on the gate dir:
 
   - the coverage audit: every pick logged since the last audit (<gate dir>/desktop-pick.jsonl,
     from gate.sh land and the try: tests/desktop_pick_shadow.sh), replayed against the NEW map: a

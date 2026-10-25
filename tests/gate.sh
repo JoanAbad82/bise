@@ -933,7 +933,7 @@ python3 -B "$root/tests/keep_logs_test.py" >/dev/null || { python3 -B "$root/tes
 python3 -B "$root/tests/runtime_check_test.py" >/dev/null || { python3 -B "$root/tests/runtime_check_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 if [ -d "$root/apps/desktop" ]; then
-  node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test >/dev/null || { node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test; echo "GATE quick FAILED"; exit 1; }
+  NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/apps/desktop/tests/harness/coverage/covmap.mts" --self-test >/dev/null || { NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/apps/desktop/tests/harness/coverage/covmap.mts" --self-test; echo "GATE quick FAILED"; exit 1; }
 fi
 # no new Bool.pick walk that never stops; the list of old ones only shrinks; no
 # def that calls itself twice with the same arguments (2^n: hub-tick) (tests/pick_gate.py)

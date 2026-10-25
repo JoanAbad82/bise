@@ -1,4 +1,4 @@
-// The line relay both stubs share (helper-stub.mjs, core-stub.mjs): a child process of the app that
+// The line relay both stubs share (helper-stub.mts, core-stub.mts): a child process of the app that
 // speaks JSON lines like the real one and is scripted by a test.
 //   start lines  written to stdout at once (the hello, a fixture world)
 //   socket       every line a test writes to the unix socket goes to stdout (an event each)
@@ -14,11 +14,28 @@ import net from 'node:net';
 
 const NL = String.fromCharCode(10);
 
+/** A command the app sent (a JSON line, or a request's method and params): its cmd and fields. */
+export type Cmd = {
+  cmd?: string; card?: unknown;
+  // what the core stub reads of a request (thread/subscribe, page, diff, log, completion, files...)
+  project?: unknown; agent?: unknown; before?: number | null; limit?: number; commit?: unknown; id?: unknown;
+  q?: unknown; rid?: unknown; find?: unknown; slot?: unknown; raw?: unknown;
+  [k: string]: unknown;
+};
+/** A test's {"harness":"refuse"} line: the next request for that command (and card) fails so. */
+type Refusal = { cmd?: string; card?: unknown; message?: string; reason?: unknown };
+/** A test's {"harness":"result"} line: a command's answer (and the events before it). */
+type Answer = { cmd?: string; card?: unknown; result?: unknown; before?: unknown[] };
+/** A JSON-RPC message the app wrote on stdin. */
+type RpcIn = { method?: unknown; id?: unknown; params?: Cmd };
+/** A line a stub sends: a JSON line already, or an object to stringify. */
+export type Line = string | object;
+
 /** Splits a stream of chunks into lines, calling `on` for each non-empty one. */
-function lines(on) {
+function lines(on: (line: string) => void) {
   let buf = '';
   return {
-    push(chunk) {
+    push(chunk: string) {
       buf += chunk;
       let i;
       while ((i = buf.indexOf(NL)) >= 0) {
@@ -35,31 +52,32 @@ function lines(on) {
  * The JSON-RPC side of the core stub: `hubEvs`, the HubEv tags (hub/<tag>; every other event is
  * core/<tag>). Returns the event writer and the stdin reader.
  */
-function rpcSide(write, hubEvs) {
+function rpcSide(write: (line: string) => void, hubEvs: readonly string[]) {
   let ready = false;
-  const held = [];
+  const held: string[] = [];
   // FakeCore.refuse: the next request for that command (and card) gets this error, as the real
   // core answers a hub's refusal to that very request (architect m_23524)
-  const refusals = [];
-  const note = (line) => {
-    let ev;
-    try { ev = JSON.parse(line); } catch { return write(line); /* a test's raw line, as is */ }
-    if (typeof ev?.ev !== 'string') return write(line);
+  const refusals: Refusal[] = [];
+  const note = (line: string) => {
+    let ev: { ev?: unknown; [k: string]: unknown } | null;
+    try { ev = JSON.parse(line) as typeof ev; } catch { write(line); return; /* a test's raw line, as is */ }
+    if (!ev || typeof ev.ev !== 'string') { write(line); return; }
     const { ev: tag, ...params } = ev;
+    if (typeof tag !== 'string') { write(line); return; }
     write(JSON.stringify({ jsonrpc: '2.0', method: `${hubEvs.includes(tag) ? 'hub' : 'core'}/${tag}`, params }));
   };
   return {
-    out: (line) => (ready ? note(line) : held.push(line)),
-    refuse: (r) => refusals.push(r),
+    out: (line: string) => { if (ready) note(line); else held.push(line); },
+    refuse: (r: Refusal) => refusals.push(r),
     // a stdin message -> the command it carries (null: none), after answering it
-    take(m) {
+    take(m: RpcIn): Cmd | null {
       if (m.method === 'initialize') { write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { proto: 1, methods: [], notifications: [] } })); return null; }
       if (m.method === 'initialized') { ready = true; for (const l of held.splice(0)) note(l); return null; }
       if (typeof m.method !== 'string' || m.id === undefined) return null;
-      const cmd = { cmd: m.method.slice(m.method.indexOf('/') + 1), ...(m.params ?? {}) };
+      const cmd: Cmd = { cmd: m.method.slice(m.method.indexOf('/') + 1), ...(m.params ?? {}) };
       const i = refusals.findIndex((r) => r.cmd === cmd.cmd && (r.card === undefined || r.card === cmd.card));
-      if (i >= 0) {
-        const [r] = refusals.splice(i, 1);
+      const r = i >= 0 ? refusals.splice(i, 1)[0] : undefined;
+      if (r) {
         write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32001, message: r.message, ...(r.reason === undefined ? {} : { data: { reason: r.reason } }) } }));
       } else {
         // the events the hub's step sent before it answered (its rows without the card it closed):
@@ -81,18 +99,18 @@ function rpcSide(write, hubEvs) {
  * send answered {} (echo.ts answered), which emptied thread/first-run's thread (review-refactor m_30967).
  */
 let nextMsgId = 9000;
-const defaultResult = (cmd) => (cmd.cmd === 'send' ? { msg_id: nextMsgId++, reason: 'made' } : {});
+const defaultResult = (cmd: Cmd) => (cmd.cmd === 'send' ? { msg_id: nextMsgId++, reason: 'made' } : {});
 
 /**
  * A request's answer a test set (FakeCore.result), or undefined: then its result is defaultResult's. A card's
  * answer stays for every request on that card; one with no card (a send's msg_id) answers the
  * next request alone, so each send of a test gets its own id.
  */
-let answersBy = [];
-const answerOf = (cmd) => {
+let answersBy: Answer[] = [];
+const answerOf = (cmd: Cmd): Answer | undefined => {
   const i = answersBy.findIndex((a) => a.cmd === cmd.cmd && a.card === cmd.card);
-  if (i < 0) return undefined;
   const a = answersBy[i];
+  if (i < 0 || !a) return undefined;
   if (a.card === undefined) answersBy = answersBy.filter((_, j) => j !== i);
   return a;
 };
@@ -102,25 +120,33 @@ const answerOf = (cmd) => {
  * subscribe). rpc: { hubEvs } to speak JSON-RPC (the core stub). follow(line): the lines to send
  * right after each line that goes out (the core stub: its rows after a hub's cards).
  */
-export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow }) {
-  const write = (line) => process.stdout.write(line + NL);
+export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow }: {
+  start?: readonly Line[];
+  sock?: string | undefined;
+  log?: string | undefined;
+  quitCmd?: string;
+  answer?: (cmd: Cmd) => readonly Line[];
+  rpc?: { hubEvs: readonly string[] };
+  follow?: (line: string) => readonly string[];
+}) {
+  const write = (line: string) => process.stdout.write(line + NL);
   const side = rpc ? rpcSide(write, rpc.hubEvs) : null;
   const sent = side ? side.out : write;
   // follow(line): the lines a real core sends right after that one (the core stub's rows on a cards event)
-  const out = (line) => {
+  const out = (line: string) => {
     sent(line);
     for (const l of follow?.(line) ?? []) sent(l);
   };
   for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l));
   // a test's {"harness":"hold","cmd":c}: the answers to `c` wait (a busy hub, thread-loading)
   // until {"harness":"release"} sends them, in order
-  let holding = null;
-  let held = [];
+  let holding: unknown = null;
+  let held: string[] = [];
   // a test's {"harness":"exit","code":n} line ends this process with that code (a core that
   // stops: the app restarts it, amb-win's app/keep); any other line goes out as is
-  const relay = (line) => {
+  const relay = (line: string) => {
     if (line.startsWith('{"harness":"hold"')) {
-      try { holding = JSON.parse(line).cmd ?? null; } catch { /* a broken line: nothing */ }
+      try { holding = (JSON.parse(line) as { cmd?: unknown }).cmd ?? null; } catch { /* a broken line: nothing */ }
       return;
     }
     if (line.startsWith('{"harness":"release"')) {
@@ -132,7 +158,7 @@ export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow })
     }
     if (line.startsWith('{"harness":"refuse"') || line.startsWith('{"harness":"result"')) {
       try {
-        const r = JSON.parse(line);
+        const r = JSON.parse(line) as Refusal & Answer & { harness?: string };
         if (r.harness === 'refuse') side?.refuse(r);
         else answersBy = [...answersBy, r];
       } catch { /* a broken line: nothing */ }
@@ -140,20 +166,20 @@ export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow })
     }
     if (line.startsWith('{"harness":"exit"')) {
       let code = 1;
-      try { code = Number(JSON.parse(line).code ?? 1); } catch { /* the default */ }
+      try { code = Number((JSON.parse(line) as { code?: unknown }).code ?? 1); } catch { /* the default */ }
       quit(code);
       return;
     }
     out(line);
   };
-  let server;
+  let server: net.Server | undefined;
   if (sock) {
     rmSync(sock, { force: true });
     server = net.createServer((c) => {
       c.setEncoding('utf8');
       const s = lines(relay);
-      c.on('data', (d) => s.push(d));
-      c.on('end', () => s.end());
+      c.on('data', (d: string) => { s.push(d); });
+      c.on('end', () => { s.end(); });
     });
     server.listen(sock);
   }
@@ -163,9 +189,10 @@ export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow })
     process.exit(code);
   }
   const s = lines((line) => {
-    let cmd;
-    try { cmd = JSON.parse(line); } catch { if (log) appendFileSync(log, line + NL); return; /* not JSON: logged as is */ }
-    if (side) cmd = side.take(cmd);
+    // a JSON line: a command (a plain stub) or a JSON-RPC message (the core stub)
+    let msg: (Cmd & RpcIn) | null;
+    try { msg = JSON.parse(line) as typeof msg; } catch { if (log) appendFileSync(log, line + NL); return; /* not JSON: logged as is */ }
+    const cmd = side && msg ? side.take(msg) : msg;
     if (cmd === null) return;
     if (log) appendFileSync(log, (side ? JSON.stringify(cmd) : line) + NL);
     if (quitCmd && cmd.cmd === quitCmd) quit();
@@ -178,6 +205,6 @@ export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow })
     }
   });
   process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (d) => s.push(d));
+  process.stdin.on('data', (d: string) => { s.push(d); });
   process.stdin.on('end', () => { s.end(); quit(); });
 }
