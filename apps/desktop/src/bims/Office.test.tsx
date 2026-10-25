@@ -381,6 +381,55 @@ describe('his camera (zoom.ts)', () => {
   });
 });
 
+describe('the follow camera (focus.ts)', () => {
+  it('follows its bim at followZoom (FOLLOW_ZOOM by default); a new zoom eases there', async () => {
+    let now = 1_000_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      const r = Object.assign(fakeRenderer(), { spotOf: vi.fn(() => ({ x: 0, y: 0, u: 0.5, v: 0.5 })) });
+      const { parts } = fakeParts(r);
+      const at = (zoom?: number) => <Office project="p1" agents={AGENTS} cards={[]} places={[]} parts={parts} onOpen={vi.fn()} follow="perf" followZoom={zoom} />;
+      const run = async () => {
+        for (let i = 0; i < 40; i++) {
+          now += 100;
+          await flush(1);
+        }
+      };
+      const zoom = () => (r.setCam.mock.calls.at(-1)?.[0] as { zoom: number }).zoom;
+      const { rerender } = render(at(2.2));
+      await run();
+      expect(zoom()).toBeCloseTo(2.2, 2);
+      rerender(at(undefined));
+      await run();
+      expect(zoom()).toBeCloseTo(4.4, 2);
+      rerender(at(2.2));
+      now += 100;
+      await flush(1);
+      // one step on: between the two, on its way back
+      expect(zoom()).toBeLessThan(4.4);
+      expect(zoom()).toBeGreaterThan(2.2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+  it('a named bim wears its hover label without the pointer; his own hover wins', async () => {
+    const r = fakeRenderer();
+    const { parts } = fakeParts(r);
+    const hovers: (string | null)[] = [];
+    const spied: Parts = { ...parts, labelsOf: (_p, o) => (hovers.push(o.hover), new Map()) };
+    const at = (named: string | null) => <Office project="p1" agents={AGENTS} cards={[]} places={[]} parts={spied} onOpen={vi.fn()} named={named} />;
+    const { rerender } = render(at(null));
+    await flush(2);
+    expect(hovers.at(-1)).toBeNull();
+    rerender(at('perf'));
+    await flush(1);
+    expect(hovers.at(-1)).toBe('perf');
+    rerender(at(null));
+    await flush(1);
+    expect(hovers.at(-1)).toBeNull();
+  });
+});
+
 describe('the map (/bims)', () => {
   /** parts whose office is the map asked for, so a new pick is another office */
   const mapParts = (r: ReturnType<typeof fakeRenderer>) => {

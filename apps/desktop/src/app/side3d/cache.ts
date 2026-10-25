@@ -3,8 +3,9 @@
 // bims-budget checks it), drawn once per thing, size and theme and kept for the window's life;
 // asked a few per frame so opening a card never stalls. A head's key carries its outfit (render
 // outfitSig, read once the renderer is loaded): when the outfits are redone (bims-clay-2,
-// bims-outfit-review; plan d6) the key changes and the heads draw again. No WebGL (a test, a lost
-// GPU): null for good, the caller keeps its plain tile. Owner: nm-side.
+// bims-outfit-review; plan d6) the key changes and the heads draw again. A draw that fails (a lost
+// context, too many on a page) shows the plain tile and is tried again RETRY_MS later; only a
+// renderer that cannot load keeps the tiles for good. Owner: nm-side.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Thing } from './objects';
 
@@ -18,7 +19,12 @@ export function thingKey(t: Thing, px: number, night: boolean, outfit: string): 
 }
 
 const drawn = new Map<string, string>();
+/** the renderer could not even load: the plain tiles for good */
 let dead = false;
+/** a draw failed (a lost context, too many contexts on a page): none tried again before this time */
+let pauseUntil = 0;
+/** how long the pictures wait after a failed draw before they try again, ms (ui-review m_43146) */
+export const RETRY_MS = 5_000;
 let loading: Promise<Render> | null = null;
 /** the renderer once loaded: the heads' outfit signatures come from it */
 let loaded: Render | null = null;
@@ -37,14 +43,16 @@ function pump(r: Render): void {
       const job = queue.shift();
       if (job === undefined) break;
       const key = thingKey(job.t, job.px, job.night, outfitOf(r, job.t));
-      if (!drawn.has(key) && !dead) {
+      if (!drawn.has(key) && !dead && Date.now() >= pauseUntil) {
         try {
           drawn.set(key, 'obj' in job.t ? r.objectPng(job.t.obj, job.px) : r.headPng(job.t.head, job.t.main, job.px, job.night));
         } catch {
-          dead = true;
+          // the tile for now, never for good: the asker hears back after the pause and asks again
+          pauseUntil = Date.now() + RETRY_MS;
         }
       }
-      job.done();
+      if (drawn.has(key) || dead) job.done();
+      else setTimeout(job.done, Math.max(0, pauseUntil - Date.now()));
     }
     if (queue.length > 0) pump(r);
     else pumping = false;
@@ -70,8 +78,9 @@ function ask(t: Thing, px: number, night: boolean, done: () => void): void {
 export function useThingPng(t: Thing | null, px: number): string | null {
   const night = useNight();
   const key = t === null ? null : thingKey(t, px, night, outfitOf(loaded, t));
-  // bumped when an asked picture comes back (drawn or never): the render reads `drawn` again
-  const [, setTick] = useState(0);
+  // bumped when an asked picture comes back (drawn, or failed and its pause over): the render reads
+  // `drawn` again, and asks again when it is still missing
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (t === null || key === null || dead || drawn.has(key)) return;
     let live = true;
@@ -82,7 +91,7 @@ export function useThingPng(t: Thing | null, px: number): string | null {
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the key says all of t, px and the theme
-  }, [key]);
+  }, [key, tick]);
   return key === null ? null : (drawn.get(key) ?? null);
 }
 

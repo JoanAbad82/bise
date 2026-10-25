@@ -15,7 +15,9 @@ import { AppIcon, Press, tipAttrs } from '@/ds';
 import { Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
 import { mapOf, mapPrefKey } from '@/bims/maps/ids';
+import { layoutOf } from '@/bims/maps';
 import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
+import { beatDelay, EASE_MS, happenedOf, HOLD_MS, leadZoom, pickBeat, seenOf, shotOf, stillRecent, type Happened, type LastBeat, type Seen, type Shot } from './camera';
 import type { Agent, Card } from '@/proto';
 import { getPref, type Prefs } from '@/settings/prefs';
 import { useGrowth, usePlaces, usePlugins, usePrefs } from '@/store';
@@ -61,8 +63,73 @@ interface OfficeOf {
   readonly cards: readonly Card[];
 }
 
-/** The project's office as the world draws it: its map, its plugins' objects, its growth. */
-function WorldOffice({ project, agents, cards }: OfficeOf) {
+/** How the world's camera runs (camera.ts): hovered (the whole office), frozen (a card open), or on its own (lead, beats). */
+interface CamState {
+  readonly hover: boolean;
+  readonly frozen: boolean;
+}
+
+/**
+ * The world's camera (camera.ts, designer m_42974): the lead framing at rest, a beat now and then
+ * on what just happened, the whole office while hovered. A card open freezes it where it is; the
+ * window away or hidden plays no beat; reduced motion: the lead only. The clock restarts when the
+ * hover or the card ends.
+ */
+function useWorldCamera(agents: readonly Agent[], lead: string | null, zoom: number, { hover, frozen }: CamState): Shot {
+  const reduced = noGrow();
+  const seen = useRef<ReadonlyMap<string, Seen> | null>(null);
+  const happened = useRef<Happened[]>([]);
+  useEffect(() => {
+    const next = seenOf(agents);
+    const now = Date.now();
+    if (seen.current !== null) happened.current = [...stillRecent(happened.current, now), ...happenedOf(seen.current, next, now)];
+    seen.current = next;
+  }, [agents]);
+  const [beat, setBeat] = useState<string | null>(null);
+  const last = useRef<LastBeat | null>(null);
+  // TODO(nm-composer useTalkingTo, native-lead m_43216): while he talks to this project's main
+  // (composer focused on it or voice on) and 10 s after, no beat: the lead framing holds. Add that
+  // flag to `stopped` once composer/talking.ts lands.
+  const stopped = hover || frozen || reduced;
+  useEffect(() => {
+    if (stopped) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      t = setTimeout(fire, beatDelay(Math.random()));
+    };
+    const fire = () => {
+      const now = Date.now();
+      const b = document.hidden ? null : pickBeat(happened.current, now, last.current);
+      if (b === null) {
+        arm();
+        return;
+      }
+      last.current = { agent: b.agent, at: now };
+      setBeat(b.agent);
+      // its ease in and its hold, then back to the lead (the follow camera's own ease)
+      t = setTimeout(() => {
+        setBeat(null);
+        arm();
+      }, EASE_MS + HOLD_MS);
+    };
+    // back from a hover or a card: a beat cut short goes back to the lead now, the clock starts again
+    t = setTimeout(() => {
+      setBeat(null);
+      arm();
+    }, 0);
+    return () => {
+      if (t !== undefined) clearTimeout(t);
+    };
+  }, [stopped]);
+  const shot = shotOf({ lead, zoom, beat, hover, reduced });
+  // a card open: the camera stays where it is
+  const [kept, setKept] = useState(shot);
+  if (!frozen && (kept.follow !== shot.follow || kept.zoom !== shot.zoom)) setKept(shot);
+  return frozen ? kept : shot;
+}
+
+/** The project's office as the world draws it: its map, its plugins' objects, its growth; its camera (camera.ts). */
+function WorldOffice({ project, agents, cards, cam }: OfficeOf & { readonly cam?: CamState }) {
   const places = usePlaces(project);
   const growth = useGrowth(project);
   const prefs = usePrefs() as Prefs | null;
@@ -70,9 +137,19 @@ function WorldOffice({ project, agents, cards }: OfficeOf) {
   const plugins = usePlugins(project);
   const picks = getPref(prefs, objectsPrefKey(project));
   const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
+  // the lead framing's zoom from the office's size (its desks follow the agents' count)
+  const desks = agents.filter((a) => !a.main).length;
+  const zoom = useMemo(() => {
+    const o = layoutOf(agents, map);
+    return leadZoom(o.W, o.D);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the office's size moves with its map and its desks' count, not each agent's state
+  }, [map, desks]);
+  const lead = agents.find((a) => a.main)?.name ?? null;
+  const shot = useWorldCamera(agents, cam === undefined ? null : lead, zoom, cam ?? { hover: false, frozen: false });
   return (
     <Office project={project} agents={agents} cards={cards} places={places} objects={objects} growth={growth} map={map}
-      parts={bimsParts} transparent onOpen={() => undefined} />
+      parts={bimsParts} transparent onOpen={() => undefined} follow={shot.follow} followZoom={shot.zoom}
+      named={shot.follow !== lead ? shot.follow : null} />
   );
 }
 
@@ -83,10 +160,12 @@ export interface WorldProps extends OfficeOf {
   readonly says: string;
   /** a click: the office in a tab */
   readonly onOpen: () => void;
+  /** a card is open: the camera stays where it is (camera.ts) */
+  readonly frozen?: boolean;
 }
 
 /** The world, small at rest, big after a hover. */
-export function World({ project, name, says, agents, cards, onOpen }: WorldProps) {
+export function World({ project, name, says, agents, cards, onOpen, frozen = false }: WorldProps) {
   const [big, setBig] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stop = () => {
@@ -130,7 +209,7 @@ export function World({ project, name, says, agents, cards, onOpen }: WorldProps
       <span className="s3-world-hit" style={hitBox(isleH, big)} data-testid="app.world.hit" />
       <span ref={isle} className="s3-world-isle" style={{ '--s3-scale': String(big ? 1 : SMALL / BIG) } as CSSProperties}>
         <span className="s3-world-office" aria-hidden="true">
-          <WorldOffice project={project} agents={agents} cards={cards} />
+          <WorldOffice project={project} agents={agents} cards={cards} cam={{ hover: big, frozen }} />
         </span>
       </span>
       {big && (

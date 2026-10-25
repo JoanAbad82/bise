@@ -211,7 +211,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     <div className="s3-side" ref={root} data-world={world} data-testid="app.side">
       {world !== 'bubble' && (
         <div className="s3-world-at" style={{ top: EDGE, right: EDGE }}>
-          <World project={project} name={name} says={says} agents={live} cards={cards} onOpen={() => {
+          <World project={project} name={name} says={says} agents={live} cards={cards} frozen={open !== null} onOpen={() => {
             openTab({ kind: 'office', project });
           }} />
         </div>

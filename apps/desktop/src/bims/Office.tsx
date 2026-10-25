@@ -40,7 +40,7 @@ import { Pins, pinPoints, placePins } from './pins';
 import { placeZzz, sleepers } from './zzz';
 import { fallingLook, fallingSig, type FallingLook } from './falling';
 import { WEATHERS, type Weather } from './sky';
-import { aimAt, bimsLit, easeCam, edgeOf, useBimsLit } from './focus';
+import { aimAt, bimsLit, easeCam, edgeOf, FOLLOW_ZOOM, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
 import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
 import type { PluginObject } from './plugin-objects';
@@ -203,6 +203,8 @@ export function Office({
   map = DEFAULT_MAP,
   parts,
   follow = null,
+  followZoom = FOLLOW_ZOOM,
+  named = null,
   fill = false,
   onOpen,
   onOpenPlugin,
@@ -226,6 +228,10 @@ export function Office({
   parts: Parts;
   /** the agent whose thread is open (focus.ts followOf): the office zooms on its bim and follows it */
   follow?: string | null;
+  /** how close the follow camera looks (focus.ts aimAt): FOLLOW_ZOOM by default; the right side's world frames its lead wider (app/side3d camera.ts) */
+  followZoom?: number;
+  /** a bim that wears its hover label without the pointer (the right side's world, a beat on it: app/side3d camera.ts); his own hover wins */
+  named?: string | null;
   /** the office fills its holder's height (a panel tab, app/panel/Office.tsx): the canvas is the holder's box, the office whole and centred in it; off, its natural height for the width */
   fill?: boolean;
   /** a click on a bim: open that agent, as its row's click */
@@ -313,6 +319,20 @@ export function Office({
     followRef.current = { target: follow !== null ? { name: follow } : was === null ? null : 'fit', at: 0 };
     kickRef.current();
   }, [follow]);
+  // how close it follows (the world's lead framing, then a beat's closer look): a change eases there
+  const zoomRef = useRef(followZoom);
+  useEffect(() => {
+    if (zoomRef.current === followZoom) return;
+    zoomRef.current = followZoom;
+    kickRef.current();
+  }, [followZoom]);
+  // the bim named without the pointer (a beat in the world): its label as hover draws it
+  const namedRef = useRef(named);
+  useEffect(() => {
+    if (namedRef.current === named) return;
+    namedRef.current = named;
+    kickRef.current();
+  }, [named]);
   // the office grows (growth.ts): its high-water mark, the last growth drawn (an unlock is a stage
   // past it), the unlock moment, its label over the piece and the ground corner's tip
   // in test mode no kept mark: the fixture's growth, or a check's own (window.__biseGrow, read when
@@ -477,7 +497,7 @@ export function Office({
       const t = Date.now() / 1000;
       const ft = followRef.current.target;
       const fol = ft === null || ft === 'fit' ? null : ft.name;
-      const step = driver.step(clockNow(t), { hover: L.hover, held: L.held, lit: L.lit, follow: fol });
+      const step = driver.step(clockNow(t), { hover: L.hover ?? namedRef.current, held: L.held, lit: L.lit, follow: fol });
       if (step === null) return;
       const { office, frames, played, look, labels: shown } = step;
       if (step.reshaped) {
@@ -576,7 +596,7 @@ export function Office({
       let to: Cam | null = FIT;
       if (F.target !== 'fit') {
         const s = rr.spotOf(F.target.name);
-        to = s === null ? null : aimAt(s.u, s.v);
+        to = s === null ? null : aimAt(s.u, s.v, zoomRef.current);
       }
       if (to === null) return false;
       const dt = F.at === 0 ? 1 / 60 : Math.min(0.1, t - F.at);

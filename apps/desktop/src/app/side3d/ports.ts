@@ -4,10 +4,6 @@
 import { openOverview, openTab } from '@/app/panel/tabs';
 import { usePanelBox } from '@/app/panel/state';
 import { useLeftWidth } from '@/app/frame-state';
+import { newAgent } from '@/app/newagent';
 
-export { openOverview, openTab, useLeftWidth, usePanelBox };
-
-/** A new agent in `project`: the sidebar's row and ⌘N's. */
-export const newAgent: (project: string) => void = () => {
-  // PENDING(nm-frame): app/newagent.ts newAgent
-};
+export { newAgent, openOverview, openTab, useLeftWidth, usePanelBox };

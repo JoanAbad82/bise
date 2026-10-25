@@ -54,9 +54,9 @@ export function followOf(route: { screen: string; project?: string; agent?: stri
   return a === undefined || a.main || a.archived === true ? null : a.name;
 }
 
-/** The view centred on a point (u, v: fractions of the fit), FOLLOW_ZOOM close, held inside the fit. Pure. */
-export function aimAt(u: number, v: number): Cam {
-  return clampCam({ zoom: FOLLOW_ZOOM, u, v });
+/** The view centred on a point (u, v: fractions of the fit), `zoom` close (FOLLOW_ZOOM by default), held inside the fit. Pure. */
+export function aimAt(u: number, v: number, zoom: number = FOLLOW_ZOOM): Cam {
+  return clampCam({ zoom, u, v });
 }
 
 /** One step of the ease from `from` to `to` after dt seconds; at the end (or reduced motion) the target itself. Pure. */
