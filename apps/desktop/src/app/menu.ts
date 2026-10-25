@@ -57,9 +57,9 @@ export function useMainRoutes(router: Router) {
     const bise = (window as Partial<Window>).bise;
     if (bise === undefined) return;
     return bise.onRoute((route) => {
-      // View > Terminal while another window had the keys: show the panel here
+      // View > Terminal while another window had the keys: the terminal here, where it lives
       if (route === 'terminal') {
-        panel.show();
+        panel.reveal();
         return;
       }
       // b1/b2: 'inbox' / a notification's 'inbox?card=<project>/<id>' open the block in place

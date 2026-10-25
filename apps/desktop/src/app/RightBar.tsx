@@ -1,7 +1,9 @@
-// The right bar (designer's desktop-right-bar v5, ambient-lead m_20085/m_20087): what happens in the
-// place shown, as the terminal's panel: four foldable sections in his order, AGENTS (the hub's rank,
-// ⌥N = the TUI's), ARCHIVED (folded until he opens it), ARTIFACTS, SCHEDULED & WATCHING (an alarm: agent-waiting-states A). 320 px, it takes panel A's slots
-// (docked from 1000 px, sliding over under it, ⌥⌘0). On bise's thread the same sections cover every
+// The Overview tab's sections (bise fait mac, page native-mac mockup 1; designer's desktop-right-bar
+// v5 before): what happens in the place shown, as the terminal's panel: foldable sections in his
+// order, Agents (the hub's rank, ⌥N = the TUI's), Archived (folded until he opens it), Artifacts,
+// Scheduled (an alarm: agent-waiting-states A), Processes. It lives in the tabbed panel's Overview
+// tab (app/panel/Overview.tsx); the office moved to its own tab (app/panel/Office.tsx), the world
+// floats on the right side. On bise's thread the same sections cover every
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
 // ARTIFACTS and SCHEDULED & WATCHING follow the thread in view (barscope.ts): a sub-agent's shows
@@ -9,7 +11,7 @@
 // label gives way ('…') under '+ add' and 'all ›' (app/bar-heads). A long section opens 50 rows
 // at a time past its cap ('show 50 more · N left', then 'show less' beside it), kept per
 // section and per scope (his m_26894, barrows.ts pageRows).
-// Owner: amb-win. The rows' words are pure (barrows.ts).
+// Owner: nm-panel (bise fait mac; amb-win before). The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
 import { markTip } from './tipwords';
@@ -22,7 +24,7 @@ import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { barProcs, isRunning, keyOf, stateOf, urlWords, useAllProcesses } from '@/running';
 import { running } from '@/proto/words_running.gen';
-import { useCards, useComputerLive, useGrowth, usePlaces, usePlugins, usePrefs, useProjects, useStore } from '@/store';
+import { useCards, useComputerLive, usePlaces, useProjects, useStore } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -37,19 +39,6 @@ import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots,
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
-import { BimsSwitch, Office } from '@/bims/Office';
-import { BimsToggle } from '@/bims/Cube';
-import { parts as bimsParts } from '@/bims/feed';
-import { BimsFold } from '@/bims/Fold';
-import { useWelcoming } from '@/welcome/shown';
-import { Town } from '@/bims/town/Town';
-import { townParts } from '@/bims/town/feed';
-import { useTownProjects } from '@/bims/town/useTown';
-import { mapOf, mapPrefKey } from '@/bims/maps/ids';
-import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
-import { getPref, type Prefs } from '@/settings/prefs';
-import { showsWide, useBimsView, wideMode } from '@/bims/view';
-import { bimsLit, followOf, useBimsLit } from '@/bims/focus';
 
 /** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre');
  *  `byDefault` until he changes it (ARCHIVED starts folded: his ask, main m_23467). */
@@ -95,7 +84,6 @@ function Section({
   full,
   onAll,
   act,
-  office,
   say,
   children,
 }: {
@@ -116,8 +104,6 @@ function Section({
   onAll: () => void;
   /** a control in the head before 'all ›' (ARTIFACTS' '+ add') */
   act?: ReactNode;
-  /** AGENTS with bims on: the office, above the rows */
-  office?: ReactNode;
   /** the section's own 'show N more' words (AGENTS': agentsMore) */
   say?: (folded: readonly BarRow[], next: number) => MoreWords;
   children: (r: BarRow) => ReactNode;
@@ -166,7 +152,6 @@ function Section({
           </div>
         </div>
       )}
-      {!shut && rows.length > 0 && office}
       {!shut && rows.length > 0 && (
         <div className="app-rb-rows">
           {shown.map(children)}
@@ -248,17 +233,13 @@ function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; 
   );
 }
 
-function Row({ r, onOpen, on, onOpenPr, lit, onLit, onEnd }: {
+function Row({ r, onOpen, on, onOpenPr, onEnd }: {
   r: BarRow;
   onOpen: () => void;
   /** a click on its end alone (RUNNING's port): its own act */
   onEnd?: (() => void) | undefined;
   on?: boolean;
   onOpenPr?: OpenPr;
-  /** its bim hovered in the office (bims/focus.ts): the rows' hover tint */
-  lit?: boolean;
-  /** the pointer on it (true) or off it: its bim lights in the office */
-  onLit?: (on: boolean) => void;
 }) {
   const openPr = onOpenPr ?? (() => undefined);
   // an agent's row, an orphan PR, a worktree's head: the TUI's columns (desktop-agents-bar §2-§4)
@@ -270,11 +251,8 @@ function Row({ r, onOpen, on, onOpenPr, lit, onLit, onEnd }: {
         aria-current={on === true || undefined}
         aria-label={r.title}
         onClick={onOpen}
-        onPointerEnter={onLit && (() => { onLit(true); })}
-        onPointerLeave={onLit && (() => { onLit(false); })}
         data-testid={r.testId}
         data-group={r.group}
-        data-lit={lit === true || undefined}
         data-slide-row
       >
         {/* each mark says itself in the ds tip (tipwords.ts); the row has none, its words are there */}
@@ -447,7 +425,7 @@ function useAgentTip(project: string, rows: readonly BarRow[], route: ReturnType
   };
 }
 
-export function RightBar({ project, name, over, column }: { project: string; name: string; over?: boolean; column?: number }) {
+export function RightBar({ project, name }: { project: string; name: string }) {
   const router = useRouter();
   // a browser-only artifact (a PR, a link) opens his browser, the bar stays (leave.ts)
   const goArtifact = useGoArtifact();
@@ -472,18 +450,6 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   }, [askStore, all, project]);
   const places = usePlaces(project);
   const cards = useCards(project);
-  const growth = useGrowth(project);
-  // the office's map he picked with /bims for this project (his prefs, every window reads them)
-  const prefs = usePrefs() as Prefs | null;
-  const officeMap = mapOf(getPref(prefs, mapPrefKey(project)));
-  // his plugins' objects in the office (plugin-objects.ts, corners.ts): the project's plugins, asked
-  // once here (the core sends them again on each change), and his picks (prefs bims.objects.<project>)
-  const plugins = usePlugins(all ? undefined : project);
-  useEffect(() => {
-    if (!all) askStore.command({ cmd: 'plugins', project });
-  }, [askStore, all, project]);
-  const picks = getPref(prefs, objectsPrefKey(project));
-  const officeObjs = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
   // the hub's rank as ⌥ numbers, held while ⌥ is (agents/model numbersOf): the rows' order and ⌥N (a project's only; bise's thread keeps start order)
@@ -533,31 +499,14 @@ export function RightBar({ project, name, over, column }: { project: string; nam
     else openAgent(r.project, r.agent ?? '');
   };
   const rowHere = (r: BarRow) => (all && r.main === true ? route.screen === 'bise' : here(r.project, r.agent ?? ''));
-  // the office above the AGENTS rows (les bims); on bise's thread the town: one office per project (bims/town)
-  const bims = useBimsView();
-  const office = bims.view === 'bims';
-  const welcomeHere = useWelcoming(project);
-  const townProjects = useTownProjects();
-  const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
-  // the row <-> bim link (bims/focus.ts): a row hovered lights its bim, a bim hovered its row
-  const lit = useBimsLit();
-  const litBim = office && lit?.from === 'bim' ? lit.name : null;
-  useEffect(() => () => { bimsLit.set(null, 'row'); }, []);
-  const follow = office ? followOf(route, project, agents.map((x) => x.a)) : null;
   return (
     // ⌥ held: every agent row shows its context ring (and its %), else only the hovered one (app.css)
-    <aside
-      className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'}
-      data-testid="app.panel"
+    <section
+      className="app-rb"
+      data-testid="app.right"
       data-held={alt ? 'alt' : undefined}
-      data-wide={showsWide(bims, project) ? wideMode(over === true, column) : undefined}
-      aria-label={panel.bar_label({ name })}
+      aria-label={panel.bar_label({ name: name === '' ? panel.tab_overview : name })}
     >
-      <div className="app-rb-top" data-testid="app.right.top">
-        <b>{name}</b>
-        {working > 0 && <span className="app-rb-dim">{panel.count_working({ n: working })}</span>}
-        <kbd className="app-rb-key">⌥⌘0</kbd>
-      </div>
       <div className="app-rb-body">
         <Section
           id="agents"
@@ -573,52 +522,6 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           onAll={() => {
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
           }}
-          act={
-            <>
-              <BimsSwitch view={bims} />
-              <BimsToggle view={bims} />
-            </>
-          }
-          office={
-            all ? (
-              <BimsFold open={office}>
-                <Town
-                  projects={townProjects}
-                  parts={townParts}
-                  onOpenProject={(p) => {
-                    router.go({ screen: 'thread', project: p, agent: 'main' });
-                  }}
-                  onOpenAgent={openAgent}
-                />
-              </BimsFold>
-            ) : (
-              // a new project's welcome shows the office in the thread: the bar's stays closed until it docks
-              <BimsFold open={office && !welcomeHere}>
-              <Office
-                project={project}
-                agents={officeAgents}
-                cards={cards}
-                places={places}
-                objects={officeObjs}
-                growth={growth}
-                map={officeMap}
-                parts={bimsParts}
-                follow={follow}
-                onOpen={(agent) => {
-                  openAgent(project, agent);
-                }}
-                // an object's '?' / '✗': its plugin on the plugins page
-                onOpenPlugin={(key) => {
-                  router.go({ screen: 'plugins', id: key });
-                }}
-                // the map chip's pick: the same prefs as '/bims <map>' (thread/commands.ts)
-                onPickMap={(m) => {
-                  store.command({ cmd: 'prefs_set', key: mapPrefKey(project), value: m });
-                }}
-              />
-              </BimsFold>
-            )
-          }
         >
           {(r) =>
             r.kind === 'group' || r.kind === 'orphan' ? (
@@ -639,8 +542,6 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                   on={rowHere(r)}
                   onOpenPr={openPr}
                   onOpen={() => { openRow(r); }}
-                  lit={r.agent !== undefined && r.agent === litBim}
-                  onLit={office && r.agent !== undefined ? (on) => { bimsLit.set(on ? { name: r.agent ?? '', from: 'row' } : null, 'row'); } : undefined}
                 />
                 {tipOf(r.agent ?? '')}
               </Fragment>
@@ -766,6 +667,6 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           </Section>
         )}
       </div>
-    </aside>
+    </section>
   );
 }
