@@ -198,8 +198,6 @@ export const library = {
   tip_list: "show as a list",
   /** a folder's count on hover, `48 artifacts` */
   tip_count: (a: { n: number }): string => a.n === 1 ? String(a.n) + " artifact" : String(a.n) + " artifacts",
-  /** a folder's ··· in its header */
-  tip_folder_more: "more: rename, merge, delete…",
   /** the crumb under 900 px */
   tip_crumb: "the folders",
   /** a stack's count, `16 shots saved in one turn` (what: kind_shots or kind_files) */
