@@ -2,8 +2,12 @@
 // studio environment (one 64×32 equirect, made once, envMapIntensity 0.55) and a little self-warmth
 // in their shadows (emissive = colour × WARM × day; day 0 at night, when the lamp pools light them).
 // A bim's merged parts (bim.ts) share one vertex-coloured material whose stopped grey and warmth are
-// uniforms (onBeforeCompile), so going grey or the day turning never needs a new program. The
-// world, the film's signed light and its theme never use any of this. Owner: bims-clay.
+// uniforms (onBeforeCompile), so going grey or the day turning never needs a new program.
+// Their clay itself (page bims-look-2, his pick B « la pâte »): the merged parts' shader adds a warm
+// glow where the key's light turns to shade (wrap lighting, as clay lets a little light through), a
+// soft rim on the edges, both fading out on dark colours (main's black stays as dark), and a faint
+// thumb-pressed grain fixed on the part (object space: it never swims as the bim moves). The
+// world, the film's signed light and its theme never use any of this. Owner: bims-clay-2.
 import { CanvasTexture, Color, EquirectangularReflectionMapping, type Material, MeshLambertMaterial, MeshStandardMaterial, SRGBColorSpace } from 'three';
 import { WORLD } from './palette';
 import type { Style } from './style';
@@ -14,6 +18,42 @@ export const WARM = 0.1;
 export const ENV_I = 0.55;
 /** how far a stopped bim goes toward WORLD.grey (rig.grey 1) */
 export const GREY_MIX = 0.85;
+/**
+ * the clay of the merged parts (page bims-look-2 B, signed by designer m_41822): its roughness, how
+ * far the wrap reaches past the terminator, the warm glow there, the rim on the edges, the grain's
+ * depth and its frequency (per office unit, on the part)
+ */
+export const CLAY = { rough: 0.65, wrap: 0.7, glow: 0.9, rim: 0.2, grain: 0.06, freq: 55 } as const;
+
+/** a cheap 3D value noise for the grain (GLSL), and the parts' object-space position */
+const GRAIN_PARS = `
+varying vec3 vObj;
+float clayHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float clayNoise(vec3 x) {
+  vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(clayHash(i), clayHash(i + vec3(1, 0, 0)), f.x), mix(clayHash(i + vec3(0, 1, 0)), clayHash(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(clayHash(i + vec3(0, 0, 1)), clayHash(i + vec3(1, 0, 1)), f.x), mix(clayHash(i + vec3(0, 1, 1)), clayHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+`;
+const f = (n: number): string => n.toFixed(3);
+/** the grain: the normal tilted by the noise's gradient on the part */
+const GRAIN = `
+{ vec3 q = vObj * ${f(CLAY.freq)}; float n0 = clayNoise(q);
+  vec3 g = vec3(clayNoise(q + vec3(1, 0, 0)) - n0, clayNoise(q + vec3(0, 1, 0)) - n0, clayNoise(q + vec3(0, 0, 1)) - n0);
+  normal = normalize(normal - (mat3(viewMatrix) * g) * ${f(CLAY.grain)}); }
+`;
+/** the warm glow past the terminator (the key: the first directional light) and the rim, both off on dark colours */
+const GLOW = `
+{ float clayLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  float clayLit = smoothstep(0.04, 0.3, clayLum);
+#if NUM_DIR_LIGHTS > 0
+  float nl = dot(normal, directionalLights[0].direction);
+  float wrapd = max(0.0, (nl + ${f(CLAY.wrap)}) / (1.0 + ${f(CLAY.wrap)})) - max(0.0, nl);
+  reflectedLight.indirectDiffuse += vec3(1.0, 0.45, 0.3) * diffuseColor.rgb * directionalLights[0].color * wrapd * ${f(CLAY.glow)} * clayLit;
+#endif
+  float fr = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0);
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(1.0, 0.92, 0.85) * fr * ${f(CLAY.rim)} * clayLit; }
+`;
 
 let env: CanvasTexture | null = null;
 /** the studio: a warm vertical gradient, a soft window up front-left (the key's side); one for every bim */
@@ -81,13 +121,23 @@ export interface PartsMaterial {
  */
 export function partsMaterial(style: Style): PartsMaterial {
   const m = style.name === 'clay'
-    ? new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
+    ? new MeshStandardMaterial({ vertexColors: true, roughness: CLAY.rough, metalness: 0 })
     : new MeshLambertMaterial({ vertexColors: true });
+  const clay = style.name === 'clay';
   if (m instanceof MeshStandardMaterial) clayLit(m, false);
   const u = { uGrey: { value: 0 }, uGreyTo: { value: GREY.clone() }, uWarm: { value: 0 } };
   m.userData.toward = [GREY.r, GREY.g, GREY.b, 0];
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
+    if (clay) {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vObj;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObj = position;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>\n${GRAIN_PARS}`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${GRAIN}`)
+        .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${GLOW}`);
+    }
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uGrey;\nuniform vec3 uGreyTo;\nuniform float uWarm;')
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, uGreyTo, uGrey);')
