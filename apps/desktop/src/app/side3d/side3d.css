@@ -20,6 +20,8 @@
 .s3-world-at {
   position: absolute;
   z-index: 1;
+  /* its box (the world's layout box, 148 x the office's 384 height) takes no pointer either */
+  pointer-events: none;
 }
 .s3-card {
   z-index: 2;

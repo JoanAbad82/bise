@@ -13,7 +13,7 @@ import { artifact, artifacts, card, ev, projects, row } from '../../../tests/fea
 import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
 import { keyAction } from '../keys';
-import { SideHost, bubbleTops, cardFloor } from './Host';
+import { SideHost, bubbleTops, cardFloor, cardPlace } from './Host';
 import { hitBox } from './World';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
@@ -168,6 +168,13 @@ describe('the right side, folded', () => {
     document.body.append(c);
     expect(cardFloor(document, 900)).toBe(761);
     c.remove();
+  });
+
+  it('a card on a low bubble rises until it ends at the floor; taller than the room, it is capped and scrolls', () => {
+    // ⌥⌘4 at 1440 × 900: the processes bubble at 392 under a 52 bar, a 428 card, the composer at 770
+    expect(cardPlace(52, 380, 428, 758)).toEqual({ lift: 102, maxH: undefined });
+    expect(cardPlace(52, 140, 200, 758)).toEqual({ lift: 0, maxH: undefined });
+    expect(cardPlace(52, 380, 900, 758)).toEqual({ lift: 368, maxH: 694 });
   });
 
   it('the bubbles under the world at 152, 80 apart, put whatever the world does; as a 5th bubble the world tops the stack', () => {

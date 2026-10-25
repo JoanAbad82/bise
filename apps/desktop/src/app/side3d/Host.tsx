@@ -70,6 +70,17 @@ export function cardFloor(doc: Document, winH: number): number {
   return floor;
 }
 
+/**
+ * Where a card goes: `sideTop` the side's top on screen, `top` its natural top in the side (on its
+ * bubble), `h` its height, `floor` how low it may go (cardFloor). It rises by `lift` until it ends
+ * at the floor, never above EDGE; taller than that room, it is capped (`maxH`) and scrolls. Pure.
+ */
+export function cardPlace(sideTop: number, top: number, h: number, floor: number): { readonly lift: number; readonly maxH: number | undefined } {
+  const room = floor - sideTop - EDGE;
+  const lift = Math.min(Math.max(0, sideTop + top + h - floor), Math.max(0, top - EDGE));
+  return { lift, maxH: h > room ? Math.max(0, room) : undefined };
+}
+
 /** The artifacts card's foot: how many, and in how many projects when more than one. Pure. */
 export function artFoot(n: number, projects: number): string {
   if (n === 0) return '';
@@ -164,17 +175,28 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   }, [open]);
   // a card stays inside the window: measured once drawn, lifted when it would pass the bottom
   const card = useRef<HTMLDivElement | null>(null);
-  const [lift, setLift] = useState(0);
+  const [place, setPlace] = useState<{ readonly lift: number; readonly maxH: number | undefined }>({ lift: 0, maxH: undefined });
   useLayoutEffect(() => {
     const el = card.current?.firstElementChild;
-    if (!(el instanceof HTMLElement) || open === null) {
-      setLift(0);
+    const side = root.current;
+    if (!(el instanceof HTMLElement) || side === null || open === null) {
+      setPlace({ lift: 0, maxH: undefined });
       return;
     }
-    const r = el.getBoundingClientRect();
-    setLift(Math.max(0, r.bottom + lift - cardFloor(document, window.innerHeight)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- measured again when the card or its rows change
-  }, [open, live.length, artifacts.length, procs.length, tasks.length]);
+    // from its natural top (on its bubble) and its own height, never from where it was drawn last
+    const measure = () => {
+      setPlace(cardPlace(side.getBoundingClientRect().top, tops.bubbles[open] - CARD_UP, el.offsetHeight, cardFloor(document, window.innerHeight)));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- its bubble's top follows `open` and the layout
+  }, [open, world]);
+  const lift = place.lift;
   const here = route.screen === 'thread' ? { project: route.project, agent: route.agent } : { project: null, agent: null };
   const at = answerFrom(here, home);
   const openAgent = (agent: string) => {
@@ -207,7 +229,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
       ))}
       <div ref={card}>
         {open === 'agents' && (
-          <Flyout id="agents" name={bubbleName('agents')} says={bubbleSays('agents', counts)} top={cardTop('agents')}
+          <Flyout id="agents" name={bubbleName('agents')} says={bubbleSays('agents', counts)} top={cardTop('agents')} maxH={place.maxH}
             add={<HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />}
             onPin={() => { openOverview(project, 'agents'); }}
             foot={{ left: archived > 0 ? side.archived({ n: archived }) : '', right: side.all_agents, onRight: () => { router.go({ screen: 'agents', project }); } }}>
@@ -217,7 +239,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
           </Flyout>
         )}
         {open === 'artifacts' && (
-          <Flyout id="artifacts" name={bubbleName('artifacts')} says={bubbleSays('artifacts', counts)} top={cardTop('artifacts')}
+          <Flyout id="artifacts" name={bubbleName('artifacts')} says={bubbleSays('artifacts', counts)} top={cardTop('artifacts')} maxH={place.maxH}
             add={<AddButton place={addPlace} testId="app.flyout.artifacts.add" />}
             onPin={() => { openOverview(project, 'artifacts'); }}
             foot={{ left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), right: side.all_artifacts, onRight: () => { router.go({ screen: 'artifacts', project }); } }}>
@@ -241,7 +263,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
               </>
             );
           return (
-            <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={cardTop(open)}
+            <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={cardTop(open)} maxH={place.maxH}
               onPin={() => { openOverview(project, 'processes'); }}
               link={{ text: open === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[open] }}
               foot={null}>

@@ -43,12 +43,14 @@ export interface FlyoutProps {
   readonly foot: { readonly left: string; readonly right: string; readonly onRight: () => void } | null;
   /** its full page's link on its head ('all processes ›'), when its kinds each keep theirs on their head */
   readonly link?: { readonly text: string; readonly onClick: () => void };
+  /** its height at most (Host cardPlace: the room above the composer); none: its CSS cap */
+  readonly maxH?: number | undefined;
   readonly children: ReactNode;
 }
 
-export function Flyout({ id, name, says, add, onPin, top, foot, link, children }: FlyoutProps) {
+export function Flyout({ id, name, says, add, onPin, top, foot, link, maxH, children }: FlyoutProps) {
   return (
-    <section className="s3-card" style={{ top }} role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
+    <section className="s3-card" style={maxH === undefined ? { top } : { top, maxHeight: maxH }} role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
       <header className="s3-card-head">
         <b>{name}</b>
         {says !== '' && <span className="s3-card-says">{says}</span>}
