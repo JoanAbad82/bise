@@ -4,7 +4,7 @@
 // The desktop ds owns the root rule (apps/desktop/src/ds/css/base.css: a control or a clickable
 // role gets the pointer, a disabled one the arrow); each stylesheet a page here starts from carries
 // the same two lines, and none puts the arrow back on a control. No browser, no deps.
-//   node kit/pointer.check.mjs
+//   node --experimental-strip-types kit/pointer.check.ts
 // Mutation: the rule's line dropped from kit/kit.css (or any site page) turns it red.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -12,11 +12,11 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (p) => readFileSync(join(root, p), "utf8");
-const noComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "");
+const read = (p: string) => readFileSync(join(root, p), "utf8");
+const noComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 
 let pass = 0, fail = 0;
-function law(name, fn) {
+function law(name: string, fn: () => void) {
   try { fn(); pass++; console.log("  ✓ " + name); } catch (e) { fail++; console.log("  ✗ " + name + "\n    " + String(e instanceof Error ? e.message : e).split("\n")[0]); }
 }
 
@@ -26,7 +26,7 @@ const HAND = base.find((l) => l.startsWith(":where(") && l.endsWith("{cursor:poi
 const ARROW = base.find((l) => l.startsWith(":is(:disabled") && l.includes("cursor:default")) ?? "";
 
 /** the page roots: a stylesheet every page of its kind loads, and every site page with its own <style> */
-const pages = (dir) => (existsSync(join(root, dir)) ? readdirSync(join(root, dir)).filter((f) => f.endsWith(".html")).map((f) => `${dir}/${f}`) : []);
+const pages = (dir: string) => (existsSync(join(root, dir)) ? readdirSync(join(root, dir)).filter((f) => f.endsWith(".html")).map((f) => `${dir}/${f}`) : []);
 const ROOTS = [
   "kit/kit.css", // the hub's pages (with tokens.css and notes.css)
   "kit/office/viewer.css", // the artifact viewers: office, markdown, pdf, image, video
@@ -35,7 +35,7 @@ const ROOTS = [
 ];
 /** every stylesheet text of the web surfaces: the roots and the kit's other sheets */
 const SHEETS = [...ROOTS, "kit/notes.css", "kit/site.css", "kit/office/select.css", "site/book/paper.css"];
-const styleOf = (p) => (p.endsWith(".html") ? [...read(p).matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n") : read(p));
+const styleOf = (p: string) => (p.endsWith(".html") ? [...read(p).matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n") : read(p));
 
 law("the desktop ds has the root rule this check copies (base.css: the hand, then the arrow when disabled)", () => {
   assert.ok(HAND.includes("button") && HAND.includes("[role=button]") && HAND.includes("a[href]"), "no :where(button,a[href],...,[role=button],...){cursor:pointer} line in base.css");

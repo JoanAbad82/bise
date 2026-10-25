@@ -5,7 +5,7 @@
 // inbox or on the page, it says `✓ you picked A in the inbox · 11:42`, its option marked `your
 // pick` (no more picks). One answer closes both.
 //
-// Two halves, like notes-fold.js: `BiseAsk.core` is pure (kit/ask.check.mjs runs it), the rest is
+// Two halves, like notes-fold.js: `BiseAsk.core` is pure (kit/ask.check.ts runs it), the rest is
 // the DOM. Loaded before kit.js. The asks come from the page's meta (`asks`) at load and after each
 // new version (kit.js's bise:swapped), then from the stream: kit.js relays its `asks` and
 // `answered` events as bise:asks and bise:hub-answered. kit.js asks `takes()` before a pick on a

@@ -1,6 +1,6 @@
 // bise kit · the laws of ask.js's pure half (node, no deps): what a page's ask linked to its
 // notification says while it waits in the inbox, then who picked what, where and when.
-//   node kit/ask.check.mjs
+//   node --experimental-strip-types kit/ask.check.ts
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -8,12 +8,15 @@ import vm from "node:vm";
 import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
+// ask.js's pure half, as these laws use it: a page's ask as the hub keeps it, its line
+type Ask = { block: string; open?: boolean; count?: number; reply?: string | number; n?: number; key?: string; via?: string; at_ms?: number };
+type AskCore = { line(a: Ask | null, count: number): string | null };
 const ctx = { Date, String };
 vm.runInNewContext(readFileSync(join(here, "ask.js"), "utf8"), ctx);
-const A = ctx.BiseAsk.core;
+const A: AskCore = Reflect.get(ctx, "BiseAsk").core;
 
 let n = 0;
-const law = (name, f) => { f(); n++; };
+const law = (_name: string, f: () => void) => { f(); n++; };
 
 law("it waits in the inbox while its notification is open, with the keys there", () => {
   assert.equal(A.line({ block: "look", open: true }, 4), "? waits in your inbox · 1–4 there, or pick here");

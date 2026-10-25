@@ -17,7 +17,7 @@
 // notes.js marks a review item the user edited with data-edited: "approve N" leaves it out.
 // and the frame's [data-bise-notes-count] and [data-bise-send] (notes.js writes and binds them).
 // No style= anywhere: looks hang on data- attributes kit.css reads. The pure half (BiseKit.*) runs
-// in node for the laws (kit/check.mjs) with a fake DOM.
+// in node for the laws (kit/check.ts) with a fake DOM.
 (function (root) {
   "use strict";
 

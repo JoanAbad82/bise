@@ -2,7 +2,7 @@
 // order, scroll kept, bise:swapped), what changed by block hash, the components' behavior
 // (numbers in tables, question picks), and that the kit itself never writes a style. kit.js runs
 // in a vm with a small fake DOM (no browser).
-//   node kit/check.mjs
+//   node --experimental-strip-types kit/check.ts
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -13,45 +13,57 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 // ---- a fake DOM: elements with attributes, children, text; a tiny HTML parser for fragments ----
 const VOID = new Set(["br", "img", "hr"]);
-class Text { constructor(t) { this.text = t; this.parent = null; } get textContent() { return this.text; } get outerHTML() { return this.text; } }
+type Node_ = El | Text;
+class Text {
+  text: string;
+  parent: El | null;
+  constructor(t: string) { this.text = t; this.parent = null; }
+  get textContent() { return this.text; } get outerHTML() { return this.text; }
+}
 class El {
-  constructor(tag) { this.tagName = tag.toUpperCase(); this.attrs = new Map(); this.nodes = []; this.parent = null; }
-  get children() { return this.nodes.filter((n) => n instanceof El); }
-  getAttribute(k) { return this.attrs.has(k) ? this.attrs.get(k) : null; }
-  setAttribute(k, v) { this.attrs.set(k, String(v)); }
-  removeAttribute(k) { this.attrs.delete(k); }
-  hasAttribute(k) { return this.attrs.has(k); }
-  get textContent() { return this.nodes.map((n) => n.textContent).join(""); }
-  set textContent(t) { for (const n of this.nodes) n.parent = null; this.nodes = []; this.append(new Text(String(t))); }
-  get outerHTML() {
+  tagName: string;
+  attrs: Map<string, string>;
+  nodes: Node_[];
+  parent: El | null;
+  // what kit.js and the laws set on an element besides its attributes
+  [prop: string]: unknown;
+  constructor(tag: string) { this.tagName = tag.toUpperCase(); this.attrs = new Map(); this.nodes = []; this.parent = null; }
+  get children(): El[] { return this.nodes.filter((n): n is El => n instanceof El); }
+  getAttribute(k: string) { return this.attrs.get(k) ?? null; }
+  setAttribute(k: string, v: unknown) { this.attrs.set(k, String(v)); }
+  removeAttribute(k: string) { this.attrs.delete(k); }
+  hasAttribute(k: string) { return this.attrs.has(k); }
+  get textContent(): string { return this.nodes.map((n) => n.textContent).join(""); }
+  set textContent(t: unknown) { for (const n of this.nodes) n.parent = null; this.nodes = []; this.append(new Text(String(t))); }
+  get outerHTML(): string {
     const t = this.tagName.toLowerCase();
     const a = [...this.attrs].map(([k, v]) => (v === "" ? ` ${k}` : ` ${k}="${v}"`)).join("");
     return VOID.has(t) ? `<${t}${a}>` : `<${t}${a}>${this.nodes.map((n) => n.outerHTML).join("")}</${t}>`;
   }
-  append(...ns) { for (const n of ns) { if (n.parent) n.parent.removeChild(n); n.parent = this; this.nodes.push(n); } }
-  removeChild(n) { const i = this.nodes.indexOf(n); assert.ok(i >= 0, "removeChild of a non-child"); this.nodes.splice(i, 1); n.parent = null; return n; }
-  insertBefore(n, ref) {
+  append(...ns: Node_[]) { for (const n of ns) { if (n.parent) n.parent.removeChild(n); n.parent = this; this.nodes.push(n); } }
+  removeChild<N extends Node_>(n: N): N { const i = this.nodes.indexOf(n); assert.ok(i >= 0, "removeChild of a non-child"); this.nodes.splice(i, 1); n.parent = null; return n; }
+  insertBefore(n: El, ref: Node_ | null | undefined) {
     if (n.parent) n.parent.removeChild(n);
     const i = ref == null ? this.nodes.length : this.nodes.indexOf(ref);
     assert.ok(i >= 0, "insertBefore: ref is not a child");
     this.nodes.splice(i, 0, n); n.parent = this; ops.push(["insert", n.getAttribute && n.getAttribute("data-id")]); return n;
   }
   // descendants by tag name only (what kit.js's pure half asks for)
-  querySelectorAll(tag) {
-    const out = [], T = tag.toUpperCase();
-    const walk = (e) => { for (const c of e.children) { if (c.tagName === T) out.push(c); walk(c); } };
+  querySelectorAll(tag: string) {
+    const out: El[] = [], T = tag.toUpperCase();
+    const walk = (e: El) => { for (const c of e.children) { if (c.tagName === T) out.push(c); walk(c); } };
     walk(this);
     return out;
   }
 }
-let ops = [];
-function parse(html) {
+let ops: [string, string | null][] = [];
+function parse(html: string) {
   const root = new El("main");
-  const stack = [root];
+  const stack: El[] = [root];
   const re = /<!--[\s\S]*?-->|<\/([a-z0-9]+)\s*>|<([a-z0-9]+)((?:\s+[a-z-]+(?:="[^"]*")?)*)\s*\/?>|([^<]+)/gi;
   for (const m of html.matchAll(re)) {
     const top = stack[stack.length - 1];
-    if (m[1]) { while (stack.length > 1 && stack.pop().tagName !== m[1].toUpperCase()); continue; }
+    if (m[1]) { const close = m[1].toUpperCase(); while (stack.length > 1 && stack.pop()?.tagName !== close); continue; }
     if (m[2]) {
       const e = new El(m[2]);
       for (const a of (m[3] || "").matchAll(/([a-z-]+)(?:="([^"]*)")?/gi)) e.setAttribute(a[1], a[2] ?? "");
@@ -63,33 +75,43 @@ function parse(html) {
   }
   return root;
 }
-const blocks = (main) => main.children.filter((c) => c.getAttribute("data-kit") != null);
-const ids = (main) => blocks(main).map((b) => b.getAttribute("data-id"));
+const blocks = (main: El) => main.children.filter((c: El) => c.getAttribute("data-kit") != null);
+const ids = (main: El) => blocks(main).map((b) => b.getAttribute("data-id"));
 
 // ---- kit.js in a vm: no document, so only BiseKit (the pure half) loads ----
-const events = [];
-class CustomEvent { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }
+const events: { type: string; detail: unknown }[] = [];
+class CustomEvent {
+  type: string;
+  detail: unknown;
+  constructor(type: string, init?: { detail?: unknown }) { this.type = type; this.detail = init && init.detail; }
+}
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Date, CustomEvent, parseInt });
 vm.runInContext(readFileSync(join(here, "kit.js"), "utf8"), ctx, { filename: "kit.js" });
 vm.runInContext(readFileSync(join(here, "plan.js"), "utf8"), ctx, { filename: "plan.js" });
-const K = ctx.BiseKit;
-const PL = ctx.BisePlan;
-const doc = { dispatchEvent: (e) => events.push({ type: e.type, detail: JSON.parse(JSON.stringify(e.detail)) }), createElement: (t) => new El(t) };
-const j = (x) => JSON.parse(JSON.stringify(x));
+// the globals kit.js and plan.js set (their types come with kit's own move to TS, js-to-ts area 6)
+const K = Reflect.get(ctx, "BiseKit");
+const PL = Reflect.get(ctx, "BisePlan");
+const doc = { dispatchEvent: (e: CustomEvent) => events.push({ type: e.type, detail: JSON.parse(JSON.stringify(e.detail)) }), createElement: (t: string) => new El(t) };
+const j = (x: unknown) => JSON.parse(JSON.stringify(x));
+// a node the law needs: there, or the law fails naming it
+function need<T>(v: T | undefined | null, what: string): T {
+  assert.ok(v !== undefined && v !== null, `missing: ${what}`);
+  return v;
+}
 
 // FNV-1a 64 over the folded block source, like rust/switchboard/src/pages/lint.rs, for fake metas
-function fnv(s) {
+function fnv(s: string) {
   let h = 0xcbf29ce484222325n;
   for (const b of Buffer.from(s)) { h ^= BigInt(b); h = (h * 0x100000001b3n) & 0xffffffffffffffffn; }
   return h.toString(16).padStart(16, "0");
 }
-const blockList = (html) => blocks(parse(html)).map((b) => ({ id: b.getAttribute("data-id"), kit: b.getAttribute("data-kit"), hash: fnv(K.norm(b.outerHTML)) }));
-const metaOf = (...versions) => ({ versions: versions.map((html, i) => ({ n: i + 1, at_ms: 1000 * i, blocks: blockList(html) })) });
+const blockList = (html: string) => blocks(parse(html)).map((b) => ({ id: b.getAttribute("data-id"), kit: b.getAttribute("data-kit"), hash: fnv(K.norm(b.outerHTML)) }));
+const metaOf = (...versions: string[]) => ({ versions: versions.map((html, i) => ({ n: i + 1, at_ms: 1000 * i, blocks: blockList(html) })) });
 
 let pass = 0, fail = 0;
-function law(name, fn) {
+function law(name: string, fn: () => void) {
   ops = []; events.length = 0;
-  try { fn(); pass++; } catch (e) { fail++; console.log(`✗ ${name}\n  ${String(e.stack || e.message).split("\n").slice(0, 6).join("\n  ")}`); }
+  try { fn(); pass++; } catch (e) { fail++; console.log(`✗ ${name}\n  ${String(e instanceof Error ? e.stack || e.message : e).split("\n").slice(0, 6).join("\n  ")}`); }
 }
 
 const V1 = `<section data-kit="heading" data-id="h"><h1>week 41</h1></section>
@@ -163,13 +185,13 @@ law("the same version again changes nothing and moves nothing", () => {
 });
 
 // a fake layout: each block is as tall as its text, the page scrolled by scrollY
-function layout(main, scrollY) {
+function layout(main: El, scrollY: number) {
   const view = {
     scrollY,
     heights: () => blocks(main).map((b) => 40 + b.textContent.length * 2),
-    topOf(id) { let y = -view.scrollY; for (const b of blocks(main)) { if (b.getAttribute("data-id") === id) return y; y += 40 + b.textContent.length * 2; } return null; },
+    topOf(id: string) { let y = -view.scrollY; for (const b of blocks(main)) { if (b.getAttribute("data-id") === id) return y; y += 40 + b.textContent.length * 2; } return null; },
     anchor() { let y = -view.scrollY; for (const b of blocks(main)) { const h = 40 + b.textContent.length * 2; if (y + h > 46) return { id: b.getAttribute("data-id"), top: y }; y += h; } return null; },
-    scrollBy(dy) { view.scrollY += dy; },
+    scrollBy(dy: number) { view.scrollY += dy; },
   };
   return view;
 }
@@ -177,6 +199,7 @@ law("scroll is kept: the block you read stays where it was when blocks above it 
   const main = parse(V1);
   const view = layout(main, 120);
   const a = view.anchor();
+  assert.ok(a, "a block on screen");
   assert.equal(a.id, "t1");
   const longer = V1.replace("signup is 4× faster.", "signup is faster: 4.1 s → 0.9 s on a mid-range phone, from #perf.");
   K.swap(main, blocks(parse(longer)), ["p1"], view);
@@ -187,7 +210,7 @@ law("scroll is kept: the block you read stays where it was when blocks above it 
 law("scroll is kept: when the block you read is gone, the next one takes its place", () => {
   const main = parse(V1);
   const view = layout(main, 120);
-  assert.equal(view.anchor().id, "t1");
+  assert.equal(view.anchor()?.id, "t1");
   const without = V1.split("\n").filter((l) => !l.includes('data-id="t1"')).join("\n");
   K.swap(main, blocks(parse(without)), null, view);
   assert.deepEqual(ids(main), ["h", "p1", "p2"]);
@@ -251,11 +274,11 @@ law("question: a pick marks one option and says what it is; the same pick again 
   K.decorate([q], "weekly update");
   assert.equal(q.getAttribute("data-by"), "weekly update");
   const seen = [K.pick(q, 2)];
-  assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, true]);
+  assert.deepEqual(K.options(q).map((li: El) => li.hasAttribute("data-picked")), [false, true]);
   seen.push(K.pick(q, 1));
-  assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [true, false]);
+  assert.deepEqual(K.options(q).map((li: El) => li.hasAttribute("data-picked")), [true, false]);
   seen.push(K.pick(q, 1));
-  assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, false]);
+  assert.deepEqual(K.options(q).map((li: El) => li.hasAttribute("data-picked")), [false, false]);
   assert.deepEqual(j(seen), [
     { block: "q1", option: 2, text: "wait for Marc" },
     { block: "q1", option: 1, text: "post now" },
@@ -270,7 +293,7 @@ law("question: an answer from anywhere (SSE answered) shows on the page and tell
   K.pick(q, 1);
   K.answered(doc, q, "2");
   assert.equal(q.getAttribute("data-answer"), "2");
-  assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, true]);
+  assert.deepEqual(K.options(q).map((li: El) => li.hasAttribute("data-picked")), [false, true]);
   assert.equal(K.pick(q, 1), null, "answered: no other pick");
   assert.deepEqual(events, [{ type: "bise:answered", detail: { block: "q1", reply: "2" } }]);
 });
@@ -280,7 +303,7 @@ law("question: an answered one (data-answer, by number or by text) shows its pic
     events.length = 0;
     const q = blocks(parse(Q.replace('data-id="q1"', `data-id="q1" data-answer="${ans}"`)))[0];
     K.decorate([q], "a");
-    assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, true], ans);
+    assert.deepEqual(K.options(q).map((li: El) => li.hasAttribute("data-picked")), [false, true], ans);
     assert.equal(K.pick(q, 1), null);
     assert.equal(events.length, 0);
   }
@@ -291,13 +314,13 @@ const R = `<section data-kit="review" data-id="inbox"><h2>3 mails</h2><ol>
 <li data-id="m1"><p>Léa · offsite</p><p>reply: yes, booked.</p></li>
 <li data-id="m2"><p>Marc · invoice</p><p>reply: paid friday.</p></li>
 <li data-id="m3"><p>Sam · intro</p><p>reply: happy to.</p></li></ol></section>`;
-const acted = (b) => K.options(b).map((li) => li.getAttribute("data-verdict") || "-");
-const allButton = (b) => b.children.find((c) => c.hasAttribute("data-kit-ui"));
+const acted = (b: El) => K.options(b).map((li: El) => li.getAttribute("data-verdict") || "-");
+const allButton = (b: El) => need(b.children.find((c: El) => c.hasAttribute("data-kit-ui")), "the approve-all bar");
 law("review: each item gets approve / skip once, and 'approve N' counts what is left", () => {
   const b = blocks(parse(R))[0];
   K.decorate([b], "inbox", doc);
   K.decorate([b], "inbox", doc);
-  for (const li of K.options(b)) assert.equal(li.children.filter((c) => c.hasAttribute("data-kit-ui")).length, 1, "one bar per item");
+  for (const li of K.options(b)) assert.equal(li.children.filter((c: El) => c.hasAttribute("data-kit-ui")).length, 1, "one bar per item");
   assert.equal(allButton(b).textContent, "approve 3");
   assert.deepEqual(j(K.react(b, "m2", "skip")), { block: "inbox", item: "m2", kind: "skip", text: "Marc · invoice reply: paid friday." });
   K.decorate([b], "inbox", doc);
@@ -309,7 +332,7 @@ law("review: 'approve N' approves the rest, never an item you skipped or edited"
   K.react(b, "m1", "skip");
   K.options(b)[2].setAttribute("data-edited", ""); // notes.js: you changed m3
   const out = K.approveAll(b);
-  assert.deepEqual(j(out).map((d) => [d.item, d.kind]), [["m2", "approve"]]);
+  assert.deepEqual(j(out).map((d: { item: string; kind: string }) => [d.item, d.kind]), [["m2", "approve"]]);
   assert.deepEqual(acted(b), ["skip", "approve", "-"]);
   K.decorate([b], "inbox", doc);
   assert.ok(allButton(b).children[0].hasAttribute("disabled"), "nothing left: disabled");
@@ -353,10 +376,10 @@ law("compare: ♡ ✗ pick on each variant, one pick per block (the last wins), 
   K.decorate([c], "offsite", doc);
   const variants = K.options(c);
   assert.equal(variants.length, 2, "the inner facts lists are not variants");
-  assert.deepEqual(variants[0].children.find((x) => x.hasAttribute("data-kit-ui")).children.map((b) => b.getAttribute("data-act")), ["keep", "drop", "pick"]);
+  assert.deepEqual(need(variants[0].children.find((x: El) => x.hasAttribute("data-kit-ui")), "its bar").children.map((b: El) => b.getAttribute("data-act")), ["keep", "drop", "pick"]);
   assert.equal(j(K.react(c, "moulin", "pick")).kind, "pick");
   assert.equal(j(K.react(c, "pins", "pick")).kind, "pick");
-  assert.deepEqual(variants.map((v) => v.getAttribute("data-verdict")), [null, "pick"]);
+  assert.deepEqual(variants.map((v: El) => v.getAttribute("data-verdict")), [null, "pick"]);
   assert.equal(j(K.react(c, "moulin", "keep")).text, "Le Moulin €12,400 22 rooms why: in budget.");
 });
 
@@ -375,7 +398,7 @@ law("message: copy gives Slack markup of what the page shows, the kit's button l
   const m = blocks(parse(`<section data-kit="message" data-id="slack" data-to="Slack · #launch"><p><strong>bise is live</strong> today, <em>finally</em>.</p>
 <ul><li>the repo is <a href="https://github.com/acme/bise">public</a></li><li>install: <code>brew install bise</code></li></ul><p>thanks <del>all</del> everyone!</p></section>`))[0];
   K.decorate([m], "launch", doc);
-  assert.equal(m.children.filter((c) => c.hasAttribute("data-kit-ui")).length, 1);
+  assert.equal(m.children.filter((c: El) => c.hasAttribute("data-kit-ui")).length, 1);
   assert.equal(K.toSlack(m), "*bise is live* today, _finally_.\n\n• the repo is <https://github.com/acme/bise|public>\n• install: `brew install bise`\n\nthanks ~all~ everyone!");
 });
 
@@ -383,8 +406,9 @@ law("writing: the last 5 intents, newest at the bottom, the rest folded; the las
   const seven = ["reading your Gmail", "reading #launch", "counting stars", "reading HN", "comparing", "drafting", "checking links"];
   const w = j(K.intentLines(seven, true));
   assert.equal(w.earlier, 2);
-  assert.deepEqual(w.lines.map((x) => x.text), seven.slice(2));
-  assert.deepEqual(w.lines.map((x) => x.current), [false, false, false, false, true]);
+  type Line = { text: string; current: boolean };
+  assert.deepEqual(w.lines.map((x: Line) => x.text), seven.slice(2));
+  assert.deepEqual(w.lines.map((x: Line) => x.current), [false, false, false, false, true]);
   assert.equal(K.W.earlier(w.earlier), "+2 earlier");
   const done = j(K.intentLines(seven.slice(0, 2), false));
   assert.deepEqual(done, { earlier: 0, lines: [{ text: "reading your Gmail", current: false }, { text: "reading #launch", current: false }] });
@@ -417,7 +441,7 @@ law("reply items: the reply is what follows the quoted comment; the approve butt
   K.decorate([b], "watch", doc);
   const [hn, x] = K.options(b);
   assert.equal(K.replyText(hn), "one thread per repo, and agents that talk to each other.");
-  const label = (li) => li.children.find((c) => c.hasAttribute("data-kit-ui")).children.find((c) => c.getAttribute("data-act") === "approve").textContent;
+  const label = (li: El) => need(need(li.children.find((c: El) => c.hasAttribute("data-kit-ui")), "its bar").children.find((c: El) => c.getAttribute("data-act") === "approve"), "its approve").textContent;
   assert.equal(label(hn), "open on Hacker News");
   assert.equal(label(x), "open on X");
 });
@@ -434,8 +458,8 @@ law("checklist who and when: due dates in words, late in its own state, done ite
   const c = blocks(parse(`<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-who="Camille" data-due="2020-01-01">trains</li><li data-id="t2" data-done data-due="2020-01-01">venue</li><li data-id="t3">invite</li></ol></section>`))[0];
   K.decorate([c], "plan", doc);
   const [t1, t2, t3] = K.options(c);
-  const when = (li) => li.children.find((n) => n.hasAttribute("data-when"));
-  assert.ok(when(t1).textContent.startsWith("Camille · late · "));
+  const when = (li: El) => li.children.find((n: El) => n.hasAttribute("data-when"));
+  assert.ok(when(t1)?.textContent.startsWith("Camille · late · "));
   assert.ok(t1.hasAttribute("data-late") && !t2.hasAttribute("data-late"), "a done item is never late");
   assert.equal(when(t2), undefined, "nor says 'late' (no who, a late due: no tag at all)");
   assert.equal(when(t3), undefined, "no who, no due: no tag");
@@ -443,27 +467,27 @@ law("checklist who and when: due dates in words, late in its own state, done ite
   const y = blocks(parse(`<section data-kit="checklist" data-id="steps"><ol><li data-id="s1" data-who="yours" data-due="2020-01-01">pay the deposit</li></ol></section>`))[0];
   K.decorate([y], "plan", doc);
   const s1 = K.options(y)[0];
-  assert.ok(when(s1).textContent.startsWith("you · late"));
+  assert.ok(when(s1)?.textContent.startsWith("you · late"));
   assert.equal(K.ticked(doc, y, "s1"), true);
   assert.equal(s1.getAttribute("data-verdict"), "tick");
   assert.ok(!s1.hasAttribute("data-late"));
-  assert.equal(when(s1).textContent, "you", "ticked: who, not 'late'");
+  assert.equal(when(s1)?.textContent, "you", "ticked: who, not 'late'");
   // bise took its own step (pm's 26): it says what it did and takes you to the draft
   const bd = blocks(parse(`<section data-kit="checklist" data-id="buy"><ol><li data-id="b1" data-who="bise" data-did="drafted" data-draft="mail-legal">the mail to legal</li><li data-id="b2" data-who="bise" data-did="checked · it loads">acme.app loads</li></ol></section>`))[0];
   K.decorate([bd], "plan", doc);
   const [b1, b2] = K.options(bd);
-  assert.equal(when(b1).textContent, "bise · drafted · in the page");
-  assert.equal(when(b1).getAttribute("data-goto"), "mail-legal");
-  assert.equal(when(b2).textContent, "bise · checked · it loads");
-  assert.equal(when(b2).getAttribute("data-goto"), null);
+  assert.equal(when(b1)?.textContent, "bise · drafted · in the page");
+  assert.equal(when(b1)?.getAttribute("data-goto"), "mail-legal");
+  assert.equal(when(b2)?.textContent, "bise · checked · it loads");
+  assert.equal(when(b2)?.getAttribute("data-goto"), null);
   // a step that is a decision (pm's 35): it points at its question until it is done
   const dq = blocks(parse(`<section data-kit="checklist" data-id="buy"><ol><li data-id="s2" data-who="yours" data-question="years">how long</li><li data-id="s3" data-who="yours" data-question="years" data-done>how long</li></ol></section>`))[0];
   K.decorate([dq], "plan", doc);
   const [q1, q2] = K.options(dq);
-  assert.equal(when(q1).textContent, "you · pick in the question");
-  assert.equal(when(q1).getAttribute("data-goto"), "years");
-  assert.equal(when(q2).textContent, "you");
-  assert.equal(when(q2).getAttribute("data-goto"), null);
+  assert.equal(when(q1)?.textContent, "you · pick in the question");
+  assert.equal(when(q1)?.getAttribute("data-goto"), "years");
+  assert.equal(when(q2)?.textContent, "you");
+  assert.equal(when(q2)?.getAttribute("data-goto"), null);
   assert.equal(K.ticked(doc, y, "nope"), false);
 });
 
@@ -477,13 +501,13 @@ law("where a draft went: the user's tool and its link on the block it came from,
   const map = K.wentFor(went, blocks(main));
   assert.deepEqual([...map.keys()].sort(), ["e1", "m2"], "no block: a draft goes to the first email; a missing block is skipped");
   K.applyWent(doc, blocks(main), went);
-  const line = (b) => b.children.find((n) => n.hasAttribute("data-went"));
-  assert.equal(line(e1).textContent, "in your Gmail draftsopen");
-  assert.equal(line(e1).getAttribute("data-went"), "gmail-draft");
+  const line = (b: El) => b.children.find((n: El) => n.hasAttribute("data-went"));
+  assert.equal(line(e1)?.textContent, "in your Gmail draftsopen");
+  assert.equal(line(e1)?.getAttribute("data-went"), "gmail-draft");
   assert.equal(line(m1), undefined);
   K.applyWent(doc, blocks(main), [{ kind: "outlook-draft", ref: "r2", url: "https://outlook.office.com/b", at: 5 }]);
-  assert.equal(e1.children.filter((n) => n.hasAttribute("data-went")).length, 1, "redrawn in place");
-  assert.ok(line(e1).textContent.startsWith("in your Outlook drafts"));
+  assert.equal(e1.children.filter((n: El) => n.hasAttribute("data-went")).length, 1, "redrawn in place");
+  assert.ok(line(e1)?.textContent.startsWith("in your Outlook drafts"));
   assert.ok(line(m2), "a local 'copied' stays until the server says where it went");
 });
 
@@ -491,7 +515,7 @@ law("send, not approve, when the draft leaves; the editable parts are the drafts
   const main = parse(`<section data-kit="review" data-id="r" data-verb="send"><ol><li data-id="m1"><p>Léa · dates · 9:12</p><p>yes</p></li><li data-id="m2"><p>Marc · invoice</p><blockquote>paid?</blockquote><p>yes, friday</p></li></ol></section><section data-kit="review" data-id="b"><ol><li data-id="x1"><p>a</p><p>b</p></li></ol></section><section data-kit="email" data-id="e"><p data-field="to">c</p><p data-field="subject">s</p><p>hi</p></section>`);
   const [r, b, e] = blocks(main);
   K.decorate([r, b, e], "inbox", doc);
-  const labels = (el) => el.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children).map((x) => x.textContent);
+  const labels = (el: El) => el.children.filter((n: El) => n.hasAttribute("data-kit-ui")).flatMap((u: El) => u.children).map((x: El) => x.textContent);
   assert.deepEqual(labels(K.options(r)[0]), ["send", "skip"]);
   assert.deepEqual(labels(r), ["send both"]);
   assert.deepEqual(labels(K.options(b)[0]), ["approve", "skip"]);
@@ -512,15 +536,15 @@ law("send, not approve, when the draft leaves; the editable parts are the drafts
   const k = blocks(parse(`<section data-kit="review" data-id="taste" data-verb="keep"><ol><li data-id="no-emoji"><p>from your notes</p><p>no emoji</p></li></ol></section>`))[0];
   K.decorate([k], "main", doc);
   assert.deepEqual(labels(K.options(k)[0]), ["keep", "strike"], "what bise keeps: keep / strike");
-  const ed = (el) => K.editableParts(el).map((x) => x.textContent);
+  const ed = (el: El) => K.editableParts(el).map((x: El) => x.textContent);
   assert.deepEqual(ed(r), ["yes", "yes, friday"], "never the who line nor the quoted comment");
   assert.deepEqual(ed(e), ["s", "hi"], "subject and body, not to");
-  assert.ok(K.editableParts(e).every((x) => x.hasAttribute("data-editable")));
+  assert.ok(K.editableParts(e).every((x: El) => x.hasAttribute("data-editable")));
 });
 
 law("a watching page: 'watching · checked 3 min ago · until tomorrow 18:00'; a read-only reply says what happened", () => {
   const now = new Date(2026, 4, 13, 14, 20).getTime();
-  const at = (d, h, m) => new Date(2026, 4, d, h, m).getTime();
+  const at = (d: number, h: number, m: number) => new Date(2026, 4, d, h, m).getTime();
   assert.equal(K.untilWords(at(13, 18, 0), now), "until 18:00");
   assert.equal(K.untilWords(at(14, 18, 0), now), "until tomorrow 18:00");
   assert.equal(K.untilWords(at(16, 9, 5), now), "until saturday 9:05");
@@ -543,22 +567,22 @@ law("a watching page: 'watching · checked 3 min ago · until tomorrow 18:00'; a
   const r = blocks(parse(`<section data-kit="review" data-id="w" data-verb="open-reply"><ol><li data-id="hn-1" data-reply="https://news.ycombinator.com/item?id=1"><p>pg · Hacker News · 1 h ago</p><blockquote>q?</blockquote><p>a.</p></li><li data-id="x-2" data-reply="https://x.com/a/status/2"><p>@a · X</p><blockquote>q</blockquote><p>b</p></li></ol></section>`))[0];
   K.decorate([r], "launch-watch", doc);
   const [hn, x] = K.options(r);
-  const labels = (el) => el.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children).map((y) => y.textContent);
+  const labels = (el: El) => el.children.filter((n: El) => n.hasAttribute("data-kit-ui")).flatMap((u: El) => u.children).map((y: El) => y.textContent);
   assert.deepEqual(labels(hn), ["open on Hacker News", "skip"], "never 'send' on a read-only place");
   assert.equal(K.replyWent(doc, hn, K.replyTarget(hn.getAttribute("data-reply"), "a.")).textContent, "copiedpaste it in the thread");
   assert.equal(K.replyWent(doc, x, K.replyTarget(x.getAttribute("data-reply"), "b")).textContent, "opened on X · your reply is in the box");
-  assert.equal(x.children.filter((n) => n.hasAttribute("data-went")).length, 1);
+  assert.equal(x.children.filter((n: El) => n.hasAttribute("data-went")).length, 1);
 });
 
 law("feedback into work: start an agent / answer Benjamin / skip; started, the start goes and the agent line shows", () => {
   const r = blocks(parse(`<section data-kit="review" data-id="reports" data-verb="start"><ol><li data-id="s-101"><p>Benjamin Roy · #bise-feedback · 9:12</p><blockquote>install fails on fish</blockquote><p>i think: the installer only writes .zshrc.</p></li><li data-id="s-102" data-agent="fix-install-path"><p>Benjamin Roy · #bise-feedback · 9:40</p><blockquote>x</blockquote><p>y</p></li></ol></section>`))[0];
   K.decorate([r], "feedback", doc);
   const [a, b] = K.options(r);
-  const btns = (li) => li.children.filter((n) => n.hasAttribute("data-kit-ui") && !n.hasAttribute("data-agent-line")).flatMap((u) => u.children);
-  assert.deepEqual(btns(a).map((x) => x.textContent), ["start an agent", "answer Benjamin", "skip"]);
+  const btns = (li: El) => li.children.filter((n: El) => n.hasAttribute("data-kit-ui") && !n.hasAttribute("data-agent-line")).flatMap((u: El) => u.children);
+  assert.deepEqual(btns(a).map((x: El) => x.textContent), ["start an agent", "answer Benjamin", "skip"]);
   assert.equal(btns(a)[0].hidden, false);
   assert.equal(btns(b)[0].hidden, true, "an agent on it: no start");
-  assert.ok(b.children.some((n) => n.hasAttribute("data-agent-line")));
+  assert.ok(b.children.some((n: El) => n.hasAttribute("data-agent-line")));
   a.setAttribute("data-starting", "");
   K.decorate([r], "feedback", doc);
   assert.equal(btns(a)[0].textContent, "starting…");
@@ -567,9 +591,9 @@ law("feedback into work: start an agent / answer Benjamin / skip; started, the s
   const m = blocks(parse(`<section data-kit="review" data-id="asks" data-verb="reply"><ol><li data-id="m1"><p>Léa Martin · #design · 9:12</p><blockquote>can you check the pricing copy?</blockquote><p>yes, i'll look at it before noon.</p></li><li data-id="m2"><p>Hugo · mail · 9:40</p><blockquote>x</blockquote><p>y</p></li></ol></section>`))[0];
   K.decorate([m], "mentions", doc);
   const [m1] = K.options(m);
-  assert.deepEqual(btns(m1).map((x) => x.textContent), ["send", "start an agent", "skip"]);
-  assert.equal(m.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children)[0].textContent, "send both");
-  assert.deepEqual(K.editableParts(m).map((e) => K.norm(e.textContent || (e.nodes || []).map((n) => n.textContent).join(""))).slice(0, 1).length, 1, "the drafted answer is editable");
+  assert.deepEqual(btns(m1).map((x: El) => x.textContent), ["send", "start an agent", "skip"]);
+  assert.equal(m.children.filter((n: El) => n.hasAttribute("data-kit-ui")).flatMap((u: El) => u.children)[0].textContent, "send both");
+  assert.deepEqual(K.editableParts(m).map((e: El) => K.norm(e.textContent || (e.nodes || []).map((n) => n.textContent).join(""))).slice(0, 1).length, 1, "the drafted answer is editable");
 });
 
 law("an item's agent: its name first (spaces, not hyphens), then its live status and note", () => {
@@ -582,14 +606,14 @@ law("an item's agent: its name first (spaces, not hyphens), then its live status
   K.agents.set("fix-login", { name: "fix-login", status: "failed" });
   K.decorate([r], "bugs", doc);
   const [b1, b2] = K.options(r);
-  const line = (li) => li.children.find((n) => n.hasAttribute("data-agent-line"));
-  assert.equal(line(b1).textContent, "▲ fix login failed");
-  assert.equal(line(b1).getAttribute("data-status"), "failed");
+  const line = (li: El) => li.children.find((n: El) => n.hasAttribute("data-agent-line"));
+  assert.equal(line(b1)?.textContent, "▲ fix login failed");
+  assert.equal(line(b1)?.getAttribute("data-status"), "failed");
   assert.equal(line(b2), undefined, "no agent: no line");
   K.agents.set("fix-login", { name: "fix-login", status: "done" });
   K.decorate([r], "bugs", doc);
-  assert.equal(K.options(r)[0].children.filter((n) => n.hasAttribute("data-agent-line")).length, 1, "redrawn in place, never twice");
-  assert.equal(line(K.options(r)[0]).textContent, "✓ fix login done");
+  assert.equal(K.options(r)[0].children.filter((n: El) => n.hasAttribute("data-agent-line")).length, 1, "redrawn in place, never twice");
+  assert.equal(line(K.options(r)[0])?.textContent, "✓ fix login done");
   K.agents.clear();
 });
 
@@ -601,7 +625,7 @@ law("ago: short words", () => {
   assert.equal(K.ago(now - 26 * 3_600_000, now), "yesterday");
   assert.equal(K.ago(now - 72 * 3_600_000, now), "3 days ago");
   // past a week: the date; past a year: with its year (designer m_7475)
-  const local = (y, mo, d) => new Date(y, mo, d, 12).getTime();
+  const local = (y: number, mo: number, d: number) => new Date(y, mo, d, 12).getTime();
   assert.equal(K.ago(local(2026, 9, 3), local(2026, 9, 20)), "3 oct");
   assert.equal(K.ago(local(2025, 9, 3), local(2026, 9, 4)), "3 oct 2025");
   assert.equal(K.ago(local(2025, 11, 20), local(2026, 0, 5)), "20 dec 2025");
@@ -621,7 +645,7 @@ law("a write his word triggers is its own action block: its button says the writ
   const a = blocks(parse(`<section data-kit="action" data-id="a-ops12" data-do="close OPS-12"><p>close OPS-12 in Linear · fixed in 0.4.2</p></section>`))[0];
   K.decorate([a], "feedback", doc);
   K.decorate([a], "feedback", doc);
-  const bars = a.children.filter((n) => n.hasAttribute("data-kit-ui"));
+  const bars = a.children.filter((n: El) => n.hasAttribute("data-kit-ui"));
   assert.equal(bars.length, 1, "one bar, however often it is decorated");
   assert.deepEqual(bars[0].children.map((b) => b.textContent), ["close OPS-12", "skip"]);
   assert.equal(K.react(a, null, "approve").kind, "approve");
@@ -632,14 +656,14 @@ law("a plan (plan.js): one start saying its verb, optional parts say so, never a
   const [, plan, ways] = blocks(main);
   PL.draw(doc, main);
   PL.draw(doc, main);
-  const bar = (b) => b.children.filter((n) => n.hasAttribute("data-kit-ui"));
+  const bar = (b: El) => b.children.filter((n: El) => n.hasAttribute("data-kit-ui"));
   assert.equal(bar(plan).length, 1, "one bar, however often it is drawn");
-  assert.deepEqual(bar(plan)[0].children.map((b) => [b.getAttribute("data-plan-act"), b.textContent]), [["start-plan", "start the plan"]]);
-  assert.ok(!bar(plan)[0].children.some((b) => b.hasAttribute("data-act")), "no kit.js act: a start is no approve");
+  assert.deepEqual(need(bar(plan)[0], "the plan's bar").children.map((b) => [b.getAttribute("data-plan-act"), b.textContent]), [["start-plan", "start the plan"]]);
+  assert.ok(!need(bar(plan)[0], "the plan's bar").children.some((b) => b.hasAttribute("data-act")), "no kit.js act: a start is no approve");
   const parts = K.options(plan);
-  assert.deepEqual(parts.map((li) => li.children.filter((n) => n.hasAttribute("data-when")).map((t) => t.textContent).join("")), ["", "", "optional"]);
+  assert.deepEqual(parts.map((li: El) => li.children.filter((n: El) => n.hasAttribute("data-when")).map((t: El) => t.textContent).join("")), ["", "", "optional"]);
   assert.equal(bar(ways)[0].textContent, "other ways");
-  const wayWords = () => K.options(ways).map((li) => li.children.filter((n) => n.hasAttribute("data-way-go")).flatMap((u) => u.children).map((b) => b.textContent));
+  const wayWords = () => K.options(ways).map((li: El) => li.children.filter((n: El) => n.hasAttribute("data-way-go")).flatMap((u: El) => u.children).map((b) => b.textContent));
   assert.deepEqual(wayWords(), [["start this one"], ["start this one"]]);
   // clicked: starting…, and the ways' starts go
   plan.setAttribute("data-starting", "");
@@ -658,12 +682,12 @@ law("a plan (plan.js): one start saying its verb, optional parts say so, never a
   assert.equal(bar(plan)[0].textContent, "✓ done 12:10");
   assert.equal(bar(plan)[0].children[0].getAttribute("data-started-line"), "done");
   // the ways' bars are hidden once their starts go: the cards shrink to their text
-  assert.ok(K.options(ways).every((li) => li.children.find((n) => n.hasAttribute("data-way-go")).hasAttribute("hidden")));
+  assert.ok(K.options(ways).every((li: El) => need(li.children.find((n: El) => n.hasAttribute("data-way-go")), "its go").hasAttribute("hidden")));
   // an other way started: it says so
   plan.removeAttribute("data-started");
   K.options(ways)[1].setAttribute("data-started", "11:50");
   PL.draw(doc, main);
-  const go = K.options(ways)[1].children.filter((n) => n.hasAttribute("data-way-go"))[0];
+  const go = K.options(ways)[1].children.filter((n: El) => n.hasAttribute("data-way-go"))[0];
   assert.equal(go.textContent, "∿ lean-install is on it · started 11:50");
   assert.ok(!go.hasAttribute("hidden"));
   assert.deepEqual(j(PL.core.wayBar({ started: null, starting: false }, true)), {}, "another started: no start");
@@ -682,7 +706,7 @@ law("a page opened with ?theme=light|dark wears it (the desktop window's pref), 
   const told = /:root\[data-theme="dark"\] \{([^}]*)\}/.exec(css);
   assert.ok(sys, "the system's dark block, unless the page was told light");
   assert.ok(told, "the told dark block");
-  const decls = (s) => s.split(";").map((d) => d.trim()).filter((d) => d !== "");
+  const decls = (s: string) => s.split(";").map((d) => d.trim()).filter((d) => d !== "");
   assert.deepEqual(decls(told[1]), decls(sys[1]), "the two dark blocks hold the same values");
 });
 
@@ -708,7 +732,7 @@ law("every example page is a fragment of known blocks with unique ids", () => {
   const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message", "compare", "checklist", "plan", "ui"]);
   for (const f of readdirSync(join(here, "examples"))) {
     const main = parse(readFileSync(join(here, "examples", f), "utf8"));
-    assert.ok(main.children.length > 0 && main.children.every((c) => c.tagName === "SECTION" && kinds.has(c.getAttribute("data-kit"))), f);
+    assert.ok(main.children.length > 0 && main.children.every((c) => c.tagName === "SECTION" && kinds.has(c.getAttribute("data-kit") ?? "")), f);
     const all = ids(main);
     assert.equal(new Set(all).size, all.length, `${f}: duplicate ids`);
   }

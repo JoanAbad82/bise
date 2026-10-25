@@ -205,7 +205,7 @@ map_paths() {  # <changed path>...
       # the skills teach the SDK through bise office run (architect m_23951)
       plugins/sheets/*|plugins/slides/*|plugins/docs/*|rust/jsrt/*) office_skills=1 ;;
     esac
-    # the kit's node checks (kit/*.check.mjs, no deps, ~0.1 s)
+    # the kit's node checks (kit/*.check.ts, no deps, ~0.1 s)
     case "$f" in kit/*) kit=1 ;; esac
     # the words ratchet (tests/word_lint.py, issue 29): the tests it lints,
     # the catalog and its generated words, its list (quick runs it always)
@@ -227,7 +227,16 @@ map_paths() {  # <changed path>...
   fi
 }
 # node as the desktop lanes find it (desktop_path): the hub's land queue has no shell setup
-kit_check() { local f; desktop_path; for f in "$root"/kit/check.mjs "$root"/kit/*.check.mjs; do echo "node ${f#"$root"/}"; node "$f" || return 1; done; }
+# Node runs the repo's .ts scripts by type stripping: flagged before node 22.18 (js-to-ts,
+# architect m_40557: the runners set it, never a shebang). Goes when engines says >=22.18.
+TS_NODE_OPTIONS="--experimental-strip-types --disable-warning=ExperimentalWarning"
+# the checks, then their types (office/sdk owns typescript: skipped without its node_modules)
+kit_check() {
+  local f tsc="$root/office/sdk/node_modules/.bin/tsc"; desktop_path
+  for f in "$root"/kit/check.ts "$root"/kit/*.check.ts; do echo "node ${f#"$root"/}"; NODE_OPTIONS="$TS_NODE_OPTIONS" node "$f" || return 1; done
+  if [ -x "$tsc" ]; then echo "tsc -p kit/tsconfig.node.json"; "$tsc" -p "$root/kit/tsconfig.node.json" || return 1
+  else echo "skipped kit types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
+}
 if [ "$mode" = wait ]; then
   arg="${2:?usage: gate.sh wait <bg .out file | pid>}"
   if [ -f "$arg" ]; then pid="$(cat "${arg%.out}.pid" 2>/dev/null)"; rcf="${arg%.out}.rc"; else pid="$arg"; rcf=; fi
@@ -1018,6 +1027,8 @@ fi
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
 # the office SDK: office/dist/office.js is what office/sdk/src builds, and its tests pass on it
 [ "${office:-0}" = 1 ] && step office_check tests/office_check.sh
+# the kit's node checks and their types (land had them, quick did not: js-to-ts)
+[ "${kit:-0}" = 1 ] && step kit kit_check
 # the office skills' scripts, through bise office run (skipped with words when bise or bend-jsrt is not built)
 [ "${office_skills:-0}" = 1 ] && step office_skills python3 tests/office_skills_check.py
 # then the desktop's own checks, when the change reaches it (tests/test_map.py desktop)

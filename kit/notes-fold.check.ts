@@ -1,6 +1,6 @@
 // bise kit · the laws of notes-fold.js's pure half (node, no deps): when the notes box comes
 // folded, what opens it by itself, what a page keeps.
-//   node kit/notes-fold.check.mjs
+//   node --experimental-strip-types kit/notes-fold.check.ts
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -8,18 +8,30 @@ import vm from "node:vm";
 import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
+// notes-fold.js's pure half, as these laws use it
+type Note = { id: string; status: string; answer?: string };
+type Fold = { started: boolean; folded: boolean; explicit: boolean | null; seen: string[] };
+type Saved = { folded: boolean | null; seen: string[] };
+type FoldCore = {
+  FW: { pill(n: number): string; key: string };
+  start(saved: unknown): Fold;
+  step(st: Fold, notes: Note[], composing: boolean): Fold;
+  toggle(st: Fold): Fold;
+  shown(st: Fold, count: number, composing: boolean): boolean;
+  saved(st: Fold): Saved;
+};
 const ctx = {};
 vm.runInNewContext(readFileSync(join(here, "notes-fold.js"), "utf8"), ctx);
-const F = ctx.BiseNotesFold.core;
+const F: FoldCore = Reflect.get(ctx, "BiseNotesFold").core;
 
 let n = 0;
-const law = (name, f) => { f(); n++; };
-const plain = (x) => JSON.parse(JSON.stringify(x));
-const draft = (id) => ({ id, status: "draft" });
-const done = (id) => ({ id, status: "done" });
-const answered = (id, answer) => ({ id, status: "answered", answer });
+const law = (_name: string, f: () => void) => { f(); n++; };
+const plain = <T>(x: T): T => JSON.parse(JSON.stringify(x));
+const draft = (id: string): Note => ({ id, status: "draft" });
+const done = (id: string): Note => ({ id, status: "done" });
+const answered = (id: string, answer: string): Note => ({ id, status: "answered", answer });
 // a visit: the page kept `saved`, the render passes, then what it keeps
-const visit = (saved, ...renders) => {
+const visit = (saved: unknown, ...renders: [notes: Note[], composing?: boolean][]) => {
   let st = F.start(saved);
   for (const [notes, composing] of renders) st = F.step(st, notes, !!composing);
   return st;
