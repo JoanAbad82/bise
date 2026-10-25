@@ -7,18 +7,46 @@
 // The numbers are the hub's (bise_session::completion::groups): viz.ts only sums and bins them.
 // Owner: debug-viz.
 import { useMemo, useState } from "react";
-import type { CompRow } from "@/proto";
+import type { CompKind, CompRole, CompRow } from "@/proto";
 import { debug } from "@/proto/words_debug.gen";
 import { histogram, kTokens, level, peaks, sameSel, series, share, topPart, total, type Filter, type Node, type Sel } from "./viz";
 
 type Tab = "tokens" | "sizes" | "series";
 
+const ROLE: Record<CompRole, string> = {
+  system: debug.role_system,
+  user: debug.role_user,
+  assistant: debug.role_assistant,
+  tool_call: debug.role_tool_call,
+  tool_result: debug.role_tool_result,
+  unknown: debug.kind_other,
+};
+const KIND: Record<CompKind, string> = {
+  prompt: debug.kind_prompt,
+  tools: debug.kind_tools,
+  params: debug.kind_params,
+  mid: debug.kind_mid,
+  words: debug.kind_words,
+  agent_message: debug.kind_agent_message,
+  bise_state: debug.kind_bise_state,
+  preamble: debug.kind_preamble,
+  summary: debug.kind_summary,
+  note: debug.kind_note,
+  tagged: debug.kind_tagged,
+  text: debug.kind_text,
+  thinking: debug.kind_thinking,
+  image: debug.kind_image,
+  tool: debug.kind_other,
+  other: debug.kind_other,
+  unknown: debug.kind_other,
+};
+
 /** A level's key as he reads it: a role or a kind through the words, a name as it is. */
 export function keyWord(key: string): string {
   if (key === "other") return debug.kind_other;
   if (key.startsWith("n:")) return key.slice(2);
-  const w = (debug as unknown as Record<string, unknown>)[key.startsWith("k:") ? `kind_${key.slice(2)}` : `role_${key}`];
-  return typeof w === "string" ? w : key.replace(/^k:/u, "");
+  if (key.startsWith("k:")) return (KIND as Record<string, string | undefined>)[key.slice(2)] ?? key.slice(2);
+  return (ROLE as Record<string, string | undefined>)[key] ?? key;
 }
 
 /** A group's words: its path's last key ('tool result › bash' in the chips). */
