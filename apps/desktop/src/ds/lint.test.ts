@@ -158,7 +158,7 @@ describe('the pointer law (his words: « chaque chose sur laquelle tu peux cliqu
     // Frame: the scrim, a click outside what floats over it, not a thing he aims at; MapChip: a
     // wrapper that only stops the map's clicks; the office and the town: a map that picks what is
     // under the mouse and sets the hand itself over a bim or a sign (data-pointer, office.css)
-    const may: Record<string, number> = { 'app/Frame.tsx': 1, 'bims/MapChip.tsx': 1, 'bims/Office.tsx': 1, 'bims/town/Town.tsx': 1 };
+    const may: Record<string, number> = { 'app/Frame.tsx': 1, 'bims/MapChip.tsx': 1, 'bims/Office.tsx': 1, 'bims/town/Town.tsx': 1, 'plugins/Room.tsx': 1 };
     const found = screens.flatMap((p) => {
       const hits = plainClicks(readFileSync(p, 'utf8'));
       return hits.length > (may[rel(p)] ?? 0) ? hits.map((h) => `${rel(p)}:${h}`) : [];

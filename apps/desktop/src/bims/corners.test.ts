@@ -131,12 +131,14 @@ describe('corners: where his plugins objects stand', () => {
     const o = layoutOf(crewOf(31), 'loft');
     const objs = objsOf(34);
     objectSpots(o, objs);
-    // the best of 3: a busy machine (a gate, shots) slows one run, never the placement's own cost
+    // its own CPU time, the best of 3: the wall clock at load 40-60 (gates, shots) doubled it while
+    // the placement's cost stayed the same (main m_41980)
     let best = Infinity;
     for (let i = 0; i < 3; i++) {
-      const t0 = performance.now();
+      const t0 = process.cpuUsage();
       objectSpots(o, objs);
-      best = Math.min(best, performance.now() - t0);
+      const d = process.cpuUsage(t0);
+      best = Math.min(best, (d.user + d.system) / 1000);
     }
     expect(best).toBeLessThan(50);
   });

@@ -24,7 +24,13 @@
 /* the room: bims' diorama of his plugins' objects (Room.tsx), a 2.2:1 banner at most 240 px high
    (centred, its sides on the hero's ground); without WebGL their icons on a floor */
 .plg-room { --plg-room-h: calc(var(--s-12) * 5); /* 240, ui-review #11 */ width: 100%; max-width: calc(var(--plg-room-h) * 2.2); min-height: 160px; margin-inline: auto; position: relative; display: flex; align-items: center; justify-content: center; }
-.plg-room-canvas { display: block; width: 100%; aspect-ratio: 2.2 / 1; }
+.plg-room-canvas { display: block; width: 100%; aspect-ratio: 2.2 / 1; outline: none; }
+/* an object under the pointer opens its plugin; zoomed, the floor drags the view (Room.tsx) */
+.plg-room-canvas[data-over] { cursor: pointer; }
+.plg-room-canvas[data-zoomed]:not([data-over]) { cursor: grab; }
+.plg-room-canvas[data-drag] { cursor: grabbing; }
+/* the hovered object's box over the canvas: the ds tip's mark (Room.tsx), nothing drawn */
+.plg-room-mark { position: absolute; cursor: pointer; }
 .plg-room-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--c-raised); }
 .plg-floor { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: var(--s-3); max-width: 560px; padding: var(--s-6) var(--s-8); border-radius: var(--r-2); background: var(--c-sunken); }
 .plg-room-sub { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }

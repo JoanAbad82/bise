@@ -110,7 +110,7 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
           <AddMenu summary={summary} onPick={(item) => { if (item === 'browse') setTab('browse'); else ports.add(item); }} />
         </div>
         <div className="plg-room" data-testid="plugins.room">
-          {room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} />}
+          {room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} onOpen={ports.open} />}
         </div>
         <div className="plg-room-sub">{settings.plugins_room_sub}</div>
       </header>

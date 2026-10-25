@@ -5,8 +5,10 @@
 // and draws a frame only when what it shows changes, or while a new object drops in (~0.4 s; cut
 // under reduced motion). Light: the office's day sun from the same corner (-5, 14, 3), its one soft
 // contact shadow, a transparent backdrop. Owner: plug-desktop.
-import { Box3, type Group, Mesh, PlaneGeometry, ShadowMaterial, type Material, type BufferGeometry } from 'three';
-import { boxSite, RIGHT, UP, type Fit, type Site } from '@/bims/render/camera';
+import { Box3, type Group, Mesh, type Object3D, PlaneGeometry, Raycaster, ShadowMaterial, Vector2, Vector3, type Material, type BufferGeometry } from 'three';
+import { boxSite, RIGHT, UP, viewFit, type Fit, type Site } from '@/bims/render/camera';
+import { HOVER_MS, MOVES, hoverAt } from '@/bims/render/objects/hover';
+import { FIT, type Cam } from '@/bims/zoom';
 import { makeObject, type ObjId } from '@/bims/render/objects';
 import { DAY, NIGHT } from '@/bims/render/palette';
 import { STYLE } from '@/bims/render/style';
@@ -119,6 +121,14 @@ export interface RoomView {
   show(objs: readonly PluginObject[], o: { readonly night: boolean; readonly reduced: boolean }): void;
   /** the canvas's css size (its height follows: a 2.2:1 banner) */
   resize(widthPx: number): void;
+  /** the plugin key of the object under (x, y), css px from the canvas's top left; null: none */
+  pick(x: number, y: number): string | null;
+  /** the object under the pointer (null: none): a new one plays its hover move once (render/objects/hover.ts), none under reduced motion */
+  hover(key: string | null, reduced: boolean): void;
+  /** his pinch and pan (zoom.ts Cam): the view inside the room's fit */
+  setCam(c: Cam): void;
+  /** an object's box on the canvas at rest, css px from its top left (its hover tip's mark); null: not shown */
+  rectOf(key: string): { left: number; top: number; width: number; height: number } | null;
   dispose(): void;
 }
 
@@ -196,6 +206,13 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
   let width = 0;
   let raf = 0;
   const drops = new Map<string, number>();
+  // the fit of the whole room, and his camera inside it
+  let fit: Fit | null = null;
+  let cam: Cam = FIT;
+  // the object under the pointer and when its hover move began (0: none playing)
+  let hovered: string | null = null;
+  let hoverT0 = 0;
+  const ray = new Raycaster();
 
   const draw = (now: number): void => {
     raf = 0;
@@ -205,9 +222,16 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
       const { lift, squash } = dropAt(t0 === undefined ? 1 : (now - t0) / DROP_MS);
       if (t0 !== undefined && now - t0 >= DROP_MS) drops.delete(s.key);
       else if (t0 !== undefined) moving = true;
+      const playing = hoverT0 > 0 && s.key === hovered;
+      const ht = playing ? (now - hoverT0) / HOVER_MS : 1;
+      if (playing && ht < 1) moving = true;
+      else if (playing) hoverT0 = 0;
+      const h = hoverAt(MOVES[s.p.o.obj], ht);
       const k = s.p.scale;
-      s.g.position.set(s.p.spot.x, lift, s.p.spot.z);
-      s.g.scale.set(k / Math.sqrt(squash), k * squash, k / Math.sqrt(squash));
+      const rot = s.p.spot.rot;
+      s.g.position.set(s.p.spot.x + h.dx * Math.cos(rot), lift + h.lift, s.p.spot.z - h.dx * Math.sin(rot));
+      s.g.rotation.set(h.pitch, rot + h.yaw, h.roll);
+      s.g.scale.set((k * h.sx) / Math.sqrt(squash), k * h.sy * squash, (k * h.sz) / Math.sqrt(squash));
     }
     view.render();
     if (moving) raf = requestAnimationFrame(draw);
@@ -272,10 +296,49 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
       width = px;
       const P = 0.75;
       const site: Site = { x0: -ROOM.w / 2 - P, x1: ROOM.w / 2 + P, z0: -ROOM.d / 2 - P, z1: ROOM.d / 2 + P, yLow: -0.6, yHigh: 2.2 };
-      const fit = boxSite(site, px, Math.round(px / 2.2));
+      fit = boxSite(site, px, Math.round(px / 2.2));
       view.size(fit);
-      view.look(fit);
+      view.look(viewFit(fit, cam));
       frame();
+    },
+    pick(x, y) {
+      const el = view.renderer.domElement;
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w <= 0 || h <= 0 || shown.length === 0) return null;
+      ray.setFromCamera(new Vector2((x / w) * 2 - 1, 1 - (y / h) * 2), view.camera);
+      const hit = ray.intersectObjects(shown.map((s) => s.g), true)[0];
+      if (hit === undefined) return null;
+      // the shown group the hit mesh is in
+      let o: Object3D | null = hit.object;
+      while (o !== null && !shown.some((s) => s.g === o)) o = o.parent;
+      return shown.find((s) => s.g === o)?.key ?? null;
+    },
+    hover(key, reduced) {
+      if (key === hovered) return;
+      hovered = key;
+      hoverT0 = key !== null && !reduced ? performanceNow() : 0;
+      frame();
+    },
+    setCam(c) {
+      cam = c;
+      if (fit !== null) view.look(viewFit(fit, c));
+      frame();
+    },
+    rectOf(key) {
+      const s = shown.find((x) => x.key === key);
+      const el = view.renderer.domElement;
+      if (s === undefined || el.clientWidth <= 0) return null;
+      view.camera.updateMatrixWorld();
+      const b = new Box3().setFromObject(s.g);
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+        const p = new Vector3(x, y, z).project(view.camera);
+        const px = ((p.x + 1) / 2) * el.clientWidth;
+        const py = ((1 - p.y) / 2) * el.clientHeight;
+        x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+      }
+      return { left: x0, top: y0, width: x1 - x0, height: y1 - y0 };
     },
     dispose() {
       if (raf !== 0) cancelAnimationFrame(raf);
