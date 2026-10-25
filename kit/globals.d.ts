@@ -136,6 +136,11 @@ declare var AmbPearl: {
   FS: string;
 } | undefined;
 
+// ---- notes.js: the note layer (the console's look: BiseNotes.live)
+/** a voice note's phase and its words (SSE voice, relayed by kit.js) */
+type BiseVoice = { phase?: string; text?: string };
+declare var BiseNotes: { core: unknown; mount(doc: Document): unknown; live?: unknown; [k: string]: unknown } | undefined;
+
 // ---- the document events between the scripts (detail: what the listeners read)
 interface DocumentEventMap {
   /** kit.js: a new version is in (changed: new or different ids) */
@@ -144,4 +149,24 @@ interface DocumentEventMap {
   "bise:asks": CustomEvent<{ asks?: unknown } | null>;
   /** kit.js relays the hub's answered event (ask.js) */
   "bise:hub-answered": CustomEvent<Ask | null>;
+  /** notes.js: an edit landed or was undone on a block (kit.js counts 'approve N' again) */
+  "bise:edited": CustomEvent<{ block?: string } | null>;
+  /** kit.js: the SSE notes event (every note of the page) */
+  "bise:notes": CustomEvent<{ notes?: unknown[] } | null>;
+  /** kit.js: the page's state (ready, updating, writing) */
+  "bise:state": CustomEvent<{ state?: string } | null>;
+  /** kit.js: a voice note at the mouse (SSE voice) */
+  "bise:voice": CustomEvent<BiseVoice | null>;
+  /** kit.js: a question's card was answered */
+  "bise:answered": CustomEvent<{ block?: string; reply?: string } | null>;
+  /** kit.js: the watching frame's stop */
+  "bise:stop": CustomEvent<{ page?: string; timer?: string | number | null } | null>;
+  /** kit.js and plan.js: start an agent on an item, or a plan */
+  "bise:start": CustomEvent<{ block?: string; item?: string | null; text?: string } | null>;
+  /** kit.js: a checklist row ticked elsewhere */
+  "bise:ticked": CustomEvent<{ block?: string; item?: string | null } | null>;
+  /** kit.js: a question's option picked as a note (option null: taken back) */
+  "bise:pick": CustomEvent<{ block?: string; option?: number | null; text?: string | null } | null>;
+  /** kit.js: approve / skip, keep / drop / pick, tick (kind null: taken back) */
+  "bise:react": CustomEvent<{ block?: string; item?: string | null; kind?: string | null; text?: string } | null>;
 }
