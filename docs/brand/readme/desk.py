@@ -918,8 +918,161 @@ def d_scheduled(m):
     o.append(at(0.35, send, d.typing(cx, cy, ask if tw(ask, 13) < R - X - 40 else "check the ingest lag every 2 min, tell me if it's over 30 s", 0.4, 2.2), dur=.05))
     return d.svg("17 in bise desktop: you ask bise to check the ingest lag every 2 minutes and tell you only if it goes over 30 s; a ◷ row says it's scheduled, every 2 min, next 10:44; the right bar's SCHEDULED & WATCHING shows it.")
 
+# ---------- the plugins place (apps/desktop/src/plugins: Place.tsx, PluginPage.tsx, the settings words) ----------
+def toggle(d, x, y, on=True):
+    """the ds Toggle: a pill, its knob right and ink when on."""
+    c = d.c
+    return (f'<rect x="{x}" y="{y - 11}" width="28" height="16" rx="8" fill="{c["text"] if on else c["chip"]}"/>'
+            f'<circle cx="{x + (20 if on else 8)}" cy="{y - 3}" r="6" fill="{c["bg"]}"/>')
+
+def tile(d, x, y, initials, s=30):
+    """a plugin's icon until its object is drawn: a plain tile, the row's initials (PluginIcon)."""
+    c = d.c
+    return (f'<rect x="{x}" y="{y}" width="{s}" height="{s}" rx="{s * .24:.0f}" fill="{c["chip"]}" stroke="{c["line"]}"/>'
+            + d.t(x + s / 2, y + s * .62, E(initials), s * .38, "dim", 600, anchor="middle"))
+
+def tag(d, x, y, words):
+    """.plg-tag: a 999 px pill, a 1 px line, 11 px text-2. returns (body, width)."""
+    c = d.c; w = tw(words, 11) * 1.05 + 14
+    return (f'<rect x="{x:.0f}" y="{y - 12}" width="{w:.0f}" height="16" rx="8" fill="none" stroke="{c["rule"]}"/>'
+            + d.t(x + w / 2, y, E(words), 11, "dim", anchor="middle")), w
+
+def place(d, kind, kinds, rows, y0=0):
+    """the plugins place: its head, the search and add, installed | browse, the kind chips, the rows.
+    kinds: [(words, n or None)]; rows: [(initials, title, tags, what, gives, control)], control 'on' or 'always on'."""
+    c, t = d.c, d.t
+    b = [t(28, y0 + 44, "plugins", 22, "text", 600), t(28, y0 + 66, "what your agents can use, in every project", 13, "dim")]
+    on = sum(n for (_, n) in kinds if n is not None)
+    b.append(t(28, y0 + 86, f"{on} on · 0 off", 12, "faint"))
+    # the search field (its '/' key) and add
+    b.append(f'<rect x="28" y="{y0 + 102}" width="520" height="28" rx="8" fill="{c["bg"]}" stroke="{c["rule"]}"/>'
+             f'<rect x="38" y="{y0 + 108}" width="16" height="16" rx="4" fill="{c["chip"]}"/>' + t(46, y0 + 120, "/", 11, "dim", anchor="middle", mono=True)
+             + t(62, y0 + 121, "search plugins, tools, skills", 12.5, "faint"))
+    b.append(f'<rect x="560" y="{y0 + 102}" width="92" height="28" rx="8" fill="{c["chip"]}"/>' + t(606, y0 + 121, "add ⌄", 12.5, "text", 500, anchor="middle"))
+    # installed | browse (ds Seg: the picked one in the 9 % tint)
+    b.append(f'<rect x="28" y="{y0 + 142}" width="210" height="26" rx="7" fill="none" stroke="{c["line"]}"/>'
+             f'<rect x="30" y="{y0 + 144}" width="104" height="22" rx="6" fill="{c["sel"]}"/>'
+             + t(82, y0 + 159, f'installed <tspan fill="{c["faint"]}">{on}</tspan>', 12, "text", anchor="middle")
+             + t(186, y0 + 159, f'browse <tspan fill="{c["faint"]}">120</tspan>', 12, "dim", anchor="middle"))
+    # the kind chips: the picked one filled
+    x = 28
+    for words, n in [("all", None)] + kinds:
+        lab = words if n is None else f'{words} <tspan fill="{c["faint"]}">{n}</tspan>'
+        w = tw(words + ("" if n is None else f" {n}"), 12) * 1.06 + 20
+        b.append(f'<rect x="{x:.0f}" y="{y0 + 180}" width="{w:.0f}" height="22" rx="11" fill="{c["chip"] if words == kind else "none"}" stroke="{c["line"]}"/>'
+                 + t(x + w / 2, y0 + 195, lab, 12, "text" if words == kind else "dim", anchor="middle"))
+        x += w + 8
+    # the rows: icon, title and tags, what it does; what it gives and its switch at the right
+    y = y0 + 214
+    for ini, title, tags, what, gives_, ctl in rows:
+        b.append(f'<path d="M28 {y} H652" stroke="{c["line"]}"/>' + tile(d, 36, y + 9, ini))
+        b.append(t(78, y + 22, f'<tspan font-weight="600">{E(title)}</tspan>', 13.5))
+        tx = 78 + tw(title, 13.5) * 1.1 + 8
+        for tg in tags:
+            body, w = tag(d, tx, y + 22, tg); b.append(body); tx += w + 6
+        b.append(t(78, y + 40, E(what), 12, "dim"))
+        if ctl == "always on":
+            b.append(t(644, y + 30, "always on", 12, "faint", anchor="end"))
+        else:
+            b.append(t(604, y + 30, E(gives_), 12, "faint", anchor="end") + toggle(d, 616, y + 30, ctl == "on"))
+        y += 50
+    return "".join(b), y
+
+def d_tools(m):
+    """18 · every MCP server: the plugins place, MCP picked: 42 servers on; then bise answers with one script over three of them."""
+    c = DPAL[m]; T = 11.5
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    swap = 3.8
+    kinds = [("plugins", 1), ("Mistral", 0), ("MCP", 42), ("skills", 3)]
+    rows = [("GH", "GitHub", ["MCP"], "repos, issues and pull requests", "41 tools", "on"),
+            ("SE", "Sentry", ["MCP"], "errors, their traces and releases", "14 tools", "on"),
+            ("SL", "Slack", ["MCP"], "channels and messages", "9 tools", "on"),
+            ("LI", "Linear", ["MCP"], "issues and projects", "22 tools", "on")]
+    pb, _ = place(d, "MCP", kinds, rows)
+    o.append(at(0, swap, pb, dur=.25))
+    # then bise's thread: one question, one script over Sentry, GitHub and Slack, two lines
+    TX = 448; X, R = 22, TX - 22
+    th = []
+    th.append(f'<rect x="{TX}" y="0" width="{680 - TX}" height="{d.H}" fill="{c["side"]}"/><path d="M{TX} 0 V{d.H}" stroke="{c["line"]}"/><path d="M0 38 H{TX}" stroke="{c["line"]}"/>')
+    rx = TX + 16
+    th.append(t(rx, 25, '<tspan font-weight="600">storefront</tspan>', 13))
+    lab = lambda y, s_: t(rx, y, s_, 11.5, "faint", 600, extra=' letter-spacing=".06em"')
+    th.append(lab(64, "AGENTS · 0") + lab(102, "ARTIFACTS · 0") + lab(130, "SCHEDULED &amp; WATCHING · 0"))
+    th.append(bise_head(d))
+    ask = "why did checkout errors jump at 14:00?"
+    send = 5.6
+    bl, bh = d.bubble(R, 54, [ask])
+    th.append(at(send, None, bl))
+    y = 54 + bh + 24
+    th.append(at(6.2, None, d.head(X, y, "bise")))
+    th.append(at(6.5, 7.6, t(X, y + 20, '$ check Sentry, GitHub and Slack in one script', 12.5, "dim") + t(R, y + 20, '<tspan class="g">∿</tspan>', 12.5, "dim", anchor="end"), dur=.05))
+    th.append(at(7.6, None, toolrow(d, X, R, y + 20, "$ check Sentry, GitHub and Slack in one script", "✓ 6 s"), dur=.05))
+    th.append(at(8.2, None, "".join(t(X, y + 50 + 20 * i, E(l), 13) for i, l in enumerate(wrap(
+        "the 14:02 deploy (#412) renamed a field the payment webhook reads: 312 errors since. Ana flagged it in #checkout.", R - X - 24)))))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, keys=REST_KEYS)
+    th.append(cb + placeholder_at(d, cx, cy, ph, [(swap + .3, send)]) + at(swap + .25, send, d.typing(cx, cy, ask, swap + .3, 5.2), dur=.05))
+    o.append(at(swap, None, f'<rect width="680" height="{d.H}" fill="{c["bg"]}"/>' + "".join(th), dur=.25))
+    return d.svg("18 in bise desktop: the plugins place lists 42 MCP servers, all on (GitHub, Sentry, Slack, Linear, postgres…); you ask bise why checkout errors jumped; it checks Sentry, GitHub and Slack in one script and answers in two lines.")
+
+def d_plugins(m):
+    """19 · Agent Plugins: the plugins place; his own plugin's page; 'try it' puts a line in bise's composer; bise uses his skill."""
+    c = DPAL[m]; T = 12
+    d = Desk(c, T, 452); o = d.o; t = d.t; at = d.at
+    page, swap = 2.2, 5.0
+    kinds = [("plugins", 2), ("Mistral", 0), ("MCP", 42), ("skills", 3)]
+    rows = [("PN", "patch-notes", [], "writes the game's patch notes from the merged PRs", "1 skill", "on"),
+            ("BI", "bise", ["skills", "built-in"], "bise's own skills: pages, notes, the group", "", "always on"),
+            ("PS", "personal skills", ["skills"], "~/.agents/skills", "4 skills", "on"),
+            ("VI", "Vibe skills", ["skills"], "~/.vibe/skills", "2 skills", "on")]
+    pb, _ = place(d, "all", kinds, rows)
+    o.append(at(0, page, pb, dur=.25))
+    o.append(ring(d, 140, 236, 1.4, page + .1, r=12))
+    # its page: head (icon, name, what, what it gives, 'on for every project' and its switch), try it, its parts
+    pg = [f'<rect width="680" height="{d.H}" fill="{c["bg"]}"/>', t(28, 30, "‹ plugins", 12.5, "dim"), tile(d, 28, 50, "PN", 52),
+          t(96, 72, "patch-notes", 22, "text", 600), t(96, 94, "writes the game's patch notes from the merged PRs", 13, "dim"),
+          t(96, 114, "1 skill", 12, "faint"), t(616, 72, "on for every project", 12, "faint", anchor="end") + toggle(d, 624, 72, True)]
+    tries = ["write the patch notes for 1.4", "what changed since the last patch notes?", "draft the notes for the next release"]
+    pg.append(f'<rect x="28" y="140" width="624" height="{24 + 30 * len(tries)}" rx="10" fill="{c["raised"]}"/>')
+    for i, l in enumerate(tries):
+        yy = 166 + 30 * i
+        pg.append(t(44, yy, E(l), 13) + t(636, yy, "→", 13, "faint", anchor="end"))
+    pg.append(t(28, 284, f'skills <tspan fill="{c["faint"]}">1</tspan>', 12, "text", 600) + f'<path d="M28 296 H652" stroke="{c["line"]}"/>'
+              + t(36, 320, f'<tspan fill="{c["faint"]}">$</tspan>  <tspan font-weight="600">patch-notes</tspan>  <tspan fill="{c["dim"]}">from the merged PRs to player-facing notes</tspan>', 13)
+              + toggle(d, 616, 320, True))
+    pg.append(t(28, 360, "about", 12, "text", 600) + f'<path d="M28 372 H652" stroke="{c["line"]}"/>'
+              + t(36, 396, f'from <tspan style="font-family:{MONO}">~/.agents/plugins/patch-notes</tspan> · your agents get a change at their next turn', 12, "dim"))
+    o.append(at(page, swap, "".join(pg), dur=.2))
+    o.append(ring(d, 60, 162, 4.1, swap + .1, r=12))
+    # its tip, over the head's blank right side (not over the other lines to try)
+    o.append(at(4.3, swap, tip_box(d, 652, 104, ["puts it in main's composer; you send it or change it"]), dur=.1))
+    # bise's thread: the line in its composer, sent; bise uses his skill
+    TX = 448; X, R = 22, TX - 22
+    th = [f'<rect width="680" height="{d.H}" fill="{c["bg"]}"/>',
+          f'<rect x="{TX}" y="0" width="{680 - TX}" height="{d.H}" fill="{c["side"]}"/><path d="M{TX} 0 V{d.H}" stroke="{c["line"]}"/><path d="M0 38 H{TX}" stroke="{c["line"]}"/>']
+    rx = TX + 16
+    lab = lambda y, s_: t(rx, y, s_, 11.5, "faint", 600, extra=' letter-spacing=".06em"')
+    th.append(t(rx, 25, '<tspan font-weight="600">mapforge</tspan>', 13) + lab(64, "AGENTS · 0"))
+    # the page bise writes joins ARTIFACTS (8.6 s); SCHEDULED moves down under it
+    th.append(at(0, 8.6, lab(102, "ARTIFACTS · 0") + lab(130, "SCHEDULED &amp; WATCHING · 0"), dur=.1))
+    th.append(at(8.6, None, lab(102, "ARTIFACTS · 1") + t(rx, 128, "↗", 13, "dim") + t(rx + 18, 128, f'<tspan font-weight="500">patch notes 1.4</tspan>  <tspan fill="{c["dim"]}" font-size="12">page</tspan>', 13)
+                  + lab(160, "SCHEDULED &amp; WATCHING · 0"), dur=.1))
+    th.append(t(18, 25, f'<tspan fill="{c["acc"]}" style="font-family:{MONO}" font-weight="700">:*</tspan> <tspan font-weight="600">bise</tspan> <tspan fill="{c["dim"]}">· mapforge</tspan>', 13))
+    q = tries[0]; send = 6.0
+    bl, bh = d.bubble(R, 54, [q])
+    th.append(at(send, None, bl))
+    y = 54 + bh + 24
+    th.append(at(6.6, None, d.head(X, y, "bise") + toolrow(d, X, R, y + 20, "$ use the patch-notes skill", "✓ 0.1 s")))
+    th.append(at(7.4, None, toolrow(d, X, R, y + 40, "$ list the PRs merged since 1.3", "✓ 2 s")))
+    th.append(at(8.4, None, t(X, y + 70, "patch notes 1.4: 9 fixes, 2 new maps, in your skill's format.", 13) + artchip(d, X, y + 102, "↗ patch notes 1.4", "page")))
+    cb, ph, (cx, cy) = d.composer(X - 4, 360, R - X + 8, where="mapforge", keys=REST_KEYS)
+    th.append(cb + at(swap, send, t(cx, cy, E(q), 13), dur=.1) + at(send, None, t(cx, cy, E(ph), 13, "faint"), dur=.1))
+    th.append(d.key(R - 50, 402, "⏎", send - .4, send + .1))
+    o.append(at(swap, None, "".join(th), dur=.25))
+    return d.svg("19 in bise desktop: the plugins place lists your plugin patch-notes next to bise's own skills and your skill folders; its page shows its skill and three lines to try; one click puts 'write the patch notes for 1.4' in bise's composer; you send it, and bise uses your skill and writes the page.")
+
 DESK = [("demo-b-desktop", d_session), ("artifacts-desktop", d_artifacts), ("voicemode-desktop", d_voicemode),
         ("resume-desktop", d_resume), ("worktree-desktop", d_worktree), ("talk-desktop", d_talk),
         ("voice-desktop", d_dictation), ("card-desktop", d_card), ("sync-desktop", d_sync), ("direct-desktop", d_direct),
         ("prs-desktop", d_prs), ("diff-desktop", d_diff), ("tokens-desktop", d_tokens), ("screenshot-desktop", d_screenshot),
-        ("quote-desktop", d_quote), ("model-desktop", d_model), ("scheduled-desktop", d_scheduled)]
+        ("quote-desktop", d_quote), ("model-desktop", d_model), ("scheduled-desktop", d_scheduled),
+        ("tools-desktop", d_tools), ("plugins-desktop", d_plugins)]
