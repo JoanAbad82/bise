@@ -77,6 +77,8 @@ export interface ComposerProps {
   /** TP-R6, ⇧⇥ (no list open): the screen's (the TUI's: switch the approvals mode yolo ↔ auto). */
   readonly onShiftTab?: () => void;
   readonly placeholder?: string;
+  /** the placeholder's droppable end (PmField placeholderTail) */
+  readonly placeholderTail?: string | undefined;
   /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
   readonly keys?: string;
   /** Voice in this composer: recording, then transcribing (the key bar's voice keys). */
@@ -318,6 +320,7 @@ export const Composer = memo(function Composer(
         store={store}
         testId={testId}
         placeholder={placeholder}
+        placeholderTail={props.placeholderTail}
         send={(o) => {
           cb.current.onSend(o);
           setSent((n) => n + 1);

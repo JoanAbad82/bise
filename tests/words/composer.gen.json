@@ -511,6 +511,13 @@
     "one": null,
     "text": "archive {agent}? /restore brings it back. y / n"
   },
+  "composer.esc_back_to": {
+    "args": [
+      "lead"
+    ],
+    "one": null,
+    "text": "esc back to {lead}"
+  },
   "composer.esc_closes": {
     "args": [],
     "one": null,
@@ -704,13 +711,6 @@
     ],
     "one": null,
     "text": "ask {agent} about it, then ⏎"
-  },
-  "composer.placeholder_agent": {
-    "args": [
-      "agent"
-    ],
-    "one": null,
-    "text": "talk to {agent} directly"
   },
   "composer.placeholder_archived": {
     "args": [

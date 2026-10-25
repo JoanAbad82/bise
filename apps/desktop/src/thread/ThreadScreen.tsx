@@ -30,7 +30,7 @@ import { AgentHead, BiseHead, StartingLine } from './AgentHead';
 import { PauseLine } from './PauseLine';
 import { LabelMark } from './LabelMark';
 import { StepLine } from './live-step';
-import { composerWords, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
+import { composerWords, emptyEnter, escTail, nothingOwnYet, usageLine, workingRowShows } from './head';
 import { useTabPlace, useTabWords } from './ComposerTab';
 import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
@@ -481,6 +481,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
             mark={labelMark}
             placeholder={answering?.placeholder ?? (artifact !== undefined ? artifact.placeholder : composerWords(title).placeholder)}
+            // a sub-agent's: esc goes up to its project's main, bise (esc-up.ts); the line says so (his ask, designer m_41726)
+            placeholderTail={escTail(agent, answering !== null || artifact !== undefined || voice === 'typing')}
             {...(artifact === undefined ? {} : { about: { id: artifact.id, title: artifact.title, url: artifact.url } })}
             aboutPink={voice === 'typing' ? undefined : artifact?.pink}
             answer={answerOf(answering)}

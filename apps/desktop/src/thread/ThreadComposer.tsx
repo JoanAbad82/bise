@@ -42,6 +42,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   tabEnd,
   me,
   placeholder,
+  placeholderTail,
   answer,
   onStop,
   onEscape,
@@ -73,6 +74,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   me?: Agent | undefined;
   /** the field's words when empty (the composer's own 'write to …' when none) */
   placeholder: string | undefined;
+  /** after the placeholder, dropped first when the line doesn't fit: a sub-agent's 'esc back to bise' */
+  placeholderTail?: string | undefined;
   /** the open card his words answer (the inbox block's, any project's), else none */
   answer: CardAt | null;
   onStop: () => void;
@@ -402,7 +405,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   useEffect(() => {
     doneRef.current = lineDone;
   });
-  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} fold={fold && !quoting} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} fold={fold && !quoting} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
   return field;
 });
 

@@ -182,3 +182,20 @@ fn a_long_archived_list_scrolls_to_the_selection() {
     click(&mut app, x + 5, y as u16);
     assert_eq!(app.sb.focus, "t000");
 }
+
+/// The empty composer per state (his ask via main m_41677, designer
+/// m_41726): main's own asks what's on his mind; a sub-agent's says
+/// where ⏎ goes and that esc goes back up to main, the same words as the
+/// desktop's (its lead is 'bise' there); too narrow, the esc part goes
+/// before the name is ever cut.
+#[test]
+fn the_placeholder_says_esc_back_to_main_in_a_sub_agent() {
+    let mut app = app();
+    assert_eq!(placeholder(&app).unwrap(), "what's on your mind?");
+    app.sb.focus = "alpha".into();
+    assert_eq!(placeholder(&app).unwrap(), "write to alpha, then ⏎ · esc back to main");
+    let (head, tail) = placeholder_parts(&app).unwrap();
+    assert_eq!(placeholder_fit(&head, tail.as_deref(), 41), "write to alpha, then ⏎ · esc back to main");
+    assert_eq!(placeholder_fit(&head, tail.as_deref(), 40), "write to alpha, then ⏎");
+    assert_eq!(placeholder_fit(&head, tail.as_deref(), 10), "write to alpha, then ⏎", "the name is never cut by the drop");
+}

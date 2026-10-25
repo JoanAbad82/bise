@@ -1356,18 +1356,38 @@ pub(crate) fn key_mode(app: &App) -> crate::keybar::Mode {
 }
 
 /// What the empty composer shows after the cursor, dim (book §8 "The
-/// frame"): `what's on your mind?` to main, `talk to auth-fix directly`
-/// inside an agent, `/restore` in an archived agent's history (it reads
-/// nothing: a plain message stays in the composer, `archived_refusal`).
-pub(crate) fn placeholder(app: &App) -> Option<String> {
+/// frame"): `what's on your mind?` to main, `write to auth-fix, then ⏎ ·
+/// esc back to main` inside an agent (esc goes up to main there: the
+/// desktop's same words, designer m_41726), `/restore` in an archived
+/// agent's history (it reads nothing: a plain message stays in the
+/// composer, `archived_refusal`). Its line and the part dropped first
+/// when the line doesn't fit (`placeholder_fit`).
+pub(crate) fn placeholder_parts(app: &App) -> Option<(String, Option<String>)> {
     let sb = &app.sb;
     Some(if sb.focus_archived() {
-        composer::placeholder_archived(&sb.focus)
+        (composer::placeholder_archived(&sb.focus), None)
     } else if sb.is_main_focus() {
-        PLACEHOLDER_MAIN.to_string()
+        (PLACEHOLDER_MAIN.to_string(), None)
     } else {
-        composer::placeholder_agent(&sb.focus)
+        let to = composer::placeholder_to(&sb.focus);
+        let to = if crate::theme::ascii_mode() { to.replace('⏎', "enter") } else { to };
+        (to, Some(composer::esc_back_to("main")))
     })
+}
+
+/// The placeholder whole (`placeholder_parts` joined by ' · '): the tests read it.
+#[cfg(test)]
+pub(crate) fn placeholder(app: &App) -> Option<String> {
+    placeholder_parts(app).map(|(head, tail)| placeholder_fit(&head, tail.as_deref(), usize::MAX))
+}
+
+/// The placeholder in `width` columns: its tail after ' · ' while the
+/// whole fits, else the head alone (the name is never cut first). Pure.
+pub(crate) fn placeholder_fit(head: &str, tail: Option<&str>, width: usize) -> String {
+    match tail {
+        Some(t) if unicode_width::UnicodeWidthStr::width(head) + 3 + unicode_width::UnicodeWidthStr::width(t) <= width => format!("{head} · {t}"),
+        _ => head.to_string(),
+    }
 }
 
 /// The line an archived agent's view says when ⏎ would send it a plain

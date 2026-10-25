@@ -35,9 +35,18 @@
 }
 .b-composer .b-field-ph {
   position: absolute;
-  inset: calc((var(--h-control-sm) - 1lh) / 2) auto auto 0;
+  /* one line: a tail that doesn't fit wraps under it, out of sight (designer m_41726) */
+  inset: calc((var(--h-control-sm) - 1lh) / 2) 0 auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  height: 1lh;
+  overflow: hidden;
   pointer-events: none;
   user-select: none;
+}
+.b-composer .b-field-ph > span {
+  flex: none;
+  white-space: pre;
 }
 /* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
    needs pre-wrap; the dictation's live words are dim after the take's chip */

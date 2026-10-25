@@ -327,8 +327,10 @@ crate::words! { composer:
 
     /// the empty composer, to main; the first run's first line
     placeholder_main = "what's on your mind?";
-    /// the empty composer in an agent's view
-    placeholder_agent(agent) = "talk to {agent} directly";
+    /// the empty composer in a sub-agent's view, after `placeholder_to` and ' · ': where esc goes
+    /// up, the name the surface gives main ('bise' in the window, 'main' in the terminal); the first
+    /// part dropped when the line doesn't fit, never the name cut (designer m_41726, his ask)
+    esc_back_to(lead) = "esc back to {lead}";
     /// the empty composer in an archived agent's view
     placeholder_archived(agent) = "{agent} is archived · /restore to talk to it";
     /// ⏎ on a plain message in an archived agent's view

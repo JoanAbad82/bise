@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { common } from '@/proto/words.gen';
-import { archivedFit, biseChip, composerWords, emptyEnter, emptyEnterAct, nothingOwnYet, roleOf, stateChip, STARTING_MS, usageLine } from './head';
+import { archivedFit, biseChip, composerWords, emptyEnter, emptyEnterAct, escTail, nothingOwnYet, roleOf, stateChip, STARTING_MS, usageLine } from './head';
 
 const NOW = 1_791_100_000_000;
 const MIN = 60_000;
@@ -107,5 +107,13 @@ describe("the head's fit", () => {
     expect(archivedFit({ ...base, avail: 247 })).toBe(1);
     expect(archivedFit({ ...base, avail: 176 })).toBe(1);
     expect(archivedFit({ ...base, avail: 175 })).toBe(2);
+  });
+});
+
+describe("the composer's placeholder per state (his ask via main m_41677, designer m_41726)", () => {
+  it("a sub-agent's says esc goes back to bise; main's, an answer's, an artifact's or voice typing's never", () => {
+    expect([composerWords('perf').placeholder, escTail('perf', false)]).toEqual(['write to perf, then ⏎', 'esc back to bise']);
+    expect(escTail('main', false)).toBeUndefined();
+    expect(escTail('perf', true)).toBeUndefined();
   });
 });

@@ -3,7 +3,8 @@
 // them. The words are the TUI's. Owner: amb-home.
 import type { Agent, EntryKind } from '@/proto';
 import { common, thread } from '@/proto/words.gen';
-import { ago } from '@/agents/model';
+import { ago, shownName } from '@/agents/model';
+import { MAIN } from '@/app/route';
 import { paused, pauseLine } from './wake';
 import { composer } from '../proto/words.gen';
 
@@ -94,6 +95,16 @@ export function workingRowShows(a: Agent | undefined): boolean {
 
 export function composerWords(name: string): { label: string; placeholder: string } {
   return { label: common.to_agent({ agent: name }), placeholder: composer.placeholder_to({ agent: name }) };
+}
+
+/**
+ * The placeholder's end in a thread: 'esc back to bise' where esc on the empty composer goes up to
+ * the project's main (a sub-agent's thread, app/esc-up.ts), the terminal's same words with its own
+ * name for main (designer m_41726). None on main's own composer, nor while the composer says
+ * something else (an answer, an artifact, voice typing): there esc is theirs. Pure.
+ */
+export function escTail(agent: string, busyWords: boolean): string | undefined {
+  return agent === MAIN || busyWords ? undefined : composer.esc_back_to({ lead: shownName(MAIN) });
 }
 
 /** K2, ⏎ on an empty composer (the TUI's sb/keys.rs + input.rs): never an empty send. A sign-in

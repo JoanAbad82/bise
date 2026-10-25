@@ -106,6 +106,9 @@ export interface PmFieldProps {
   readonly store: Store;
   readonly testId: string;
   readonly placeholder: string;
+  /** after the placeholder and ' · ', dropped whole first when the line doesn't fit (a sub-agent's
+   *  'esc back to bise': designer m_41726); never an ellipsis in the name */
+  readonly placeholderTail?: string | undefined;
   readonly send: (o: Outgoing) => void;
   /** tab during a turn: his message to the hub's queue (issue 23); the screen's drawer shows it */
   readonly queue: (o: Outgoing) => void;
@@ -155,6 +158,11 @@ function slotOf(
     (name) => find(name) !== undefined,
     (name, i) => find(name)?.argKinds?.[i] === "text",
   );
+}
+
+/** The placeholder's words whole, for the field's label: its tail after ' · '. Pure. */
+export function phWords(placeholder: string, tail: string | undefined): string {
+  return tail === undefined ? placeholder : `${placeholder} · ${tail}`;
 }
 
 export function PmField(p: PmFieldProps): JSX.Element {
@@ -257,7 +265,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
   useLayoutEffect(() => {
     const el = host.current;
     if (el === null) return;
-    const ph = props.current.placeholder;
+    const ph = phWords(props.current.placeholder, props.current.placeholderTail);
     const editor = new Editor({
       element: el,
       extensions: [
@@ -347,12 +355,13 @@ export function PmField(p: PmFieldProps): JSX.Element {
     };
   }, []);
 
-  // the field's label follows the placeholder (the target's name)
+  // the field's label follows the placeholder (the target's name), its tail too
   useEffect(() => {
     const dom = view()?.dom;
-    dom?.setAttribute("aria-label", p.placeholder);
-    dom?.setAttribute("aria-placeholder", p.placeholder);
-  }, [p.placeholder]);
+    const ph = phWords(p.placeholder, p.placeholderTail);
+    dom?.setAttribute("aria-label", ph);
+    dom?.setAttribute("aria-placeholder", ph);
+  }, [p.placeholder, p.placeholderTail]);
 
   useEffect(() => {
     saved.current = load(p.store, p.target);
@@ -948,7 +957,10 @@ export function PmField(p: PmFieldProps): JSX.Element {
       />
       <div ref={host} className="b-field-host" />
       {blank && !dictShown && (
-        <span className="ph b-field-ph">{p.placeholder}</span>
+        <span className="ph b-field-ph">
+          <span className="ph-head">{p.placeholder}</span>
+          {p.placeholderTail !== undefined && <span className="ph-tail" data-testid={`${p.testId}.ph-tail`}>{` · ${p.placeholderTail}`}</span>}
+        </span>
       )}
       {open && (
         <Picker

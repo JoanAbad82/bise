@@ -878,7 +878,7 @@ fn draw_composer(app: &mut App, frame: &mut Frame, area: Rect, inner: usize, lea
     // dim, the placeholder says where the keys are
     let diff_keys = crate::diffview::has_keys(app);
     let rows = if empty {
-        let note = if diff_keys { crate::diffview::COMPOSER_NOTE.to_string() } else { sb::answer_target::placeholder(app).or_else(|| sb::placeholder(app)).unwrap_or_default() };
+        let note = if diff_keys { crate::diffview::COMPOSER_NOTE.to_string() } else { sb::answer_target::placeholder(app).or_else(|| sb::placeholder_parts(app).map(|(head, tail)| sb::placeholder_fit(&head, tail.as_deref(), text_w.saturating_sub(1)))).unwrap_or_default() };
         let caret = if finding || diff_keys { Style::default() } else { Style::default().fg(text()).add_modifier(Modifier::REVERSED) };
         let mut spans = vec![Span::styled(" ", caret)];
         if !note.is_empty() {
