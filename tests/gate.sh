@@ -238,7 +238,11 @@ TS_NODE_OPTIONS="--experimental-strip-types --disable-warning=ExperimentalWarnin
 kit_check() {
   local f tsc="$root/office/sdk/node_modules/.bin/tsc"; desktop_path
   for f in "$root"/kit/check.ts "$root"/kit/*.check.ts; do echo "node ${f#"$root"/}"; NODE_OPTIONS="$TS_NODE_OPTIONS" node "$f" || return 1; done
-  if [ -x "$tsc" ]; then echo "tsc -p kit/tsconfig.node.json"; "$tsc" -p "$root/kit/tsconfig.node.json" || return 1
+  if [ -x "$tsc" ]; then
+    echo "tsc -p kit/tsconfig.node.json"; "$tsc" -p "$root/kit/tsconfig.node.json" || return 1
+    # the page scripts: their types, and the committed .js is what their .ts emits
+    echo "tsc -p kit/tsconfig.json"; "$tsc" -p "$root/kit/tsconfig.json" || return 1
+    echo "ts_emit kit/tsconfig.json --check"; NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/kit/tsconfig.json" --check || return 1
   else echo "skipped kit types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
 }
 # the extension's unit tests (no browser), then the types of its tests and the bench
