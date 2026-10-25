@@ -33,6 +33,21 @@
 .s3-world[data-big] {
   width: var(--world-big);
 }
+/* the world's box takes no pointer: its hit span does (the island as drawn, never the bubbles'
+   column, World.tsx hitBox), and its legend; their events reach the button */
+.s3-world {
+  pointer-events: none;
+}
+.s3-world-hit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: auto;
+}
+.s3-legend {
+  pointer-events: auto;
+}
 .s3-world-isle {
   display: block;
   width: var(--world-big);

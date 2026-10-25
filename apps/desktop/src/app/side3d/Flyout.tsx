@@ -41,16 +41,23 @@ export interface FlyoutProps {
   /** its top, px from the side's top (aligned on its bubble, kept inside the window) */
   readonly top: number;
   readonly foot: { readonly left: string; readonly right: string; readonly onRight: () => void } | null;
+  /** its full page's link on its head ('all processes ›'), when its kinds each keep theirs on their head */
+  readonly link?: { readonly text: string; readonly onClick: () => void };
   readonly children: ReactNode;
 }
 
-export function Flyout({ id, name, says, add, onPin, top, foot, children }: FlyoutProps) {
+export function Flyout({ id, name, says, add, onPin, top, foot, link, children }: FlyoutProps) {
   return (
     <section className="s3-card" style={{ top }} role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
       <header className="s3-card-head">
         <b>{name}</b>
         {says !== '' && <span className="s3-card-says">{says}</span>}
         <span className="s3-card-acts">
+          {link !== undefined && (
+            <SideLink onClick={link.onClick} testId={`app.flyout.${id}.all`}>
+              {link.text}
+            </SideLink>
+          )}
           {add}
           <HeadButton icon="panel" tip={side.pin_tab} onClick={onPin} testId={`app.flyout.${id}.pin`} />
         </span>

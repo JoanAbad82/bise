@@ -13,7 +13,8 @@ import { artifact, artifacts, card, ev, projects, row } from '../../../tests/fea
 import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
 import { keyAction } from '../keys';
-import { SideHost, bubbleTops } from './Host';
+import { SideHost, bubbleTops, cardFloor } from './Host';
+import { hitBox } from './World';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
 vi.mock('@/bims/Office', () => ({ Office: () => <canvas data-testid="office" /> }));
@@ -150,6 +151,23 @@ describe('the right side, folded', () => {
     panel.open = true;
     const { v } = side3d();
     expect(v.queryByTestId('app.side')).toBeNull();
+  });
+
+  it('the world takes the pointer on its island only: grown, never on the bubbles\' column', () => {
+    expect(hitBox(280, false)).toEqual({ width: 148, height: 108 });
+    const big = hitBox(280, true);
+    expect(big).toMatchObject({ width: 384, height: 280 });
+    expect(big.clipPath).toContain('calc(100% - 68px) 112px');
+  });
+
+  it('a card stops 12 above the composer on screen, else --float-room above the bottom', () => {
+    expect(cardFloor(document, 900)).toBe(816);
+    const c = document.createElement('div');
+    c.dataset['testid'] = 'composer';
+    c.getBoundingClientRect = () => ({ top: 773, height: 114, bottom: 887, left: 0, right: 0, width: 0, x: 0, y: 773, toJSON: () => ({}) });
+    document.body.append(c);
+    expect(cardFloor(document, 900)).toBe(761);
+    c.remove();
   });
 
   it('the bubbles under the world at 152, 80 apart, put whatever the world does; as a 5th bubble the world tops the stack', () => {

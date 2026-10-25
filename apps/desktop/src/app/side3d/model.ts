@@ -24,6 +24,8 @@ export interface Counts {
   readonly timers: number;
   readonly watches: number;
   readonly running: number;
+  /** processes that ended today (the processes head's 'done today') */
+  readonly doneToday: number;
 }
 
 /** The agents' part of the counts. Pure. */
@@ -72,6 +74,7 @@ export function bubbleSays(b: BubbleId, c: Counts): string {
       break;
     case 'processes':
       if (c.running > 0) parts.push(side.running({ n: c.running }));
+      if (c.doneToday > 0) parts.push(side.done_today({ n: c.doneToday }));
       break;
   }
   return parts.join(' · ');

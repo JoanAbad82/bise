@@ -56,6 +56,20 @@ export function bubbleTops(world: 'small' | 'bubble'): { readonly world: number 
   return { world: world === 'bubble' ? TOP_STACK : null, bubbles: tops };
 }
 
+/**
+ * How low a card may go, px from the window's top: 12 above the composer on screen (the thread's,
+ * or the floating one), else --float-room above the bottom (ui-review: a card never covers his
+ * composer). Reads the composers' boxes.
+ */
+export function cardFloor(doc: Document, winH: number): number {
+  let floor = winH - FLOAT_ROOM;
+  for (const el of doc.querySelectorAll('[data-testid="composer"], [data-testid="composer.float"]')) {
+    const r = el.getBoundingClientRect();
+    if (r.height > 0 && r.top > 0) floor = Math.min(floor, r.top - EDGE);
+  }
+  return floor;
+}
+
 /** The artifacts card's foot: how many, and in how many projects when more than one. Pure. */
 export function artFoot(n: number, projects: number): string {
   if (n === 0) return '';
@@ -109,6 +123,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     timers: tasks.length,
     watches: live.reduce((n, a) => n + alarms(a, now).length, 0),
     running: procs.filter((x) => isRunning(x.p)).length,
+    doneToday: procs.filter((x) => !isRunning(x.p) && today(endedAt(x.p) ?? 0, now)).length,
   };
   const [open, setOpen] = useState<BubbleId | null>(null);
   const tops = bubbleTops(world === 'bubble' ? 'bubble' : 'small');
@@ -157,7 +172,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
       return;
     }
     const r = el.getBoundingClientRect();
-    setLift(Math.max(0, r.bottom + lift - (window.innerHeight - FLOAT_ROOM)));
+    setLift(Math.max(0, r.bottom + lift - cardFloor(document, window.innerHeight)));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- measured again when the card or its rows change
   }, [open, live.length, artifacts.length, procs.length, tasks.length]);
   const here = route.screen === 'thread' ? { project: route.project, agent: route.agent } : { project: null, agent: null };
@@ -170,7 +185,6 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   const says = [side.at_desks({ n: live.length }), counts.asks > 0 ? side.asks({ n: counts.asks }) : ''].filter((s) => s !== '').join(' · ');
   const archived = agents.filter((a) => a.archived).length;
   const running = procs.filter((x) => isRunning(x.p));
-  const doneToday = procs.filter((x) => !isRunning(x.p) && (endedAt(x.p) ?? 0) > 0 && today(endedAt(x.p) ?? 0, now)).length;
   return (
     <div className="s3-side" ref={root} data-world={world} data-testid="app.side">
       {world !== 'bubble' && (
@@ -229,7 +243,8 @@ function Side({ project, home, world }: { project: string; home: string; world: 
           return (
             <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={cardTop(open)}
               onPin={() => { openOverview(project, 'processes'); }}
-              foot={{ left: open === 'processes' && doneToday > 0 ? side.done_today({ n: doneToday }) : '', right: open === 'processes' ? side.all_processes : side.all_scheduled, onRight: goAll[open] }}>
+              link={{ text: open === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[open] }}
+              foot={null}>
               {rowsOf(open)}
               <div className="s3-card-sub" data-testid={`app.flyout.${open}.${other}`}>
                 <b>{bubbleName(other)}</b>

@@ -35,6 +35,25 @@ export function noGrow(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+/** the bubbles' column, from the world's right edge (44 + its objects' 12 each side): the big world never takes the pointer there */
+export const BUBBLE_COL = 68;
+/** where the bubbles' objects start, from the world's top (the first bubble at 152 - 12, its object 28 above it) */
+export const BUBBLE_FROM = 112;
+
+/**
+ * The world's pointer box, px in the world's own corner: the island as drawn (its 384 office
+ * `isleH` tall, scaled to 148 at rest); grown, it leaves out the bubbles' column under BUBBLE_FROM,
+ * so a bubble under the big world still takes his click. Pure.
+ */
+export function hitBox(isleH: number, big: boolean): CSSProperties {
+  const k = big ? 1 : SMALL / BIG;
+  const w = BIG * k;
+  const h = Math.round(isleH * k);
+  if (!big || h <= BUBBLE_FROM) return { width: w, height: h };
+  const cut = `polygon(0 0, 100% 0, 100% ${String(BUBBLE_FROM)}px, calc(100% - ${String(BUBBLE_COL)}px) ${String(BUBBLE_FROM)}px, calc(100% - ${String(BUBBLE_COL)}px) 100%, 0 100%)`;
+  return { width: w, height: h, clipPath: cut };
+}
+
 interface OfficeOf {
   readonly project: string;
   /** the project's live agents */
@@ -89,11 +108,27 @@ export function World({ project, name, says, agents, cards, onOpen }: WorldProps
   const leave = () => {
     after(GRACE_MS, false);
   };
+  // the office's drawn height at 384 (its layout box: the scale leaves it as it is)
+  const isle = useRef<HTMLSpanElement | null>(null);
+  const [isleH, setIsleH] = useState(0);
+  useEffect(() => {
+    const el = isle.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setIsleH(el.offsetHeight);
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
   const label = side.world_open({ project: name });
   return (
     <Press look="s3-world" data-big={big || undefined} aria-label={label} {...tipAttrs(big ? undefined : label)}
       onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={onOpen} data-testid="app.world">
-      <span className="s3-world-isle" style={{ '--s3-scale': String(big ? 1 : SMALL / BIG) } as CSSProperties}>
+      {/* the one place that takes the pointer: the island's box as drawn, never the bubbles' column under it */}
+      <span className="s3-world-hit" style={hitBox(isleH, big)} data-testid="app.world.hit" />
+      <span ref={isle} className="s3-world-isle" style={{ '--s3-scale': String(big ? 1 : SMALL / BIG) } as CSSProperties}>
         <span className="s3-world-office" aria-hidden="true">
           <WorldOffice project={project} agents={agents} cards={cards} />
         </span>

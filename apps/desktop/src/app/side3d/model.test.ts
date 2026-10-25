@@ -11,7 +11,7 @@ const agent = (name: string, over: Partial<Agent> = {}): Agent => ({
 const card = (id: number, agentName: string, over: Partial<Card> = {}): Card => ({
   id, project: 'acme', kind: 'question', agent: agentName, question: 'run it?', options: [{ n: 1, label: 'yes' }, { n: 2, label: 'no' }, { n: 3, label: 'later' }], urgent: false, since_ms: id, ...over,
 });
-const COUNTS: Counts = { working: 3, asks: 1, busy: 3, artifacts: 12, newArtifacts: 2, timers: 1, watches: 1, running: 2 };
+const COUNTS: Counts = { working: 3, asks: 1, busy: 3, artifacts: 12, newArtifacts: 2, timers: 1, watches: 1, running: 2, doneToday: 3 };
 
 describe('the counts', () => {
   it('agents: working without main, asking by its open cards, busy each once', () => {
@@ -33,8 +33,9 @@ describe('the counts', () => {
   });
   it('a tip names the bubble and what it counts, "nothing" when empty', () => {
     expect(bubbleTip('agents', COUNTS)).toBe(side.bubble_tip({ name: side.agents, says: `${side.working({ n: 3 })} · ${side.asks({ n: 1 })}` }));
-    const none: Counts = { working: 0, asks: 0, busy: 0, artifacts: 0, newArtifacts: 0, timers: 0, watches: 0, running: 0 };
+    const none: Counts = { working: 0, asks: 0, busy: 0, artifacts: 0, newArtifacts: 0, timers: 0, watches: 0, running: 0, doneToday: 0 };
     expect(bubbleTip('processes', none)).toBe(side.bubble_tip({ name: side.processes, says: side.bubble_none }));
+    expect(bubbleTip('processes', COUNTS)).toBe(side.bubble_tip({ name: side.processes, says: `${side.running({ n: 2 })} · ${side.done_today({ n: 3 })}` }));
   });
 });
 
