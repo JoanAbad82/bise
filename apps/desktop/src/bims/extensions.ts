@@ -15,7 +15,7 @@ import type { PluginObject } from './plugin-objects';
 import { decorOf, terraceSlab } from './render/decor';
 
 /** the maps that grow like his sketch so far (each map's look of them comes in its own step); the others wait, their objects in `left` */
-export const GROWS: ReadonlySet<MapId> = new Set<MapId>(['loft', 'campus', 'workshop', 'kyoto', 'riad', 'nordic', 'patio', 'haveli', 'tropical']);
+export const GROWS: ReadonlySet<MapId> = new Set<MapId>(['loft', 'campus', 'workshop', 'kyoto', 'riad', 'nordic', 'patio', 'haveli', 'tropical', 'cyclades', 'sahel', 'greenhouse', 'climb']);
 
 /** which of his sketch's extensions an office needs */
 export interface Need {
