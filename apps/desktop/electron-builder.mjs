@@ -1,3 +1,4 @@
+// stays JS: the release config, read by electron-builder's own loader (no TS there).
 // Packaging bise desktop (electron-builder; `pnpm dist`). Owner: amb-mac.
 // The app carries what it runs, so nothing is looked up on PATH:
 //   Contents/Resources/bin/bise          the bise it runs (src/main/paths.ts binPath); in a

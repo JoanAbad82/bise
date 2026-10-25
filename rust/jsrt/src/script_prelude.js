@@ -1,3 +1,4 @@
+// stays JS: script.rs include_str!s it into bend-jsrt, which builds with cargo alone (no node).
 // bend-jsrt's script mode, before the office bundle and the script
 // (script.rs): console and the run.read/run.write host. No timers
 // (architect m_23800): a library that needs setTimeout fails loudly in a

@@ -1,3 +1,4 @@
+// stays JS: an eslint.config.ts needs jiti, a dependency for what this file does as is.
 // ESLint for bise desktop: typed rules (typescript-eslint strictTypeChecked)
 // on every .ts/.tsx through the two tsconfigs, React hooks rules on the
 // renderer, plain JS rules on the scripts. `pnpm lint` fails on any warning.

@@ -855,6 +855,8 @@ if [ "$mode" = full ]; then
   python3 tests/shims_check.py || { echo "GATE full FAILED"; exit 1; }
   # sb-core's records by position only in bend/hub/gen/ (state-schema, ~0.1 s)
   python3 tests/state_guard.py || { echo "GATE full FAILED"; exit 1; }
+  # no new hand-written JS (js-to-ts, ~0.1 s)
+  python3 tests/js_guard.py || { echo "GATE full FAILED"; exit 1; }
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
   # the e2e/tmux tests this change can break (tests/test_map.py; the user's
@@ -934,6 +936,9 @@ python3 "$root/tests/shims_check.py" || { echo "GATE quick FAILED"; exit 1; }
 # sb-core's records built or opened only in bend/hub/gen/ (tests/state_guard.py, state-schema)
 python3 "$root/tests/state_guard.py" --self-test >/dev/null || { python3 "$root/tests/state_guard.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 python3 "$root/tests/state_guard.py" || { echo "GATE quick FAILED"; exit 1; }
+# no new hand-written JS: generated, vendored or on tests/js_allowlist.txt (js-to-ts, ~0.1 s)
+python3 "$root/tests/js_guard.py" --self-test >/dev/null || { python3 "$root/tests/js_guard.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+python3 "$root/tests/js_guard.py" || { echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the crates' compile-time reads outside rust/ map to their crate (tests/include_map.py)
