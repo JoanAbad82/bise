@@ -6,7 +6,7 @@
 // check while it is open (`check` now and every 30 s, `leave` when it
 // closes; the core stops by itself 2 min after the last check).
 // Owner: amb-home.
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { AppCmd, CoreEv } from '@/proto';
 import { Act, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
 import { settings } from '@/proto/words.gen';
@@ -19,16 +19,26 @@ export const KEEP_MS = 30_000;
 const GLYPH: Record<string, string> = { done: '✓', waits: '?', checking: '…', failed: '▲', not_yet: '·' };
 
 export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: AppCmd) => void }) {
+  // the screen hands a new `send` on each render (each core event): the check follows the page's
+  // mount, never that identity, or each event would `leave` then `check` from scratch, the core
+  // would answer with no steps, and so on forever (stuck on checking, the steps flickering)
+  const sendRef = useRef(send);
   useEffect(() => {
-    send({ cmd: 'computer_use', act: 'check' });
+    sendRef.current = send;
+  }, [send]);
+  useEffect(() => {
+    const say = (act: string) => {
+      sendRef.current({ cmd: 'computer_use', act });
+    };
+    say('check');
     const keep = window.setInterval(() => {
-      send({ cmd: 'computer_use', act: 'check' });
+      say('check');
     }, KEEP_MS);
     return () => {
       window.clearInterval(keep);
-      send({ cmd: 'computer_use', act: 'leave' });
+      say('leave');
     };
-  }, [send]);
+  }, []);
   const on = cu?.on ?? false;
   const row = (r: ComputerUse['rows'][number]): GroupItem => ({
     id: r.id,

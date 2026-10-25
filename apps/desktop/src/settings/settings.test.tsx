@@ -17,6 +17,8 @@ import { KEY_SECTIONS } from './keys';
 import { notifyRow } from './pages';
 import { checks } from './check';
 import { FALLBACK } from './roles';
+import type { ComputerUse } from './computer';
+import { settings } from '@/proto/words.gen';
 
 /** a role's model picker (the ds Select): open it, then pick that option */
 function pickRole(role: string, value: string): void {
@@ -279,6 +281,51 @@ describe('computer use', () => {
       { cmd: 'computer_use', act: 'off' },
       { cmd: 'computer_use', act: 'leave' },
     ]);
+  });
+
+  // the screen (screen.tsx) hands the page a new `send` on each of its renders, and it renders on
+  // every core event: the page checks once while it is open, it never leaves and checks again
+  it('a re-render with a new send neither leaves nor checks again (the stuck check)', () => {
+    const sent: AppCmd[] = [];
+    const draw = () => <Settings page="computer" prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} computerUse={{ ...cu() }} perms={{}} ports={{ ...ports(), send: (c) => sent.push(c) }} />;
+    const { rerender } = render(draw());
+    for (let i = 0; i < 3; i++) rerender(draw());
+    expect(sent).toEqual([{ cmd: 'computer_use', act: 'check' }]);
+  });
+
+  // a stand-in for the core's acts (ambient/core/setup.rs computer_use): `leave` drops what it
+  // checked, a `check` with nothing open starts over with no steps; each act answers the page
+  // (a new event, so a new render of the screen, so a new send)
+  it('the steps, once checked, stay drawn while the screen re-renders (the flicker)', () => {
+    let open = false;
+    let rows: ComputerUse['rows'] = [];
+    const queue: ComputerUse[] = [];
+    const answer = () => queue.push({ ev: 'computer_use', on: true, ready: false, rows });
+    const send = (c: AppCmd) => {
+      if (c.cmd !== 'computer_use') return;
+      if (c.act === 'leave') open = false;
+      if (c.act === 'check' && !open) {
+        open = true;
+        rows = [];
+      }
+      if (c.act !== 'leave') answer();
+    };
+    const draw = (e: ComputerUse) => <Settings page="computer" prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} computerUse={e} perms={{}} ports={{ ...ports(), send: (c) => { send(c); } }} />;
+    const { rerender } = render(draw({ ev: 'computer_use', on: true, ready: false, rows: [] }));
+    const settle = () => {
+      for (let n = 0; n < 10 && queue.length > 0; n++) rerender(draw(queue.shift() as ComputerUse));
+    };
+    settle();
+    // the poll's first answer: the steps
+    rows = cu().rows;
+    answer();
+    settle();
+    expect(screen.getByTestId('settings.cu.web').textContent).toContain('add bise to Chrome');
+    // any other event re-renders the screen
+    rerender(draw({ ev: 'computer_use', on: true, ready: false, rows }));
+    settle();
+    expect(screen.queryByTestId('settings.cu.web')?.textContent).toContain('add bise to Chrome');
+    expect(screen.queryByText(settings.cu_checking)).toBeNull();
   });
 
   it('off: no steps, the switch turns it on', () => {
