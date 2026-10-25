@@ -81,9 +81,9 @@ describe('the PR list', () => {
     expect(row.textContent).toContain('sb/dark-mode');
     expect(row.textContent).toContain('dark-mode');
     expect(v.getByTestId('prs.words.412').textContent).toBe('changes asked · checks fail: e2e');
-    expect(row.getAttribute('data-tone')).toBe('err');
+    expect(row.closest('[data-tone]')?.getAttribute('data-tone')).toBe('err');
     expect(v.getByTestId('prs.row.415').textContent).toContain('draft');
-    fireEvent.click(row);
+    fireEvent.click(v.getByTestId('prs.row.412.open'));
     expect(openExternal).toHaveBeenCalledWith('https://github.com/acme/acme/pull/412');
     delete (window as unknown as { bise?: unknown }).bise;
   });
@@ -102,7 +102,7 @@ describe('the PR list', () => {
     replay(store);
     const v = render(wrap(<ChangesScreen project={P} />));
     expect(cmds).toContainEqual({ cmd: 'prs', project: P });
-    fireEvent.click(v.getByTestId('changes.prs'));
+    fireEvent.click(v.getByTestId('changes.prs.open'));
     expect(router.get()).toEqual({ screen: 'prs', project: P });
   });
 });

@@ -8,6 +8,9 @@ import { Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
 import { defaultWords, effortsFor, hasChanges, modelChoices, modelGroups, modelOf, nameProblem, newCmd, renameAgent, setEffort, setModel } from './actions';
 import { AgentsScreen } from './AgentsScreen';
+import { askEntityAction } from '@/app/menus/actions';
+import { AgentSheet, NewAgentSheet } from './Tune';
+import { keepSheet } from './sheet';
 
 const P = 'acme-1a2b3c4d';
 const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, watching: [], ...over });
@@ -50,7 +53,7 @@ describe('agent actions, pure', () => {
   });
 });
 
-function setup() {
+function setup(what: 'page' | 'new' = 'page') {
   const cmds: CoreCmd[] = [];
   const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   const store = new Store(port);
@@ -58,22 +61,45 @@ function setup() {
   store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99', { model: 'openai/gpt-5', effort: 'medium' })] });
   store.apply({ ev: 'worktrees', project: P, items: [wt({ dirty: true })] });
   const router = createRouter({ screen: 'bise' });
+  const done: boolean[] = [];
   const v = render(
     <StoreProvider store={store}>
       <RouterContext value={router}>
-        <AgentsScreen project={P} />
+        {what === 'page' ? <AgentsScreen project={P} /> : <NewAgentSheet project={P} onDone={() => { done.push(true); }} />}
       </RouterContext>
     </StoreProvider>,
   );
-  return { store, cmds, v };
+  return { store, cmds, v, done };
 }
 
-afterEach(cleanup);
+/** The agent menu's Rename… / Change Model… on p99, as a pick would ask it (run.ts → useEntityAction). */
+const ask = (action: 'rename' | 'change-model', agent = 'p99') => {
+  act(() => {
+    askEntityAction(action, { kind: 'agent', project: P, agent });
+  });
+};
+
+afterEach(() => {
+  cleanup();
+  keepSheet(P, null);
+});
 
 describe('the agents screen: new, rename, model, reasoning', () => {
-  it('+ new agent: a sheet; ⏎ sends new with its fields; with my changes only when he has some and a worktree; a refusal shows in place', () => {
-    const { store, cmds, v } = setup();
+  it("New agent: the page's button opens the one new agent sheet (app/newagent.tsx)", async () => {
+    const { useNewAgentAsked } = await import('@/app/newagent');
+    const seen: (string | null)[] = [];
+    const Probe = () => {
+      seen.push(useNewAgentAsked());
+      return null;
+    };
+    const { v } = setup();
+    render(<Probe />);
     fireEvent.click(v.getByTestId('agents.new'));
+    expect(seen.at(-1)).toBe(P);
+  });
+
+  it('the new agent sheet: ⏎ sends new with its fields; with my changes only when he has some and a worktree; a refusal shows in place', () => {
+    const { store, cmds, v } = setup('new');
     expect(v.queryByTestId('agents.new.changes')).toBeNull();
     fireEvent.click(v.getByTestId('agents.new.worktree'));
     fireEvent.click(v.getByTestId('agents.new.changes'));
@@ -93,21 +119,22 @@ describe('the agents screen: new, rename, model, reasoning', () => {
   });
 
   it('the sheet closes when the named agent appears', () => {
-    const { store, v } = setup();
-    fireEvent.click(v.getByTestId('agents.new'));
+    const { store, v, done } = setup('new');
     fireEvent.change(v.getByTestId('agents.new.name'), { target: { value: 'cart' } });
     fireEvent.change(v.getByTestId('agents.new.brief'), { target: { value: 'fix it' } });
     fireEvent.click(v.getByTestId('agents.new.send'));
     act(() => {
       store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99'), ag('cart', { status: 'working' })] });
     });
-    expect(v.queryByTestId('agents.newsheet')).toBeNull();
-    expect(v.getByTestId('agents.row.cart')).toBeTruthy();
+    expect(done.length).toBeGreaterThan(0);
   });
 
-  it("…: rename inline (⏎), a taken name said before sending; model and reasoning from the row's values", () => {
+  it("Rename…: the agent's sheet titled with its name, a taken name said before sending; model and reasoning from the row's values", () => {
     const { store, cmds, v } = setup();
-    fireEvent.click(v.getByTestId('agents.more.p99'));
+    expect(v.getByTestId('agents.more.p99')).toBeTruthy();
+    ask('rename');
+    expect(v.getByTestId('agents.sheet.p99').querySelector('.b-sheet-head')?.textContent).toBe('p99');
+    expect(v.getByTestId('agents.tune.p99').getAttribute('data-field')).toBe('name');
     const name = v.getByTestId('agents.rename.p99');
     fireEvent.change(name, { target: { value: 'main' } });
     fireEvent.keyDown(name, { key: 'Enter' });
@@ -128,7 +155,7 @@ describe('the agents screen: new, rename, model, reasoning', () => {
     expect((v.getByTestId('agents.rename.p99') as HTMLInputElement).value).toBe('perf');
 
     expect((v.getByTestId('agents.model.p99') as HTMLInputElement).value).toBe('openai/gpt-5');
-    expect(v.getByTestId('agents.effort.p99.medium').getAttribute('aria-checked')).toBe('true');
+    expect(v.getByTestId('agents.effort.p99.medium').getAttribute('aria-selected')).toBe('true');
     fireEvent.click(v.getByTestId('agents.effort.p99.high'));
     expect(cmds).toContainEqual({ cmd: 'effort', project: P, agent: 'p99', effort: 'high' });
     fireEvent.change(v.getByTestId('agents.model.p99'), { target: { value: 'anthropic/claude-opus-4' } });
@@ -140,8 +167,7 @@ describe('the agents screen: new, rename, model, reasoning', () => {
     expect(v.getByTestId('agents.tune.p99.error').textContent).toBe('no key for anthropic: /provider');
   });
 
-  it('a rename that lands: renaming… until the agents event has the new name, then onRenamed with it (the thread follows)', async () => {
-    const { Tune } = await import('./Tune');
+  it('a rename that lands: renaming… until the agents event has the new name, then onRenamed with it', () => {
     const cmds: CoreCmd[] = [];
     const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
     const store = new Store(port);
@@ -151,7 +177,7 @@ describe('the agents screen: new, rename, model, reasoning', () => {
     const v = render(
       <StoreProvider store={store}>
         <RouterContext value={createRouter({ screen: 'bise' })}>
-          <Tune project={P} a={ag('p99')} onRenamed={(to) => renamed.push(to)} />
+          <AgentSheet project={P} a={ag('p99')} field="name" onClose={() => undefined} onRenamed={(to) => renamed.push(to)} />
         </RouterContext>
       </StoreProvider>,
     );
@@ -174,12 +200,13 @@ describe('the agents screen: new, rename, model, reasoning', () => {
       store.apply({ ...ev, project: P });
       store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99', { model: 'anthropic/claude-opus-5-5', effort: 'high' })] });
     });
-    fireEvent.click(v.getByTestId('agents.more.p99'));
+    ask('change-model');
+    expect(v.getByTestId('agents.tune.p99').getAttribute('data-field')).toBe('model');
     const list = v.getByTestId('agents.models.p99');
     expect([...list.querySelectorAll('.ag-model-head')].map((h) => h.textContent)).toEqual(['Anthropic', 'Mistral', 'aliases']);
     const opus = v.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5');
     expect(opus.getAttribute('aria-selected')).toBe('true');
-    expect(opus.textContent).toContain('✓');
+    expect(opus.querySelector('.ag-model-mark .b-app-icon')).not.toBeNull();
     expect(opus.textContent).toContain('opus 5.5');
     expect(opus.textContent).toContain('1M');
     expect(opus.textContent).toContain('default for main and agents');
@@ -207,10 +234,10 @@ describe('the agents screen: new, rename, model, reasoning', () => {
       store.apply({ ev: 'models', project: P, items: [opus] });
       store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99', { model: opus.id, effort: 'high' })] });
     });
-    fireEvent.click(v.getByTestId('agents.more.p99'));
-    expect([...v.container.querySelectorAll('[data-testid^="agents.effort.p99."]')].map((e) => e.textContent)).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
-    expect(v.getByTestId('agents.effort.p99.xhigh').getAttribute('title')).toBe('deeper still');
-    expect(v.getByTestId('agents.effort.p99.max').getAttribute('title')).toBe('the hard stuff');
+    ask('change-model');
+    expect([...v.getByTestId('agents.effort.p99').querySelectorAll('[role="tab"]')].map((e) => e.textContent)).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(v.getByTestId('agents.effort.p99.xhigh').getAttribute('data-tip')).toBe('deeper still');
+    expect(v.getByTestId('agents.effort.p99.max').getAttribute('data-tip')).toBe('the hard stuff');
     fireEvent.click(v.getByTestId('agents.effort.p99.xhigh'));
     expect(cmds).toContainEqual({ cmd: 'effort', project: P, agent: 'p99', effort: 'xhigh' });
   });
@@ -230,7 +257,7 @@ describe('the model mark follows the hub (qa-flows a8758ee6)', () => {
       store.apply({ ...ev, project: P });
     });
     runs('anthropic/claude-opus-5-5');
-    fireEvent.click(v.getByTestId('agents.more.p99'));
+    ask('change-model');
     const on = (id: string) => v.getByTestId(`agents.model.p99.pick.${id}`).getAttribute('aria-selected');
     // no pick: the row moves, the mark follows
     runs('mistral/devstral-medium-latest');
@@ -268,9 +295,8 @@ describe('the catalog, pure', () => {
 
 
 describe('L5: a model whose provider has no key yet (amb-kit 6078b20c)', () => {
-  it("Tune's pick of it opens settings · models and sends nothing; a ready model is sent at once", async () => {
+  it("the sheet's pick of it opens settings · models and sends nothing; a ready model is sent at once", async () => {
     const { releaseHeld } = await import('@/settings');
-    const { Tune } = await import('./Tune');
     const cmds: CoreCmd[] = [];
     const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
     const store = new Store(port);
@@ -288,7 +314,7 @@ describe('L5: a model whose provider has no key yet (amb-kit 6078b20c)', () => {
     const v = render(
       <StoreProvider store={store}>
         <RouterContext value={router}>
-          <Tune project={P} a={ag('p99', { model: 'anthropic/claude-opus-5-5' })} />
+          <AgentSheet project={P} a={ag('p99', { model: 'anthropic/claude-opus-5-5' })} field="model" onClose={() => undefined} />
         </RouterContext>
       </StoreProvider>,
     );

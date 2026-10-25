@@ -16,6 +16,20 @@ crate::words! { hero:
     scheduled_title = "Scheduled";
     /// the processes page's banner title
     processes_title = "Processes";
+    /// a project's agents page's banner title
+    agents_title = "Agents";
+    /// a project's archived agents page's banner title
+    archived_title = "Archived";
+    /// a project's changes page's banner title
+    changes_title = "Changes";
+    /// a project's pull requests page's banner title
+    prs_title = "Pull requests";
+    /// a project's environments page's banner title
+    environments_title = "Environments";
+    /// the crash report page's banner title
+    crash_title = "Crash report";
+    /// the update log page's banner title
+    update_log_title = "Update log";
 
     // ---- the sentences
     /// the inbox screen's hero sentence
@@ -64,4 +78,16 @@ crate::words! { hero:
     archived(n) = "{n} archived";
     /// archived: the age of the newest, `the newest 2 h ago`
     newest(age) = "the newest {age} ago";
+    /// changes: how many branches
+    branches_n(n) = one "{n} branch" | "{n} branches";
+    /// changes: how many commits reached main today
+    merged_today(n) = "{n} merged today";
+    /// pull requests: GitHub hasn't answered yet
+    asking_github = "asking GitHub…";
+    /// pull requests: none open
+    none_open = "none open";
+    /// environments: how many places agents work in
+    places_n(n) = one "{n} place" | "{n} places";
+    /// environments: how many servers listen
+    servers_up(n) = one "{n} server up" | "{n} servers up";
 }

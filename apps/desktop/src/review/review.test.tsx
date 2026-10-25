@@ -68,28 +68,27 @@ describe('the review', () => {
 });
 
 describe('the agents screen', () => {
-  it('lists the live agents, opens one, stops and archives through typed commands', () => {
-    const { store, cmds, router, wrap } = setup();
+  it("lists the live agents in the hub's order, opens one; each row's actions are its menu ('…', a right click); the filter goes to /archived", () => {
+    const { store, router, wrap } = setup();
     const v = render(wrap(<AgentsScreen project={P} />));
     const live = store.agents(P).filter((a) => !a.archived);
     for (const a of live) expect(v.getByTestId(`agents.row.${a.name}`)).toBeTruthy();
-    fireEvent.click(v.getByTestId('agents.open.perf'));
+    // no text action links on the rows (stop, archive, restore are the agent menu's: app/menus)
+    expect(v.queryByTestId('agents.stop.perf')).toBeNull();
+    expect(v.queryByTestId('agents.archive.perf')).toBeNull();
+    expect(v.getByTestId('agents.more.perf')).toBeTruthy();
+    fireEvent.click(v.getByTestId('agents.open.perf.open'));
     expect(router.get()).toEqual({ screen: 'thread', project: P, agent: 'perf' });
-    act(() => {
-      store.apply({ ev: 'agents', project: P, agents: store.agents(P).map((a) => (a.name === 'perf' ? { ...a, status: 'working' as const } : a)) });
-    });
-    fireEvent.click(v.getByTestId('agents.stop.perf'));
-    expect(cmds.at(-1)).toEqual({ cmd: 'stop', project: P, agent: 'perf' });
-    fireEvent.click(v.getByTestId('agents.archive.perf'));
-    expect(cmds.at(-1)).toEqual({ cmd: 'archive', project: P, agent: 'perf', force: true });
-    // agents/lifecycle (min-tests): once the hub has it archived, its /archived row restores it
+    fireEvent.click(v.getByTestId('agents.filter.archived'));
+    expect(router.get()).toEqual({ screen: 'agents', project: P, archived: true });
+    // the archived list: its rows, no 'New agent'
     act(() => {
       store.apply({ ev: 'agents', project: P, agents: store.agents(P).map((a) => (a.name === 'perf' ? { ...a, status: 'idle' as const, archived: true } : a)) });
     });
     const arch = render(wrap(<AgentsScreen project={P} archived />));
-    fireEvent.click(arch.getByTestId('agents.restore.perf'));
-    expect(cmds.at(-1)).toEqual({ cmd: 'unarchive', project: P, agent: 'perf' });
-    // A.1: '+ new agent' is live since amb-feed 6cb6c0ef's typed new
+    expect(arch.getByTestId('agents.row.perf')).toBeTruthy();
+    expect(arch.getAllByTestId('agents.new')).toHaveLength(1);
+    // A.1: 'New agent' is live since amb-feed 6cb6c0ef's typed new
     expect((v.getByTestId('agents.new') as HTMLButtonElement).disabled).toBe(false);
   });
 });

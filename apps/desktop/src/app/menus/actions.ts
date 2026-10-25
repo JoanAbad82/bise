@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 import type { Entity } from '@/shared/entity';
 
 /** What a menu may ask a screen. */
-export type EntityAction = 'rename';
+export type EntityAction = 'rename' | 'change-model';
 
 /** A taker: true when it took `e` (it shows it and can do the action). */
 type Taker = (e: Entity) => boolean;

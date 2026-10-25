@@ -34,11 +34,11 @@ describe('the agents list, kept', () => {
     const list = v.getByTestId('agents.screen');
     fireEvent.keyDown(list, { key: 'ArrowDown' });
     fireEvent.keyDown(list, { key: 'ArrowDown' });
-    const picked = v.container.querySelector('[data-sel]')?.getAttribute('data-testid');
+    const picked = v.container.querySelector('.b-lrow.on')?.getAttribute('data-testid');
     expect(picked).toBeTruthy();
     expect(keep.view(`agents.sel:${P}`)).toBeTypeOf('string');
     v.unmount();
     const again = screen();
-    expect(again.container.querySelector('[data-sel]')?.getAttribute('data-testid')).toBe(picked);
+    expect(again.container.querySelector('.b-lrow.on')?.getAttribute('data-testid')).toBe(picked);
   });
 });

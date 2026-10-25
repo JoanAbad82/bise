@@ -45,6 +45,7 @@ describe('an agent', () => {
   it("a working agent: d4's groups in order, Schedule…, Fork and New side thread hidden (no hub command)", () => {
     expect(shape(menuOf(agentFacts(agent({ status: 'working' }))))).toEqual([
       menus.rename,
+      menus.change_model,
       menus.pin,
       '─',
       menus.changes,

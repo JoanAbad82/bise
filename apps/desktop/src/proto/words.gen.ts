@@ -13,6 +13,7 @@ export { hero } from './words_hero.gen';
 export { inbox } from './words_inbox.gen';
 export { library } from './words_library.gen';
 export { menus } from './words_menus.gen';
+export { pages } from './words_pages.gen';
 export { panel } from './words_panel.gen';
 export { running } from './words_running.gen';
 export { scheduled } from './words_scheduled.gen';

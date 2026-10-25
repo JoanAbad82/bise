@@ -1,23 +1,33 @@
-// A project's agents (bar A.2-A.4): the live ones as the TUI's panel
-// shows them (status, what it does, age, its last report), each opening
-// its thread; stop and archive where the hub has a typed command; the
-// archived ones on their own list (/archived) with restore; '+ new agent' (A.1) and each agent's
-// '…' (rename, model, reasoning: A.5) through amb-feed's typed commands
-// (actions.ts). Owner: amb-win.
+// A project's agents (bise fait mac, page native-mac §6 and §9; routes agents and archived): under
+// the window's bar its banner (ds PageBanner: 'Agents' or 'Archived', its sentence, how many work and
+// wait on him, the page's signed vignette), its filter (Live / Archived, ds Filters: the two routes)
+// and 'New agent' (app/newagent.tsx, the same sheet as ⌘N), then one ds ListRow per agent in the
+// hub's order (main first): its state mark, its name and what it does, then where it is and its last
+// report; its '…' and a right click are its menu (useEntityMenu: Rename…, Change Model…, Pin,
+// Changes, Stop, Archive, Restore...). The menu's Rename… and Change Model… open the agent's sheet
+// here (Tune.tsx AgentSheet, sheet.ts), on its own field. The list keys (app/listkeys.ts), space
+// shows its feed in place. The floating composer's room at the foot (--float-room).
+// Owner: nm-pages-b (amb-win's before).
 import { memo, useState } from 'react';
 import { Peek } from './Peek';
-import { Act, Button, cx, Empty, HeroWait, IconButton, PageHero, Row, Slide } from '@/ds';
+import { AppIcon, BannerWait, Button, Dot, Empty, FilterRow, Filters, ListRow, MoreButton, PageBanner, tipAttrs } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
+import { pages } from '@/proto/words_pages.gen';
+import { panel } from '@/proto/words_panel.gen';
+import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { archivedFacts, liveFacts } from './hero';
 import type { Agent } from '@/proto';
-import { useAgents, useStore } from '@/store';
+import { useAgents } from '@/store';
 import { useRouter } from '@/app/router';
 import { useNow } from '@/app/clock';
-import { keep, useKeptScroll } from '@/app/keep';
+import { useKeptScroll } from '@/app/keep';
 import { useListKeys } from '@/app/listkeys';
+import { useEntityMenu } from '@/app/menus/use';
+import { useEntityAction } from '@/app/menus/actions';
+import { newAgent } from '@/app/newagent';
 import { archivedEnd, archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
-import { panel } from '@/proto/words_panel.gen';
-import { NewAgentSheet, Tune } from './Tune';
+import { keepSheet, keptSheet, type SheetAsk } from './sheet';
+import { AgentSheet } from './Tune';
 import './agents.css';
 
 /**
@@ -31,34 +41,40 @@ export function peekKey(key: string, sel: string | null, peek: string | null): {
   return null;
 }
 
+/** What waits on him in a row: a card of its, or the hub's waiting_on him (the accent's only use). Pure. */
+export function asksHim(a: Pick<Agent, 'archived' | 'waits' | 'waiting_on'>): boolean {
+  return !a.archived && (a.waits > 0 || a.waiting_on?.who === 'you');
+}
+
 /**
  * As the TUI (his try on a43609b2): /agents lists the live agents only, /archived (`archived`)
- * only the archived ones, each with restore. No archived row on the live list (designer's v6:
- * the archived ones are under /archived and the project's ⋯ menu).
+ * only the archived ones; the filter goes from one to the other.
  */
 export function AgentsScreen({ project, archived: showArchived = false }: { project: string; archived?: boolean }) {
-  useKeptScroll(`agents:${project}${showArchived ? ':archived' : ''}`, () => document.querySelector<HTMLElement>('[data-testid="agents.screen"] .ag-body'));
+  useKeptScroll(`agents:${project}${showArchived ? ':archived' : ''}`, () => document.querySelector<HTMLElement>('[data-testid="agents.scroll"]'));
   const agents = useAgents(project);
   const live = liveOf(agents);
   const archived = archivedOf(agents);
-  // the new-agent sheet stays open across a reload (keep.ts: an open panel, no age)
-  const addKey = `new.open:${project}`;
-  const [adding, setAddingState] = useState(() => keep.view(addKey) === true);
-  const setAdding = (f: boolean | ((x: boolean) => boolean)) => {
-    setAddingState((x) => {
-      const on = typeof f === 'function' ? f(x) : f;
-      keep.setView(addKey, on ? true : undefined);
-      return on;
-    });
-  };
   const router = useRouter();
+  const gutter = useBannerGutter();
   const [peek, setPeek] = useState<string | null>(null);
+  // the agent's sheet (Rename…, Change Model…): kept across a reload, asked by the menu from anywhere
+  const [sheet, setSheetState] = useState<SheetAsk | null>(() => keptSheet(project));
+  const setSheet = (s: SheetAsk | null) => {
+    keepSheet(project, s);
+    setSheetState(s);
+  };
+  const take = (field: SheetAsk['field']) => (e: Parameters<Parameters<typeof useEntityAction>[1]>[0]) => {
+    if (e.kind !== 'agent' || e.project !== project || !agents.some((a) => a.name === e.agent)) return false;
+    setSheet({ agent: e.agent, field });
+    return true;
+  };
+  useEntityAction('rename', take('name'));
+  useEntityAction('change-model', take('model'));
   const shown = showArchived ? archived : live;
   const now = useNow();
   const liveNow = liveFacts(live);
-  // W6/K18: the list keys (app/listkeys.ts), space shows its feed in place, space again (or esc)
-  // closes it; the selected row comes back after a reload, an update swap or a core restart (keep.ts: 10 minutes)
-  const { sel, ref: section, onKeyDown } = useListKeys({
+  const { sel, setSel, ref: section, onKeyDown } = useListKeys({
     order: shown.map((a) => a.name),
     keepAs: `agents.sel:${project}`,
     onOpen: (agent) => {
@@ -72,171 +88,97 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
       return true;
     },
   });
+  const sheetOf = sheet === null ? undefined : agents.find((a) => a.name === sheet.agent && !a.archived);
   return (
     <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
-      <div className="ag-body">
-        {/* the hero card (designer's page-hero) scrolls away with the list; the crumb keeps the
-            project's name. It holds no button: '+ new agent' sits under it, at the list's right */}
+      {/* one scroller: the banner scrolls away with the list; its foot keeps the floating composer's room */}
+      <div className="ag-scroll" data-testid="agents.scroll">
         {showArchived ? (
-          <PageHero name={panel.archived} sentence={hero.archived_say} facts={archivedFacts(archived, now)} testId="agents.hero" />
+          <PageBanner title={hero.archived_title} sentence={hero.archived_say} facts={archivedFacts(archived, now)}
+            visual={<PageVignette page="archived" />} icon="archive" gutter={gutter} testId="agents.lead" />
         ) : (
-          <PageHero name={panel.agents} sentence={hero.agents_say} facts={<>{liveNow.rest}{liveNow.wait !== undefined && <>{' · '}<HeroWait>{liveNow.wait}</HeroWait></>}</>} testId="agents.hero" />
+          <PageBanner title={hero.agents_title} sentence={hero.agents_say}
+            facts={<>{liveNow.rest}{liveNow.wait !== undefined && <>{' · '}<BannerWait>{liveNow.wait}</BannerWait></>}</>}
+            visual={<PageVignette page="agents" />} icon="thread" gutter={gutter} testId="agents.lead" />
         )}
-        {!showArchived && (
-          <div className="ag-acts">
-            <Button
-              kind="ghost"
-              onClick={() => {
-                setAdding((x) => !x);
+        <div className="ag-col">
+          <FilterRow testId="agents.filters">
+            <Filters
+              items={[
+                { id: 'live', label: <>{pages.agents_live}<span className="ag-n">{live.length}</span></> },
+                { id: 'archived', label: <>{pages.agents_archived}<span className="ag-n">{archived.length}</span></> },
+              ]}
+              on={showArchived ? 'archived' : 'live'}
+              label={pages.agents_show}
+              onPick={(id) => {
+                router.go(id === 'archived' ? { screen: 'agents', project, archived: true } : { screen: 'agents', project });
               }}
-              testId="agents.new"
-            >
-              + new agent
-            </Button>
-          </div>
-        )}
-        {adding && (
-          <NewAgentSheet
-            project={project}
-            onDone={() => {
-              setAdding(false);
-            }}
-          />
-        )}
-        {shown.length === 0 && <Empty title={showArchived ? panel.no_archived : panel.no_agents} />}
-        {shown.map((a) => (
-          <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} />
-        ))}
+              testId="agents.filter"
+            />
+            {!showArchived && (
+              <span className="ag-new">
+                <Button kind="ghost" onClick={() => { newAgent(project); }} testId="agents.new">
+                  <AppIcon name="plus" size={14} />
+                  {pages.new_agent}
+                </Button>
+              </span>
+            )}
+          </FilterRow>
+          {shown.length === 0 ? (
+            <Empty testId="agents.empty" title={showArchived ? panel.no_archived : panel.no_agents} />
+          ) : (
+            <div className="ag-list" data-testid="agents.list">
+              {shown.map((a) => (
+                <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} now={now}
+                  onClick={() => {
+                    setSel(a.name);
+                    router.go({ screen: 'thread', project, agent: a.name });
+                  }} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+      {sheetOf !== undefined && sheet !== null && (
+        <AgentSheet key={sheetOf.name} project={project} a={sheetOf} field={sheet.field}
+          onClose={() => {
+            setSheet(null);
+          }}
+          onRenamed={() => {
+            setSheet(null);
+          }} />
+      )}
     </section>
   );
 }
 
-const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: string; a: Agent; sel: boolean; peek: boolean }) {
-  const store = useStore();
-  const router = useRouter();
-  const now = useNow();
-  const end = endOf(a, now);
+/** A row's state mark: '?' in the accent when it asks him, a check when done, else its status dot. */
+function StateMark({ a }: { a: Agent }) {
+  if (asksHim(a)) return <span className="ag-ask" {...tipAttrs(pages.asks_you)}>?</span>;
+  if (a.archived) return <span className="ag-mark" {...tipAttrs(a.status === 'done' ? pages.done : pages.stopped)}><AppIcon name={a.status === 'done' ? 'check' : 'stop'} size={14} /></span>;
+  if (a.status === 'done' && a.waiting_on == null) return <span className="ag-mark" {...tipAttrs(pages.done)}><AppIcon name="check" size={14} /></span>;
+  if (a.waiting_on?.who === 'agent') return <span className="ag-mark" {...tipAttrs(pages.waits_on_agent)}><AppIcon name="more" size={14} /></span>;
+  return <Dot state={dotOf(a.status)} />;
+}
+
+const AgentItem = memo(function AgentItem({ project, a, sel, peek, now, onClick }: { project: string; a: Agent; sel: boolean; peek: boolean; now: number; onClick: () => void }) {
+  const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
+  const end = a.archived ? archivedEnd(a, now) : endOf(a, now).text;
+  const line = lineOf(a);
   const id = a.name;
-  // its tune panel stays open across a reload (keep.ts: an open panel, no age)
-  const tuneKey = `tune.open:${project}/${a.name}`;
-  const [tuning, setTuningState] = useState(() => keep.view(tuneKey) === true);
-  const setTuning = (f: boolean | ((x: boolean) => boolean)) => {
-    setTuningState((x) => {
-      const on = typeof f === 'function' ? f(x) : f;
-      keep.setView(tuneKey, on ? true : undefined);
-      return on;
-    });
-  };
   return (
-    <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-row={a.name} data-testid={`agents.row.${id}`} data-slide-row data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
-      {/* one row (designer m_19489): its sign, its name, then at its right its acts (shown on
-          hover, on the ↑↓-selected row and with the focus in it; an archived one's restore always)
-          and its end, so a row is one line high. bise's own row has no acts. */}
-      <div className="ag-top">
-        <Row
-          kind={a.archived ? 'arch' : 'ag'}
-          name={a.main ? 'bise' : a.name}
-          dot={a.archived || a.status === 'done' ? undefined : dotOf(a.status)}
-          // a finished one is a dim ✓, never green (designer m_19489: done lines are dim)
-          {...(!a.archived && a.status === 'done' && a.waits === 0 && a.waiting_on == null ? { lead: <span className="app-sign dim" aria-label="done">✓</span> } : {})}
-          // R9/S3: one that waits on someone starts with the sidebar's sign, not its status dot (designer m_14246)
-          {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'agent' ? { lead: <span className="app-sign dim" aria-label="waiting">⋯</span> } : {})}
-          // what waits on him (a card, or the hub's waiting_on him): the accent '?' in the dot's place, as the right bar
-          {...(!a.archived && (a.waits > 0 || a.waiting_on?.who === 'you') ? { lead: <span className="app-sign acc" aria-label="asks you">?</span> } : {})}
-          // an archived one keeps the sign's slot empty, so its name starts where the others' do
-          {...(a.archived ? { lead: <span className="ag-slot" aria-hidden="true" /> } : {})}
-          onClick={() => {
-            router.go({ screen: 'thread', project, agent: a.name });
-          }}
-          testId={`agents.open.${id}`}
-        />
-        {a.archived ? (
-          <span className="ag-ra is-on">
-            <Act
-              onClick={() => {
-                store.command({ cmd: 'unarchive', project, agent: a.name });
-              }}
-              testId={`agents.restore.${id}`}
-            >
-              restore
-            </Act>
-          </span>
-        ) : (
-          !a.main && (
-            <span className="ag-ra">
-              {/* first: it comes and goes with the turn, and the acts are right-aligned, so it
-                  never moves the ones after it (a click aimed at archive stays on archive when a
-                  turn starts; qa-flows' app/clicks) */}
-              {a.status === 'working' && (
-                <Act
-                  onClick={() => {
-                    store.stop(project, a.name);
-                  }}
-                  testId={`agents.stop.${id}`}
-                >
-                  stop
-                </Act>
-              )}
-              {a.branch != null && (
-                <Act
-                  onClick={() => {
-                    router.go({ screen: 'review', project, agent: a.name });
-                  }}
-                  testId={`agents.review.${id}`}
-                >
-                  review
-                </Act>
-              )}
-              <Act
-                onClick={() => {
-                  store.command({ cmd: 'archive', project, agent: a.name, force: a.status === 'working' });
-                }}
-                testId={`agents.archive.${id}`}
-              >
-                archive
-              </Act>
-              <IconButton
-                size="row"
-                label="rename, model, reasoning"
-                pressed={tuning}
-                onClick={() => {
-                  setTuning((x) => !x);
-                }}
-                testId={`agents.more.${id}`}
-              >
-                ⋯
-              </IconButton>
-            </span>
-          )
-        )}
-        <span className={cx('ag-end', !a.archived && end.needs && 'nd')} data-testid={`agents.end.${id}`}>
-          {a.archived ? archivedEnd(a, now) : end.text}
-        </span>
-      </div>
-      {/* one line each, full words on hover, and only when there are words: the acts sit on the
-          row's own line now, so a line or a report that comes never moves them (qa-flows'
-          app/clicks), and an agent with neither stays one line high (designer m_19489); a cut
-          line slides on the row's hover to show the rest (ds Slide, his ask m_26200) */}
-      {lineOf(a) !== '' && (
-        <Slide className="ag-line" text={lineOf(a)} testId={`agents.line.${id}`} />
-      )}
-      {a.report != null && (
-        <p className="ag-report" title={`${a.report.kind} · ${a.report.text}`} data-testid={`agents.report.${id}`}>
-          {a.report.kind} · {a.report.text}
-        </p>
-      )}
+    <div data-row={a.name} data-testid={`agents.row.${id}`} data-status={a.status}>
+      <ListRow on={sel} onClick={onClick} onContextMenu={menu.onContextMenu} testId={`agents.open.${id}`}
+        // the whole line and report in its tip: the row cuts them (his rule: every cut text has its tip)
+        tip={[line, a.report == null ? '' : `${a.report.kind} · ${a.report.text}`].filter((x) => x !== '').join('\n') || undefined}
+        state={<StateMark a={a} />}
+        title={<><span className="ag-name">{a.main ? 'bise' : a.name}</span>{line !== '' && <span className="ag-what" data-testid={`agents.line.${id}`}>{line}</span>}</>}
+        sub={<>
+          <span className={asksHim(a) ? 'ag-end wait' : 'ag-end'} data-testid={`agents.end.${id}`}>{end}</span>
+          {a.report != null && <span data-testid={`agents.report.${id}`}>{` · ${a.report.kind} · ${a.report.text}`}</span>}
+        </>}
+        end={<MoreButton menu={menu} testId={`agents.more.${id}`} />} />
       {peek && <Peek project={project} agent={a.name} />}
-      {tuning && !a.archived && (
-        <Tune
-          key={a.name}
-          project={project}
-          a={a}
-          onRenamed={() => {
-            setTuning(false);
-          }}
-        />
-      )}
     </div>
   );
 });

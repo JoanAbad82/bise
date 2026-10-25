@@ -12,6 +12,20 @@ export const hero = {
   scheduled_title: "Scheduled",
   /** the processes page's banner title */
   processes_title: "Processes",
+  /** a project's agents page's banner title */
+  agents_title: "Agents",
+  /** a project's archived agents page's banner title */
+  archived_title: "Archived",
+  /** a project's changes page's banner title */
+  changes_title: "Changes",
+  /** a project's pull requests page's banner title */
+  prs_title: "Pull requests",
+  /** a project's environments page's banner title */
+  environments_title: "Environments",
+  /** the crash report page's banner title */
+  crash_title: "Crash report",
+  /** the update log page's banner title */
+  update_log_title: "Update log",
   /** the inbox screen's hero sentence */
   inbox_say: "what your agents wait on you for, from every project.",
   /** the scheduled screen's hero sentence */
@@ -56,4 +70,16 @@ export const hero = {
   archived: (a: { n: string | number }): string => String(a.n) + " archived",
   /** archived: the age of the newest, `the newest 2 h ago` */
   newest: (a: { age: string | number }): string => "the newest " + String(a.age) + " ago",
+  /** changes: how many branches */
+  branches_n: (a: { n: number }): string => a.n === 1 ? String(a.n) + " branch" : String(a.n) + " branches",
+  /** changes: how many commits reached main today */
+  merged_today: (a: { n: string | number }): string => String(a.n) + " merged today",
+  /** pull requests: GitHub hasn't answered yet */
+  asking_github: "asking GitHub…",
+  /** pull requests: none open */
+  none_open: "none open",
+  /** environments: how many places agents work in */
+  places_n: (a: { n: number }): string => a.n === 1 ? String(a.n) + " place" : String(a.n) + " places",
+  /** environments: how many servers listen */
+  servers_up: (a: { n: number }): string => a.n === 1 ? String(a.n) + " server up" : String(a.n) + " servers up",
 } as const;

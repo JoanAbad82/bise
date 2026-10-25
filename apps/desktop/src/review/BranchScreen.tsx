@@ -7,6 +7,7 @@ import { Head, Empty, Press } from '@/ds';
 import { useStore, useWorktrees } from '@/store';
 import { useRouter } from '@/app/router';
 import { ReviewScreen } from './ReviewScreen';
+import { pages } from '@/proto/words_pages.gen';
 import './review.css';
 
 /** The agent whose worktree is on that branch, if any. Pure. */
@@ -26,13 +27,13 @@ export function BranchScreen({ project, branch }: { project: string; branch: str
   if (agent !== undefined) return <ReviewScreen project={project} agent={agent} />;
   return (
     <section className="rv-screen" data-testid="branch.screen" data-project={project} data-branch={branch}>
-      <Head title={branch} sub="a branch" />
+      <Head title={branch} sub={pages.a_branch} />
       <div className="rv-body">
-        <Empty title="no agent works on this branch">
+        <Empty title={pages.branch_no_agent}>
           <span data-testid="branch.none">
-            its diff needs an agent on it for now.{' '}
+            {pages.branch_no_diff}{' '}
             <Press look="rv-link" onClick={() => { router.go({ screen: 'changes', project }); }} data-testid="branch.changes">
-              see the changes
+              {pages.see_changes}
             </Press>
           </span>
         </Empty>

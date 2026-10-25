@@ -10,6 +10,11 @@
     "one": null,
     "text": "Archive"
   },
+  "menus.change_model": {
+    "args": [],
+    "one": null,
+    "text": "Change Model…"
+  },
   "menus.changes": {
     "args": [],
     "one": null,

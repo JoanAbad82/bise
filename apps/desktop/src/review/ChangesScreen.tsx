@@ -1,13 +1,20 @@
-// A project's changes (bar A.6): its branches (the agents' worktrees and
-// his others) and what reached main today. Owner: amb-win. Each agent's
-// branch opens its review; a merged commit opens read-only.
+// A project's changes (bise fait mac, page native-mac §9; bar A.6): under the window's bar its banner
+// (ds PageBanner: 'Changes', its sentence, how many branches and merged today, the signed vignette),
+// then one ds ListRow per thing in ds GroupLabels: its open pull requests (a click: the PRs page), its
+// features, its branches (the agents' worktrees and his others; an agent's opens its review) and what
+// reached main today (a click opens the commit read-only). A branch's and a commit's '…' and right
+// click are their menu (useEntityMenu: open in a tab, a window). The floating composer's room at the
+// foot (--float-room). Owner: nm-pages-b (amb-win's before).
 import { useEffect } from 'react';
-import { Act, Empty, PageHero, Row, SectionHead } from '@/ds';
+import { AppIcon, Dot, Empty, GroupLabel, ListRow, MoreButton, PageBanner } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
+import { pages } from '@/proto/words_pages.gen';
+import type { Merged, Worktree } from '@/proto';
 import { useFeatures, useMerged, usePrs, useStore, useWorktrees } from '@/store';
+import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { distance, stateWords } from './feature';
 import { useRouter } from '@/app/router';
-import { MAIN } from '@/app/route';
+import { useEntityMenu } from '@/app/menus/use';
 import { clock } from '@/thread/entry';
 import { branchEnd, branchesOf } from './model';
 import './review.css';
@@ -15,9 +22,10 @@ import { useKeptScroll } from '@/app/keep';
 
 export function ChangesScreen({ project }: { project: string }) {
   // where he was in the list comes back after a reload (keep.ts)
-  useKeptScroll(`changes:${project}`, () => document.querySelector<HTMLElement>('[data-testid="changes.screen"] .rv-body'));
+  useKeptScroll(`changes:${project}`, () => document.querySelector<HTMLElement>('[data-testid="changes.scroll"]'));
   const store = useStore();
   const router = useRouter();
+  const gutter = useBannerGutter();
   const worktrees = useWorktrees(project);
   const merged = useMerged(project);
   const features = useFeatures(project);
@@ -34,85 +42,86 @@ export function ChangesScreen({ project }: { project: string }) {
   const branches = branchesOf(worktrees);
   return (
     <section className="rv-screen" data-testid="changes.screen" data-project={project}>
-      <div className="rv-body">
-        {/* the page hero, every full page's first block (ui-review-app #2): it scrolls with the list */}
-        <PageHero name="changes" sentence={hero.changes_say} facts={`${branches.length} branches · ${merged.length} merged today`} testId="changes.hero" />
-        <Row
-          // its open PRs (bar A.7, the TUI's /prs): the count, the list one click away
-          name="pull requests"
-          end={prs === null ? '…' : prs.items.length === 0 ? 'none open' : prs.head}
-          onClick={() => {
-            router.go({ screen: 'prs', project });
-          }}
-          testId="changes.prs"
-        />
-        {features.length > 0 && <SectionHead>features</SectionHead>}
-        {features.map((f) => (
-          <Row
-            key={f.name}
-            // a feature: its branch, its agents' work merged into it, tried and merged as one
-            name={`ψ ${f.name}`}
-            end={`${stateWords(f)} · ${distance(f)}`}
+      <div className="rv-scroll" data-testid="changes.scroll">
+        <PageBanner title={hero.changes_title} sentence={hero.changes_say}
+          facts={`${hero.branches_n({ n: branches.length })} · ${hero.merged_today({ n: merged.length })}`}
+          visual={<PageVignette page="changes" />} icon="changes" gutter={gutter} testId="changes.lead" />
+        <div className="rv-col">
+          {/* its open PRs (bar A.7, the TUI's /prs): the count, the list one click away */}
+          <ListRow testId="changes.prs" state={<AppIcon name="branch" size={14} />}
+            title={pages.prs_row}
+            sub={prs === null ? pages.prs_asking : prs.items.length === 0 ? pages.prs_none_open : prs.head}
             onClick={() => {
-              router.go({ screen: 'feature', project, name: f.name });
-            }}
-            testId={`changes.feature.${f.name}`}
-          />
-        ))}
-        <SectionHead>branches</SectionHead>
-        {branches.length === 0 && <Empty title="no branches">its agents work in the shared folder</Empty>}
-        {branches.map((w) => {
-          const agent = w.agent;
-          return (
-            <Row
-              key={w.path}
-              // the branch as the TUI names it ('sb/checkout'), whose worktree it is at the end
-              name={w.branch === '' ? 'detached' : w.branch}
-              end={`${agent ?? 'yours'} · ${branchEnd(w)}`}
-              onClick={
-                agent == null
-                  ? undefined
-                  : () => {
-                      router.go({ screen: 'review', project, agent });
-                    }
-              }
-              testId={`changes.branch.${agent ?? 'his'}`}
-            />
-          );
-        })}
-        <SectionHead>merged today</SectionHead>
-        {merged.length === 0 && <Empty title="nothing merged today" />}
-        {merged.map((m) => (
-          <Row
-            key={m.sha}
-            name={m.title}
-            // the sha is the machine's text (mono), the rest words (designer m_21379 (4))
-            end={
-              <>
-                <span className="rv-mono">{m.sha.slice(0, 7)}</span>
-                {[m.by ?? '', clock(m.at_ms)]
-                  .filter(Boolean)
-                  .map((w) => ` · ${w}`)
-                  .join('')}
-              </>
-            }
-            onClick={() => {
-              router.go({ screen: 'commit', project, sha: m.sha });
-            }}
-            testId={`changes.merged.${m.sha.slice(0, 7)}`}
-          />
-        ))}
-        <p className="rv-foot">
-          <Act
-            onClick={() => {
-              router.go({ screen: 'thread', project, agent: MAIN });
-            }}
-            testId="changes.thread"
-          >
-            back to its thread
-          </Act>
-        </p>
+              router.go({ screen: 'prs', project });
+            }} />
+          {features.length > 0 && (
+            <div role="group" aria-label={pages.group_features}>
+              <GroupLabel count={features.length} testId="changes.group.features">{pages.group_features}</GroupLabel>
+              {features.map((f) => (
+                // a feature: its branch, its agents' work merged into it, tried and merged as one
+                <ListRow key={f.name} testId={`changes.feature.${f.name}`} state={<AppIcon name="branch" size={14} />}
+                  title={<span className="rv-mono">{f.name}</span>}
+                  sub={`${stateWords(f)} · ${distance(f)}`}
+                  onClick={() => {
+                    router.go({ screen: 'feature', project, name: f.name });
+                  }} />
+              ))}
+            </div>
+          )}
+          <div role="group" aria-label={pages.group_branches}>
+            <GroupLabel count={branches.length} testId="changes.group.branches">{pages.group_branches}</GroupLabel>
+            {branches.length === 0 ? (
+              <Empty testId="changes.branches.none" title={pages.no_branches}>{pages.no_branches_why}</Empty>
+            ) : (
+              branches.map((w) => <BranchRow key={w.path} project={project} w={w} />)
+            )}
+          </div>
+          <div role="group" aria-label={pages.group_merged}>
+            <GroupLabel count={merged.length} testId="changes.group.merged">{pages.group_merged}</GroupLabel>
+            {merged.length === 0 ? (
+              <Empty testId="changes.merged.none" title={pages.nothing_merged} />
+            ) : (
+              merged.map((m) => <MergedRow key={m.sha} project={project} m={m} />)
+            )}
+          </div>
+        </div>
       </div>
     </section>
+  );
+}
+
+/** A branch: as the TUI names it ('sb/checkout'), then whose worktree it is and how far from main. */
+function BranchRow({ project, w }: { project: string; w: Worktree }) {
+  const router = useRouter();
+  const agent = w.agent ?? undefined;
+  const menu = useEntityMenu(agent === undefined ? { kind: 'project', project } : { kind: 'diff', project, agent });
+  const tid = `changes.branch.${agent ?? 'his'}`;
+  return (
+    <ListRow testId={tid} state={<Dot state={w.dirty ? 'wk' : 'off'} />}
+      title={<span className="rv-mono">{w.branch === '' ? pages.detached : w.branch}</span>}
+      sub={`${agent ?? pages.yours} · ${branchEnd(w)}`}
+      onContextMenu={agent === undefined ? undefined : menu.onContextMenu}
+      end={agent === undefined ? undefined : <MoreButton menu={menu} testId={`${tid}.more`} />}
+      onClick={agent === undefined ? undefined : () => {
+        router.go({ screen: 'review', project, agent });
+      }} />
+  );
+}
+
+/** A commit that reached main today: its title, then its sha (mono), who and when; opens read-only. */
+function MergedRow({ project, m }: { project: string; m: Merged }) {
+  const router = useRouter();
+  const menu = useEntityMenu({ kind: 'commit', project, sha: m.sha });
+  const tid = `changes.merged.${m.sha.slice(0, 7)}`;
+  return (
+    <ListRow testId={tid} state={<AppIcon name="check" size={14} />}
+      title={m.title}
+      // the sha is the machine's text (mono), the rest words (designer m_21379 (4))
+      sub={<><span className="rv-mono">{m.sha.slice(0, 7)}</span>{[m.by ?? '', clock(m.at_ms)].filter(Boolean).map((x) => ` · ${x}`).join('')}</>}
+      onContextMenu={menu.onContextMenu}
+      end={<MoreButton menu={menu} testId={`${tid}.more`} />}
+      onClick={() => {
+        router.go({ screen: 'commit', project, sha: m.sha });
+      }} />
   );
 }

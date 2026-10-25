@@ -18,6 +18,8 @@ export interface MenuFx {
   readonly stop: (project: string, agent: string) => void;
   /** ask the screen showing `e` to rename it (useEntityAction's takers) */
   readonly rename: (e: Entity) => void;
+  /** ask the screen showing `e` (an agent) for its sheet on its model (nm-pages-b, designer m_43315) */
+  readonly changeModel: (e: Entity) => void;
   readonly openTab: (e: Entity) => void;
   readonly openWindow: (to: WindowOpen) => void;
   readonly copy: (text: string) => void;
@@ -101,6 +103,9 @@ export function runAct(act: Act, f: MenuFacts, fx: MenuFx): void {
   switch (act) {
     case 'rename':
       fx.rename(e);
+      return;
+    case 'change-model':
+      fx.changeModel(e);
       return;
     case 'pin':
     case 'unpin':

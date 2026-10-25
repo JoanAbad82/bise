@@ -40,7 +40,8 @@ export type Act =
   | 'stop-scheduled'
   | 'close-tab'
   | 'close-others'
-  | 'move-bottom';
+  | 'move-bottom'
+  | 'change-model';
 
 type Of<K extends Entity['kind']> = Extract<Entity, { kind: K }>;
 
@@ -95,6 +96,7 @@ export const ICONS: Record<Act, string> = {
   'close-tab': 'xmark',
   'close-others': 'xmark.square',
   'move-bottom': 'rectangle.bottomhalf.inset.filled',
+  'change-model': 'cpu',
 };
 
 const COPY_ICON = 'doc.on.doc';
@@ -152,7 +154,7 @@ function agentMenu(a: Agent, pinned: boolean, reply: boolean): PopupItem[] {
   const live = !a.archived;
   const path = agentPath(a);
   return grouped([
-    [...when(live && !a.main, item('rename', menus.rename)), ...when(live, pinned ? item('unpin', menus.unpin) : item('pin', menus.pin))],
+    [...when(live && !a.main, item('rename', menus.rename)), ...when(live, item('change-model', menus.change_model)), ...when(live, pinned ? item('unpin', menus.unpin) : item('pin', menus.pin))],
     when(!a.main && (a.changes?.files ?? 0) > 0, item('changes', menus.changes)),
     copySub([
       item('copy-name', menus.copy_name),

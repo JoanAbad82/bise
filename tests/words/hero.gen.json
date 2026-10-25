@@ -5,6 +5,11 @@
     "one": null,
     "text": "who works on this project now: main, your lead, and the agents it started, one per job."
   },
+  "hero.agents_title": {
+    "args": [],
+    "one": null,
+    "text": "Agents"
+  },
   "hero.archived": {
     "args": [
       "n"
@@ -16,6 +21,11 @@
     "args": [],
     "one": null,
     "text": "agents whose work is done. their threads stay here to read; restore one to talk to it again."
+  },
+  "hero.archived_title": {
+    "args": [],
+    "one": null,
+    "text": "Archived"
   },
   "hero.artifacts_n": {
     "args": [
@@ -29,20 +39,47 @@
     "one": null,
     "text": "Artifacts"
   },
+  "hero.asking_github": {
+    "args": [],
+    "one": null,
+    "text": "asking GitHub…"
+  },
+  "hero.branches_n": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} branch",
+    "text": "{n} branches"
+  },
   "hero.changes_say": {
     "args": [],
     "one": null,
     "text": "what your agents changed in this project: their branches, the features they try, what reached main today."
+  },
+  "hero.changes_title": {
+    "args": [],
+    "one": null,
+    "text": "Changes"
   },
   "hero.crash_say": {
     "args": [],
     "one": null,
     "text": "what bise wrote when it last crashed. it stays on this Mac; nothing is sent anywhere."
   },
+  "hero.crash_title": {
+    "args": [],
+    "one": null,
+    "text": "Crash report"
+  },
   "hero.environments_say": {
     "args": [],
     "one": null,
     "text": "where this project runs: each worktree, the agents working in it and the servers they started."
+  },
+  "hero.environments_title": {
+    "args": [],
+    "one": null,
+    "text": "Environments"
   },
   "hero.inbox_say": {
     "args": [],
@@ -53,6 +90,13 @@
     "args": [],
     "one": null,
     "text": "Inbox"
+  },
+  "hero.merged_today": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} merged today"
   },
   "hero.new_ones": {
     "args": [
@@ -75,6 +119,11 @@
     "one": null,
     "text": "next at {at}"
   },
+  "hero.none_open": {
+    "args": [],
+    "one": null,
+    "text": "none open"
+  },
   "hero.nothing_waits": {
     "args": [],
     "one": null,
@@ -92,6 +141,13 @@
     "one": null,
     "text": "the oldest {age} ago"
   },
+  "hero.places_n": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} place",
+    "text": "{n} places"
+  },
   "hero.processes_say": {
     "args": [],
     "one": null,
@@ -106,6 +162,11 @@
     "args": [],
     "one": null,
     "text": "the pull requests open on GitHub for this project. in PR flow, an agent opens one when its work is done."
+  },
+  "hero.prs_title": {
+    "args": [],
+    "one": null,
+    "text": "Pull requests"
   },
   "hero.running": {
     "args": [
@@ -124,10 +185,22 @@
     "one": null,
     "text": "Scheduled"
   },
+  "hero.servers_up": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} server up",
+    "text": "{n} servers up"
+  },
   "hero.update_log_say": {
     "args": [],
     "one": null,
     "text": "what happened the last time this app updated itself and restarted."
+  },
+  "hero.update_log_title": {
+    "args": [],
+    "one": null,
+    "text": "Update log"
   },
   "hero.wait_for_you": {
     "args": [

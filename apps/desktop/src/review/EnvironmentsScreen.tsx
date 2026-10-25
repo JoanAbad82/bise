@@ -1,16 +1,21 @@
-// A project's environments (tui-parity W5; the TUI panel's worktree
-// sections, sb/places.rs): where its agents work. A worktree two or more
-// agents share is one section titled by its branch; an agent alone in one
-// carries its branch; the shared checkout is 'the shared folder'. What its
-// agents left running under it (the hub's processes rows, running ones).
-// Owner: amb-win.
+// A project's environments (bise fait mac, page native-mac §9; tui-parity W5, the TUI panel's worktree
+// sections, sb/places.rs): where its agents work. Under the window's bar its banner (ds PageBanner:
+// 'Environments', its sentence, how many places and servers up, the signed vignette), then one ds
+// GroupLabel per place: a worktree two or more agents share is titled by its branch, an agent alone
+// in one carries its branch, the shared checkout is 'the shared folder'; under it one ds ListRow per
+// agent (its thread) and per server its agents left running (its output on the processes page). Each
+// row's '…' and right click are its menu (useEntityMenu). The floating composer's room at the foot
+// (--float-room). Owner: nm-pages-b (amb-win's before).
 import { useEffect } from 'react';
-import { Empty, PageHero, Row, SectionHead } from '@/ds';
+import { Dot, Empty, GroupLabel, ListRow, MoreButton, PageBanner } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
+import { pages } from '@/proto/words_pages.gen';
 import type { Agent, Worktree } from '@/proto';
 import { useAgents, useProcesses, useStore, useWorktrees } from '@/store';
 import { isRunning, stateOf, urlWords, type Proc } from '@/running/model';
+import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { useRouter } from '@/app/router';
+import { useEntityMenu } from '@/app/menus/use';
 import { dotOf } from '@/agents/model';
 import { branchEnd } from './model';
 import './review.css';
@@ -39,7 +44,7 @@ export function placesOf(agents: readonly Agent[], worktrees: readonly Worktree[
     const names = new Set(as.map((a) => a.name));
     return {
       path,
-      title: path === '' ? 'the shared folder' : (wt?.branch ?? as[0]?.branch ?? path),
+      title: path === '' ? pages.shared_folder : (wt?.branch ?? as[0]?.branch ?? path),
       ...(wt ? { worktree: wt } : {}),
       agents: as,
       procs: procs.filter((p) => isRunning(p) && names.has(p.agent)),
@@ -49,9 +54,9 @@ export function placesOf(agents: readonly Agent[], worktrees: readonly Worktree[
 }
 
 export function EnvironmentsScreen({ project }: { project: string }) {
-  useKeptScroll(`environments:${project}`, () => document.querySelector<HTMLElement>('[data-testid="environments.screen"] .rv-body'));
+  useKeptScroll(`environments:${project}`, () => document.querySelector<HTMLElement>('[data-testid="environments.scroll"]'));
   const store = useStore();
-  const router = useRouter();
+  const gutter = useBannerGutter();
   const agents = useAgents(project);
   const worktrees = useWorktrees(project);
   const procs = useProcesses(project);
@@ -65,48 +70,57 @@ export function EnvironmentsScreen({ project }: { project: string }) {
   const listening = procs.filter((p) => isRunning(p) && (p.ports?.length ?? 0) > 0).length;
   return (
     <section className="rv-screen" data-testid="environments.screen" data-project={project}>
-      <div className="rv-body">
-        <PageHero name="environments" sentence={hero.environments_say} facts={`${String(places.length)} places · ${String(listening)} servers up`} testId="environments.hero" />
-        {places.length === 0 && <Empty title="no agents at work here" />}
-        {places.map((p, i) => (
-          <div key={p.path} data-testid={`environments.place.${String(i)}`}>
-            <SectionHead>
-              {p.title}
-              {p.worktree ? ` · ${branchEnd(p.worktree)}` : ''}
-            </SectionHead>
-            {p.agents.map((a) => (
-              <Row
-                key={a.name}
-                // a place's agents and servers are siblings: one edge, each its sign slot (designer m_21379 (2))
-                name={a.name}
-                dot={dotOf(a.status)}
-                end={a.branch == null || a.branch === '' ? '' : <span className="rv-mono">{a.branch}</span>}
-                onClick={() => {
-                  router.go({ screen: 'thread', project, agent: a.name });
-                }}
-                testId={`environments.agent.${a.name}`}
-              />
-            ))}
-            {p.procs.map((s) => {
-              const u = urlWords(s, stateOf(s));
-              return (
-                <Row
-                  key={`${s.agent}/${s.id}`}
-                  name={s.name ?? s.cmd}
-                  sub={s.cmd}
-                  dot="ok"
-                  end={u === null ? '' : <span className="rv-mono">{u.label}</span>}
-                  onClick={() => {
-                    // its output on the running screen; its address is the end's
-                    router.go({ screen: 'running', open: { project, agent: s.agent, id: s.id } });
-                  }}
-                  testId={`environments.server.${s.agent}.${s.id}`}
-                />
-              );
-            })}
-          </div>
-        ))}
+      <div className="rv-scroll" data-testid="environments.scroll">
+        <PageBanner title={hero.environments_title} sentence={hero.environments_say}
+          facts={`${hero.places_n({ n: places.length })} · ${hero.servers_up({ n: listening })}`}
+          visual={<PageVignette page="environments" />} icon="place" gutter={gutter} testId="environments.lead" />
+        <div className="rv-col">
+          {places.length === 0 && <Empty testId="environments.empty" title={pages.no_places} />}
+          {places.map((p, i) => (
+            <div key={p.path} role="group" aria-label={p.title} data-testid={`environments.place.${String(i)}`}>
+              <GroupLabel>{p.worktree ? `${p.title} · ${branchEnd(p.worktree)}` : p.title}</GroupLabel>
+              {p.agents.map((a) => <AgentRow key={a.name} project={project} a={a} />)}
+              {p.procs.map((s) => <ServerRow key={`${s.agent}/${s.id}`} project={project} s={s} />)}
+            </div>
+          ))}
+        </div>
       </div>
     </section>
+  );
+}
+
+/** One agent of a place: its status dot, its name, its branch (mono); a click opens its thread. */
+function AgentRow({ project, a }: { project: string; a: Agent }) {
+  const router = useRouter();
+  const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
+  const tid = `environments.agent.${a.name}`;
+  return (
+    <ListRow testId={tid} state={<Dot state={dotOf(a.status)} />}
+      title={a.main ? 'bise' : a.name}
+      {...(a.branch == null || a.branch === '' ? {} : { sub: <span className="rv-mono">{a.branch}</span> })}
+      onContextMenu={menu.onContextMenu}
+      end={<MoreButton menu={menu} testId={`${tid}.more`} />}
+      onClick={() => {
+        router.go({ screen: 'thread', project, agent: a.name });
+      }} />
+  );
+}
+
+/** One server an agent left running: its name, then its command and its address; a click shows its output. */
+function ServerRow({ project, s }: { project: string; s: Proc }) {
+  const router = useRouter();
+  const menu = useEntityMenu({ kind: 'process', project, agent: s.agent, id: s.id });
+  const u = urlWords(s, stateOf(s));
+  const tid = `environments.server.${s.agent}.${s.id}`;
+  return (
+    <ListRow testId={tid} tip={s.cmd} state={<Dot state="ok" tip={pages.server_up} />}
+      title={s.name ?? s.cmd}
+      sub={<><span className="rv-mono">{s.cmd}</span>{u !== null && <>{' · '}<span className="rv-mono">{u.label}</span></>}</>}
+      onContextMenu={menu.onContextMenu}
+      end={<MoreButton menu={menu} testId={`${tid}.more`} />}
+      onClick={() => {
+        // its output on the processes page; its address is in its menu
+        router.go({ screen: 'running', open: { project, agent: s.agent, id: s.id } });
+      }} />
   );
 }

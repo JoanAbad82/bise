@@ -14,7 +14,6 @@ export const PENDING_SPACING: Readonly<Record<string, number>> = {
 
 /** cursor:pointer on something not a link (lint.ts handRules): macOS draws the arrow on a control */
 export const PENDING_HAND: Readonly<Record<string, number>> = {
-  "agents/agents.css": 2,
   "bims/office.css": 10,
   "capsule/capsule.css": 1,
   "composer/composer.css": 1,
@@ -22,7 +21,7 @@ export const PENDING_HAND: Readonly<Record<string, number>> = {
   "log/log.css": 3,
   "plugins/plugins.css": 2,
   "quote/quote.css": 1,
-  "review/review.css": 2,
+  "review/review.css": 1,
   "setup/setup.css": 1,
   "terminal/terminal.css": 2,
   "thread/thread.css": 17,

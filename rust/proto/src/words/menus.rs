@@ -14,6 +14,8 @@ crate::words! { menus:
     // ---- an agent (d4's order)
     /// rename the agent (its thread head takes the new name)
     rename = "Rename";
+    /// the agent's sheet on its model and reasoning (nm-pages-b, designer m_43315)
+    change_model = "Change Model…";
     /// keep the agent at the top of the sidebar (a view state of the app)
     pin = "Pin";
     /// take it off the top of the sidebar

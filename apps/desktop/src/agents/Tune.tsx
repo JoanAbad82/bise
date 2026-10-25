@@ -1,12 +1,13 @@
-// An agent's name, model and reasoning effort, changed in place (bar A.5):
-// the '…' of its row in the agents list and of its thread's head open it.
-// Rename is an inline field as the project rename; the model a pick among
-// the models in use plus any id typed; the effort the TUI's /reasoning
-// levels. The current values come from the agents row; a refusal shows its
-// words here, a change shows when the next agents event comes. And the
-// '+ new agent' sheet (A.1). Owner: amb-win.
+// An agent's name, model and reasoning effort (bar A.5), in its sheet (AgentSheet, designer m_43315):
+// the agent menu's Rename… and Change Model… open it on the agents page (sheet.ts). Rename a field;
+// the model a pick among the models in use plus any id typed; the effort the TUI's /reasoning levels
+// (ds Filters). The current values come from the agents row; a refusal shows its words here, a
+// change shows when the next agents event comes. And the new agent sheet (A.1, app/newagent.tsx).
+// Owner: nm-pages-b (amb-win's before).
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Button, Check, Input, Press, TextArea } from '@/ds';
+import { AppIcon, Button, Check, Filters, Input, Press, Sheet, TextArea } from '@/ds';
+import { pages } from '@/proto/words_pages.gen';
+import type { SheetField } from './sheet';
 import type { Agent } from '@/proto';
 import { useAgents, useCoreEvent, useModels, useStore, useWorktrees, type Ev } from '@/store';
 import { defaultWords, EFFORTS, effortsFor, hasChanges, modelGroups, modelOf, nameProblem, newAgent, renameAgent, setEffort } from './actions';
@@ -42,7 +43,13 @@ export function useRefusal(project: string, cmds: readonly string[]): { text: st
   };
 }
 
-export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onRenamed?: (to: string) => void }) {
+/**
+ * An agent's sheet (designer m_43315): the agent menu's Rename… (on its name) and Change Model… (on
+ * its model, reasoning just under it) open it over the agents page; titled with its name, its rows
+ * Name, Model, Reasoning. Every change is the hub's (rename, model, effort); a refusal says its words
+ * here.
+ */
+export function AgentSheet({ project, a, field, onClose, onRenamed }: { project: string; a: Agent; field: SheetField; onClose: () => void; onRenamed?: (to: string) => void }) {
   const store = useStore();
   const router = useRouter();
   const agents = useAgents(project);
@@ -130,123 +137,130 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
       setName(a.name);
     }
   };
+  // Change Model…: the model it runs takes the focus once the sheet gave it its first field (its name)
+  useEffect(() => {
+    if (field !== 'model') return undefined;
+    const f = requestAnimationFrame(() => {
+      const list = document.querySelector<HTMLElement>(`[data-testid="agents.models.${id}"]`);
+      (list?.querySelector<HTMLElement>('[aria-selected="true"]') ?? list?.querySelector<HTMLElement>('[role="option"]') ?? document.querySelector<HTMLElement>(`[data-testid="agents.model.${id}"]`))?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(f);
+    };
+  }, [field, id]);
   return (
-    <div className="ag-tune" data-testid={`agents.tune.${id}`}>
-      {!a.main && (
+    <Sheet open onClose={onClose} title={a.main ? 'bise' : a.name} testId={`agents.sheet.${id}`}
+      foot={<Button kind="pri" onClick={onClose} testId={`agents.sheet.${id}.done`}>{pages.tune_done}</Button>}>
+      <div className="ag-tune" data-testid={`agents.tune.${id}`} data-field={field}>
+        {!a.main && (
+          <label className="ag-field">
+            <span className="ag-label">{pages.tune_name}</span>
+            <Input
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+              }}
+              onKeyDown={onNameKey}
+              onBlur={() => {
+                if (name.trim() !== a.name && problem === undefined && !refusedRename) rename();
+              }}
+              readOnly={renaming !== undefined}
+              spellCheck={false}
+              aria-invalid={problem !== undefined}
+              data-testid={`agents.rename.${id}`}
+            />
+            {problem !== undefined && <em className="ag-why">{problem}</em>}
+            {renaming !== undefined && (
+              <em className="ag-why" data-testid={`agents.rename.${id}.wait`}>
+                {pages.tune_renaming}
+              </em>
+            )}
+          </label>
+        )}
+        <div className="ag-field ag-models">
+          <span className="ag-label">{pages.tune_model}</span>
+          <div className="ag-model-list" role="listbox" aria-label={pages.tune_model} data-testid={`agents.models.${id}`}>
+            {groups.length === 0 && <em className="ag-why">{pages.tune_models_wait}</em>}
+            {groups.map((g) => (
+              <div key={g.head} className="ag-model-group">
+                <div className="ag-model-head">{g.head}</div>
+                {g.rows.map((m) => {
+                  const on = m.id === current;
+                  return (
+                    <Press
+                      key={m.id}
+                      role="option"
+                      aria-selected={on}
+                      look={on ? 'ag-model on' : 'ag-model'}
+                      onClick={() => {
+                        pick(m.id);
+                      }}
+                      data-testid={`agents.model.${id}.pick.${m.id}`}
+                    >
+                      <span className="ag-model-mark">{on && <AppIcon name="check" size={14} />}</span>
+                      <span className="ag-model-label">{m.label}</span>
+                      {/* the catalog's own words, as they come (never rebuilt here) */}
+                      <span className="ag-model-short">{m.short}</span>
+                      {defaultWords(m) !== '' && <span className="ag-model-def">{defaultWords(m)}</span>}
+                    </Press>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
         <label className="ag-field">
-          <span>name</span>
+          <span className="ag-label">{pages.tune_or_id}</span>
           <Input
-            value={name}
+            value={model}
+            placeholder={pages.tune_id_placeholder}
             onChange={(e) => {
-              setName(e.target.value);
+              setModelText(e.target.value);
             }}
-            onKeyDown={onNameKey}
-            onBlur={() => {
-              if (name.trim() !== a.name && problem === undefined && !refusedRename) rename();
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                pick(model);
+              }
             }}
-            readOnly={renaming !== undefined}
             spellCheck={false}
-            aria-invalid={problem !== undefined}
-            data-testid={`agents.rename.${id}`}
+            data-testid={`agents.model.${id}`}
           />
-          {problem !== undefined && <em className="ag-why">{problem}</em>}
-          {renaming !== undefined && (
-            <em className="ag-why" data-testid={`agents.rename.${id}.wait`}>
-              renaming…
+          <Button
+            kind="ghost"
+            disabled={model.trim() === '' || model.trim() === current}
+            onClick={() => {
+              pick(model);
+            }}
+            testId={`agents.model.${id}.set`}
+          >
+            {pages.tune_use_it}
+          </Button>
+        </label>
+        <div className="ag-field" role="radiogroup" aria-label={pages.tune_reasoning}>
+          <span className="ag-label">{pages.tune_reasoning}</span>
+          {efforts.length > 0 && (
+            <Filters items={efforts.map((e) => ({ id: e, label: e, tip: hintOf(e) }))} on={a.effort ?? ''} label={pages.tune_reasoning}
+              onPick={(e) => {
+                refusal.clear();
+                setEffort(store, project, a.name, e);
+              }}
+              testId={`agents.effort.${id}`} />
+          )}
+          {efforts.length === 0 && (
+            <em className="ag-why" data-testid={`agents.effort.${id}.none`}>
+              {pages.tune_no_reasoning({ model: modelOf(models, current)?.label ?? current })}
             </em>
           )}
-        </label>
-      )}
-      <div className="ag-field ag-models">
-        <span>model</span>
-        <div className="ag-model-list" role="listbox" aria-label="model" data-testid={`agents.models.${id}`}>
-          {groups.length === 0 && <em className="ag-why">the list comes from the hub</em>}
-          {groups.map((g) => (
-            <div key={g.head} className="ag-model-group">
-              <div className="ag-model-head">{g.head}</div>
-              {g.rows.map((m) => {
-                const on = m.id === current;
-                return (
-                  <Press
-                    key={m.id}
-                    role="option"
-                    aria-selected={on}
-                    look={on ? 'ag-model on' : 'ag-model'}
-                    onClick={() => {
-                      pick(m.id);
-                    }}
-                    data-testid={`agents.model.${id}.pick.${m.id}`}
-                  >
-                    <span className="ag-model-mark">{on ? '✓' : ''}</span>
-                    <span className="ag-model-label">{m.label}</span>
-                    {/* the catalog's own words, as they come (never rebuilt here) */}
-                    <span className="ag-model-short">{m.short}</span>
-                    {defaultWords(m) !== '' && <span className="ag-model-def">{defaultWords(m)}</span>}
-                  </Press>
-                );
-              })}
-            </div>
-          ))}
         </div>
-      </div>
-      <label className="ag-field">
-        <span>or an id</span>
-        <Input
-          value={model}
-          placeholder="provider/model"
-          onChange={(e) => {
-            setModelText(e.target.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              pick(model);
-            }
-          }}
-          spellCheck={false}
-          data-testid={`agents.model.${id}`}
-        />
-        <Button
-          kind="ghost"
-          disabled={model.trim() === '' || model.trim() === current}
-          onClick={() => {
-            pick(model);
-          }}
-          testId={`agents.model.${id}.set`}
-        >
-          use it
-        </Button>
-      </label>
-      <div className="ag-field" role="radiogroup" aria-label="reasoning effort">
-        <span>reasoning</span>
-        {efforts.map((e) => (
-          <Press
-            key={e}
-            role="radio"
-            aria-checked={a.effort === e}
-            look={a.effort === e ? 'ag-seg on' : 'ag-seg'}
-            title={hintOf(e)}
-            onClick={() => {
-              refusal.clear();
-              setEffort(store, project, a.name, e);
-            }}
-            data-testid={`agents.effort.${id}.${e}`}
-          >
-            {e}
-          </Press>
-        ))}
-        {efforts.length === 0 && (
-          <em className="ag-why" data-testid={`agents.effort.${id}.none`}>
-            {modelOf(models, current)?.label ?? current} has no reasoning setting
-          </em>
+        {refusal.text !== undefined && (
+          <p className="ag-err" role="alert" data-testid={`agents.tune.${id}.error`}>
+            {refusal.text}
+          </p>
         )}
       </div>
-      {refusal.text !== undefined && (
-        <p className="ag-err" role="alert" data-testid={`agents.tune.${id}.error`}>
-          {refusal.text}
-        </p>
-      )}
-    </div>
+    </Sheet>
   );
 }
 

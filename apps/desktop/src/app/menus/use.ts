@@ -20,6 +20,7 @@ import { MAIN, type Route } from '../route';
 import { RouterContext, useRoute, useRouter, type Router } from '../router';
 import { emitAction } from '../menu';
 import { askEntityAction } from './actions';
+import { keepSheet } from '@/agents/sheet';
 import { menuOf, type Act, type MenuFacts } from './registry';
 import { runAct, type MenuFx } from './run';
 
@@ -107,9 +108,16 @@ function fxOf(store: Store, router: Router | null): MenuFx {
     },
     rename: (e) => {
       if (askEntityAction('rename', e)) return;
-      // nobody shows it to rename in place: the page that can
-      if (e.kind === 'agent') router?.go({ screen: 'agents', project: e.project });
-      else if (e.kind === 'project') router?.go({ screen: 'settings', page: 'projects' });
+      // nobody shows it to rename in place: the page that can (an agent's: its sheet, agents/sheet.ts)
+      if (e.kind === 'agent') {
+        keepSheet(e.project, { agent: e.agent, field: 'name' });
+        router?.go({ screen: 'agents', project: e.project });
+      } else if (e.kind === 'project') router?.go({ screen: 'settings', page: 'projects' });
+    },
+    changeModel: (e) => {
+      if (askEntityAction('change-model', e) || e.kind !== 'agent') return;
+      keepSheet(e.project, { agent: e.agent, field: 'model' });
+      router?.go({ screen: 'agents', project: e.project });
     },
     openTab,
     openWindow: (to) => bise?.openWindow?.(to),

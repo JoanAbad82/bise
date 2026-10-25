@@ -136,7 +136,7 @@ describe('the feature screen', () => {
     const { cmds, router, wrap } = setup();
     const v = render(wrap(<ChangesScreen project={P} />));
     expect(cmds).toContainEqual({ cmd: 'features', project: P });
-    fireEvent.click(v.getByTestId('changes.feature.gift-cards'));
+    fireEvent.click(v.getByTestId('changes.feature.gift-cards.open'));
     expect(router.get()).toEqual({ screen: 'feature', project: P, name: 'gift-cards' });
   });
 });
