@@ -302,7 +302,7 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
     const guestDraws = ctl.length === 2 && Math.abs((ctl[1] ?? 0) - (ctl[0] ?? 0)) > 20;
     tally.push({ row: "control: the guest draws macOS's own vibrancy (Spotlight over black vs white)", pass: guestDraws, saw: `Spotlight's level over black ${String(ctl[0])}, over white ${String(ctl[1])}${ctl.length < 2 ? ' (Spotlight window not found)' : ''}` });
     const asked = (await sh(`grep 'glass: capsule' ${Q}/main.err | tail -1`)).trim();
-    tally.push({ row: 'control: main asked macOS for the capsule vibrancy', pass: /vibrancy=popover state=active/.test(asked), saw: asked || 'no glass line in main.err' });
+    tally.push({ row: 'control: main asked macOS for the capsule vibrancy', pass: /vibrancy=menu state=active/.test(asked), saw: asked || 'no glass line in main.err' });
     row({ row: 'glass: what is behind the capsule shows through (vibrancy)', pass: glass.length === 2 && Math.abs((glass[1] ?? 0) - (glass[0] ?? 0)) > 20, saw: `mean glass level over black ${String(glass[0])}, over white ${String(glass[1])}` });
 
     // ⌘Q for real: bise and its helper end

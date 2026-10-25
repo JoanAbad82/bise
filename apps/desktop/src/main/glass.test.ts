@@ -4,7 +4,7 @@ import { glassOf } from './glass';
 describe('glassOf', () => {
   it('the capsule is real glass on macOS: vibrancy that stays on while bise is not the active app, a clear background, macOS shadow and corners', () => {
     expect(glassOf('capsule', 'darwin', false)).toEqual({
-      vibrancy: 'popover',
+      vibrancy: 'menu',
       visualEffectState: 'active',
       backgroundColor: '#00000000',
       transparent: false,

@@ -10,6 +10,31 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
    native rounded glass it drew a second rounded card and a clipped square shadow (his corner card
    shot, 2026-10-14). The only rounded edge is the window's. */
 .b-capsule { position: relative; width: fit-content; padding: 0; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; }
+/* the words on the glass (menubar-contrast, his Sound-panel shot): macOS's label colours, white
+   (dark) or black (light) at an alpha, so the glass under them keeps its hue, never the window's
+   opaque greys (#a39c90 / #857d72 were made for a near-black ground: 1.2:1 on his pink glass).
+   macOS's tertiary (25%) is for what is off; our text-3 carries words (heads, keys), so it stays
+   readable. The accent goes a step lighter (dark) or deeper (light) for the same reason.
+   capsule-ink.test.ts holds them to a contrast floor over a light, a pink and a dark wallpaper. */
+.b-capsule {
+  --c-text: rgba(255, 255, 255, .92); --c-text-2: rgba(255, 255, 255, .66); --c-text-3: rgba(255, 255, 255, .54);
+  --c-line: rgba(255, 255, 255, .12); --c-line-strong: rgba(255, 255, 255, .2); --c-accent: #ffc2cc;
+  --c-hover: rgba(255, 255, 255, .1);
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .b-capsule {
+  --c-text: rgba(0, 0, 0, .85); --c-text-2: rgba(0, 0, 0, .6); --c-text-3: rgba(0, 0, 0, .5);
+  --c-line: rgba(0, 0, 0, .1); --c-line-strong: rgba(0, 0, 0, .18); --c-accent: #962a52;
+  --c-hover: rgba(0, 0, 0, .06);
+} }
+[data-theme="light"] .b-capsule {
+  --c-text: rgba(0, 0, 0, .85); --c-text-2: rgba(0, 0, 0, .6); --c-text-3: rgba(0, 0, 0, .5);
+  --c-line: rgba(0, 0, 0, .1); --c-line-strong: rgba(0, 0, 0, .18); --c-accent: #962a52;
+  --c-hover: rgba(0, 0, 0, .06);
+}
+/* the row under the pointer or the keys (designer m_41742): a neutral fill (--c-hover above, never
+   the system blue or our pink), r-1, 4 px in from the glass's edges (the menu's own padding), the
+   text unchanged */
+.b-capsule .b-picker-row, .b-capsule .b-row { border-radius: var(--r-1); }
 .b-cap-glass, .b-cap-talk, .b-cap-answer { width: 640px; box-sizing: border-box; }
 .b-capsule .b-spot, .b-capsule .b-menu { background: transparent; backdrop-filter: none; box-shadow: none; border-radius: 0; }
 .b-capsule .b-spot { width: 640px; }
