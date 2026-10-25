@@ -89,7 +89,7 @@ describe('the gallery, as he sees it', () => {
     expect(screen.queryByTestId('grid.card.h-1/pr.ext')).toBeNull();
   });
 
-  it('the cursor is a ring; ←→ move one card, ↓ one row; a click picks, ⌘-click picks several and fills the circles', () => {
+  it('the cursor is a ring; ←→ move one card, ↓ one row; a click opens, ⌘-click and ⇧-click pick without opening', () => {
     render(<Gallery />);
     const scr = screen.getByTestId('screen');
     expect(card('h-1/hero').className).toContain(' on');
@@ -101,13 +101,33 @@ describe('the gallery, as he sees it', () => {
     fireEvent.keyDown(scr, { key: 'ArrowLeft' });
     expect(card('h-1/pr').className).toContain(' on');
 
+    // one click opens it (no double click), and the cursor is on it when he comes back
     fireEvent.click(card('h-1/target'));
+    expect(scr.dataset['opened']).toBe('target');
     expect(card('h-1/target').className).toContain('picked');
     expect(screen.getByTestId('grid.card.h-1/target.pick').className).not.toContain(' y');
     fireEvent.click(card('h-1/hero'), { metaKey: true });
     expect(card('h-1/hero').className).toContain('picked');
     expect(screen.getByTestId('grid.card.h-1/target.pick').className).toContain(' y');
     expect(screen.getByTestId('grid.card.h-1/hero.pick').textContent).toBe('✓');
+    fireEvent.click(card('h-1/pr'), { shiftKey: true });
+    fireEvent.click(screen.getByTestId('grid.card.h-1/folds.pick'));
+    expect(scr.dataset['opened']).toBe('target');
+  });
+
+  it('one click opens: a stack its sheet, an item of the sheet, a row of the list', () => {
+    const { unmount } = render(<Gallery />);
+    const scr = screen.getByTestId('screen');
+    fireEvent.click(card(STACK));
+    expect(screen.getByTestId('sheet')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('sheet.item.s2'));
+    expect(scr.dataset['opened']).toBe('s2');
+    unmount();
+    render(<Gallery view="list" />);
+    fireEvent.click(screen.getByTestId('grid.row.h-1/folds'));
+    expect(screen.getByTestId('screen').dataset['opened']).toBe('folds');
+    fireEvent.click(screen.getByTestId('grid.row.h-1/pr'), { metaKey: true });
+    expect(screen.getByTestId('screen').dataset['opened']).toBe('folds');
   });
 
   it('⏎ opens an artifact; on a stack it opens its sheet: line, chips from its names, a chip filters, esc clears then goes back', () => {

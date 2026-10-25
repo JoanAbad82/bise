@@ -19,6 +19,21 @@ export interface PickHow {
   readonly shift: boolean;
 }
 
+/** A click on a card or a row: how it picks, and whether it opens (a plain click; ⌘ or ⇧ only pick). */
+export function clickOf(e: { readonly metaKey: boolean; readonly ctrlKey: boolean; readonly shiftKey: boolean }): { how: PickHow; open: boolean } {
+  const how = { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey };
+  return { how, open: !how.meta && !how.shift };
+}
+
+/** The click handler of a card or a row: it picks first (the cursor stays on it), then a plain click opens. */
+export function onCardClick(key: string, onPick: (key: string, how: PickHow) => void, onOpen: () => void) {
+  return (e: MouseEvent) => {
+    const c = clickOf(e);
+    onPick(key, c.how);
+    if (c.open) onOpen();
+  };
+}
+
 /** The picture of a card: the 16:10 box, the stack's sheets behind, the marks on its corners. */
 export function CardPic({ card, it, visible, picked, onPick, onMenu, testId }: {
   card: Card | null;
@@ -92,8 +107,7 @@ export const ArtCard = memo(function ArtCard({ card, line, on, picked, many, vis
   return (
     <div {...dragOf?.(card.key)} className={`art-card${on ? ' on' : ''}${picked ? ' picked' : ''}`} role="option" aria-selected={on || picked}
       data-row={card.key} data-testid={testId} data-stack={card.kind === 'stack' || undefined}
-      onClick={(e: MouseEvent) => { onPick(card.key, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey }); }}
-      onDoubleClick={() => { onOpen(card); }}
+      onClick={onCardClick(card.key, onPick, () => { onOpen(card); })}
       onContextMenu={menu === undefined ? undefined : (e) => { e.preventDefault(); menu({ x: e.clientX, y: e.clientY }); }}>
       <CardPic card={card} it={it} visible={visible} picked={many && picked}
         onPick={(how) => { onPick(card.key, how); }} {...(menu === undefined ? {} : { onMenu: menu })} testId={testId} />

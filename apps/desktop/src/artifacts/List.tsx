@@ -3,13 +3,13 @@
 // (amb-win's Panel.tsx mounts <ArtifactList project onOpen />). The list keys are app/listkeys.ts's
 // (↑↓ jk pgup pgdn home end, ⏎ opens), the row's are rowKey's (space looks, v, c, r, @), the
 // gallery's too. Owner: amb-mac (amb-kit's before); the list view art-grid.
-import { memo, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type Ref } from 'react';
+import { memo, useState, type HTMLAttributes, type KeyboardEvent, type Ref } from 'react';
 import { useListKeys } from '@/app/listkeys';
 import { tipAttrs } from '@/ds';
 import { byDay, glyphOf, keyOf, kindWords, madeBy, revealPathOf, splitArchived, timeOf, type Item } from './model';
 import { isNew, lineTip, listKind, listName, topOf, whenOf, whoOf, type Card } from './gallery';
 import { library } from '@/proto/words_library.gen';
-import type { PickHow } from './Card';
+import { onCardClick, type PickHow } from './Card';
 import { Thumb } from './thumbs';
 import { useAllArtifacts } from './hooks';
 import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
@@ -151,7 +151,7 @@ export function ListHead() {
 /**
  * One row of the gallery's list view (☰): a small picture (no marks on it), the name ('· 16
  * shots' for a stack) with its new chip, who made it, the kind in words (the list says it, the
- * cards never), when. A click picks as a card's, a double click opens.
+ * cards never), when. A click opens as a card's, ⌘ or ⇧ click picks.
  */
 export const ListRow = memo(function ListRow({ card, on, picked, now, visible, onPick, onOpen, onMenu, dragOf, testId }: {
   card: Card;
@@ -170,8 +170,7 @@ export const ListRow = memo(function ListRow({ card, on, picked, now, visible, o
   return (
     <div {...dragOf?.(card.key)} className={`art-lr${on ? ' on' : ''}${picked ? ' picked' : ''}`} role="option" aria-selected={on || picked}
       data-row={card.key} data-testid={testId}
-      onClick={(e: MouseEvent) => { onPick(card.key, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey }); }}
-      onDoubleClick={() => { onOpen(card); }}
+      onClick={onCardClick(card.key, onPick, () => { onOpen(card); })}
       onContextMenu={onMenu === undefined ? undefined : (e) => { e.preventDefault(); onMenu(card.key, { x: e.clientX, y: e.clientY }); }}>
       <span className="art-lr-th"><Thumb item={it} visible={visible} /></span>
       <span className="art-title">

@@ -71,7 +71,7 @@ export function StackSheet({ stack, now, onOpen, onLook, onPut, onBack, testId }
           const on = sel === c.key;
           return (
             <div key={c.key} className={`art-card sheet${on ? ' on' : ''}`} role="option" aria-selected={on} data-row={c.key}
-              data-testid={`${testId}.item.${it.a.id}`} onClick={() => { setSel(c.key); }} onDoubleClick={() => { onOpen(it); }}>
+              data-testid={`${testId}.item.${it.a.id}`} onClick={() => { setSel(c.key); onOpen(it); }}>
               <CardPic card={null} it={it} visible picked={false} testId={`${testId}.item.${it.a.id}`} />
               <span className="art-sheet-cp">{captionOf(it, stack.title)}</span>
             </div>

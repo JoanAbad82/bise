@@ -30,7 +30,7 @@ export interface GridProps {
   /** his multi-pick (⌘ / shift click, the circle) */
   readonly picked: ReadonlySet<string>;
   readonly onPick: (key: string, how: PickHow) => void;
-  /** ⏎ or a double click: an artifact opens, a stack opens as its sheet */
+  /** ⏎ or a plain click (Card.tsx clickOf): an artifact opens, a stack opens as its sheet */
   readonly onOpen: (card: Card) => void;
   /** ··· and a right click */
   readonly onMenu?: (key: string, at: { x: number; y: number }) => void;
