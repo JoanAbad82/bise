@@ -31,6 +31,8 @@ export interface Plan<O extends Office = Office> {
   readonly cozy?: CozyHints;
   /** the room its office makes for his plugins' objects past what its layout lays (maps/room.ts withRoom); absent: none (the loft has its bands in its layout) */
   readonly room?: Room;
+  /** the floor boxes of the pieces its look draws past the furniture and the cozy kit, from the same numbers (Office.props); absent: none */
+  props?(o: Office): readonly Box[];
 }
 
 

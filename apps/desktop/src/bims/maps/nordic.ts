@@ -100,7 +100,12 @@ function leftWindows(o: Office): [number, number][] {
 
 const nordicCozy: CozyHints = {
   walls: (o) => [{ wall: 'back', top: 1.9, busy: backBusy(o) }, { wall: 'left', top: 1.3, busy: leftWindows(o) }, { wall: 'right', top: 0 }],
-  keepOut: (o) => [{ x0: o.x0, x1: o.x0 + 0.95, z0: 0.1, z1: 1.8 }, { x0: o.x0 + o.W - 0.75, x1: o.x0 + o.W, z0: 0, z1: 0.45 }],
+  keepOut: (o) => nordicProps(o),
 };
 
-export const nordic: Plan<NordicOffice> = { id: 'nordic', ready: true, layout: nordicLayout, things: THINGS, cozy: nordicCozy, room: ROOM };
+/** what its look draws by its walls (Office.props, the cozy pieces keep off them too): the stove and its logs at the back left, the skis in the back right corner */
+function nordicProps(o: Office): Box[] {
+  return [{ x0: o.x0, x1: o.x0 + 0.95, z0: 0.1, z1: 1.8 }, { x0: o.x0 + o.W - 0.75, x1: o.x0 + o.W, z0: 0, z1: 0.45 }];
+}
+
+export const nordic: Plan<NordicOffice> = { id: 'nordic', ready: true, layout: nordicLayout, things: THINGS, cozy: nordicCozy, room: ROOM, props: nordicProps };

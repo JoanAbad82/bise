@@ -10,7 +10,7 @@
 // portraits in black and white, a golden frame at 500. Owner: maps-c.
 import { Group, type Object3D } from 'three';
 import type { Pt } from '../../model';
-import type { SahelOffice } from '../../maps/sahel';
+import { type SahelOffice, sahelShell } from '../../maps/sahel';
 import type { Kit } from '../kit';
 import { DAY, NIGHT, WORLD, hash } from '../palette';
 import type { Build, MapLook, Wear } from './look';
@@ -64,15 +64,6 @@ function hangar(k: Kit, g: Object3D, x0: number, x1: number, z0: number, z1: num
   for (let i = 0; i < 3; i++) k.add(k.style.box(x1 - x0, 0.03, 0.4), k.mat(STRAW), g, (x0 + x1) / 2, 2.06, a + (i * (b - a)) / 2);
 }
 
-/**
- * A buttress's x on the back wall, moved into the lane beside a nap spot it stood behind: there a
- * napper's head went into it (Gabriel, bims-life). The lanes are half a spot's pitch either side.
- */
-function offNap(o: SahelOffice, x: number): number {
-  const s = o.lounge.find((l) => Math.abs(l.x - x) < 0.6);
-  if (!s) return x;
-  return s.x + (x >= s.x ? 1 : -1) * Math.abs(s.ax - s.x);
-}
 
 function shell(b: Build): void {
   const { k, root } = b;
@@ -87,28 +78,25 @@ function shell(b: Build): void {
   const banco = k.mat(k.pal.wall);
   k.add(k.style.box(W + 0.2, 1.5, 0.4), banco, root, x0 + W / 2, 0.75, -0.2);
   k.add(k.style.box(0.4, 1.2, D + 0.2), banco, root, x0 - 0.2, 0.6, D / 2);
-  // the torons go round the posters on the back wall (a roomier office moves them under one)
-  const hung = (o.cozy?.posters ?? []).filter((p) => p.wall === 'back');
-  const underPoster = (x: number): boolean => hung.some((p) => Math.abs(p.x - x) < p.w / 2 + 0.08);
-  for (let x = x0 + 0.6; x < x0 + W; x += 0.9) if (!underPoster(x)) k.add(k.style.cylinder(0.035, 0.5), k.mat(WOOD), root, x, 1.2, 0.05).rotation.x = Math.PI / 2;
-  for (let x = x0; x <= x0 + W + 0.01; x += W / 4) {
-    k.add(k.style.box(0.55, 1.8, 0.6), banco, root, offNap(o, x), 0.9, -0.15);
-    cone(k, root, 0.25, 0.5, k.pal.wall, offNap(o, x), 2.05, -0.15);
+  // the torons round the posters, the buttresses off the nappers (maps/sahel.ts sahelShell: the plan's props keep his objects off them)
+  const sh = sahelShell(o);
+  for (const x of sh.torons) k.add(k.style.cylinder(0.035, 0.5), k.mat(WOOD), root, x, 1.2, 0.05).rotation.x = Math.PI / 2;
+  for (const x of sh.buttresses) {
+    k.add(k.style.box(0.55, 1.8, 0.6), banco, root, x, 0.9, -0.15);
+    cone(k, root, 0.25, 0.5, k.pal.wall, x, 2.05, -0.15);
   }
   // the hangar over the desks, a woven mat under each desk
   // its straw drawn over no napper's head: 2.8 past the nap place's front row (the camera's slant at the roof's height)
   hangar(k, root, H.x0, H.x1, H.z0, H.z1, Math.max(...o.lounge.map((l) => l.z), H.z0) + 2.8);
   for (const d of o.desks.values()) mat(k, root, d.x, d.z + 0.3, 1.6, 1.4, MATS[hash(`${d.x}`) % 4] ?? STRAW);
   // granaries with straw hats in the yard's back corner, water jars by the door
-  for (const [gx, gz] of [[x0 + W - 0.9, 5.0], [x0 + W - 0.9, 6.3]] as const) {
+  for (const { x: gx, z: gz } of sh.granaries) {
     k.add(k.style.cylinder(0.4, 1.0), banco, root, gx, 0.5, gz);
     cone(k, root, 0.55, 0.55, STRAW, gx, 1.27, gz);
   }
-  for (let i = 0; i < 3; i++) k.add(k.style.ball(0.2), k.mat('#a8764a'), root, o.door.x + 0.8 + i * 0.45, 0.2, D - 0.25).scale.y = 1.1;
+  for (const j of sh.jars) k.add(k.style.ball(0.2), k.mat('#a8764a'), root, j.x, 0.2, j.z).scale.y = 1.1;
   // wax cloth drying on a line in the yard
-  const lx0 = o.tree.x - 1.8;
-  const lx1 = o.tree.x + 1.8;
-  const lz = 4.6;
+  const { x0: lx0, x1: lx1, z: lz } = sh.line;
   for (const lx of [lx0, lx1]) k.add(k.style.cylinder(0.04, 1.6), k.mat(WOOD), root, lx, 0.8, lz);
   k.add(k.style.cylinder(0.008, lx1 - lx0), k.mat(WORLD.dark), root, (lx0 + lx1) / 2, 1.55, lz).rotation.z = Math.PI / 2;
   WAX.forEach(([a, c], i) => {

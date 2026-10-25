@@ -47,10 +47,16 @@ export function layoutOf(agents: readonly Agent[], map: MapId = DEFAULT_MAP, pre
   const p = planOf(map);
   const laid = p.layout(agents, prev?.map === p.id ? prev : undefined);
   const room = p.room;
-  if (room === undefined) return withInbox(withCozy(withSeats(laid), p.cozy ?? {}));
+  if (room === undefined) return withProps(withInbox(withCozy(withSeats(laid), p.cozy ?? {})), p);
   // the room for his plugins' objects (maps/room.ts): its walls out, the play corner's band kept from the cozy pieces
   const o = withRoom(laid, room);
   const hints = p.cozy ?? {};
   const keepOut = (x: Office) => [...(hints.keepOut?.(x) ?? []), ...roomKeepOut(x, room)];
-  return withInbox(withCozy(withSeats(o), { ...hints, keepOut }));
+  return withProps(withInbox(withCozy(withSeats(o), { ...hints, keepOut })), p);
+}
+
+/** its look's own pieces' floor boxes (Plan.props): what his objects keep off */
+function withProps(o: Office, p: Plan): Office {
+  const props = p.props?.(o);
+  return props === undefined || props.length === 0 ? o : { ...o, props };
 }

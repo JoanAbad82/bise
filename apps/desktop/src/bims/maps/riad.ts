@@ -133,4 +133,16 @@ const riadKeep = (o: Office): Box[] => {
   ];
 };
 
-export const riad: Plan<RiadOffice> = { id: 'riad', ready: true, layout: riadLayout, things: THINGS, cozy: { keepOut: riadKeep }, room: ROOM };
+/** the banquette's span along the back wall, behind the poufs (its look draws it) */
+export const loungeX = (o: Office): [number, number] => {
+  const xs = o.lounge.map((s) => s.x);
+  return xs.length ? [Math.min(...xs) - 0.4, Math.max(...xs) + 0.4] : [o.x0 + 0.3, o.x0 + 4];
+};
+
+/** what its look draws that his objects keep off (Office.props): the banquette along the back wall */
+const riadProps = (o: Office): Box[] => {
+  const [l0, l1] = loungeX(o);
+  return [{ x0: l0, x1: l1, z0: 0, z1: 0.6 }];
+};
+
+export const riad: Plan<RiadOffice> = { id: 'riad', ready: true, layout: riadLayout, things: THINGS, cozy: { keepOut: riadKeep }, room: ROOM, props: riadProps };

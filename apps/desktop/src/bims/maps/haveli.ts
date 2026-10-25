@@ -6,7 +6,7 @@
 // The back zone: the jhoola and its cushions on the left, the slate, main's desk on the right.
 // The room grows to the right and to the front (its left wall never moves). Owner: maps-c.
 import type { Agent } from '@/proto';
-import type { Box, Leg, Office, Spot } from '../model';
+import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { type Plan, boxAt, deskNames } from './plan';
 import { ROOM } from './room';
 import { BACK_D, CROSS_BACK, backZone, frontZone, keepSlots, slotsUsed, walksOf } from './yard';
@@ -115,4 +115,22 @@ const jhoola = (o: Office): Box[] => {
   return [left ? { x0: o.x0, x1: o.x0 + 0.75, z0: sz - 1.45, z1: sz + 1.45 } : { x0: o.x0 + o.W - 0.75, x1: o.x0 + o.W, z0: sz - 1.45, z1: sz + 1.45 }];
 };
 
-export const haveli: Plan<HaveliOffice> = { id: 'haveli', ready: true, layout: haveliLayout, cozy: { keepOut: jhoola }, room: ROOM };
+/** the arcades' arches (its look draws one between each two neighbours of a line): the left side's, the right side's, the back's */
+export function archesOf(o: HaveliOffice): [Pt, Pt][] {
+  const left = o.columns.filter((c) => c.x < o.x0 + 2.3).sort((p, q) => p.z - q.z);
+  const right = o.columns.filter((c) => c.x > o.x0 + o.W - 2.3).sort((p, q) => p.z - q.z);
+  const back = o.columns.filter((c) => Math.abs(c.z - 6.0) < 1e-6).sort((p, q) => p.x - q.x);
+  return [left, right, back].flatMap((line) => line.slice(1).map((c, i): [Pt, Pt] => [line[i] as Pt, c]));
+}
+
+/** the two jharokhas' middles on the back wall (its look draws them) */
+export const jharokhaXs = (o: Office): number[] => [o.x0 + o.W * 0.45, o.x0 + o.W * 0.66];
+
+/** what its look draws that his objects keep off (Office.props): the jharokhas' floor, the arcades' columns and arches, the jhoola */
+const haveliProps = (o: Office): Box[] => {
+  const h = o as HaveliOffice;
+  const arches = archesOf(h).map(([a, b]) => ({ x0: Math.min(a.x, b.x) - 0.15, x1: Math.max(a.x, b.x) + 0.15, z0: Math.min(a.z, b.z) - 0.15, z1: Math.max(a.z, b.z) + 0.15 }));
+  return [...jharokhaXs(o).map((x) => ({ x0: x - 0.6, x1: x + 0.6, z0: 0, z1: 0.5 })), ...arches, ...jhoola(o)];
+};
+
+export const haveli: Plan<HaveliOffice> = { id: 'haveli', ready: true, layout: haveliLayout, cozy: { keepOut: jhoola }, room: ROOM, props: haveliProps };

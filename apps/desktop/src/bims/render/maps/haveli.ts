@@ -8,7 +8,7 @@
 // lotus pond, kites, a golden peacock; painted miniatures, a mirror wall at 500. Owner: maps-c.
 import { Group, type Object3D, TorusGeometry } from 'three';
 import type { Pt } from '../../model';
-import type { HaveliOffice } from '../../maps/haveli';
+import { type HaveliOffice, archesOf, jharokhaXs } from '../../maps/haveli';
 import type { Kit } from '../kit';
 import { DAY, NIGHT, WORLD, hash, rng } from '../palette';
 import type { Build, MapLook, Wear } from './look';
@@ -78,7 +78,7 @@ function shell(b: Build): void {
   k.add(k.style.box(W + 0.2, 1.8, 0.22), k.mat(k.pal.wall), root, x0 + W / 2, 0.9, -0.11);
   k.add(k.style.box(0.22, 1.1, D + 0.2), k.mat(nc(BLUE, night)), root, x0 - 0.11, 0.55, D / 2);
   // two jharokhas: a closed balcony, its jali lit at night, a little dome
-  for (const jx of [x0 + W * 0.45, x0 + W * 0.66]) {
+  for (const jx of jharokhaXs(o)) {
     k.add(k.style.box(1.0, 0.7, 0.4), k.mat(nc('#e0b25c', night)), root, jx, 1.5, 0.2);
     k.add(k.style.box(0.7, 0.5, 0.02), glow(k, '#c48f3a', 0.6), root, jx, 1.5, 0.41);
     for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) k.add(k.style.ball(0.05), k.mat('#5c3d2e'), root, jx - 0.2 + i * 0.2, 1.4 + j * 0.2, 0.42);
@@ -88,10 +88,7 @@ function shell(b: Build): void {
   // the arcades: slim columns, scalloped arches between neighbours on each side
   const col = nc(CREAM, night);
   for (const c of o.columns) k.add(k.style.cylinder(0.09, 1.3), k.mat(col), root, c.x, 0.65, c.z);
-  const left = o.columns.filter((c) => c.x < x0 + 2.3).sort((p, q) => p.z - q.z);
-  const right = o.columns.filter((c) => c.x > x0 + W - 2.3).sort((p, q) => p.z - q.z);
-  const back = o.columns.filter((c) => Math.abs(c.z - 6.0) < 1e-6).sort((p, q) => p.x - q.x);
-  for (const line of [left, right, back]) for (let i = 1; i < line.length; i++) arch(k, root, line[i - 1] as Pt, line[i] as Pt, col);
+  for (const [a, c] of archesOf(o)) arch(k, root, a, c, col);
   // the rangoli at the door, its colours following the day
   const day = new Date().getDate();
   const cs = [[SAFFRON, GOLD, TEAL], [BLUE, GOLD, '#7cc26b'], ['#7b5fc0', SAFFRON, '#fffaf0']][day % 3] ?? [SAFFRON, GOLD, TEAL];

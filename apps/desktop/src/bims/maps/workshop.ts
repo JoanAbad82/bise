@@ -248,4 +248,15 @@ export function cornerRug(c: Corner): Box {
   return { x0: Math.min(c.x - 1.4, ...xs), x1: Math.max(c.x + 1.4, ...xs), z0: Math.min(c.z - 1.1, ...zs), z1: Math.max(c.z + 1.1, ...zs) };
 }
 
-export const workshop: Plan<WorkshopOffice> = { id: 'workshop', ready: true, layout: workshopLayout, things: LOFT_LIKE, cozy: workshopCozy, room: ROOM };
+/** what its look draws that his objects keep off (Office.props): the roller door's scooter, the Vespa, each floor corner's pieces */
+const workshopProps = (o: Office): Box[] => {
+  const ws = o as WorkshopOffice;
+  const sc = scooterAt(ws);
+  return [
+    { x0: o.x0, x1: sc.x + 0.6, z0: Math.min(sc.z - 0.35, ws.roller.z0), z1: Math.max(sc.z + 0.35, ws.roller.z1) },
+    ...(ws.vespa ? [vespaBox(ws.vespa)] : []),
+    ...ws.corners.flatMap((c) => c.pieces),
+  ];
+};
+
+export const workshop: Plan<WorkshopOffice> = { id: 'workshop', ready: true, layout: workshopLayout, things: LOFT_LIKE, cozy: workshopCozy, room: ROOM, props: workshopProps };

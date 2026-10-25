@@ -7,7 +7,7 @@
 // A desk's box is the floor box of a turned desk; its chair walks out through it (Box.of). Pure.
 // Owner: maps-b.
 import type { Agent } from '@/proto';
-import type { Box, Leg, Pt, Spot } from '../model';
+import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { backBusy, backFrames, type CozyHints } from '../cozy';
 import { type BOffice, LOFT_LIKE, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, boxAt } from './plan';
@@ -116,4 +116,13 @@ const greenhouseCozy: CozyHints = {
   ],
 };
 
-export const greenhouse: Plan<GreenhouseOffice> = { id: 'greenhouse', ready: true, layout: greenhouseLayout, things: LOFT_LIKE, cozy: greenhouseCozy, room: ROOM };
+/** where its look hangs a plant along the back, in the glass's bays: never over a napper's head by the back wall (nap.test.ts) */
+export function hangingXs(o: Office): number[] {
+  const overHead = (x: number): boolean => o.lounge.some((s) => s.z < 1.6 && Math.abs(s.x - x) < 0.6);
+  return Array.from({ length: 6 }, (_, i) => o.x0 + ((i + 0.5) * o.W) / 6).filter((x) => !overHead(x));
+}
+
+/** what his objects keep off: the floor under each hanging plant (Office.props) */
+const greenhouseProps = (o: Office): Box[] => hangingXs(o).map((x) => boxAt(x, 0.25, 0.5, 0.5));
+
+export const greenhouse: Plan<GreenhouseOffice> = { id: 'greenhouse', ready: true, layout: greenhouseLayout, things: LOFT_LIKE, cozy: greenhouseCozy, room: ROOM, props: greenhouseProps };

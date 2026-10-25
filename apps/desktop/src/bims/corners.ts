@@ -15,7 +15,7 @@
 // compact one (COMPACT), and only then waits in `left` (p5's growth makes room).
 // objectSpots is the one seam p4's per-map corners plug into: the signature stays.
 // Pure, no three. Owner: bims-life.
-import type { Box, Office, Pt } from './model';
+import type { Box, Office, Prop, Pt } from './model';
 import type { PluginObject } from './plugin-objects';
 import type { ObjId } from './render/objects/ids';
 import { FEET, type FootOf } from './render/objects/feet';
@@ -196,6 +196,8 @@ interface Keep {
   readonly nz: number;
   /** (nx + 1) x (nz + 1) running sums of kept cells */
   readonly sum: Int32Array;
+  /** the map's pieces high up (Plan.props with y0): a thing as tall as that may not stand under one */
+  readonly high: readonly (Prop & { readonly y0: number })[];
 }
 
 function keepOf(o: Office): Keep {
@@ -210,6 +212,8 @@ function keepOf(o: Office): Keep {
     }
   }
   if (o.inbox !== undefined) boxes.push(inboxBox(o.inbox));
+  // the map's own drawn pieces (Plan.props: a lamppost, a street tree, a bench): never under an object; one high up (a peg, a hanging pot) only over a lower one (free)
+  boxes.push(...(o.props ?? []).filter((p) => p.y0 === undefined));
   if (o.park !== undefined) boxes.push(o.park.area);
   if (o.gym !== undefined) boxes.push(o.gym.area, ...o.gym.mats);
   for (const g of o.ghosts ?? []) boxes.push({ x0: g.x - 0.8, x1: g.x + 0.8, z0: g.z - 1.0, z1: g.z + 0.4 });
@@ -264,7 +268,7 @@ function keepOf(o: Office): Keep {
   const sum = new Int32Array((nx + 1) * (nz + 1));
   for (let i = 0; i < nx; i++)
     for (let j = 0; j < nz; j++) sum[(i + 1) * (nz + 1) + j + 1] = (kept[i * nz + j] as number) + (sum[i * (nz + 1) + j + 1] as number) + (sum[(i + 1) * (nz + 1) + j] as number) - (sum[i * (nz + 1) + j] as number);
-  return { boxes, gx, gz, nx, nz, sum };
+  return { boxes, gx, gz, nx, nz, sum, high: (o.props ?? []).filter((p): p is Prop & { y0: number } => p.y0 !== undefined) };
 }
 
 /** a point's distance to a leg */
@@ -445,6 +449,7 @@ const gapOf = (a: Corner, b: Corner): number => (OUT.has(a) && OUT.has(b) ? GAP_
 function free(c: Ctx, b: Box, corner: Corner, area: Box, taken: readonly Placed[], h = 0): boolean {
   if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1) return false;
   if (keptIn(c.keep, b) > 0) return false;
+  if (c.keep.high.some((p) => h > p.y0 && overlaps(b, p, 0))) return false;
   for (const p of taken) if (overlaps(b, p.box, gapOf(corner, p.corner))) return false;
   return corner !== 'terrace' || !underCanopy(c.o, b, h);
 }

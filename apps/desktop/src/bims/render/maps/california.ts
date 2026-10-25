@@ -98,7 +98,9 @@ function shell(b: Build): void {
   floor.receiveShadow = true;
   // the back wall, white stucco; the low left wall
   k.add(style.box(ow + 0.2, 1.9, 0.2), k.mat(pal.wall), root, x0 + ow / 2, 0.95, -0.1);
-  k.add(style.box(0.2, 1.1, D + 0.2), k.mat(pal.wall), root, x0 - 0.1, 0.55, D / 2);
+  // open where his sketch's wing goes on past it (extensions.ts WING_LEFT): the wall starts at the wing's front
+  const wz = o.wing !== undefined && o.wing.x1 <= x0 + 1e-9 ? o.wing.z1 : -0.1;
+  k.add(style.box(0.2, 1.1, D + 0.1 - wz), k.mat(pal.wall), root, x0 - 0.1, 0.55, (wz + D + 0.1) / 2);
   sunsetMural(k, root, x0 + 0.3, x0 + 4.5, n);
   // the surfboards against the left wall, near the front
   SURF.forEach((c, i) => {

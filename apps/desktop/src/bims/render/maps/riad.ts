@@ -8,7 +8,7 @@
 // board, the fountain's second tier, a steaming hammam, a long zellige basin, a balloon over the
 // Atlas, a golden brass lantern; frames under small plaster arches. Owner: maps-b.
 import type { Mesh, Object3D } from 'three';
-import type { RiadOffice } from '../../maps/riad';
+import { type RiadOffice, loungeX } from '../../maps/riad';
 import type { Office, Pt } from '../../model';
 import { decorOf } from '../decor';
 import { type Kit, boxOf, onFloor } from '../kit';
@@ -29,10 +29,6 @@ const LEATHER = '#c98a3e';
 const rd = (o: Office): RiadOffice => o as RiadOffice;
 const boardX = (o: Office): number => o.boardSpots.reduce((s, p) => s + p.x, 0) / Math.max(1, o.boardSpots.length);
 const piece = (at: (o: Office) => Pt, draw: Piece['draw'] = () => undefined): Piece => ({ at, draw });
-const loungeX = (o: Office): [number, number] => {
-  const xs = o.lounge.map((s) => s.x);
-  return xs.length ? [Math.min(...xs) - 0.4, Math.max(...xs) + 0.4] : [o.x0 + 0.3, o.x0 + 4];
-};
 /** the banquette along the back wall (shell): its top */
 const BANQUETTE = 0.35;
 /**

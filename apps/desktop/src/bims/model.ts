@@ -164,6 +164,9 @@ export interface Box {
   readonly of?: Pt;
 }
 
+/** a drawn piece's floor box; `y0`: how high up it starts (absent: on the floor) */
+export type Prop = Box & { readonly y0?: number };
+
 /** A straight leg of a walk graph, between two points. */
 export type Leg = readonly [Pt, Pt];
 
@@ -229,6 +232,13 @@ export interface Office {
   readonly ghosts?: readonly Spot[];
   /** the inbox stand's middle on the floor (inbox.ts, just inside the door); absent: none fits */
   readonly inbox?: Pt;
+  /**
+   * The floor boxes of what its look draws past the furniture and the cozy pieces (a lamppost, a
+   * street tree, a bench, a hanging pot's reach): the map's Plan.props, the very numbers its look
+   * draws them at. His plugins' objects never stand on one (corners.ts, render/collide.test.ts).
+   * `y0`: it is that high up (a peg on the wall, a hanging pot): a thing lower than that may stand under it.
+   */
+  readonly props?: readonly Prop[];
 }
 
 /** A straight piece to grind or ride across, along x: a curb, a ledge, a rail, a flat lane (h 0). */

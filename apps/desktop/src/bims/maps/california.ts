@@ -138,7 +138,13 @@ const californiaCozy: CozyHints = {
   keepOut: (o) => [{ x0: o.x0, x1: o.x0 + 0.5, z0: o.D - 4.35, z1: o.D - 2.45 }],
 };
 
-export const california: Plan<CaliforniaOffice> = { id: 'california', ready: true, layout: californiaLayout, cozy: californiaCozy, room: ROOM };
+/** what its look draws past the room that his objects keep off: the strip between the room and the park (its hedge, its grass, its palms) */
+const californiaProps = (o: Office): Box[] => {
+  const c = o as CaliforniaOffice;
+  return [{ x0: c.roomX1, x1: c.parkX0, z0: 0, z1: c.D }];
+};
+
+export const california: Plan<CaliforniaOffice> = { id: 'california', ready: true, layout: californiaLayout, cozy: californiaCozy, room: ROOM, props: californiaProps };
 
 /**
  * The park on its slab (x px0..px1, z pz0..pz1), v10's drawing: the mini ramp across the back left

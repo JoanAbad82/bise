@@ -16,7 +16,7 @@ import {
   BufferGeometry, DoubleSide, ExtrudeGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, type Object3D, PointLight, Shape,
 } from 'three';
 import type { Office, Pt, Spot } from '../../model';
-import { type ClimbOffice, CAFE_WALL_H, COUNTER, HALL_H, HANGING, SEAT_DX, framesSpan, shoeShelves } from '../../maps/climb';
+import { type ClimbOffice, CAFE_WALL_H, COUNTER, HALL_H, HANGING, SEAT_DX, framesSpan, shoeShelves, streetOf } from '../../maps/climb';
 import {
   HOLD_COLS, MAT_H, ROUTE_COLS, type V3, WALL_MID, WALL_TOP, bellAt, decorHolds, facets, goldenHold, routeHolds, routes, volumeFaces, volumes, wallVertex,
 } from '../../climbwall';
@@ -333,7 +333,7 @@ function streetTree(k: Kit, parent: Object3D, x: number, z: number, size: number
 /** the street out front: the pavement's kerb and the cobbled strip, a Morris column, bistro tables, trees, lampposts, a bike rack */
 function street(k: Kit, root: Object3D, o: ClimbOffice): void {
   const { style } = k;
-  const { x0, W, D, ox0 } = o;
+  const { x0, W } = o;
   const sx0 = x0 - 1.0;
   const sx1 = x0 + W + 1.0;
   // past the pavement (the terrace slab, decor.ts terraceSlab): the kerb, the cobbles and their rows; open where the town's path comes in at the door (decor.ts pathEnd)
@@ -344,9 +344,10 @@ function street(k: Kit, root: Object3D, o: ClimbOffice): void {
     k.add(style.box(b - a, 0.03, 0.48), k.mat(COBBLE), root, (a + b) / 2, 0.015, zs);
     for (let x = a + 0.25; x < b - 0.1; x += 0.45) k.add(style.box(0.025, 0.02, 0.44), k.mat('#7d8790'), root, x, 0.035, zs);
   }
-  // the Morris column, in front of the hall
-  const mx = x0 + 7.6;
-  const mz = D + 2.1;
+  // the Morris column, in front of the hall (maps/climb.ts streetOf: the plan's props keep his objects off them all)
+  const st = streetOf(o);
+  const mx = st.column.x;
+  const mz = st.column.z;
   k.add(style.cylinder(0.32, 1.7), k.mat(PARIS_GREEN), root, mx, 0.85, mz);
   k.add(style.cylinder(0.335, 0.85), k.mat('#f1e3c9'), root, mx, 1.0, mz);
   for (const [c, a] of [['#ffd166', 0], ['#6cb4ee', 1.6], ['#9b8fe0', 3.2]] as const) {
@@ -356,8 +357,7 @@ function street(k: Kit, root: Object3D, o: ClimbOffice): void {
   k.add(style.cap(0.36, 0.5), k.mat(PARIS_GREEN), root, mx, 1.7, mz);
   k.add(style.ball(0.06), k.mat(PARIS_GREEN), root, mx, 2.05, mz);
   // bistro tables and their chairs, in front of the hall
-  for (const tx of [x0 + 2.3, x0 + 4.6]) {
-    const tz = D + 2.0;
+  for (const { x: tx, z: tz } of st.tables) {
     k.add(style.cylinder(0.04, 0.7), k.mat(STEEL), root, tx, 0.35, tz);
     k.add(style.cylinder(0.3, 0.04), k.mat('#ebe4d6'), root, tx, 0.72, tz);
     for (const d of [-0.5, 0.5]) {
@@ -367,13 +367,11 @@ function street(k: Kit, root: Object3D, o: ClimbOffice): void {
     }
   }
   // trees in grates and green lampposts, on the hall's side of the pavement
-  streetTree(k, root, x0 + 0.9, D + 3.0, 1.0);
-  streetTree(k, root, x0 + 6.0, D + 3.1, 0.95);
-  lamppost(k, root, x0 + 3.5, D + 3.2);
-  lamppost(k, root, ox0 + 6.9, D + 3.4);
+  for (const t of st.trees) streetTree(k, root, t.x, t.z, t.size);
+  for (const l of st.lampposts) lamppost(k, root, l.x, l.z);
   // a bike rack and two bikes before the reception (no brand)
-  const bx = ox0 + 8.0;
-  const bz = D + 2.6;
+  const bx = st.rack.x;
+  const bz = st.rack.z;
   k.add(style.box(1.8, 0.05, 0.05), k.mat(STEEL), root, bx, 0.45, bz);
   for (const dx of [-0.85, 0.85]) k.add(style.box(0.05, 0.45, 0.05), k.mat(STEEL), root, bx + dx, 0.22, bz);
   for (const [dx, c] of [[-0.45, '#6cb4ee'], [0.35, '#ffd166']] as const) {

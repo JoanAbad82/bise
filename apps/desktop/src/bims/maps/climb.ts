@@ -276,6 +276,34 @@ export function shoeShelves(o: ClimbOffice): Box {
   return { x0: o.x0 + o.W - 0.45, x1: o.x0 + o.W - 0.05, z0: z - 1.0, z1: z + 1.0 };
 }
 
+/** the street out front (its look draws them there): the Morris column, two bistro tables, two trees in grates, two lampposts, a bike rack */
+export function streetOf(o: ClimbOffice) {
+  const { x0, D, ox0 } = o;
+  return {
+    column: { x: x0 + 7.6, z: D + 2.1 },
+    tables: [x0 + 2.3, x0 + 4.6].map((x) => ({ x, z: D + 2.0 })),
+    trees: [{ x: x0 + 0.9, z: D + 3.0, size: 1.0 }, { x: x0 + 6.0, z: D + 3.1, size: 0.95 }],
+    lampposts: [{ x: x0 + 3.5, z: D + 3.2 }, { x: ox0 + 6.9, z: D + 3.4 }],
+    rack: { x: ox0 + 8.0, z: D + 2.6 },
+  } as const;
+}
+
+/** what its look draws that his objects keep off: the hall and its walls, the shoe shelves, the street's pieces (Office.props) */
+function climbProps(o: Office): Box[] {
+  const c = o as ClimbOffice;
+  const s = streetOf(c);
+  return [
+    { x0: o.x0, x1: c.ox0 + 0.15, z0: 0, z1: o.D + 0.5 },
+    shoeShelves(c),
+    ...HANGING.map((x) => boxAt(c.ox0 + x, 0.3, 0.7, 0.6)),
+    boxAt(s.column.x, s.column.z, 0.75, 0.75),
+    ...s.tables.map((t) => boxAt(t.x, t.z, 1.5, 0.5)),
+    ...s.trees.map((t) => boxAt(t.x, t.z, 1.3 * t.size, 1.3 * t.size)),
+    ...s.lampposts.map((l) => boxAt(l.x, l.z, 0.4, 0.4)),
+    boxAt(s.rack.x, s.rack.z, 1.9, 1.0),
+  ];
+}
+
 /** the pieces its look puts in the café side (render/maps/climb.ts pieceAt): nothing cozy there */
 const climbPieces = (o: Office): Pt[] => {
   const c = o as ClimbOffice;
@@ -306,7 +334,7 @@ const THINGS: Things = {
   8: bims.stage_climb_8, 9: bims.stage_climb_9, 10: bims.stage_climb_10, 11: bims.stage_climb_11, 12: bims.stage_climb_12, 13: bims.stage_climb_13, 14: bims.stage_climb_14,
 };
 
-export const climb: Plan<ClimbOffice> = { id: 'climb', ready: true, layout: climbLayout, things: THINGS, cozy: climbCozy, room: ROOM };
+export const climb: Plan<ClimbOffice> = { id: 'climb', ready: true, layout: climbLayout, things: THINGS, cozy: climbCozy, room: ROOM, props: climbProps };
 
 /**
  * The walk graph: the back corridor from the hall's rest spot lane to the right lane, the aisle down

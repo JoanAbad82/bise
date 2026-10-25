@@ -99,7 +99,7 @@ function solidsOf(o: Office): Box[] {
   const c = o.cozy;
   const dec = decorOf(o);
   const decor = [dec.parasol, dec.palm, dec.ramp].map((f) => ({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd }));
-  return [...o.furniture, ...(c ? [c.coffee, c.shelf, ...c.lamps, ...c.plants].map((i) => i.box) : []), ...decor];
+  return [...o.furniture, ...(c ? [c.coffee, c.shelf, ...c.lamps, ...c.plants].map((i) => i.box) : []), ...decor, ...(o.props ?? [])];
 }
 
 /** a straight leg (along x or z) clear of every solid by CLEAR */

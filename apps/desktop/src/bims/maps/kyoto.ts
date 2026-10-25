@@ -14,7 +14,7 @@ import { ROOM } from './room';
 
 export interface KyotoOffice extends BOffice {
   /** the inner garden's floor box (gravel, moss, the lantern, the maple), right of the engawa */
-  readonly garden: Box;
+  readonly court: Box;
   /** the kotatsu's floor box */
   readonly kotatsu: Box;
   readonly rows: number;
@@ -84,7 +84,7 @@ export function kyotoLayout(agents: readonly Agent[], prev?: KyotoOffice): Kyoto
   const out = outside(x0, D, aisle, front);
   ways.push(...out.ways);
   furniture.push(...out.furniture);
-  const garden: Box = { x0: x0 + 7.4, x1: x0 + W - 0.3, z0: 4.6, z1: D - 1.4 };
+  const court: Box = { x0: x0 + 7.4, x1: x0 + W - 0.3, z0: 4.6, z1: D - 1.4 };
 
   const backLeg = corridor(BACK, ways, [aisle, lane]);
   const trunk: Leg[] = [
@@ -104,7 +104,7 @@ export function kyotoLayout(agents: readonly Agent[], prev?: KyotoOffice): Kyoto
     walks, furniture,
     queueMore: queueMoreOf(back.queue, back.mainDesk, backLeg, x0),
     slots, cap, crossBack: BACK,
-    garden, kotatsu, rows,
+    court, kotatsu, rows,
   };
 }
 
@@ -115,6 +115,6 @@ const THINGS: Things = {
 };
 
 /** the inner garden holds its stages' pieces (the lantern, the maple, the go board, the shishi-odoshi): nothing cozy in it */
-const kyotoKeep = (o: Office): Box[] => [(o as KyotoOffice).garden];
+const kyotoKeep = (o: Office): Box[] => [(o as KyotoOffice).court];
 
-export const kyoto: Plan<KyotoOffice> = { id: 'kyoto', ready: true, layout: kyotoLayout, things: THINGS, cozy: { keepOut: kyotoKeep }, room: ROOM };
+export const kyoto: Plan<KyotoOffice> = { id: 'kyoto', ready: true, layout: kyotoLayout, things: THINGS, cozy: { keepOut: kyotoKeep }, room: ROOM, props: kyotoKeep };

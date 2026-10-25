@@ -71,7 +71,8 @@ describe('corners: where his plugins objects stand', () => {
       for (const k of SETS) found.push(...breaksOf(o, objectSpots(o, objsOf(k))));
     }
     expect(found.slice(0, 12)).toEqual([]);
-  });
+    // ~0.5 s alone; a gate at load 40+ ran it past vitest's 5 s
+  }, 30_000);
 
   it('the whole collection: every object finds its corner or waits, never breaks a law', () => {
     const all = objsOf(OBJ_IDS.length, OBJ_IDS);

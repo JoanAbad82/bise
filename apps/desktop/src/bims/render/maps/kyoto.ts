@@ -51,7 +51,7 @@ function tree(k: Kit, parent: Object3D, x: number, z: number, size: number, i: n
 
 /** the garden's inside spots: the lantern, the maple, the goban, the shishi-odoshi */
 const gardenAt = (o: Office) => {
-  const g = ky(o).garden;
+  const g = ky(o).court;
   const gx = (g.x0 + g.x1) / 2;
   return {
     lantern: { x: gx + 0.9, z: g.z0 + 0.7 },
@@ -98,7 +98,7 @@ const grower: Grower = {
         k.add(k.style.box(w / 5 - 0.04, 0.08 + (i % 3) * 0.06, 0.01), k.mat(c), g, p.x - w / 2 + (i + 0.5) * (w / 5), 1.0 + (i % 3) * 0.07, 0.04 + pz);
       }
       k.add(k.style.ball(0.11), k.mat(WORLD.paper), g, p.x + w / 2 - 0.25, 1.36, 0.04 + pz);
-      const gd = ky(b.o).garden;
+      const gd = ky(b.o).court;
       k.add(k.style.cylinder(0.005, 0.3), k.mat(WORLD.ink), g, gd.x0 - 0.25, 1.6, gd.z0);
       k.add(k.style.cap(0.08, 0.6), k.mat('#bfe1f2'), g, gd.x0 - 0.25, 1.42, gd.z0);
       k.add(k.style.box(0.06, 0.14, 0.01), k.mat(WORLD.paper), g, gd.x0 - 0.25, 1.28, gd.z0);
@@ -109,7 +109,7 @@ const grower: Grower = {
       k.add(k.style.cylinder(0.08, 0.07), k.mat('#e9e2d4'), g, p.x - 0.08, 0.76, p.z);
       k.add(k.style.cylinder(0.06, 0.02), k.mat('#7cb35a'), g, p.x - 0.08, 0.8, p.z);
       k.add(k.style.cylinder(0.035, 0.14), k.mat('#d8c9a0'), g, p.x + 0.1, 0.79, p.z);
-      const gd = ky(b.o).garden;
+      const gd = ky(b.o).court;
       for (const [fx, fz, r] of [[0.25, 0.3, 0.45], [0.7, 0.75, 0.35], [0.2, 0.85, 0.3]] as const) {
         k.add(k.style.ball(r), k.mat(MOSS), g, gd.x0 + (gd.x1 - gd.x0) * fx, 0, gd.z0 + (gd.z1 - gd.z0) * fz).scale.y = 0.35;
       }
@@ -188,7 +188,7 @@ function shell(b: Build): void {
   const { k, root } = b;
   const { style, pal } = k;
   const o = ky(b.o);
-  const { x0, W, D, garden: gd } = o;
+  const { x0, W, D, court: gd } = o;
   k.add(style.box(W, 0.14, D), style.floor(pal.floor, W, D), root, x0 + W / 2, -0.05, D / 2);
   // tatami borders, left of the engawa
   const edge = k.mat(MAT_EDGE);
