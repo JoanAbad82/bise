@@ -58,9 +58,10 @@ function lowest(m: Mesh): Vector3 {
   return low;
 }
 
-/** the napper's parts: its hoodie (the back), its feet, every shown mesh */
+/** the napper's parts: its torso (the back, bim.ts's first mesh), its soles, every shown mesh */
 function napper(name: string, spot: Spot, bedAt: (p: { x: number; z: number }) => NapRest | undefined): { back: Vector3; heels: Vector3[]; all: { m: Mesh; low: Vector3 }[]; head: Box3 } {
-  const bim = makeBim(name, false, STYLE);
+  // unmerged (makeBim's merge false: bim.test.ts's law draws the same triangles merged), so its torso is a mesh of its own
+  const bim = makeBim(name, false, STYLE, undefined, undefined, false);
   const pose: Pose = {
     x: spot.x, z: spot.z, dir: spot.face, moving: false, since: 30,
     seg: { t: 0, act: NAP, sig: 'nap', spot, path: { pts: [spot], seg: [], len: 0 }, speed: 2.4, from: null },
@@ -69,8 +70,8 @@ function napper(name: string, spot: Spot, bedAt: (p: { x: number; z: number }) =
   bim.group.updateMatrixWorld(true);
   const body = bim.group.children[0] as Group;
   const hoodie = body.children.find((c) => c instanceof Mesh) as Mesh;
-  // the legs: the groups at the hips (bim.ts: x ±0.1, y 0.3), each its capsule then its foot
-  const feet = body.children.filter((c) => c instanceof Group && Math.abs(c.position.y - 0.3) < 1e-6 && Math.abs(Math.abs(c.position.x) - 0.1) < 1e-6).map((g) => g.children[1] as Mesh);
+  // the legs (bim.ts legL, legR): each one's sole, its last mesh
+  const feet = ['legL', 'legR'].map((n) => body.getObjectByName(n)?.children.filter((c) => c instanceof Mesh).at(-1) as Mesh);
   const all: { m: Mesh; low: Vector3 }[] = [];
   bim.group.traverse((o) => {
     if (!(o instanceof Mesh) || !shown(o)) return;
@@ -101,6 +102,16 @@ function onScreen(fit: Fit, b: Box3): Rect {
 const covers = (a: Rect, b: Rect): boolean => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 3 && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 3;
 /** how near the camera a box's middle is */
 const depth = (b: Box3): number => ((b.min.x + b.max.x) / 2) * BACK.x + ((b.min.y + b.max.y) / 2) * BACK.y + ((b.min.z + b.max.z) / 2) * BACK.z;
+/**
+ * a box that can't hide `h` at all: on its far side along an axis the view looks along (a ray from h
+ * to the camera only goes up, and toward +BACK in x and z). The middles' depth alone counted the
+ * back wall's tall pieces as nearer than a napper lying before it (kyoto's back row, the clay bims'
+ * bigger heads of page bims-look D).
+ */
+const behind = (b: Box3, h: Box3): boolean =>
+  (BACK.x > 0 ? b.max.x < h.min.x : BACK.x < 0 && b.min.x > h.max.x) ||
+  (BACK.y > 0 ? b.max.y < h.min.y : BACK.y < 0 && b.min.y > h.max.y) ||
+  (BACK.z > 0 ? b.max.z < h.min.z : BACK.z < 0 && b.min.z > h.max.z);
 /** a box cut in pieces 0.1 long along its longest side (clip.test.ts: a long beam's box is a wide rectangle its line only crosses) */
 function pieces(b: Box3): Box3[] {
   const size = b.getSize(new Vector3());
@@ -132,7 +143,7 @@ function napReds(o: Office, stage: number, heads = false): string[] {
     // its head on the screen: nothing taller than its middle, nearer the camera, over it
     if (heads) {
     const mid = (n.head.min.y + n.head.max.y) / 2;
-    const near = boxes.filter((b) => b.max.y > mid && depth(b) > depth(n.head));
+    const near = boxes.filter((b) => b.max.y > mid && depth(b) > depth(n.head) && !behind(b, n.head));
     for (const [px, fit] of fits) {
       const r = onScreen(fit, n.head);
       const over = near.find((b) => covers(r, onScreen(fit, b)));

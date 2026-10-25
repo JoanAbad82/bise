@@ -1,10 +1,19 @@
-// One bim's meshes (three): a round, happy body in plain blocks, its outfit from its name, and the
-// props its poses show (a box to land, a mug, fruit, a sheet, a skate, sunglasses, the
-// failed cloud, hot's sweat and steam). Its materials are its own, so it can fade (reduced motion)
-// and go grey (stopped). apply() copies a pose.ts Rig onto the meshes; nothing here decides.
-import { type BufferGeometry, Color, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, type Object3D, Vector3 } from 'three';
-import { CHEEK, EYE, MOUTH, WORLD, outfitOf, type Outfit } from './palette';
-import { HEAD_Y } from './laptop';
+// One bim's meshes (three): the clay look of page bims-look D (his pick, v6): a round glossy-eyed
+// head, a bean of a torso in one of six outfits from its name (main keeps its ink hoodie), chunky
+// sleeves, mitten hands, round sneakers; and the props its poses show (a box to land, a mug, fruit, a
+// sheet, a skate, sunglasses, the failed cloud, hot's sweat and steam). apply() copies a pose.ts Rig
+// onto the meshes; nothing here decides.
+// Each rigid part (head, body, two arms, two legs) is baked into one vertex-coloured mesh (merge.ts
+// bakePart, the designer's condition for the look): the face's eyes, lids and mouths (they toggle and
+// scale), the props (they toggle) and the glows stay apart. A part with small details (cuffs, folds,
+// hems, a pocket, strings, buttons, the eyes' catchlights: userData.near) is baked twice, near and
+// far, and detail() swaps them by how big the bim is on screen (nearAt). Its materials are its own,
+// so it fades (reduced motion) and goes grey (stopped); the clay light is claylight.ts's.
+import { type BufferGeometry, Color, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, MeshStandardMaterial, type Object3D, SphereGeometry, TorusGeometry, Vector3 } from 'three';
+import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Outfit } from './palette';
+import { HAT_K, HEAD_R, HEAD_Y } from './laptop';
+import { bakePart } from './merge';
+import { GREY_MIX, clayLit, partsMaterial, warmth } from './claylight';
 import type { Rig, Rot } from './pose';
 import type { Style } from './style';
 import type { Wear } from './maps/look';
@@ -17,6 +26,10 @@ export interface Bim {
   readonly outfit: Outfit;
   readonly group: Group;
   apply(rig: Rig): void;
+  /** the small details drawn (near) or not (far): nearAt(fit.scale) */
+  detail(near: boolean): void;
+  /** the day's light, 0 (night: the lamp pools light it) .. 1: its clay's self-warmth */
+  daylight(day: number): void;
   /** the point above its head where labels and pills go, world units */
   headTop(out: Vector3): Vector3;
   /** its feet on the floor, world units */
@@ -29,118 +42,266 @@ export interface Bim {
 const GREY = new Color(WORLD.grey);
 /** eyes this shut or more (pose.ts: 0.15 asleep, 0.3 laughing) draw as closed lines */
 const CLOSED = 0.25;
+/**
+ * css px per office unit from which the small details are drawn: the follow zoom (×2.2) shows them,
+ * the office's fit at 320 (12.2 px) and at 640 (21.8) does not; measured on page bims-look v6 at ×1.8
+ * of the 320 fit (1,927 → 1,655 draws unmerged, no visible difference)
+ */
+export const NEAR_PX = 22;
+/** whether a bim seen through a fit of `scale` (world units per css px) draws its small details. Pure. */
+export const nearAt = (scale: number): boolean => scale > 0 && 1 / scale >= NEAR_PX;
+/** the rigid parts, each baked into one mesh (two with a far level of detail) */
+export const PARTS = ['head', 'body', 'armL', 'armR', 'legL', 'legR'] as const;
 
 /**
  * `outfit`: another bim's (s3, april fools: hats shuffled, one in main's hoodie); its own by default.
  * `wear`: the map's small thing every bim wears (render/maps/look.ts), after its outfit.
+ * `merge`: false leaves every mesh as built (the merge law compares both: bim.test.ts).
  */
-export function makeBim(name: string, main: boolean, style: Style, outfit?: Outfit, wear?: (w: Wear) => void): Bim {
+export function makeBim(name: string, main: boolean, style: Style, outfit?: Outfit, wear?: (w: Wear) => void, merge = true): Bim {
   const o = outfit ?? outfitOf(name, main);
   const mats = new Map<string, Mat>();
   const orig = new Map<Mat, Color>();
-  const mat = (color: string, glow = 0): Mat => {
-    const key = `${color}|${glow}`;
+  let day = 1;
+  const own = (key: string, make: () => Mat): Mat => {
     let m = mats.get(key);
     if (!m) {
-      m = style.material(color, glow > 0 ? { emissive: color, ei: glow } : {}) as Mat;
+      m = make();
       mats.set(key, m);
       orig.set(m, m.color.clone());
+      warmth(m, day);
     }
     return m;
   };
+  const mat = (color: string, glow = 0): Mat =>
+    own(`${color}|${glow}`, () => {
+      const m = style.material(color, glow > 0 ? { emissive: color, ei: glow } : {}) as Mat;
+      clayLit(m, glow === 0);
+      return m;
+    });
+  /** a glossy one (the eyes) */
+  const gloss = (color: string, rough: number): Mat =>
+    own(`${color}|gloss${rough}`, () => {
+      const m = style.material(color) as Mat;
+      if (m instanceof MeshStandardMaterial) m.roughness = rough;
+      clayLit(m, true);
+      return m;
+    });
   const add = (geo: BufferGeometry, m: Material, parent: Object3D, x: number, y: number, z: number): Mesh => {
     const mesh = new Mesh(geo, m);
     mesh.position.set(x, y, z);
     parent.add(mesh);
     return mesh;
   };
+  /** a small detail: drawn near only */
+  const lod = (m: Mesh): Mesh => {
+    m.userData.near = true;
+    return m;
+  };
+  /** the face's toggling pieces: never merged, no shadow (too small to cast one) */
+  const kept = new Set<Object3D>();
+  const face = (m: Mesh): Mesh => {
+    kept.add(m);
+    m.userData.noShadow = true;
+    return m;
+  };
+  const shade = (hex: string, k: number): string => '#' + new Color(hex).multiplyScalar(k).getHexString();
 
   const g = new Group();
   const body = new Group();
+  body.name = 'body';
   const s = main ? 1.18 : 1;
   body.scale.setScalar(s);
   g.add(body);
 
-  add(style.capsule(0.21, 0.22), mat(o.hoodie), body, 0, 0.5, 0);
+  const KIND = o.kind;
+  const SECOND = o.second;
+  const SLEEVE = KIND === 'puffer' ? SECOND : o.hoodie;
+  const SHORT = KIND === 'tee' || KIND === 'overalls';
+  const DARK = 0.86;
+  const R = HEAD_R;
+  /** a point on the face at (x, y), pushed out by `out` */
+  const onFace = (x: number, y: number, out = 0): number => Math.sqrt(Math.max(0, R * R - x * x - y * y)) + out;
+
+  // the torso: a round bean in the outfit's colour (the shirt's under dungarees), a chunky roll collar
+  const under = KIND === 'overalls' ? WORLD.paper : o.hoodie;
+  add(style.capsule(0.215, 0.17), mat(under), body, 0, 0.49, 0).scale.set(1.04, 1, 0.94);
+  if (KIND === 'hoodie' || KIND === 'sweater') {
+    add(new TorusGeometry(0.115, 0.052, 10, 24), mat(o.hoodie), body, 0, 0.775, 0).rotation.x = Math.PI / 2;
+  }
+  if (KIND === 'tee') {
+    // a crew neck and a print on the chest (the second colour)
+    add(new TorusGeometry(0.1, 0.022, 8, 22), mat(shade(o.hoodie, 0.88)), body, 0, 0.775, 0.01).rotation.x = Math.PI / 2;
+    add(new SphereGeometry(0.06, 14, 10), mat(SECOND), body, 0.02, 0.57, 0.19).scale.set(1, 1, 0.3);
+  }
+  if (KIND === 'sweater') {
+    // a knit jumper: two bands round the chest, a ribbed hem
+    for (const y of [0.56, 0.48]) {
+      const band = add(new TorusGeometry(0.212, 0.026, 8, 30), mat(SECOND), body, 0, y, 0);
+      band.rotation.x = Math.PI / 2;
+      band.scale.set(1.04, 0.94, 1);
+    }
+    lod(add(new TorusGeometry(0.19, 0.03, 8, 30), mat(shade(o.hoodie, DARK)), body, 0, 0.27, 0)).rotation.x = Math.PI / 2;
+  }
+  if (KIND === 'overalls') {
+    // dungarees over a white tee: the waist, the bib, two straps, two gold buttons
+    const pm = mat(o.hoodie);
+    add(style.capsule(0.221, 0.06), pm, body, 0, 0.33, 0).scale.set(1.04, 1, 0.95);
+    add(style.box(0.24, 0.2, 0.06, 0.03), pm, body, 0, 0.5, 0.17).rotation.x = -0.05;
+    for (const sx of [-1, 1]) {
+      add(style.box(0.045, 0.3, 0.03, 0.012), pm, body, sx * 0.09, 0.66, 0.1).rotation.x = -0.75;
+      lod(add(style.ball(0.018), mat(WORLD.gold), body, sx * 0.09, 0.585, 0.205));
+    }
+    lod(add(style.box(0.11, 0.07, 0.02, 0.008), mat(shade(o.hoodie, 0.88)), body, 0, 0.5, 0.205));
+  }
+  if (KIND === 'jacket') {
+    // an open jacket over a white shirt: the shirt in a V down the front, two lapels, buttons
+    add(new SphereGeometry(0.1, 16, 12), mat(WORLD.paper), body, 0, 0.6, 0.155).scale.set(0.62, 1.7, 0.5);
+    for (const sx of [-1, 1]) {
+      add(style.box(0.07, 0.13, 0.03, 0.012), mat(shade(o.hoodie, 0.9)), body, sx * 0.07, 0.71, 0.17).rotation.set(-0.45, 0, sx * -0.35);
+    }
+    for (const y of [0.56, 0.44]) lod(add(style.ball(0.016), mat(SECOND), body, 0.065, y, 0.212));
+  }
+  if (KIND === 'puffer') {
+    // a puffer vest: three soft rings stacked over a long-sleeved shirt (the second colour)
+    for (const [y, r] of [[0.64, 0.19], [0.5, 0.215], [0.36, 0.2]] as const) {
+      const ring = add(new TorusGeometry(r, 0.06, 10, 28), mat(o.hoodie), body, 0, y, 0);
+      ring.rotation.x = Math.PI / 2;
+      ring.scale.set(1.04, 0.94, 1);
+    }
+    lod(add(style.box(0.012, 0.36, 0.012), mat(shade(o.hoodie, 0.75)), body, 0, 0.5, 0.235));
+  }
+  if (KIND === 'hoodie') {
+    // the hood lying on its back, the pocket, two drawstrings (main has none: its chain and :* sit there, designer m_41188 3)
+    const hood = add(new SphereGeometry(0.16, 16, 10), mat(shade(o.hoodie, 0.93)), body, 0, 0.72, -0.15);
+    hood.scale.set(1.15, 0.55, 0.7);
+    hood.rotation.x = 0.35;
+    lod(add(style.box(0.25, 0.11, 0.06, 0.03), mat(shade(o.hoodie, DARK)), body, 0, 0.36, 0.175)).rotation.x = -0.25;
+    for (const dx of main ? [] : [-0.045, 0.045]) {
+      lod(add(style.capsule(0.011, 0.09), mat(WORLD.paper), body, dx, 0.66, 0.2)).rotation.x = -0.35;
+      lod(add(style.ball(0.017), mat(WORLD.paper), body, dx, 0.6, 0.222));
+    }
+  }
+
   const head = new Group();
+  head.name = 'head';
   head.position.set(0, HEAD_Y, 0);
   body.add(head);
-  add(style.ball(0.22), mat(o.skin), head, 0, 0, 0);
-  const eyes = [-0.075, 0.075].map((ex) => add(style.box(0.07, 0.08, 0.02), mat(EYE), head, ex, 0.03, 0.205));
-  // closed eyes (asleep, napping): two thin lines a little lower and apart, flush on the face; a
-  // squashed eye box read as one thick bar from above (Gabriel, via landing-shots m_28200)
-  const lids = [-0.08, 0.08].map((ex) => add(style.box(0.065, 0.014, 0.006), mat(EYE), head, ex, 0.01, 0.214));
-  const smile = add(style.box(0.12, 0.03, 0.02), mat(EYE), head, 0, -0.05, 0.205);
-  const laugh = add(style.box(0.12, 0.06, 0.02), mat(MOUTH), head, 0, -0.06, 0.207);
-  const oh = add(style.box(0.06, 0.06, 0.02), mat(EYE), head, 0, -0.08, 0.205);
-  for (const ex of [-0.135, 0.135]) add(style.box(0.06, 0.04, 0.02), mat(CHEEK), head, ex, -0.05, 0.205);
+  add(style.ball(R), mat(o.skin), head, 0, 0, 0);
+  // the hats and the maps' wears, drawn for a 0.22 head, at the clay head's size
+  const hat = new Group();
+  hat.scale.setScalar(HAT_K);
+  head.add(hat);
+  // round dot eyes, glossy, a catchlight each, set into the face
+  const ER = 0.044;
+  const EX = 0.09;
+  const EY = 0.01;
+  const catchlights: Mesh[] = [];
+  const eyes = [-EX, EX].map((ex) => {
+    const e = face(add(new SphereGeometry(ER, 16, 12), gloss(EYE, 0.3), head, ex, EY, onFace(ex, EY, -0.016)));
+    e.scale.z = 0.55;
+    e.rotation.y = Math.atan2(ex, R);
+    const hl = lod(add(new SphereGeometry(ER * 0.32, 8, 6), mat(WORLD.paper, 0.6), e, -ER * 0.3, ER * 0.38, ER * 0.85));
+    hl.scale.z = 0.5;
+    hl.userData.noShadow = true;
+    catchlights.push(hl);
+    return e;
+  });
+  // closed: a soft arc each (a sleeper's ‿)
+  const lids = [-EX, EX].map((ex) => {
+    const l = face(add(new TorusGeometry(0.028, 0.0075, 6, 14, Math.PI), mat(EYE), head, ex, EY + 0.008, onFace(ex, EY, -0.002)));
+    l.rotation.z = Math.PI;
+    return l;
+  });
+  // the smile: a thin arc; laughing: an open half moon; oh: a small round
+  const MY = -0.055;
+  const smile = face(add(new TorusGeometry(0.03, 0.0075, 6, 16, Math.PI), mat(EYE), head, 0, MY + 0.012, onFace(0, MY, -0.002)));
+  smile.rotation.z = Math.PI;
+  const laugh = face(add(new SphereGeometry(0.045, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), mat(MOUTH), head, 0, MY + 0.005, onFace(0, MY, -0.006)));
+  laugh.scale.z = 0.4;
+  const oh = face(add(new SphereGeometry(0.024, 12, 8), mat(MOUTH), head, 0, MY - 0.01, onFace(0, MY, -0.005)));
+  oh.scale.z = 0.45;
+  // blush: two soft round cheeks under the eyes, a little out, from its skin
+  for (const ex of [-0.13, 0.13].map((x) => x * HAT_K)) {
+    const cy = -0.035;
+    const c = add(new SphereGeometry(0.042, 14, 10), mat(blushOf(o.skin)), head, ex, cy, onFace(ex, cy, -0.016));
+    c.scale.set(1, 0.68, 0.35);
+    c.rotation.y = Math.atan2(ex, R);
+  }
 
+  // a fringe of soft tufts over the cap of hair, all leaning the same way
+  const hairOn = (): void => {
+    add(style.cap(R + 0.008, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
+    const T: readonly (readonly [number, number, number, number, number])[] = [
+      [-0.13, 0.13, 0.15, 0.085, 0.5],
+      [-0.04, 0.17, 0.16, 0.09, 0.35],
+      [0.06, 0.17, 0.15, 0.088, 0.2],
+      [0.15, 0.12, 0.12, 0.075, 0.05],
+      [0, 0.23, 0.02, 0.1, 0.3],
+    ];
+    for (const [x, y, z, r, rot] of T) {
+      const t = add(new SphereGeometry(r, 14, 10), mat(o.hair), head, x, y, z);
+      t.scale.set(1.25, 0.62, 0.9);
+      t.rotation.set(-0.35, 0, rot);
+    }
+  };
   // hair and hats
   const capOn = (back: boolean): void => {
-    add(style.cap(0.225, 0.48), mat(o.hatColor), head, 0, 0.03, 0);
-    add(style.box(0.22, 0.03, 0.2), mat(o.hatColor), head, 0, 0.07, back ? -0.22 : 0.21);
+    add(style.cap(0.225, 0.48), mat(o.hatColor), hat, 0, 0.03, 0);
+    add(style.box(0.22, 0.03, 0.2), mat(o.hatColor), hat, 0, 0.07, back ? -0.22 : 0.21);
   };
   switch (o.hat) {
     case 'cap': capOn(false); break;
     case 'capback': capOn(true); break;
     case 'beanie':
-      add(style.cap(0.232, 0.5), mat(o.hatColor), head, 0, 0.04, 0);
-      add(style.ball(0.06), mat(WORLD.paper), head, 0, 0.28, 0);
+      add(style.cap(0.232, 0.5), mat(o.hatColor), hat, 0, 0.04, 0);
+      add(style.ball(0.06), mat(WORLD.paper), hat, 0, 0.28, 0);
       break;
-    case 'afro': {
-      const af = add(style.ball(0.27), mat(o.hair), head, 0, 0.1, -0.05);
-      af.scale.set(1.05, 0.85, 1);
+    case 'afro':
+      add(style.ball(0.27), mat(o.hair), hat, 0, 0.1, -0.05).scale.set(1.05, 0.85, 1);
       break;
-    }
     case 'bun':
-      add(style.cap(0.226, 0.42), mat(o.hair), head, 0, 0.02, -0.01);
-      add(style.ball(0.09), mat(o.hair), head, 0, 0.24, -0.08);
+      add(style.cap(0.226, 0.42), mat(o.hair), hat, 0, 0.02, -0.01);
+      add(style.ball(0.09), mat(o.hair), hat, 0, 0.24, -0.08);
       break;
     case 'hair':
-      add(style.cap(0.228, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
+      hairOn();
       break;
     case 'headphones': {
       // a headset (Gabriel: « cette barre orange est sensé etre un casque audio? »): a band that
       // follows the head's curve over its hair from ear to ear, a cup in its hat colour on each
       // ear over a dark cushion, and a small mic arm from the left cup to the mouth
-      add(style.cap(0.226, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
+      add(style.cap(0.226, 0.4), mat(o.hair), hat, 0, 0.02, -0.02);
       const ink = mat(WORLD.dark);
-      const R = 0.262;
+      const BR = 0.262;
       const SEGS = 7;
       const SPAN = 1.3; // radians each side of the top: the band ends just above the cups
       const step = (2 * SPAN) / SEGS;
       for (let i = 0; i < SEGS; i++) {
         const a = -SPAN + step * (i + 0.5);
-        const seg = add(style.box(R * step * 1.15, 0.034, 0.06, 0.012), ink, head, R * Math.sin(a), R * Math.cos(a), -0.01);
-        seg.rotation.z = -a;
+        add(style.box(BR * step * 1.15, 0.034, 0.06, 0.012), ink, hat, BR * Math.sin(a), BR * Math.cos(a), -0.01).rotation.z = -a;
       }
       for (const sx of [-1, 1]) {
-        add(style.box(0.03, 0.07, 0.035, 0.01), ink, head, sx * 0.258, 0.07, -0.01);
-        const cushion = add(style.cylinder(0.078, 0.03), ink, head, sx * 0.222, -0.01, -0.01);
-        cushion.rotation.z = Math.PI / 2;
-        const cup = add(style.cylinder(0.086, 0.055), mat(o.hatColor), head, sx * 0.258, -0.01, -0.01);
-        cup.rotation.z = Math.PI / 2;
-        const plate = add(style.cylinder(0.05, 0.012), ink, head, sx * 0.288, -0.01, -0.01);
-        plate.rotation.z = Math.PI / 2;
+        add(style.box(0.03, 0.07, 0.035, 0.01), ink, hat, sx * 0.258, 0.07, -0.01);
+        add(style.cylinder(0.078, 0.03), ink, hat, sx * 0.222, -0.01, -0.01).rotation.z = Math.PI / 2;
+        add(style.cylinder(0.086, 0.055), mat(o.hatColor), hat, sx * 0.258, -0.01, -0.01).rotation.z = Math.PI / 2;
+        add(style.cylinder(0.05, 0.012), ink, hat, sx * 0.288, -0.01, -0.01).rotation.z = Math.PI / 2;
       }
       const from = new Vector3(-0.27, -0.05, 0.03);
       const to = new Vector3(-0.12, -0.1, 0.19);
       const dir = to.clone().sub(from);
-      const arm = add(style.box(0.018, 0.018, dir.length(), 0.006), ink, head, (from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
+      const arm = add(style.box(0.018, 0.018, dir.length(), 0.006), ink, hat, (from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
       arm.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir.normalize());
-      add(style.ball(0.026), ink, head, to.x, to.y, to.z);
+      add(style.ball(0.026), ink, hat, to.x, to.y, to.z);
       break;
     }
     case 'main': {
-      // main: the ink hoodie, its :* on the chest in the neon's yellow, a gold chain
-      add(style.cap(0.228, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
-      const neon = mat(WORLD.wheel, 0.3);
+      // main: the ink hoodie, its :* on the chest in the neon's yellow (bims.md), a gold chain
+      hairOn();
+      const neon = mat(DAY.neon, 0.35);
       add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.58, 0.215);
       add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.47, 0.215);
-      for (let i = 0; i < 3; i++) {
-        const b = add(style.box(0.11, 0.025, 0.02), neon, body, 0.05, 0.525, 0.215);
-        b.rotation.z = (i * Math.PI) / 3;
-      }
+      for (let i = 0; i < 3; i++) add(style.box(0.11, 0.025, 0.02), neon, body, 0.05, 0.525, 0.215).rotation.z = (i * Math.PI) / 3;
       add(style.box(0.3, 0.03, 0.03), mat(WORLD.gold, 0.2), body, 0, 0.7, 0.2);
       break;
     }
@@ -150,21 +311,83 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   const legs: Group[] = [];
   for (const sx of [-1, 1]) {
     const arm = new Group();
+    arm.name = sx < 0 ? 'armL' : 'armR';
     arm.position.set(sx * 0.24, 0.66, 0);
     body.add(arm);
-    add(style.capsule(0.065, 0.2), mat(o.hoodie), arm, 0, -0.15, 0);
-    add(style.ball(0.065), mat(o.skin), arm, 0, -0.3, 0);
+    // chunky round sleeves (a short one over a bare forearm: the tee's, the shirt's under dungarees), a mitten of a hand
+    if (SHORT) {
+      add(style.capsule(0.06, 0.17), mat(o.skin), arm, 0, -0.16, 0);
+      add(style.capsule(0.082, 0.05), mat(KIND === 'overalls' ? WORLD.paper : o.hoodie), arm, 0, -0.07, 0);
+    } else add(style.capsule(0.078, 0.17), mat(SLEEVE), arm, 0, -0.14, 0);
+    add(new SphereGeometry(0.066, 16, 12), mat(o.skin), arm, 0, -0.305, 0.005).scale.set(0.95, 1.05, 0.85);
+    if (!SHORT) {
+      // a ribbed cuff and a fold at the elbow
+      lod(add(new TorusGeometry(0.066, 0.022, 8, 18), mat(shade(SLEEVE, DARK)), arm, 0, -0.245, 0)).rotation.x = Math.PI / 2;
+      lod(add(new TorusGeometry(0.075, 0.014, 6, 18), mat(shade(SLEEVE, 0.94)), arm, 0, -0.12, 0)).rotation.set(Math.PI / 2 + 0.25, 0, 0);
+    }
     arms.push(arm);
     const leg = new Group();
+    leg.name = sx < 0 ? 'legL' : 'legR';
     leg.position.set(sx * 0.1, 0.3, 0);
     body.add(leg);
-    add(style.capsule(0.075, 0.14), mat(o.pants), leg, 0, -0.12, 0);
-    add(style.box(0.15, 0.08, 0.24), mat(WORLD.paper), leg, 0, -0.27, 0.04);
+    add(style.capsule(0.088, 0.12), mat(o.pants), leg, 0, -0.11, 0);
+    lod(add(new TorusGeometry(0.082, 0.02, 8, 18), mat(shade(o.pants, 0.9)), leg, 0, -0.2, 0)).rotation.x = Math.PI / 2;
+    // a round sneaker (designer m_41188 6): a squashed ball over a thin sole, the sole inside the
+    // toe box's outline (a wider one showed as a dark plate in the close-up)
+    add(new SphereGeometry(0.1, 18, 12), mat(WORLD.paper), leg, 0, -0.262, 0.05).scale.set(0.82, 0.48, 1.3);
+    add(new SphereGeometry(0.1, 16, 8), mat(SOLE), leg, 0, -0.296, 0.05).scale.set(0.78, 0.2, 1.24);
     legs.push(leg);
   }
   const [armL, armR] = arms as [Group, Group];
   const [legL, legR] = legs as [Group, Group];
-  wear?.({ style, name, head, body, arms, legs, mat, add });
+  wear?.({ style, name, head: hat, body, arms, legs, mat, add });
+
+  // every rigid part baked into one mesh (two: near and far), the face's toggling pieces apart
+  const parts: readonly Group[] = [head, body, armL, armR, legL, legR];
+  const pm = partsMaterial(style);
+  const nearMeshes: Mesh[] = [];
+  const farMeshes: Mesh[] = [];
+  if (merge) {
+    const isPart = new Set<Object3D>(parts);
+    for (const part of parts) {
+      const ms: Mesh[] = [];
+      const walk = (obj: Object3D): void => {
+        for (const c of obj.children) {
+          if (isPart.has(c) || kept.has(c)) continue;
+          if (c instanceof Mesh) ms.push(c as Mesh);
+          walk(c);
+        }
+      };
+      walk(part);
+      if (ms.length === 0) continue;
+      const near = bakePart(part, ms);
+      const far = ms.some((m) => m.userData.near === true) ? bakePart(part, ms, (m) => m.userData.near !== true) : null;
+      for (const m of ms) {
+        m.removeFromParent();
+        m.geometry.dispose();
+      }
+      for (const c of [...part.children]) if (!(c instanceof Mesh) && !isPart.has(c) && c.children.length === 0) part.remove(c);
+      const put = (geo: BufferGeometry, m: Material, label: string): Mesh => {
+        const mesh = new Mesh(geo, m);
+        mesh.name = `${part.name}:${label}`;
+        part.add(mesh);
+        return mesh;
+      };
+      if (near.colours) {
+        const n = put(near.colours, pm.material, far ? 'near' : 'all');
+        if (far) nearMeshes.push(n);
+      }
+      if (far?.colours) {
+        // near until detail() says far
+        const f = put(far.colours, pm.material, 'far');
+        f.visible = false;
+        farMeshes.push(f);
+      }
+      // the glows (main's :* and chain) carry no small detail: the near bake's
+      for (const [m, geo] of near.glows) put(geo, m, 'glow');
+      for (const [, geo] of far?.glows ?? []) geo.dispose();
+    }
+  }
 
   // props
   const crate = add(style.box(0.4, 0.3, 0.3), mat(WORLD.crate), body, 0, 0.62, 0.3);
@@ -200,7 +423,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       w.rotation.z = Math.PI / 2;
     }
   }
-  const glasses = add(style.box(0.26, 0.06, 0.03), mat(WORLD.sunglasses), head, 0, 0.04, 0.215);
+  const glasses = add(style.box(0.26, 0.06, 0.03), mat(WORLD.sunglasses), hat, 0, 0.04, 0.215);
   // the cloud over the laptop (failed): ahead of the bim, where its desk is
   const cloud = new Group();
   g.add(cloud);
@@ -248,9 +471,21 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   g.add(puff);
   for (const [px, pz] of [[-0.24, 0.05], [0.24, 0.05], [0, -0.22], [0.14, 0.22], [-0.14, 0.22]] as const) add(style.ball(0.07), mat(WORLD.paper), puff, px, 0.3, pz);
 
+  // the materials still drawn (the baked ones' sources are gone), the golden pineapple's too
+  const used = new Set<Material>([golden]);
+  g.traverse((obj) => { if (obj instanceof Mesh) used.add(obj.material as Material); });
+  for (const m of [...orig.keys()]) {
+    if (!used.has(m)) {
+      orig.delete(m);
+      m.dispose();
+    }
+  }
+  const all: Material[] = [...orig.keys(), pm.material];
+
   const setRot = (obj: Object3D, r: Rot): void => { obj.rotation.set(r[0], r[1], r[2]); };
   let lastGrey = -1;
   let lastOp = -1;
+  let near = true;
   // how far a poke lifts its head (Rig.anchor): its labels stay where the state's pose has them
   let anchor = 0;
 
@@ -360,13 +595,17 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       if (p.chalk !== undefined) puff.scale.setScalar(0.6 + p.chalk * 1.4);
       if (rig.grey !== lastGrey) {
         lastGrey = rig.grey;
-        for (const [m, c] of orig) m.color.copy(c).lerp(GREY, rig.grey * 0.85);
+        for (const [m, c] of orig) {
+          m.color.copy(c).lerp(GREY, rig.grey * GREY_MIX);
+          warmth(m, day);
+        }
+        pm.grey(rig.grey);
       }
       if (rig.opacity !== lastOp) {
         const wasOpaque = lastOp >= 1 || lastOp < 0;
         lastOp = rig.opacity;
         const opaque = rig.opacity >= 1;
-        for (const m of orig.keys()) {
+        for (const m of all) {
           m.opacity = rig.opacity;
           if (m.transparent === opaque || wasOpaque !== opaque) {
             m.transparent = !opaque;
@@ -374,6 +613,19 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
           }
         }
       }
+    },
+    detail(n) {
+      if (n === near) return;
+      near = n;
+      for (const m of nearMeshes) m.visible = n;
+      for (const m of farMeshes) m.visible = !n;
+      for (const m of catchlights) m.visible = n;
+    },
+    daylight(d) {
+      if (d === day) return;
+      day = d;
+      for (const m of orig.keys()) warmth(m, d);
+      pm.day(d);
     },
     headTop(out) {
       head.getWorldPosition(out);
@@ -393,7 +645,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     },
     dispose() {
       g.traverse((obj) => { if (obj instanceof Mesh) (obj.geometry as BufferGeometry).dispose(); });
-      for (const m of orig.keys()) m.dispose();
+      for (const m of all) m.dispose();
     },
   };
 }

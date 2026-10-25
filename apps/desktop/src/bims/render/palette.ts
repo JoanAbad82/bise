@@ -108,7 +108,22 @@ export type Hat = (typeof HATS)[number];
 export const MAIN_HOODIE = '#1d1a17';
 export const EYE = '#1d1a17';
 export const MOUTH = '#3a2b26';
-export const CHEEK = '#f2b36b';
+/** the sneakers' sole (bim.ts) */
+export const SOLE = '#5b544d';
+/** a bim's clothes beyond the hoodie (page bims-look v6, his note n1): one from its name, main's always the hoodie */
+export const KINDS = ['hoodie', 'tee', 'sweater', 'overalls', 'jacket', 'puffer'] as const;
+export type Kind = (typeof KINDS)[number];
+
+/**
+ * A bim's cheeks from its skin (designer m_41188 2): the skin warmed and darkened a step, at 60 %.
+ * Its hue stays >= 25° on every skin, never the error red's or the accent's (palette.test). Pure.
+ */
+export function blushOf(skin: string): string {
+  const n = parseInt(skin.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const mix = (c: number, t: number): number => Math.round(c + (t - c) * 0.6);
+  return '#' + [mix(r, r * 0.92), mix(g, g * 0.82), mix(b, b * 0.6)].map((x) => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0')).join('');
+}
 
 /** FNV-1a: a name's stable number (its clothes, its loop phase) */
 export function hash(s: string): number {
@@ -137,6 +152,10 @@ export interface Outfit {
   readonly hair: string;
   readonly hatColor: string;
   readonly hat: Hat | 'main';
+  /** what it wears over its torso (`hoodie` the main colour); main's is always the hoodie */
+  readonly kind: Kind;
+  /** the outfit's second colour (a sweater's bands, a tee's print, a puffer's sleeves): never the hoodie's */
+  readonly second: string;
   /** its loop phase, so two bims never type in step */
   readonly phase: number;
 }
@@ -144,8 +163,12 @@ export interface Outfit {
 export function outfitOf(name: string, main: boolean): Outfit {
   const h = hash(name);
   const pick = <T>(xs: readonly T[], shift: number): T => xs[(h >>> shift) % xs.length] as T;
+  const hoodie = main ? MAIN_HOODIE : pick(HOODIE, 0);
+  const second = pick(HOODIE, 23);
   return {
-    hoodie: main ? MAIN_HOODIE : pick(HOODIE, 0),
+    hoodie,
+    kind: main ? 'hoodie' : pick(KINDS, 19),
+    second: second === hoodie ? WORLD.paper : second,
     pants: pick(PANTS, 4),
     skin: pick(SKIN, 2),
     hair: main ? '#2b2118' : pick(HAIR, 13),
@@ -168,6 +191,6 @@ export function allColours(): string[] {
     if (typeof v === 'string') out.push(v);
     else if (Array.isArray(v)) for (const x of v) if (typeof x === 'string') out.push(x);
   }
-  out.push(...HOODIE, ...PANTS, ...SKIN, ...HAIR, MAIN_HOODIE, EYE, MOUTH, CHEEK);
+  out.push(...HOODIE, ...PANTS, ...SKIN, ...HAIR, MAIN_HOODIE, EYE, MOUTH, SOLE, ...SKIN.map(blushOf));
   return out;
 }

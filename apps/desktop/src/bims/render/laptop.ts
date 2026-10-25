@@ -18,16 +18,22 @@ export const LAPTOP = {
 /** the desk's centre ahead of its chair's spot (layout.ts furniture: box(d.x, d.z + 0.5, ...)) */
 const DESK_AHEAD = 0.5;
 
-/** the head's centre above the body's origin (bim.ts) */
-export const HEAD_Y = 0.93;
+/** the head's centre above the body's origin (bim.ts; the clay head of page bims-look D sits 0.02 higher) */
+export const HEAD_Y = 0.95;
+/** the head's radius (bim.ts) */
+export const HEAD_R = 0.245;
+/** the hats and the maps' wears were drawn for a 0.22 head: bim.ts scales them by this about its centre */
+export const HAT_K = HEAD_R / 0.22;
 
-/** the head's parts as balls in the head's frame: the skull, an afro, a bun, a beanie's pompom, a cap's brim (bim.ts) */
+/** the head's parts as balls in the head's frame: the skull, an afro, a bun, a beanie's pompom, a cap's brim (bim.ts, the hats at HAT_K) */
 const HEAD_PARTS: readonly { readonly x: number; readonly y: number; readonly z: number; readonly r: number }[] = [
-  { x: 0, y: 0, z: 0, r: 0.22 },
-  { x: 0, y: 0.1, z: -0.05, r: 0.27 },
-  { x: 0, y: 0.24, z: -0.08, r: 0.09 },
-  { x: 0, y: 0.28, z: 0, r: 0.06 },
-  ...[0.13, 0.19, 0.25, 0.3].map((z) => ({ x: 0, y: 0.07, z, r: 0.02 })),
+  { x: 0, y: 0, z: 0, r: HEAD_R },
+  ...[
+    { x: 0, y: 0.1, z: -0.05, r: 0.27 },
+    { x: 0, y: 0.24, z: -0.08, r: 0.09 },
+    { x: 0, y: 0.28, z: 0, r: 0.06 },
+    ...[0.13, 0.19, 0.25, 0.3].map((z) => ({ x: 0, y: 0.07, z, r: 0.02 })),
+  ].map((b) => ({ x: b.x * HAT_K, y: b.y * HAT_K, z: b.z * HAT_K, r: b.r * HAT_K })),
 ];
 
 interface V {

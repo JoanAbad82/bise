@@ -14,7 +14,7 @@
 // of the same problem) are checked once. Also: the lines last 8-12 s, a rest at least as long; two
 // climbers at most, never main, nobody under reduced motion; a line draws at LOOP_FPS, a rest nothing.
 import { describe, expect, it } from 'vitest';
-import { BufferGeometry, CapsuleGeometry, Group, Mesh, type Object3D, SphereGeometry, Vector3 } from 'three';
+import { BufferGeometry, Group, Mesh, type Object3D, SphereGeometry, Vector3 } from 'three';
 import { agent, mainAgent } from '../fixtures';
 import { climbLayout } from '../maps/climb';
 import type { Activity, ClimbPastime, FunIn, Gym } from '../model';
@@ -76,24 +76,22 @@ interface Parts {
 
 function partsOf(root: Group): Parts {
   const out: Parts = { hands: [], feet: [], body: [], limbs: [] };
+  // the bim unmerged (makeBim's merge false: bim.test.ts's law draws the same triangles merged), its parts by name
+  const partOf = (o: Object3D): string => {
+    for (let p = o.parent; p; p = p.parent) if (p.name !== '') return p.name;
+    return '';
+  };
   root.traverse((o) => {
     if (!(o instanceof Mesh)) return;
     const m: Mesh = o as Mesh;
     const g = m.geometry;
-    const parent = m.parent;
-    if (g instanceof SphereGeometry && Math.abs(g.parameters.radius - 0.065) < 1e-9 && parent && Math.abs(Math.abs(parent.position.x) - 0.24) < 1e-9) out.hands.push(m);
-    else if (parent && Math.abs(parent.position.y - 0.3) < 1e-9 && Math.abs(Math.abs(parent.position.x) - 0.1) < 1e-9) (g instanceof CapsuleGeometry ? out.limbs : out.feet).push(m);
-    else if (parent && Math.abs(Math.abs(parent.position.x) - 0.24) < 1e-9) out.limbs.push(m);
-    else if (g instanceof CapsuleGeometry && Math.abs(g.parameters.radius - 0.21) < 1e-9) out.body.push(m);
-    else if (isHead(o)) out.body.push(m);
+    const part = partOf(m);
+    // the mitten (r 0.066) and the toe box (r 0.1, 18 segments; its sole under it is a limb's)
+    if (part === 'armL' || part === 'armR') (g instanceof SphereGeometry && Math.abs(g.parameters.radius - 0.066) < 1e-9 ? out.hands : out.limbs).push(m);
+    else if (part === 'legL' || part === 'legR') (g instanceof SphereGeometry && Math.abs(g.parameters.radius - 0.1) < 1e-9 && g.parameters.widthSegments === 18 ? out.feet : out.limbs).push(m);
+    else if (part === 'body' || part === 'head') out.body.push(m);
   });
   return out;
-}
-
-/** a mesh in the head's group (render/bim.ts: the body's child at HEAD_Y) */
-function isHead(o: Object3D): boolean {
-  for (let p = o.parent; p; p = p.parent) if (Math.abs(p.position.y - 0.93) < 1e-9 && p.parent && p.parent.parent) return true;
-  return false;
 }
 
 function shown(m: Object3D): boolean {
@@ -218,7 +216,7 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
       if (gold) holds.push(gold);
       // the bells (a hand rings one: a hold of its own)
       for (const r of routes(gym)) { const b = bellAt(r); if (b) holds.push({ p: b.at, n: r.n, r: 0.075, colour: 0 }); }
-      const bim = makeBim('climber', false, STYLE);
+      const bim = makeBim('climber', false, STYLE, undefined, undefined, false);
       const parts = partsOf(bim.group);
       expect(parts.hands.length).toBe(2);
       expect(parts.feet.length).toBe(2);

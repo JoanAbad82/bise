@@ -23,13 +23,14 @@ export const NAP_DZ: Readonly<Record<NapShape, number>> = { flat: 0.2, sink: 0.1
 /**
  * The flat lie (pose.ts lying): on its back, its head a little up on a pillow and tilted to the
  * room, legs down to the bed. Its pivot is LIFT over the surface: its back's and its heels' lowest
- * points are on it (bim.ts's hoodie, feet: render/nap.test.ts measures them).
+ * points are on it (bim.ts's torso, soles: render/nap.test.ts measures them). 0.161: the clay torso
+ * of page bims-look D is 0.94 as deep as the old hoodie's.
  */
 export const FLAT = {
   body: -1.45,
   head: 0.5,
   legs: 0.3,
-  lift: 0.169,
+  lift: 0.161,
   /** where the ray looks, from the hips (z ahead): the back's lowest point, the heels' */
   back: -0.39,
   heels: -0.035,

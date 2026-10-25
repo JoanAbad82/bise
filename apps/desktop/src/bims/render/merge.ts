@@ -16,6 +16,8 @@ function bakeable(m: Material): m is MeshStandardMaterial | MeshLambertMaterial 
   if (!(m instanceof MeshStandardMaterial || m instanceof MeshLambertMaterial)) return false;
   if (m.userData.live === true) return false;
   if (m.transparent || m.map !== null) return false;
+  // a bim's warmth (claylight.ts) is no glow: it bakes as a matte one
+  if (m.userData.warm === true) return true;
   return m.emissiveIntensity === 0 || (m.emissive.r === 0 && m.emissive.g === 0 && m.emissive.b === 0);
 }
 
@@ -45,15 +47,19 @@ function painted(g: BufferGeometry, r: number, gg: number, b: number): BufferGeo
   return g;
 }
 
-/** a geometry's own vertex colours times a colour (rgb, whatever its colour's item size was) */
-function tinted(g: BufferGeometry, r: number, gg: number, b: number): BufferGeometry {
+/**
+ * a geometry's own vertex colours times a colour (rgb, whatever its colour's item size was), then
+ * toward another by k (a stopped bim's grey: claylight.ts partsMaterial's userData.toward)
+ */
+function tinted(g: BufferGeometry, r: number, gg: number, b: number, toward: readonly number[] = [0, 0, 0, 0]): BufferGeometry {
   const src = g.getAttribute('color');
   const n = g.getAttribute('position').count;
   const c = new Float32Array(n * 3);
+  const [tr = 0, tg = 0, tb = 0, k = 0] = toward;
   for (let i = 0; i < n; i++) {
-    c[i * 3] = src.getX(i) * r;
-    c[i * 3 + 1] = src.getY(i) * gg;
-    c[i * 3 + 2] = src.getZ(i) * b;
+    c[i * 3] = src.getX(i) * r * (1 - k) + tr * k;
+    c[i * 3 + 1] = src.getY(i) * gg * (1 - k) + tg * k;
+    c[i * 3 + 2] = src.getZ(i) * b * (1 - k) + tb * k;
   }
   g.setAttribute('color', new BufferAttribute(c, 3));
   return g;
@@ -97,7 +103,7 @@ export function mergeRoot(root: Object3D, style: Style, shadows: boolean): Merge
       // keeps them, tinted by its material; painted one colour, the town's merge of the office turned
       // the cozy plants and pots white (bims m_32697)
       const own = m.vertexColors && geo.hasAttribute('color');
-      plain.push(own ? tinted(prepared(geo, obj.matrixWorld, false, true), m.color.r, m.color.g, m.color.b) : painted(prepared(geo, obj.matrixWorld, false), m.color.r, m.color.g, m.color.b));
+      plain.push(own ? tinted(prepared(geo, obj.matrixWorld, false, true), m.color.r, m.color.g, m.color.b, m.userData.toward as number[] | undefined) : painted(prepared(geo, obj.matrixWorld, false), m.color.r, m.color.g, m.color.b));
       return;
     }
     const uv = 'map' in m && m.map !== null && m.map !== undefined;
@@ -135,4 +141,49 @@ export function mergeRoot(root: Object3D, style: Style, shadows: boolean): Merge
       baked?.dispose();
     },
   };
+}
+
+/** one bim part's static meshes baked (bim.ts): the matte ones into one vertex-coloured geometry, the glows one geometry per material */
+export interface BakedPart {
+  readonly colours: BufferGeometry | null;
+  readonly glows: ReadonlyMap<Material, BufferGeometry>;
+}
+
+/**
+ * The meshes `meshes` (under `part`, their matrices as they are now) in the part's own frame: the
+ * bakeable ones (matte, opaque, no texture) painted their material's colour and merged into one
+ * geometry, the others merged per material. `keep` leaves some out (a far level of detail drops
+ * the meshes tagged userData.near). The sources are left as they are: the caller removes them.
+ */
+export function bakePart(part: Object3D, meshes: readonly Mesh[], keep: (m: Mesh) => boolean = () => true): BakedPart {
+  part.updateMatrixWorld(true);
+  const into = part.matrixWorld.clone().invert();
+  const plain: BufferGeometry[] = [];
+  const byMat = new Map<Material, BufferGeometry[]>();
+  for (const mesh of meshes) {
+    if (!keep(mesh)) continue;
+    const m = mesh.material;
+    if (Array.isArray(m)) continue;
+    const at = into.clone().multiply(mesh.matrixWorld);
+    if (bakeable(m)) plain.push(painted(prepared(mesh.geometry, at, false), m.color.r, m.color.g, m.color.b));
+    else {
+      const list = byMat.get(m) ?? [];
+      list.push(prepared(mesh.geometry, at, false));
+      byMat.set(m, list);
+    }
+  }
+  const join = (geos: BufferGeometry[]): BufferGeometry | null => {
+    if (geos.length === 0) return null;
+    if (geos.length === 1) return geos[0] ?? null;
+    // three's merge gives null for geometries it can't join (prepared() makes them alike)
+    const g: BufferGeometry | null = mergeGeometries(geos, false);
+    for (const x of geos) x.dispose();
+    return g;
+  };
+  const glows = new Map<Material, BufferGeometry>();
+  for (const [m, geos] of byMat) {
+    const g = join(geos);
+    if (g) glows.set(m, g);
+  }
+  return { colours: join(plain), glows };
 }

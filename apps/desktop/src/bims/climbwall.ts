@@ -232,36 +232,27 @@ export function routes(g: Gym): readonly Route[] {
 /** the bim's joints and parts in its body's frame (render/bim.ts makeBim), +z its face, +x its right */
 export const SKEL = {
   shoulder: { x: 0.24, y: 0.66 },
-  /** the hand ball's centre down the arm, its radius */
-  arm: 0.3,
-  hand: 0.065,
+  /** the mitten's centre down the arm, its farthest reach from it (a 0.066 ball stretched 1.05 along the arm) */
+  arm: 0.305,
+  hand: 0.0693,
   hip: { x: 0.1, y: 0.3 },
-  /** the shoe's centre in the leg's frame and its half sizes, as drawn: style.ts roundBox(0.15, 0.08, 0.24)
-   * with r 0.0176 grows its outline by 0.4 r and sinks its sole by r / 4 */
-  foot: { y: -0.2744, z: 0.04, hx: 0.0821, hy: 0.04, hz: 0.1271 },
-  /** what must clear the wall: the hoodie's two ends, the legs' tops (spheres in the body's frame) */
+  /** the sneaker in the leg's frame, as drawn (the clay look, page bims-look D): its toe box (a 0.1 ball
+   * scaled 0.82, 0.48, 1.3 at y -0.262) over its sole (scaled 0.78, 0.2, 1.24 at y -0.296), as one box */
+  foot: { y: -0.265, z: 0.05, hx: 0.082, hy: 0.051, hz: 0.13 },
+  /** what must clear the wall: the torso's two ends (its drawstrings at the top), the legs' tops (spheres in the body's frame) */
   body: [
-    { x: 0, y: 0.39, z: 0, r: 0.21 },
-    { x: 0, y: 0.61, z: 0, r: 0.21 },
-    { x: 0, y: 0.18, z: 0.1, r: 0.075 },
+    { x: 0, y: 0.405, z: 0, r: 0.225 },
+    { x: 0, y: 0.575, z: 0, r: 0.245 },
+    { x: 0, y: 0.18, z: 0.1, r: 0.088 },
   ],
-  /** the head's pivot, and its parts round it: the ball, the widest hair or hat, a cap's peak */
-  headY: 0.93,
+  /** the head's pivot (laptop.ts HEAD_Y), and its parts round it: the ball with the face set in it, the widest hair or hat, a cap's peak (the hats at HAT_K) */
+  headY: 0.95,
   head: [
-    { x: 0, y: 0, z: 0, r: 0.225 },
-    { x: 0, y: 0.1, z: -0.05, r: 0.29 },
-    { x: -0.08, y: 0.07, z: 0.28, r: 0.04 },
-    { x: 0, y: 0.07, z: 0.28, r: 0.04 },
-    { x: 0.08, y: 0.07, z: 0.28, r: 0.04 },
-    // the face's flat pieces (eyes, cheeks, mouth): their outer corners
-    { x: -0.165, y: -0.03, z: 0.215, r: 0.012 },
-    { x: 0.165, y: -0.03, z: 0.215, r: 0.012 },
-    { x: -0.165, y: -0.07, z: 0.215, r: 0.012 },
-    { x: 0.165, y: -0.07, z: 0.215, r: 0.012 },
-    { x: -0.11, y: 0.07, z: 0.215, r: 0.012 },
-    { x: 0.11, y: 0.07, z: 0.215, r: 0.012 },
-    { x: -0.11, y: -0.01, z: 0.215, r: 0.012 },
-    { x: 0.11, y: -0.01, z: 0.215, r: 0.012 },
+    { x: 0, y: 0, z: 0, r: 0.255 },
+    { x: 0, y: 0.111, z: -0.056, r: 0.323 },
+    { x: -0.089, y: 0.078, z: 0.312, r: 0.045 },
+    { x: 0, y: 0.078, z: 0.312, r: 0.045 },
+    { x: 0.089, y: 0.078, z: 0.312, r: 0.045 },
   ],
 } as const;
 
@@ -410,8 +401,13 @@ export function footCorners(f: Frame, side: 1 | -1, pitch: number): V3[] {
   return out;
 }
 
-/** a limb's gap to the surface when it touches: the hand's ball, the shoe's nearest corner */
-export const TOUCH = { hand: 0.003, foot: 0.004 } as const;
+/**
+ * a limb's gap to the surface when it touches: the hand's ball, the shoe box's nearest corner. The
+ * clay sneaker (page bims-look D) is a squashed ball inside that box: its corners stand off the ball
+ * by about 2 cm, so the box's corner goes 3 mm past the surface and the toe itself touches within
+ * 2 cm, never in it (render/climb.test.ts)
+ */
+export const TOUCH = { hand: 0.003, foot: -0.003 } as const;
 
 /** a hand reaching: the in-plane way (from its shoulder: 0 out to its side, π/2 straight up) */
 export function reachHand(r: Route, f: Frame, side: 1 | -1, phi: number): { rot: ArmRot; at: V3 } | null {

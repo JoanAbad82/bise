@@ -3,7 +3,8 @@
 // /Applications, and writes site/bims/: one WebP sheet per gag (<id>.webp, its frames side by
 // side), one idle sheet (<id>-idle.webp: its last pose and its blink) and sheets.json, what
 // site/bims-gags.ts reads (frame size, anchor, order, hit box). Each sheet's quality steps down
-// until it weighs SHEET_MAX at most; the run fails past the budgets.
+// until it weighs SHEET_MAX at most, then the heaviest ones a step down while all of them pass
+// ALL_MAX; the run fails past the budgets.
 //   pnpm sprites:home              write site/bims/
 //   pnpm sprites:home --look <dir> also write each strip as a PNG there, to look at it
 // Owner: bims-home.
@@ -53,25 +54,38 @@ try {
   mkdirSync(out, { recursive: true });
   if (look) mkdirSync(look, { recursive: true });
   const bytes = (url: string): Buffer => Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+  const render = async (id: string, qi: number): Promise<{ meta: object; gag: Buffer; idle: Buffer; qi: number }> => {
+    const q = QUALITIES[qi] ?? 0.5;
+    const r = await page.evaluate(([i, a, b]) => (globalThis as unknown as Studio).studio.render(i, a, b), [id, q, IDLE_Q] as const);
+    return { meta: r.meta, gag: bytes(r.gag), idle: bytes(r.idle), qi };
+  };
+  const got = new Map<string, { meta: object; gag: Buffer; idle: Buffer; qi: number }>();
+  for (const id of ids) {
+    // each sheet's quality steps down until it weighs SHEET_MAX at most
+    let g = await render(id, 0);
+    while (g.gag.length > SHEET_MAX && g.qi < QUALITIES.length - 1) g = await render(id, g.qi + 1);
+    if (g.gag.length > SHEET_MAX) throw new Error(`${id}: ${(g.gag.length / KB).toFixed(1)} KB at quality ${String(QUALITIES[g.qi])}, past ${String(SHEET_MAX / KB)} KB`);
+    got.set(id, g);
+  }
+  const sum = (): number => [...got.values()].reduce((n, g) => n + g.gag.length + g.idle.length, 0);
+  // then the heaviest sheet a step down while all of them pass ALL_MAX (the clay bims of page bims-look D weigh more)
+  while (sum() > ALL_MAX) {
+    const heavy = [...got.entries()].filter(([, g]) => g.qi < QUALITIES.length - 1).sort((a, b) => b[1].gag.length - a[1].gag.length)[0];
+    if (!heavy) break;
+    got.set(heavy[0], await render(heavy[0], heavy[1].qi + 1));
+  }
   const metas: object[] = [];
-  let total = 0;
   const lines: string[] = [];
   for (const id of ids) {
-    let got: { meta: object; gag: Buffer; idle: Buffer; q: number } | null = null;
-    for (const q of QUALITIES) {
-      const r = await page.evaluate(([i, a, b]) => (globalThis as unknown as Studio).studio.render(i, a, b), [id, q, IDLE_Q] as const);
-      got = { meta: r.meta, gag: bytes(r.gag), idle: bytes(r.idle), q };
-      if (got.gag.length <= SHEET_MAX) break;
-    }
-    if (!got) throw new Error(`${id}: nothing drawn`);
-    if (got.gag.length > SHEET_MAX) throw new Error(`${id}: ${(got.gag.length / KB).toFixed(1)} KB at quality ${String(got.q)}, past ${String(SHEET_MAX / KB)} KB`);
-    writeFileSync(resolve(out, `${id}.webp`), got.gag);
-    writeFileSync(resolve(out, `${id}-idle.webp`), got.idle);
-    metas.push(got.meta);
-    total += got.gag.length + got.idle.length;
-    lines.push(`${id.padEnd(11)} ${(got.gag.length / KB).toFixed(1).padStart(5)} KB (q ${got.q.toFixed(2)}) + idle ${(got.idle.length / KB).toFixed(1)} KB`);
+    const g = got.get(id);
+    if (!g) throw new Error(`${id}: nothing drawn`);
+    writeFileSync(resolve(out, `${id}.webp`), g.gag);
+    writeFileSync(resolve(out, `${id}-idle.webp`), g.idle);
+    metas.push(g.meta);
+    lines.push(`${id.padEnd(11)} ${(g.gag.length / KB).toFixed(1).padStart(5)} KB (q ${(QUALITIES[g.qi] ?? 0).toFixed(2)}) + idle ${(g.idle.length / KB).toFixed(1)} KB`);
     if (look) writeFileSync(resolve(look, `${id}.png`), bytes(await page.evaluate((i) => (globalThis as unknown as Studio).studio.png(i), id)));
   }
+  const total = sum();
   if (errors.length > 0) throw new Error(`the studio page failed: ${errors.join('; ')}`);
   writeFileSync(resolve(out, 'sheets.json'), `${JSON.stringify(metas)}\n`);
   console.log(lines.join('\n'));

@@ -8,7 +8,7 @@
 import { Color, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, Vector3, type ColorRepresentation, type Object3D } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, Motion, Office, Pt } from '../model';
-import { makeBim, type Bim } from './bim';
+import { makeBim, nearAt, type Bim } from './bim';
 import { pillOf } from '../labels';
 import { siteOf, type Fit, type V3 } from './camera';
 import { cameraStart, viewPoint, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
@@ -537,8 +537,13 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       let motion: Motion = 'still';
       const seen = new Set<string>();
       rigs.clear();
+      // the bims' small details only when they are big enough on screen (bim.ts nearAt); their clay's warmth by day (claylight.ts)
+      const near = nearAt(fit.scale);
+      const day = 1 - (lamps ?? (world.pal.pendants ? 1 : 0));
       for (const f of frames) {
         const b = ensureBim(f.name, f.main);
+        b.detail(near);
+        b.daylight(day);
         // his easter egg on top of its pose (eggs.ts picks it, egg.ts plays it)
         // a skater in the park (skate.ts): its line's pose once it is there; on the way, the walk's
         const park = office.park;

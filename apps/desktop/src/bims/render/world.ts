@@ -141,7 +141,8 @@ const LAMP_ON_EI_LIT = 1.1;
 /** every mesh under `root` casts and takes the sun's shadow (a style with shadows: clay) */
 export function castShadows(root: Object3D): void {
   root.traverse((obj) => {
-    if (obj instanceof Mesh) {
+    // a bim's eyes and mouths are too small to cast one (bim.ts)
+    if (obj instanceof Mesh && obj.userData.noShadow !== true) {
       obj.castShadow = true;
       obj.receiveShadow = true;
     }

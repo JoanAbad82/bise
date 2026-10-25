@@ -21,8 +21,12 @@ const TEAL = '#2a9d8f';
 const VIOLET = '#9b8fe0';
 const ORANGE = '#f39a4c';
 
-/** a shade's place along the pod (over each desk pair), its height */
-const SHADES = [-1.8, 0, 1.8] as const;
+/**
+ * a shade's place along the pod (over each desk pair), its height; 4 cm to the right of the pairs'
+ * middles: the clay bims' bigger heads (page bims-look D) standing at a desk's right side met the
+ * shade nearer the camera by 0.2 px at 320 (shade.test.ts)
+ */
+const SHADES = [-1.76, 0.04, 1.84] as const;
 const SHADE_Y = 2.06;
 
 const tag = <T extends Object3D>(o: T, i: number): T => {
