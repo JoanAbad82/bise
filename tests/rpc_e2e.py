@@ -11,6 +11,7 @@ Run: python3 -u tests/rpc_e2e.py (after scripts/bins.sh)
 """
 import json
 import os
+import re
 import socket
 import sys
 import threading
@@ -21,6 +22,16 @@ import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
 PROTO = 1
+COMMANDS_RS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "rust/proto/src/commands.rs")
+
+
+def catalog_commands():
+    """[(name, client)] of the slash commands as their owner lists them
+    (bise_proto::commands: COMMANDS, then DEBUG, both before its tests)."""
+    src = open(COMMANDS_RS, encoding="utf-8").read().split("#[cfg(test)]")[0]
+    return [(n, c == "true") for n, c in re.findall(r'\bname: "(/[^"]+)",.*?\bclient: (true|false)', src, re.S)]
+
+
 NOT_INITIALIZED, METHOD_NOT_FOUND, INVALID_PARAMS, HUB_REFUSED = -32002, -32601, -32602, -32011
 
 
@@ -129,12 +140,12 @@ def main():
         check(gone["error"]["code"] == HUB_REFUSED and "nobody" in gone["error"]["message"], "no such agent: %r" % gone)
 
         cmds = r.call("commands/list")["result"]["commands"]
-        # the 38 of the catalog (/pause, /resume, /usage: cost-pause;
-        # /processes: running-procs, a client screen), then /debug (a client
-        # screen, debug-cmd)
-        check(len(cmds) == 39 and any(c["name"] == "/new" and not c["client"] for c in cmds)
-              and any(c["name"] == "/processes" and c["client"] for c in cmds)
-              and cmds[-1]["name"] == "/debug" and cmds[-1]["client"], "commands/list: %d" % len(cmds))
+        # the catalog as its owner holds it (bise_proto::commands: COMMANDS,
+        # then /debug), each name in order with who runs it; no count pinned
+        got = [(c["name"], c["client"]) for c in cmds]
+        want = catalog_commands()
+        check(got == want and ("/new", False) in got and ("/processes", True) in got and got[-1] == ("/debug", True),
+              "commands/list, not the catalog: extra %r, missing %r" % ([c for c in got if c not in want], [c for c in want if c not in got]))
         helped = r.call("command/run", {"project": project, "agent": "main", "line": "/help"})["result"]
         check(helped.get("notice"), "command/run /help: %r" % helped)
         read = r.call("hub/read")["result"]

@@ -27,6 +27,7 @@ python3 -u tests/tui_mcp_login_tmux.py
 """
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -212,7 +213,8 @@ def login_here():
             sc = t.wait("mcp fake · %s · needs a login · /plugins login" % host)
             shot(t, "plugins-needs-login", sc)
             t.typed("/plugins login ")
-            sc = t.wait_re(r"fake\s+" + w_re("settings.login_needs", host=host))
+            # the row's desc: `<host> · ` and the part's login word
+            sc = t.wait_re(r"fake\s+" + re.escape("%s · %s" % (host, w("settings.plugins_part_needs_login"))))
             shot(t, "popup-needs-login", sc)
             t.keys("Enter")
             sc = t.wait("logged in to fake: 3 tools, your agents have them now.")
@@ -221,7 +223,7 @@ def login_here():
             html = page(1)
             assert "bise <b>:*</b> is logged in to fake." in html, html
             t.typed("/plugins login ")
-            sc = t.wait_re(r"fake\s+" + w_re("settings.login_in_tools", host=host, n=3))
+            sc = t.wait_re(r"fake\s+" + re.escape("%s · logged in · 3 tools" % host))
             shot(t, "popup-logged-in", sc)
             t.keys("Escape")
             t.keys("C-u")
