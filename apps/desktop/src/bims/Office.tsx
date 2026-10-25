@@ -870,6 +870,7 @@ export function Office({
             role={onOpenPlugin === undefined ? undefined : 'button'}
             data-pill={p.pill === '?' ? 'asks' : 'failed'}
             data-testid={`app.right.bims.objpill.${p.key}`}
+            {...tipAttrs(p.tip)}
             style={{ left: `${String(p.x)}px`, top: `${String(p.y)}px` }}
             onClick={(e) => {
               e.stopPropagation();

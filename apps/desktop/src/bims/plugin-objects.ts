@@ -20,6 +20,8 @@ export type PluginRow = Pick<Plugin, 'name' | 'state'> & {
   readonly id?: string | null;
   readonly kind?: string | null;
   readonly login?: string | null;
+  /** its name as he reads it ('Gmail'); empty or absent: its name */
+  readonly title?: string | null;
   readonly parts?: readonly { readonly kind: string; readonly on: boolean; readonly login?: string | null; readonly error?: string | null }[] | null;
 };
 
@@ -41,6 +43,8 @@ export interface PluginObject {
   readonly picked: boolean;
   /** the plugin its pill is for when not its own (uniqueObjects: a plugin not drawn whose object this is, its state worse); its click opens that one */
   readonly pillOf?: string;
+  /** the name of the plugin its pill is for, as he reads it (the pill's tip: 'slides failed to start'); absent: no pill */
+  readonly pillName?: string;
 }
 
 /** His picks for one project: plugin key → object. */
@@ -179,14 +183,16 @@ export function objectOf(row: PluginRow, picks: Picks): PluginObject | null {
   const dflt = defaultObject(row);
   // his pick keeps the default's count only when it is the same object (the plant's pot, the shelf's books)
   const n = pick === undefined || pick === dflt.obj ? dflt.n : undefined;
+  const pill = broken ? '✗' : owesLogin(row) ? '?' : null;
   return {
     key,
     obj: pick ?? dflt.obj,
     ...(n === undefined ? {} : { n }),
     // broken is not off (designer m_41417): a broken plugin's object stays lit, its '✗' says it failed; glass is for off
     glass: !on && !broken,
-    pill: broken ? '✗' : owesLogin(row) ? '?' : null,
+    pill,
     picked: pick !== undefined,
+    ...(pill === null ? {} : { pillName: row.title !== undefined && row.title !== null && row.title !== '' ? row.title : row.name }),
   };
 }
 
@@ -248,11 +254,11 @@ export function uniqueObjects(objs: readonly PluginObject[]): readonly PluginObj
       // not drawn: its object carries the worst state of the plugins it stands for (designer m_43133)
       const at = out.findIndex((h) => unitOf(h) === unitOf(o));
       const h = out[at];
-      if (h !== undefined && worse(h.pill, o.pill)) out[at] = { ...h, pill: o.pill, pillOf: o.key };
+      if (h !== undefined && worse(h.pill, o.pill)) out[at] = { ...h, pill: o.pill, pillOf: o.key, ...(o.pillName === undefined ? {} : { pillName: o.pillName }) };
       continue;
     }
     taken.add(kin);
-    out.push({ key: o.key, obj: kin, glass: o.glass, pill: o.pill, picked: o.picked });
+    out.push({ key: o.key, obj: kin, glass: o.glass, pill: o.pill, picked: o.picked, ...(o.pillName === undefined ? {} : { pillName: o.pillName }) });
   }
   return out.sort(byKey);
 }

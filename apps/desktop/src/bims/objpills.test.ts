@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { layoutOf } from './maps';
 import { objectSpots } from './corners';
 import { crewOf, objsOf } from './corners.test';
+import { settings } from '@/proto/words.gen';
 import { objPillsOf } from './objpills';
 
 describe("the objects' pills", () => {
@@ -18,7 +19,7 @@ describe("the objects' pills", () => {
     });
     const want = placed.filter((p) => p.pill !== null);
     expect(want.length).toBeGreaterThan(0);
-    expect(pills).toEqual(want.map((p) => ({ key: p.key, pill: p.pill, x: Math.round(p.key.length * 10.4), y: 8 })));
+    expect(pills).toEqual(want.map((p) => ({ key: p.key, pill: p.pill, tip: p.pill === '✗' ? settings.plugins_waits_error({ name: p.key }) : settings.plugins_waits_login({ name: p.key }), x: Math.round(p.key.length * 10.4), y: 8 })));
     expect(asked).toEqual(want.map((p) => p.key));
   });
 
@@ -26,11 +27,13 @@ describe("the objects' pills", () => {
     const p = placed[0];
     if (p === undefined) throw new Error('no object placed');
     const asked: string[] = [];
-    const pills = objPillsOf([{ ...p, pill: '✗', pillOf: 'slides' }], (key) => {
+    const pills = objPillsOf([{ ...p, pill: '✗', pillOf: 'slides', pillName: 'Slides' }], (key) => {
       asked.push(key);
       return { x: 1, y: 2 };
     });
-    expect(pills).toEqual([{ key: 'slides', pill: '✗', x: 1, y: 2 }]);
+    // its tip names that plugin and its state (designer m_43241)
+    expect(pills).toEqual([{ key: 'slides', pill: '✗', tip: 'Slides failed to start', x: 1, y: 2 }]);
+    expect(objPillsOf([{ ...p, pill: '?', pillName: 'Gmail' }], () => ({ x: 0, y: 0 }))[0]?.tip).toBe('Gmail needs a login');
     expect(asked).toEqual([p.key]);
   });
 
