@@ -47,7 +47,10 @@ export function breaksOf(o: Office, c: Corners): string[] {
     });
     // a grown office (extensions.ts): the wing is room, the garden terrace
     const floors = p.corner === 'terrace' ? [terraceSlab(o)] : p.corner === 'garden' ? (o.garden ? [o.garden] : []) : [room, ...(o.wing ? [o.wing] : [])];
-    if (!floors.some((f) => inside(p.box, f))) out.push(`${at}: off its ${p.corner === 'terrace' ? 'terrace' : 'room'}`);
+    // the room and its wing are one floor (an L): a thing may stand across where they meet, never past the wing's front
+    const w = o.wing;
+    const acrossWing = w !== undefined && p.corner !== 'terrace' && p.corner !== 'garden' && inside(p.box, { x0: room.x0, x1: w.x1, z0: 0, z1: w.z1 });
+    if (!acrossWing && !floors.some((f) => inside(p.box, f))) out.push(`${at}: off its ${p.corner === 'terrace' ? 'terrace' : 'room'}`);
     // only its own corner, or the other one a travel thing may take (the door or the terrace), or its swap's own (the ping-pong's babyfoot by the nap place)
     // a grown office's garden takes the terrace's things and the travel ones (extensions.ts, designer m_41450)
     const out_ = p.corner === 'garden' && (CORNER[p.of] === 'terrace' || ['mailbox', 'scooter', 'bike'].includes(p.of));

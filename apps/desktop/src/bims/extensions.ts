@@ -12,7 +12,7 @@ export { wingLamp, wingWindow } from './wing';
 import type { Box, Leg, Office, Pt } from './model';
 import type { MapId } from './maps/ids';
 import type { PluginObject } from './plugin-objects';
-import { terraceSlab } from './render/decor';
+import { decorOf, terraceSlab } from './render/decor';
 
 /** the maps that grow like his sketch so far (each map's look of them comes in its own step); the others wait, their objects in `left` */
 export const GROWS: ReadonlySet<MapId> = new Set<MapId>(['loft']);
@@ -79,23 +79,70 @@ export function gardenOf(o: Office): Box {
   return { x0: o.x0, x1, z0: t.z1, z1: t.z1 + size(o.D) };
 }
 
-/** the network's walk out of the square into the wing: from main's desk along its line, then along the wing's open front (its back wall's floor stays for things) */
-function wingLegs(o: Office, w: Box): Leg[] {
-  const from: Pt = { x: o.mainDesk.x, z: o.mainDesk.z };
-  const z = w.z1 - WING_IN;
-  const a: Pt = { x: w.x0 + WING_IN, z: from.z };
-  const b: Pt = { x: w.x0 + WING_IN, z };
-  const c: Pt = { x: w.x1 - WING_END, z };
-  return [[from, a], [a, b], [b, c]];
+/** how far a new walk keeps off furniture and cozy pieces */
+const CLEAR = 0.3;
+
+/** what a new walk keeps off: the plan's furniture, the cozy pieces, the terrace's decor */
+function solidsOf(o: Office): Box[] {
+  const c = o.cozy;
+  const dec = decorOf(o);
+  const decor = [dec.parasol, dec.palm, dec.ramp].map((f) => ({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd }));
+  return [...o.furniture, ...(c ? [c.coffee, c.shelf, ...c.lamps, ...c.plants].map((i) => i.box) : []), ...decor];
 }
 
-/** the stone path: from the door straight out over the terrace to the garden, then along its back */
-function gardenLegs(o: Office, g: Box): Leg[] {
+/** a straight leg (along x or z) clear of every solid by CLEAR */
+function clearLeg(l: Leg, solids: readonly Box[]): boolean {
+  const [a, b] = l;
+  const box = { x0: Math.min(a.x, b.x) - CLEAR, x1: Math.max(a.x, b.x) + CLEAR, z0: Math.min(a.z, b.z) - CLEAR, z1: Math.max(a.z, b.z) + CLEAR };
+  return !solids.some((f) => box.x0 < f.x1 && box.x1 > f.x0 && box.z0 < f.z1 && box.z1 > f.z0);
+}
+
+/**
+ * The network's walk out of the square into the wing: from the walk's point nearest the wing whose
+ * straight way across is clear (main's desk when none is), into the wing, then along its open front
+ * (its back wall's floor stays for things).
+ */
+function wingLegs(o: Office, w: Box): Leg[] {
+  const solids = solidsOf(o);
+  const x = w.x0 + WING_IN;
+  const z = w.z1 - WING_IN;
+  const tail = (from: Pt): Leg[] => {
+    const a: Pt = { x, z: from.z };
+    const b: Pt = { x, z };
+    return [[from, a], [a, b], [b, { x: w.x1 - WING_END, z }]];
+  };
+  const ends = o.walks.flatMap(([a, b]) => [a, b]).filter((p) => p.x < w.x0 && p.z >= 0.5 && p.z <= z);
+  ends.sort((p, q) => w.x0 - p.x - (w.x0 - q.x) || p.z - q.z);
+  for (const p of ends) {
+    const legs = tail(p);
+    if (legs.every((l) => l[0].x === l[1].x && l[0].z === l[1].z ? true : clearLeg(l, solids))) return legs;
+  }
+  return tail({ x: o.mainDesk.x, z: o.mainDesk.z });
+}
+
+/**
+ * The stone path (render/extensions.ts lays its stones on it): from the door along the front wall
+ * to a lane clear of the terrace's pieces, straight out to the garden, then along its back. Pure.
+ */
+export function gardenPath(o: Office, g: Box): Pt[] {
+  const solids = solidsOf(o);
   const from: Pt = { x: o.door.x, z: o.door.z };
   const z = g.z0 + PATH_IN;
-  const a: Pt = { x: o.door.x, z };
-  const b: Pt = { x: g.x0 + WING_END, z };
-  return [[from, a], [a, b]];
+  const end: Pt = { x: g.x0 + WING_END, z };
+  const lanes: number[] = [];
+  for (let d = 0; d <= g.x1 - g.x0; d += 0.25) for (const x of d === 0 ? [o.door.x] : [o.door.x - d, o.door.x + d]) if (x >= g.x0 + WING_END && x <= g.x1 - 0.5) lanes.push(x);
+  for (const x of lanes) {
+    const pts: Pt[] = x === from.x ? [from, { x, z }, end] : [from, { x, z: from.z }, { x, z }, end];
+    const legs = pts.slice(1).map((p, i): Leg => [pts[i] as Pt, p]);
+    // the last leg runs along the garden's back: the terrace's pieces stand before it
+    if (legs.slice(0, -1).every((l) => clearLeg(l, solids))) return pts;
+  }
+  return [from, { x: o.door.x, z }, end];
+}
+
+function gardenLegs(o: Office, g: Box): Leg[] {
+  const pts = gardenPath(o, g);
+  return pts.slice(1).map((p, i): Leg => [pts[i] as Pt, p]);
 }
 
 /** The office grown by what it needs: its wing and garden, and their walks on the network. The same office and need give the same one. Pure. */

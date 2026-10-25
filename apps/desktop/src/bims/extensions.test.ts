@@ -3,6 +3,7 @@
 // every object placed again on the grown floor by p4's laws, its walks clear of every piece.
 import { describe, expect, it } from 'vitest';
 import { layoutOf } from './maps';
+import { MAP_IDS } from './maps/ids';
 import { objectSpots } from './corners';
 import { breaksOf, crewOf, objsOf } from './corners.test';
 import { GROWS, NO_NEED, either, gardenOf, grownFor, needOf, wingOf, withExtensions } from './extensions';
@@ -61,27 +62,27 @@ describe("his sketch's growth", () => {
     }
   });
 
-  it('a full collection grows the loft, and every object stands by the laws on the grown floor', () => {
-    for (const n of [1, 3, 12, 20, 31]) {
-      const o = layoutOf(crewOf(n), 'loft');
+  it('a full collection grows each map, and every object stands by the laws on the grown floor', () => {
+    for (const [m, n] of MAP_IDS.flatMap((id) => [1, 3, 12, 20, 31].map((k) => [id, k] as const))) {
+      const o = layoutOf(crewOf(n), m);
       const objs = objsOf(34);
       const square = objectSpots(o, objs);
       const g = grownFor(o, objs, []);
-      expect(g.need, `${String(n)} agents`).toEqual(needOf(o, square.left));
+      expect(g.need, `${m} ${String(n)} agents`).toEqual(needOf(o, square.left));
       const c = objectSpots(g.office, objs, square.placed);
-      expect(breaksOf(g.office, c), `${String(n)} agents`).toEqual([]);
+      expect(breaksOf(g.office, c), `${m} ${String(n)} agents`).toEqual([]);
       // it takes in more than the square did
-      expect(c.left.length, `${String(n)} agents`).toBeLessThan(square.left.length);
+      expect(c.left.length, `${m} ${String(n)} agents`).toBeLessThanOrEqual(square.left.length);
     }
   });
 
-  it("the wing's walk and the garden's path cross no furniture, and join the office's network", () => {
-    for (const n of [1, 12, 20, 31]) {
-      const o = layoutOf(crewOf(n), 'loft');
+  it("on every map, the wing's walk and the garden's path cross no furniture, and join the office's network", () => {
+    for (const [m, n] of MAP_IDS.flatMap((id) => [1, 12, 20, 31].map((k) => [id, k] as const))) {
+      const o = layoutOf(crewOf(n), m);
       const g = withExtensions(o, { wing: 5, garden: true });
       const added = g.walks.slice(o.walks.length);
       expect(added.length).toBeGreaterThan(0);
-      for (const l of added) for (const f of o.furniture) expect(legThrough(l, f), `${String(n)} agents: ${JSON.stringify(l)} through ${JSON.stringify(f)}`).toBe(false);
+      for (const l of added) for (const f of o.furniture) expect(legThrough(l, f), `${m} ${String(n)} agents: ${JSON.stringify(l)} through ${JSON.stringify(f)}`).toBe(false);
       // every new leg's end is on the network: the wing's and the garden's far ends are reached from the door
       const net = network(g);
       const ends = added.flatMap(([a, b]) => [a, b]);

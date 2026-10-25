@@ -3,10 +3,10 @@
 // of the terrace (a hedge along its front, a tree in its far corner, stepping stones on its path from
 // the door). The generic look, every growing map's until its own (a map's style comes as data in its
 // look later). Owner: bims-life.
-import type { Box } from '../model';
 import type { Build } from './maps/look';
 import { WORLD } from './palette';
 import { wingLamp, wingWindow } from '../wing';
+import { gardenPath } from '../extensions';
 
 /** the wing's back wall: the square's (the loft's 1.7) */
 const WALL_H = 1.7;
@@ -53,15 +53,23 @@ export function buildExtensions(b: Build): void {
     k.add(style.box(0.2, 1.0, 0.2, 0.05), k.mat(TRUNK), root, g.x0 + 0.7, 0.5, g.z1 - 1.1);
     k.add(style.ball(0.6), k.mat(LEAF), root, g.x0 + 0.7, 1.45, g.z1 - 1.1);
     // the stone path: from the door, the walks the office added for it (extensions.ts gardenLegs)
-    for (const s of pathStones(o.door, g)) k.add(style.box(0.46, 0.05, 0.36, 0.06), k.mat(STONE), root, s.x, 0.0, s.z);
+    for (const s of pathStones(gardenPath(o, g))) k.add(style.box(0.46, 0.05, 0.36, 0.06), k.mat(STONE), root, s.x, 0.0, s.z);
   }
 }
 
-/** where the path's stones lie: down from the door to the garden, then along its back. Pure. */
-export function pathStones(door: { readonly x: number; readonly z: number }, g: Box): { x: number; z: number }[] {
+/** where the path's stones lie: along the garden's path from the door (extensions.ts gardenPath), every STONE_STEP. Pure. */
+export function pathStones(pts: readonly { readonly x: number; readonly z: number }[]): { x: number; z: number }[] {
   const out: { x: number; z: number }[] = [];
-  const z = g.z0 + 0.6;
-  for (let at = door.z + 0.9; at <= z; at += STONE_STEP) out.push({ x: door.x + (out.length % 2 ? 0.08 : -0.08), z: at });
-  for (let x = door.x - STONE_STEP; x >= g.x0 + 1.0; x -= STONE_STEP) out.push({ x, z: z + (out.length % 2 ? 0.08 : -0.08) });
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1] as { x: number; z: number };
+    const b = pts[i] as { x: number; z: number };
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    // the first stones past the door's step
+    for (let at = i === 1 ? 0.9 : STONE_STEP / 2; at <= len; at += STONE_STEP) {
+      const t = at / len;
+      const side = out.length % 2 ? 0.08 : -0.08;
+      out.push({ x: a.x + (b.x - a.x) * t + (a.z === b.z ? 0 : side), z: a.z + (b.z - a.z) * t + (a.z === b.z ? side : 0) });
+    }
+  }
   return out;
 }
