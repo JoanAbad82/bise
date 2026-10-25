@@ -300,6 +300,14 @@ body:has(.app-shell) {
 .app-s-row.project {
   font-weight: 500;
 }
+/* one tinted row, the place in view (designer m_43568): a project row only folds, so no tint, not
+   even on hover (it stayed on after a click to fold); its folder goes to ink instead */
+.app-s-row.project:hover {
+  background: transparent;
+}
+.app-s-row.project:hover > svg {
+  color: var(--c-text);
+}
 /* the project's inline rename (the menu's Rename): the row's own font, a focus ring as its frame */
 .app-s-rename {
   flex: 1;
@@ -355,6 +363,23 @@ body:has(.app-shell) {
   height: calc(var(--s-2) + var(--s-1) / 2);
   border-radius: 50%;
   border: 1.5px solid var(--c-text-3);
+  /* a 3/4 arc that turns, one turn per 1.2 s (designer m_43568: a full still ring reads 'off');
+     under reduced motion the arc stays, still */
+  border-top-color: transparent;
+  animation: app-s-turn 1.2s linear infinite;
+}
+@keyframes app-s-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-s-ring {
+    animation: none;
+  }
+}
+:root[data-reduce-motion] .app-s-ring {
+  animation: none;
 }
 .app-s-label {
   flex: none;
