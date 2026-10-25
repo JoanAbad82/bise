@@ -52,7 +52,7 @@ describe('office-driver: one office brain', () => {
     d.seedNeed('loft', { wing: 0, garden: false });
     expect(d.step(clock(T + 2), NO_ATTENTION)?.office.wing?.z1).toBe(4);
     // a map that does not grow: none
-    d.rows(snap, crew, 'climb');
+    d.rows(snap, crew, 'california');
     expect(d.step(clock(T + 3), NO_ATTENTION)?.grown).toBeNull();
   });
 
