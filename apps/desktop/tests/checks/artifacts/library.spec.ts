@@ -27,6 +27,8 @@ for (const theme of THEMES) {
       const core = new FakeCore(libraryWorld(theme, NOW) as never);
       const s = await launchDesktop({ core, route: 'artifacts', size });
       const page = s.page;
+      // the window's size: the harness's own is fixed, the viewport is the page's
+      await page.setViewportSize({ width: Number(w), height: Number(size.split('x')[1]) });
       const shot = async (tab: string) => {
         await page.waitForTimeout(250);
         await page.screenshot({ path: test.info().outputPath(`lib-${tab}-${w}-${theme}.png`) });
@@ -41,6 +43,8 @@ for (const theme of THEMES) {
       try {
         await expect(id(page, 'artifacts.hero')).toContainText(library.say);
         await expect(id(page, 'artifacts.tiles')).toBeVisible();
+        // the bims still is in the hero, drawn (from 800 px down the hero is words only: ds pagehero.css)
+        if (Number(w) > 800) expect(await page.locator('[data-testid="artifacts.hero"] img.art-hero-still:visible').evaluate((i) => (i as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
         await shot('home');
 
         if (narrowOf(size)) {
@@ -153,6 +157,7 @@ for (const theme of THEMES) {
     const core = new FakeCore(libraryWorld(theme, NOW, true) as never);
     const s = await launchDesktop({ core, route: 'artifacts', size: '1100x820' });
     try {
+      await s.page.setViewportSize({ width: 1100, height: 820 });
       await expect(s.page.getByTestId('artifacts.empty')).toContainText(library.first_title);
       await s.page.screenshot({ path: test.info().outputPath(`lib-first-run-1100-${theme}.png`) });
     } finally {

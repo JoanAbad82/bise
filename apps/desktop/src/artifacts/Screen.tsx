@@ -320,8 +320,11 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   };
 
 
+  // the place's theme is always open in the column (a folder reached by a link, a tile, the fold)
+  const curTheme = curId === null ? null : (lib.byId.get(curId)?.parent ?? curId);
+  const shownOpen = curTheme === null || open.has(curTheme) ? open : new Set([...open, curTheme]);
   const column = (
-    <FolderColumn lib={lib} counts={counts} at={atNow} open={open} full={full} editing={editing} flash={flash} drop={drop}
+    <FolderColumn lib={lib} counts={counts} at={atNow} open={shownOpen} full={full} editing={editing} flash={flash} drop={drop}
       onGo={(a) => { setQ(''); setAt(a); }} onToggle={(t) => { setOpen(toggled(open, t)); }} onMore={(t) => { setFull(new Set([...full, t])); }}
       onNew={() => { setEditing({ kind: 'new', parent: null }); }} onRename={(id) => { setEditing({ kind: 'rename', id }); }} onEdited={onEdited}
       onMenu={(id, e: MouseEvent) => { setOver({ k: 'folder', id, at: { x: e.clientX, y: e.clientY } }); }} testId="artifacts.col" />
@@ -334,6 +337,8 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       scroller={() => document.querySelector<HTMLElement>('[data-testid="artifacts.scroll"]')} testId={testId} />
   );
   const crumb = crumbOf(lib, atNow);
+  // under 900 px the column folds into the crumb: the place's title opens it (page v7 'à 800 px')
+  const fold = <FoldCrumb label={crumb.length === 0 ? library.all_artifacts : crumb.map((c) => c.name).join(' / ')} testId="artifacts.fold">{column}</FoldCrumb>;
   const current = atNow.at === 'folder' ? lib.byId.get(atNow.id) : undefined;
   const filterRow = (
     <div className="art-filters">
@@ -429,7 +434,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const head = searching || atNow.at === 'all' || stack !== null ? null : (
     <header className="art-head" data-testid="artifacts.head">
       <div className="art-head-t">
-        <span className="t">{atNow.at === 'folder' ? crumb.map((c) => c.name).join(' / ') : crumb[0]?.name}</span>
+        {narrow ? fold : <span className="t">{atNow.at === 'folder' ? crumb.map((c) => c.name).join(' / ') : crumb[0]?.name}</span>}
         {current !== undefined && (
           <span {...tipAttrs(library.tip_folder_more)}>
             <IconButton label={library.tip_folder_more} size="row" onClick={(e) => { setOver({ k: 'folder', id: current.id, at: atOf(e.currentTarget) }); }} testId="artifacts.head.more">···</IconButton>
@@ -446,7 +451,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   );
   const stackHead = stack === null ? null : (
     <header className="art-head" data-testid="artifacts.head">
-      <div className="art-head-t"><span className="t">{[...crumb.map((c) => c.name), stack.title].join(' / ')}</span></div>
+      <div className="art-head-t">{narrow && fold}<span className="t">{narrow ? stack.title : [...crumb.map((c) => c.name), stack.title].join(' / ')}</span></div>
     </header>
   );
 
@@ -455,11 +460,11 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       data-title-path={titlePath(lib, atNow, searching)} onKeyDown={onKeyDown}>
       <div className="art-scroll" data-testid="artifacts.scroll">
         <PageHero name={archivedOn ? 'artifacts · archived' : 'artifacts'} sentence={library.say} facts={libraryFacts(lib, scoped, projectName)}
-          vignette={<picture><source srcSet={heroDark} media="(prefers-color-scheme: dark)" /><img src={heroLight} alt="" /></picture>} testId="artifacts.hero" />
+          vignette={<><img className="art-hero-still light" src={heroLight} alt="" /><img className="art-hero-still dark" src={heroDark} alt="" /></>} testId="artifacts.hero" />
         <div className="art-lib">
           {!narrow && column}
           <div className="art-main">
-            {narrow && <FoldCrumb label={crumb.length === 0 ? library.all_artifacts : crumb.map((c) => c.name).join(' / ')} testId="artifacts.fold">{column}</FoldCrumb>}
+            {narrow && (stackHead ?? head) === null && fold}
             {stackHead ?? head}
             {filterRow}
             <AddDrop place={place_} testId="artifacts.drop">{body}</AddDrop>
