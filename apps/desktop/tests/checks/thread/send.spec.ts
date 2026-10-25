@@ -104,7 +104,7 @@ test('thread/send: cold, his words show at once, every wait is named, main works
           row,
           hold: document.querySelector('[data-testid="thread.route"]') !== null,
           working: document.querySelector('[data-testid="composer.stop"]') !== null,
-          answer: (list?.textContent ?? '').includes(`${nonce} [[slow: 2]] </user_message>`),
+          answer: (list?.textContent ?? '').includes(`ack: hi from qa-flows ${nonce} [[slow: 2]]`),
         };
         out.push(s);
         if (s.working || s.answer || s.t > 15_000) done(out);
@@ -137,11 +137,11 @@ test('thread/send: cold, his words show at once, every wait is named, main works
     expect.soft(worstSending, "ms of a plain 'sending…' (a longer wait must say what it waits for)").toBeLessThanOrEqual(1000);
     expect.soft(workingMs - holdMs, "ms from ⏎ to main working, the shown hold not counted, vs the TUI's + 500").toBeLessThanOrEqual(tuiMs + 500);
     await expect.poll(() => transcriptHas(w, 'bise', 'main', `hi from qa-flows ${n}`), { timeout: 15_000, message: "the home hub's main got his words" }).toBe(true);
-    await expect(page.locator(T.thread), "the model's answer is drawn in the thread").toContainText(`${n} [[slow: 2]] </user_message>`, { timeout: 20_000 });
+    await expect(page.locator(T.thread), "the model's answer is drawn in the thread").toContainText(`ack: ${words}`, { timeout: 20_000 });
     // in the DOM is not on screen (amb-win 35d08ae5): his row and the answer's are shown
     const rows = page.locator(T.thread).locator('[data-testid^="thread.entry."], [data-testid^="thread.pending."]');
     await expectShownSoft(rows.filter({ hasText: `hi from qa-flows ${n}` }).last(), 'his row');
-    await expectShownSoft(rows.filter({ hasText: `${n} [[slow: 2]] </user_message>` }).last(), "the answer's row (the list follows the answer)");
+    await expectShownSoft(rows.filter({ hasText: `ack: ${words}` }).last(), "the answer's row (the list follows the answer)");
     await page.screenshot({ path: test.info().outputPath('answered.png') });
   } finally {
     await s.close();
