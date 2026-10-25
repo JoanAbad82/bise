@@ -16,7 +16,7 @@ import { panel } from '@/proto/words_panel.gen';
 import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
 import { MAX_W, MIN_W, type Tab } from './model';
-import { dropGoneTabs, resetWidth, setWidth, usePanelState, usePanelWidth } from './state';
+import { dropGoneTabs, resetWidth, setWidth, usePanelFit, usePanelState } from './state';
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
@@ -26,7 +26,7 @@ import './panel.css';
 /** The tabbed panel on the window's right (--w-panel 384, from --w-panel-min to --w-panel-max). */
 export function PanelHost() {
   const s = usePanelState();
-  const width = usePanelWidth();
+  const { width, over } = usePanelFit();
   const [dragging, setDragging] = useState(false);
   useDropGone(s.tabs.list);
   const front = s.tabs.list.find((t) => t.id === s.tabs.active);
@@ -37,9 +37,10 @@ export function PanelHost() {
       data-testid="app.panel"
       data-open={s.open || undefined}
       data-drag={dragging || undefined}
+      data-over={over || undefined}
       aria-label={panel.panel_label}
       inert={!s.open}
-      style={{ width: s.open ? width : 0 }}
+      style={{ width: s.open && !over ? width : 0 }}
     >
       {s.open && <Border width={width} onDrag={setDragging} />}
       <div className="pn-col" style={{ width }}>

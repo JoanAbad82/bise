@@ -16,7 +16,7 @@ import { openTab } from './tabs';
 afterEach(cleanup);
 beforeEach(() => {
   panelState.reset();
-  // a wide window: the panel's width is what its tab asks (capW keeps the thread 560 beside the left)
+  // a wide window: the panel's width is what its tab asks (fitW keeps the thread 560 beside the left)
   Object.defineProperty(window, 'innerWidth', { value: 1920, configurable: true });
 });
 const ACME = 'acme-1a2b3c4d';
@@ -101,13 +101,15 @@ describe('the tabbed panel', () => {
     expect(v.getByTestId(`app.panel.tab.commit:${ACME}/abcdef7`)).toBeTruthy();
     expect(v.getByTestId(`app.panel.tab.commit:${ACME}/abcdef7`).getAttribute('aria-selected')).toBe('true');
   });
-  it('every tab has a VoiceOver name and a tip; the strip has its name', () => {
+  it('every tab has a VoiceOver name, a tip only when its title is cut; the strip has its name', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByRole('tablist').getAttribute('aria-label')).toBe('panel tabs');
     const t = v.getByTestId('app.panel.tab.overview');
     expect(t.getAttribute('aria-label')).toBe('Overview');
-    expect(t.getAttribute('data-tip')).toBe('Overview');
+    // its whole title shows: no tip repeating it (ui-review m_42619 #5)
+    fireEvent.pointerEnter(t);
+    expect(t.getAttribute('data-tip')).toBeNull();
     expect(v.getByTestId('app.panel.toggle').getAttribute('data-tip')).toContain('⌥⌘0');
   });
 });

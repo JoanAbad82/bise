@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activate,
-  capW,
+  fitW,
   clampW,
   closable,
   closeIn,
@@ -126,12 +126,13 @@ describe('the tab model: six at most in the bar (HIG), the rest in the overflow 
     expect(shownOf(FIRST).over).toEqual([]);
   });
   it('the row holds as many whole tabs as fit, six at most, one at least: none cut', () => {
-    expect(fitCount(384)).toBe(3);
-    expect(fitCount(640)).toBe(6);
+    expect(fitCount(384)).toBe(2);
+    expect(fitCount(640)).toBe(4);
+    expect(fitCount(900)).toBe(6);
     expect(fitCount(2000)).toBe(6);
     expect(fitCount(100)).toBe(1);
     const t = activate(many, 'overview');
-    expect(shownOf(t, fitCount(384)).shown.map((x) => x.id)).toEqual(['overview', 'artifact:acme/a', 'artifact:acme/b']);
+    expect(shownOf(t, fitCount(384)).shown.map((x) => x.id)).toEqual(['overview', 'artifact:acme/a']);
   });
 });
 
@@ -154,11 +155,16 @@ describe('the panel width (page native-mac §6: 384; mockup 2: 480; mockup 4: 64
     expect(widthOf(art('a'))).toBe('page');
     expect(WIDTHS).toEqual({ rows: 384, shell: 480, page: 640 });
   });
-  it('the thread keeps 560 beside the left: a wide tab caps, never under 320 (ui-review m_42509)', () => {
-    expect(capW(640, 1100, 296)).toBe(320);
-    expect(capW(640, 1440, 296)).toBe(584);
-    expect(capW(640, 1920, 296)).toBe(640);
-    expect(capW(384, 1440, 296)).toBe(384);
+  it('the thread keeps 560 beside the left: a wide tab caps (ui-review m_42509)', () => {
+    expect(fitW(640, 1440, 296)).toEqual({ width: 584, over: false });
+    expect(fitW(640, 1920, 296)).toEqual({ width: 640, over: false });
+    expect(fitW(384, 1440, 296)).toEqual({ width: 384, over: false });
+    expect(fitW(640, 1176, 296)).toEqual({ width: 320, over: false });
+  });
+  it('no room for 320 beside a 560 thread: a sheet over it, never a thread under 560 (ui-review m_42619 #3)', () => {
+    expect(fitW(640, 1100, 296)).toEqual({ width: 640, over: true });
+    expect(fitW(384, 1100, 296)).toEqual({ width: 384, over: true });
+    expect(fitW(640, 800, 296)).toEqual({ width: 504, over: true });
   });
   it('a drag stays from 320 to 640', () => {
     expect(clampW(100)).toBe(MIN_W);

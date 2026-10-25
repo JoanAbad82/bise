@@ -99,6 +99,9 @@ function BarTab({ tab, look, on, dragging, onDragStart, onDropAt, onDragEnd }: {
 }) {
   const menu = useEntityMenu({ kind: 'tab', id: tab.id });
   const [near, setNear] = useState(false);
+  // a tip only when the title is cut, never one that repeats the label he reads (ui-review m_42619 #5)
+  const titleEl = useRef<HTMLSpanElement>(null);
+  const [cut, setCut] = useState(false);
   const pick = () => {
     activateTab(tab.id);
   };
@@ -117,7 +120,11 @@ function BarTab({ tab, look, on, dragging, onDragStart, onDropAt, onDragEnd }: {
       tabIndex={0}
       aria-selected={on}
       aria-label={look.title}
-      {...tipAttrs(look.title)}
+      {...(cut ? tipAttrs(look.title) : {})}
+      onPointerEnter={() => {
+        const el = titleEl.current;
+        setCut(el !== null && el.scrollWidth > el.clientWidth);
+      }}
       data-on={on || undefined}
       data-drag={dragging || undefined}
       data-near={near || undefined}
@@ -145,7 +152,7 @@ function BarTab({ tab, look, on, dragging, onDragStart, onDropAt, onDragEnd }: {
       onDragEnd={onDragEnd}
     >
       {look.icon}
-      <span className="pn-tab-t">{look.title}</span>
+      <span className="pn-tab-t" ref={titleEl}>{look.title}</span>
       {closable(tab.id) && <Press
         look="pn-tab-x"
         aria-label={close}

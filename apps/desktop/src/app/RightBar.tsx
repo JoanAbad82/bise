@@ -18,7 +18,7 @@ import { markTip } from './tipwords';
 import { common } from '@/proto/words_common.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { useAllArtifacts } from '@/artifacts';
-import { useGoArtifact } from '@/artifacts/leave';
+import { leaves } from '@/artifacts/leave';
 import { AddDrop, useAddPlace } from '@/artifacts/Drops';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
@@ -39,6 +39,7 @@ import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots,
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { useMenuOf } from './panel/menu';
+import { openTab } from './panel/tabs';
 import { DoneSign } from './Marks';
 
 /** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre');
@@ -246,7 +247,7 @@ function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; 
         onOpenPr(r);
       }}
     >
-      {head && m.pr !== undefined ? `${m.g} #${String(m.pr)}` : m.g}
+      {head && m.pr !== undefined ? `#${String(m.pr)}` : m.g}
     </span>
   );
 }
@@ -364,7 +365,8 @@ function Row({ r, onOpen, on, onOpenPr, onEnd, icon }: {
           </span>
         </span>
       ) : onEnd !== undefined && r.end !== '' ? (
-        // RUNNING's port: underlined, it opens the address, never the row (designer's running-procs)
+        // RUNNING's port: a plain link with the open icon (never underlined, no '↗' glyph: ui-review
+        // m_42619), it opens the address, never the row (designer's running-procs)
         <span
           className={`app-rb-end app-rb-link ${r.endTone}`}
           role="link"
@@ -374,7 +376,8 @@ function Row({ r, onOpen, on, onOpenPr, onEnd, icon }: {
             onEnd();
           }}
         >
-          {r.end}
+          {r.end.replace(/ ↗$/, '')}
+          {r.end.endsWith(' ↗') && <AppIcon name="open" size={14} />}
         </span>
       ) : (
         <span className={`app-rb-end ${r.endTone}`} {...tipAttrs(r.tips?.end)} data-testid={`${r.testId}.end`}>
@@ -480,10 +483,22 @@ function useAgentTip(project: string, rows: readonly BarRow[], route: ReturnType
   };
 }
 
+/** An artifact row's click: a browser-only one in his browser, else in a panel tab; the route stays. */
+function useArtifactTab(): (project: string, id: string) => void {
+  const store = useStore();
+  return (project, id) => {
+    const a = store.artifacts(project).find((x) => x.id === id);
+    const out = (window as Partial<Window>).bise?.openExternal;
+    if (a !== undefined && leaves(a) && out !== undefined) void out(a.url);
+    else openTab({ kind: 'artifact', project, id });
+  };
+}
+
 export function RightBar({ project, name }: { project: string; name: string }) {
   const router = useRouter();
-  // a browser-only artifact (a PR, a link) opens his browser, the bar stays (leave.ts)
-  const goArtifact = useGoArtifact();
+  // a browser-only artifact (a PR, a link) opens his browser, the bar stays (leave.ts); any other
+  // opens in a tab, the route kept: the bar still names the thread beside (ui-review m_42619 #1)
+  const goArtifact = useArtifactTab();
   const route = useRoute();
   // ⌥ held alone for HINT_HOLD_MS: the agents' rows show ⌥1-⌥9 (designer: '⌥ tenu'; held.ts)
   const alt = useModHeld('Alt');
@@ -609,7 +624,7 @@ export function RightBar({ project, name }: { project: string; name: string }) {
           rows={archived}
           cap={5}
           pageScope={project}
-          summary={archived[0] === undefined ? '' : `${archived[0].glyph} ${archived[0].name}`}
+          summary={archived[0] === undefined ? '' : archived[0].name}
           onAll={() => {
             if (!all) router.go({ screen: 'agents', project, archived: true });
           }}

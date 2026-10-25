@@ -22,6 +22,22 @@
 .pn[data-drag] {
   transition: none;
 }
+/* no room for 320 beside a 560 thread (1100 with a sidebar): a sheet over the thread, from the
+   window's right edge, raised; the thread keeps its width under it (ui-review m_42619 #3) */
+.pn[data-over] {
+  overflow: visible;
+  z-index: 3;
+}
+.pn[data-over] > .pn-col {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--c-solid);
+  box-shadow: var(--e-3);
+}
+.pn[data-over] > .pn-border {
+  left: auto;
+}
 .pn-col {
   box-sizing: border-box;
   height: 100%;
@@ -93,7 +109,7 @@
 .pn-tab {
   box-sizing: border-box;
   flex: 0 1 auto;
-  min-width: calc(var(--s-8) * 2 + var(--s-6));
+  min-width: calc(var(--s-8) * 3 + var(--s-6));
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
@@ -619,8 +635,9 @@
 }
 /* RUNNING's port at the row's end: underlined, it opens the address */
 .app-rb-end.app-rb-link {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
 }
 .app-rb-end.app-rb-link:hover {
   color: var(--c-text);

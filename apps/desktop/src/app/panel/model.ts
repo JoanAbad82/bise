@@ -136,8 +136,11 @@ export function stepIn(t: Tabs, dir: 1 | -1): Tabs {
   return { ...t, active: next.id };
 }
 
-/** The least a tab shrinks to before the next one goes to the overflow menu (its icon and a few letters). */
-export const TAB_MIN_W = 88;
+/**
+ * The least a tab shrinks to before the next one goes to the overflow menu: its icon, eight
+ * letters and its × (ui-review m_42619 #4: never 'New …' or 'Perf n…'); panel.css .pn-tab's min-width.
+ */
+export const TAB_MIN_W = 120;
 /** What the tab row keeps for its '+', the overflow button and their gaps. */
 export const ROW_KEEP_W = 104;
 
@@ -203,12 +206,23 @@ export function widthOf(what: TabWhat): WidthOf {
 /** What the thread keeps beside the panel (ui-review m_42509: a 640 tab at 1100 left it 220). */
 export const THREAD_MIN = 560;
 
+/** Where the panel stands: beside the thread (it takes its column) or over it, as a sheet. */
+export interface PanelFit {
+  readonly width: number;
+  /** a sheet over the thread: the window has no room for MIN_W beside a THREAD_MIN thread */
+  readonly over: boolean;
+}
+
 /**
- * The panel's width in a window: what its tab asks, capped so the thread keeps THREAD_MIN beside
- * the left (rail and sidebar), never under MIN_W. Pure.
+ * The panel in a window: what its tab asks, capped so the thread keeps THREAD_MIN beside the left
+ * (rail and sidebar). Where even MIN_W leaves the thread under THREAD_MIN (1100 with a sidebar),
+ * it goes over the thread as a sheet, at what its tab asks within the window: never a thread
+ * under 560 (ui-review m_42619 #3). Pure.
  */
-export function capW(asked: number, win: number, left: number, threadMin = THREAD_MIN): number {
-  return Math.max(MIN_W, Math.min(asked, win - left - threadMin));
+export function fitW(asked: number, win: number, left: number, threadMin = THREAD_MIN): PanelFit {
+  const room = win - left - threadMin;
+  if (room >= MIN_W) return { width: Math.min(asked, room), over: false };
+  return { width: Math.max(MIN_W, Math.min(asked, win - left)), over: true };
 }
 
 /** A width in the panel's limits. Pure. */

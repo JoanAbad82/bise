@@ -8,7 +8,8 @@
 // (ArtifactView's centre and column modes are gone, rule 7): the centre keeps the thread, the
 // maker's composer is the centre's. Owner: nm-panel.
 import { useEffect, useRef, useState } from 'react';
-import { AppIcon, IconButton, KindIcon, MoreButton, Press, iconKindOf, tipAttrs } from '@/ds';
+import { AppIcon, IconButton, KindIcon, Press, iconKindOf, tipAttrs } from '@/ds';
+import { ds } from '@/proto/words_ds.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { ArtifactOpen, ArtifactVersions, useAllArtifacts } from '@/artifacts';
 import { useEntityMenu } from '@/app/menus/use';
@@ -108,7 +109,10 @@ export function Browser({ project, id, tabId }: { project: string; id: string; t
         >
           <AppIcon name="open" size={16} />
         </IconButton>
-        <MoreButton menu={menu} testId="app.panel.addr.more" />
+        {/* the bar's own size, like ← → ⟳ ↗ (ui-review m_42619 #6: ds' MoreButton is a row's 28) */}
+        <IconButton label={ds.more_actions} size="bar" onClick={menu.open} testId="app.panel.addr.more">
+          <AppIcon name="more" size={16} />
+        </IconButton>
       </div>
       <div className="pn-page">
         <ArtifactOpen

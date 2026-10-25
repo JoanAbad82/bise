@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { useLeftWidth } from '@/app/frame-state';
-import { activate, closable, closeIn, closeOthers, moveIn, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widthOf, clampW, capW, dropGone, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, closable, closeIn, closeOthers, moveIn, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widthOf, clampW, fitW, dropGone, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 
 const KEY = 'panel';
 
@@ -58,16 +58,19 @@ function useWindowWidth(): number {
   );
 }
 
-/** The panel's width in this window now: what the tab in front asks, the thread keeping its room (capW). */
-export function usePanelWidth(): number {
-  return capW(widthNow(usePanelState()), useWindowWidth(), useLeftWidth());
+/** The panel in this window now: what the tab in front asks, beside the thread or over it (fitW). */
+export function usePanelFit(): PanelFit {
+  return fitW(widthNow(usePanelState()), useWindowWidth(), useLeftWidth());
 }
 
-/** Open or folded, and its width now (0 folded): what the right side (nm-side's sideLayout) and the shell read. */
-export function usePanelBox(): { readonly open: boolean; readonly width: number } {
+/**
+ * Open or folded, and the column it takes (0 folded, 0 as a sheet over the thread): what the right
+ * side (nm-side's sideLayout) and the shell read. `over`: it is a sheet now.
+ */
+export function usePanelBox(): { readonly open: boolean; readonly width: number; readonly over: boolean } {
   const s = usePanelState();
-  const w = usePanelWidth();
-  return { open: s.open, width: s.open ? w : 0 };
+  const f = usePanelFit();
+  return { open: s.open, width: s.open && !f.over ? f.width : 0, over: s.open && f.over };
 }
 
 /** The bar's ▯ and ⌥⌘0: fold or unfold, on the tab he left in front. */
