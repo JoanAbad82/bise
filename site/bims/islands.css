@@ -1,5 +1,5 @@
-/* the home bims' two prototypes (page bims-home v4): their layer over the page, read by site/bims-proto.ts.
-   Only the bim takes pointers; the island's soft shadow is its slab's underside dropped and blurred,
+/* the home bims' islands (page bims-home v7): their layer over the page, read by site/bims-islands.ts.
+   Only the bims take pointers; the island's soft shadow is its slab's underside dropped and blurred,
    black 15 % light / 35 % dark (docs/brand/bims.md, the cube). */
 .bp { position:absolute; top:0; left:0; width:100%; overflow:clip; pointer-events:none; z-index:4; }
 .bp > div { position:absolute; transform-origin:0 0; }

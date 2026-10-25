@@ -1,20 +1,22 @@
-// The studio that draws bise.dev's home islands (gags.ts, prototype A) with the app's own bims: a
-// little clay island (the hero town's cube in miniature: a dirt slab, a top of floor or grass), its
-// props (a tiny desk with a little window, the music family's upright piano) and its bim, in the
-// town's 2:1 iso camera and the day palette's fixed light (the hero film's, TownOpts.themed by day),
-// with the clay's soft sun shadow, on a transparent ground. Off screen, one canvas: the island alone
-// (its base), then each frame with its bim, cropped to where it differs from the base (the bim, its
-// shadow, the notes); scripts/bims-sprites.mts packs them into WebP. Owner: bims-proto.
-import { type DirectionalLight, Group, type Material, Mesh, type Object3D, Vector3 } from 'three';
-import { BACK, DIST } from '../render/camera';
+// The studio that draws bise.dev's home islands (gags.ts) with the app's own bims: a little clay
+// island (the hero town's cube in miniature: a dirt slab, a top of floor or grass), its props (a tiny
+// desk with a little window, the music family's upright piano, a beanbag, a whiteboard, a quarter
+// pipe, a floor lamp and a pouf), its bims and their bits (notes, z's, sticky notes, the hero's paper
+// plane, a book), in the town's 2:1 iso camera and the day palette's fixed light (the hero film's,
+// TownOpts.themed by day), with the clay's soft sun shadow, on a transparent ground. Off screen, one
+// canvas: the island alone (its base), then each frame with its bims, cropped to where any frame
+// differs from the base; scripts/bims-sprites.mts packs them into WebP. Owner: bims-islands.
+import { type DirectionalLight, ExtrudeGeometry, Group, type Material, Mesh, type Object3D, Shape, Vector3 } from 'three';
+import { AZ, BACK, DIST } from '../render/camera';
 import { makeBim, type Bim } from '../render/bim';
 import { makeObject } from '../render/objects';
-import { CREAM, INK, PANE, SLATE, SLATE_L, STEEL, WOOD_D, WOOD_L, partOf } from '../render/objects/kit';
+import { CREAM, GREEN, INK, PANE, PAPER, SKY, SLATE, SLATE_L, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, darker, lighter, partOf } from '../render/objects/kit';
 import { DAY, WORLD } from '../render/palette';
+import { makePlane, type Plane } from '../render/plane';
 import { STYLE } from '../render/style';
 import { makeView } from '../render/view';
 import { castShadows } from '../render/world';
-import { SLAB, type Island } from './gags';
+import { type Bit, type Island, type Prop, SLAB } from './gags';
 
 /** px per office unit on the sheet (2x: 64 css px a unit, the island ~200 css px wide) */
 export const PX = 128;
@@ -23,8 +25,15 @@ const HALF = 2.3;
 /** the sun: from the upper left, in front (the town's: its left side lit, its right in the shade) */
 const SUN = new Vector3(-2, 9, 3.5);
 const NOTE = WORLD.gold;
+/** the sticky notes' colours, by Bit.n */
+const STICKY = [YELLOW, SKY, GREEN] as const;
+const BEANBAG = VIOLET;
+const POUF = TEAL;
+const BOOK = SKY;
+/** the lamp's shade, warm (a light yellow, lit from inside) */
+const SHADE = lighter(YELLOW, 0.45);
 /** every colour the studio adds to the app's (the palette law checks them: never the accent pink or the error red) */
-export const STUDIO_COLOURS: readonly string[] = [NOTE, CREAM, INK, PANE, SLATE, SLATE_L, STEEL, WOOD_D, WOOD_L];
+export const STUDIO_COLOURS: readonly string[] = [NOTE, CREAM, INK, PANE, PAPER, SLATE, SLATE_L, STEEL, WOOD, WOOD_D, WOOD_L, ...STICKY, BEANBAG, POUF, BOOK, SHADE];
 
 export interface Box { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
 
@@ -34,15 +43,17 @@ export interface Drawn {
   /** each frame's box in the base (px, 2x), the same for all */
   readonly at: Box;
   readonly frames: HTMLCanvasElement[];
-  /** the bim's own box in its frame at its held pose (px, 2x): its hit area */
+  /** the bims' own box in their frame at the held pose (px, 2x): their hit area */
   readonly hit: Box;
   /** the slab's underside's four corners in the base (px, 2x): its shadow on the page */
   readonly under: readonly number[];
 }
 
+const OPTS = { off: false, night: 0, n: 5 } as const;
+
 /** a tiny desk: wooden top on four legs, a little app window standing on its back half */
-function deskOn(root: Group, d: NonNullable<Island['desk']>): void {
-  const g = partOf(root, { off: false, night: 0, n: 5 });
+function deskOn(root: Group, d: Extract<Prop, { kind: 'desk' }>): void {
+  const g = partOf(root, OPTS);
   const top = 0.06;
   g.box(d.w, top, d.d, WOOD_L, d.x, d.h - top / 2, d.z, 0.02);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.box(0.06, d.h - top, 0.06, WOOD_D, d.x + sx * (d.w / 2 - 0.07), (d.h - top) / 2, d.z + sz * (d.d / 2 - 0.07), 0.015);
@@ -59,14 +70,228 @@ function deskOn(root: Group, d: NonNullable<Island['desk']>): void {
   for (let i = 0; i < 3; i++) w.box([0.3, 0.24, 0.27][i] ?? 0.3, 0.025, 0.01, SLATE_L, 0.06 - (i === 1 ? 0.03 : 0), y + 0.06 - i * 0.08, 0.02, 0.004);
 }
 
+/** a whiteboard on two legs, its front to `turn`: a white face in a steel frame, a tray for its markers */
+function boardOn(root: Group, b: Extract<Prop, { kind: 'board' }>): void {
+  const g = partOf(root, OPTS).at(b.x, 0, b.z);
+  g.root.rotation.y = b.turn;
+  const W = 1.05, H = 0.66;
+  for (const x of [-W / 2 + 0.03, W / 2 - 0.03]) {
+    g.box(0.05, b.mid + H / 2, 0.05, SLATE_L, x, (b.mid + H / 2) / 2, -0.04, 0.015);
+    g.box(0.07, 0.04, 0.36, SLATE_L, x, 0.02, -0.04, 0.015);
+  }
+  g.box(W + 0.05, H + 0.05, 0.035, STEEL, 0, b.mid, 0, 0.015);
+  g.box(W - 0.02, H - 0.02, 0.012, CREAM, 0, b.mid, 0.02, 0.004);
+  g.box(W * 0.8, 0.025, 0.07, STEEL, 0, b.mid - H / 2 - 0.02, 0.04, 0.008);
+  for (const [x, c] of [[-0.2, SKY], [-0.12, INK]] as const) { const m = g.cyl(0.013, 0.09, c, x, b.mid - H / 2 + 0.01, 0.05); m.rotation.z = Math.PI / 2; }
+}
+
+/** a beanbag: a soft squashed ball, dented where its sleeper sits */
+function beanbagOn(root: Group, b: Extract<Prop, { kind: 'beanbag' }>): void {
+  const g = partOf(root, OPTS);
+  g.contact(1.0, 1.0, b.x, b.z);
+  g.ball(0.52, BEANBAG, b.x, 0.22, b.z).scale.set(1.05, 0.5, 1.05);
+  g.ball(0.36, lighter(BEANBAG, 0.12), b.x, 0.34, b.z).scale.set(1, 0.55, 1);
+}
+
+/** a little quarter pipe, rising away from its front (`turn`): its curve and deck in one wooden piece (its side shows the curve), a steel coping */
+function rampOn(root: Group, r: Extract<Prop, { kind: 'ramp' }>): void {
+  const R = 0.5, W = 0.9, DECK_D = 0.2, N = 16;
+  // the profile: s back from the front, y up; the curve's foot at s 0
+  const shape = new Shape();
+  shape.moveTo(0, 0);
+  for (let i = 1; i <= N; i++) {
+    const a = (i / N) * (Math.PI / 2);
+    shape.lineTo(R * Math.sin(a), R * (1 - Math.cos(a)));
+  }
+  shape.lineTo(R + DECK_D, R);
+  shape.lineTo(R + DECK_D, 0);
+  shape.lineTo(0, 0);
+  const geo = new ExtrudeGeometry(shape, { depth: W, bevelEnabled: true, bevelSize: 0.015, bevelThickness: 0.015, bevelSegments: 2, curveSegments: 4 });
+  geo.translate(0, 0, -W / 2);
+  const g = partOf(root, OPTS).at(r.x, 0, r.z);
+  g.root.rotation.y = r.turn;
+  g.contact(W + 0.1, R + DECK_D + 0.1, 0, -(R + DECK_D) / 2);
+  // s back (local -z), the width along local x
+  const ramp = new Mesh(geo, STYLE.material(WOOD));
+  ramp.rotation.y = Math.PI / 2;
+  g.root.add(ramp);
+  const c = g.cyl(0.025, W + 0.02, STEEL, 0, R + 0.02, -R + 0.01);
+  c.rotation.z = Math.PI / 2;
+}
+
+/** a floor lamp: a round foot, a thin pole, a warm shade lit from inside */
+function lampOn(root: Group, l: Extract<Prop, { kind: 'lamp' }>): void {
+  const g = partOf(root, OPTS).at(l.x, 0, l.z);
+  g.contact(0.36, 0.36);
+  g.cyl(0.16, 0.035, SLATE, 0, 0.018, 0);
+  g.box(0.035, 1.38, 0.035, SLATE, 0, 0.72, 0, 0.012);
+  g.ball(0.05, YELLOW, 0, 1.36, 0, 1.2);
+  g.cyl(0.19, 0.22, SHADE, 0, 1.44, 0, 0.5);
+  g.cyl(0.13, 0.012, darker(CREAM, 0.9), 0, 1.56, 0);
+}
+
+/** a round pouf to sit on */
+function poufOn(root: Group, p: Extract<Prop, { kind: 'pouf' }>): void {
+  const g = partOf(root, OPTS);
+  g.contact(0.62, 0.62, p.x, p.z);
+  g.cyl(0.27, p.h - 0.03, POUF, p.x, (p.h - 0.03) / 2, p.z);
+  g.cyl(0.25, 0.04, lighter(POUF, 0.18), p.x, p.h - 0.02, p.z);
+}
+
+function propOn(root: Group, p: Prop): void {
+  switch (p.kind) {
+    case 'desk': deskOn(root, p); return;
+    case 'board': boardOn(root, p); return;
+    case 'beanbag': beanbagOn(root, p); return;
+    case 'ramp': rampOn(root, p); return;
+    case 'lamp': lampOn(root, p); return;
+    case 'pouf': poufOn(root, p); return;
+    case 'piano': {
+      const m = makeObject('piano').group;
+      m.scale.setScalar(p.scale);
+      m.position.set(p.x, 0, p.z);
+      m.rotation.y = p.turn;
+      root.add(m);
+    }
+  }
+}
+
 /** a music note: a head and a stem in gold */
 function makeNote(): Group {
   const g = new Group();
-  const p = partOf(g, { off: false, night: 0, n: 5 });
+  const p = partOf(g, OPTS);
+  g.rotation.y = Math.PI / 4;
   p.ball(0.05, NOTE, 0, 0, 0).scale.set(1.2, 0.85, 0.7);
   p.box(0.018, 0.17, 0.018, NOTE, 0.05, 0.085, 0, 0);
   p.box(0.06, 0.02, 0.018, NOTE, 0.075, 0.16, 0, 0).rotation.z = -0.5;
   return g;
+}
+
+/** a sleeper's z: three strokes, facing the page */
+function makeZ(): Group {
+  const g = new Group();
+  const p = partOf(g, OPTS);
+  const s = 0.11;
+  p.box(s, 0.022, 0.02, SLATE_L, 0, s / 2, 0, 0.006);
+  p.box(s, 0.022, 0.02, SLATE_L, 0, -s / 2, 0, 0.006);
+  p.box(Math.hypot(s, s) * 0.95, 0.022, 0.02, SLATE_L, 0, 0, 0, 0.006).rotation.z = Math.PI / 4;
+  g.rotation.y = AZ;
+  return g;
+}
+
+function makeSticky(n: number): Group {
+  const g = new Group();
+  const inner = new Group();
+  g.add(inner);
+  partOf(inner, OPTS).box(0.17, 0.17, 0.012, STICKY[n % STICKY.length] ?? YELLOW, 0, 0, 0, 0.004);
+  return g;
+}
+
+/** a small open book: its cover toward the page, its pages toward its reader; one page turns about the spine */
+function makeBook(): { g: Group; page: Group } {
+  const g = new Group();
+  const p = partOf(g, OPTS);
+  for (const s of [-1, 1]) {
+    const half = p.at(0, 0, 0);
+    half.root.rotation.y = s * 0.35;
+    half.box(0.13, 0.19, 0.012, BOOK, s * 0.065, 0, 0, 0.004);
+    half.box(0.12, 0.175, 0.012, PAPER, s * 0.062, 0, -0.012, 0.003);
+  }
+  const page = new Group();
+  g.add(page);
+  partOf(page, OPTS).box(0.12, 0.175, 0.006, CREAM, 0.06, 0, -0.022, 0.002);
+  return { g, page };
+}
+
+/** the bits' pools: one mesh per bit drawn in a frame, by kind, hidden when a frame has fewer */
+interface Pools {
+  note: Group[];
+  z: Group[];
+  sticky: Group[];
+  plane: Plane[];
+  book: { g: Group; page: Group }[];
+}
+
+function placeBits(root: Group, pools: Pools, bits: readonly Bit[]): void {
+  const used = { note: 0, z: 0, plane: 0, book: 0 };
+  const stuck = new Set<number>();
+  for (const b of bits) {
+    const [x, y, z] = b.at;
+    switch (b.kind) {
+      case 'note': {
+        const n = pools.note[used.note++] ?? more(root, pools.note, makeNote);
+        n.visible = b.k < 1;
+        n.position.set(x + Math.sin(b.k * 5) * 0.06, y + b.k * 0.5, z);
+        n.scale.setScalar(0.8 + b.k * 0.4);
+        break;
+      }
+      case 'z': {
+        const n = pools.z[used.z++] ?? more(root, pools.z, makeZ);
+        n.visible = true;
+        n.position.set(x + Math.sin(b.k * 4) * 0.05, y, z);
+        n.scale.setScalar(0.6 + b.k * 0.6);
+        break;
+      }
+      case 'sticky': {
+        while (pools.sticky.length <= b.n) more(root, pools.sticky, () => makeSticky(pools.sticky.length));
+        const s = pools.sticky[b.n] as Group;
+        stuck.add(b.n);
+        s.visible = true;
+        s.position.set(x, y, z);
+        s.rotation.set(0, b.turn, 0);
+        (s.children[0] as Group).rotation.z = b.tilt;
+        break;
+      }
+      case 'plane': {
+        const p = pools.plane[used.plane++] ?? morePlane(root, pools.plane);
+        p.group.visible = true;
+        p.group.position.set(x, y, z);
+        p.group.rotation.set(-b.pitch, b.dir, 0, 'YXZ');
+        p.setFold(b.fold);
+        break;
+      }
+      case 'book': {
+        const k = pools.book[used.book++] ?? moreBook(root, pools.book);
+        k.g.visible = true;
+        k.g.position.set(x, y, z);
+        // its pages toward its reader, tilted back toward its eyes
+        k.g.rotation.set(-0.45, b.dir + Math.PI, 0, 'YXZ');
+        k.page.rotation.y = -0.35 + b.flip * Math.PI * 0.98;
+        break;
+      }
+    }
+  }
+  pools.note.forEach((n, i) => { n.visible &&= i < used.note; });
+  pools.z.forEach((n, i) => { n.visible = i < used.z; });
+  pools.sticky.forEach((n, i) => { n.visible = stuck.has(i); });
+  pools.plane.forEach((n, i) => { n.group.visible = i < used.plane; });
+  pools.book.forEach((n, i) => { n.g.visible = i < used.book; });
+}
+
+function more(root: Group, pool: Group[], make: () => Group): Group {
+  const g = make();
+  castShadows(g);
+  root.add(g);
+  pool.push(g);
+  return g;
+}
+
+function moreBook(root: Group, pool: Pools['book']): Pools['book'][number] {
+  const b = makeBook();
+  castShadows(b.g);
+  root.add(b.g);
+  pool.push(b);
+  return b;
+}
+
+function morePlane(root: Group, pool: Plane[]): Plane {
+  const p = makePlane(STYLE);
+  p.setInk(true);
+  p.group.scale.setScalar(0.45);
+  castShadows(p.group);
+  root.add(p.group);
+  pool.push(p);
+  return p;
 }
 
 /** the island's slab: the dirt's rounded block, its top's layer (the town's cube in miniature) */
@@ -111,21 +336,25 @@ export function drawIsland(s: Island): Drawn {
   const root = new Group();
   scene.add(root);
   slabOn(root, s.top);
-  if (s.desk) deskOn(root, s.desk);
-  if (s.piano) {
-    const p = makeObject('piano').group;
-    p.scale.setScalar(s.piano.scale);
-    p.position.set(s.piano.x, 0, s.piano.z);
-    p.rotation.y = s.piano.turn;
-    root.add(p);
-  }
+  for (const p of s.props) propOn(root, p);
   castShadows(root);
+  const island = [...root.children];
   const first = s.frames[0];
   if (!first) throw new Error(`${s.id}: no frames`);
-  const b: Bim = makeBim(first.bim.name, false, STYLE);
-  castShadows(b.group);
-  root.add(b.group);
-  const notes: Group[] = [];
+  const bims: Bim[] = first.bims.map((a) => {
+    const b = makeBim(a.name, false, STYLE);
+    castShadows(b.group);
+    root.add(b.group);
+    return b;
+  });
+  const movers = new Group();
+  root.add(movers);
+  const pools: Pools = { note: [], z: [], sticky: [], plane: [], book: [] };
+  const pose = (i: number): void => {
+    const f = s.frames[i] ?? first;
+    bims.forEach((b, k) => { const a = f.bims[k]; if (a) b.apply(a.rig); });
+    placeBits(movers, pools, f.bits ?? []);
+  };
 
   const grab = (): HTMLCanvasElement => {
     view.render();
@@ -135,44 +364,29 @@ export function drawIsland(s: Island): Drawn {
     c.getContext('2d')?.drawImage(canvas, 0, 0);
     return c;
   };
-  const island = root.children.filter((c) => c !== b.group);
-  // the base: the island with the held bim's shadow on it, the bim itself unseen (it still casts)
-  b.apply(s.frames[s.idle]?.bim.rig ?? first.bim.rig);
-  unseen([b.group], true);
+  const moving = [...bims.map((b) => b.group), movers];
+  // the base: the island with the held pose's shadows on it, the bims and their bits unseen (they still cast)
+  pose(s.idle);
+  unseen(moving, true);
   const base = grab();
-  unseen([b.group], false);
+  unseen(moving, false);
   const pixels = (c: HTMLCanvasElement): Uint8ClampedArray => c.getContext('2d')?.getImageData(0, 0, N, N).data ?? new Uint8ClampedArray(0);
   const basePx = pixels(base);
 
-  // the frames: the bim (and the notes) alone, the island unseen but still in front where it is
+  // the frames: the bims and their bits alone, the island unseen but still in front where it is
   unseen(island, true);
   const full: HTMLCanvasElement[] = [];
-  for (const f of s.frames) {
-    b.apply(f.bim.rig);
-    const ns = f.notes ?? [];
-    while (notes.length < ns.length) {
-      const n = makeNote();
-      castShadows(n);
-      n.rotation.y = Math.PI / 4;
-      notes.push(n);
-      root.add(n);
-    }
-    notes.forEach((n, i) => {
-      const at = ns[i];
-      n.visible = at !== undefined && at[3] < 1;
-      if (!at) return;
-      const [x, y, z, k] = at;
-      n.position.set(x + Math.sin(k * 5) * 0.06, y + k * 0.5, z);
-      n.scale.setScalar(0.8 + k * 0.4);
-    });
+  for (let i = 0; i < s.frames.length; i++) {
+    pose(i);
+    unseen(moving, false);
     full.push(grab());
   }
   unseen(island, false);
   // the frames' box: what any of them draws, a few px around it
   const drawnBox = (c: HTMLCanvasElement): Box => boxOf(pixels(c), N, (d, i) => (d[i + 3] ?? 0) > 8);
-  const at = grow(full.map(drawnBox).reduce(union), 4, N);
+  const at = growBox(full.map(drawnBox).reduce(union), 4, N);
   const hit0 = drawnBox(full[s.idle] ?? base);
-  const ink = grow(boxOf(basePx, N, (d, i) => (d[i + 3] ?? 0) > 8), 2, N);
+  const ink = growBox(boxOf(basePx, N, (d, i) => (d[i + 3] ?? 0) > 8), 2, N);
   const all = union(ink, at);
   const crop = (c: HTMLCanvasElement, r: Box): HTMLCanvasElement => {
     const o = document.createElement('canvas');
@@ -195,7 +409,8 @@ export function drawIsland(s: Island): Drawn {
     hit: { x: hit0.x - at.x, y: hit0.y - at.y, w: hit0.w, h: hit0.h },
     under,
   };
-  b.dispose();
+  for (const b of bims) b.dispose();
+  for (const p of pools.plane) p.dispose();
   view.dispose();
   return drawn;
 }
@@ -232,7 +447,7 @@ function union(a: Box, b: Box): Box {
   return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
 }
 
-function grow(a: Box, k: number, n: number): Box {
+function growBox(a: Box, k: number, n: number): Box {
   const x = Math.max(0, a.x - k), y = Math.max(0, a.y - k);
   // even sizes: the css size is half of it
   const w = Math.min(n - x, a.w + 2 * k), h = Math.min(n - y, a.h + 2 * k);

@@ -499,7 +499,7 @@
 </section>
 
 <!-- the answer: a team lead, and a team -->
-<section class="lead" style="padding-bottom:6vh">
+<section class="lead" id="lead" style="padding-bottom:6vh">
   <div class="inner blow">
     <div class="kicker">bise</div>
     <h2>so here’s how bise does it.</h2>
@@ -549,7 +549,7 @@
 </section>
 
 <!-- artifacts: questions you can actually answer -->
-<section class="arts">
+<section class="arts" id="arts">
   <div class="inner blow">
     <div class="kicker">artifacts</div>
     <h2>questions you can actually answer.</h2>
@@ -582,7 +582,7 @@
 </section>
 
 <!-- the details, handled -->
-<section style="padding-bottom:8vh">
+<section id="hard" style="padding-bottom:8vh">
   <div class="inner blow" style="max-width:1080px">
     <div class="kicker">under the hood</div>
     <h2>the hard parts, done right.</h2>
@@ -911,7 +911,7 @@ if (!q.get("state")) {
 }
 body.dataset.fed = "1";  /* the tests wait on it */
 </script>
-<!-- the home bims' two prototypes (page bims-home v4): ?bims=islands or ?bims=pencil; nothing loads without it -->
-<script>if (/[?&]bims=/.test(location.search)) { const s = document.createElement('script'); s.src = '/bims-proto.js'; s.defer = true; document.head.append(s); }</script>
+<!-- the home bims (page bims-home v7): a clay island beside each section's title; not on bise.dev until Gabriel's go -->
+<script>if (!/(^|\.)bise\.dev$/.test(location.hostname)) { const s = document.createElement('script'); s.src = '/bims-islands.js'; s.defer = true; document.head.append(s); }</script>
 </body>
 </html>

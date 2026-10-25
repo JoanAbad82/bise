@@ -1,7 +1,7 @@
-// The home islands' laws (gags.ts, prototype A of page bims-home v4): the brief's weight in frames,
-// every gag ending on the pose its bim then holds, the blink closing its eyes and nothing else, the
-// bim and its notes never leaving the island, one bim per gag, and no attention colour among the
-// studio's own.
+// The home islands' laws (gags.ts, page bims-home v7): one island per section, the brief's weight in
+// frames, every gag ending on the pose its bims then hold, the blink closing their eyes and nothing
+// else, the bims and their bits never leaving the island, its own bims per gag, and no attention
+// colour among the studio's own.
 import { describe, expect, it } from 'vitest';
 import { readsAsAttention } from '../render/palette.testkit';
 import { ISLANDS, MAX_FRAMES, MIN_FRAMES, SLAB } from './gags';
@@ -25,18 +25,24 @@ describe('the home islands', () => {
     for (const s of ISLANDS) {
       const open = s.frames[s.idle];
       const shut = s.frames[s.blink];
-      expect(shut?.bim.rig.eyes, s.id).toBeLessThan(0.25);
-      expect({ ...shut?.bim.rig, eyes: 0 }, s.id).toEqual({ ...open?.bim.rig, eyes: 0 });
+      expect(shut?.bims.length, s.id).toBe(open?.bims.length);
+      shut?.bims.forEach((b, i) => {
+        expect(b.rig.eyes, s.id).toBeLessThan(0.25);
+        expect({ ...b.rig, eyes: 0 }, s.id).toEqual({ ...open?.bims[i]?.rig, eyes: 0 });
+      });
+      expect(shut?.bits, s.id).toEqual(open?.bits);
     }
   });
 
-  it('the bim and its notes never leave the island', () => {
+  it('the bims and their bits never leave the island', () => {
     const half = SLAB.w / 2 - 0.15;
     for (const s of ISLANDS) {
       for (const f of s.frames) {
-        expect(Math.abs(f.bim.rig.x), s.id).toBeLessThan(half);
-        expect(Math.abs(f.bim.rig.z), s.id).toBeLessThan(half);
-        for (const [x, , z] of f.notes ?? []) {
+        for (const b of f.bims) {
+          expect(Math.abs(b.rig.x), s.id).toBeLessThan(half);
+          expect(Math.abs(b.rig.z), s.id).toBeLessThan(half);
+        }
+        for (const { at: [x, , z] } of f.bits ?? []) {
           expect(Math.abs(x), s.id).toBeLessThan(half);
           expect(Math.abs(z), s.id).toBeLessThan(half);
         }
@@ -44,10 +50,18 @@ describe('the home islands', () => {
     }
   });
 
-  it('one bim per gag, never the same on both', () => {
-    const names = ISLANDS.map((s) => new Set(s.frames.map((f) => f.bim.name)));
-    for (const n of names) expect(n.size).toBe(1);
-    expect(new Set(names.flatMap((n) => [...n])).size).toBe(ISLANDS.length);
+  it('one island per section, in the page order', () => {
+    expect(ISLANDS.map((s) => s.id)).toEqual(['ways', 'why', 'lead', 'arts', 'fun', 'hard', 'faq', 'end']);
+  });
+
+  it('the same bims all through a gag, and no bim on two islands', () => {
+    const names = ISLANDS.map((s) => {
+      const first = s.frames[0]?.bims.map((b) => b.name) ?? [];
+      for (const f of s.frames) expect(f.bims.map((b) => b.name), s.id).toEqual(first);
+      return first;
+    });
+    const all = names.flat();
+    expect(new Set(all).size).toBe(all.length);
   });
 
   it('the studio adds no accent pink and no error red', () => {

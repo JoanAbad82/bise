@@ -1,5 +1,5 @@
 {
-  "//": "bise.dev's own scripts (Vercel serves this folder as is, no build): annotate, bims-proto, book/paper and docs/docs are classic scripts, download an ES module desktop.html imports. Each .js is emitted next to its .ts by scripts/ts_emit.ts and committed (Vercel never runs node); .vercelignore keeps the .ts out of the deploy. desktop/hero/*.js are apps/desktop's hero bundle (hero.vite.config.ts), not these. typescript is office/sdk's.",
+  "//": "bise.dev's own scripts (Vercel serves this folder as is, no build): annotate, bims-islands, book/paper and docs/docs are classic scripts, download an ES module desktop.html imports. Each .js is emitted next to its .ts by scripts/ts_emit.ts and committed (Vercel never runs node); .vercelignore keeps the .ts out of the deploy. desktop/hero/*.js are apps/desktop's hero bundle (hero.vite.config.ts), not these. typescript is office/sdk's.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -13,5 +13,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["annotate.ts", "bims-proto.ts", "download.ts", "book/paper.ts", "docs/docs.ts"]
+  "include": ["annotate.ts", "bims-islands.ts", "download.ts", "book/paper.ts", "docs/docs.ts"]
 }

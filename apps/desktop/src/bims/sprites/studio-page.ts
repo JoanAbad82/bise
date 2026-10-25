@@ -1,7 +1,7 @@
 // The studio's page (index.html): what scripts/bims-sprites.mts calls through window.studio. Each
 // island comes back as WebP data URLs at a quality (its base, its frames' strip) with what the page
 // needs to play it: sizes in css px (the sheets are 2x), the frames' box on the base, their order,
-// the held pose and its blink, the bim's hit box and the slab's underside (its shadow). Owner: bims-proto.
+// the held pose and its blink, the bims' hit box and the slab's underside (its shadow). Owner: bims-islands.
 import { ISLANDS } from './gags';
 import { drawIsland, type Drawn } from './studio';
 
