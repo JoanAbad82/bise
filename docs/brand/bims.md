@@ -146,6 +146,7 @@ What goes on a head or in a hand (bim.ts, palette.ts HATS, the maps' wears, the 
   - loops at LOOP_FPS 8 (eating, skating), blends at 10;
   - the checks: budget.spec, the town's fit at ≤ 16 ms.
 - **clipping laws:** nothing passes through anything, on every map and stage, at 0-31 agents.
+  - render/outfit-clip.test.ts: the outfits' clipping law (the intent sheet above): for each outfit (outfits.testkit.ts OUTFIT_BIMS, one fixed bim per outfit) and each pose (the office's activities, the catch, the home's gags) at every sampled frame, no forearm, cuff or hand 1.6 cm inside what it wears on its torso, nothing worn on the torso through a sleeve or a hand. bim.ts clearArm keeps the arms out at every frame: a point in front rolls the shoulder forward (10 cm at most), else the arm turns the least out of the torso's girth (bim.ts GIRTH, per outfit, sides and front).
   - render/clip.test.ts: a napper inside its own bed box, beds never overlap, no foreign mesh in a bed, a desk or a napper. A bed's own meshes carry `userData.bed`.
   - render/nap.test.ts: back and heels within 3 cm of the bed, never floating, and every napper's head in view at the office camera.
   - render/standing.test.ts and render/shade.test.ts: no lamp shade or string over a head on screen at 320 or 640.

@@ -9,8 +9,8 @@
 // hems, a pocket, strings, buttons, the eyes' catchlights: userData.near) is baked twice, near and
 // far, and detail() swaps them by how big the bim is on screen (nearAt). Its materials are its own,
 // so it fades (reduced motion) and goes grey (stopped); the clay light is claylight.ts's.
-import { type BufferGeometry, Color, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, MeshStandardMaterial, type Object3D, SphereGeometry, TorusGeometry, Vector3 } from 'three';
-import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Outfit } from './palette';
+import { type BufferGeometry, Color, CylinderGeometry, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, MeshStandardMaterial, type Object3D, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three';
+import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Kind, type Outfit } from './palette';
 import { HAT_K, HEAD_R, HEAD_Y } from './laptop';
 import { bakePart } from './merge';
 import { GREY_MIX, clayLit, partsMaterial, warmth } from './claylight';
@@ -52,6 +52,72 @@ export const NEAR_PX = 22;
 export const nearAt = (scale: number): boolean => scale > 0 && 1 / scale >= NEAR_PX;
 /** an afro's half-width: inside the shoulders' (0.24 + a sleeve's 0.078), as the old afro sat inside the old shoulders */
 const AFRO_W = 0.29;
+/**
+ * The torso an arm keeps out of (apply's arm solver, the outfits' clipping law outfit-clip.test.ts):
+ * the bean's capsule in the body's space (its axis from y0 to y1, its radius, squashed in x and z),
+ * plus how far each outfit stands off it at the sides (the puffer's rings, the sweater's bands).
+ */
+export const TORSO = { y0: 0.405, y1: 0.575, r: 0.215, sx: 1.04, sz: 0.94 } as const;
+export const GIRTH: Readonly<Record<Kind, { readonly side: number; readonly front: number }>> = {
+  hoodie: { side: 0.012, front: 0.045 },
+  tee: { side: 0.006, front: 0.01 },
+  sweater: { side: 0.016, front: 0.03 },
+  overalls: { side: 0.016, front: 0.045 },
+  jacket: { side: 0.016, front: 0.045 },
+  puffer: { side: 0.03, front: 0.07 },
+};
+/** the arm's points the solver keeps out (arm space y, their radius): the elbow, the forearm, the cuff, the hand; above the elbow it joins the torso */
+const ARM_PTS: readonly (readonly [number, number])[] = [[-0.16, 0.074], [-0.21, 0.07], [-0.26, 0.066], [-0.31, 0.06]];
+/** how much higher than the bean's straight part the solver keeps arms off (a collar, the lapels' tops) */
+const NECK = 0.08;
+/** how far forward a shoulder may roll to keep a forearm off the torso's front */
+const SHOULDER_ROLL = 0.1;
+/** how deep an arm point may sink into the torso's cloth: under the clipping law's own slack */
+const SINK = 0.03;
+
+/**
+ * Keeps an arm (its rotation `q` in the body's space, its shoulder `at`) the least out of the
+ * torso's girth: a point in front rolls the shoulder forward (SHOULDER_ROLL at most), any other
+ * turns the arm about the axis that pushes its deepest point straight out (hanging arms a few
+ * degrees out to the side). Pure but for `q` and `at`.
+ */
+export function clearArm(q: Quaternion, at: Vector3, girth: { readonly side: number; readonly front: number }): void {
+  const p = new Vector3();
+  const v = new Vector3();
+  const n = new Vector3();
+  const axis = new Vector3();
+  const step = new Quaternion();
+  for (let i = 0; i < 20; i++) {
+    let worst = 0;
+    for (const [y, r] of ARM_PTS) {
+      p.set(0, y, 0).applyQuaternion(q).add(at);
+      // the collar and lapels stand above the bean's shoulders: its straight part reaches NECK higher here
+      const dy = p.y - Math.min(TORSO.y1 + NECK, Math.max(TORSO.y0, p.y));
+      const d = Math.hypot(p.x / TORSO.sx, dy, p.z / TORSO.sz);
+      if (d < 1e-4) continue;
+      // what it wears in front (a bib, lapels, strings, a chain) stands further off than its sides
+      const front = Math.max(0, p.z / TORSO.sz / d);
+      const pen = TORSO.r + girth.side + (girth.front - girth.side) * front + r - SINK - d;
+      if (pen > worst) {
+        worst = pen;
+        n.set(p.x / TORSO.sx, dy, p.z / TORSO.sz).normalize();
+        v.copy(p).sub(at);
+      }
+    }
+    if (worst <= 0.002) return;
+    // in front of the torso (crossed arms, hands on the belly or at the mouth), the shoulder rolls
+    // forward a little, as a real one does: the forearms stay where the pose put them
+    if (n.z > 0.6 && at.z < SHOULDER_ROLL) {
+      at.z = Math.min(SHOULDER_ROLL, at.z + worst * 1.05);
+      continue;
+    }
+    axis.crossVectors(v, n);
+    if (axis.lengthSq() < 1e-8) return;
+    step.setFromAxisAngle(axis.normalize(), Math.min(0.12, (worst / Math.max(0.05, v.length())) * 1.1));
+    q.premultiply(step);
+  }
+}
+
 /** the rigid parts, each baked into one mesh (two with a far level of detail) */
 export const PARTS = ['head', 'body', 'armL', 'armR', 'legL', 'legR'] as const;
 
@@ -120,69 +186,100 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   const SECOND = o.second;
   const SLEEVE = KIND === 'puffer' ? SECOND : o.hoodie;
   const SHORT = KIND === 'tee' || KIND === 'overalls';
-  const DARK = 0.86;
   const R = HEAD_R;
   /** a point on the face at (x, y), pushed out by `out` */
   const onFace = (x: number, y: number, out = 0): number => Math.sqrt(Math.max(0, R * R - x * x - y * y)) + out;
 
-  // the torso: a round bean in the outfit's colour (the shirt's under dungarees), a chunky roll collar
+  // the torso: a round bean in the outfit's colour (the shirt's under dungarees); what each outfit
+  // shows is its intent block in docs/brand/bims.md (the outfits' character loop, round 1)
   const under = KIND === 'overalls' ? WORLD.paper : o.hoodie;
-  add(style.capsule(0.215, 0.17), mat(under), body, 0, 0.49, 0).scale.set(1.04, 1, 0.94);
-  if (KIND === 'hoodie' || KIND === 'sweater') {
-    add(new TorusGeometry(0.115, 0.052, 10, 24), mat(o.hoodie), body, 0, 0.775, 0).rotation.x = Math.PI / 2;
+  const bean = add(style.capsule(0.215, 0.17), mat(under), body, 0, 0.49, 0);
+  bean.scale.set(1.04, 1, 0.94);
+  bean.userData.bean = true;
+  /** a strap or a lapel: boxes from point to point (body space), w wide, t thick */
+  const along = (pts: readonly (readonly [number, number, number])[], w: number, t: number, m: Mat, near = false): void => {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [ax, ay, az] = pts[i] as readonly [number, number, number];
+      const [bx, by, bz] = pts[i + 1] as readonly [number, number, number];
+      const d = new Vector3(bx - ax, by - ay, bz - az);
+      const seg = add(style.box(w, t, d.length() + t, Math.min(w, t) * 0.45), m, body, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
+      seg.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), d.normalize());
+      if (near) lod(seg);
+    }
+  };
+  /** a knitted band flush on the bean's cloth at y (a cylinder hugging it, not a ring round it) */
+  const knit = (y: number, h: number, m: Mat, r = 0.218): Mesh => {
+    const band = add(new CylinderGeometry(r, r, h, 40, 1, true), m, body, 0, y, 0);
+    band.scale.set(1.04, 1, 0.94);
+    return band;
+  };
+  /** a ribbed hem round the hips, a step darker */
+  const hem = (c: string): void => {
+    const h = add(new TorusGeometry(0.205, 0.034, 8, 36), mat(shade(c, 0.7)), body, 0, 0.31, 0);
+    h.rotation.x = Math.PI / 2;
+    h.scale.set(1.04, 0.94, 1);
+  };
+  if (KIND === 'sweater') {
+    // a knit jumper: a rolled collar round the neck's base, two bands knitted flat into the chest, a ribbed hem
+    add(new TorusGeometry(0.135, 0.05, 10, 28), mat(shade(o.hoodie, 0.92)), body, 0, 0.745, 0).rotation.x = Math.PI / 2;
+    for (const y of [0.555, 0.475]) knit(y, 0.05, mat(SECOND));
+    hem(o.hoodie);
   }
   if (KIND === 'tee') {
     // a crew neck and a print on the chest (the second colour)
     add(new TorusGeometry(0.1, 0.022, 8, 22), mat(shade(o.hoodie, 0.88)), body, 0, 0.775, 0.01).rotation.x = Math.PI / 2;
     add(new SphereGeometry(0.06, 14, 10), mat(SECOND), body, 0.02, 0.57, 0.19).scale.set(1, 1, 0.3);
   }
-  if (KIND === 'sweater') {
-    // a knit jumper: two bands round the chest, a ribbed hem
-    for (const y of [0.56, 0.48]) {
-      const band = add(new TorusGeometry(0.212, 0.026, 8, 30), mat(SECOND), body, 0, y, 0);
-      band.rotation.x = Math.PI / 2;
-      band.scale.set(1.04, 0.94, 1);
-    }
-    lod(add(new TorusGeometry(0.19, 0.03, 8, 30), mat(shade(o.hoodie, DARK)), body, 0, 0.27, 0)).rotation.x = Math.PI / 2;
-  }
   if (KIND === 'overalls') {
-    // dungarees over a white tee: the waist, the bib, two straps, two gold buttons
+    // dungarees over a white tee: a waist band, the bib with its pocket, two straps over the shoulders
+    // crossing on the back, two gold buttons
     const pm = mat(o.hoodie);
     add(style.capsule(0.221, 0.06), pm, body, 0, 0.33, 0).scale.set(1.04, 1, 0.95);
+    knit(0.375, 0.045, mat(shade(o.hoodie, 0.72)), 0.232);
     add(style.box(0.24, 0.2, 0.06, 0.03), pm, body, 0, 0.5, 0.17).rotation.x = -0.05;
+    lod(add(style.box(0.11, 0.07, 0.02, 0.008), mat(shade(o.hoodie, 0.85)), body, 0, 0.5, 0.205));
     for (const sx of [-1, 1]) {
-      add(style.box(0.045, 0.3, 0.03, 0.012), pm, body, sx * 0.09, 0.66, 0.1).rotation.x = -0.75;
-      lod(add(style.ball(0.018), mat(WORLD.gold), body, sx * 0.09, 0.585, 0.205));
+      // up from the bib, over the shoulder's top, down the back to the other hip
+      along([[sx * 0.09, 0.59, 0.2], [sx * 0.1, 0.7, 0.155], [sx * 0.11, 0.785, 0.04], [sx * 0.1, 0.77, -0.07], [sx * 0.06, 0.68, -0.18], [-sx * 0.04, 0.5, -0.215], [-sx * 0.1, 0.38, -0.215]], 0.05, 0.026, pm);
+      add(style.ball(0.026), mat(WORLD.gold), body, sx * 0.09, 0.585, 0.212);
     }
-    lod(add(style.box(0.11, 0.07, 0.02, 0.008), mat(shade(o.hoodie, 0.88)), body, 0, 0.5, 0.205));
   }
   if (KIND === 'jacket') {
-    // an open jacket over a white shirt: the shirt in a V down the front, two lapels, buttons
-    add(new SphereGeometry(0.1, 16, 12), mat(WORLD.paper), body, 0, 0.6, 0.155).scale.set(0.62, 1.7, 0.5);
-    for (const sx of [-1, 1]) {
-      add(style.box(0.07, 0.13, 0.03, 0.012), mat(shade(o.hoodie, 0.9)), body, sx * 0.07, 0.71, 0.17).rotation.set(-0.45, 0, sx * -0.35);
-    }
-    for (const y of [0.56, 0.44]) lod(add(style.ball(0.016), mat(SECOND), body, 0.065, y, 0.212));
+    // an open jacket over a white shirt: the shirt's V wide down to the chest, two lapels along it, two buttons, a hem
+    add(new SphereGeometry(0.1, 18, 14), mat(WORLD.paper), body, 0, 0.6, 0.168).scale.set(1.3, 1.8, 0.45);
+    const lapel = mat(shade(o.hoodie, 0.72));
+    // on the cloth: the bean's surface plus half the lapel's thickness at each point
+    for (const sx of [-1, 1]) along([[sx * 0.095, 0.74, 0.112], [sx * 0.085, 0.65, 0.187], [sx * 0.045, 0.46, 0.212]], 0.065, 0.024, lapel);
+    for (const y of [0.45, 0.37]) add(style.ball(0.02), mat(SECOND), body, 0.06, y, 0.215);
+    hem(o.hoodie);
   }
   if (KIND === 'puffer') {
-    // a puffer vest: three soft rings stacked over a long-sleeved shirt (the second colour)
-    for (const [y, r] of [[0.64, 0.19], [0.5, 0.215], [0.36, 0.2]] as const) {
-      const ring = add(new TorusGeometry(r, 0.06, 10, 28), mat(o.hoodie), body, 0, y, 0);
+    // a puffer vest: three soft quilted rings hugging the torso, a zip line, the arm holes' rims; the
+    // long sleeves (the second colour) come out of them
+    for (const [y, r] of [[0.62, 0.185], [0.49, 0.2], [0.36, 0.19]] as const) {
+      const ring = add(new TorusGeometry(r, 0.066, 12, 32), mat(o.hoodie), body, 0, y, 0);
       ring.rotation.x = Math.PI / 2;
-      ring.scale.set(1.04, 0.94, 1);
+      // slimmer at the sides, where the arms hang: they stay close to the vest (no A-pose)
+      ring.scale.set(0.9, 0.92, 0.85);
     }
-    lod(add(style.box(0.012, 0.36, 0.012), mat(shade(o.hoodie, 0.75)), body, 0, 0.5, 0.235));
+    add(style.box(0.018, 0.32, 0.016, 0.006), mat(shade(o.hoodie, 0.6)), body, 0, 0.48, 0.228);
   }
   if (KIND === 'hoodie') {
-    // the hood lying on its back, the pocket, two drawstrings (main has none: its chain and :* sit there, designer m_41188 3)
-    const hood = add(new SphereGeometry(0.16, 16, 10), mat(shade(o.hoodie, 0.93)), body, 0, 0.72, -0.15);
-    hood.scale.set(1.15, 0.55, 0.7);
-    hood.rotation.x = 0.35;
-    lod(add(style.box(0.25, 0.11, 0.06, 0.03), mat(shade(o.hoodie, DARK)), body, 0, 0.36, 0.175)).rotation.x = -0.25;
+    // the hood folded on the back and shoulders, its drop down the back, the neck's rim, a kangaroo
+    // pocket with an edge, two drawstrings (main has none: its chain and :* sit there, designer m_41188 3), a ribbed hem
+    add(new TorusGeometry(0.12, 0.036, 10, 26), mat(shade(o.hoodie, 0.9)), body, 0, 0.765, 0.01).rotation.x = Math.PI / 2;
+    const hm = mat(shade(o.hoodie, 0.9));
+    const hood = add(new SphereGeometry(0.17, 18, 12), hm, body, 0, 0.72, -0.15);
+    hood.scale.set(1.25, 0.6, 0.62);
+    hood.rotation.x = 0.5;
+    add(new SphereGeometry(0.1, 14, 10), hm, body, 0, 0.6, -0.2).scale.set(1.2, 1.1, 0.45);
+    add(style.box(0.27, 0.13, 0.05, 0.025), mat(shade(o.hoodie, 0.72)), body, 0, 0.36, 0.172).rotation.x = -0.25;
+    add(style.box(0.25, 0.11, 0.06, 0.03), mat(shade(o.hoodie, 0.84)), body, 0, 0.365, 0.18).rotation.x = -0.25;
     for (const dx of main ? [] : [-0.045, 0.045]) {
       lod(add(style.capsule(0.011, 0.09), mat(WORLD.paper), body, dx, 0.66, 0.2)).rotation.x = -0.35;
       lod(add(style.ball(0.017), mat(WORLD.paper), body, dx, 0.6, 0.222));
     }
+    hem(o.hoodie);
   }
 
   const head = new Group();
@@ -324,11 +421,15 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     if (SHORT) {
       add(style.capsule(0.06, 0.17), mat(o.skin), arm, 0, -0.16, 0);
       add(style.capsule(0.082, 0.05), mat(KIND === 'overalls' ? WORLD.paper : o.hoodie), arm, 0, -0.07, 0);
-    } else add(style.capsule(0.078, 0.17), mat(SLEEVE), arm, 0, -0.14, 0);
+    } else add(style.capsule(0.078, 0.12), mat(SLEEVE), arm, 0, -0.115, 0);
     add(new SphereGeometry(0.066, 16, 12), mat(o.skin), arm, 0, -0.305, 0.005).scale.set(0.95, 1.05, 0.85);
+    if (KIND === 'puffer') {
+      // the vest's arm hole: its rim lies round the top of the sleeve and turns with it, never off the shoulder
+      add(new TorusGeometry(0.08, 0.02, 8, 22), mat(shade(o.hoodie, 0.85)), arm, 0, -0.045, 0).rotation.x = Math.PI / 2;
+    }
     if (!SHORT) {
-      // a ribbed cuff and a fold at the elbow
-      lod(add(new TorusGeometry(0.066, 0.022, 8, 18), mat(shade(SLEEVE, DARK)), arm, 0, -0.245, 0)).rotation.x = Math.PI / 2;
+      // a ribbed cuff, a step darker, and a fold at the elbow
+      add(new CylinderGeometry(0.074, 0.07, 0.05, 20), mat(shade(SLEEVE, 0.7)), arm, 0, -0.235, 0);
       lod(add(new TorusGeometry(0.075, 0.014, 6, 18), mat(shade(SLEEVE, 0.94)), arm, 0, -0.12, 0)).rotation.set(Math.PI / 2 + 0.25, 0, 0);
     }
     arms.push(arm);
@@ -394,6 +495,9 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       for (const [, geo] of far?.glows ?? []) geo.dispose();
     }
   }
+
+  // what it wears and its body (the clipping law's volumes, outfits.testkit.ts): every mesh so far; the props below are not
+  g.traverse((obj) => { if (obj instanceof Mesh) obj.userData.worn = true; });
 
   // props
   const crate = add(style.box(0.4, 0.3, 0.3), mat(WORLD.crate), body, 0, 0.62, 0.3);
@@ -518,6 +622,11 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       setRot(head, rig.head);
       setRot(armL, rig.armL);
       setRot(armR, rig.armR);
+      // its sleeves never go into what it wears (the outfits' intent sheet): each arm moved the least out of the torso
+      armL.position.z = 0;
+      armR.position.z = 0;
+      clearArm(armL.quaternion, armL.position, GIRTH[KIND]);
+      clearArm(armR.quaternion, armR.position, GIRTH[KIND]);
       legL.rotation.set(rig.legL, 0, 0);
       legR.rotation.set(rig.legR, 0, 0);
       // under CLOSED the eyes are shut: the lids' lines, no squashed box
