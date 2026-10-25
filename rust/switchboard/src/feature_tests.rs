@@ -42,6 +42,7 @@ fn job(agent: &str, dir: &Path, shared: &Path, files: &[&str], onto: &str) -> Jo
         flow: crate::flow::FlowConfig { mode: Some(crate::flow::FlowMode::Trunk), ..Default::default() },
         onto: Some(format!("refs/heads/{}", onto)),
         checks: shared.parent().unwrap().join("worktrees"),
+        lands: shared.parent().unwrap().join("lands.jsonl"),
     }
 }
 

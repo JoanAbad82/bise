@@ -23,6 +23,12 @@
 //!   main checked out ([`move_main`]).
 //! - One land at a time per target ref ([`Queue`]): the others wait in
 //!   line, and the views say so (`waits to land · 2nd`).
+//! - The revert guard ([`crate::land_revert`]) before a shared ref moves
+//!   (a worktree's plain land after its rebase, a `--here` from the
+//!   shared folder): a land that puts back old copies of what another
+//!   agent landed since it started is refused, its files and that agent
+//!   named. The daemon writes each land's record
+//!   ([`crate::land_record`]) from the [`Outcome`]'s range.
 
 use crate::flow::{FlowConfig, FlowMode};
 pub use crate::land_pick::left_out_note;
@@ -61,6 +67,9 @@ pub struct Job {
     /// The project's worktrees, the root of the land check's warm tree
     /// (`scratch::CheckTree`; the daemon sets it, like `flow`).
     pub checks: PathBuf,
+    /// The hub's land records (`Paths::lands`, the daemon sets it): the
+    /// revert guard's "whose land was it" ([`crate::land_revert`]).
+    pub lands: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,11 +85,14 @@ pub struct Outcome {
     /// New files of the place that no agent claimed, made since the agent
     /// started: not landed, named in the answer ([`left_out_note`]).
     pub left_out: Vec<String>,
+    /// The range the target moved over, full shas (the land record's).
+    pub base: String,
+    pub tip: String,
 }
 
 // ---- git ----
 
-fn git_in(dir: &Path, args: &[&str], index: Option<&Path>) -> Result<String, String> {
+pub(crate) fn git_in(dir: &Path, args: &[&str], index: Option<&Path>) -> Result<String, String> {
     let mut cmd = crate::tools_env::git_command()?;
     cmd.arg("-C").arg(dir).args(args);
     if let Some(i) = index {
@@ -174,7 +186,7 @@ pub(crate) fn short(r: &str) -> &str {
 /// A private index path no other land of this process shares: two lands
 /// in the same millisecond (two agents of one hub, parallel tests) once
 /// shared one file, and one's read-tree emptied the other's tree.
-fn tmp_index(tag: &str) -> PathBuf {
+pub(crate) fn tmp_index(tag: &str) -> PathBuf {
     static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     std::env::temp_dir().join(format!("sb-land-{}-{}-{}-{}", tag, std::process::id(), crate::util::now_ms(), seq))
@@ -384,8 +396,13 @@ pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &m
     let turn = queue.wait_turn(&target, &job.place, joined);
     // onto the trunk: the land check on the new commit, in the warm check
     // tree, before the swap (issue 28 part 2); a CAS miss checks again
+    // from the shared folder (a branch every agent lands on), the revert
+    // guard first; a worktree's own branch is guarded at its plain land
     let via = crate::land_check::Via::Here;
     let mut verify = |old: &str, new: &str| {
+        if !job.worktree {
+            revert_guard(job, &target, old, new)?;
+        }
         if crate::land_check::checked(via, target == main, false) {
             crate::land_check::in_check_tree(&job.shared, &job.checks, old, new, via, &turn)
         } else {
@@ -393,8 +410,16 @@ pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &m
         }
     };
     let new = commit_files(&job.dir, &target, &mine, &job.message, &mut verify, &mut || {})?;
+    let base = git(&job.dir, &["rev-parse", &format!("{}^", new)])?;
     let (pushed, push_error) = pushed(job, &target, &main);
-    Ok(Outcome { target: short(&target).to_string(), sha: shorten(&job.dir, &new), commits: 1, pushed, push_error, left_out })
+    let sha = shorten(&job.dir, &new);
+    Ok(Outcome { target: short(&target).to_string(), sha, commits: 1, pushed, push_error, left_out, base, tip: new })
+}
+
+/// [`crate::land_revert::guard`] for `job`'s land onto `target`.
+fn revert_guard(job: &Job, target: &str, base: &str, tip: &str) -> Result<(), String> {
+    let records = crate::land_record::read(&job.lands);
+    crate::land_revert::guard(&job.dir, target, base, tip, job.since_ms, &job.agent, &records)
 }
 
 /// Move `main` (a ref) from `base` to `tip`, a fast-forward: in the
@@ -482,6 +507,9 @@ fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String],
         }
     }
     let tip = git(&job.dir, &["rev-parse", "HEAD"])?;
+    // never put back old copies of what another agent just landed (the
+    // native-mac incident: a fast-forward, no conflict to see it)
+    revert_guard(job, main, &base, &tip)?;
     // the repo's land check on the tree main will point at, in this turn
     // (land N is checked on top of N-1): onto the trunk, moved or not
     // in the agent's worktree when it is clean at the tip, else (a file
@@ -508,6 +536,8 @@ fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String],
         pushed,
         push_error,
         left_out,
+        base,
+        tip,
     })
 }
 
@@ -528,7 +558,7 @@ mod tests {
         std::fs::create_dir_all(&ws).unwrap();
         sh(
             &ws,
-            "git init -q -b main && git config user.email t@t && git config user.name t && git config commit.gpgsign false && echo a > a && echo b > b && echo c > c && git add . && git commit -qm init",
+            "git init -q -b main && git config user.email t@t && git config user.name t && git config commit.gpgsign false && echo a > a && echo b > b && echo c > c && git add . && GIT_COMMITTER_DATE=2000-01-01T00:00:00Z git commit -qm init",
         );
         ws.canonicalize().unwrap()
     }
@@ -552,6 +582,7 @@ mod tests {
             flow: FlowConfig::default(),
             onto: None,
             checks: shared.parent().unwrap_or(shared).join("worktrees"),
+            lands: shared.parent().unwrap_or(shared).join("lands.jsonl"),
         }
     }
 

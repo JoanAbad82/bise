@@ -41,6 +41,15 @@ fn told(stream: &mut UnixStream, body: &Value) -> bool {
     stream.write_all(line.as_bytes()).and_then(|_| stream.flush()).is_ok()
 }
 
+/// The land's record (`crate::land_record`), in its own thread right
+/// after the swap: its commits are `base..tip`. A write that fails costs
+/// only the guard's "your own land" for these commits (logged).
+fn record(job: &crate::land::Job, o: &crate::land::Outcome) {
+    if let Err(e) = crate::land_record::append(&job.lands, &crate::land_record::of(job, o, now_ms())) {
+        eprintln!("land record not written ({}): {}", job.lands.display(), e);
+    }
+}
+
 impl Shell {
     /// `sb land` (dev-flow §5) in a thread, its answer to the agent (or
     /// bise's message when its `sb` is gone), a line in main's feed.
@@ -57,6 +66,7 @@ impl Shell {
             }
         };
         (job.flow, job.checks) = (crate::flow::FlowConfig::load(&self.opts.paths), self.opts.paths.worktrees.clone());
+        job.lands = self.opts.paths.lands();
         let (queue, tx) = (self.lands.clone(), self.tx.clone());
         std::thread::spawn(move || {
             let _claim = claim;
@@ -66,6 +76,7 @@ impl Shell {
             let mut landed: Option<Feed> = None;
             let (body, line) = match res {
                 Ok(o) => {
+                    record(&job, &o);
                     landed = art::landed_rec(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
                     let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed);
                     if let Some(e) = &o.push_error {

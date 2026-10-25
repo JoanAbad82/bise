@@ -11,7 +11,9 @@
 //! Interim source (architect m_9058): `by` still reads main's feed text
 //! (`sb landed :` lines); the structured fix is a land
 //! record the hub writes through sb-core when it lands (agent, from, to,
-//! at), which this file then reads instead.
+//! at), which this file then reads instead. TODO(land-record): that
+//! record exists now (`crate::land_record`, `lands.jsonl`, the revert
+//! guard reads it): move `by` onto it.
 
 use super::rpc::Typed;
 use super::*;

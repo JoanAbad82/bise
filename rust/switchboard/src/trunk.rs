@@ -153,6 +153,7 @@ mod tests {
             flow: crate::flow::FlowConfig::default(),
             onto: None,
             checks: root.join("worktrees"),
+            lands: root.join("lands.jsonl"),
         };
         let o = crate::land::run(&job, &crate::land::Queue::default(), &mut || {}).unwrap();
         assert_eq!((o.target.as_str(), o.commits), ("main", 1));

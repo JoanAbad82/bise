@@ -102,6 +102,10 @@ impl Paths {
     pub fn journal(&self) -> PathBuf {
         self.state.join("journal.jsonl")
     }
+    /// One line per land (`crate::land_record`): who landed which commits.
+    pub fn lands(&self) -> PathBuf {
+        self.state.join("lands.jsonl")
+    }
     pub fn pid_file(&self) -> PathBuf {
         self.state.join("hub.pid")
     }

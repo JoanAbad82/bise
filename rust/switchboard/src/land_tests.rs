@@ -54,8 +54,9 @@ fn the_shared_folder_names_a_changed_tracked_file_and_add_takes_it() {
     sh(&ws, "echo c-old > c && touch -t 200001010000 c");
     let since = crate::util::now_ms() - 60_000;
     // mine: a (file tool); y's: b; the user's (or my sed's) since I
-    // started: d; a plain mv of mine whose old path no tool saw
-    sh(&ws, "echo d > d && git add d && git commit -qm d && echo a2 > a && echo b2 > b && echo d2 > d && git mv d e.txt && mv a a.rs && echo a3 > a.rs");
+    // started: d (its commit older: out of the revert guard's window); a
+    // plain mv of mine whose old path no tool saw
+    sh(&ws, "echo d > d && git add d && GIT_COMMITTER_DATE=2000-01-01T00:00:00Z git commit -qm d && echo a2 > a && echo b2 > b && echo d2 > d && git mv d e.txt && mv a a.rs && echo a3 > a.rs");
     let mut j = job("x", &ws, &ws, &["a.rs"], &[("y", &["b"])]);
     j.since_ms = since;
     let o = run(&j, &Queue::default(), &mut || {}).unwrap();
@@ -190,4 +191,90 @@ fn a_here_land_on_a_worktree_branch_is_not_checked() {
     j.place = "wt:x".into();
     let o = run(&j, &Queue::default(), &mut || {}).unwrap();
     assert_eq!(o.target, "sb/x");
+}
+
+/// A worktree on feature `feat` for agent `name` (its own branch sb/<name>).
+fn on_feat(ws: &Path, name: &str) -> (PathBuf, Job) {
+    let wt = ws.parent().unwrap().join(format!("wt-{}", name));
+    sh(ws, &format!("git worktree add -q -b sb/{} {} feat", name, wt.display()));
+    let wt = wt.canonicalize().unwrap();
+    let mut j = job(name, &wt, ws, &[], &[]);
+    (j.place, j.here, j.onto) = (format!("wt:{}", name), false, Some("refs/heads/feat".into()));
+    (wt, j)
+}
+
+/// `run`, then its record as the daemon writes it (`daemon/land.rs`).
+fn land(j: &Job) -> Result<Outcome, String> {
+    let o = run(j, &Queue::default(), &mut || {})?;
+    crate::land_record::append(&j.lands, &crate::land_record::of(j, &o, 1)).unwrap();
+    Ok(o)
+}
+
+/// The native-mac incident (04aaaa8d3): y lands b and p/new on the
+/// feature; x, its tree still the old one, squashes with `git reset
+/// --soft feat` and lands: a fast-forward that put back the old b and
+/// deleted p/new. Refused now, naming the files and y; nothing moves.
+/// An undo on purpose (`git revert`) lands.
+#[test]
+fn a_land_that_carries_old_copies_of_anothers_fresh_land_is_refused() {
+    let ws = repo("revert-guard");
+    sh(&ws, "git branch feat main");
+    let (wx, jx) = on_feat(&ws, "x");
+    let (wy, jy) = on_feat(&ws, "y");
+    sh(&wy, "echo b2 > b && mkdir p && echo p > p/new && git add . && git commit -qm 'y: b and p'");
+    land(&jy).unwrap();
+    let tip = git(&ws, &["rev-parse", "feat"]).unwrap();
+    sh(&wx, "echo a2 > a && git add a && git commit -qm 'x: a' && git reset -q --soft feat && git commit -qm 'x: a, squashed'");
+    let e = land(&jx).unwrap_err();
+    assert!(e.starts_with("your land puts back old copies of b, p/new, undoing @y's "), "{}", e);
+    assert!(e.contains("\"y: b and p\" on feat") && e.contains("nothing moved"), "{}", e);
+    assert_eq!(git(&ws, &["rev-parse", "feat"]).unwrap(), tip, "feat did not move");
+    // x takes y's version back: its own change lands alone
+    sh(&wx, "git checkout -q feat -- b p && git commit -q --amend --no-edit");
+    land(&jx).unwrap();
+    assert_eq!(git(&ws, &["show", "feat:b"]).unwrap(), "b2");
+    assert_eq!(git(&ws, &["show", "feat:a"]).unwrap(), "a2");
+    // an undo on purpose names the commit: it lands
+    sh(&wx, &format!("git revert --no-edit {}", tip));
+    land(&jx).unwrap();
+    assert_eq!(git(&ws, &["show", "feat:b"]).unwrap(), "b");
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}
+
+/// An agent undoes its own land (its record holds the commit): no refusal.
+#[test]
+fn undoing_your_own_land_lands() {
+    let ws = repo("revert-own");
+    sh(&ws, "git branch feat main");
+    let (wx, jx) = on_feat(&ws, "x");
+    sh(&wx, "echo b2 > b && git commit -qam 'x: b2'");
+    land(&jx).unwrap();
+    sh(&wx, "echo b > b && git commit -qam 'x: b back'");
+    land(&jx).unwrap();
+    assert_eq!(git(&ws, &["show", "feat:b"]).unwrap(), "b");
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}
+
+/// architect m_42458's mixed case: x edits f and carries y's old copy of
+/// it too (y's hunk undone, x's own line new): refused. x keeping y's
+/// hunk and editing another line of f lands.
+#[test]
+fn a_file_both_edited_is_refused_only_when_the_others_lines_are_back() {
+    let ws = repo("revert-mixed");
+    sh(&ws, "seq 1 30 > f && git add f && git commit -qm f && git branch feat main");
+    let (wx, jx) = on_feat(&ws, "x");
+    let (wy, jy) = on_feat(&ws, "y");
+    sh(&wy, "sed -i.bak 's/^3$/three/' f && rm f.bak && git commit -qam 'y: three'");
+    land(&jy).unwrap();
+    let tip = git(&ws, &["rev-parse", "feat"]).unwrap();
+    // x's old tree (3), its own edit at 25, put on feat by a reset
+    sh(&wx, "sed -i.bak 's/^25$/twenty-five/' f && rm f.bak && git commit -qam 'x: 25' && git reset -q --soft feat && git commit -qm 'x: 25, squashed'");
+    let e = land(&jx).unwrap_err();
+    assert!(e.starts_with("your land puts back old copies of f, undoing @y's "), "{}", e);
+    assert_eq!(git(&ws, &["rev-parse", "feat"]).unwrap(), tip, "feat did not move");
+    // rebuilt on y's f: lands
+    sh(&wx, "git reset -q --hard feat && sed -i.bak 's/^25$/twenty-five/' f && rm f.bak && git commit -qam 'x: 25'");
+    land(&jx).unwrap();
+    assert_eq!(git(&ws, &["show", "feat:f"]).unwrap().lines().filter(|l| l.contains('t')).collect::<Vec<_>>(), ["three", "twenty-five"]);
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
