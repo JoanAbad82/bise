@@ -24,6 +24,7 @@ import { backBusy, backFrames } from './cozy';
 import { BODY_R } from './avoid';
 import { network } from './paths';
 import { decorOf, terraceSlab } from './render/decor';
+import { BACK, RIGHT, UP, type V3 } from './render/camera';
 
 export type Corner = 'play' | 'read' | 'machines' | 'kitchen' | 'door' | 'hang' | 'terrace';
 
@@ -82,6 +83,8 @@ const EDGE = 0.12;
 /** two objects apart: close when both stand in an assemblage, a step otherwise */
 const GAP_ORGANIC = 0.3;
 const GAP = 0.6;
+/** outside, long low things (a bike, a scooter, a mailbox) read as one in the view at 0.3: half a step (designer m_41229) */
+const GAP_OUT = 0.5;
 /** how close counts as touching (a wall, a seed, a neighbour) */
 export const TOUCH = 0.35;
 /** the search's step */
@@ -372,14 +375,66 @@ function wallTries(c: Ctx, corner: Corner, foot: FootOf): readonly Try[] {
 }
 
 /** two objects apart: close when both stand in an assemblage, a step when either does not (the same both ways, so a kept spot stays free) */
-const gapOf = (a: Corner, b: Corner): number => (ORGANIC.has(a) && ORGANIC.has(b) ? GAP_ORGANIC : GAP);
+const gapOf = (a: Corner, b: Corner): number => (a === 'terrace' && b === 'terrace' ? GAP_OUT : ORGANIC.has(a) && ORGANIC.has(b) ? GAP_ORGANIC : GAP);
 
-/** whether a box is free in a corner: on its area, off what the office keeps, apart from the others */
-function free(c: Ctx, b: Box, corner: Corner, area: Box, taken: readonly Placed[]): boolean {
+/** whether a box is free in a corner: on its area, off what the office keeps, apart from the others, never under a canopy in the view */
+function free(c: Ctx, b: Box, corner: Corner, area: Box, taken: readonly Placed[], h = 0): boolean {
   if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1) return false;
   if (keptIn(c.keep, b) > 0) return false;
   for (const p of taken) if (overlaps(b, p.box, gapOf(corner, p.corner))) return false;
-  return true;
+  return corner !== 'terrace' || !underCanopy(c.o, b, h);
+}
+
+/** a thing high up over the floor: x, z its floor box, y its heights */
+interface Solid {
+  readonly x0: number;
+  readonly x1: number;
+  readonly y0: number;
+  readonly y1: number;
+  readonly z0: number;
+  readonly z1: number;
+}
+
+/** the terrace's high pieces that draw over what stands behind them in the office's view: the parasol's canopy, the palm's fronds (stages.ts) */
+function canopiesOf(o: Office): Solid[] {
+  const d = decorOf(o);
+  return [
+    { x0: d.parasol.x - 0.7, x1: d.parasol.x + 0.7, y0: 1.7, y1: 2.0, z0: d.parasol.z - 0.7, z1: d.parasol.z + 0.7 },
+    { x0: d.palm.x - 0.45, x1: d.palm.x + 0.45, y0: 1.55, y1: 1.7, z0: d.palm.z - 0.45, z1: d.palm.z + 0.45 },
+  ];
+}
+
+const dot3 = (x: number, y: number, z: number, v: V3): number => x * v.x + y * v.y + z * v.z;
+
+/** a solid's rectangle on the screen (the office's isometric view: camera.ts RIGHT, UP) and how near the camera its middle is (BACK) */
+function screenOf(s: Solid): { sx0: number; sx1: number; sy0: number; sy1: number; near: number } {
+  let sx0 = Infinity;
+  let sx1 = -Infinity;
+  let sy0 = Infinity;
+  let sy1 = -Infinity;
+  for (const x of [s.x0, s.x1])
+    for (const y of [s.y0, s.y1])
+      for (const z of [s.z0, s.z1]) {
+        const sx = dot3(x, y, z, RIGHT);
+        const sy = dot3(x, y, z, UP);
+        sx0 = Math.min(sx0, sx);
+        sx1 = Math.max(sx1, sx);
+        sy0 = Math.min(sy0, sy);
+        sy1 = Math.max(sy1, sy);
+      }
+  return { sx0, sx1, sy0, sy1, near: dot3((s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2, (s.z0 + s.z1) / 2, BACK) };
+}
+
+/** how far apart on the screen a canopy and what stands behind it stay (office units) */
+const SCREEN_GAP = 0.1;
+
+/** whether a canopy, nearer the camera, draws over a thing of height h standing on b (designer m_41229: test it in the camera's projection) */
+export function underCanopy(o: Office, b: Box, h: number): boolean {
+  const t = screenOf({ x0: b.x0, x1: b.x1, y0: 0, y1: Math.max(h, 0.1), z0: b.z0, z1: b.z1 });
+  return canopiesOf(o).some((s) => {
+    const c = screenOf(s);
+    return c.near > t.near && c.sx0 < t.sx1 + SCREEN_GAP && c.sx1 > t.sx0 - SCREEN_GAP && c.sy0 < t.sy1 + SCREEN_GAP && c.sy1 > t.sy0 - SCREEN_GAP;
+  });
 }
 
 /**
@@ -460,7 +515,7 @@ function placedOf(p: PluginObject, obj: ObjId, compact: boolean, foot: FootOf, c
 function kept(c: Ctx, p: PluginObject, before: Placed, taken: readonly Placed[]): Placed | null {
   const { obj, foot } = footOf(p.obj, before.compact);
   if (before.obj !== obj || before.of !== p.obj) return null;
-  return free(c, before.box, before.corner, areaOf(c.o, before.corner), taken) ? placedOf(p, obj, before.compact, foot, before.corner, before) : null;
+  return free(c, before.box, before.corner, areaOf(c.o, before.corner), taken, foot.h) ? placedOf(p, obj, before.compact, foot, before.corner, before) : null;
 }
 
 function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null {
@@ -480,7 +535,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
       if ((against && corner !== 'terrace') || corner === 'hang') {
         for (const t of wallTries(c, corner, foot)) {
           const b = boxOf(t.x, t.z, foot.w, foot.d, t.rot);
-          if (touches(c.o, b, corner, taken, seeds, play) && free(c, b, corner, area, taken)) return placedOf(p, obj, compact, foot, corner, t);
+          if (touches(c.o, b, corner, taken, seeds, play) && free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, compact, foot, corner, t);
         }
         continue;
       }
@@ -495,7 +550,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
         if (!inZone(area, b, corner, seeds, play)) continue;
         if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1 || keptIn(c.keep, b) > 0) continue;
         if (!touches(c.o, b, corner, taken, seeds, play)) continue;
-        if (free(c, b, corner, area, taken)) return placedOf(p, obj, compact, foot, corner, { x: q.x, z: q.z, rot: turn });
+        if (free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, compact, foot, corner, { x: q.x, z: q.z, rot: turn });
       }
     }
   }
