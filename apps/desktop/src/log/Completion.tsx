@@ -5,7 +5,10 @@
 // the top, then the messages since the compaction, the role at the left and the tokens at the
 // right; bash draws as its command, run_typescript as its code, texts as markdown, the rest as
 // JSON or text as it is. [ ] step through the ring, r shows each row's raw JSON as sent.
-// Owner: debug-cmd.
+// At the right (above under a pane of 880), the charts of its tokens (Charts.tsx, debug-viz): a
+// click on a bar or a bin filters the list (a chip per filter, ⌫ clears, esc goes up one level), a
+// click on a message's bar opens it; v hides them.
+// Owner: debug-cmd (the charts: debug-viz).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { CompBlock, CompRow, Completion as Comp } from "@/proto";
@@ -28,6 +31,9 @@ import {
   tokensWord,
 } from "./model";
 import { FindLine, K, useScreenKeys } from "./parts";
+import { Charts, selWords } from "./Charts";
+import { filterRows, kTokens, sameSel, total, type Filter, type Node } from "./viz";
+import { debug } from "@/proto/words_debug.gen";
 
 type CompEv = { ev: "completion" } & Comp;
 
@@ -55,6 +61,11 @@ export function Completion({
   const [finding, setFinding] = useState(false);
   const [needle, setNeedle] = useState("");
   const [at, setAt] = useState(0);
+  // the charts' level shown, the list's filter, a message opened from the series, the charts shown
+  const [drill, setDrill] = useState<readonly string[]>([]);
+  const [filter, setFilter] = useState<Filter>({});
+  const [pinned, setPinned] = useState<number | null>(null);
+  const [charts, setCharts] = useState(true);
   const root = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -90,6 +101,7 @@ export function Completion({
         setState("ready");
         setOpen(new Set());
         setCursor(null);
+        setPinned(null);
       },
       [project, agent],
     ),
@@ -101,7 +113,13 @@ export function Completion({
     if (el !== null && state === "ready") el.scrollTop = el.scrollHeight;
   }, [comp, state]);
 
-  const rows = useMemo(() => comp?.rows ?? [], [comp]);
+  const all = useMemo(() => comp?.rows ?? [], [comp]);
+  const filtering = filter.sel !== undefined || filter.size !== undefined;
+  const rows = useMemo(() => {
+    const kept = filterRows(all, filter);
+    if (pinned === null || kept.some((r) => r.n === pinned)) return kept;
+    return all.filter((r) => r.n === pinned || kept.includes(r));
+  }, [all, filter, pinned]);
   const hits = useMemo(() => compHits(rows, needle), [rows, needle]);
   const isOpen = (r: CompRow): boolean => !compFolds(r) || open.has(r.n);
 
@@ -165,6 +183,36 @@ export function Completion({
     root.current?.focus();
   };
 
+  // a bar: the list keeps its group (again: no group), the charts open the level below
+  const onBar = (n: Node) => {
+    const same = sameSel(filter.sel, n);
+    setFilter((f) => ({ ...f, sel: same ? undefined : n }));
+    setPinned(null);
+    if (!same && n.deeper && !n.rest) setDrill(n.path);
+  };
+  // the breadcrumb, or esc: back to that level, the list keeping its group
+  const onCrumb = (depth: number) => {
+    const path = drill.slice(0, depth);
+    setDrill(path);
+    setFilter((f) => ({ ...f, sel: path.length === 0 ? undefined : { path } }));
+    setPinned(null);
+  };
+  const onBin = (from: number, to: number) => {
+    setFilter((f) => ({ ...f, size: f.size?.from === from && f.size.to === to ? undefined : { from, to } }));
+    setPinned(null);
+  };
+  const onOpenMsg = (n: number) => {
+    setPinned(n);
+    setCursor(n);
+    setOpen((o) => new Set(o).add(n));
+    reveal(n, "center");
+  };
+  const clearFilter = () => {
+    setFilter({});
+    setDrill([]);
+    setPinned(null);
+  };
+
   const onKey = (e: KeyboardEvent) => {
     const mod = e.metaKey || e.ctrlKey;
     const k = e.key;
@@ -199,7 +247,15 @@ export function Completion({
     if (k === "Escape") {
       done();
       if (finding || needle !== "") closeFind();
+      else if (drill.length > 0) onCrumb(drill.length - 1);
+      else if (filtering) clearFilter();
       else router.back();
+    } else if (k === "Backspace" && filtering) {
+      done();
+      clearFilter();
+    } else if (k === "v") {
+      done();
+      setCharts((c) => !c);
     } else if (k === "Tab") {
       done();
       onTab();
@@ -241,6 +297,31 @@ export function Completion({
           {raw && <span className="lg-raw"> · raw json</span>}
         </div>
       )}
+      <div className={`lg-cbody${charts ? "" : " bare"}`}>
+      <div className="lg-cmain">
+      {filtering && (
+        <div className="lg-cfilter" data-testid="comp.filter">
+          {filter.sel !== undefined && (
+            <span className="lg-fchip" data-testid="comp.filter.group">
+              {selWords(filter.sel)}
+              <button type="button" data-tip={debug.tip_clear} aria-label={debug.tip_clear} onClick={() => { onCrumb(0); }}>
+                ×
+              </button>
+            </span>
+          )}
+          {filter.size !== undefined && (
+            <span className="lg-fchip" data-testid="comp.filter.size">
+              {debug.chip_size({ from: kTokens(filter.size.from), to: kTokens(filter.size.to) })}
+              <button type="button" data-tip={debug.tip_clear} aria-label={debug.tip_clear} onClick={() => { setFilter((f) => ({ ...f, size: undefined })); }}>
+                ×
+              </button>
+            </span>
+          )}
+          <span className="count" data-testid="comp.filter.count">
+            {debug.filtered({ shown: rows.length, total: all.length, tokens: kTokens(total(rows, filter.sel)) })}
+          </span>
+        </div>
+      )}
       <div className="lg-list" ref={list} data-testid="comp.list">
         {state === "loading" && comp === null && (
           <div className="lg-note">reading the request…</div>
@@ -264,6 +345,11 @@ export function Completion({
             }}
           />
         ))}
+      </div>
+      </div>
+      {charts && comp !== null && (
+        <Charts rows={all} drill={drill} filter={filter} onBar={onBar} onCrumb={onCrumb} onBin={onBin} onOpen={onOpenMsg} />
+      )}
       </div>
       <div className="lg-keys" data-testid="comp.keys">
         {finding ? (
@@ -292,6 +378,8 @@ export function Completion({
               <K k="⏎">open</K>
               <K k="⌘O">open all</K>
               <K k="⌘]">history</K>
+              {filtering && <K k="⌫">{debug.key_clear}</K>}
+              <K k="v">{debug.key_charts}</K>
             </span>
             <K k="esc" esc>
               back

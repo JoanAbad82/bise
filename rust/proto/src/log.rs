@@ -145,6 +145,79 @@ pub struct CompRow {
     /// the bytes of its slice of the body, and its tokens (bytes / 4)
     pub bytes: u64,
     pub tokens: u64,
+    /// what its tokens are, part by part (`bise_session::completion::groups`);
+    /// their tokens sum to `tokens`. Empty from an older hub.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<CompPart>,
+}
+
+/// Whose a part of the request is, the first level of `/debug`'s charts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum CompRole {
+    /// the system prompt, the tool definitions, the params, a system message
+    System,
+    /// his words and what bise adds as a user message (notifications)
+    User,
+    /// the model's text and thinking
+    Assistant,
+    ToolCall,
+    ToolResult,
+    #[serde(other)]
+    Unknown,
+}
+
+/// What a part is, the second level (with a tool, its name in `names`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum CompKind {
+    /// the system prompt at the top
+    Prompt,
+    /// a tool's definition (its name in `names`)
+    Tools,
+    /// the request's other keys (model, max_tokens, ...)
+    Params,
+    /// a system or developer message among the messages
+    Mid,
+    /// his words (`<user_message>`)
+    Words,
+    /// another agent's message (its sender in `names`)
+    AgentMessage,
+    /// the live state bise adds before each call
+    BiseState,
+    /// the agent's role preamble
+    Preamble,
+    /// the compaction's summary and its note
+    Summary,
+    /// a `[bise]` line
+    Note,
+    /// another tagged text (its tag in `names`)
+    Tagged,
+    /// a text: the model's, or a user text with no envelope
+    Text,
+    Thinking,
+    Image,
+    /// a call or its result (the tool, then the program or the group, in `names`)
+    Tool,
+    /// what the classifier does not know (an orphan result, an unknown block)
+    Other,
+    #[serde(other)]
+    Unknown,
+}
+
+/// One part of a row: a content block, a call, a tool's definition, with
+/// its share of the row's tokens.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CompPart {
+    pub role: CompRole,
+    pub kind: CompKind,
+    /// data, never words: a tool, a program, an agent, a tag (at most 2)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub names: Vec<String>,
+    pub tokens: u64,
 }
 
 /// One request the agent's ring keeps (`bise_session::reqlog`), for

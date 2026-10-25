@@ -285,10 +285,11 @@ pub const USER_ID_PREFIX: &str = "m_";
 /// send --input` take; law: the id shown is the id accepted), and its
 /// view when he wrote from one.
 pub fn user_message(m: &Msg) -> String {
+    let tag = bise_proto::envelope::USER_MESSAGE;
     let id = format!(" id=\"{USER_ID_PREFIX}{}\"", m.id);
     match m.via.as_deref() {
-        Some(view) => format!("<user_message{id} via=\"{view}\">\n{}\n</user_message>", m.text.trim()),
-        None => format!("<user_message{id}>\n{}\n</user_message>", m.text.trim()),
+        Some(view) => format!("<{tag}{id} via=\"{view}\">\n{}\n</{tag}>", m.text.trim()),
+        None => format!("<{tag}{id}>\n{}\n</{tag}>", m.text.trim()),
     }
 }
 
@@ -313,11 +314,8 @@ pub fn tagged(m: &Msg, relation: &str) -> String {
     if m.auto {
         attrs.push_str(" auto=\"true\"");
     }
-    format!(
-        "<agent_message {}>\n{}\n</agent_message>",
-        attrs,
-        m.text.trim()
-    )
+    let tag = bise_proto::envelope::AGENT_MESSAGE;
+    format!("<{tag} {}>\n{}\n</{tag}>", attrs, m.text.trim())
 }
 
 #[cfg(test)]
@@ -337,6 +335,22 @@ mod tests {
             text: "v1 ou v2 ?".into(),
             ..Default::default()
         }
+    }
+
+    /// Pin (architect m_41684): each envelope the real writers build
+    /// classifies to its kind in `/debug`'s charts, so renaming a tag can't
+    /// send everything to `other`.
+    #[test]
+    fn each_envelope_classifies_to_its_kind() {
+        use bise_proto::log::CompKind;
+        use bise_session::completion::groups::text_kind;
+        assert_eq!(text_kind(&tagged(&msg(), "peer")), (CompKind::AgentMessage, vec!["docs".to_string()]));
+        let his = Msg { from: USER.into(), plain: true, ..msg() };
+        assert_eq!(text_kind(&tagged(&his, "user")).0, CompKind::Words);
+        assert_eq!(text_kind(&main_role("/w", "/t", FLOW, true)).0, CompKind::Preamble);
+        let st = crate::model::State::new("/w");
+        let group = crate::board::Group::of(&st, 0, &crate::board::Models::new());
+        assert_eq!(text_kind(&crate::board::task_context("docs", &group, &[])).0, CompKind::BiseState);
     }
 
     #[test]

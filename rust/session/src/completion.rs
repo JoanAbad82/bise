@@ -11,6 +11,8 @@
 //! the request's head: every top-level key but the system prompt and the
 //! messages (the model, its params, the tools). Every text is redacted
 //! and a base64 image is a line ("image png · 120 KB"), after the split.
+//! Each row also carries its parts ([`groups`]): whose and what its
+//! tokens are, for `/debug`'s charts.
 
 use crate::history::{call_view, first_line, pretty_json, short_bytes, Body};
 use crate::Redactor;
@@ -398,7 +400,7 @@ fn item_row(n: u64, family: Family, raw: &str, red: &Redactor) -> CompRow {
             if role.is_empty() { if ty.is_empty() { "item".into() } else { ty.clone() } } else { role }
         }
     };
-    CompRow { n, role, head: red.text(&head), blocks, bytes: raw.len() as u64, tokens: (raw.len() as u64).div_ceil(4) }
+    CompRow { n, role, head: red.text(&head), blocks, bytes: raw.len() as u64, tokens: (raw.len() as u64).div_ceil(4), parts: Vec::new() }
 }
 
 /// The system prompt key (`system` / `instructions`) as a row.
@@ -408,7 +410,7 @@ fn system_row(n: u64, raw: &str, red: &Redactor) -> CompRow {
     let mut head = String::new();
     content(Some(&v), red, &mut blocks, &mut head);
     let lines: usize = blocks.iter().map(|b| b.body.text.lines().count()).sum();
-    CompRow { n, role: "system".into(), head: format!("the system prompt · {lines} lines"), blocks, bytes: raw.len() as u64, tokens: (raw.len() as u64).div_ceil(4) }
+    CompRow { n, role: "system".into(), head: format!("the system prompt · {lines} lines"), blocks, bytes: raw.len() as u64, tokens: (raw.len() as u64).div_ceil(4), parts: Vec::new() }
 }
 
 /// Row 0: the head keys (model, params) as one JSON block, the tools as
@@ -436,7 +438,7 @@ fn head_row(s: &Split, red: &Redactor) -> CompRow {
         blocks.push(json_block(Some(&format!("tools · {n_tools}")), t, red));
     }
     let head = format!("{} · {model} · {n_tools} tools", s.family.word());
-    CompRow { n: 0, role: "request".into(), head, blocks, bytes, tokens: bytes.div_ceil(4) }
+    CompRow { n: 0, role: "request".into(), head, blocks, bytes, tokens: bytes.div_ceil(4), parts: Vec::new() }
 }
 
 /// The rows of a body: the head, the system prompt, the messages.
@@ -448,7 +450,18 @@ pub fn rows(s: &Split, red: &Redactor) -> Vec<CompRow> {
             Part::Item => item_row(x.n, s.family, x.raw, red),
         });
     }
-    out
+    with_parts(out, s, red)
+}
+
+/// Each row with its parts ([`groups::parts`]), the same in both views.
+fn with_parts(mut rows: Vec<CompRow>, s: &Split, red: &Redactor) -> Vec<CompRow> {
+    let mut parts = groups::parts(s, red);
+    for r in &mut rows {
+        if let Some(p) = parts.get_mut(r.n as usize) {
+            r.parts = std::mem::take(p);
+        }
+    }
+    rows
 }
 
 /// The rows of each slice as its raw bytes (`r`: the JSON sent, as is),
@@ -477,11 +490,14 @@ pub fn raw_rows(s: &Split, red: &Redactor) -> Vec<CompRow> {
                 blocks: vec![block],
                 bytes: x.raw.len() as u64,
                 tokens: (x.raw.len() as u64).div_ceil(4),
+                parts: Vec::new(),
             }),
         }
     }
-    out
+    with_parts(out, s, red)
 }
+
+pub mod groups;
 
 #[cfg(test)]
 mod tests;

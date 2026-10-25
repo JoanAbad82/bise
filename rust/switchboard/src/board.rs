@@ -190,8 +190,9 @@ fn parties_of<'a>(ms: &[&'a crate::model::Msg]) -> Vec<&'a str> {
 /// main's unanswered messages (both built from the messages alone, so
 /// contexts.rs keeps them until the messages change).
 pub fn main_context(st: &State, now: u64, threads: &[String], questions: &[String]) -> String {
-    let mut s = String::from(
-        "<bise_state>\nLive state injected by bise before this call (not a user message).\n<task_board>\n",
+    let mut s = format!(
+        "<{}>\nLive state injected by bise before this call (not a user message).\n<task_board>\n",
+        bise_proto::envelope::BISE_STATE
     );
     let tasks: Vec<&Agent> = st
         .tasks()
@@ -236,7 +237,7 @@ pub fn main_context(st: &State, now: u64, threads: &[String], questions: &[Strin
         .collect();
     push_block(&mut s, "open_notifications", &cards);
     push_block(&mut s, "questions_for_you", questions);
-    s.push_str("</bise_state>");
+    s.push_str(&format!("</{}>", bise_proto::envelope::BISE_STATE));
     s
 }
 
@@ -492,7 +493,8 @@ impl<'a> Group<'a> {
 /// `questions`: [`questions_for`] its unanswered messages.
 pub fn task_context(name: &str, group: &Group, questions: &[String]) -> String {
     let mut s = format!(
-        "<bise_state>\nLive state injected by bise before this call (not a user message). You are `{}`.\n<group>\n",
+        "<{}>\nLive state injected by bise before this call (not a user message). You are `{}`.\n<group>\n",
+        bise_proto::envelope::BISE_STATE,
         name
     );
     for l in group.seen_by(name) {
@@ -501,7 +503,7 @@ pub fn task_context(name: &str, group: &Group, questions: &[String]) -> String {
     }
     s.push_str("</group>\n");
     push_block(&mut s, "questions_for_you", questions);
-    s.push_str("</bise_state>");
+    s.push_str(&format!("</{}>", bise_proto::envelope::BISE_STATE));
     s
 }
 

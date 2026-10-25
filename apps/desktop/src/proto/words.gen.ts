@@ -6,6 +6,7 @@
 export { bims } from './words_bims.gen';
 export { common } from './words_common.gen';
 export { composer } from './words_composer.gen';
+export { debug } from './words_debug.gen';
 export { hero } from './words_hero.gen';
 export { inbox } from './words_inbox.gen';
 export { library } from './words_library.gen';

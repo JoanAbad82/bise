@@ -82,6 +82,7 @@ pub mod context;
 pub mod core;
 pub mod diff;
 pub mod draft;
+pub mod envelope;
 pub mod helper;
 pub mod hub;
 pub mod inbox;

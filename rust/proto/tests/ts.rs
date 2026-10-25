@@ -79,6 +79,9 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
             log::LogItem,
             log::CompBlock,
             log::CompRow,
+            log::CompRole,
+            log::CompKind,
+            log::CompPart,
             log::CompSlot,
             log::CompletionAsk,
             log::Completion

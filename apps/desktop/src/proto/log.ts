@@ -98,7 +98,32 @@ head: string, blocks: Array<CompBlock>,
 /**
  * the bytes of its slice of the body, and its tokens (bytes / 4)
  */
-bytes: number, tokens: number, };
+bytes: number, tokens: number, 
+/**
+ * what its tokens are, part by part (`bise_session::completion::groups`);
+ * their tokens sum to `tokens`. Empty from an older hub.
+ */
+parts?: Array<CompPart>, };
+
+/**
+ * Whose a part of the request is, the first level of `/debug`'s charts.
+ */
+export type CompRole = "system" | "user" | "assistant" | "tool_call" | "tool_result" | "unknown";
+
+/**
+ * What a part is, the second level (with a tool, its name in `names`).
+ */
+export type CompKind = "prompt" | "tools" | "params" | "mid" | "words" | "agent_message" | "bise_state" | "preamble" | "summary" | "note" | "tagged" | "text" | "thinking" | "image" | "tool" | "other" | "unknown";
+
+/**
+ * One part of a row: a content block, a call, a tool's definition, with
+ * its share of the row's tokens.
+ */
+export type CompPart = { role: CompRole, kind: CompKind, 
+/**
+ * data, never words: a tool, a program, an agent, a tag (at most 2)
+ */
+names?: Array<string>, tokens: number, };
 
 /**
  * One request the agent's ring keeps (`bise_session::reqlog`), for
