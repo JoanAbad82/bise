@@ -21,7 +21,7 @@ export const side = {
   /** a count of working agents (a bubble's tip, the agents card's head) */
   working: (a: { n: string | number }): string => String(a.n) + " working",
   /** a count of agents that ask him something */
-  asks: (a: { n: string | number }): string => String(a.n) + " asks",
+  asks: (a: { n: string | number }): string => String(a.n) + " asking",
   /** a count of new artifacts */
   new_count: (a: { n: string | number }): string => String(a.n) + " new",
   /** a count of artifacts (the artifacts bubble's tip) */

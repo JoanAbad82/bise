@@ -205,7 +205,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
         )}
         {open === 'artifacts' && (
           <Flyout id="artifacts" name={bubbleName('artifacts')} says={bubbleSays('artifacts', counts)} top={cardTop('artifacts')}
-            add={<AddButton place={addPlace} className="s3-icon-btn" testId="app.flyout.artifacts.add" />}
+            add={<AddButton place={addPlace} testId="app.flyout.artifacts.add" />}
             onPin={() => { openOverview(project, 'artifacts'); }}
             foot={{ left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), right: side.all_artifacts, onRight: () => { router.go({ screen: 'artifacts', project }); } }}>
             {artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} />)}
