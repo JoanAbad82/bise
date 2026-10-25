@@ -77,6 +77,11 @@
     "one": null,
     "text": "add a project"
   },
+  "settings.add_project_more": {
+    "args": [],
+    "one": null,
+    "text": "add a project…"
+  },
   "settings.add_rescan": {
     "args": [],
     "one": null,
@@ -3652,6 +3657,13 @@
     "one": null,
     "text": "keep"
   },
+  "settings.project_menu": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "{name}: rename, move, remove"
+  },
   "settings.project_name_field": {
     "args": [],
     "one": null,
@@ -3673,6 +3685,13 @@
     "args": [],
     "one": null,
     "text": "rename"
+  },
+  "settings.project_tip": {
+    "args": [
+      "path"
+    ],
+    "one": null,
+    "text": "{path} · drag to move it"
   },
   "settings.project_up": {
     "args": [],

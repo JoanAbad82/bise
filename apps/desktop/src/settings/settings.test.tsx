@@ -208,12 +208,28 @@ describe('Settings', () => {
     expect(screen.getByTestId('settings.account.chatgpt').getAttribute('aria-busy')).toBe('true');
   });
 
+  it("projects: one line each, the ⌘N key at the row's right, never a box over the name (his shot, designer m_41841)", () => {
+    view('projects', ports(), { home: '/Users/camille' }, storeWith());
+    const row = screen.getByTestId('settings.projects.acme-1a2b3c4d');
+    const key = [...row.querySelectorAll('.b-kbd')];
+    expect(key.map((k) => k.textContent)).toEqual(['⌘1']);
+    // the key sits in the row's end, beside the ⋯, never in the name's column (where it stretched)
+    expect(key[0]?.parentElement?.classList.contains('sp-end')).toBe(true);
+    expect(row.querySelector('.sp-name .b-kbd')).toBeNull();
+    // its folder said short, the whole one in the row's tip
+    expect(screen.getByTestId('settings.project.acme-1a2b3c4d.path').textContent).toBe('~/acme');
+    expect(row.getAttribute('data-tip')).toContain('/Users/camille/acme');
+  });
+
   it('projects: remove asks once; rename; add a found repo with land', () => {
     const p = ports();
     view('projects', p, {}, storeWith());
+    // remove and rename sit in the row's ⋯ menu (designer m_41841)
+    fireEvent.click(screen.getByTestId('settings.project.acme-1a2b3c4d.more'));
     fireEvent.click(screen.getByTestId('settings.project.acme-1a2b3c4d.remove'));
     expect(p.sent).toEqual([]);
     fireEvent.click(screen.getByTestId('settings.project.acme-1a2b3c4d.remove.yes'));
+    fireEvent.click(screen.getByTestId('settings.project.acme-1a2b3c4d.more'));
     fireEvent.click(screen.getByTestId('settings.project.acme-1a2b3c4d.rename'));
     const n = screen.getByTestId<HTMLInputElement>('settings.project.acme-1a2b3c4d.name');
     n.value = 'engine';

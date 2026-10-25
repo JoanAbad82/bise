@@ -5,6 +5,33 @@
 .settings .b-set { height: 100%; min-height: 0; }
 .settings .b-set .nav, .settings .b-set .pg { min-height: 0; overflow-y: auto; }
 .settings-row-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
+/* settings › projects (projects.tsx, designer m_41841): one 32 px row each, on the column, its fill
+   8 px past it as on every list; the name, then its folder short; at the right its ⌘N, then the ⋯
+   whose slot stays (shown on hover, focus or its menu open: nothing moves). A drag lifts the row
+   (--c-raised, --e-2) and a 2 px ink line marks where it lands. */
+.sp-list { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--pad-row-x)); }
+.sp-row { position: relative; display: flex; align-items: center; gap: var(--gap-inline); height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); outline: none; touch-action: none; user-select: none; }
+.sp-row:hover, .sp-row:focus-visible, .sp-row[data-menu] { background: var(--c-hover); }
+.sp-row:focus-visible { box-shadow: inset 0 0 0 1px var(--c-focus); }
+.sp-list[data-drag] .sp-row:not([data-lifted]) { background: none; }
+.sp-row[data-lifted] { z-index: 1; background: linear-gradient(var(--c-raised), var(--c-raised)), var(--c-solid); box-shadow: var(--e-2); cursor: grabbing; }
+.sp-row[data-drop]::before { content: ""; position: absolute; left: var(--pad-row-x); right: var(--pad-row-x); height: 2px; border-radius: 1px; background: var(--c-ink); }
+.sp-row[data-drop="before"]::before { top: -1px; }
+.sp-row[data-drop="after"]::before { bottom: -1px; }
+.sp-name { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: var(--s-2); overflow: hidden; white-space: nowrap; }
+.sp-name .b-field { width: 100%; }
+.sp-n { flex: none; font: var(--t-13) var(--font-ui); color: var(--c-text); }
+.sp-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.sp-path.err { color: var(--c-err); }
+.sp-end { flex: none; display: inline-flex; align-items: center; gap: var(--gap-inline); }
+.sp-end .b-kbd { color: var(--c-text-3); }
+.sp-more { visibility: hidden; }
+.sp-more .b-ibtn { color: var(--c-text-3); }
+.sp-more .b-ibtn:hover { color: var(--c-text); }
+.sp-row:hover .sp-more, .sp-row:focus-visible .sp-more, .sp-row:focus-within .sp-more, .sp-row[data-menu] .sp-more { visibility: visible; }
+.sp-list[data-drag] .sp-more { visibility: hidden; }
+.sp-menu-err .b-picker-row { color: var(--c-err); }
+.sp-add { display: block; margin: var(--s-3) 0 0 calc(-1 * var(--pad-control-x-sm)); }
 /* the key field and its caption are one block: 4 between them, then the group gap before the next title (designer m_21395) */
 .settings-key { margin: var(--s-3) 0 var(--gap-section); max-width: 420px; }
 .settings-key .b-help { margin-top: var(--gap-tight); }

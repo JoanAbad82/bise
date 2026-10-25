@@ -22,6 +22,12 @@ crate::words! { settings:
     project_remove_ask(name) = "remove {name} from bise? its folder and its git history stay.";
     /// the add button; the add sheet's head
     add_project = "add a project";
+    /// the projects page's add button, under the list (designer m_41841)
+    add_project_more = "add a project…";
+    /// a project row's ⋯: its name in words (aria-label, tip)
+    project_menu(name) = "{name}: rename, move, remove";
+    /// a project row's tip: its folder whole, and that it moves by dragging
+    project_tip(path) = "{path} · drag to move it";
 
     /// the add sheet's line under its head
     add_sub = "a folder, a git repo. its main starts right away.";
