@@ -160,7 +160,7 @@ pub fn expand(text: &str, store: &Path) -> Result<String, String> {
     }
     let store = std::fs::canonicalize(store).ok();
     let segs: Vec<&str> = text.split('\0').collect();
-    if segs.len() % 2 == 0 {
+    if segs.len().is_multiple_of(2) {
         return Err("an image part with no end".into());
     }
     let mut out = String::with_capacity(text.len());
