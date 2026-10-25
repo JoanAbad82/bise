@@ -602,6 +602,10 @@ def reply_for(conv, seen=0):
     # image, text `</image>` (docs/images.md): a model says `[Image #1]`,
     # it does not echo the framing
     user = re.sub(r'<image name=(\[[^\]]*\])[^>]*>\s*</image>', r"\1", user)
+    # his own words come framed `<user_message id="m_2">…</user_message>`
+    # (msg-forward): a model answers the words, not the frame; a routed one
+    # (`via="main"`) keeps its frame, the tests check the route by it
+    user = re.sub(r'<user_message id="[^"]*">\s*(.*?)\s*</user_message>', r"\1", user, flags=re.S)
     turn["text"] = "ack: " + " ".join(user.split())[:300]
     return turn
 

@@ -227,7 +227,10 @@ def in_view(name):
 MAIN_IDLE = r"\b0 ○ main\b|you → main(?: · [\w.\-]+(?:[ ·][\w.\-]+)*)* ─"
 
 
-PLACEHOLDER = re.compile(r"^(%s|%s)$" % (re.escape(w("composer.placeholder_main")), w_re("composer.placeholder_agent")))
+# a sub-agent's: 'write to perf, then ⏎ · esc back to main', its head dropped when it doesn't fit
+PLACEHOLDER = re.compile(r"^(%s|(?:%s · )?%s|%s)$" % (
+    re.escape(w("composer.placeholder_main")), w_re("composer.placeholder_to"),
+    w_re("composer.esc_back_to"), w_re("composer.placeholder_to")))
 
 
 def pane_rows(rows):
