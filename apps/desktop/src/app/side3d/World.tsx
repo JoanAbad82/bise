@@ -199,11 +199,12 @@ function WorldOffice({ project, agents, cards, shot }: OfficeOf & { readonly sho
  * 148. From the beat's start to the start of its return. Pure render.
  */
 function BeatLabel({ agent, cards, mid }: { readonly agent: Agent; readonly cards: readonly Card[]; readonly mid: number }) {
-  const s = speechOf(agent, cards);
+  // it asks him when it has open cards (the beat's own signal, camera.ts seenOf), even before its card is in `cards`
+  const asks = agent.waits > 0;
   return (
     <span className="s3-beat" style={{ top: mid }} data-testid="app.world.beat">
       <b>{agent.name}</b>
-      <span className="s3-beat-says" data-asks={s.k === 'asks' || undefined}>{speechWord(s)}</span>
+      <span className="s3-beat-says" data-asks={asks || undefined}>{asks ? side.state_asks : speechWord(speechOf(agent, cards))}</span>
     </span>
   );
 }
