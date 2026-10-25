@@ -23,19 +23,29 @@ crate::words! { frame:
     /// the same row once open: back to the first 4
     show_less = "Show less";
     /// the rail's VoiceOver name
-    places = "places";
+    places = "Places";
     /// a control's hover tip with its key ('inbox · ⌘I')
     tip_key(what, key) = "{what} · {key}";
     /// the bar's sidebar button, its VoiceOver name while the sidebar shows
-    hide_sidebar = "hide sidebar";
+    hide_sidebar = "Hide sidebar";
     /// the same button while the sidebar is hidden
-    show_sidebar = "show sidebar";
+    show_sidebar = "Show sidebar";
     /// the bar's back arrow (⌘[)
-    back = "back";
+    back = "Back";
     /// the bar's forward arrow (⌘])
-    forward = "forward";
+    forward = "Forward";
     /// the rail's last button: settings (⌘,)
-    settings = "settings";
+    settings = "Settings";
+    /// the rail's inbox button: its VoiceOver name and tip (chrome: sentence case, designer m_43052)
+    inbox = "Inbox";
+    /// the rail's scheduled button
+    scheduled = "Scheduled";
+    /// the rail's artifacts button
+    artifacts = "Artifacts";
+    /// the rail's plugins button
+    plugins = "Plugins";
+    /// the '+' at the Projects label's end: its VoiceOver name and tip
+    add_project = "Add a project";
     /// the sidebar border's VoiceOver name (drag it, or ←/→)
-    sidebar_width = "sidebar width";
+    sidebar_width = "Sidebar width";
 }

@@ -3,38 +3,78 @@
 // <InBar>{its BarSearch, its right-side action}</InBar> anywhere in its tree and that content shows
 // in the bar (a portal), gone when the page unmounts. One page's content at a time: the route's
 // screen (App.tsx remounts the screen on each route). The slot drags the window like the bar;
-// what a page puts in it does not (app.css .app-barslot > *). Owner: nm-frame.
-import { useSyncExternalStore, type ReactNode } from 'react';
+// what a page puts in it does not (app.css .app-barslot > *).
+// <InTitle>{node}</InTitle> (nm-thread m_43271) does the same for the bar's title: while mounted, its
+// node replaces the title's text (the thread's inline rename field); the subtitle stays. Owner: nm-frame.
+import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-let slot: HTMLElement | null = null;
-const listeners = new Set<() => void>();
-
-function setSlot(el: HTMLElement | null): void {
-  if (slot === el) return;
-  slot = el;
-  for (const l of listeners) l();
-}
-
-function subscribe(cb: () => void): () => void {
-  listeners.add(cb);
-  return () => {
-    listeners.delete(cb);
+/** One portal target in the bar: its element (null: no bar drawn, the onboarding's window) and how many fill it. */
+function slotStore() {
+  let el: HTMLElement | null = null;
+  let users = 0;
+  const listeners = new Set<() => void>();
+  const tell = () => {
+    for (const l of listeners) l();
+  };
+  const subscribe = (cb: () => void) => {
+    listeners.add(cb);
+    return () => {
+      listeners.delete(cb);
+    };
+  };
+  return {
+    set: (next: HTMLElement | null): void => {
+      if (el === next) return;
+      el = next;
+      tell();
+    },
+    useEl: (): HTMLElement | null => useSyncExternalStore(subscribe, () => el),
+    useFilled: (): boolean => useSyncExternalStore(subscribe, () => users > 0),
+    /** Counts one filler while it is mounted. */
+    useFill(): void {
+      useEffect(() => {
+        users += 1;
+        tell();
+        return () => {
+          users -= 1;
+          tell();
+        };
+      }, []);
+    },
   };
 }
 
-/** The bar's slot element now (null: no bar drawn, the onboarding's window). */
-function useSlot(): HTMLElement | null {
-  return useSyncExternalStore(subscribe, () => slot);
-}
+const bar = slotStore();
+const title = slotStore();
+// the slots' ref callbacks, plain module functions (a store's field read in render reads as a ref to the lint)
+const setBar = bar.set;
+const setTitle = title.set;
 
 /** The slot, in the title bar (Frame.tsx): empty until a page fills it. */
 export function BarSlot() {
-  return <div ref={setSlot} className="app-barslot" data-testid="app.bar.slot" />;
+  return <div ref={setBar} className="app-barslot" data-testid="app.bar.slot" />;
 }
 
 /** What a page shows in the window's bar: its search, its action; nothing once the page leaves. */
 export function InBar({ children }: { children: ReactNode }) {
-  const el = useSlot();
+  const el = bar.useEl();
+  return el === null ? null : createPortal(children, el);
+}
+
+/** The bar's title: its text, or what an <InTitle> puts there while it is mounted. */
+export function TitleSlot({ text }: { text: ReactNode }) {
+  const filled = title.useFilled();
+  return (
+    <span ref={setTitle} className="t" data-testid="app.bar.title.text">
+      {filled ? null : text}
+    </span>
+  );
+}
+
+/** What replaces the bar's title text while it is mounted (the thread's rename field); nothing once it leaves. */
+export function InTitle({ children }: { children: ReactNode }) {
+  title.useFill();
+  const el = title.useEl();
   return el === null ? null : createPortal(children, el);
 }

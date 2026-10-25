@@ -222,8 +222,6 @@ export const panel = {
   plugins: "plugins",
   /** the projects' head */
   projects: "projects",
-  /** no project yet */
-  add_project: "add a project",
   /** a project row: its folder is gone */
   folder_gone: "folder gone",
   /** a project row: its hub refused this core */

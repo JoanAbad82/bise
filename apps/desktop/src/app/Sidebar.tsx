@@ -270,8 +270,8 @@ function AddProject() {
   return (
     <Press
       look="app-s-add"
-      aria-label={panel.add_project}
-      {...tipAttrs(panel.add_project)}
+      aria-label={frame.add_project}
+      {...tipAttrs(frame.add_project)}
       onClick={() => {
         addProject(router);
       }}

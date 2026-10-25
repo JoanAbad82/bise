@@ -3,7 +3,7 @@
 // the page; it leaves with the page; without a bar it draws nothing.
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { BarSlot, InBar } from './barslot';
+import { BarSlot, InBar, InTitle, TitleSlot } from './barslot';
 
 afterEach(cleanup);
 
@@ -39,5 +39,34 @@ describe('InBar', () => {
   it('draws nothing when no bar is mounted', () => {
     const v = render(<Shell page bar={false} />);
     expect(v.queryByTestId('page.search')).toBeNull();
+  });
+});
+
+function Titled({ renaming }: { renaming: boolean }) {
+  return (
+    <div>
+      <header>
+        <TitleSlot text="perf" />
+        <span data-testid="sub">profiling the hub</span>
+      </header>
+      <main data-testid="page">{renaming && <InTitle><input data-testid="rename" /></InTitle>}</main>
+    </div>
+  );
+}
+
+describe('InTitle', () => {
+  it("replaces the title's text while mounted, the subtitle stays", () => {
+    const v = render(<Titled renaming />);
+    const t = v.getByTestId('app.bar.title.text');
+    expect(t.contains(v.getByTestId('rename'))).toBe(true);
+    expect(t.textContent).toBe('');
+    expect(v.getByTestId('sub').textContent).toBe('profiling the hub');
+  });
+
+  it('gives the title its text back once it unmounts', () => {
+    const v = render(<Titled renaming />);
+    v.rerender(<Titled renaming={false} />);
+    expect(v.getByTestId('app.bar.title.text').textContent).toBe('perf');
+    expect(v.queryByTestId('rename')).toBeNull();
   });
 });

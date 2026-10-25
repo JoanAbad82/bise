@@ -21,7 +21,7 @@ import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
 import { BarTabs } from "./panel/BarTabs";
-import { BarSlot } from "./barslot";
+import { BarSlot, TitleSlot } from "./barslot";
 import { frameLeft, useLeft } from "./frame-state";
 import { SIDE, sideWidthOf, UNFOLD_PX } from "./resize";
 import { crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
@@ -354,9 +354,7 @@ export function Bar({ frame: state }: { frame: FrameState }) {
         <HistoryArrows name={name} />
       </div>
       <div className="app-bar-title" data-testid="app.bar.title">
-        <span className="t" data-testid="app.bar.title.text">
-          {t.title}
-        </span>
+        <TitleSlot text={t.title} />
         {t.sub.length > 0 && (
           <span className="s" data-testid="app.bar.title.sub">
             {t.sub.map((p, i) => (

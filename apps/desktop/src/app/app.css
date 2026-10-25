@@ -94,7 +94,9 @@ body:has(.app-shell) {
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  width: max(calc(var(--w-rail) + var(--side-col, 0px)), calc(var(--s-6) * 4 + var(--h-control-sm) * 3 + var(--s-1) * 2 + var(--s-4)));
+  /* border-box: the lights' 96 counts inside the width, so the lead ends on the content's left edge */
+  box-sizing: border-box;
+  width: max(calc(var(--w-rail) + var(--side-col, 0px)), calc(var(--s-6) * 4 + var(--h-control-sm) * 3 + var(--s-1) * 2));
   padding-left: calc(var(--s-6) * 4);
   transition: width var(--d-base) var(--ease-out);
 }
@@ -128,14 +130,14 @@ body:has(.app-shell) {
   outline: 2px solid var(--c-focus);
   outline-offset: 0;
 }
-/* the title from 16 left of the content, its subtitle 8 after */
+/* the title 24 into the content (mockups 1-4: x 320 with the rail and a 240 sidebar), its subtitle 8 after */
 .app-bar-title {
   flex: 0 1 auto;
   min-width: 0;
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
-  padding-left: var(--s-4);
+  padding-left: var(--s-6);
   overflow: hidden;
 }
 .app-bar-title .t {
@@ -326,9 +328,16 @@ body:has(.app-shell) {
   flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s-1);
   color: var(--c-text-3);
   font: 400 var(--f-meta);
+}
+/* an agent's or a project's end: one 10 box for the dot and the ring alike, so a name never shifts */
+.app-s-row.agent .app-s-end,
+.app-s-row.project .app-s-end {
+  width: calc(var(--s-2) + var(--s-1) / 2);
+  height: calc(var(--s-2) + var(--s-1) / 2);
 }
 .app-s-end kbd {
   font: inherit;
@@ -341,20 +350,11 @@ body:has(.app-shell) {
   background: var(--c-accent);
 }
 .app-s-ring {
+  box-sizing: border-box;
   width: calc(var(--s-2) + var(--s-1) / 2);
   height: calc(var(--s-2) + var(--s-1) / 2);
   border-radius: 50%;
   border: 1.5px solid var(--c-text-3);
-  border-right-color: transparent;
-  animation: app-s-spin 1s linear infinite;
-}
-@keyframes app-s-spin {
-  to {
-    transform: rotate(1turn);
-  }
-}
-:root[data-still] .app-s-ring {
-  animation: none;
 }
 .app-s-label {
   flex: none;
@@ -373,8 +373,8 @@ body:has(.app-shell) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--s-5));
-  height: calc(var(--s-5));
+  width: var(--s-6);
+  height: var(--s-6);
   padding: 0;
   border: 0;
   border-radius: var(--r-1);

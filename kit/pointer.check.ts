@@ -1,9 +1,11 @@
 // bise kit · the hand on every thing he can click (his words: « chaque élément interactif, chaque
 // bouton, chaque chose sur lequel tu peux cliquer ... devrait avoir un cursor pointer »), on the
 // web surfaces outside the desktop app: the kit's pages, the artifact viewers, bise.dev.
-// The desktop ds owns the root rule (apps/desktop/src/ds/css/base.css: a control or a clickable
-// role gets the pointer, a disabled one the arrow); each stylesheet a page here starts from carries
-// the same two lines, and none puts the arrow back on a control. No browser, no deps.
+// The kit owns the web's root rule (kit/kit.css: a control or a clickable role gets the pointer, a
+// disabled one the arrow); each stylesheet a page here starts from carries the same two lines, and
+// none puts the arrow back on a control. The desktop app has its own rule since bise fait mac
+// (17242f0d0, apps/desktop/src/ds/css/base.css: macOS's arrow on controls, the hand on links only;
+// ds/pointer.test.tsx keeps it), so this check no longer copies base.css. No browser, no deps.
 //   node --experimental-strip-types kit/pointer.check.ts
 // Mutation: the rule's line dropped from kit/kit.css (or any site page) turns it red.
 import assert from "node:assert/strict";
@@ -20,8 +22,8 @@ function law(name: string, fn: () => void) {
   try { fn(); pass++; console.log("  ✓ " + name); } catch (e) { fail++; console.log("  ✗ " + name + "\n    " + String(e instanceof Error ? e.message : e).split("\n")[0]); }
 }
 
-/** the root rule's two lines, as the desktop ds writes them */
-const base = noComments(read("apps/desktop/src/ds/css/base.css")).split("\n").map((l) => l.trim());
+/** the root rule's two lines, as the kit writes them */
+const base = noComments(read("kit/kit.css")).split("\n").map((l) => l.trim());
 const HAND = base.find((l) => l.startsWith(":where(") && l.endsWith("{cursor:pointer}")) ?? "";
 const ARROW = base.find((l) => l.startsWith(":is(:disabled") && l.includes("cursor:default")) ?? "";
 
@@ -37,12 +39,12 @@ const ROOTS = [
 const SHEETS = [...ROOTS, "kit/notes.css", "kit/site.css", "kit/office/select.css", "site/book/paper.css"];
 const styleOf = (p: string) => (p.endsWith(".html") ? [...read(p).matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n") : read(p));
 
-law("the desktop ds has the root rule this check copies (base.css: the hand, then the arrow when disabled)", () => {
-  assert.ok(HAND.includes("button") && HAND.includes("[role=button]") && HAND.includes("a[href]"), "no :where(button,a[href],...,[role=button],...){cursor:pointer} line in base.css");
-  assert.ok(ARROW !== "", "no :is(:disabled,...){cursor:default} line in base.css");
+law("the kit has the root rule this check copies (kit.css: the hand, then the arrow when disabled)", () => {
+  assert.ok(HAND.includes("button") && HAND.includes("[role=button]") && HAND.includes("a[href]"), "no :where(button,a[href],...,[role=button],...){cursor:pointer} line in kit/kit.css");
+  assert.ok(ARROW !== "", "no :is(:disabled,...){cursor:default} line in kit/kit.css");
 });
 
-law("every page root carries the root rule, the same text as the desktop ds", () => {
+law("every page root carries the root rule, the same text as the kit", () => {
   const missing = ROOTS.filter((p) => {
     const lines = noComments(styleOf(p)).split("\n").map((l) => l.trim());
     return !lines.includes(HAND) || !lines.includes(ARROW);

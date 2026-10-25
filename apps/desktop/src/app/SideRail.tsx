@@ -44,10 +44,10 @@ export const RAIL_KEYS: Record<RailPlace, string> = { bise: '⌘0', inbox: '⌘I
 
 const NAMES: Record<RailPlace, string> = {
   bise: panel.bise,
-  inbox: panel.inbox,
-  scheduled: panel.scheduled,
-  artifacts: panel.artifacts,
-  plugins: panel.plugins,
+  inbox: frame.inbox,
+  scheduled: frame.scheduled,
+  artifacts: frame.artifacts,
+  plugins: frame.plugins,
   settings: frame.settings,
 };
 
