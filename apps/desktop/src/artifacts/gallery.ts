@@ -193,9 +193,9 @@ export function countTip(s: Stack): string {
   return library.tip_stack({ n: s.items.length, what: stackWhat(s) });
 }
 
-/** The extension's tip on a card's corner: 'xlsx: sheet · xlsx'. Pure. */
-export function extTip(it: Item, ext: string): string {
-  return library.tip_ext({ ext, kind: listKind(oneOf(it)) });
+/** The extension's tip on a card's corner: its kind in words, 'sheet · xlsx', 'image' (designer m_40806). Pure. */
+export function extTip(it: Item): string {
+  return listKind(oneOf(it));
 }
 
 /** A link's domain, for its '↗ github.com' mark: '' when it has none. Pure. */
@@ -345,7 +345,7 @@ export function sheetItems(s: Stack, chip: string | null): readonly Item[] {
   return s.items.filter((it) => tokensOf(captionOf(it, s.title)).includes(chip));
 }
 
-/** A sheet's line under its name: '16 shots amb-home saved in one turn, today 14:02'. Pure. */
+/** A sheet's line under its name: 'amb-home saved 16 shots in one turn · today 14:02'. Pure. */
 export function sheetLine(s: Stack, now: number): string {
   const top = s.items[0] as Item;
   const day = `${dayWords(top.a.at_ms, now)} ${timeOf(top.a.at_ms)}`;

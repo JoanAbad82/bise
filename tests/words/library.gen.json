@@ -527,7 +527,7 @@
       "day"
     ],
     "one": null,
-    "text": "{n} {what} {who} saved in one turn, {day}"
+    "text": "{who} saved {n} {what} in one turn · {day}"
   },
   "library.sort_with_main": {
     "args": [],
@@ -571,14 +571,6 @@
     "one": null,
     "text": "the folders"
   },
-  "library.tip_ext": {
-    "args": [
-      "ext",
-      "kind"
-    ],
-    "one": null,
-    "text": "{ext}: {kind}"
-  },
   "library.tip_folder_more": {
     "args": [],
     "one": null,
@@ -610,7 +602,7 @@
   "library.tip_new": {
     "args": [],
     "one": null,
-    "text": "new: you have not opened it yet"
+    "text": "new: you haven't opened it yet"
   },
   "library.tip_new_dot": {
     "args": [
@@ -622,7 +614,7 @@
   "library.tip_pick": {
     "args": [],
     "one": null,
-    "text": "pick: ⌘-click picks several"
+    "text": "⌘-click picks several"
   },
   "library.tip_stack": {
     "args": [

@@ -1,6 +1,6 @@
 // A stack open (page artifacts-gallery v7, block b-pages 'a stack open'): its contact sheet. Under
-// the screen's header (Screen.tsx, art-folders: the path, its name, ···): one line ('16 shots
-// amb-home saved in one turn, today 14:02'), the filter chips taken from its names ('all 16 · dark
+// the screen's header (Screen.tsx, art-folders: the path, its name, ···): one line ('amb-home
+// saved 16 shots in one turn · today 14:02'), the filter chips taken from its names ('all 16 · dark
 // · light · 1400 · 800', one at a time), then every picture with its caption in mono. The keys are
 // the grid's (←→ ↑↓, ⏎ opens one, space looks, @, v, c, r) and esc goes back to the cards.
 // Owner: art-grid.

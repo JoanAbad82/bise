@@ -117,7 +117,7 @@ describe('the gallery, as he sees it', () => {
     expect(scr.dataset['opened']).toBe('hero');
     fireEvent.keyDown(scr, { key: 'ArrowRight' });
     fireEvent.keyDown(scr, { key: 'Enter' });
-    expect(screen.getByTestId('sheet.line').textContent).toBe('4 shots amb-home saved in one turn, today 14:02');
+    expect(screen.getByTestId('sheet.line').textContent).toBe('amb-home saved 4 shots in one turn · today 14:02');
     expect(screen.getByTestId('sheet.chip.all').textContent).toBe('all 4');
     expect(['dark', 'light', '1400', '800'].every((c) => screen.queryByTestId(`sheet.chip.${c}`) !== null)).toBe(true);
     expect(screen.getByTestId('sheet.item.s1').textContent).toContain('dark · 1400');

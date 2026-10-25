@@ -40,7 +40,7 @@ export function CardPic({ card, it, visible, picked, onPick, onMenu, testId }: {
       {stack && <span className="art-card-s1" aria-hidden="true" />}
       <span className="art-card-th" data-testid={`${testId}.pic`}>
         <Thumb item={it} visible={visible} />
-        {ext !== null && !out && <span className="art-card-x" data-testid={`${testId}.ext`} {...tipAttrs(extTip(it, ext))}>{ext}</span>}
+        {ext !== null && !out && <span className="art-card-x" data-testid={`${testId}.ext`} {...tipAttrs(extTip(it))}>{ext}</span>}
         {stack && <span className="art-card-n" data-testid={`${testId}.count`} {...tipAttrs(countTip(stack))}>{stack.items.length}</span>}
         {out && <span className="art-card-lk" data-testid={`${testId}.out`} {...tipAttrs(library.tip_leaves)}>{domain === '' ? '↗' : `↗ ${domain}`}</span>}
       </span>

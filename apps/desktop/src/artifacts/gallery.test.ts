@@ -42,7 +42,7 @@ describe('the cards: one agent, one turn, one title prefix make one stack', () =
 
   it('a stack opens as a sheet: its line, chips from its names (some share them, not all), one chip keeps its items', () => {
     const s = cardsOf(shots)[0] as Stack;
-    expect(sheetLine(s, NOW)).toBe('4 shots amb-home saved in one turn, today 14:02');
+    expect(sheetLine(s, NOW)).toBe('amb-home saved 4 shots in one turn · today 14:02');
     expect(chipsOf(s)).toEqual(['dark', '1400', 'perf', '800', 'light']);
     expect(sheetItems(s, 'dark').map((it) => it.a.id)).toEqual(['s1', 's2']);
     expect(sheetItems(s, null)).toHaveLength(4);

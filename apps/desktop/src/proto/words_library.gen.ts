@@ -190,24 +190,22 @@ export const library = {
   tip_crumb: "the folders",
   /** a stack's count, `16 shots saved in one turn: opens as a sheet` (what: kind_shots or kind_files) */
   tip_stack: (a: { n: string | number; what: string | number }): string => String(a.n) + " " + String(a.what) + " saved in one turn: opens as a sheet",
-  /** the extension on a card's corner, `xlsx: sheet` */
-  tip_ext: (a: { ext: string | number; kind: string | number }): string => String(a.ext) + ": " + String(a.kind),
   /** a PR's or a link's ↗ on its card */
   tip_leaves: "opens in your browser",
   /** a card's ··· */
   tip_more: "more: open, move, archive…",
   /** a card's pick circle */
-  tip_pick: "pick: ⌘-click picks several",
+  tip_pick: "⌘-click picks several",
   /** a card's line: where it comes from, the project it never shows, `made by epargne-offre in ai-docs` */
   tip_made: (a: { who: string | number; project: string | number }): string => "made by " + String(a.who) + " in " + String(a.project),
   /** the same for what he added himself, `added by you in ai-docs` */
   tip_added: (a: { project: string | number }): string => "added by you in " + String(a.project),
   /** a card's new chip */
-  tip_new: "new: you have not opened it yet",
+  tip_new: "new: you haven't opened it yet",
   /** who made it, when he added it himself: `you · 10:00` */
   you: "you",
-  /** a stack open, its line: `16 shots amb-home saved in one turn, today 14:02` */
-  sheet_line: (a: { n: string | number; what: string | number; who: string | number; day: string | number }): string => String(a.n) + " " + String(a.what) + " " + String(a.who) + " saved in one turn, " + String(a.day),
+  /** a stack open, its line: `amb-home saved 16 shots in one turn · today 14:02` */
+  sheet_line: (a: { n: string | number; what: string | number; who: string | number; day: string | number }): string => String(a.who) + " saved " + String(a.n) + " " + String(a.what) + " in one turn · " + String(a.day),
   /** a stack open, its first chip: `all 16` */
   sheet_all: (a: { n: string | number }): string => "all " + String(a.n),
   /** the list view's head: the name column */
