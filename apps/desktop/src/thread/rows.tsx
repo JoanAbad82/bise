@@ -245,7 +245,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
         </div>
       );
     case 'compacted':
-      return <CompactedRow e={e} />;
+      return <CompactedRow e={e} ctx={ctx} />;
     // R12: a failed turn is its own row with why, in the TUI's words (proto words::turn_failed: '✗ turn
     // failed: provider 500', a missing key's line; a plan line, its own words, a ▲), never a silent stop
     case 'turn_failed': {

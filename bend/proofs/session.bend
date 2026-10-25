@@ -125,10 +125,7 @@ def Laws.turn_words_keep_the_old_outcomes():
 def Laws.turn_failed_reads_an_interrupt():
   {==}
 
-def Laws.compaction_preview_one_line():
-  {==}
-
-def Laws.compaction_preview_unescapes():
+def Laws.compaction_done_carries_whole_summary():
   {==}
 
 def Laws.implicit_say():

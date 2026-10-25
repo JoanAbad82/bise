@@ -12,6 +12,7 @@ import { cardLine, EntryRow, foldOf, NOTICE_MARK, thoughtFor, toAgentName, type 
 import { onOpenInbox } from '@/inbox/Block';
 import { countsOf, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
+import { createFolds, FoldsContext } from './folds';
 
 vi.mock('@/composer', () => ({
   // the tab is the screen's words (ComposerTab): drawn, the field is not
@@ -277,6 +278,36 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(v.getByTestId('thread.compacted.23').textContent).not.toContain('we profiled');
     fireEvent.click(v.getByTestId('thread.compacted.23.head'));
     expect(v.getByTestId('thread.compacted.23').textContent).toContain('we profiled the hub');
+  });
+
+  it('compaction: ctrl+o (or a click) opens the whole summary as markdown, never cut; again folds it', () => {
+    const store = new Store(null);
+    const tail = 'the cold run is slow because the index is rebuilt at every start, keep it warm';
+    const summary = ['## What was done', '- profiled the **hub**', `- ${tail}`].join(String.fromCharCode(10));
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 23, at_ms: 2, kind: 'compacted', text: summary } });
+    const folds = createFolds();
+    const v = render(
+      <StoreProvider store={store}>
+        <FoldsContext.Provider value={folds}>
+          <EntryRow ctx={ctx} pos={23} />
+        </FoldsContext.Provider>
+      </StoreProvider>,
+    );
+    expect(v.queryByTestId('thread.compacted.23.body')).toBeNull();
+    // ctrl+o: the window's fold-all (keys.ts), every fold of the thread
+    act(() => {
+      folds.toggle();
+    });
+    const body = v.getByTestId('thread.compacted.23.body');
+    expect(body.querySelector('h2')?.textContent).toBe('What was done');
+    expect(body.querySelector('strong')?.textContent).toBe('hub');
+    expect([...body.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['profiled the hub', tail]);
+    act(() => {
+      folds.toggle();
+    });
+    expect(v.queryByTestId('thread.compacted.23.body')).toBeNull();
+    fireEvent.click(v.getByTestId('thread.compacted.23.head'));
+    expect(v.getByTestId('thread.compacted.23.body').textContent).toContain(tail);
   });
 
   it('a notice says its level in a glyph, not by color alone; an unknown kind is its words, dim', () => {

@@ -44,3 +44,15 @@ fn an_unknown_or_bad_record_is_other() {
     assert_eq!(o, Obs::Other(r#"tool_started :: {"call":"x"}"#.into()));
     assert_eq!(read("obs nothing here"), Rec::Raw("obs nothing here".into()));
 }
+
+/// The line Bend writes for a compaction's end (bend/laws/session.bend
+/// compaction_done_carries_whole_summary, character for character):
+/// the whole summary, its newline, tab and quotes back as they were.
+#[test]
+fn a_compaction_line_carries_the_whole_summary() {
+    let rest = r#"- veut\t\"ça\" en entier, sans coupe après quarante caractères"#;
+    let line = format!(r###"obs compaction_done :: {{"summary":"## Le user{}n{rest}"}}"###, '\\');
+    let Rec::Obs(o) = read(&line) else { panic!() };
+    let summary = format!("## Le user{}- veut{}\"ça\" en entier, sans coupe après quarante caractères", char::from(10), char::from(9));
+    assert_eq!(o, Obs::CompactionDone(summary));
+}

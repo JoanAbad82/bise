@@ -136,7 +136,6 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
-/** The summary its context was compacted to: one folded line. */
 /**
  * A scheduled task (sb every) set, run or ended, as the TUI's faint '◷ head ▸' row (wire.rs
  * Scheduled): the head is the hub's words as sent; the words it sends open under it (none: no ▸).
@@ -180,7 +179,11 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
-export function CompactedRow({ e }: { e: Entry }) {
+/**
+ * The summary its context was compacted to: one folded line; a click or ⌃O opens the whole summary
+ * as markdown (the hub sends it whole; an older transcript's 40-char preview shows as it came).
+ */
+export function CompactedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const [open, setOpen] = useFold(false, e.pos);
   const hint = useFoldHint();
   const toggle = () => {
@@ -191,7 +194,11 @@ export function CompactedRow({ e }: { e: Entry }) {
       <Fold open={open} onToggle={e.text === '' ? undefined : toggle} hint={e.text === '' ? undefined : hint} testId={`thread.compacted.${e.pos}.head`}>
         {thread.compacted}
       </Fold>
-      {open && e.text !== '' && <div className="th-think-body">{e.text}</div>}
+      {open && e.text !== '' && (
+        <div className="th-compact-body" data-testid={`thread.compacted.${e.pos}.body`}>
+          <Markdown text={e.text} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
+        </div>
+      )}
     </div>
   );
 }

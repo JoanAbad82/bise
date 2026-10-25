@@ -881,6 +881,30 @@ fn computer_actions_are_rows_of_their_own() {
     assert!(!rows.iter().any(|r| r.contains("computer.act")), "{}", rows.join("\n"));
 }
 
+/// The compaction's summary folds like the other rows: ctrl+o opens it
+/// (and closes it again), and open it shows every word of the whole
+/// summary as markdown (its heading without the `##`, its list), wrapped
+/// to the width, never cut.
+#[test]
+fn ctrl_o_opens_the_whole_compaction_summary_as_markdown() {
+    let tail = "the cold run is slow because the index is rebuilt at every start, keep it warm";
+    let summary = ["## What was done", "- profiled the **hub**", &format!("- {tail}")].join(&char::from(10).to_string());
+    let mut events = vec![Ev::Compacted { text: summary, open: false }];
+    let mut cache: Vec<Option<EventRows>> = vec![None];
+    assert_eq!(feed_text(&events, 40), [" ≡ summary ▸"]);
+    crate::feed::set_everything(&mut events, &mut cache, true);
+    let rows = feed_text(&events, 40);
+    assert_eq!(rows[0], " ≡ summary ▾");
+    assert!(rows.iter().any(|r| r.ends_with("│ What was done")), "{rows:#?}");
+    assert!(!rows.iter().any(|r| r.contains("##") || r.contains("**")), "{rows:#?}");
+    let said: Vec<&str> = rows[1..].iter().flat_map(|r| r.split_whitespace()).filter(|w| *w != "│").collect();
+    let said = said.join(" ");
+    assert!(said.contains(&tail.split_whitespace().collect::<Vec<_>>().join(" ")), "{rows:#?}");
+    assert!(rows.iter().all(|r| UnicodeWidthStr::width(r.as_str()) <= 40), "{rows:#?}");
+    crate::feed::set_everything(&mut events, &mut cache, false);
+    assert_eq!(feed_text(&events, 40), [" ≡ summary ▸"]);
+}
+
 #[test]
 fn feed_entities_use_the_book_glyphs() {
     let row = |ev: Ev| rows_text(&ev_rows(&ev, 0, 100)).join("\n");

@@ -188,7 +188,7 @@ law resume_replays_history:
 fini", Nil{}),
       Con{T.asst("", Con{T.Call{9, "bash", "pwd"}, Nil{}}),
       Nil{}}}}}}}})
-    == Con{"history obs compaction_done :: {\"summary\":\"court...\"}",
+    == Con{"history obs compaction_done :: {\"summary\":\"court\"}",
       Con{"history you : salut",
       Con{"history obs tool_started :: {\"call\":7}",
       Con{"history tool #7 bash : ls -la",

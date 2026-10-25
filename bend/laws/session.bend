@@ -564,19 +564,14 @@ law turn_failed_reads_an_interrupt:
     == Con{T.TurnDone{"interrupted", "main"}, Con{T.TurnDone{"failed", "boom"}, Nil{}}}
     : List<&2, T.Obs>}
 
-# LAW: the compaction preview stays on one wire line: a summary that
-# starts with (or contains) newlines is trimmed and flattened.
-law compaction_preview_one_line:
-  {O.show_obs(T.CompactionDone{"
-Le user
-veut ça"})
-    == "obs compaction_done :: {\"summary\":\"Le user veut ça...\"}" : String}
-
-# LAW: the same holds for the in-session form, where a newline travels
-# escaped as backslash-n (chars 92, 110).
-law compaction_preview_unescapes:
-  {O.show_obs(T.CompactionDone{SCon{Chr{92}, SCon{Chr{110}, "Le user"}}})
-    == "obs compaction_done :: {\"summary\":\"Le user...\"}" : String}
+# LAW: compaction_done carries the whole summary the model gets after
+# the compaction, never cut, on one wire line: the JSON encoder escapes
+# its newline, tab and quotes (rust/proto obs/tests.rs decodes this very
+# line back to the same summary).
+law compaction_done_carries_whole_summary:
+  {O.show_obs(T.CompactionDone{"## Le user
+- veut	\"ça\" en entier, sans coupe après quarante caractères"})
+    == "obs compaction_done :: {\"summary\":\"## Le user\\n- veut\\t\\\"ça\\\" en entier, sans coupe après quarante caractères\"}" : String}
 
 # ---- the command language (core/commands.bend, server-side) ----
 

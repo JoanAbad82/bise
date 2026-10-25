@@ -613,6 +613,16 @@
   white-space: pre-wrap;
   font-size: 13px;
 }
+/* the compaction's summary, open: the whole summary as markdown, where a thinking body opens, dim,
+   its headings at reading size (the brief's) */
+.th-compact-body {
+  margin: var(--gap-tight) 0 var(--s-2) var(--s-4);
+  color: var(--c-text-2);
+  font-size: 13px;
+  --md-text: var(--c-text-2);
+}
+.th-compact-body .b-md { --md-text: var(--c-text-2); }
+.th-compact-body :is(h1, h2, h3, h4) { font-size: var(--t-14); font-weight: 600; margin: var(--s-2) 0 var(--gap-tight); }
 .th-notice {
   display: flex;
   gap: var(--gap-inline);
