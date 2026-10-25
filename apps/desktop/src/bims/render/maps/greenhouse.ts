@@ -47,9 +47,12 @@ function shell(b: Build): void {
   for (let i = 0; i <= 6; i++) k.add(style.box(0.07, H, 0.07), steel, root, x0 - 0.05, H / 2, (i * D) / 6);
   k.add(style.box(W, 0.06, 0.08), steel, root, x0 + W / 2, H, -0.05);
   k.add(style.box(0.08, 0.06, D), steel, root, x0 - 0.05, H, D / 2);
-  // plants hanging along the back, in the glass's bays
+  // plants hanging along the back, in the glass's bays; never over a napper's head by the back wall
+  // (nap.test.ts: a roomier office, maps/room.ts, brought a bay over bed 3)
+  const overHead = (x: number): boolean => o.lounge.some((s) => s.z < 1.6 && Math.abs(s.x - x) < 0.6);
   for (let i = 0; i < 6; i++) {
     const x = x0 + ((i + 0.5) * W) / 6;
+    if (overHead(x)) continue;
     k.add(style.cylinder(0.005, 0.3), steel, root, x, H - 0.15, 0.25);
     k.add(style.cylinder(0.14, 0.14), k.mat(WORLD.pot), root, x, H - 0.35, 0.25);
     k.add(style.ball(0.2), k.mat(LEAF[i % 3] ?? WORLD.leaf[0]), root, x, H - 0.48, 0.25).scale.y = 1.3;
