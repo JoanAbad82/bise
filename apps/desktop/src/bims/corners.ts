@@ -1,15 +1,19 @@
 // Where his plugins' objects stand in the bims' office (bims-plugins plan p4, page bims-plugins v15,
 // layout B "by corners"): each object goes to the corner its kind belongs to (CORNER: a play
 // corner by the nap place, a reading corner along the left wall, a machine corner round main's
-// desk, the kitchen round the eating place, the door, the terrace; the calendar hangs on the back
-// wall), a little turned and close together where a team would arrange it (ORGANIC), tall things
-// with their back to a wall (AGAINST), a rug under a real cluster. A free spot is off every piece
-// of furniture, cozy piece, inbox and park, and a body's room off every walk: a walk never crosses
-// an object, and the desks never move for one (the plan lays them without knowing the objects).
-// When the office changes (an agent comes, a new size), an object keeps its spot while it is still
-// free, else slides to the nearest free one of its corner; one with no room anywhere takes its
+// desk, the kitchen round the eating place, the door, the terrace; the calendar hangs on a wall),
+// and only there (a scooter or a bike may take the door or the terrace): a game never stands among
+// the desks. Nothing stands alone mid-floor: each object touches a wall, its corner's seed (the
+// nap place, main's desk, the island, the door, the terrace's edge) or another object of its
+// corner (designer m_41180). In an assemblage (ORGANIC) things are a little turned and closer; tall
+// things stand with their back to a wall (AGAINST); a cluster of 3 or more gets its rug. A free
+// spot is off every piece of furniture, cozy piece, decor and inbox, a body's room off every walk
+// and place, a bim's width behind every chair, and a bim's width off the terrace's own pieces: a
+// walk never crosses an object, and the desks never move for one (the plan lays them without the
+// objects). When the office changes (an agent comes, a new size), an object keeps its spot while
+// it is still free, else slides to the nearest free one of its corner; one with no room takes its
 // compact one (COMPACT), and only then waits in `left` (p5's growth makes room).
-// objectSpots is the one seam p4's per-map corners plug into (Plan.corners): the signature stays.
+// objectSpots is the one seam p4's per-map corners plug into: the signature stays.
 // Pure, no three. Owner: bims-life.
 import type { Box, Office, Pt } from './model';
 import type { PluginObject } from './plugin-objects';
@@ -39,26 +43,18 @@ export const CORNER: Readonly<Record<ObjId, Corner>> = {
   plant: 'kitchen', campfire: 'terrace', pond: 'terrace', beehive: 'terrace', veggies: 'terrace', swing: 'terrace', hammock: 'terrace', fountain: 'terrace', birdhouse: 'terrace', treehouse: 'terrace', glasshouse: 'terrace',
   // animals: the cat and its things by the nap place, the dog by main, the yard's outside
   cat: 'play', catwalk: 'play', cushion: 'play', dog: 'machines', aquarium: 'play', parrot: 'read', hens: 'terrace', tortoise: 'terrace', rabbit: 'terrace', hamster: 'read', goldfish: 'read', ducks: 'terrace',
-  // comms: round main; the mailbox and the birds by the door and outside
+  // comms: round main; the mailbox by the door, the birds outside
   mailbox: 'door', booth: 'machines', visio: 'machines', radio: 'machines', dovecote: 'terrace', rotary: 'machines', telegraph: 'machines', dish: 'terrace', pneumatic: 'machines', switchboard: 'machines',
-  // machines: round main; the snacks by the kitchen
+  // machines: round main; the snacks by the kitchen, the old games with the games
   rack: 'machines', macdesk: 'machines', retro: 'play', crt: 'machines', snacks: 'kitchen', photobooth: 'play', robot: 'machines', drone: 'machines', clock: 'machines', dashboard: 'machines',
-  // travel: outside; the yoga mat too
+  // travel: outside; the scooter by the door
   scooter: 'door', bike: 'terrace', hoop: 'terrace', surf: 'terrace', kayak: 'terrace', balloon: 'terrace', rocket: 'terrace', car: 'terrace', yoga: 'terrace', trampoline: 'terrace',
   // office: the calendar hangs, the extinguisher by the door, the files and trophies read
   calendar: 'hang', files: 'read', trophies: 'read', extinguisher: 'door', charts: 'machines', packing: 'door',
 };
 
-/** where an object goes when its corner is full, in order (never outside for an indoor thing, never in for an outdoor one) */
-const NEXT: Readonly<Record<Corner, readonly Corner[]>> = {
-  play: ['read', 'kitchen', 'machines', 'door'],
-  read: ['play', 'kitchen', 'machines', 'door'],
-  machines: ['read', 'play', 'kitchen', 'door'],
-  kitchen: ['play', 'read', 'machines', 'door'],
-  door: ['machines', 'read', 'play', 'kitchen'],
-  hang: [],
-  terrace: [],
-};
+/** the other corner a thing may take when its own is full: the travel things go by the door or outside (designer m_41180) */
+export const ALSO: Partial<Record<ObjId, Corner>> = { scooter: 'terrace', bike: 'door', mailbox: 'terrace' };
 
 /** tall things that stand with their back to a wall (the back one or the left one) */
 const AGAINST: ReadonlySet<ObjId> = new Set<ObjId>([
@@ -76,15 +72,19 @@ export const COMPACT_SCALE = 0.8;
 
 /** how far an object keeps from a walk's middle line: a body and a hair */
 export const WALK_GAP = BODY_R + 0.1;
-/** how far from furniture, cozy pieces and the floor's edge */
+/** a bim's width: what stays free behind a chair and round the terrace's own pieces (designer m_41180) */
+export const BIM_W = 2 * BODY_R + 0.03;
+/** how far from furniture, cozy pieces and the decor indoors */
 const AROUND = 0.2;
 /** the parasol's canopy's and the palm's fronds' half reach */
 const CANOPY = 0.9;
 const EDGE = 0.12;
-/** two objects apart: close in an assemblage, a step elsewhere */
+/** two objects apart: close when both stand in an assemblage, a step otherwise */
 const GAP_ORGANIC = 0.3;
 const GAP = 0.6;
-/** the search's step and reach round a corner's anchor */
+/** how close counts as touching (a wall, a seed, a neighbour) */
+export const TOUCH = 0.35;
+/** the search's step */
 const STEP = 0.25;
 /** a wall thing's back off its wall */
 const OFF_WALL = 0.08;
@@ -113,7 +113,7 @@ export interface Placed {
   readonly box: Box;
 }
 
-/** a rug under a corner's real cluster (2 objects or more close together) */
+/** a rug under a play or reading corner's cluster of 3 or more */
 export interface Rug {
   readonly box: Box;
   readonly corner: 'play' | 'read';
@@ -121,7 +121,7 @@ export interface Rug {
 
 export interface Corners {
   readonly placed: readonly Placed[];
-  /** what found no room even compact (p5: the office grows for them); in its order */
+  /** what found no room in its corner, even compact (p5: the office grows for them); in its order */
   readonly left: readonly PluginObject[];
   readonly rugs: readonly Rug[];
 }
@@ -139,6 +139,7 @@ export function seedOf(s: string): number {
 }
 
 const overlaps = (a: Box, b: Box, m: number): boolean => a.x0 < b.x1 + m && a.x1 > b.x0 - m && a.z0 < b.z1 + m && a.z1 > b.z0 - m;
+const grow = (b: Box, m: number): Box => ({ x0: b.x0 - m, x1: b.x1 + m, z0: b.z0 - m, z1: b.z1 + m });
 
 /** a w x d foot turned by rot round (x, z): its floor box */
 export function boxOf(x: number, z: number, w: number, d: number, rot: number): Box {
@@ -159,14 +160,16 @@ const footOf = (obj: ObjId, compact: boolean): { obj: ObjId; foot: FootOf } => {
 };
 
 const mid = (ps: readonly Pt[], or: Pt): Pt => (ps.length === 0 ? or : { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, z: ps.reduce((s, p) => s + p.z, 0) / ps.length });
+const hull = (bs: readonly Box[]): Box => ({ x0: Math.min(...bs.map((b) => b.x0)), x1: Math.max(...bs.map((b) => b.x1)), z0: Math.min(...bs.map((b) => b.z0)), z1: Math.max(...bs.map((b) => b.z1)) });
 
 /** the kept floor's cell: what the office keeps is laid on a grid once per office, a box's question is then a sum */
 const CELL = 0.125;
 
 /**
- * What the office keeps for itself (furniture, cozy pieces, the inbox, a park, a gym, a body's room
- * round every walk and every place a bim stands), as a grid of kept cells over the room and the
- * terrace, summed (a box's kept cells in four reads).
+ * What the office keeps for itself, as a grid of kept cells over the room and the terrace, summed
+ * (a box's kept cells in four reads): furniture, cozy pieces, the decor, the inbox, a park, a gym
+ * (AROUND off; a bim's width off the terrace's pieces), a body's room round every walk and every
+ * place a bim stands, and a bim's width behind every chair.
  */
 interface Keep {
   readonly boxes: readonly Box[];
@@ -188,10 +191,9 @@ function keepOf(o: Office): Keep {
   if (o.park !== undefined) boxes.push(o.park.area);
   if (o.gym !== undefined) boxes.push(o.gym.area, ...o.gym.mats);
   for (const g of o.ghosts ?? []) boxes.push({ x0: g.x - 0.8, x1: g.x + 0.8, z0: g.z - 1.0, z1: g.z + 0.4 });
-  // the decor every look draws: the plants, the door mat, and on the terrace the parasol, the palm, the ramp
+  // the decor every look draws: the plants, the door mat, and on the terrace the ramp, the parasol's canopy, the palm's fronds
   const dec = decorOf(o);
-  for (const f of [...dec.plants, dec.doorMat, dec.ramp]) boxes.push({ x0: f.x - f.hw - 0.3, x1: f.x + f.hw + 0.3, z0: f.z - f.hd - 0.3, z1: f.z + f.hd + 0.3 });
-  // the parasol's canopy and the palm's fronds spread past their poles
+  for (const f of [...dec.plants, dec.doorMat, dec.ramp]) boxes.push({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd });
   for (const f of [dec.parasol, dec.palm]) boxes.push({ x0: f.x - CANOPY, x1: f.x + CANOPY, z0: f.z - CANOPY, z1: f.z + CANOPY });
   const spots: Pt[] = [o.door, o.mainDesk, ...o.desks.values(), ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, ...o.terrace, ...(o.nooks ?? []), ...(c?.coffeeSpots ?? [])];
   const t = terraceSlab(o);
@@ -200,18 +202,29 @@ function keepOf(o: Office): Keep {
   const nx = Math.ceil((Math.max(o.x0 + o.W, t.x1) + CELL - gx) / CELL);
   const nz = Math.ceil((Math.max(o.D, t.z1) + CELL - gz) / CELL);
   const kept = new Uint8Array(nx * nz);
-  const mark = (x0: number, x1: number, z0: number, z1: number, keepIf: (cx: number, cz: number) => boolean): void => {
+  const mark = (x0: number, x1: number, z0: number, z1: number, keepIf?: (cx: number, cz: number) => boolean): void => {
     const i0 = Math.max(0, Math.floor((x0 - gx) / CELL));
     const i1 = Math.min(nx - 1, Math.floor((x1 - gx) / CELL));
     const j0 = Math.max(0, Math.floor((z0 - gz) / CELL));
     const j1 = Math.min(nz - 1, Math.floor((z1 - gz) / CELL));
-    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (keepIf(gx + (i + 0.5) * CELL, gz + (j + 0.5) * CELL)) kept[i * nz + j] = 1;
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (keepIf === undefined || keepIf(gx + (i + 0.5) * CELL, gz + (j + 0.5) * CELL)) kept[i * nz + j] = 1;
   };
   // a cell is kept when any of its square comes within reach: its middle within reach + half its diagonal
   const half = CELL * Math.SQRT1_2;
-  for (const b of boxes) mark(b.x0 - AROUND, b.x1 + AROUND, b.z0 - AROUND, b.z1 + AROUND, () => true);
+  for (const b of boxes) {
+    // outside the room (the terrace's loungers, the parasol, the ramp): a bim's width round them
+    const m = b.z0 >= o.D - 1e-6 ? BIM_W : AROUND;
+    mark(b.x0 - m, b.x1 + m, b.z0 - m, b.z1 + m);
+  }
   const r = WALK_GAP + half;
   for (const s of spots) mark(s.x - r, s.x + r, s.z - r, s.z + r, (x, z) => Math.hypot(x - s.x, z - s.z) < r);
+  // a bim's width behind each chair: the desk is in front of its spot (its face), the chair's back the other way
+  const rc = BIM_W / 2 + half;
+  for (const s of [o.mainDesk, ...o.desks.values()]) {
+    const bx = s.x - Math.sin(s.face) * (BODY_R + BIM_W / 2);
+    const bz = s.z - Math.cos(s.face) * (BODY_R + BIM_W / 2);
+    mark(bx - rc, bx + rc, bz - rc, bz + rc, (x, z) => Math.hypot(x - bx, z - bz) < rc);
+  }
   for (const [a, b] of network(o)) {
     mark(Math.min(a.x, b.x) - r, Math.max(a.x, b.x) + r, Math.min(a.z, b.z) - r, Math.max(a.z, b.z) + r, (x, z) => segGap({ x, z }, a, b) < r);
   }
@@ -255,7 +268,8 @@ function anchorOf(o: Office, corner: Corner): Pt {
     case 'play':
       return mid(o.lounge, isl);
     case 'read':
-      return { x: o.x0, z: o.D * 0.4 };
+      // the left wall's front half: its back half is by the nap place, the play corner's
+      return { x: o.x0, z: o.D * 0.65 };
     case 'machines':
       return o.mainDesk;
     case 'kitchen':
@@ -271,21 +285,23 @@ function anchorOf(o: Office, corner: Corner): Pt {
   }
 }
 
-/** two objects apart: close when both stand in an assemblage, a step when either does not (the same both ways, so a kept spot stays free) */
-const gapOf = (a: Corner, b: Corner): number => (ORGANIC.has(a) && ORGANIC.has(b) ? GAP_ORGANIC : GAP);
-
-/** whether a box is free in a corner: on its area, off what the office keeps, a body's room off every walk and every place, apart from the others */
-function free(b: Box, corner: Corner, area: Box, keep: Keep, taken: readonly Placed[]): boolean {
-  if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1) return false;
-  if (keptIn(keep, b) > 0) return false;
-  for (const p of taken) if (overlaps(b, p.box, gapOf(corner, p.corner))) return false;
-  return true;
-}
-
-interface Try {
-  readonly x: number;
-  readonly z: number;
-  readonly rot: number;
+/** what a corner's first thing may stand against besides a wall: the nap place, main's desk, the island, the door */
+function seedsOf(o: Office, corner: Corner): Box[] {
+  const near = (p: Pt, r: number): Box => ({ x0: p.x - r, x1: p.x + r, z0: p.z - r, z1: p.z + r });
+  switch (corner) {
+    case 'play': {
+      const beds = o.furniture.filter((f) => f.of !== undefined && o.lounge.some((l) => l.x === f.of?.x && l.z === f.of.z));
+      return [...beds, ...(o.cozy?.rug ? [o.cozy.rug] : [])];
+    }
+    case 'machines':
+      return [near(o.mainDesk, 1.4)];
+    case 'kitchen':
+      return [o.island];
+    case 'door':
+      return [near({ x: o.door.x, z: o.D }, 1.6)];
+    default:
+      return [];
+  }
 }
 
 /** a wall's spans along it where nothing tall stands (the board, main's neon, the mural, the frames, a poster); x for the back wall, z for the left one */
@@ -301,12 +317,13 @@ function wallSpans(o: Office): { back: [number, number][]; left: [number, number
 
 const crosses = (spans: readonly (readonly [number, number])[], a: number, b: number): boolean => spans.some(([s, e]) => a < e && b > s);
 
-/** one call's searches: the kept floor, each corner's floor and its points nearest its anchor first (laid once) */
+/** one call's searches: the kept floor, each corner's floor, seeds and points nearest its anchor (laid once) */
 interface Ctx {
   readonly o: Office;
   readonly keep: Keep;
   readonly spans: { back: [number, number][]; left: [number, number][] };
   readonly grids: Map<Corner, readonly Pt[]>;
+  readonly seeds: Map<Corner, readonly Box[]>;
 }
 
 function gridOf(c: Ctx, corner: Corner): readonly Pt[] {
@@ -314,12 +331,26 @@ function gridOf(c: Ctx, corner: Corner): readonly Pt[] {
   if (had !== undefined) return had;
   const area = areaOf(c.o, corner);
   const a = anchorOf(c.o, corner);
-  const ps: Pt[] = [];
-  for (let x = area.x0; x <= area.x1 + 1e-9; x += STEP) for (let z = area.z0; z <= area.z1 + 1e-9; z += STEP) ps.push({ x, z });
-  const r = (p: Pt): number => Math.hypot(p.x - a.x, p.z - a.z);
-  ps.sort((p, q) => r(p) - r(q) || p.x - q.x || p.z - q.z);
-  c.grids.set(corner, ps);
-  return ps;
+  const ps: { p: Pt; r: number }[] = [];
+  for (let x = area.x0; x <= area.x1 + 1e-9; x += STEP) for (let z = area.z0; z <= area.z1 + 1e-9; z += STEP) ps.push({ p: { x, z }, r: Math.hypot(x - a.x, z - a.z) });
+  ps.sort((p, q) => p.r - q.r || p.p.x - q.p.x || p.p.z - q.p.z);
+  const out = ps.map((p) => p.p);
+  c.grids.set(corner, out);
+  return out;
+}
+
+function seedOfCorner(c: Ctx, corner: Corner): readonly Box[] {
+  const had = c.seeds.get(corner);
+  if (had !== undefined) return had;
+  const s = seedsOf(c.o, corner);
+  c.seeds.set(corner, s);
+  return s;
+}
+
+interface Try {
+  readonly x: number;
+  readonly z: number;
+  readonly rot: number;
 }
 
 /** a wall thing's spots in a corner, nearest its anchor first: along the back wall, then the left one (turned to face the room), off their busy spans; a hung one flat on the wall */
@@ -340,6 +371,50 @@ function wallTries(c: Ctx, corner: Corner, foot: FootOf): readonly Try[] {
   return out.sort((p, q) => r(p) - r(q) || p.x - q.x || p.z - q.z);
 }
 
+/** two objects apart: close when both stand in an assemblage, a step when either does not (the same both ways, so a kept spot stays free) */
+const gapOf = (a: Corner, b: Corner): number => (ORGANIC.has(a) && ORGANIC.has(b) ? GAP_ORGANIC : GAP);
+
+/** whether a box is free in a corner: on its area, off what the office keeps, apart from the others */
+function free(c: Ctx, b: Box, corner: Corner, area: Box, taken: readonly Placed[]): boolean {
+  if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1) return false;
+  if (keptIn(c.keep, b) > 0) return false;
+  for (const p of taken) if (overlaps(b, p.box, gapOf(corner, p.corner))) return false;
+  return true;
+}
+
+/**
+ * Whether a box in a corner touches what its corner gathers round (designer m_41180: nothing alone
+ * mid-floor, nothing in another corner's place): the reading corner its left wall, the hung things
+ * a wall, the terrace its slab's edge, the others their seed (the nap place, main's desk, the
+ * island, the door); and any of them another thing of its corner.
+ */
+export function touches(o: Office, b: Box, corner: Corner, taken: readonly Placed[], seeds: readonly Box[], play: readonly Box[] = []): boolean {
+  const area = areaOf(o, corner);
+  if (!inZone(area, b, corner, seeds, play)) return false;
+  if (corner === 'terrace' && (b.x0 <= area.x0 + TOUCH || b.x1 >= area.x1 - TOUCH || b.z0 <= area.z0 + TOUCH || b.z1 >= area.z1 - TOUCH)) return true;
+  if (corner !== 'terrace' && (b.z0 <= area.z0 + TOUCH || b.x0 <= area.x0 + TOUCH)) return true;
+  if (seeds.some((s) => overlaps(b, s, TOUCH))) return true;
+  return taken.some((p) => p.corner === corner && overlaps(b, p.box, gapOf(corner, p.corner) + TOUCH));
+}
+
+/** how far a corner reaches from its seed (the nap place, main's desk, the island, the door), and the reading corner from its wall */
+export const ZONE = 2.5;
+export const PLAY_ZONE = 1.5;
+
+/**
+ * Whether a box stands in its corner's place: near its seed (or its wall: the reading corner, the
+ * hung things; the terrace anywhere on its slab). The reading corner's wall stops where the play
+ * corner's place starts (`play`: the nap place's seeds): the games come first by the nap place.
+ */
+function inZone(area: Box, b: Box, corner: Corner, seeds: readonly Box[], play: readonly Box[] = []): boolean {
+  if (corner === 'terrace') return true;
+  if (corner === 'read') return b.x0 <= area.x0 + ZONE && !play.some((s) => overlaps(b, s, ZONE));
+  if (corner === 'hang') return b.z0 <= area.z0 + TOUCH || b.x0 <= area.x0 + TOUCH;
+  // the games stay right by the nap place, never halfway to main's desk (designer m_41180)
+  const reach = corner === 'play' ? PLAY_ZONE : ZONE;
+  return seeds.some((s) => overlaps(b, s, reach));
+}
+
 /** the order objects take their spots: hung and wall things first (they need a wall), then the biggest; the key breaks ties */
 function orderOf(objs: readonly PluginObject[]): PluginObject[] {
   const rank = (p: PluginObject): number => (CORNER[p.obj] === 'hang' ? 0 : AGAINST.has(p.obj) ? 1 : 2);
@@ -354,7 +429,7 @@ function orderOf(objs: readonly PluginObject[]): PluginObject[] {
  */
 export function objectSpots(o: Office, objs: readonly PluginObject[], prev: readonly Placed[] = []): Corners {
   if (objs.length === 0) return NO_CORNERS;
-  const c: Ctx = { o, keep: keepOf(o), spans: wallSpans(o), grids: new Map() };
+  const c: Ctx = { o, keep: keepOf(o), spans: wallSpans(o), grids: new Map(), seeds: new Map() };
   const was = new Map(prev.map((p) => [p.key, p]));
   const placed: Placed[] = [];
   const left: PluginObject[] = [];
@@ -371,7 +446,7 @@ export function objectSpots(o: Office, objs: readonly PluginObject[], prev: read
     if (at === null) left.push(p);
     else placed.push(at);
   }
-  return { placed, left, rugs: rugsOf(placed, c.keep) };
+  return { placed, left, rugs: rugsOf(o, placed, c.keep) };
 }
 
 function placedOf(p: PluginObject, obj: ObjId, compact: boolean, foot: FootOf, corner: Corner, t: Try): Placed {
@@ -385,62 +460,87 @@ function placedOf(p: PluginObject, obj: ObjId, compact: boolean, foot: FootOf, c
 function kept(c: Ctx, p: PluginObject, before: Placed, taken: readonly Placed[]): Placed | null {
   const { obj, foot } = footOf(p.obj, before.compact);
   if (before.obj !== obj || before.of !== p.obj) return null;
-  return free(before.box, before.corner, areaOf(c.o, before.corner), c.keep, taken) ? placedOf(p, obj, before.compact, foot, before.corner, before) : null;
+  return free(c, before.box, before.corner, areaOf(c.o, before.corner), taken) ? placedOf(p, obj, before.compact, foot, before.corner, before) : null;
 }
 
 function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null {
   const home = CORNER[p.obj];
-  const corners: readonly Corner[] = [home, ...NEXT[home]];
-  // a tall thing tries a wall first, its compact one at a wall next, then standing free in the room (turned to it)
+  const also = ALSO[p.obj];
+  const corners: readonly Corner[] = also === undefined ? [home] : [home, also];
+  // a tall thing tries a wall first, its compact one at a wall next, then standing free (touching its corner's others)
   const walled = AGAINST.has(p.obj);
-  const tries: readonly (readonly [boolean, boolean])[] = walled ? [[false, true], [true, true], [false, false], [true, false]] : [[false, false], [true, false]];
-  for (const [compact, against] of tries) {
+  const modes: readonly (readonly [boolean, boolean])[] = walled ? [[false, true], [true, true], [false, false], [true, false]] : [[false, false], [true, false]];
+  for (const [compact, against] of modes) {
     if (compact && COMPACT[p.obj] === undefined && !(FEET[p.obj].w * FEET[p.obj].d > 1)) continue;
     const { obj, foot } = footOf(p.obj, compact);
     for (const corner of corners) {
       const area = areaOf(c.o, corner);
-      const turn = ORGANIC.has(corner) ? (seedOf(p.key) * 2 - 1) * TURN : 0;
+      const seeds = seedOfCorner(c, corner);
+      const play = seedOfCorner(c, 'play');
       if ((against && corner !== 'terrace') || corner === 'hang') {
         for (const t of wallTries(c, corner, foot)) {
-          if (free(boxOf(t.x, t.z, foot.w, foot.d, t.rot), corner, area, c.keep, taken)) return placedOf(p, obj, compact, foot, corner, t);
+          const b = boxOf(t.x, t.z, foot.w, foot.d, t.rot);
+          if (touches(c.o, b, corner, taken, seeds, play) && free(c, b, corner, area, taken)) return placedOf(p, obj, compact, foot, corner, t);
         }
         continue;
       }
       // the floor's points nearest the corner's anchor: one turned box's half sizes for all of them
+      const turn = ORGANIC.has(corner) ? (seedOf(p.key) * 2 - 1) * TURN : 0;
       const cs = Math.abs(Math.cos(turn));
       const sn = Math.abs(Math.sin(turn));
       const hw = (foot.w * cs + foot.d * sn) / 2;
       const hd = (foot.w * sn + foot.d * cs) / 2;
       for (const q of gridOf(c, corner)) {
         const b = { x0: q.x - hw, x1: q.x + hw, z0: q.z - hd, z1: q.z + hd };
-        if (free(b, corner, area, c.keep, taken)) return placedOf(p, obj, compact, foot, corner, { x: q.x, z: q.z, rot: turn });
+        if (!inZone(area, b, corner, seeds, play)) continue;
+        if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1 || keptIn(c.keep, b) > 0) continue;
+        if (!touches(c.o, b, corner, taken, seeds, play)) continue;
+        if (free(c, b, corner, area, taken)) return placedOf(p, obj, compact, foot, corner, { x: q.x, z: q.z, rot: turn });
       }
     }
   }
   return null;
 }
 
-/** the rug's margin round its cluster, and how close two things are to share one */
-const RUG_PAD = 0.35;
-const RUG_NEAR = 2.6;
+/** the rug's margin round its cluster (a smaller one when the big one meets furniture), and how close two things are to be one cluster */
+const RUG_PAD = 0.3;
+const RUG_PAD_MIN = 0.12;
+const CLUSTER = 1.0;
+const RUG_MIN = 3;
 
-/** a rug under each play or reading corner's real cluster, kept off the furniture */
-function rugsOf(placed: readonly Placed[], keep: Keep): Rug[] {
+/** a rug under each play or reading corner's biggest cluster of RUG_MIN or more, off the furniture, the nap rug and the walls */
+function rugsOf(o: Office, placed: readonly Placed[], keep: Keep): Rug[] {
   const out: Rug[] = [];
+  const room = { x0: o.x0 + EDGE, x1: o.x0 + o.W - EDGE, z0: EDGE, z1: o.D - EDGE };
   for (const corner of ['play', 'read'] as const) {
     const ps = placed.filter((p) => p.corner === corner && !p.foot.wall);
-    const first = ps[0];
-    if (first === undefined) continue;
-    const near = ps.filter((p) => Math.hypot(p.x - first.x, p.z - first.z) < RUG_NEAR);
-    if (near.length < 2) continue;
-    const box = {
-      x0: Math.min(...near.map((p) => p.box.x0)) - RUG_PAD,
-      x1: Math.max(...near.map((p) => p.box.x1)) + RUG_PAD,
-      z0: Math.min(...near.map((p) => p.box.z0)) - RUG_PAD,
-      z1: Math.max(...near.map((p) => p.box.z1)) + RUG_PAD,
-    };
-    if (keep.boxes.some((f) => overlaps(box, f, 0))) continue;
-    out.push({ box, corner });
+    // its clusters: things within CLUSTER of each other, chained
+    const seen = new Set<number>();
+    let best: Placed[] = [];
+    for (let i = 0; i < ps.length; i++) {
+      if (seen.has(i)) continue;
+      const group: number[] = [i];
+      seen.add(i);
+      for (let k = 0; k < group.length; k++) {
+        const a = ps[group[k] as number] as Placed;
+        ps.forEach((b, j) => {
+          if (!seen.has(j) && overlaps(a.box, b.box, CLUSTER)) {
+            seen.add(j);
+            group.push(j);
+          }
+        });
+      }
+      if (group.length > best.length) best = group.map((j) => ps[j] as Placed);
+    }
+    if (best.length < RUG_MIN) continue;
+    const h = hull(best.map((p) => p.box));
+    for (const pad of [RUG_PAD, RUG_PAD_MIN]) {
+      const g = grow(h, pad);
+      const box = { x0: Math.max(g.x0, room.x0), x1: Math.min(g.x1, room.x1), z0: Math.max(g.z0, room.z0), z1: Math.min(g.z1, room.z1) };
+      if (keep.boxes.some((f) => overlaps(box, f, 0))) continue;
+      out.push({ box, corner });
+      break;
+    }
   }
   return out;
 }

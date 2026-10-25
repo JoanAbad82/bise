@@ -134,7 +134,13 @@ export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOff
 }
 
 /** the loft as a map (maps/index.ts); its island's top takes stage 2's coffee machine (cozy.ts) */
-export const loft: Plan<LoftOffice> = { id: 'loft', ready: true, layout: loftLayout, cozy: { islandTop: 0.695 } };
+export const loft: Plan<LoftOffice> = {
+  id: 'loft',
+  ready: true,
+  layout: loftLayout,
+  // the reading band's back, by the nap place, is the play corner's (corners.ts): no cozy piece there
+  cozy: { islandTop: 0.695, keepOut: (o) => [{ x0: o.x0, x1: o.x0 + READ_BAND, z0: 0, z1: BACK_D }] },
+};
 
 /**
  * The loft's walk graph: the trunk (the back and front corridors, the two aisles, the door line,

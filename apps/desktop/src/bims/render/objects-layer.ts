@@ -13,9 +13,9 @@ export const RUG = {
   play: { day: '#bfe1f2', night: '#4c6b80' },
   read: { day: '#ffd166', night: '#8a7240' },
 } as const;
-/** a rug's thickness and its lift off the floor (over the floor's top, under every foot) */
+/** a rug's thickness and its height: the nap rug's (stages.ts loftLounge), over the floor's top, under every foot */
 const RUG_H = 0.02;
-const RUG_Y = 0.012;
+const RUG_Y = 0.035;
 
 export interface ObjectsLayer {
   readonly root: Group;
