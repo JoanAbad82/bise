@@ -11,6 +11,7 @@ import { useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { BiseMark, PickerPop, Press, tipAttrs } from '@/ds';
 import type { ComposerActions } from '@/composer';
 import { useProjects, useStore } from '@/store';
+import { useWaitingCount } from '@/inbox';
 import { useRouter } from '@/app/router';
 import { MAIN } from '@/app/route';
 import { composer } from '@/proto/words_composer.gen';
@@ -68,10 +69,28 @@ export function HomeSlot({ tkey, project, composer: field, bise }: { tkey: strin
 export function Home({ project, onIdea }: { project: string | null; onIdea: (text: string) => void }) {
   const rows = useProjects();
   const facts = homeFacts(rows, project);
+  // what waits: the inbox block's own count under it, same number, same words (designer m_43577)
+  const waits = useWaitingCount({ project, agent: MAIN });
+  const [waitBefore = '', waitAfter = ''] = composer.home_waits({ n: HOLE }).split(HOLE);
+  const waitsEl =
+    waits > 0 ? (
+      <span data-testid="composer.home.waits">
+        {waitBefore}
+        <span className="cmp-home-n">{waits}</span>
+        {waitAfter}
+      </span>
+    ) : null;
+  const working = facts.working > 0 ? composer.home_working({ n: facts.working }) : null;
   const line =
-    facts.working === 0 && facts.waits === 0
-      ? composer.home_quiet
-      : [facts.working > 0 ? composer.home_working({ n: facts.working }) : '', facts.waits > 0 ? composer.home_waits({ n: facts.waits }) : ''].filter((x) => x !== '').join(' · ');
+    working === null && waitsEl === null ? (
+      composer.home_quiet
+    ) : (
+      <>
+        {working}
+        {working !== null && waitsEl !== null && ' · '}
+        {waitsEl}
+      </>
+    );
   return (
     <div className="cmp-home" data-testid="composer.home">
       <BiseMark size={32} wink={false} testId="composer.home.mark" />

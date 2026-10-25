@@ -32,7 +32,9 @@ describe('the empty home', () => {
     const { v } = mount(P);
     expect(v.getByTestId('composer.home.question').textContent).toBe('what should we build in acme?');
     expect(v.getByTestId('composer.home.project').textContent).toBe('acme');
-    expect(v.getByTestId('composer.home.line').textContent).toBe('1 agent working · 2 wait for you');
+    // what waits: the inbox block's own count and words, its number in the accent (designer m_43577)
+    expect(v.getByTestId('composer.home.line').textContent).toBe('1 agent working · 2 waiting for you');
+    expect(v.getByTestId('composer.home.waits').querySelector('.cmp-home-n')?.textContent).toBe('2');
   });
 
   it("bise's own main asks what to work on; an idea fills the composer, never a send", () => {

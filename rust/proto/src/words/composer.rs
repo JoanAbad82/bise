@@ -448,11 +448,9 @@ crate::words! { composer:
     /// the empty home's line: who works
     home_working(n) = one "{n} agent working" | "{n} agents working";
     /// the empty home's line: what waits
-    home_waits(n) = one "{n} waits for you" | "{n} wait for you";
+    home_waits(n) = "{n} waiting for you";
     /// the empty home's line: no agent yet
     home_quiet = "no agent working yet";
-    /// the empty home's composer
-    home_placeholder = "ask bise anything, or start an agent";
     /// the empty home's project picker: its name and tip
     home_pick(project) = "{project} · pick another project";
     /// the empty home's suggestions, for VoiceOver

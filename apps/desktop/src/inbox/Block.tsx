@@ -195,6 +195,19 @@ function useNotifyRow(items: number): { show: boolean; on: () => void; later: ()
   };
 }
 
+/** The count the block in `here` says in its head ('N waiting'): the same items in the same scope,
+ *  bise's notifications ask too where every project's show (the empty home's line says this
+ *  number, designer m_43577: one count, one word). */
+export function useWaitingCount(here: Here): number {
+  const rows = useProjects();
+  const all = useInboxItems();
+  const home = rows.find((r) => r.home)?.project ?? '';
+  const scope = inboxScope(here, home);
+  const n = all.filter((c) => inScope(scope, c)).length;
+  const notify = useNotifyRow(n);
+  return n + (notify.show && scope === null ? 1 : 0);
+}
+
 // ---- the pure parts
 
 /** The thread he answers from: the screen's, or bise's view's (its home project's main); none elsewhere. Pure. */

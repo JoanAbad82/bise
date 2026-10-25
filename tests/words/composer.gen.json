@@ -710,11 +710,6 @@
     "one": null,
     "text": "{project} · pick another project"
   },
-  "composer.home_placeholder": {
-    "args": [],
-    "one": null,
-    "text": "ask bise anything, or start an agent"
-  },
   "composer.home_question": {
     "args": [
       "project"
@@ -736,8 +731,8 @@
     "args": [
       "n"
     ],
-    "one": "{n} waits for you",
-    "text": "{n} wait for you"
+    "one": null,
+    "text": "{n} waiting for you"
   },
   "composer.home_working": {
     "args": [

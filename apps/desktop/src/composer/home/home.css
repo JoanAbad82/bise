@@ -36,6 +36,10 @@
   font: var(--f-ui);
   color: var(--c-text-3);
 }
+/* the waiting count's number in the accent, as every waiting count */
+.cmp-home-line .cmp-home-n {
+  color: var(--c-accent);
+}
 .cmp-home-ideas {
   display: flex;
   flex-wrap: wrap;
