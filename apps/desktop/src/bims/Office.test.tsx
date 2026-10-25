@@ -33,6 +33,7 @@ function fakeRenderer() {
     motion: 'still' as Motion,
     frames: 0,
     setOffice: vi.fn(),
+    setObjects: vi.fn(),
     setSize: vi.fn(() => 120),
     setCam: vi.fn(),
     frame: vi.fn((): Motion => {

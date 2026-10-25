@@ -27,6 +27,13 @@ const DZ = 2.3;
 const ISL = 1.4;
 const AISLE = 1.0;
 const BACK_D = 4.3;
+/**
+ * The room his plugins' objects take past the desks' (bims-plugins p4, Gabriel's note n3 on v6: the
+ * office rebuilt to make room, no desk moved): a band along the left wall (the reading corner's
+ * shelves face the room there) and one past main's desk (the machine corner: a rack, a booth).
+ */
+const READ_BAND = 1.6;
+const MACHINE_BAND = 1.4;
 /** past this many agents (main aside), 3 desk columns each side of the island */
 export const WIDE_PAST = 16;
 const LOUNGE_N = 8;
@@ -51,8 +58,13 @@ export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOff
   const slots = deskSlots(others, side, prev);
   const used = Math.max(0, ...[...slots.values()].map((s) => s + 1));
   const rows = Math.max(3, Math.ceil(used / cols), prev?.side === side ? prev.rows : 0);
-  const W = 2 * (ISL / 2 + AISLE + side * DX) + 0.2;
-  const x0 = -W / 2;
+  // the desks' room, centred on the island; past it the room his plugins' objects take (corners.ts):
+  // the reading corner's band along the left wall, the machine corner's past main's desk
+  const core = 2 * (ISL / 2 + AISLE + side * DX) + 0.2;
+  const W = core + READ_BAND + MACHINE_BAND;
+  const x0 = -core / 2 - READ_BAND;
+  /** the desks' room's left edge: the lounge, the board and the terrace line up on it */
+  const xl = -core / 2;
   const D = BACK_D + rows * DZ + 1.0;
   const ax = ISL / 2 + AISLE / 2;
   const crossBack = BACK_D - 0.25;
@@ -76,22 +88,22 @@ export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOff
   }
 
   // the lounge: 4 bean bags a row; a lane between two columns leads to the back corridor
-  const loungeW = W * 0.4;
+  const loungeW = core * 0.4;
   const step = (loungeW - 0.9) / 3;
   const lounge: Spot[] = [];
   for (let i = 0; i < LOUNGE_N; i++) {
     const j = i % 4;
-    const x = x0 + 0.65 + j * step;
+    const x = xl + 0.65 + j * step;
     const z = NAP_Z0 + Math.floor(i / 4) * NAP_ROW;
     lounge.push({ x, z, wz: z, ax: j < 3 ? x + step / 2 : x - step / 2, face: 0 });
   }
 
   // the whiteboard on the back wall, 3 places in front of it
-  const boardX = x0 + loungeW + 1.15;
+  const boardX = xl + loungeW + 1.15;
   const boardSpots = [-0.45, 0.45, 0].map((o) => ({ x: boardX + o, z: 0.75, wz: crossBack, ax: boardX + o, face: Math.PI }));
 
   // main's desk at the back right; its land queue on its left, a lane main takes too
-  const mx = W / 2 - 1.55;
+  const mx = core / 2 - 1.55;
   const qx = mx - 1.45;
   const mainDesk: Spot = { x: mx, z: 1.25, wz: 0.8, ax: qx, face: 0 };
   const queue: Spot[] = [];
@@ -102,7 +114,7 @@ export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOff
   const terrace: Spot[] = [];
   for (let i = 0; i < TERRACE_N; i++) {
     const j = i % 4;
-    const x = x0 + 1.0 + j * TERRACE_GAP;
+    const x = xl + 1.0 + j * TERRACE_GAP;
     const z = D + 1.5 + Math.floor(i / 4) * TERRACE_GAP;
     terrace.push({ x, z, wz: z, ax: j < 3 ? x + TERRACE_GAP / 2 : x - TERRACE_GAP / 2, face: 0 });
   }
@@ -117,7 +129,7 @@ export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOff
   // past the queue's last place: on the back corridor, in line towards its left end (walksOf's first leg)
   const q0 = queue[0]?.x ?? mx;
   const left = Math.min(...walks[0].map((p) => p.x));
-  const queueMore: Leg = [{ x: q0, z: crossBack }, { x: Math.min(q0, Math.max(left, x0 + 1.5)), z: crossBack }];
+  const queueMore: Leg = [{ x: q0, z: crossBack }, { x: Math.min(q0, Math.max(left, xl + 1.5)), z: crossBack }];
   return { ...base, side, rows, crossBack, crossFront, ax, walks, furniture, queueMore };
 }
 

@@ -43,6 +43,8 @@ import { WEATHERS, type Weather } from './sky';
 import { aimAt, bimsLit, easeCam, edgeOf, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
 import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
+import type { PluginObject } from './plugin-objects';
+import type { Corners } from './corners';
 import { planOf } from './maps';
 import './office.css';
 
@@ -54,6 +56,8 @@ const HOLD_MS = 400;
  * fixed light: a slot's blend never lands in their frame counts); { weather } pins the weather, its
  * time is window.__biseLocal's.
  */
+const NO_OBJECTS: readonly PluginObject[] = [];
+
 function pinnedSky(): { sky?: false; weather?: Weather } {
   const pin = (window as { __biseSky?: { weather?: string } }).__biseSky;
   if (pin === undefined) return { sky: false };
@@ -192,6 +196,7 @@ export function Office({
   agents,
   cards,
   places,
+  objects = NO_OBJECTS,
   growth = null,
   map = DEFAULT_MAP,
   parts,
@@ -208,6 +213,8 @@ export function Office({
   agents: readonly Agent[];
   cards: readonly Card[];
   places: readonly Place[];
+  /** his plugins' objects (plugin-objects.ts officeObjects): the office places them by corners (corners.ts); absent: none */
+  objects?: readonly PluginObject[];
   /** how much the project has done (hub/growth); the office draws its high-water mark (growth.ts) */
   growth?: Growth | null;
   /** the project's map (his /bims pick, prefs bims.map.<project>); the loft when he never picked one */
@@ -313,6 +320,11 @@ export function Office({
     driver.rows({ agents, cards, places }, agents, map);
     kickRef.current();
   }, [driver, agents, cards, places, map]);
+  // his plugins' objects: the next frame places and draws them (no desk moves for them)
+  useEffect(() => {
+    driver.objects(objects);
+    kickRef.current();
+  }, [driver, objects]);
   useEffect(() => {
     live.current.held = held;
     kickRef.current();
@@ -390,6 +402,8 @@ export function Office({
     // the renderer is loaded; the map last drawn (another one crossfades)
     let started = false;
     let drawnMap: OfficeMap['map'] | null = null;
+    /** the objects' spots the renderer has (the driver's Step.corners: a new value when they change) */
+    let drawnCorners: Corners | null = null;
     let lost = false;
     let raf = 0;
     let tick: ReturnType<typeof setTimeout> | undefined;
@@ -451,6 +465,11 @@ export function Office({
         if (holder.current !== null) Object.assign(holder.current.dataset, { want: step.want, map: office.map });
         r.setOffice(office, step.agents);
         resize();
+      }
+      // his plugins' objects: drawn again only when their spots changed (another office, a plugin more)
+      if (step.corners !== drawnCorners) {
+        drawnCorners = step.corners;
+        r.setObjects(step.corners);
       }
       // his drag or pinch: a sky blend due now waits until he lets go (bims m_33030)
       const hold = holder.current?.hasAttribute('data-drag') === true || Date.now() - lastWheel < HOLD_MS;

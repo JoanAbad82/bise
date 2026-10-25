@@ -15,6 +15,8 @@ import { MAX_WALK_S, SETTLE_S } from './timeline';
 import type { MapId } from './maps/ids';
 import { skyAt, skyOf, type Sky, type Weather } from './sky';
 import { forcedPokes, notePokes, NO_POKES, pokesAt, pokeWake, roomOf, type Click, type PokeLog } from './pokes';
+import type { PluginObject } from './plugin-objects';
+import { NO_CORNERS, objectSpots, type Corners } from './corners';
 
 /** The pure modules a driver runs on: feed.ts's, or fakes in a test. */
 export interface DriverParts {
@@ -69,6 +71,8 @@ export interface Step {
   readonly moving: boolean;
   /** s until a poke starts or ends that no frame would see (a delayed one, a word alone); null: none */
   readonly wake: number | null;
+  /** his plugins' objects at their spots in this office (corners.ts objectSpots): the same value until the office or the objects change */
+  readonly corners: Corners;
 }
 
 export interface OfficeDriver {
@@ -78,6 +82,8 @@ export interface OfficeDriver {
   grow(g: Grow, t: number): void;
   /** hub/activity: a plane, a visit, a report */
   event(e: BimEvent): void;
+  /** his plugins' objects (plugin-objects.ts officeObjects): the next step places them (corners.ts); no desk moves for them */
+  objects(list: readonly PluginObject[]): void;
   /** he typed the konami code at t */
   konami(t: number): void;
   /** he clicked this bim: its poke (pokes.ts) starts at t */
@@ -128,6 +134,10 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
   let lastClock = '';
   /** the sky's slot and pin the last step drew (skyKey): a new slot is a frame (its blend) */
   let lastSky = '';
+  /** his plugins' objects as last heard, and their spots in the office they were placed in */
+  let objs: readonly PluginObject[] = [];
+  let corners: Corners = NO_CORNERS;
+  let placedIn: { office: Office; objs: readonly PluginObject[] } | null = null;
 
   return {
     rows(s, as, m) {
@@ -148,6 +158,9 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
     event(e) {
       events.push(e);
       fresh = true;
+    },
+    objects(list) {
+      objs = list;
     },
     konami(t) {
       konamiAt = t;
@@ -230,6 +243,17 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       const words = new Map([...pk].map(([n, x]) => [n, x.label]));
       const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), pokes: words, follow: a.follow, park: office.park });
       const wake = c.forced !== undefined ? null : pokeWake(pokes, frames, t, reduced);
-      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake };
+      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake, corners: cornersIn(office) };
+  }
+
+  /** the objects' spots in this office: placed again only when the office or the objects changed, each kept where it still fits */
+  function cornersIn(office: Office): Corners {
+    if (placedIn === null || placedIn.office !== office || placedIn.objs !== objs) {
+      // another map starts afresh; the same map keeps what still fits
+      const prev = placedIn !== null && placedIn.office.map === office.map ? corners.placed : [];
+      corners = objectSpots(office, objs, prev);
+      placedIn = { office, objs };
+    }
+    return corners;
   }
 }

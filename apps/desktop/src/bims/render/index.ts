@@ -181,6 +181,9 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
       lightUp(lastT, lastLook);
       applyFit();
     },
+    setObjects(c) {
+      office.setObjects(c);
+    },
     setSize(widthPx, maxHeightPx) {
       size = { w: Math.round(widthPx), maxH: Math.round(maxHeightPx) };
       applyFit();

@@ -13,6 +13,7 @@ import type { Built, Grow } from './growth';
 import type { Cozy } from './cozy';
 import type { MapId } from './maps/ids';
 import type { Sky } from './sky';
+import type { Corners } from './corners';
 
 /** The office's maps (maps/ids.ts MAP_IDS); the project's pick, the loft when he never picked one. */
 export type { MapId };
@@ -527,6 +528,8 @@ export interface Look {
 export interface OfficeRenderer {
   /** the office changed (an agent came or left): rebuild the world */
   setOffice(office: Office, agents: readonly Agent[]): void;
+  /** his plugins' objects at their spots (corners.ts objectSpots, the driver's Step.corners): the next frame draws them */
+  setObjects(c: Corners): void;
   /** css px; the camera fits the office to the width (never cropped), returns the height it takes */
   setSize(widthPx: number, maxHeightPx: number): number;
   /** his pinch and pan (zoom.ts): the view inside the fit; FIT is the whole office. The next frame shows it */
