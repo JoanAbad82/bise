@@ -42,6 +42,9 @@ const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 pub struct Recent {
     pub sha: String,
     pub parent: Option<String>,
+    /// its committer time, in ms (a landed commit's: about its land's, a
+    /// land rebases)
+    pub committed_ms: u64,
     pub subject: String,
     pub files: Vec<String>,
 }
@@ -49,7 +52,7 @@ pub struct Recent {
 /// `git log --first-parent --diff-merges=first-parent --name-only -z`
 /// with [`LOG_FORMAT`]: records start with \x01, the header ends with a
 /// NUL, then the files, each NUL-ended (the first after a newline).
-pub const LOG_FORMAT: &str = "--format=%x01%H%x1f%P%x1f%s";
+pub const LOG_FORMAT: &str = "--format=%x01%H%x1f%P%x1f%ct%x1f%s";
 
 pub fn parse_log(out: &str) -> Vec<Recent> {
     out.split('\u{1}')
@@ -59,9 +62,10 @@ pub fn parse_log(out: &str) -> Vec<Recent> {
             let mut head = parts.next()?.split('\u{1f}');
             let sha = head.next()?.trim().to_string();
             let parent = head.next()?.split_whitespace().next().map(str::to_string);
+            let committed_ms = head.next()?.trim().parse::<u64>().unwrap_or(0) * 1000;
             let subject = head.next().unwrap_or_default().to_string();
             let files = parts.map(|f| f.trim_start_matches('\n')).filter(|f| !f.is_empty()).map(str::to_string).collect();
-            (!sha.is_empty()).then_some(Recent { sha, parent, subject, files })
+            (!sha.is_empty()).then_some(Recent { sha, parent, committed_ms, subject, files })
         })
         .collect()
 }
@@ -130,13 +134,22 @@ pub fn hunk_undone(minus: &[String], plus: &[String], before: &BTreeSet<&str>, a
 }
 
 /// What a land undoes of one commit: who landed it (None: no agent's land
-/// record: the user, a feature merge), and the files.
+/// record: the user, a feature merge), whether it is older than every
+/// record ([`before_records`]), and the files.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Undone {
     pub sha: String,
     pub subject: String,
     pub by: Option<String>,
+    pub before_records: bool,
     pub files: Vec<String>,
+}
+
+/// A commit with no land record (`by` None), committed before the first
+/// record (or with no record at all): it may be anyone's land, the
+/// lander's own too, from before bise kept them (architect m_42765).
+pub fn before_records(by: Option<&str>, committed_ms: u64, records: &[LandRecord]) -> bool {
+    by.is_none() && records.iter().map(|r| r.at_ms).min().is_none_or(|first| committed_ms < first)
 }
 
 /// The files named in a refusal before "and N more".
@@ -168,14 +181,19 @@ pub fn refusal(target: &str, undone: &[Undone]) -> Option<String> {
     if undone.len() > 1 {
         whose = format!("{} and {} other commits", whose, undone.len() - 1);
     }
-    Some(format!(
+    let mut line = format!(
         "your land puts back old copies of {}, undoing {} on {}: your commits carry an old tree (a reset or a squash on a stale copy?). nothing moved: take their version (git checkout {} -- <file>), redo your change on top, commit, sb land again; to undo theirs on purpose: git revert {}",
-        list,
-        whose,
-        target,
-        target,
-        sha7
-    ))
+        list, whose, target, target, sha7
+    );
+    let old: Vec<String> = undone.iter().filter(|u| u.before_records).map(|u| u.sha.chars().take(7).collect()).collect();
+    if !old.is_empty() {
+        line.push_str(&format!(
+            ". {} landed before bise kept land records: if it is your own earlier land, name it in your commit message ('reworks my {}') and land again",
+            old.join(", "),
+            old[0]
+        ));
+    }
+    Some(line)
 }
 
 /// The guard on `base..tip` in the checkout `dir`, a land of `lander`
@@ -206,7 +224,8 @@ pub fn guard(dir: &Path, target: &str, base: &str, tip: &str, since_ms: u64, lan
         }
         let files = undone_files(dir, &c, base, tip, &both)?;
         if !files.is_empty() {
-            undone.push(Undone { sha: c.sha, subject: c.subject, by, files });
+            let before_records = before_records(by.as_deref(), c.committed_ms, records);
+            undone.push(Undone { sha: c.sha, subject: c.subject, by, before_records, files });
         }
     }
     match refusal(short(target), &undone) {
@@ -265,13 +284,20 @@ mod tests {
 
     #[test]
     fn the_log_reads_each_commit_its_first_parent_and_files() {
-        let out = "\u{1}c2\u{1f}p2 m2\u{1f}y: b and p\0\nb\0p/new\0\u{1}c1\u{1f}\u{1f}init\0\na\0\u{1}c0\u{1f}p0\u{1f}empty\0";
+        let out = "\u{1}c2\u{1f}p2 m2\u{1f}1700\u{1f}y: b and p\0\nb\0p/new\0\u{1}c1\u{1f}\u{1f}1600\u{1f}init\0\na\0\u{1}c0\u{1f}p0\u{1f}1500\u{1f}empty\0";
+        let r = |sha: &str, parent: Option<&str>, s: u64, subject: &str, files: &[&str]| Recent {
+            sha: sha.into(),
+            parent: parent.map(str::to_string),
+            committed_ms: s * 1000,
+            subject: subject.into(),
+            files: files.iter().map(|f| f.to_string()).collect(),
+        };
         assert_eq!(
             parse_log(out),
             vec![
-                Recent { sha: "c2".into(), parent: Some("p2".into()), subject: "y: b and p".into(), files: vec!["b".into(), "p/new".into()] },
-                Recent { sha: "c1".into(), parent: None, subject: "init".into(), files: vec!["a".into()] },
-                Recent { sha: "c0".into(), parent: Some("p0".into()), subject: "empty".into(), files: vec![] },
+                r("c2", Some("p2"), 1700, "y: b and p", &["b", "p/new"]),
+                r("c1", None, 1600, "init", &["a"]),
+                r("c0", Some("p0"), 1500, "empty", &[]),
             ]
         );
     }
@@ -328,6 +354,7 @@ mod tests {
             sha: sha.into(),
             subject: "y: b and p".into(),
             by: by.map(str::to_string),
+            before_records: false,
             files: files.iter().map(|s| s.to_string()).collect(),
         };
         assert_eq!(refusal("feat", &[]), None);
@@ -337,5 +364,34 @@ mod tests {
         );
         let e = refusal("main", &[u("1a2b3c4d5e", None, &["a", "b", "c", "d"]), u("9f9f9f9f", Some("z"), &["d", "e", "f"])]).unwrap();
         assert!(e.starts_with("your land puts back old copies of a, b, c, d, e and 1 more, undoing a 1a2b3c4 \"y: b and p\" and 1 other commits on main"), "{}", e);
+        assert!(!e.contains("land records"), "{}", e);
+    }
+
+    /// architect m_42765: a commit with no record from before the first
+    /// one may be the lander's own (nm-panel's 723e639d5): the refusal
+    /// says how to name it. Nothing else changes.
+    #[test]
+    fn a_commit_from_before_the_records_is_named_with_the_way_through() {
+        let rec = |at_ms: u64| LandRecord {
+            agent: "y".into(),
+            place: "wt:y".into(),
+            target: "feat".into(),
+            base: "b".into(),
+            tip: "t".into(),
+            commits: vec!["t".into()],
+            at_ms,
+        };
+        let records = [rec(5_000), rec(9_000)];
+        assert!(before_records(None, 4_000, &records), "no record, older than the first");
+        assert!(!before_records(None, 6_000, &records), "no record, after the first: the user, a merge");
+        assert!(!before_records(Some("y"), 4_000, &records), "a record says whose");
+        assert!(before_records(None, 6_000, &[]), "no record at all yet");
+        let u = |sha: &str, old: bool| Undone { sha: sha.into(), subject: "s".into(), by: None, before_records: old, files: vec!["f".into()] };
+        let e = refusal("feat", &[u("723e639d5a", true), u("9f9f9f9f", false)]).unwrap();
+        assert!(
+            e.ends_with("git revert 723e639. 723e639 landed before bise kept land records: if it is your own earlier land, name it in your commit message ('reworks my 723e639') and land again"),
+            "{}",
+            e
+        );
     }
 }
