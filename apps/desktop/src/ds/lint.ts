@@ -107,6 +107,36 @@ const SPACE_PROP = /^(?:(?:margin|padding|inset)(?:-[a-z]+)*|gap|row-gap|column-
 const HEIGHT_PROP = /^(?:min-|max-)?(?:height|block-size)$/;
 const LENGTH = /(-?\d*\.?\d+)(px|r?em)\b/g;
 
+/** A text size under the floor: its line and the value written. */
+export interface SmallText {
+  line: number;
+  value: string;
+}
+
+/** the ds's floor, --t-11: 11.5 px (ambient m_8298) */
+const FLOOR_PX = 11.5;
+
+/**
+ * The text sizes a stylesheet writes under the ds's floor (--t-11, 11.5 px; ui-review-app #7): a
+ * font-size, or a font shorthand's size, in px or rem (16 px) under 11.5. A var() is the token's
+ * business; em and % follow their parent and are not read. Pure.
+ */
+export function smallText(css: string): SmallText[] {
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+  const out: SmallText[] = [];
+  for (const m of body.matchAll(/(^|[{;])(\s*)(font-size|font)(\s*:\s*)([^;{}]+)/g)) {
+    const value = (m[5] ?? "").trim();
+    // a shorthand's size is the length before its optional '/ line-height'
+    const size = m[3] === "font" ? /(?:^|\s)(\d*\.?\d+)(px|rem)\s*(?:\/|\s)/.exec(`${value} `) : /^(\d*\.?\d+)(px|rem)$/.exec(value);
+    if (!size) continue;
+    const px = Number(size[1]) * (size[2] === "rem" ? 16 : 1);
+    if (px >= FLOOR_PX) continue;
+    const at = m.index + (m[1] ?? "").length + (m[2] ?? "").length;
+    out.push({ line: body.slice(0, at).split("\n").length, value });
+  }
+  return out;
+}
+
 /**
  * The lengths a stylesheet writes by hand in its spacing properties, one per length: not 0, not a
  * token (a var() or a calc() of them has no length of its own), not a 1 px stroke's offset; and

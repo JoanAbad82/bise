@@ -64,15 +64,14 @@ export function Projects({ projects, ports }: { projects: readonly ProjectRow[];
                 }}
               />
             ) : (
-              <>
-                {i < 9 && <Kbd>{`⌘${String(i + 1)}`}</Kbd>} {p.name}
-              </>
+              p.name
             ),
           sub: projectSub(p),
           control:
             confirm === p.project ? (
               <span className="settings-row-acts" data-testid={`settings.project.${p.project}.confirm`}>
-                {/* designer m_18736: nothing ghost in rows; remove is an Act in the error tone, asked once */}
+                {/* designer m_18736: nothing ghost in rows; remove is an Act in the error tone, asked once
+                    (at rest it waits in text-2, red on hover: ui-review-app #12) */}
                 <Act tone="err" onClick={() => { ports.send({ cmd: 'project_remove', project: p.project }); setConfirm(null); }} testId={`settings.project.${p.project}.remove.yes`}>
                   {settings.project_remove}
                 </Act>
@@ -82,10 +81,12 @@ export function Projects({ projects, ports }: { projects: readonly ProjectRow[];
               </span>
             ) : (
               <span className="settings-row-acts">
+                {/* its ⌘ key at the row's right, before its acts (ui-review-app #12) */}
+                {i < 9 && <Kbd>{`⌘${String(i + 1)}`}</Kbd>}
                 <IconButton size="row" label={settings.project_up} disabled={i === 0} onClick={() => { move(p, -1); }} testId={`settings.project.${p.project}.up`}>↑</IconButton>
                 <IconButton size="row" label={settings.project_down_move} disabled={i === ps.length - 1} onClick={() => { move(p, 1); }} testId={`settings.project.${p.project}.down`}>↓</IconButton>
                 <Act onClick={() => { setRenaming(p.project); }} testId={`settings.project.${p.project}.rename`}>{settings.project_rename}</Act>
-                <Act tone="err" onClick={() => { setConfirm(p.project); }} testId={`settings.project.${p.project}.remove`}>{settings.project_remove}</Act>
+                <Act tone="danger" onClick={() => { setConfirm(p.project); }} testId={`settings.project.${p.project}.remove`}>{settings.project_remove}</Act>
               </span>
             ),
         }))}
@@ -97,7 +98,6 @@ export function Projects({ projects, ports }: { projects: readonly ProjectRow[];
         }
       />
       <Button
-        kind="pri"
         onClick={() => {
           setSheet(true);
         }}

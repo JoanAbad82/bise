@@ -131,17 +131,22 @@ export function whereWords(w: Where): string {
   }
 }
 
+/** A time the hub never knew: 0, or a few seconds after the epoch (a test world's 2000 ms, an old
+ *  record's seconds read as ms). Before 2001 bise did not exist: such a time is no date at all. */
+const KNOWN_FROM_MS = 1_000_000_000_000;
+const known = (ms: number): number => (ms >= KNOWN_FROM_MS ? ms : 0);
+
 /** When it closed: its at_ms, else when it was asked (an older hub's record without a close time);
  *  0: neither known (its day reads 'earlier', never jan 1 1970). Pure. */
 export function closedMs(r: InboxRecord): number {
-  return r.at_ms > 0 ? r.at_ms : r.asked_ms > 0 ? r.asked_ms : 0;
+  return known(r.at_ms) || known(r.asked_ms);
 }
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 /** A day's head (words::day_head): 'today', 'yesterday', 'oct 12', 'dec 30 2024'. Pure (local time). */
 export function dayHead(ms: number, now: number): string {
-  if (ms <= 0) return inbox.day_earlier;
+  if (known(ms) === 0) return inbox.day_earlier;
   if (dayOf(ms) === dayOf(now)) return inbox.day_today;
   if (dayOf(ms) === dayOf(now - 86_400_000)) return inbox.day_yesterday;
   const d = new Date(ms);

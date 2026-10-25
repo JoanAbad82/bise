@@ -80,7 +80,7 @@
 .ic-foot .b-act { color: inherit; }
 .ic-foot .b-act:hover { color: var(--c-text-2); }
 .ic-foot-end { margin-left: auto; }
-.ic-foot .b-kbd, .ic-foot kbd { font: 600 11px var(--font-mono); color: var(--c-text-2); margin-right: var(--s-1); background: none; box-shadow: none; padding: 0; }
+.ic-foot .b-kbd, .ic-foot kbd { font: 600 var(--t-11) var(--font-mono); color: var(--c-text-2); margin-right: var(--s-1); background: none; box-shadow: none; padding: 0; }
 /* the capsule's card keeps its glass (the capsule draws the surface) */
 .ic.glass { background: transparent; box-shadow: none; border-radius: 0; max-height: none; }
 /* the strip's open item: docked between the thread and the composer's label, the composer's edges */

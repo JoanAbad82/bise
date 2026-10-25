@@ -36,11 +36,11 @@
 
 /* the marks on the picture's corners: small, quiet, on the page's ground */
 .art-card-x, .art-card-n, .art-card-lk { position: absolute; z-index: 1; line-height: 1.6; background: var(--c-bg, var(--p-bg)); box-shadow: 0 0 0 1px var(--c-line); }
-.art-card-x { left: var(--card-mark); bottom: var(--card-mark); padding: 0 var(--s-1); border-radius: var(--r-1); font: 10.5px/1.5 var(--font-mono); color: var(--c-text-2); }
-.art-card-n { right: var(--card-mark); top: var(--card-mark); padding: 0 var(--card-mark); border-radius: var(--r-pill); font: 600 11px/1.6 var(--font-ui); color: var(--c-text); }
-.art-card-lk { right: var(--card-mark); bottom: var(--card-mark); padding: 0 var(--card-mark); border-radius: var(--r-1); font: 11px/1.6 var(--font-ui); color: var(--c-text-2); }
+.art-card-x { left: var(--card-mark); bottom: var(--card-mark); padding: 0 var(--s-1); border-radius: var(--r-1); font: var(--t-11)/1.5 var(--font-mono); color: var(--c-text-2); }
+.art-card-n { right: var(--card-mark); top: var(--card-mark); padding: 0 var(--card-mark); border-radius: var(--r-pill); font: 600 var(--t-11)/1.6 var(--font-ui); color: var(--c-text); }
+.art-card-lk { right: var(--card-mark); bottom: var(--card-mark); padding: 0 var(--card-mark); border-radius: var(--r-1); font: var(--t-11)/1.6 var(--font-ui); color: var(--c-text-2); }
 .art-card-ck, .art-card-mb { position: absolute; z-index: 2; top: var(--card-mark); display: flex; align-items: center; justify-content: center; padding: 0; border: 0; }
-.art-card-ck { left: var(--card-mark); width: var(--card-pick); height: var(--card-pick); border-radius: 50%; background: var(--c-bg, var(--p-bg)); box-shadow: inset 0 0 0 1.5px var(--c-text-2); font: 600 11px/1 var(--font-ui); color: var(--p-bg); }
+.art-card-ck { left: var(--card-mark); width: var(--card-pick); height: var(--card-pick); border-radius: 50%; background: var(--c-bg, var(--p-bg)); box-shadow: inset 0 0 0 1.5px var(--c-text-2); font: 600 var(--t-11)/1 var(--font-ui); color: var(--p-bg); }
 .art-card-ck.y { background: var(--c-ink); box-shadow: none; }
 .art-card-mb { right: calc(2 * var(--card-mark)); width: var(--card-menu); height: var(--card-menu); border-radius: var(--r-1); background: var(--c-bg, var(--p-bg)); box-shadow: 0 0 0 1px var(--c-line); font: 700 12px/1 var(--font-ui); letter-spacing: 1px; color: var(--c-text); }
 .art-card-pic:not(.stack) .art-card-mb { right: var(--card-mark); }
@@ -87,4 +87,4 @@
 .art-sheet { display: grid; gap: var(--s-4); }
 .art-card.sheet { padding-top: 0; }
 .art-card.sheet .art-card-pic { margin-right: 0; }
-.art-sheet-cp { display: block; margin-top: var(--card-room); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 11px/1.4 var(--font-mono); color: var(--c-text-3); }
+.art-sheet-cp { display: block; margin-top: var(--card-room); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--t-11)/1.4 var(--font-mono); color: var(--c-text-3); }

@@ -108,8 +108,9 @@ export function SearchButton({ label, keys, onClick, testId }: SearchButtonProps
 
 export interface ActProps {
   children: ReactNode;
-  /** err: the words in the error tone */
-  tone?: "err";
+  /** err: the words in the error tone; danger: text-2 at rest, the error tone on hover (a
+   *  destructive act that waits in its row: remove; ui-review-app #12) */
+  tone?: "err" | "danger";
   /** ref: a reference in a news line (the landed sha, 'PR #12'): ink, always underlined (designer m_18626) */
   kind?: "ref";
   state?: UiState;

@@ -32,6 +32,7 @@
 .b-act:hover,.b-act.is-hover{color:var(--c-text);text-decoration:underline}
 .b-act:focus-visible,.b-act.is-focus{outline:1px solid var(--c-focus);outline-offset:0}
 .b-act.err{color:var(--c-err)}
+.b-act.danger:hover,.b-act.danger.is-hover{color:var(--c-err)}
 .b-act:disabled,.b-act.is-disabled{opacity:.5;text-decoration:none}
 
 /* TextArea: the Field's frame around a textarea that grows with its words to 40% of the window */

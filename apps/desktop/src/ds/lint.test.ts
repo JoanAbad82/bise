@@ -5,8 +5,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { classesOf, cssClasses, cursorFaults, looseSpacing, menuDrawn, plainClicks, rawControls } from './lint';
-import { PENDING_CLASSES, PENDING_RAW } from './lint.pending';
+import { classesOf, cssClasses, cursorFaults, looseSpacing, menuDrawn, plainClicks, rawControls, smallText } from './lint';
+import { PENDING_CLASSES, PENDING_RAW, PENDING_SMALL_TEXT } from './lint.pending';
 import { PENDING_SPACING } from './spacing.pending';
 
 const SRC = join(__dirname, '..');
@@ -79,6 +79,32 @@ describe('the ds laws (designer m_18343)', () => {
     expect(fresh, 'a class with no CSS rule: give it one, or use a data-testid for a test hook').toEqual([]);
     const done = PENDING_CLASSES.filter((c) => !missing.has(c));
     expect(done, 'lint.pending.ts lists a class that has its rule now: drop it').toEqual([]);
+  });
+});
+
+describe('the text floor (--t-11, 11.5 px: ambient m_8298, ui-review-app #7)', () => {
+  it('reads the sizes under 11.5 px, and only those', () => {
+    const css = ['/* font-size: 9px */', '.a{font-size:11px;font:600 10.5px/16px var(--font-ui)}', '.b{font-size:var(--t-11);font:12px/1 x;font-size:.6875rem;font-size:.9em}'].join('\n');
+    expect(smallText(css).map((t) => `${String(t.line)} ${t.value}`)).toEqual(['2 11px', '2 600 10.5px/16px var(--font-ui)', '3 .6875rem']);
+  });
+
+  it('no stylesheet writes text under the floor (lint.pending.ts PENDING_SMALL_TEXT only shrinks)', () => {
+    // drawings, not words: a sleeping bim's z's grow 9, 11, 13 px as they rise (bims' art)
+    const ART: Record<string, number> = { 'bims/office.css': 2 };
+    const now: Record<string, number> = {};
+    for (const p of files.filter((f) => f.endsWith('.css'))) {
+      const r = rel(p);
+      // bise.dev/desktop's hero bundle: the site's page, its sizes designer's page specs in px
+      if (r.startsWith('hero/')) continue;
+      // the dots' state glyphs in high contrast (✓ ! ?) fill a 14-16 px ring: a mark, not text
+      if (r === 'ds/css/live.css') continue;
+      const n = smallText(readFileSync(p, 'utf8')).length - (ART[r] ?? 0);
+      if (n > 0) now[r] = n;
+    }
+    const grown = Object.entries(now).filter(([f, n]) => n > (PENDING_SMALL_TEXT[f] ?? 0)).map(([f, n]) => `${f}: ${String(n)} (pending ${String(PENDING_SMALL_TEXT[f] ?? 0)})`);
+    expect(grown, 'text under 11.5 px: use var(--t-11), the floor').toEqual([]);
+    const done = Object.entries(PENDING_SMALL_TEXT).filter(([f, n]) => (now[f] ?? 0) < n).map(([f, n]) => `${f}: ${String(now[f] ?? 0)} now, pending says ${String(n)}`);
+    expect(done, 'PENDING_SMALL_TEXT lists more than is left: lower it').toEqual([]);
   });
 });
 

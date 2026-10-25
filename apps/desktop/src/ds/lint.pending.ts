@@ -28,3 +28,12 @@ export const PENDING_CLASSES: readonly string[] = [
   'th-voice',
   'vm-said',
 ];
+
+/** text under the floor (--t-11, 11.5 px) per stylesheet (lint.ts smallText; ui-review-app #7):
+ *  files their owner is changing now, fixed after it lands. It may only shrink. */
+export const PENDING_SMALL_TEXT: Readonly<Record<string, number>> = {
+  'app/app.css': 3,
+  'bims/office.css': 1,
+  'plugins/plugins.css': 3,
+  'thread/thread.css': 2,
+};

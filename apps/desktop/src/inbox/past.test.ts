@@ -80,11 +80,15 @@ it('heads a day as words::day_head', () => {
   expect(dayHead(new Date(2024, 11, 30, 9, 0).getTime(), NOW)).toBe('dec 30 2024');
   // a time never known reads 'earlier', never 'jan 1 1970' (his inbox shot)
   expect(dayHead(0, NOW)).toBe('earlier');
+  // nor a time a few seconds after the epoch (the fake world's at_ms 2000: ui-review-app #11)
+  expect(dayHead(2000, NOW)).toBe('earlier');
 });
 
 it('a record without a close time sits on the day it was asked; none known: earlier, never 1970', () => {
   const l = listsOf([], [rec(1, { at_ms: 0, asked_ms: at(1, 9, 0) }), rec(2, { at_ms: 0, asked_ms: 0 })], NAMES, ALL, NOW);
   expect(l.days.map((d) => d.title)).toEqual(['yesterday', 'earlier']);
+  const tiny = listsOf([], [rec(3, { at_ms: 2000, asked_ms: 1000 }), rec(4, { at_ms: 900, asked_ms: 500 })], NAMES, ALL, NOW);
+  expect(tiny.days.map((d) => d.title)).toEqual(['earlier']);
 });
 
 describe('jumpOf: where a past row goes', () => {
