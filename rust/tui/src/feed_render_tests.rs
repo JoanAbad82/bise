@@ -905,6 +905,35 @@ fn ctrl_o_opens_the_whole_compaction_summary_as_markdown() {
     assert_eq!(feed_text(&events, 40), [" ≡ summary ▸"]);
 }
 
+/// A list item longer than its row, in a reply and in an open summary,
+/// at 80 and 150 columns: its wrapped rows hang under its text (4
+/// columns in, after `  - ` or `  1. `'s mark), never back at the edge
+/// (designer m_41685).
+#[test]
+fn a_wrapped_list_item_hangs_under_its_text() {
+    let long = "the cold run is slow because the index is rebuilt at every start of the hub and nobody keeps it warm between two runs of the gate, so every agent pays it again and again, all day long, on every machine";
+    let md = [format!("- {long}"), format!("1. {long}")].join(&char::from(10).to_string());
+    for width in [80, 150] {
+        for (what, ev) in [("reply", Ev::Assistant(md.clone())), ("summary", Ev::Compacted { text: md.clone(), open: true })] {
+            let rows = feed_text(&[ev], width);
+            if let Some(f) = std::env::var_os("HANG_DUMP") {
+                let _ = std::fs::write(format!("{}-{what}-{width}.txt", f.to_string_lossy()), rows.join(&char::from(10).to_string()));
+            }
+            // the rows of the item's text, from its mark to the next item or the end
+            for mark in ["- ", "1. "] {
+                let at = rows.iter().position(|r| r.contains(&format!("  {mark}the cold run"))).unwrap_or_else(|| panic!("{what} {width}: {rows:#?}"));
+                let col = rows[at].find("the cold").unwrap();
+                let next: Vec<&String> = rows[at + 1..].iter().take_while(|r| !r.contains("the cold run")).filter(|r| !r.trim().is_empty() && r.trim() != "│").collect();
+                assert!(!next.is_empty(), "{what} {width}: the item wraps: {rows:#?}");
+                for r in next {
+                    let text_at = r.char_indices().find(|(i, c)| *i >= 1 && !c.is_whitespace() && *c != '│').map(|(i, _)| i).unwrap();
+                    assert_eq!(text_at, col, "{what} {width}: {r:?} hangs under the text: {rows:#?}");
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn feed_entities_use_the_book_glyphs() {
     let row = |ev: Ev| rows_text(&ev_rows(&ev, 0, 100)).join("\n");
