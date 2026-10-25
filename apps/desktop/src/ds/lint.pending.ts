@@ -12,8 +12,6 @@ export const PENDING_CLASSES: readonly string[] = [
   'ag-model-label',
   'app-hint',
   'art-day',
-  'hit',
-  'lab',
   'lab-sent',
   'pearl',
   'pr-branch',
