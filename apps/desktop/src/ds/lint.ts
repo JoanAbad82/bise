@@ -168,11 +168,11 @@ export function looseSpacing(css: string): LooseSpace[] {
 }
 
 /**
- * The pointer law (his words: « chaque élément interactif ... devrait avoir un cursor pointer »):
- * the hand comes from ds/css/base.css's root rule, which matches controls and roles. A plain
- * element he clicks (a div, a span, an li with onClick) and no role is outside it: it shows the
- * arrow. A double-click or a drag alone is no click: no hand (designer m_38970). One entry per
- * such tag: its line and its tag. A native control (button,
+ * A thing he clicks says what it is: ds/css/base.css's root rule (the arrow on a control, the hand
+ * on a link, chrome text not selectable) and VoiceOver match controls and roles. A plain element
+ * he clicks (a div, a span, an li with onClick) and no role is outside both. A double-click or a
+ * drag alone is no click (designer m_38970). One entry per such tag: its line and its tag. A
+ * native control (button,
  * a, input, select, textarea, label, summary, option) is the rule's own. Pure.
  */
 export function plainClicks(src: string): string[] {
@@ -207,18 +207,77 @@ function openingTag(src: string, at: number): string {
 }
 
 /**
- * The rules of a stylesheet that put the arrow (cursor: default or auto) back on something: one
- * selector each. A disabled state's (:disabled, [disabled], aria-disabled) is the root rule's own
- * and left out. Any other would undo the hand the root gives a control. Pure.
+ * The arrow law (bise fait mac, page native-mac §1: « le curseur flèche (pas la main) sur les
+ * boutons », as macOS draws it): ds/css/base.css's root rule gives every control the arrow and a
+ * link the hand. The rules of a stylesheet that put the hand on something: one selector each. A
+ * link's (a[href], [role=link]) is the root rule's own and left out. Pure.
  */
-export function cursorFaults(css: string): string[] {
+export function handRules(css: string): string[] {
   const body = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const out: string[] = [];
   for (const m of body.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
-    if (!/(^|[;\s])cursor\s*:\s*(default|auto)\b/.test(m[2] ?? "")) continue;
+    if (!/(^|[;\s])cursor\s*:\s*pointer\b/.test(m[2] ?? "")) continue;
     for (const sel of (m[1] ?? "").split(",").map((s) => s.trim().replace(/\s+/g, " "))) {
-      if (sel !== "" && !/:disabled|\[disabled\]|aria-disabled/.test(sel)) out.push(sel);
+      if (sel !== "" && !/a\[href\]|\[role=["']?link/.test(sel)) out.push(sel);
     }
+  }
+  return out;
+}
+
+/** the 7 text sizes of native-mac §6 in px: 30, 15, 14, 13, 12 (and 12 mono), 11.5 in a kbd */
+export const TYPE_SCALE: readonly number[] = [30, 15, 14, 13, 12, 11.5];
+/** the size tokens off that scale, kept for the screens not moved yet */
+const OFF_SCALE_TOKENS = ["--t-17", "--t-22"];
+
+/**
+ * The text sizes a stylesheet writes off the 7 of native-mac §6 (TYPE_SCALE): a font-size, or a
+ * font shorthand's size, in px or rem off the scale, or one of the off-scale tokens (--t-17,
+ * --t-22). Under the floor is smallText's. em and % follow their parent and are not read. Pure.
+ */
+export function offScaleText(css: string): SmallText[] {
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+  const out: SmallText[] = [];
+  for (const m of body.matchAll(/(^|[{;])(\s*)(font-size|font)(\s*:\s*)([^;{}]+)/g)) {
+    const value = (m[5] ?? "").trim();
+    const at = m.index + (m[1] ?? "").length + (m[2] ?? "").length;
+    const line = body.slice(0, at).split("\n").length;
+    if (OFF_SCALE_TOKENS.some((t) => value.includes(`var(${t})`))) {
+      out.push({ line, value });
+      continue;
+    }
+    const size = m[3] === "font" ? /(?:^|\s)(\d*\.?\d+)(px|rem)\s*(?:\/|\s)/.exec(`${value} `) : /^(\d*\.?\d+)(px|rem)$/.exec(value);
+    if (!size) continue;
+    const px = Number(size[1]) * (size[2] === "rem" ? 16 : 1);
+    if (px < FLOOR_PX || TYPE_SCALE.includes(px)) continue;
+    out.push({ line, value });
+  }
+  return out;
+}
+
+/**
+ * The scrollbars a stylesheet draws itself: scrollbar-width, scrollbar-color or a
+ * ::-webkit-scrollbar rule, one entry each. Any of them turns Chromium's macOS overlay scrollbar
+ * (drawn by the system over the content, gone when still) into a classic bar that takes room
+ * (ds/css/base.css). Pure.
+ */
+export function drawnScrollbars(css: string): string[] {
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  return [...body.matchAll(/scrollbar-(?:width|color)\s*:|::-webkit-scrollbar[\w-]*/g)].map((m) => m[0].replace(/\s*:$/, ""));
+}
+
+/**
+ * The length tokens of tokens.css off the 4 px grid (designer's rule: every size is a 4 px step):
+ * a custom property whose whole value is one px length that is not a multiple of 4. Radii
+ * (--r-*: macOS's 6, 10, 22) and the 1 px of a stroke are the rule's own. Pure.
+ */
+export function offGridTokens(css: string): string[] {
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out: string[] = [];
+  for (const m of body.matchAll(/(--[\w-]+)\s*:\s*(-?\d*\.?\d+)px\s*[;}]/g)) {
+    const name = m[1] ?? "";
+    const n = Math.abs(Number(m[2]));
+    if (name.startsWith("--r-") || n === 1 || n % 4 === 0) continue;
+    out.push(`${name}: ${m[2] ?? ""}px`);
   }
   return out;
 }

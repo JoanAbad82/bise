@@ -45,6 +45,10 @@
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
+  /* the bims' world floating over the window, frameless (native-mac §7): three layers, 18/28/16% in
+     dark, a brown tint 14/20/12% in light (--sh-world-1..3); a bubble's 3D object: 0 4 3 at 28% */
+  --sh-world: 0 2px 1px color-mix(in srgb, var(--p-shadow) var(--sh-world-1, 18%), transparent), 0 14px 14px color-mix(in srgb, var(--p-shadow) var(--sh-world-2, 28%), transparent), 0 28px 32px color-mix(in srgb, var(--p-shadow) var(--sh-world-3, 16%), transparent);
+  --sh-obj: 0 4px 3px color-mix(in srgb, var(--p-shadow) 28%, transparent);
   /* a dialog's shadow (designer's dialogs rules): a short soft drop; --e-3's wide halo is only for
      what floats over other apps (spotlight, capsule, palette). --sheet-shadow is 12% in light */
   --e-sheet: 0 0 0 1px var(--c-line), 0 1px 2px color-mix(in srgb, var(--p-shadow) 8%, transparent), 0 12px 32px -12px color-mix(in srgb, var(--p-shadow) var(--sheet-shadow, 22%), transparent);
@@ -89,11 +93,47 @@
   --h-control-lg: 40px;  /* the onboarding's main button */
   --h-row-tight: 28px;   /* a sidebar row */
   --h-row: 32px;         /* a list row */
-  --h-bar: 40px;         /* the window's title bar */
+  --h-bar: 52px;         /* the window's bar, full width: the lights, the title, the panel's tabs (native-mac §6) */
   --h-head: 44px;        /* a panel's or a screen's head */
   --h-composer: 48px;    /* the composer on one line */
   /* the old names, kept working */
   --row: var(--h-row); --row-tight: var(--h-row-tight);
+
+  /* bise fait mac (page native-mac v10 §6 and §7, plan native-mac-plan v4). Every one a 4 px step
+     but the radii --r-menu 10 (macOS's menus and settings groups) and nothing else */
+  --h-kbd: 20px;           /* a kbd chip, a switch's height */
+  --h-seg-in: 24px;        /* a segment inside the 28 segmented filter (margin 2) */
+  --h-group: 32px;         /* a group label over a page's rows (16 above it) */
+  --h-launcher-row: 40px;  /* an entry of New tab, the launcher */
+  --h-setting-row: 44px;   /* a settings row (at least) */
+  --h-recent: 48px;        /* a recent entry of the launcher, with its 32 tile */
+  --h-list-row: 52px;      /* a page's row on two lines (13/18 + 12/16): inbox, artifacts, scheduled */
+  --w-rail: 56px;          /* the permanent rail on the window's left */
+  --w-panel: 384px; --w-panel-min: 320px; --w-panel-max: 640px; /* the tabbed panel on the right */
+  --w-flyout: 360px;       /* a bubble's card on the right side */
+  --w-search: 200px;       /* the search field in a page's bar */
+  --w-state: 16px;         /* a list row's state column ('?', a check) */
+  --bubble: 44px;          /* a bubble on the right side (A: its object comes out of its top) */
+  --bubble-obj: 68px;      /* the 3D object in a bubble: 28 out of its top */
+  --world: 148px;          /* the bims' world, folded, at the right side's top */
+  --world-big: 384px;      /* the world after 300 ms of hover */
+  --world-hover: var(--world-big); /* what the hover grows it to: --world under reduced motion */
+  --r-menu: 10px;          /* a menu's and a settings group's corner, as macOS draws them */
+  /* the floating composer on a page that is no thread: at rest, focused, open (70% of the height at most) */
+  --float-w: 560px; --float-h: 44px;
+  --float-w-focus: 640px; --float-h-focus: 88px;
+  --float-w-open: 640px; --float-h-open: 560px; --float-max-h: 70vh;
+  --float-bottom: var(--s-6); /* from the window's bottom */
+  /* the room every page keeps at its bottom for the floating composer: 24 + 44 + 16 = 84 */
+  --float-room: calc(var(--float-bottom) + var(--float-h) + var(--s-4));
+  /* the 7 text sizes (native-mac §6), nothing else: font: <weight> var(--f-*). lint.ts typeScale counts the rest */
+  --f-question: var(--t-30)/36px var(--font-ui); /* the empty home's question, 500, -0.01em */
+  --f-lead: var(--t-15)/22px var(--font-ui);     /* the sentence at a page's top, text-2 */
+  --f-read: var(--t-14)/22px var(--font-read);   /* the thread, the bubbles, the composer's field */
+  --f-ui: var(--t-13)/18px var(--font-ui);       /* the sidebar, the bar, tabs, rows, menus, buttons */
+  --f-meta: var(--t-12)/16px var(--font-ui);     /* dates, labels, the composer's context */
+  --f-kbd: var(--t-11)/16px var(--font-ui);      /* in a kbd chip only: the floor */
+  --f-mono: var(--t-12)/18px var(--font-mono);   /* the terminal, commands, branches, the :* */
 }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
   --p-bg: #fdfbf7; --p-text: #1b1917; --p-dim: #6b645a; --p-faint: #7d766c; --p-rule: #cfc8bd;
@@ -143,23 +183,63 @@
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
+  --sh-world: 0 2px 1px color-mix(in srgb, var(--p-shadow) var(--sh-world-1, 18%), transparent), 0 14px 14px color-mix(in srgb, var(--p-shadow) var(--sh-world-2, 28%), transparent), 0 28px 32px color-mix(in srgb, var(--p-shadow) var(--sh-world-3, 16%), transparent);
+  --sh-obj: 0 4px 3px color-mix(in srgb, var(--p-shadow) 28%, transparent);
   --e-sheet: 0 0 0 1px var(--c-line), 0 1px 2px color-mix(in srgb, var(--p-shadow) 8%, transparent), 0 12px 32px -12px color-mix(in srgb, var(--p-shadow) var(--sheet-shadow, 22%), transparent);
   --c-scrim: color-mix(in srgb, var(--c-solid) 62%, transparent);
   --glass: blur(30px) saturate(1.4);
   --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
   --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
 }
-@media (prefers-reduced-motion: reduce) { :root { --d-fast: 0ms; --d-base: 120ms; --d-slow: 160ms; } }
-/* light: softer raised surfaces and shadows (amb-win's S6 review) */
+/* light: softer raised surfaces and shadows (amb-win's S6 review); the world's shadow in a brown tint */
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
   --c-accent-soft: color-mix(in srgb, var(--p-accent) 7%, var(--p-bg));
   --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
   --sheet-shadow: 12%;
+  --sh-world-1: 14%; --sh-world-2: 20%; --sh-world-3: 12%;
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
 } }
 [data-theme="light"] {
   --c-accent-soft: color-mix(in srgb, var(--p-accent) 7%, var(--p-bg));
   --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
   --sheet-shadow: 12%;
+  --sh-world-1: 14%; --sh-world-2: 20%; --sh-world-3: 12%;
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
+}
+[data-theme="dark"] { --sh-world-1: 18%; --sh-world-2: 28%; --sh-world-3: 16%; }
+
+/* macOS's accessibility settings (native-mac-plan §2): the system's media query, or the flag main
+   puts on <html> from systemPreferences (main/a11y.ts → window.bise.a11y: data-reduce-transparency,
+   data-reduce-motion, data-increase-contrast), whichever says it. Each block names :root and every
+   [data-theme] subtree, which recomputes the roles. */
+/* reduce transparency: no glass, opaque grounds, so no text sits on a ground it can't be read on */
+@media (prefers-reduced-transparency: reduce) { :root, [data-theme] {
+  --glass: none;
+  --c-window: var(--p-bg); --c-surface: var(--p-bg); --c-raised: var(--p-raised);
+  --c-overlay: var(--p-bg); --c-sidebar: var(--p-raised);
+} }
+:root[data-reduce-transparency], :root[data-reduce-transparency] [data-theme] {
+  --glass: none;
+  --c-window: var(--p-bg); --c-surface: var(--p-bg); --c-raised: var(--p-raised);
+  --c-overlay: var(--p-bg); --c-sidebar: var(--p-raised);
+}
+/* reduce motion: every duration 0, and the world does not grow on hover */
+@media (prefers-reduced-motion: reduce) { :root, [data-theme] {
+  --d-press: 0ms; --d-fast: 0ms; --d-base: 0ms; --d-slow: 0ms; --d-mood: 0ms;
+  --world-hover: var(--world);
+} }
+:root[data-reduce-motion], :root[data-reduce-motion] [data-theme] {
+  --d-press: 0ms; --d-fast: 0ms; --d-base: 0ms; --d-slow: 0ms; --d-mood: 0ms;
+  --world-hover: var(--world);
+}
+/* increase contrast: stronger rules and a solid focus ring */
+@media (prefers-contrast: more) { :root, [data-theme] {
+  --c-line: color-mix(in srgb, var(--p-text) 28%, transparent);
+  --c-line-strong: color-mix(in srgb, var(--p-text) 50%, transparent);
+  --c-focus: var(--p-text);
+} }
+:root[data-increase-contrast], :root[data-increase-contrast] [data-theme] {
+  --c-line: color-mix(in srgb, var(--p-text) 28%, transparent);
+  --c-line-strong: color-mix(in srgb, var(--p-text) 50%, transparent);
+  --c-focus: var(--p-text);
 }

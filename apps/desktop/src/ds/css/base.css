@@ -6,12 +6,21 @@
    browser ring around the whole screen; its row's highlight says where he is (his m_24123). Zero
    specificity, and never a control (a role, a button): every real focus ring still wins. */
 :where(section[tabindex="-1"]:focus,div[tabindex="-1"]:not([role]):focus){outline:0}
-/* every thing he can click shows the hand (his words: « chaque chose sur laquelle tu peux cliquer,
-   il se passe quelque chose, devrait avoir un cursor pointer »). Owned here, at the root: zero
-   specificity, so a screen's own cursor (text, grab, resize) still wins, and no rule anywhere sets
-   cursor:default on a control (lint.ts cursorFaults); a plain div/span he clicks gets a role
-   (lint.ts plainClicks). Disabled is the arrow, over any screen's own pointer. ds/pointer.test.tsx. */
-:where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
+/* the cursor as macOS draws it (bise fait mac, page native-mac §1: « le curseur flèche (pas la
+   main) sur les boutons »): the arrow on every control, the hand on a link only. Owned here, at the
+   root: zero specificity, so a screen's own cursor (text, grab, resize) still wins; a screen's own
+   cursor:pointer is counted by lint.ts handRules (spacing.pending.ts PENDING_HAND, shrink-only); a
+   plain div/span he clicks gets a role (lint.ts plainClicks). ds/pointer.test.tsx. */
+:where(button,select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:default}
+:where(a[href],[role=link]){cursor:pointer}
+/* chrome text is not selectable, as in a Mac app: every control, and what the frame marks as
+   chrome (.b-chrome: the bar, the rail, the sidebar, the tabs; a ds row or label). Content (the
+   thread, a page's words, a field) keeps its selection */
+:where(button,summary,[role=button],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio],.b-chrome){-webkit-user-select:none;user-select:none}
+/* scrollbars: macOS draws its overlay ones (over the content, gone when still, the system's
+   'show scroll bars' setting) as long as no stylesheet draws its own: scrollbar-width,
+   scrollbar-color or ::-webkit-scrollbar turn Chromium's classic bar on, which takes room
+   (lint.ts drawnScrollbars, spacing.pending.ts PENDING_SCROLLBAR, shrink-only) */
 :is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
 .b-stage{padding:var(--s-4);border-radius:var(--r-4);background:radial-gradient(circle at 12% 0%,color-mix(in srgb,var(--c-accent) 18%,transparent),transparent 42%),radial-gradient(circle at 95% 100%,color-mix(in srgb,var(--c-ok) 12%,transparent),transparent 45%),linear-gradient(160deg,var(--c-sunken),var(--c-canvas))}
 .b-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--s-3)}

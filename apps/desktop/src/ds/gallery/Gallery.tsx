@@ -12,6 +12,7 @@ import {
   Field, Fold, Group, Head, Help, HeroWait, IconButton, PageHero, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, PickerTrigger, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
+  APP_ICONS, AppIcon, BarSearch, FilterRow, Filters, GroupLabel, LeadWait, ListRow, MoreButton, PageLead, type EntityMenu,
 } from "../index";
 import { BimsToggle } from "@/bims/Cube";
 import { BimsSwitch } from "@/bims/Office";
@@ -534,6 +535,36 @@ export const SECTIONS: Record<string, () => ReactNode> = {
       </div>
     );
   },
+  // bise fait mac's shared kit (page native-mac §6, mockup 6; nm-ds): the lead, the filters and the
+  // bar's search, a group label, the 52 rows (rest, chosen, hovered, with an action and the '…'),
+  // the empty state, and the line icons at 18, 16 and 14
+  mac: () => {
+    const noop = () => undefined;
+    const m: EntityMenu = { open: noop, onContextMenu: noop };
+    const q = <span className="g-mac-q">?</span>;
+    return (
+      <div className="g-col g-mac" data-testid="ds.mac">
+        <PageLead sentence="what your agents wait on you for, from every project." facts={<><LeadWait>3 waiting</LeadWait> · the oldest 21 d ago</>} testId="ds.mac.lead" />
+        <FilterRow>
+          <Filters items={[{ id: "w", label: "waiting" }, { id: "a", label: "answered" }, { id: "x", label: "withdrawn" }]} on="w" onPick={noop} testId="ds.mac.filters" />
+          <PickerTrigger onClick={noop}>all projects</PickerTrigger>
+          <span className="g-mac-end"><BarSearch value="" testId="ds.mac.search" /></span>
+        </FilterRow>
+        <GroupLabel count={3} waits tip="3 waiting for you" testId="ds.mac.group">waiting for you</GroupLabel>
+        <ListRow on state={q} title={<><b>perf</b> run rm -rf target?</>} sub="acme · 21 d · #10" end={<><Button size="sm">answer</Button><MoreButton menu={m} /></>} testId="ds.mac.row.on" />
+        <ListRow state={q} title={<><b>perf</b> which bench: cold or warm?</>} sub="acme · 21 d · #9" end={<MoreButton menu={m} />} testId="ds.mac.row" />
+        <div className="g-hover"><ListRow state={q} title={<><b>bise</b> let questions reach you as macOS notifications?</>} sub="harness · now" end={<MoreButton menu={m} />} testId="ds.mac.row.hover" /></div>
+        <GroupLabel testId="ds.mac.group.earlier">earlier</GroupLabel>
+        <ListRow state={<AppIcon name="check" size={14} />} title={<><b>perf</b> webp or avif for the hero?</>} sub="you: avif · acme · #11" testId="ds.mac.row.done" />
+        <Empty title="nothing waits on you." testId="ds.mac.empty">your agents ask here when they need you.</Empty>
+        {([18, 16, 14] as const).map((size) => (
+          <div key={size} className="g-row g-mac-icons" data-testid={"ds.mac.icons." + String(size)}>
+            {APP_ICONS.map((n) => <span key={n} data-tip={n}><AppIcon name={n} size={size} /></span>)}
+          </div>
+        ))}
+      </div>
+    );
+  },
   window: () => (
     <Win
       side={<Side foot="+ add a project"><Row kind="me" name="bise" sub="every project" /><SectionHead>projects</SectionHead><Row kind="pj" name="telemetry" dot="nd" end="2" needs on /></Side>}
@@ -543,7 +574,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   ),
 };
 
-export const WIDE = new Set(["presence", "markdown", "thread", "composer", "dock", "board", "sideview", "settings", "onboarding", "window", "head", "rows"]);
+export const WIDE = new Set(["mac", "presence", "markdown", "thread", "composer", "dock", "board", "sideview", "settings", "onboarding", "window", "head", "rows"]);
 
 /** the gallery: each section, dark | light */
 export function Gallery({ only }: { only?: readonly string[] }) {

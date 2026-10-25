@@ -5,9 +5,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { classesOf, cssClasses, cursorFaults, looseSpacing, menuDrawn, plainClicks, rawControls, smallText } from './lint';
+import { classesOf, cssClasses, drawnScrollbars, handRules, looseSpacing, menuDrawn, offGridTokens, offScaleText, plainClicks, rawControls, smallText } from './lint';
 import { PENDING_CLASSES, PENDING_RAW, PENDING_SMALL_TEXT } from './lint.pending';
-import { PENDING_SPACING } from './spacing.pending';
+import { PENDING_HAND, PENDING_SCROLLBAR, PENDING_SPACING, PENDING_TYPE } from './spacing.pending';
 
 const SRC = join(__dirname, '..');
 const walk = (dir: string): string[] =>
@@ -136,8 +136,8 @@ describe('the spacing law (designer desktop-spacing m_19568, ambient-lead m_1956
   });
 });
 
-describe('the pointer law (his words: « chaque chose sur laquelle tu peux cliquer ... cursor pointer »)', () => {
-  it('reads a plain element he clicks with no role, and a rule that puts the arrow back', () => {
+describe('the arrow law (page native-mac §1: « le curseur flèche (pas la main) sur les boutons »)', () => {
+  it('reads a plain element he clicks with no role, and a rule that puts the hand on a control', () => {
     expect(plainClicks(`<div onClick={go}>a</div>
 <span role="button" onClick={go} />
 <button onClick={go} />
@@ -151,10 +151,10 @@ describe('the pointer law (his words: « chaque chose sur laquelle tu peux cliqu
 >
   <Press onClick={go} />
 </span>`)).toEqual(['1 <div>', '4 <li>']);
-    expect(cursorFaults('/* .no{cursor:default} */ .a{color:red;cursor:default} .b,.c:disabled{cursor: auto} .d[aria-disabled="true"]{cursor:default} .e{cursor:pointer} .f{cursor:text}')).toEqual(['.a', '.b']);
+    expect(handRules('/* .no{cursor:pointer} */ .a{color:red;cursor:pointer} .b,a[href].c{cursor: pointer} .d[role=link]{cursor:pointer} .e{cursor:default} .f{cursor:text}')).toEqual(['.a', '.b']);
   });
 
-  it('every plain element he clicks has a role, so the root rule gives it the hand', () => {
+  it('every plain element he clicks has a role, so the root rule and VoiceOver know it', () => {
     // Frame: the scrim, a click outside what floats over it, not a thing he aims at; MapChip: a
     // wrapper that only stops the map's clicks; the office and the town: a map that picks what is
     // under the mouse and sets the hand itself over a bim or a sign (data-pointer, office.css)
@@ -166,14 +166,77 @@ describe('the pointer law (his words: « chaque chose sur laquelle tu peux cliqu
     expect(found, 'a div/span he clicks: give it its role (button, option, tab, link...) or use a ds control').toEqual([]);
   });
 
-  it('no stylesheet puts the arrow back on a control (only a disabled state, or a thing that takes no click)', () => {
-    // labels that look like rows but take no click
-    // an object's '?' pill that takes no click (only a broken plugin's '✗' opens it: objpills.ts)
-    const may = new Set(['app/app.css .app-rb-none', 'app/app.css .app-rb-none:hover', "bims/office.css .bims-pill.bims-objpill:not([role='button'])"]);
-    const found = files
-      .filter((f) => f.endsWith('.css'))
-      .flatMap((p) => cursorFaults(readFileSync(p, 'utf8')).map((s) => `${rel(p)} ${s}`))
-      .filter((s) => !may.has(s));
-    expect(found, 'cursor:default on a control undoes the hand (ds/css/base.css owns the cursor)').toEqual([]);
+  it('no stylesheet puts more hands on controls than when the arrow law came in (PENDING_HAND, a ratchet)', () => {
+    expect(ratchet(PENDING_HAND, (css, r) => (r === 'ds/css/base.css' ? 0 : handRules(css).length)), 'cursor:pointer on a control: macOS draws the arrow (ds/css/base.css owns the cursor; a link has the hand from there)').toEqual([]);
+  });
+});
+
+/** A shrink-only count per stylesheet: the files over their line, and the lines over their file. */
+function ratchet(pending: Readonly<Record<string, number>>, count: (css: string, r: string) => number): string[] {
+  const now: Record<string, number> = {};
+  for (const p of files.filter((f) => f.endsWith('.css'))) {
+    const r = rel(p);
+    if (r === 'ds/tokens.css' || r === 'ds/md-tokens.css' || r.startsWith('hero/')) continue;
+    const n = count(readFileSync(p, 'utf8'), r);
+    if (n > 0) now[r] = n;
+  }
+  const grown = Object.entries(now).filter(([f, n]) => n > (pending[f] ?? 0)).map(([f, n]) => `${f}: ${String(n)} (pending ${String(pending[f] ?? 0)})`);
+  const done = Object.entries(pending).filter(([f, n]) => (now[f] ?? 0) < n).map(([f, n]) => `${f}: ${String(now[f] ?? 0)} now, pending says ${String(n)}: lower it`);
+  return [...grown, ...done];
+}
+
+describe('the 7 text sizes (page native-mac §6: 30, 15, 14, 13, 12, 11.5 kbd, 12 mono)', () => {
+  it('reads a size off the scale, and only those', () => {
+    const css = ['/* font-size: 17px */', '.a{font-size:13px;font:600 16px/20px var(--font-ui)}', '.b{font-size:var(--t-22);font:var(--f-ui);font-size:1.0625rem;font-size:11px;font-size:.9em}'].join('\n');
+    expect(offScaleText(css).map((t) => `${String(t.line)} ${t.value}`)).toEqual(['2 600 16px/20px var(--font-ui)', '3 var(--t-22)', '3 1.0625rem']);
+  });
+
+  it('no stylesheet writes more sizes off the scale than when it came in (PENDING_TYPE, a ratchet)', () => {
+    expect(ratchet(PENDING_TYPE, (css) => offScaleText(css).length), 'a text size off the 7: font: <weight> var(--f-question|lead|read|ui|meta|kbd|mono) (src/ds/tokens.css)').toEqual([]);
+  });
+});
+
+describe("macOS's overlay scrollbars (page native-mac §11)", () => {
+  it('reads a scrollbar a stylesheet draws itself', () => {
+    expect(drawnScrollbars('/* scrollbar-width: none */ .a{scrollbar-width:thin;scrollbar-color:red blue} .b::-webkit-scrollbar-thumb{x:y}')).toEqual(['scrollbar-width', 'scrollbar-color', '::-webkit-scrollbar-thumb']);
+  });
+
+  it('no stylesheet draws more scrollbars than when the rule came in (PENDING_SCROLLBAR, a ratchet)', () => {
+    expect(ratchet(PENDING_SCROLLBAR, (css) => drawnScrollbars(css).length), 'a drawn scrollbar takes room: leave it to macOS (ds/css/base.css)').toEqual([]);
+  });
+});
+
+describe('the tokens (page native-mac §6 and §7; ui-review native-mac-qa §11)', () => {
+  const tokens = readFileSync(join(SRC, 'ds/tokens.css'), 'utf8');
+  /** a token's value as written in tokens.css's spacing :root block (its first declaration) */
+  const tok = (name: string): string => new RegExp(`${name}:\\s*([^;]+);`).exec(tokens)?.[1]?.trim() ?? '';
+
+  it('reads a length token off the 4 px grid, radii and strokes aside', () => {
+    expect(offGridTokens(':root{--a: 52px; --b: 10px; --r-menu: 10px; --c: 1px; --d: var(--s-2); --e: 0 2px 1px x;}')).toEqual(['--b: 10px']);
+  });
+
+  it('every length token is a 4 px step (designer: --r-* the only exception)', () => {
+    expect(offGridTokens(tokens)).toEqual([]);
+  });
+
+  it("names the new sizes with the spec sheet's values", () => {
+    const want: Record<string, string> = {
+      '--h-bar': '52px', '--w-rail': '56px', '--w-panel': '384px', '--w-panel-min': '320px', '--w-panel-max': '640px',
+      '--w-flyout': '360px', '--bubble': '44px', '--bubble-obj': '68px', '--world': '148px', '--world-big': '384px',
+      '--r-menu': '10px', '--h-list-row': '52px', '--h-launcher-row': '40px', '--h-recent': '48px', '--h-setting-row': '44px',
+      '--float-w': '560px', '--float-h': '44px', '--float-w-focus': '640px', '--float-h-focus': '88px',
+      '--float-w-open': '640px', '--float-h-open': '560px', '--float-max-h': '70vh', '--w-search': '200px',
+    };
+    expect(Object.fromEntries(Object.keys(want).map((k) => [k, tok(k)]))).toEqual(want);
+    // 24 + 44 + 16: the room every page keeps at its bottom for the floating composer
+    expect(tok('--float-room')).toBe('calc(var(--float-bottom) + var(--float-h) + var(--s-4))');
+    expect(tok('--float-bottom')).toBe('var(--s-6)');
+  });
+
+  it("has macOS's three accessibility fallbacks, by media query and by main's flag", () => {
+    for (const [media, flag] of [['prefers-reduced-transparency: reduce', 'data-reduce-transparency'], ['prefers-reduced-motion: reduce', 'data-reduce-motion'], ['prefers-contrast: more', 'data-increase-contrast']] as const) {
+      expect(tokens, media).toContain(`@media (${media})`);
+      expect(tokens, flag).toContain(`:root[${flag}], :root[${flag}] [data-theme]`);
+    }
   });
 });

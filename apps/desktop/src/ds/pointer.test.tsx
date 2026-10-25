@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
-// src/ds · the hand on every thing he can click (his words: « chaque élément interactif, chaque
-// bouton, chaque chose sur lequel tu peux cliquer ... devrait avoir un cursor pointer »). The ds's
-// whole stylesheet (index.css's imports, in order) on its clickable components, read back with
-// getComputedStyle: each control shows the hand, a disabled one the arrow. ds/css/base.css owns it;
-// lint.test.ts's pointer law keeps screens from undoing it. Mutation: base.css's :where(...) rule
-// dropped turns this red.
+// src/ds · the cursor as macOS draws it (bise fait mac, page native-mac §1: « le curseur flèche
+// (pas la main) sur les boutons »). The ds's whole stylesheet (index.css's imports, in order) on its
+// clickable components, read back with getComputedStyle: no control shows the hand (the root rule's
+// arrow, or a ds rule's own default), a link does. ds/css/base.css owns it; lint.test.ts's arrow
+// law counts the screens' own hands. Mutation: base.css's link rule dropped, or a ds stylesheet's
+// cursor:pointer on a control, turns this red.
 import { cleanup, render } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -27,8 +27,8 @@ beforeAll(() => {
 });
 afterEach(cleanup);
 
-describe("the hand on every ds control (ds/css/base.css)", () => {
-  it("every clickable ds component shows the pointer", () => {
+describe("the arrow on every ds control, the hand on a link (ds/css/base.css)", () => {
+  it("no clickable ds control shows the hand; a link does", () => {
     const { container } = render(
       <div>
         <Button onClick={go}>save</Button>
@@ -59,11 +59,17 @@ describe("the hand on every ds control (ds/css/base.css)", () => {
     );
     const nodes = [...container.querySelectorAll<HTMLElement>(CLICKABLE)].filter((n) => !n.matches(":disabled,[aria-disabled=true]"));
     expect(nodes.length).toBeGreaterThan(20);
-    const arrow = nodes.filter((n) => getComputedStyle(n).cursor !== "pointer").map((n) => n.outerHTML.slice(0, 90));
-    expect(arrow, "a control without the hand").toEqual([]);
+    const link = (n: HTMLElement) => n.matches("a[href],[role=link]");
+    // ds/css/thread.css's own hands (nm-thread's file, counted in spacing.pending.ts PENDING_HAND)
+    const pending = (n: HTMLElement) => n.matches(".b-act.ref,.b-route.handoff,.b-brief-line,.b-card-line");
+    const hand = nodes.filter((n) => !link(n) && !pending(n) && getComputedStyle(n).cursor === "pointer").map((n) => n.outerHTML.slice(0, 90));
+    expect(hand, "a control with the hand: macOS draws the arrow").toEqual([]);
+    const links = nodes.filter(link);
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.map((n) => getComputedStyle(n).cursor)).toEqual(links.map(() => "pointer"));
   });
 
-  it("a disabled control shows the arrow, even one whose own rule says pointer", () => {
+  it("a disabled control shows the arrow, even a link", () => {
     const { container } = render(
       <div>
         <Button disabled onClick={go}>save</Button>
@@ -79,7 +85,7 @@ describe("the hand on every ds control (ds/css/base.css)", () => {
     expect(off.map((n) => getComputedStyle(n).cursor)).toEqual(off.map(() => "default"));
   });
 
-  it("a plain element with no role keeps the browser's cursor: the hand means a click", () => {
+  it("a plain element with no role keeps the browser's cursor: the hand means a link", () => {
     const { container } = render(<div><span data-x>words</span></div>);
     expect(getComputedStyle(container.querySelector("[data-x]") as HTMLElement).cursor).not.toBe("pointer");
   });

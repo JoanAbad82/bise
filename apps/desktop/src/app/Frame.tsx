@@ -4,7 +4,8 @@
 // 1000 px the sidebar is hidden and slides over the window with a 45%
 // scrim, esc or a click outside closes it, and the titlebar shows the
 // sidebar button (⌘\) and 'n waiting' in the accent), and which of the
-// sidebar and the right panel show. Owner: amb-win.
+// sidebar and the right panel show; the panel's tabs mount in the title bar
+// (<BarTabs/>, nm-panel's). Owner: nm-frame (bise fait mac; amb-win before).
 import {
   useCallback,
   useEffect,
@@ -21,6 +22,7 @@ import { formatRoute, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
+import { BarTabs } from "./panel/BarTabs";
 import {
   keptWidth,
   PANEL,
@@ -475,6 +477,8 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       <StatusSlot>
         <TitleStatus />
       </StatusSlot>
+      {/* bise fait mac: the panel's tabs in the bar (nm-panel's mount point) */}
+      <BarTabs />
       {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
           pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
       {frame.panel !== undefined && (

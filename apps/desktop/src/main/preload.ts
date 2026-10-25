@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type FileFacts, type MenuAction, type NotifyAuth, type SaveResult, type Surface, type ThumbAnswer, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type A11y, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type FileFacts, type MenuAction, type NotifyAuth, type SaveResult, type Surface, type ThumbAnswer, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -28,6 +28,7 @@ interface Pushed {
   [IPC.termData]: { id: string; bytes: Uint8Array };
   [IPC.termExit]: { id: string; code: number | null };
   [IPC.updateState]: UpdateState;
+  [IPC.a11y]: A11y;
 }
 
 // window.bise.saveCopy's answer as main gives it: {to}, {error}, or null
@@ -189,9 +190,15 @@ const api: BiseApi = {
   quit: () => {
     ipcRenderer.send(IPC.quit);
   },
-  openWindow: (route) => {
-    ipcRenderer.send(IPC.openWindow, route);
+  openWindow: (to) => {
+    ipcRenderer.send(IPC.openWindow, to);
   },
+  popupMenu: async (items, at) => {
+    const id: unknown = await ipcRenderer.invoke(IPC.popupMenu, items, at);
+    return typeof id === 'string' ? id : null;
+  },
+  a11y: async () => (await ipcRenderer.invoke(IPC.a11y)) as A11y,
+  onA11y: (listener) => listen(IPC.a11y, listener),
   onRoute: (listener) => listen(IPC.route, listener),
   onArtifactLink: (listener) => listen(IPC.artifactLink, listener),
   onFullScreen: (listener) => {

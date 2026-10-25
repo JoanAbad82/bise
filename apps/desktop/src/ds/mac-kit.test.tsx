@@ -1,0 +1,156 @@
+// @vitest-environment happy-dom
+// src/ds · bise fait mac's shared components (page native-mac §6, nm-ds): what each draws for its
+// props, what it says to VoiceOver and in its tip, what a click sends; and noClip's walk. The sizes
+// are tokens.css's (lint.test.ts reads their values); a box's pixels are ui-review's shots.
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ds } from "@/proto/words_ds.gen";
+import { APP_ICONS, AppIcon, BarSearch, Filters, GroupLabel, LeadWait, ListRow, MoreButton, PageLead, type EntityMenu } from "./index";
+import { clippers, noClip } from "./noclip";
+
+afterEach(cleanup);
+
+const menu = (): EntityMenu & { opened: number; right: number } => {
+  const m = { opened: 0, right: 0, open: () => { m.opened += 1; }, onContextMenu: () => { m.right += 1; } };
+  return m;
+};
+
+describe("PageLead", () => {
+  it("the sentence, then the facts with the accent only on what waits; no name of its own", () => {
+    const { getByTestId } = render(<PageLead sentence="what your agents wait on you for." facts={<><LeadWait>3 waiting</LeadWait> · the oldest 21 d ago</>} testId="lead" />);
+    const lead = getByTestId("lead");
+    expect(lead.querySelector(".say")?.textContent).toBe("what your agents wait on you for.");
+    expect(lead.querySelector(".facts")?.textContent).toBe("3 waiting · the oldest 21 d ago");
+    expect([...lead.querySelectorAll(".wait")].map((n) => n.textContent)).toEqual(["3 waiting"]);
+    expect(lead.querySelector(".name")).toBeNull();
+  });
+
+  it("no facts line when the place has no live number", () => {
+    const { getByTestId } = render(<PageLead sentence="s" testId="lead" />);
+    expect(getByTestId("lead").querySelector(".facts")).toBeNull();
+  });
+});
+
+describe("Filters", () => {
+  const items = [{ id: "waiting", label: "Waiting" }, { id: "answered", label: "Answered", tip: "12 answered" }];
+
+  it("a tablist, the chosen tab selected and the only one in the tab order, each with its test id", () => {
+    const { getByTestId } = render(<Filters items={items} on="waiting" label="show" testId="f" />);
+    expect(getByTestId("f").getAttribute("role")).toBe("tablist");
+    expect(getByTestId("f").getAttribute("aria-label")).toBe("show");
+    const on = getByTestId("f.waiting");
+    const off = getByTestId("f.answered");
+    expect([on.getAttribute("aria-selected"), on.tabIndex, on.className]).toEqual(["true", 0, "on"]);
+    expect([off.getAttribute("aria-selected"), off.tabIndex, off.className]).toEqual(["false", -1, ""]);
+    expect(off.dataset["tip"]).toBe("12 answered");
+  });
+
+  it("a click or enter picks a segment by its id", () => {
+    const pick = vi.fn();
+    const { getByTestId } = render(<Filters items={items} on="waiting" onPick={pick} testId="f" />);
+    fireEvent.click(getByTestId("f.answered"));
+    fireEvent.keyDown(getByTestId("f.waiting"), { key: "Enter" });
+    expect(pick.mock.calls).toEqual([["answered"], ["waiting"]]);
+  });
+});
+
+describe("BarSearch", () => {
+  it("the ds's words: its placeholder, its VoiceOver name, its tip with the key; the key shown while empty", () => {
+    const { getByTestId, rerender } = render(<BarSearch value="" testId="s" />);
+    const input = getByTestId("s.input") as HTMLInputElement;
+    expect([input.placeholder, input.getAttribute("aria-label")]).toEqual([ds.search, ds.search]);
+    expect(getByTestId("s").dataset["tip"]).toBe(ds.search_tip({ key: "/" }));
+    expect(getByTestId("s").querySelector(".b-kbd")?.textContent).toBe("/");
+    expect(getByTestId("s").querySelector("svg[data-icon=search]")).not.toBeNull();
+    rerender(<BarSearch value="perf" testId="s" />);
+    expect(getByTestId("s").querySelector(".b-kbd")).toBeNull();
+  });
+});
+
+describe("GroupLabel", () => {
+  it("its words and a count, the count in the accent only when it waits", () => {
+    const { getByTestId, rerender } = render(<GroupLabel count={3} waits tip="3 waiting for you" testId="g">waiting for you</GroupLabel>);
+    const n = getByTestId("g").querySelector(".n") as HTMLElement;
+    expect([getByTestId("g").textContent, n.className, n.dataset["tip"]]).toEqual(["waiting for you3", "n wait", "3 waiting for you"]);
+    rerender(<GroupLabel count={12} testId="g">earlier</GroupLabel>);
+    expect(getByTestId("g").querySelector(".n")?.className).toBe("n");
+  });
+});
+
+describe("ListRow", () => {
+  it("one button holds the state and the two lines; its end beside it, never inside it", () => {
+    const m = menu();
+    const { getByTestId } = render(<ListRow title="run rm -rf target?" sub="acme · 21 d" state="?" end={<MoreButton menu={m} testId="r.more" />} testId="r" />);
+    const body = getByTestId("r.open");
+    expect(body.tagName).toBe("BUTTON");
+    expect([body.querySelector(".l1")?.textContent, body.querySelector(".l2")?.textContent, body.querySelector(".state")?.textContent]).toEqual(["run rm -rf target?", "acme · 21 d", "?"]);
+    expect(body.contains(getByTestId("r.more"))).toBe(false);
+    expect(getByTestId("r").querySelectorAll("button button")).toHaveLength(0);
+  });
+
+  it("the chosen row says so (aria-current); a click opens, a right click anywhere is the menu's", () => {
+    const m = menu();
+    const open = vi.fn();
+    const { getByTestId } = render(<ListRow title="t" on onClick={open} onContextMenu={m.onContextMenu} testId="r" />);
+    expect(getByTestId("r").className).toBe("b-lrow b-chrome on");
+    expect(getByTestId("r.open").getAttribute("aria-current")).toBe("true");
+    fireEvent.click(getByTestId("r.open"));
+    fireEvent.contextMenu(getByTestId("r"));
+    expect([open.mock.calls.length, m.right]).toEqual([1, 1]);
+  });
+});
+
+describe("MoreButton", () => {
+  it("its VoiceOver name and tip are the ds's words; a click opens the menu without the row's click", () => {
+    const m = menu();
+    const row = vi.fn();
+    const { getByTestId } = render(<ListRow title="t" onClick={row} end={<MoreButton menu={m} testId="more" />} testId="r" />);
+    const b = getByTestId("more");
+    expect([b.getAttribute("aria-label"), b.dataset["tip"], b.getAttribute("aria-haspopup")]).toEqual([ds.more_actions, ds.more_actions, "menu"]);
+    expect(b.querySelector("svg[data-icon=more]")).not.toBeNull();
+    fireEvent.click(b);
+    expect([m.opened, row.mock.calls.length]).toEqual([1, 0]);
+  });
+});
+
+describe("AppIcon", () => {
+  it("every icon draws, decorative, a 1.5 px stroke at every size, in currentColor", () => {
+    const { container } = render(<div>{APP_ICONS.map((n) => <AppIcon key={n} name={n} size={18} />)}</div>);
+    const svgs = [...container.querySelectorAll("svg")];
+    expect(svgs).toHaveLength(APP_ICONS.length);
+    for (const s of svgs) {
+      expect([s.getAttribute("aria-hidden"), s.getAttribute("stroke"), s.getAttribute("stroke-width"), s.getAttribute("width")]).toEqual(["true", "currentColor", "1.5", "18"]);
+      expect(s.childElementCount, s.dataset["icon"]).toBeGreaterThan(0);
+      for (const p of s.querySelectorAll("path")) expect(p.getAttribute("vector-effect")).toBe("non-scaling-stroke");
+    }
+  });
+});
+
+describe("noClip (plan native-mac-plan §2)", () => {
+  it("names each ancestor that clips: an overflow other than visible, a paint containment", () => {
+    const { getByTestId } = render(
+      <div style={{ overflow: "hidden" }} className="app-main">
+        <div style={{ overflowY: "auto" }}>
+          <div style={{ contain: "paint" }}>
+            <i data-testid="obj" />
+          </div>
+        </div>
+      </div>,
+    );
+    const obj = getByTestId("obj");
+    expect(clippers(obj)).toEqual(["div contain: paint", "div overflow-y: auto", "div.app-main overflow-x: hidden", "div.app-main overflow-y: hidden"]);
+    expect(() => { noClip(obj); }).toThrow(/clipped by 4 ancestor/);
+  });
+
+  it("is quiet for an element whose ancestors all let it overflow, and stops at its root", () => {
+    const { getByTestId } = render(
+      <div style={{ overflow: "hidden" }} data-testid="root">
+        <div>
+          <i data-testid="obj" />
+        </div>
+      </div>,
+    );
+    expect(() => { noClip(getByTestId("obj"), getByTestId("root")); }).not.toThrow();
+    expect(clippers(getByTestId("obj"))).toEqual(["div overflow-x: hidden", "div overflow-y: hidden"]);
+  });
+});

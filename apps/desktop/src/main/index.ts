@@ -38,7 +38,7 @@ import { themeSourceOf } from './theme';
 import { drivingOf } from './update/moment';
 import { askWindow, bounded, fakeDistUpdate, QUIT_SWAP_MS, systemIdleS, takeAfter, Updates, updateTarget } from './update/run';
 import { installTrySwapIpc } from './update/tryrun';
-import { MainWindow } from './windows';
+import { MainWindow, openWindowOf, windowTarget } from './windows';
 import { fenceOffscreen, isOffscreen, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenActivation } from './offscreen';
 import { Notifier } from './notify/run';
 import { langOf } from './notify/plan';
@@ -209,8 +209,10 @@ void app.whenReady().then(() => {
   ipcMain.on(IPC.quit, () => {
     app.quit();
   });
-  ipcMain.on(IPC.openWindow, (_e, route: unknown) => {
-    main.open(typeof route === 'string' ? route : undefined);
+  ipcMain.on(IPC.openWindow, (_e, raw: unknown) => {
+    const to = windowTarget(raw);
+    if ('own' in to) openWindowOf(to.own);
+    else main.open(to.main);
   });
   // the menu bar's ':*' (tray.ts), its look from the counts below
   const tray = testMode ? null : new BiseTray(capsule, main);

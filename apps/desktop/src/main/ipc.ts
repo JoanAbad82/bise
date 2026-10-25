@@ -6,8 +6,10 @@ import { appendFile, existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type FileFacts, type MenuAction, type SaveResult, type ThumbAnswer } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type A11y, type FileFacts, type MenuAction, type PopupAt, type PopupItem, type SaveResult, type ThumbAnswer } from '../shared/api';
 import { saveCopy } from './savecopy';
+import { a11yNow } from './a11y';
+import { popupMenu } from './menu-popup';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
@@ -167,6 +169,8 @@ export function installIpc(testMode: boolean): void {
   ipcMain.handle(IPC.fullScreen, (e): boolean => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);
   ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));
   ipcMain.handle(IPC.pickFiles, (e): Promise<readonly string[]> => pickFiles(BrowserWindow.fromWebContents(e.sender), testMode));
+  ipcMain.handle(IPC.popupMenu, (e, items: unknown, at: unknown): Promise<string | null> => popupMenu(BrowserWindow.fromWebContents(e.sender), Array.isArray(items) ? (items as PopupItem[]) : [], (at ?? undefined) as PopupAt | undefined));
+  ipcMain.handle(IPC.a11y, (): A11y => a11yNow());
   // R41: a pasted or dropped image into the TUI's image store (the test home's under test)
   ipcMain.handle(IPC.saveImage, (_e, bytes: unknown): string | null => saveImage(imageDir(process.env), bytes));
   ipcMain.handle(IPC.copy, async (_e, text: unknown): Promise<void> => {

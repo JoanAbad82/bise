@@ -1,0 +1,7 @@
+/* src/ds · MoreButton (more.tsx; page native-mac §6): 28 × 28, r 6, the '…' at 16 in text-3, the
+   hover's tint; the focus ring --c-focus. The app's line icons (icons-app.tsx): a box of their size. */
+.b-more{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--h-control-sm);height:var(--h-control-sm);margin:0;padding:0;border:0;border-radius:var(--r-1);background:none;color:var(--c-text-3)}
+.b-more:hover{background:var(--c-hover);color:var(--c-text)}
+.b-more:active{background:var(--c-press)}
+.b-more:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-focus)}
+.b-app-icon{display:inline-block;flex:none}

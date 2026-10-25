@@ -14,7 +14,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions } from 'electron';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface, type WindowOpen } from '../shared/api';
 import { glassOf } from './glass';
 import { readKeep, writeKeep } from './keep';
 import { framesText, keepFrame, MAIN_SIZE, openFrame, parseFrames, type Screen } from './mainsize';
@@ -200,4 +200,23 @@ export class MainWindow {
     win.show();
     win.focus();
   }
+}
+
+/**
+ * A window of its own (window.bise.openWindow with a WindowOpen; bise fait mac): settings (780 ×
+ * 600, one at a time), an artifact, an agent's thread. The contract nm-ds set for the wave; nm-frame
+ * fills it (nm-settings and nm-panel call it).
+ */
+export const openWindowOf: (to: WindowOpen) => void = () => {
+  // STUB(native-mac): nm-frame
+};
+
+/** What the renderer sent to openWindow: a route (or nothing) for the main window, or a WindowOpen. Pure. */
+export function windowTarget(raw: unknown): { readonly main: string | undefined } | { readonly own: WindowOpen } {
+  if (typeof raw === 'object' && raw !== null) {
+    const r = raw as Record<string, unknown>;
+    const kind = r['kind'];
+    if ((kind === 'settings' || kind === 'artifact' || kind === 'agent') && typeof r['route'] === 'string') return { own: { kind, route: r['route'] } };
+  }
+  return { main: typeof raw === 'string' ? raw : undefined };
 }

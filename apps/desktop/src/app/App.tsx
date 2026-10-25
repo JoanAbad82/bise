@@ -1,6 +1,8 @@
 // The app's shell: the window's layout (sidebar + the screen) and the
-// routing between screens. Owner: amb-win; other chunks ask to add their
-// screen here (one line in <ScreenOf>).
+// routing between screens. Owner: nm-frame (bise fait mac; amb-win before);
+// other chunks ask to add their screen here (one line in <ScreenOf>), and
+// render through the mount points nm-ds put here: <PanelHost/> (the right
+// column), <SideHost/> and <FloatHost/> (fixed, at the shell's root).
 //
 // The rule that keeps typing smooth (the reset's bug 1): the shell
 // re-renders only when the route changes. Every list below reads the store
@@ -38,6 +40,9 @@ import { Sidebar, useWaitingTotal } from './Sidebar';
 import { useZen, useZenWatch } from './zen';
 import { RAIL_PX, SideRail } from './SideRail';
 import { Over, Titlebar, useFrame } from './Frame';
+import { PanelHost } from './panel/Host';
+import { SideHost } from './side3d/Host';
+import { FloatHost } from '@/composer/float/Host';
 import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
 import { RightBar } from './RightBar';
 import { TipLayer } from './TipLayer';
@@ -281,7 +286,9 @@ function Shell() {
                 <ArtifactColumn project={art.project} id={art.id} />
               ) : frame.panel?.docked === true ? (
                 <RightBar project={frame.panel.project} name={frame.panel.name} column={frame.panelW} />
-              ) : undefined
+              ) : (
+                <PanelHost />
+              )
             }
           />
           {/* his try a43609b2: both side columns resize by their border (designer m_19374); a folded
@@ -365,6 +372,11 @@ function Shell() {
           }}
         />
       )}
+      {/* bise fait mac: the right side (the world, the bubbles, their cards) and the floating
+          composer, fixed at the shell's root, outside .app-main and .app-screen, so no parent's
+          overflow clips their shadows (plan native-mac-plan §2; nm-side's, nm-composer's) */}
+      <SideHost />
+      <FloatHost />
       {/* every compact mark's hover tip (data-tip): one layer for the window */}
       <TipLayer />
     </div>

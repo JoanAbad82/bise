@@ -179,8 +179,25 @@ export interface BiseApi {
     /** One line in app.log, next to core.log (the field's dictation: start, stop, final len/error/ms; never words). */
     readonly log?: (line: string) => void;
   };
-  /** Opens the main window, on `route` when given (the capsule's ⏎, a card's 'open'). */
-  readonly openWindow: (route?: string) => void;
+  /**
+   * Opens a window. A route (or nothing): the main window, on `route` when given (the capsule's ⏎,
+   * a card's 'open'). A WindowOpen: a window of its own (bise fait mac: settings, an artifact, an
+   * agent's thread; main/windows.ts openWindowOf, nm-frame's).
+   */
+  readonly openWindow: (to?: string | WindowOpen) => void;
+  /**
+   * Shows a native menu (Electron's Menu.popup, drawn by macOS) at the pointer, or under `at` (a
+   * '…' button's box, in the window's CSS px); resolves the picked item's id, null when he closes it
+   * (main/menu-popup.ts, nm-menus').
+   */
+  readonly popupMenu: (items: readonly PopupItem[], at?: PopupAt) => Promise<string | null>;
+  /**
+   * macOS's accessibility settings now (main/a11y.ts, nm-frame's: systemPreferences), and on every
+   * change; the shell sets them on <html> as data-reduce-transparency, data-reduce-motion and
+   * data-increase-contrast (ds/tokens.css's fallbacks).
+   */
+  readonly a11y: () => Promise<A11y>;
+  readonly onA11y: (listener: (a: A11y) => void) => () => void;
   /** Quits bise (the tray dropdown's last row, ⌘Q's twin). */
   readonly quit: () => void;
   /** Main asks this window to go to a route (openWindow while it was open); returns the unsubscribe. */
@@ -372,6 +389,45 @@ export interface CapsuleApi {
   readonly onState: (listener: (s: CapsuleState) => void) => () => void;
 }
 
+/** A window of its own (window.bise.openWindow): its kind and the route it opens on. */
+export interface WindowOpen {
+  readonly kind: 'settings' | 'artifact' | 'agent';
+  readonly route: string;
+}
+
+/** One entry of a native menu (window.bise.popupMenu): an item, a submenu or a separator. */
+export type PopupItem =
+  | {
+      readonly type?: 'item';
+      /** what popupMenu resolves when he picks it */
+      readonly id: string;
+      /** its words (the caller's, from the words catalog) */
+      readonly label: string;
+      /** its shortcut as Electron's accelerator ('CmdOrCtrl+W'), shown at its right */
+      readonly accelerator?: string;
+      /** a check mark (Pin while pinned) */
+      readonly checked?: boolean;
+      /** an erase with no way back: drawn as macOS's destructive item */
+      readonly destructive?: boolean;
+    }
+  | { readonly type: 'submenu'; readonly label: string; readonly items: readonly PopupItem[] }
+  | { readonly type: 'separator' };
+
+/** Where a native menu opens: a box in the window's CSS px (the menu under it), else the pointer. */
+export interface PopupAt {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** macOS's accessibility settings that change how bise draws (window.bise.a11y). */
+export interface A11y {
+  readonly reduceTransparency: boolean;
+  readonly reduceMotion: boolean;
+  readonly increaseContrast: boolean;
+}
+
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
 export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save';
 
@@ -448,6 +504,8 @@ export const IPC = {
   /** main -> a window: it entered (true) or left (false) full screen; invoke: the state now */
   fullScreen: 'bise:full-screen',
   openWindow: 'bise:open-window',
+  popupMenu: 'bise:popup-menu',
+  a11y: 'bise:a11y',
   route: 'bise:route',
   /** main -> a window: a link in its artifact's frame names another artifact (guard.ts, framelink.ts) */
   artifactLink: 'bise:artifact-link',

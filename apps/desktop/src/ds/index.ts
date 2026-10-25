@@ -30,3 +30,8 @@ export { textWidth } from "./hooks";
 export * from "./ring";
 export * from "./pagehero";
 export * from "./icons";
+export * from "./icons-app";
+export * from "./lead";
+export * from "./filters";
+export * from "./listrow";
+export * from "./more";

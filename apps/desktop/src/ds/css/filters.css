@@ -1,0 +1,14 @@
+/* src/ds · Filters, FilterRow, BarSearch (filters.tsx; page native-mac §6, mockup 6). The chosen
+   segment is --c-solid with --e-1: never the hover's tint, never the accent (designer's rule). */
+.b-filter-row{display:flex;align-items:center;gap:var(--s-2);height:var(--h-control-sm);margin-top:var(--s-6)}
+.b-filters{display:inline-flex;flex:none;height:var(--h-control-sm);padding:calc(var(--s-1) / 2);border-radius:var(--r-2);background:var(--c-sunken)}
+.b-filters>[role=tab]{display:inline-flex;align-items:center;height:var(--h-seg-in);padding:0 var(--s-3);border-radius:var(--r-1);font:500 var(--f-meta);color:var(--c-text-2);white-space:nowrap;transition:color var(--d-fast) var(--ease-out)}
+.b-filters>[role=tab]:not(.on):hover{color:var(--c-text)}
+.b-filters>[role=tab].on{background:var(--c-solid);color:var(--c-text);box-shadow:var(--e-1)}
+.b-filters>[role=tab]:focus-visible{outline:2px solid var(--c-focus);outline-offset:-2px}
+.b-barsearch{display:inline-flex;align-items:center;gap:var(--s-2);flex:none;width:var(--w-search);height:var(--h-control-sm);padding:0 var(--s-1) 0 var(--s-2);border-radius:var(--r-2);background:var(--c-sunken);color:var(--c-text-3);cursor:text}
+.b-barsearch:focus-within{box-shadow:0 0 0 2px var(--c-focus)}
+.b-barsearch input{flex:1;min-width:0;height:100%;margin:0;padding:0;border:0;outline:0;background:none;font:400 var(--f-ui);color:var(--c-text);-webkit-appearance:none;appearance:none}
+.b-barsearch input::placeholder{color:var(--c-text-3)}
+.b-barsearch input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.b-barsearch .b-kbd{height:var(--h-kbd);padding:0 var(--s-1);border-radius:var(--r-1);background:var(--c-solid);box-shadow:none;font:400 var(--f-kbd);color:var(--c-text-2)}
