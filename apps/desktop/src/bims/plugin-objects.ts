@@ -18,7 +18,6 @@ export type PluginRow = Pick<Plugin, 'name' | 'state'> & {
   readonly id?: string | null;
   readonly kind?: string | null;
   readonly login?: string | null;
-  readonly logins?: readonly { readonly state: string }[] | null;
   readonly parts?: readonly { readonly kind: string; readonly on: boolean; readonly login?: string | null; readonly error?: string | null }[] | null;
 };
 
@@ -129,9 +128,9 @@ function count(row: PluginRow, kind: string, onOnly: boolean): number {
   return Math.max(1, n);
 }
 
-/** A login he owes: the row's own (a connector), a server's (main's `logins`), or a part's. */
+/** A login he owes: the row's own (a connector) or a part's (a remote server's). */
 function owesLogin(row: PluginRow): boolean {
-  return row.login === 'needs' || (row.logins ?? []).some((l) => l.state === 'needs') || (row.parts ?? []).some((p) => p.on && p.login === 'needs');
+  return row.login === 'needs' || (row.parts ?? []).some((p) => p.on && p.login === 'needs');
 }
 
 /** A server of it that failed (a part with an error: its presence marks it, never its text). */

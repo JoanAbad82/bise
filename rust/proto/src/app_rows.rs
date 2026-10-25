@@ -206,8 +206,9 @@ pub struct Plugin {
     /// 3, one line each); a click puts one in the composer, never sends it
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub prompts: Vec<String>,
-    /// its remote MCP servers that log in (the released app's reader;
-    /// the same servers are `mcp` parts with their `login`)
+    /// the released app's (before desktop-v2026.10.16) remote MCP servers
+    /// that log in: kept on the wire for the released law, always empty
+    /// now; a server's login is its `mcp` part's `login`
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub logins: Vec<PluginLogin>,
 }

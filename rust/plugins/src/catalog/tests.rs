@@ -234,13 +234,14 @@ fn mcp_servers_say_their_status_tools_login_and_error_as_data() {
     assert_eq!((idle.tool_count, idle.error.as_deref()), (Some(2), None));
     assert_eq!(idle.status.as_deref(), Some(settings::plugins_listed(2).as_str()));
     status::write(&sd, "stats", "gh", &status::Status::now("stdio", "", Ok(2)).listed(vec![("issues".into(), "list issues".into()), ("stars".into(), "count stars".into())]));
-    // a remote server that needs a login: the data, the button, the released shape
+    // a remote server that needs a login: the data and the button, on its part only
+    // (the released row's `logins` stays empty: shim plugin-logins is gone)
     let linear = row(&rows, "linear");
     let l = part(linear, "linear#mcp:linear");
     assert_eq!((l.login, l.error.as_deref(), l.what.as_deref()), (Some(LoginState::Needs), None, Some("mcp.linear.app")));
     assert_eq!(linear.action, Some(PluginAction::LogIn));
     assert_eq!(linear.what.as_deref(), Some("mcp.linear.app"));
-    assert_eq!(linear.logins.len(), 1);
+    assert!(linear.logins.is_empty());
     // its login open in his browser: pending, no button
     let rows2 = build(&t, &state(), &["linear".to_string()]);
     assert_eq!(part(row(&rows2, "linear"), "linear#mcp:linear").login, Some(LoginState::Pending));

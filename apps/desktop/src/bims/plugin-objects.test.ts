@@ -97,9 +97,8 @@ describe('objectOf', () => {
     expect(objectOf(row('mistral:gmail', 'mistral', 'available'), NONE)).toBeNull();
   });
 
-  it('a login he owes is the ? pill: main logins, a connector own login, a part login', () => {
-    expect(objectOf(mainRow('linear', 'loaded', { logins: [{ name: 'linear', host: 'mcp.linear.app', state: 'needs' }] }), NONE)?.pill).toBe('?');
-    expect(objectOf(mainRow('linear', 'loaded', { logins: [{ name: 'linear', host: 'mcp.linear.app', state: 'in' }] }), NONE)?.pill).toBeNull();
+  it('a login he owes is the ? pill: a connector own login, a part login', () => {
+    expect(objectOf(row('linear', 'plugin', 'loaded', { parts: [{ kind: 'mcp', on: true, login: 'in' }] }), NONE)?.pill).toBeNull();
     expect(objectOf(row('mistral:gmail', 'mistral', 'loaded', { login: 'needs' }), NONE)?.pill).toBe('?');
     expect(objectOf(row('linear', 'plugin', 'loaded', { parts: [{ kind: 'mcp', on: true, login: 'needs' }] }), NONE)?.pill).toBe('?');
   });

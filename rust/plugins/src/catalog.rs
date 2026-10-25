@@ -22,7 +22,7 @@ use crate::id::{PartKind as IdPart, PluginId, SkillsScope};
 use crate::model::{ConnectorAuth, ConnectorEntry, SkillEntry, StateV2};
 use crate::resolve::{self, HttpServer, StdioServer};
 use crate::{connectors, status};
-use bise_proto::app_rows::{ConnectorsProblem, LoginState, PartKind, Plugin, PluginAction, PluginKind, PluginLogin, PluginPart, PluginScope, PluginState};
+use bise_proto::app_rows::{ConnectorsProblem, LoginState, PartKind, Plugin, PluginAction, PluginKind, PluginPart, PluginScope, PluginState};
 use bise_proto::words::settings;
 use std::path::{Path, PathBuf};
 
@@ -149,9 +149,7 @@ fn plugin_row(i: &Inputs, p: &resolve::Plugin, names: &[(String, String, String)
         action: (on && needs).then_some(PluginAction::LogIn),
         login: None,
         prompts: prompts(&p.prompts),
-        // TODO(plugin-logins): the released app's reader, the same parts
-        // in the released shape; goes in desktop-v2026.10.16
-        logins: parts.iter().filter_map(released_login).collect(),
+        logins: Vec::new(),
         parts,
     }
 }
@@ -264,11 +262,6 @@ fn logged_in(p: &resolve::Plugin, s: &HttpServer, oauth_dir: &Path) -> bool {
     let env_dir = Some(bise_home::Home::from_env().mcp_secrets_dir());
     let t = crate::login::Target { plugin: p.name.clone(), server: s.clone(), name: s.id.clone(), env_dir };
     crate::login::logged_in(&t, oauth_dir)
-}
-
-/// An `mcp` part that logs in, as the released row's `logins` item.
-fn released_login(part: &PluginPart) -> Option<PluginLogin> {
-    Some(PluginLogin { name: part.name.clone(), host: part.what.clone()?, state: part.login?, tools: part.tool_count })
 }
 
 fn connector_scope(c: &ConnectorEntry) -> PluginScope {

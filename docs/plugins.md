@@ -160,9 +160,10 @@ the bodies marked `todo!("plugins chunk ...")` come with their chunk.
   `app_rows::Plugin {id, name, kind, scope, title, what?, icon?, state,
   on, locked, action?, parts[], logins[]}`, `app_rows::PluginPart {id,
   kind, name, what?, on, status?, login?, tools[], tool_count?}`.
-  `name`, `state`, `scope`, `what` and `logins` keep their released
-  meaning (the wire rule); `logins` is the released app's only (shim
-  `plugin-logins`, tests/shims.txt): new clients read `parts[].login`.
+  `name`, `state`, `scope` and `what` keep their released meaning (the
+  wire rule); `logins` stays on the wire for the released law but is
+  always empty since desktop-v2026.10.16: a server's login is
+  `parts[].login`.
   Commands: `plugins`, `plugin_set {name, on}` (`name`: any id; a bare
   name is that plugin), `plugin_connect {id}`, `plugins_refresh`,
   `plugin_add {add: mcp|import|folder|git|marketplace|agent}`,

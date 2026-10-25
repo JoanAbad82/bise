@@ -176,8 +176,9 @@ login?: LoginState | null, parts?: Array<PluginPart>,
  */
 prompts?: Array<string>, 
 /**
- * its remote MCP servers that log in (the released app's reader;
- * the same servers are `mcp` parts with their `login`)
+ * the released app's (before desktop-v2026.10.16) remote MCP servers
+ * that log in: kept on the wire for the released law, always empty
+ * now; a server's login is its `mcp` part's `login`
  */
 logins?: Array<PluginLogin>, };
 
