@@ -8,6 +8,7 @@ import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
 import { running } from '@/proto/words_running.gen';
 import { MAIN, type Route } from './route';
+import { pageOf } from '@/settings/pages';
 import { shortAge } from '@/agents/model';
 import { pauseLine, shownPause } from '@/thread/wake';
 
@@ -180,7 +181,8 @@ export function crumbOf(route: Route, name: (project: string) => string, place: 
       // the library's place after it: 'artifacts › desktop app › agent view' (artifacts/folders.ts crumbOf)
       return [...(route.project === '' ? [panel.artifacts] : [name(route.project), panel.artifacts]), ...(route.at === undefined ? [] : place(route.at).map((c) => c.name))];
     case 'settings':
-      return route.page === undefined ? [panel.crumb_settings] : [panel.crumb_settings, route.page];
+      // the page's title, the nav's words ('computer use', never its id 'computer')
+      return route.page === undefined ? [panel.crumb_settings] : [panel.crumb_settings, pageOf(route.page).title];
     case 'notfound':
       return [panel.crumb_not_found];
     case 'report':

@@ -1,4 +1,5 @@
 use super::*;
+use super::words::{LIVE_FAILED, LIVE_NOT_RUN, LIVE_PASSED};
 use serde_json::json;
 
 fn text(lines: &[Line]) -> String {
@@ -48,7 +49,7 @@ fn the_extension_step_shows_the_load_unpacked_steps() {
                           and Select
                           the folder: /h/.bise/dev/try/computer-use/extension
                        4  i'll see it here, no key needed
- · live test           last
+ · live test           not run yet
 
  what the agents see goes only to their model: Anthropic.
  in yolo, agents act without asking, purchases included. ⇧⇥ for auto.
@@ -137,15 +138,32 @@ fn the_live_test_runs_then_says_ready() {
     let done = rows(&base(row("live_test", "done", "ready", None)), &Busy::default());
     assert!(ready(&done));
     let t = text(&lines(&done, 2, &Around { mode: "auto".into(), ..around() }, 100));
-    assert!(t.contains(" ✓ live test           opened a tab, clicked a button. all set"), "{t}");
+    assert!(t.contains(&format!(" ✓ live test           {LIVE_PASSED}")), "{t}");
     // Chrome only: only what's true (m_3904)
     assert!(t.contains(" ✓ Chrome is ready. ask any agent to use it."), "{t}");
     assert!(t.contains(" in auto, agents ask you in their thread before buying"), "{t}");
     assert!(t.ends_with(" ↑↓ step   esc later"), "{t}");
     let failed = rows(&base(row("live_test", "failed", "the click did not land", Some("run_live_test"))), &Busy::default());
     assert_eq!((failed[2].st, failed[2].action.as_deref()), (St::Failed, Some("try again")));
-    assert_eq!(failed[2].detail, "the click didn't land", "contractions (m_3904)");
+    assert_eq!(failed[2].detail, format!("{LIVE_FAILED} · the click didn't land"), "contractions (m_3904)");
     assert!(!ready(&failed));
+}
+
+/// the live test's detail says what happened (designer m_42943), never
+/// 'last': not run yet before one (the extension not there, or waiting
+/// to run), `passed · 14:02` after one (when it ran, his zone)
+#[test]
+fn the_live_test_says_not_run_yet_then_passed_and_when() {
+    let at = 1_791_100_000_000u64;
+    let with = |ext: &str, lt: Value| check(vec![row("browser", "done", "Chrome 154", None), row("extension", ext, "", None), lt]);
+    let before = rows(&with("waits", row("live_test", "not_yet", "", None)), &Busy::default());
+    assert_eq!(before[2].detail, LIVE_NOT_RUN);
+    let waits = rows(&with("done", row("live_test", "waits", "last", Some("run_live_test"))), &Busy::default());
+    assert_eq!(waits[2].detail, LIVE_NOT_RUN);
+    let mut c = with("done", row("live_test", "done", "ready", None));
+    c["live_test"] = json!({"ok": true, "at_ms": at});
+    let done = rows(&c, &Busy::default());
+    assert_eq!(done[2].detail, format!("{LIVE_PASSED} · {}", crate::running::clock(at)));
 }
 
 /// the helper installed: the "for apps" rows after the live test, the

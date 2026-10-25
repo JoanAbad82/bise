@@ -5,6 +5,7 @@ import { computerDot, crumbGoOf, crumbOf, folds, moreWords, panelAt, panelWords,
 import { keyAction, type KeyLike } from './keys';
 import type { Route } from './route';
 import { newWords } from './Sidebar';
+import { PAGES } from '@/settings/pages';
 
 const NOW = new Date(2026, 9, 7, 14, 0).getTime();
 const agent = (name: string, status: Agent['status'], over: Partial<Agent> = {}): Agent => ({
@@ -118,6 +119,8 @@ describe('the frame', () => {
     expect(crumbGoOf({ screen: 'branch', project: 'p', branch: 'sb/x' }, name)).toEqual([{ c: 'storefront', go: { screen: 'thread', project: 'p', agent: 'main' } }]);
     // settings: its word goes to its root, the page's stays plain; a report and a lab: nothing before
     expect(crumbGoOf({ screen: 'settings', page: 'general' }, name)).toEqual([{ c: 'settings', go: { screen: 'settings' } }]);
+    // the page's crumb is the nav's title, never the route's id (designer m_42943: 'computer use')
+    for (const p of PAGES) expect(crumbOf({ screen: 'settings', page: p.id }, name).at(-1)).toBe(p.title);
     expect(crumbGoOf({ screen: 'report' }, name)).toEqual([]);
     // one place: nothing to go
     expect(crumbGoOf({ screen: 'thread', project: 'p', agent: 'main' }, name)).toEqual([]);

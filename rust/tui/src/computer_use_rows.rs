@@ -63,6 +63,20 @@ pub(crate) fn helper_app(check: &Value) -> Option<String> {
     Some(str_at(check, "helper")).filter(|d| !d.is_empty()).map(String::from)
 }
 
+/// The live test's words (designer m_42943): before one, after one
+/// (`passed · 14:02`), a failed one (`failed · <reason>`).
+pub(crate) const LIVE_NOT_RUN: &str = "not run yet";
+pub(crate) const LIVE_PASSED: &str = "passed";
+pub(crate) const LIVE_FAILED: &str = "failed";
+
+/// `passed · 14:02` (his zone); `passed` when the run's time isn't known.
+pub(crate) fn live_passed(at_ms: Option<u64>) -> String {
+    match at_ms {
+        Some(ms) => format!("{LIVE_PASSED} · {}", crate::running::clock(ms)),
+        None => LIVE_PASSED.to_string(),
+    }
+}
+
 /// The rows from a setup-check and what runs now.
 pub(crate) fn rows(check: &Value, busy: &Busy) -> Vec<Row> {
     let browser = str_at(check, "browser");
@@ -120,12 +134,14 @@ pub(crate) fn rows(check: &Value, busy: &Busy) -> Vec<Row> {
                 if busy.live_test {
                     st = St::Checking;
                 }
+                // when the last one ran, in his zone (setup-check's live_test.at_ms)
+                let at = check.get("live_test").and_then(|l| l.get("at_ms")).and_then(Value::as_u64);
                 let (d, a) = match st {
                     St::Checking => (format!("opening a tab in the background{}", theme::ellipsis()), None),
-                    St::Done => ("opened a tab, clicked a button. all set".to_string(), None),
-                    St::Failed => (contract(&given), o("try again")),
-                    St::Waits => ("opens a tab in the background and clicks".to_string(), o("run it")),
-                    St::NotYet => ("last".to_string(), None),
+                    St::Done => (live_passed(at), None),
+                    St::Failed => (format!("{LIVE_FAILED} · {}", contract(&given)), o("try again")),
+                    St::Waits => (LIVE_NOT_RUN.to_string(), o("run it")),
+                    St::NotYet => (LIVE_NOT_RUN.to_string(), None),
                 };
                 ("live test".to_string(), d, vec![], a, false)
             }
