@@ -4,7 +4,8 @@
 //! same crate), so the window lists and ranks exactly what the TUI does,
 //! with no copy in TypeScript.
 //!
-//! - `commands`: COMMANDS (bise_proto's catalog) as data, each with how
+//! - `commands`: COMMANDS (bise_proto's catalog), then DEBUG (outside
+//!   the catalog: its usage has no completer), as data, each with how
 //!   it runs (`hub`: his line goes to the hub's parser; `window`: a
 //!   screen of the window, the catalog's `client`) and
 //!   `runnable`: every hub command runs (his typed line goes as amb-feed's
@@ -20,6 +21,7 @@
 
 use super::*;
 use crate::commands::{Arg, COMMANDS};
+use bise_proto::commands::DEBUG;
 use bise_proto::app_rows::{PickArg, PickChoice, PickCommand, PickFile, PickFolder, PickSkill, Runs};
 use std::collections::HashMap;
 
@@ -50,10 +52,12 @@ fn arg(a: Arg) -> PickArg {
     }
 }
 
-/// The TUI's slash commands as the window lists them.
+/// The TUI's slash commands as the window lists them: the catalog, then
+/// `/debug` (outside COMMANDS, as `commands/list` sends it last).
 pub fn commands() -> Vec<PickCommand> {
     COMMANDS
         .iter()
+        .chain([&DEBUG])
         .map(|c| {
             // the catalog's `client`: a screen of the window's own
             let hub = !c.client;
@@ -178,16 +182,21 @@ mod tests {
     use super::*;
 
     /// Law: every TUI command once, in its order, with its args and how
-    /// it runs; the tables name only real commands.
+    /// it runs, then /debug last (commands/list's order); the tables name
+    /// only real commands.
     #[test]
     fn every_command_is_listed_once_with_how_it_runs() {
         let list = commands();
+        let table: Vec<&bise_proto::commands::Cmd> = COMMANDS.iter().chain([&DEBUG]).collect();
         let names: Vec<&str> = list.iter().map(|c| c.name.as_str()).collect();
-        assert_eq!(names, COMMANDS.iter().map(|c| c.name).collect::<Vec<_>>());
-        for (c, t) in list.iter().zip(COMMANDS) {
+        assert_eq!(names, table.iter().map(|c| c.name).collect::<Vec<_>>());
+        assert_eq!(names, bise_proto::commands::rows().iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), "the window lists what commands/list sends");
+        for (c, t) in list.iter().zip(&table) {
             assert_eq!((c.desc.as_str(), c.args.len()), (t.desc, t.args.len()), "{}", c.name);
         }
-        for (c, t) in list.iter().zip(COMMANDS) {
+        let debug = list.last().unwrap();
+        assert_eq!((debug.name.as_str(), debug.runs, debug.runnable), ("/debug", Runs::Window, false), "/debug is the window's screen, last");
+        for (c, t) in list.iter().zip(&table) {
             assert_eq!(c.runs == Runs::Hub, !t.client, "{}: runs as the catalog says", c.name);
             assert_eq!(c.runnable, c.runs == Runs::Hub, "{}: every hub command runs (slash), no window one is the hub's", c.name);
         }
