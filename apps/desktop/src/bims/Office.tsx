@@ -204,7 +204,6 @@ export function Office({
   parts,
   follow = null,
   followZoom = FOLLOW_ZOOM,
-  named = null,
   fill = false,
   onOpen,
   onOpenPlugin,
@@ -230,8 +229,6 @@ export function Office({
   follow?: string | null;
   /** how close the follow camera looks (focus.ts aimAt): FOLLOW_ZOOM by default; the right side's world frames its lead wider (app/side3d camera.ts) */
   followZoom?: number;
-  /** a bim that wears its hover label without the pointer (the right side's world, a beat on it: app/side3d camera.ts); his own hover wins */
-  named?: string | null;
   /** the office fills its holder's height (a panel tab, app/panel/Office.tsx): the canvas is the holder's box, the office whole and centred in it; off, its natural height for the width */
   fill?: boolean;
   /** a click on a bim: open that agent, as its row's click */
@@ -326,13 +323,6 @@ export function Office({
     zoomRef.current = followZoom;
     kickRef.current();
   }, [followZoom]);
-  // the bim named without the pointer (a beat in the world): its label as hover draws it
-  const namedRef = useRef(named);
-  useEffect(() => {
-    if (namedRef.current === named) return;
-    namedRef.current = named;
-    kickRef.current();
-  }, [named]);
   // the office grows (growth.ts): its high-water mark, the last growth drawn (an unlock is a stage
   // past it), the unlock moment, its label over the piece and the ground corner's tip
   // in test mode no kept mark: the fixture's growth, or a check's own (window.__biseGrow, read when
@@ -497,7 +487,7 @@ export function Office({
       const t = Date.now() / 1000;
       const ft = followRef.current.target;
       const fol = ft === null || ft === 'fit' ? null : ft.name;
-      const step = driver.step(clockNow(t), { hover: L.hover ?? namedRef.current, held: L.held, lit: L.lit, follow: fol });
+      const step = driver.step(clockNow(t), { hover: L.hover, held: L.held, lit: L.lit, follow: fol });
       if (step === null) return;
       const { office, frames, played, look, labels: shown } = step;
       if (step.reshaped) {

@@ -14,10 +14,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
-import { mapOf, mapPrefKey } from '@/bims/maps/ids';
+import { mapOf, mapPrefKey, type MapId } from '@/bims/maps/ids';
 import { layoutOf } from '@/bims/maps';
 import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
 import { beatDelay, EASE_MS, happenedOf, HOLD_MS, leadZoom, pickBeat, seenOf, shotOf, stillRecent, type Happened, type LastBeat, type Seen, type Shot } from './camera';
+import { speechOf, speechWord } from './model';
 import type { Agent, Card } from '@/proto';
 import { getPref, type Prefs } from '@/settings/prefs';
 import { useGrowth, usePlaces, usePlugins, usePrefs } from '@/store';
@@ -128,28 +129,49 @@ function useWorldCamera(agents: readonly Agent[], lead: string | null, zoom: num
   return frozen ? kept : shot;
 }
 
-/** The project's office as the world draws it: its map, its plugins' objects, its growth; its camera (camera.ts). */
-function WorldOffice({ project, agents, cards, cam }: OfficeOf & { readonly cam?: CamState }) {
-  const places = usePlaces(project);
-  const growth = useGrowth(project);
+/** The project's map, his /bims pick. */
+function useMap(project: string): MapId {
   const prefs = usePrefs() as Prefs | null;
-  const map = mapOf(getPref(prefs, mapPrefKey(project)));
-  const plugins = usePlugins(project);
-  const picks = getPref(prefs, objectsPrefKey(project));
-  const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
-  // the lead framing's zoom from the office's size (its desks follow the agents' count)
+  return mapOf(getPref(prefs, mapPrefKey(project)));
+}
+
+/** The lead framing's zoom from the office's size: its map and its desks (one per agent but main). */
+function useLeadZoom(agents: readonly Agent[], map: MapId): number {
   const desks = agents.filter((a) => !a.main).length;
-  const zoom = useMemo(() => {
+  return useMemo(() => {
     const o = layoutOf(agents, map);
     return leadZoom(o.W, o.D);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the office's size moves with its map and its desks' count, not each agent's state
   }, [map, desks]);
-  const lead = agents.find((a) => a.main)?.name ?? null;
-  const shot = useWorldCamera(agents, cam === undefined ? null : lead, zoom, cam ?? { hover: false, frozen: false });
+}
+
+/** The project's office as the world draws it: its map, its plugins' objects, its growth; `shot`: its camera (camera.ts), none: the whole office. */
+function WorldOffice({ project, agents, cards, shot }: OfficeOf & { readonly shot?: Shot }) {
+  const places = usePlaces(project);
+  const growth = useGrowth(project);
+  const prefs = usePrefs() as Prefs | null;
+  const map = useMap(project);
+  const plugins = usePlugins(project);
+  const picks = getPref(prefs, objectsPrefKey(project));
+  const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
   return (
     <Office project={project} agents={agents} cards={cards} places={places} objects={objects} growth={growth} map={map}
-      parts={bimsParts} transparent onOpen={() => undefined} follow={shot.follow} followZoom={shot.zoom}
-      named={shot.follow !== lead ? shot.follow : null} />
+      parts={bimsParts} transparent onOpen={() => undefined} follow={shot?.follow ?? null} followZoom={shot?.zoom} />
+  );
+}
+
+/**
+ * The beat's name label (designer m_43213): the followed agent's name and its state word, over the
+ * island's middle, where the follow camera puts its bim; outside the scaled island, so it reads at
+ * 148. From the beat's start to the start of its return. Pure render.
+ */
+function BeatLabel({ agent, cards, mid }: { readonly agent: Agent; readonly cards: readonly Card[]; readonly mid: number }) {
+  const s = speechOf(agent, cards);
+  return (
+    <span className="s3-beat" style={{ top: mid }} data-testid="app.world.beat">
+      <b>{agent.name}</b>
+      <span className="s3-beat-says" data-asks={s.k === 'asks' || undefined}>{speechWord(s)}</span>
+    </span>
   );
 }
 
@@ -167,6 +189,11 @@ export interface WorldProps extends OfficeOf {
 /** The world, small at rest, big after a hover. */
 export function World({ project, name, says, agents, cards, onOpen, frozen = false }: WorldProps) {
   const [big, setBig] = useState(false);
+  // its camera: the lead framing, a beat now and then (camera.ts)
+  const zoom = useLeadZoom(agents, useMap(project));
+  const lead = agents.find((a) => a.main)?.name ?? null;
+  const shot = useWorldCamera(agents, lead, zoom, { hover: big, frozen });
+  const beat = shot.follow !== null && shot.follow !== lead ? agents.find((a) => a.name === shot.follow) : undefined;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stop = () => {
     if (timer.current !== null) clearTimeout(timer.current);
@@ -209,9 +236,10 @@ export function World({ project, name, says, agents, cards, onOpen, frozen = fal
       <span className="s3-world-hit" style={hitBox(isleH, big)} data-testid="app.world.hit" />
       <span ref={isle} className="s3-world-isle" style={{ '--s3-scale': String(big ? 1 : SMALL / BIG) } as CSSProperties}>
         <span className="s3-world-office" aria-hidden="true">
-          <WorldOffice project={project} agents={agents} cards={cards} cam={{ hover: big, frozen }} />
+          <WorldOffice project={project} agents={agents} cards={cards} shot={shot} />
         </span>
       </span>
+      {beat !== undefined && !big && <BeatLabel agent={beat} cards={cards} mid={Math.round((isleH * SMALL) / BIG / 2)} />}
       {big && (
         <span className="s3-legend" data-testid="app.world.legend">
           <b>{name}</b>

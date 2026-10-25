@@ -412,22 +412,6 @@ describe('the follow camera (focus.ts)', () => {
       clock.mockRestore();
     }
   });
-  it('a named bim wears its hover label without the pointer; his own hover wins', async () => {
-    const r = fakeRenderer();
-    const { parts } = fakeParts(r);
-    const hovers: (string | null)[] = [];
-    const spied: Parts = { ...parts, labelsOf: (_p, o) => (hovers.push(o.hover), new Map()) };
-    const at = (named: string | null) => <Office project="p1" agents={AGENTS} cards={[]} places={[]} parts={spied} onOpen={vi.fn()} named={named} />;
-    const { rerender } = render(at(null));
-    await flush(2);
-    expect(hovers.at(-1)).toBeNull();
-    rerender(at('perf'));
-    await flush(1);
-    expect(hovers.at(-1)).toBe('perf');
-    rerender(at(null));
-    await flush(1);
-    expect(hovers.at(-1)).toBeNull();
-  });
 });
 
 describe('the map (/bims)', () => {

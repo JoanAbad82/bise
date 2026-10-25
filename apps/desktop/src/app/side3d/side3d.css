@@ -114,6 +114,39 @@
   color: var(--c-text-2);
 }
 
+/* a beat's name label (camera.ts, designer m_43213): over the followed bim, which the camera puts
+   at the island's middle (`top`: that middle); its bottom 16 above it, so the bim's head shows */
+.s3-beat {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, calc(-100% - var(--s-4)));
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-pill);
+  background: var(--c-overlay);
+  backdrop-filter: var(--glass);
+  box-shadow: var(--e-1);
+  font: var(--f-meta);
+  color: var(--c-text-3);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: s3-beat-in var(--d-base) var(--ease-out);
+}
+.s3-beat b {
+  font-weight: 500;
+  color: var(--c-text);
+}
+.s3-beat-says[data-asks] {
+  color: var(--c-accent);
+}
+@keyframes s3-beat-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* a bubble: 44 round glass, its object 68 rising 28 out of its top */
 .s3-bubble {
   position: absolute;
