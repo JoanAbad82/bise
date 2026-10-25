@@ -1994,7 +1994,6 @@
 }
 .th-fwd-line {
   color: var(--c-text-3);
-  cursor: default;
 }
 .th-fwd-orig {
   margin-top: var(--s-1);
