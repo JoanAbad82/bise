@@ -23,10 +23,11 @@ import { inboxBox } from './inbox';
 import { backBusy, backFrames } from './cozy';
 import { BODY_R } from './avoid';
 import { network } from './paths';
+import { wingLamp, wingWindow } from './wing';
 import { decorOf, terraceSlab } from './render/decor';
 import { BACK, RIGHT, UP, type V3 } from './render/camera';
 
-export type Corner = 'play' | 'read' | 'machines' | 'kitchen' | 'door' | 'hang' | 'terrace';
+export type Corner = 'play' | 'read' | 'machines' | 'kitchen' | 'door' | 'hang' | 'terrace' | 'garden';
 
 /** the corner each object belongs to (bims-plugins' SENSE_B, signed by Gabriel on v15; every family has its default) */
 export const CORNER: Readonly<Record<ObjId, Corner>> = {
@@ -64,7 +65,13 @@ const AGAINST: ReadonlySet<ObjId> = new Set<ObjId>([
 ]);
 
 /** the corners an assemblage lives in: things a little turned (±TURN, seeded by the plugin), closer together */
-const ORGANIC: ReadonlySet<Corner> = new Set<Corner>(['play', 'machines', 'kitchen', 'terrace']);
+const ORGANIC: ReadonlySet<Corner> = new Set<Corner>(['play', 'machines', 'kitchen', 'terrace', 'garden']);
+/** the outdoor corners: the terrace, and his sketch's garden (extensions.ts) */
+const OUT: ReadonlySet<Corner> = new Set<Corner>(['terrace', 'garden']);
+/** the travel things that go out together to a garden, by its stepping stones' start (designer m_41450) */
+const TRAVEL: ReadonlySet<ObjId> = new Set<ObjId>(['mailbox', 'scooter', 'bike']);
+/** the garden's hedge along its front and its tree in its far corner (render/extensions.ts): what its things keep off */
+const HEDGE_D = 0.8;
 export const TURN = 0.3;
 
 /** a big thing's compact one in an office with no room for it (the registry's COMPACT, three-free); the others scale by COMPACT_SCALE */
@@ -210,6 +217,10 @@ function keepOf(o: Office): Keep {
   const dec = decorOf(o);
   for (const f of [...dec.plants, dec.doorMat, dec.ramp]) boxes.push({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd });
   for (const f of [dec.parasol, dec.palm]) boxes.push({ x0: f.x - CANOPY, x1: f.x + CANOPY, z0: f.z - CANOPY, z1: f.z + CANOPY });
+  // his sketch's wing: its lamp and the floor under its window (wing.ts)
+  if (o.wing !== undefined) boxes.push(wingLamp(o.wing), wingWindow(o.wing));
+  // his sketch's garden: its tree (render/extensions.ts), its crown's reach
+  if (o.garden !== undefined) boxes.push({ x0: o.garden.x0 + 0.7 - CANOPY, x1: o.garden.x0 + 0.7 + CANOPY, z0: o.garden.z1 - 1.1 - CANOPY, z1: o.garden.z1 - 1.1 + CANOPY });
   const spots: Pt[] = [o.door, o.mainDesk, ...o.desks.values(), ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, ...o.terrace, ...(o.nooks ?? []), ...(c?.coffeeSpots ?? [])];
   const t = terraceSlab(o);
   const gx = Math.min(o.x0, t.x0, o.garden?.x0 ?? t.x0) - CELL;
@@ -280,9 +291,10 @@ function keptIn(k: Keep, b: Box): number {
 /** the floor an object may stand on in a corner: the room's, or the terrace's slab */
 function areaOf(o: Office, corner: Corner): Box {
   // a grown office's (extensions.ts): the wing widens the room, the garden the terrace; what is no floor between them is kept (keepOf)
-  if (corner === 'terrace') {
-    const t = terraceSlab(o);
-    return o.garden === undefined ? t : { x0: Math.min(t.x0, o.garden.x0 + EDGE), x1: Math.max(t.x1, o.garden.x1 - EDGE), z0: t.z0, z1: o.garden.z1 - EDGE };
+  if (corner === 'terrace') return terraceSlab(o);
+  if (corner === 'garden') {
+    const g = o.garden ?? { x0: 0, x1: 0, z0: 0, z1: 0 };
+    return { x0: g.x0 + EDGE, x1: g.x1 - EDGE, z0: g.z0 + EDGE, z1: g.z1 - HEDGE_D };
   }
   return { x0: o.x0 + EDGE, x1: (o.wing?.x1 ?? o.x0 + o.W) - EDGE, z0: EDGE, z1: o.D - EDGE };
 }
@@ -313,6 +325,9 @@ function anchorOf(o: Office, corner: Corner): Pt {
       const t = terraceSlab(o);
       return { x: t.x1, z: (t.z0 + t.z1) / 2 };
     }
+    case 'garden':
+      // the stepping stones' start, where the path from the door arrives
+      return { x: o.door.x, z: (o.garden?.z0 ?? o.D) + 0.6 };
   }
 }
 
@@ -330,6 +345,8 @@ function seedsOf(o: Office, corner: Corner): Box[] {
       return [o.island];
     case 'door':
       return [near({ x: o.door.x, z: o.D }, 1.6)];
+    case 'garden':
+      return o.garden === undefined ? [] : [near({ x: o.door.x, z: o.garden.z0 + 0.6 }, 1.6)];
     default:
       return [];
   }
@@ -422,7 +439,7 @@ function wallTries(c: Ctx, corner: Corner, foot: FootOf): readonly Try[] {
 }
 
 /** two objects apart: close when both stand in an assemblage, a step when either does not (the same both ways, so a kept spot stays free) */
-const gapOf = (a: Corner, b: Corner): number => (a === 'terrace' && b === 'terrace' ? GAP_OUT : ORGANIC.has(a) && ORGANIC.has(b) ? GAP_ORGANIC : GAP);
+const gapOf = (a: Corner, b: Corner): number => (OUT.has(a) && OUT.has(b) ? GAP_OUT : ORGANIC.has(a) && ORGANIC.has(b) ? GAP_ORGANIC : GAP);
 
 /** whether a box is free in a corner: on its area, off what the office keeps, apart from the others, never under a canopy in the view */
 function free(c: Ctx, b: Box, corner: Corner, area: Box, taken: readonly Placed[], h = 0): boolean {
@@ -495,8 +512,8 @@ export function touches(o: Office, b: Box, corner: Corner, taken: readonly Place
   if (!inZone(area, b, corner, seeds, play, o.wing)) return false;
   // the door's things stand against its wall, on the way-out side, each of them (designer m_41307): never on a rug or a pod's place inside
   if (corner === 'door') return b.z1 >= area.z1 - TOUCH && seeds.some((s) => overlaps(b, s, TOUCH));
-  if (corner === 'terrace' && (b.x0 <= area.x0 + TOUCH || b.x1 >= area.x1 - TOUCH || b.z0 <= area.z0 + TOUCH || b.z1 >= area.z1 - TOUCH)) return true;
-  if (corner !== 'terrace' && (b.z0 <= area.z0 + TOUCH || b.x0 <= area.x0 + TOUCH)) return true;
+  if (OUT.has(corner) && (b.x0 <= area.x0 + TOUCH || b.x1 >= area.x1 - TOUCH || b.z0 <= area.z0 + TOUCH || b.z1 >= area.z1 - TOUCH)) return true;
+  if (!OUT.has(corner) && (b.z0 <= area.z0 + TOUCH || b.x0 <= area.x0 + TOUCH)) return true;
   if (seeds.some((s) => overlaps(b, s, TOUCH))) return true;
   return taken.some((p) => p.corner === corner && overlaps(b, p.box, gapOf(corner, p.corner) + TOUCH));
 }
@@ -511,7 +528,7 @@ export const PLAY_ZONE = 1.5;
  * corner's place starts (`play`: the nap place's seeds): the games come first by the nap place.
  */
 function inZone(area: Box, b: Box, corner: Corner, seeds: readonly Box[], play: readonly Box[] = [], wing?: Box): boolean {
-  if (corner === 'terrace') return true;
+  if (OUT.has(corner)) return true;
   // his sketch's wing (extensions.ts) is the office going on: any indoor corner may gather there too (not the door's, not a hung thing)
   if (wing !== undefined && corner !== 'door' && corner !== 'hang' && b.x0 >= wing.x0 - 1e-9) return true;
   if (corner === 'read') return b.x0 <= area.x0 + ZONE && !play.some((s) => overlaps(b, s, ZONE));
@@ -580,7 +597,9 @@ function kept(c: Ctx, p: PluginObject, before: Placed, taken: readonly Placed[])
 function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null {
   const home = CORNER[p.obj];
   const also = ALSO[p.obj];
-  const corners: readonly Corner[] = also === undefined ? [home] : [home, also];
+  const own0: readonly Corner[] = also === undefined ? [home] : [home, also];
+  // his sketch's garden (extensions.ts): the terrace's things that find no room there go out to it; the travel things go together, by its path's start
+  const corners: readonly Corner[] = c.o.garden === undefined ? own0 : TRAVEL.has(p.obj) ? ['garden', ...own0] : own0.includes('terrace') ? [...own0, 'garden'] : own0;
   // a tall thing tries a wall first, its compact one at a wall next, then standing free (touching its corner's others)
   const walled = AGAINST.has(p.obj);
   // last, a swap scaled down (the ping-pong's small babyfoot: the one a babyfoot plugin would take)
@@ -595,7 +614,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
       const area = areaOf(c.o, corner);
       const seeds = seedOfCorner(c, corner);
       const play = seedOfCorner(c, 'play');
-      if ((against && corner !== 'terrace') || corner === 'hang') {
+      if ((against && !OUT.has(corner)) || corner === 'hang') {
         for (const t of wallTries(c, corner, foot)) {
           const b = boxOf(t.x, t.z, foot.w, foot.d, t.rot);
           if (touches(c.o, b, corner, taken, seeds, play) && free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, size, foot, corner, t);
@@ -660,5 +679,47 @@ function rugsOf(o: Office, placed: readonly Placed[], keep: Keep): Rug[] {
       break;
     }
   }
+  // his sketch's wing (extensions.ts): its biggest cluster gets a rug too, so it reads as more office (designer m_41450)
+  const w = o.wing;
+  if (w !== undefined) {
+    const ps = placed.filter((p) => p.box.x0 >= w.x0 - 1e-9 && !p.foot.wall && p.corner !== 'hang');
+    const best = biggestCluster(ps);
+    if (best.length >= WING_RUG_MIN) {
+      const reads = best.filter((p) => p.corner === 'read').length;
+      const area = { x0: w.x0 + EDGE, x1: w.x1 - EDGE, z0: EDGE, z1: w.z1 - EDGE };
+      for (const pad of [RUG_PAD, RUG_PAD_MIN]) {
+        const g = grow(hull(best.map((p) => p.box)), pad);
+        const box = { x0: Math.max(g.x0, area.x0), x1: Math.min(g.x1, area.x1), z0: Math.max(g.z0, area.z0), z1: Math.min(g.z1, area.z1) };
+        if (keep.boxes.some((f) => overlaps(box, f, 0)) || out.some((r) => overlaps(box, r.box, 0))) continue;
+        out.push({ box, corner: reads * 2 > best.length ? 'read' : 'play' });
+        break;
+      }
+    }
+  }
   return out;
+}
+
+/** a wing cluster's least size for a rug */
+const WING_RUG_MIN = 2;
+
+/** the biggest group of things within CLUSTER of each other, chained */
+function biggestCluster(ps: readonly Placed[]): Placed[] {
+  const seen = new Set<number>();
+  let best: Placed[] = [];
+  for (let i = 0; i < ps.length; i++) {
+    if (seen.has(i)) continue;
+    const group: number[] = [i];
+    seen.add(i);
+    for (let k = 0; k < group.length; k++) {
+      const a = ps[group[k] as number] as Placed;
+      ps.forEach((b, j) => {
+        if (!seen.has(j) && overlaps(a.box, b.box, CLUSTER)) {
+          seen.add(j);
+          group.push(j);
+        }
+      });
+    }
+    if (group.length > best.length) best = group.map((j) => ps[j] as Placed);
+  }
+  return best;
 }

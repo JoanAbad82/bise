@@ -23,14 +23,21 @@ function legThrough(l: Leg, b: Box): boolean {
 }
 
 describe("his sketch's growth", () => {
-  it('needs the wing for an indoor thing left, the garden for an outdoor one, nothing for none', () => {
-    const [lib, ping] = [objsOf(34).find((p) => p.obj === 'library'), objsOf(34).find((p) => p.obj === 'pingpong')];
-    if (!lib || !ping) throw new Error('fixtures');
-    expect(needOf([])).toEqual(NO_NEED);
-    expect(needOf([lib])).toEqual({ wing: true, garden: false });
-    expect(needOf([ping])).toEqual({ wing: false, garden: true });
-    expect(needOf([lib, ping])).toEqual({ wing: true, garden: true });
-    expect(either({ wing: true, garden: false }, { wing: false, garden: true })).toEqual({ wing: true, garden: true });
+  it('needs the wing for an indoor thing left (as deep as they need), the garden for an outdoor or a travel one, nothing for none', () => {
+    const o = layoutOf(crewOf(3), 'loft');
+    const all = objsOf(34);
+    const of = (id: string) => all.find((p) => p.obj === id) ?? (() => { throw new Error(id); })();
+    const [lib, ping, mail] = [of('library'), of('pingpong'), of('mailbox')];
+    expect(needOf(o, [])).toEqual(NO_NEED);
+    expect(needOf(o, [lib]).garden).toBe(false);
+    expect(needOf(o, [lib]).wing).toBeGreaterThan(0);
+    expect(needOf(o, [ping])).toEqual({ wing: 0, garden: true });
+    expect(needOf(o, [mail])).toEqual({ wing: 0, garden: true });
+    // more things, a deeper wing, never past its sketch step
+    const many = all.filter((p) => !['pingpong', 'mailbox', 'scooter', 'bike', 'telescope', 'campfire', 'calendar'].includes(p.obj));
+    expect(needOf(o, many).wing).toBeGreaterThan(needOf(o, [lib]).wing);
+    expect(needOf(o, many).wing).toBeLessThanOrEqual(wingOf(o).z1);
+    expect(either({ wing: 3, garden: false }, { wing: 4, garden: true })).toEqual({ wing: 4, garden: true });
   });
 
   it('a few objects that fit: the square alone, the same office', () => {
@@ -60,7 +67,7 @@ describe("his sketch's growth", () => {
       const objs = objsOf(34);
       const square = objectSpots(o, objs);
       const g = grownFor(o, objs, []);
-      expect(g.need, `${String(n)} agents`).toEqual(needOf(square.left));
+      expect(g.need, `${String(n)} agents`).toEqual(needOf(o, square.left));
       const c = objectSpots(g.office, objs, square.placed);
       expect(breaksOf(g.office, c), `${String(n)} agents`).toEqual([]);
       // it takes in more than the square did
@@ -71,7 +78,7 @@ describe("his sketch's growth", () => {
   it("the wing's walk and the garden's path cross no furniture, and join the office's network", () => {
     for (const n of [1, 12, 20, 31]) {
       const o = layoutOf(crewOf(n), 'loft');
-      const g = withExtensions(o, { wing: true, garden: true });
+      const g = withExtensions(o, { wing: 5, garden: true });
       const added = g.walks.slice(o.walks.length);
       expect(added.length).toBeGreaterThan(0);
       for (const l of added) for (const f of o.furniture) expect(legThrough(l, f), `${String(n)} agents: ${JSON.stringify(l)} through ${JSON.stringify(f)}`).toBe(false);
@@ -84,10 +91,11 @@ describe("his sketch's growth", () => {
 
   it('nothing drawn of the square moves: the grown office keeps its desks, furniture and walls', () => {
     const o = layoutOf(crewOf(12), 'loft');
-    const g = withExtensions(o, { wing: true, garden: true });
+    const g = withExtensions(o, { wing: 5, garden: true });
     expect([g.x0, g.W, g.D]).toEqual([o.x0, o.W, o.D]);
     expect(g.desks).toBe(o.desks);
     expect(g.furniture).toBe(o.furniture);
+    expect(g.wing?.z1).toBe(Math.min(5, wingOf(o).z1));
     expect(overlaps(g.wing ?? { x0: 0, x1: 0, z0: 0, z1: 0 }, { x0: o.x0, x1: o.x0 + o.W, z0: 0, z1: o.D })).toBe(false);
   });
 

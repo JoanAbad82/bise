@@ -5,6 +5,8 @@
 // look later). Owner: bims-life.
 import type { Box } from '../model';
 import type { Build } from './maps/look';
+import { WORLD } from './palette';
+import { wingLamp, wingWindow } from '../wing';
 
 /** the wing's back wall: the square's (the loft's 1.7) */
 const WALL_H = 1.7;
@@ -28,8 +30,20 @@ export function buildExtensions(b: Build): void {
     const floor = k.add(style.box(ww, 0.14, wd), style.floor(pal.floor, ww, wd), root, (w.x0 + w.x1) / 2, -0.051, (w.z0 + w.z1) / 2);
     floor.receiveShadow = true;
     k.add(style.box(ww + 0.1, WALL_H, 0.2), k.mat(pal.wall), root, (w.x0 + w.x1) / 2 + 0.05, WALL_H / 2, -0.1);
-    // a window in the middle of its back wall
-    k.add(style.box(Math.min(1.4, ww / 3), 0.8, 0.04), k.glow(pal.window, { night: 0.4 }), root, (w.x0 + w.x1) / 2, 1.05, 0.02);
+    // a window in the middle of its back wall, the floor under it kept clear (wing.ts), a frame round it
+    const win = wingWindow(w);
+    const wwin = win.x1 - win.x0;
+    const cx = (win.x0 + win.x1) / 2;
+    k.add(style.box(wwin + 0.12, 0.92, 0.05), k.mat(pal.desk), root, cx, 1.0, 0.025);
+    k.add(style.box(wwin, 0.8, 0.06), k.glow(pal.window, { night: 0.4 }), root, cx, 1.0, 0.04);
+    k.add(style.box(0.04, 0.8, 0.07), k.mat(pal.desk), root, cx, 1.0, 0.045);
+    // a floor lamp in its far back corner (wing.ts), lit at night like the cozy ones
+    const lamp = wingLamp(w);
+    const lx = (lamp.x0 + lamp.x1) / 2;
+    const lz = (lamp.z0 + lamp.z1) / 2;
+    k.add(style.cylinder(0.16, 0.04), k.mat(WORLD.dark), root, lx, 0.02, lz);
+    k.add(style.cylinder(0.025, 1.4), k.mat(WORLD.dark), root, lx, 0.72, lz);
+    k.add(style.cylinder(0.2, 0.28), k.glow(pal.lamp, { night: 1, emissive: pal.lampOn }), root, lx, 1.5, lz);
   }
   if (o.garden !== undefined) {
     const g = o.garden;
