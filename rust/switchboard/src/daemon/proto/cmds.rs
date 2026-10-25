@@ -295,7 +295,7 @@ impl Shell {
                     let redact = bise_session::Redactor::from_home(&home.auth_file(), &home.env_files());
                     let render = |wire: &std::path::Path, model: &str| super::completion::render(&repl, &root, wire, model, &keys);
                     let project = ask.project.clone();
-                    let v = match super::completion::answer(&ask, &req_dir, &models, &render, &redact) {
+                    let v = match super::completion::answer(&ask, &req_dir, &home.images_dir(), &models, &render, &redact) {
                         Ok(c) => HubEv::Completion(Box::new(c)).to_value(),
                         Err(text) => HubEv::Error { project: Some(project), cmd: Some(tag), text, cid: None, reason: None, kind: None }.to_value(),
                     };

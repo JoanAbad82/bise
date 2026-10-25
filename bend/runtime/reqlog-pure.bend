@@ -10,7 +10,12 @@
 # line with the byte lengths of the .json and the .wire. A reader trusts
 # a slot only when the .meta is there and both lengths match (else it is
 # being written). The order of the slots is the .meta's mtime, never
-# the slot number (a restart counts req from 1 again).
+# the slot number (a restart counts req from 1 again). The .json is the
+# body before its file parts are read: an image's base64 is there as
+# Http.file_part (NUL "bend-file:<size>:<path>" NUL), whose file the HTTP
+# client sends in its place; the ring never copies it (8 slots of up to
+# 24 MB per agent). The reader puts the file back (bise_session::reqlog::
+# expand, the render mode's output too).
 # runtime/reqlog.bend runs the writes.
 import Base
 import ../vendor/json.bend as J

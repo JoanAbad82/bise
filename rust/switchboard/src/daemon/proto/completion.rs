@@ -62,10 +62,12 @@ pub(super) fn hits(rows: &[CompRow], needle: &str) -> Vec<u64> {
 
 /// The answer to `ask` from the ring in `req_dir`; `models`: the
 /// catalog's ids; `render(wire, model)`: the body the runtime makes of a
-/// slot's `.wire` for `model`.
+/// slot's `.wire` for `model`; `store`: the image store, where both
+/// bodies' image parts are read back (`reqlog::expand`).
 pub(super) fn answer(
     ask: &CompletionAsk,
     req_dir: &Path,
+    store: &Path,
     models: &[String],
     render: &dyn Fn(&Path, &str) -> Result<String, String>,
     redact: &Redactor,
@@ -77,12 +79,12 @@ pub(super) fn answer(
         Some(p) => {
             let model = model_for(p, models)?;
             if model == sent || (!p.contains('/') && provider_of(&sent) == p.trim()) {
-                (reqlog::body(s)?, None)
+                (reqlog::body(s, store)?, None)
             } else {
-                (render(&s.wire, &model)?, Some(model))
+                (reqlog::expand(&render(&s.wire, &model)?, store)?, Some(model))
             }
         }
-        None => (reqlog::body(s)?, None),
+        None => (reqlog::body(s, store)?, None),
     };
     let split = completion::split(&body)?;
     let rows = if ask.raw { completion::raw_rows(&split, redact) } else { completion::rows(&split, redact) };
@@ -192,16 +194,16 @@ mod tests {
             rendered.borrow_mut().push((w.to_path_buf(), m.to_string()));
             Ok(r#"{"model":"gpt-x","messages":[{"role":"system","content":"s"},{"role":"user","content":"bench the hero"}]}"#.to_string())
         };
-        let c = answer(&ask(None), &d, &models, &render, &red).unwrap();
+        let c = answer(&ask(None), &d, &d, &models, &render, &red).unwrap();
         assert_eq!((c.family.as_str(), c.shown_as.clone(), c.slot.req), ("anthropic", None, 2));
         assert_eq!(c.hits, Some(vec![2]));
         assert!(!serde_json::to_string(&c).unwrap().contains(key));
-        let same = answer(&ask(Some("fake")), &d, &models, &render, &red).unwrap();
+        let same = answer(&ask(Some("fake")), &d, &d, &models, &render, &red).unwrap();
         assert_eq!((same.shown_as, rendered.borrow().len()), (None, 0), "its own provider: as sent");
-        let other = answer(&ask(Some("oai")), &d, &models, &render, &red).unwrap();
+        let other = answer(&ask(Some("oai")), &d, &d, &models, &render, &red).unwrap();
         assert_eq!((other.family.as_str(), other.shown_as.as_deref()), ("openai-chat", Some("oai/gpt-x")));
         assert_eq!(rendered.borrow()[0], (d.join("2.wire"), "oai/gpt-x".to_string()));
-        assert!(answer(&ask(Some("nowhere")), &d, &models, &render, &red).is_err());
+        assert!(answer(&ask(Some("nowhere")), &d, &d, &models, &render, &red).is_err());
         assert_eq!(c.slots.len(), 1);
         let _ = std::fs::remove_dir_all(&d);
     }

@@ -268,7 +268,10 @@ fn image(label: &str, v: &Value) -> CompBlock {
         .iter()
         .find_map(|p| v.pointer(p).and_then(Value::as_str))
         .unwrap_or("");
-    let text = format!("{} · {}", mime.replace("image/", "image "), short_bytes(data.len()));
+    // an image the ring could not put back reads as its word
+    // (`reqlog::expand`: "[image gone]"), never as a size
+    let size = data.find("[image ").map_or_else(|| short_bytes(data.len()), |i| data[i..].to_string());
+    let text = format!("{} · {}", mime.replace("image/", "image "), size);
     CompBlock { label: Some(label.to_string()), body: LogBody { kind: LogBodyKind::Plain, lang: None, text, cut: false } }
 }
 

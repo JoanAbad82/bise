@@ -290,7 +290,7 @@ impl View {
         self.slot = slot.filter(|i| ready.contains(i)).or(ready.last().copied());
         let got = match self.slot {
             None => Err("no request kept yet: the agent has not called its model since its start".to_string()),
-            Some(i) => reqlog::body(&self.slots[i]).and_then(|b| comp::of_body(&b, self.raw, &self.redact)),
+            Some(i) => reqlog::body(&self.slots[i], &bise_home::Home::from_env().images_dir()).and_then(|b| comp::of_body(&b, self.raw, &self.redact)),
         };
         match got {
             Ok((items, shown)) => {
