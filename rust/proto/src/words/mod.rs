@@ -44,6 +44,7 @@ pub mod panel;
 pub mod running;
 pub mod scheduled;
 pub mod settings;
+pub mod side;
 pub mod thread;
 
 /// One word of the catalog.
@@ -75,6 +76,7 @@ pub const ALL: &[(&str, &[Word])] = &[
     ("running", running::WORDS),
     ("scheduled", scheduled::WORDS),
     ("settings", settings::WORDS),
+    ("side", side::WORDS),
     ("thread", thread::WORDS),
 ];
 

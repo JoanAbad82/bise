@@ -15,4 +15,5 @@ export { panel } from './words_panel.gen';
 export { running } from './words_running.gen';
 export { scheduled } from './words_scheduled.gen';
 export { settings } from './words_settings.gen';
+export { side } from './words_side.gen';
 export { thread } from './words_thread.gen';
