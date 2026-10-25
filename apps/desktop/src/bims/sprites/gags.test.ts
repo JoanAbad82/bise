@@ -1,53 +1,53 @@
-// The home gags' laws (gags.ts, page bims-home): the brief's weight in frames, every gag ending on the
-// pose its bim holds, the blink closing its eyes, the skater's path step by step, the 4 phone gags,
-// and no attention colour among the studio's own.
+// The home islands' laws (gags.ts, prototype A of page bims-home v4): the brief's weight in frames,
+// every gag ending on the pose its bim then holds, the blink closing its eyes and nothing else, the
+// bim and its notes never leaving the island, one bim per gag, and no attention colour among the
+// studio's own.
 import { describe, expect, it } from 'vitest';
 import { readsAsAttention } from '../render/palette.testkit';
-import { MAX_FRAMES, MIN_FRAMES, SHEETS, idleFrames } from './gags';
+import { ISLANDS, MAX_FRAMES, MIN_FRAMES, SLAB } from './gags';
 import { STUDIO_COLOURS } from './studio';
 
-describe('the home gags', () => {
-  it('draw 8 to 16 frames each, and play only those', () => {
-    for (const s of SHEETS) {
+describe('the home islands', () => {
+  it('draw 8 to 16 frames each, and play them all but the blink', () => {
+    for (const s of ISLANDS) {
       expect(s.frames.length, s.id).toBeGreaterThanOrEqual(MIN_FRAMES);
       expect(s.frames.length, s.id).toBeLessThanOrEqual(MAX_FRAMES);
       for (const i of s.seq) expect(s.frames[i], `${s.id} plays frame ${String(i)}`).toBeDefined();
-      // every frame drawn is played: none weighs for nothing
-      expect(new Set(s.seq).size, s.id).toBe(s.frames.length);
+      expect(new Set([...s.seq, s.blink]).size, s.id).toBe(s.frames.length);
     }
   });
 
   it('end on the pose their bim then holds', () => {
-    for (const s of SHEETS) expect(s.seq.at(-1), s.id).toBe(s.idle);
+    for (const s of ISLANDS) expect(s.seq.at(-1), s.id).toBe(s.idle);
   });
 
-  it('blink: the idle sheet is its pose, then the same with its eyes shut', () => {
-    for (const s of SHEETS) {
-      const [open, shut] = idleFrames(s);
-      expect(open, s.id).toBe(s.frames[s.idle]);
-      for (const b of shut?.bims ?? []) expect(b.rig.eyes, s.id).toBeLessThan(0.25);
-      expect(shut?.bims.map((b) => ({ ...b.rig, eyes: 0 })), s.id).toEqual(open?.bims.map((b) => ({ ...b.rig, eyes: 0 })));
+  it('blink: the held pose with its eyes shut, nothing else', () => {
+    for (const s of ISLANDS) {
+      const open = s.frames[s.idle];
+      const shut = s.frames[s.blink];
+      expect(shut?.bim.rig.eyes, s.id).toBeLessThan(0.25);
+      expect({ ...shut?.bim.rig, eyes: 0 }, s.id).toEqual({ ...open?.bim.rig, eyes: 0 });
     }
   });
 
-  it('the skater moves along its path at each step, never back, and stops at its end', () => {
-    for (const s of SHEETS.filter((x) => x.travel)) {
-      const t = s.travel ?? [];
-      expect(t.length, s.id).toBe(s.seq.length);
-      t.forEach((u, i) => {
-        expect(u, `${s.id} step ${String(i)}`).toBeGreaterThanOrEqual(t[i - 1] ?? 0);
-      });
-      expect(t.at(-1), s.id).toBe(1);
+  it('the bim and its notes never leave the island', () => {
+    const half = SLAB.w / 2 - 0.15;
+    for (const s of ISLANDS) {
+      for (const f of s.frames) {
+        expect(Math.abs(f.bim.rig.x), s.id).toBeLessThan(half);
+        expect(Math.abs(f.bim.rig.z), s.id).toBeLessThan(half);
+        for (const [x, , z] of f.notes ?? []) {
+          expect(Math.abs(x), s.id).toBeLessThan(half);
+          expect(Math.abs(z), s.id).toBeLessThan(half);
+        }
+      }
     }
   });
 
-  it('on a phone: desktop or terminal?, babysit robots, it talks back and the end', () => {
-    expect(SHEETS.filter((s) => s.phone).map((s) => s.id)).toEqual(['ways-sit', 'ways-climb', 'why', 'fun', 'end']);
-  });
-
-  it('one bim per agent name: no two gags share a bim', () => {
-    const names = SHEETS.flatMap((s) => [...new Set(s.frames.flatMap((f) => f.bims.map((b) => b.name)))]);
-    expect(new Set(names).size).toBe(names.length);
+  it('one bim per gag, never the same on both', () => {
+    const names = ISLANDS.map((s) => new Set(s.frames.map((f) => f.bim.name)));
+    for (const n of names) expect(n.size).toBe(1);
+    expect(new Set(names.flatMap((n) => [...n])).size).toBe(ISLANDS.length);
   });
 
   it('the studio adds no accent pink and no error red', () => {

@@ -1,0 +1,13 @@
+/* the home bims' two prototypes (page bims-home v4): their layer over the page, read by site/bims-proto.ts.
+   Only the bim takes pointers; the island's soft shadow is its slab's underside dropped and blurred,
+   black 15 % light / 35 % dark (docs/brand/bims.md, the cube). */
+.bp { position:absolute; top:0; left:0; width:100%; overflow:clip; pointer-events:none; z-index:4; }
+.bp > div { position:absolute; transform-origin:0 0; }
+.bp .is, .bp .fr { position:absolute; background-repeat:no-repeat; background-size:100% 100%; }
+.bp i { position:absolute; pointer-events:auto; }
+.bp .sh { position:absolute; inset:0; filter:blur(9px); opacity:.15; transform:translateY(14px) scale(.92,.85); transform-origin:50% 100%; }
+html.pd .bp .sh { opacity:.35; }
+.bp .sh > b { position:absolute; inset:0; background:#000; }
+.bp .hopi { animation:bp-hop .45s cubic-bezier(.3,0,.3,1); }
+@keyframes bp-hop { 20% { transform:translateY(2px) scale(1.06,.92); } 55% { transform:translateY(-12px) scale(.96,1.05); } 80% { transform:translateY(1px); } }
+@media (prefers-reduced-motion: reduce) { .bp .hopi { animation:none; } }
