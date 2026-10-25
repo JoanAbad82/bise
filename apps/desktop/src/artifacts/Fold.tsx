@@ -27,15 +27,25 @@ export function FoldCrumb({ label, children, testId }: { label: string; children
     const down = (e: PointerEvent) => {
       if (box.current?.contains(e.target as Node) !== true) setOpen(false);
     };
+    // a click on a row goes there and closes it: on the document's bubble, after React's own
+    // listener ran the row's click. A real click runs the microtasks between listeners, so a close
+    // any earlier (on capture, or on the popover) commits first, drops the row and React never calls
+    // its onClick (a script's el.click() hides that). A theme's open/close or the new folder stays.
+    const click = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('.art-fold-pop') !== null && t.closest('.art-col-new, [aria-expanded]') === null) setOpen(false);
+    };
     const key = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopPropagation();
       setOpen(false);
     };
     document.addEventListener('pointerdown', down, true);
+    document.addEventListener('click', click);
     document.addEventListener('keydown', key, true);
     return () => {
       document.removeEventListener('pointerdown', down, true);
+      document.removeEventListener('click', click);
       document.removeEventListener('keydown', key, true);
     };
   }, [open]);
@@ -45,10 +55,7 @@ export function FoldCrumb({ label, children, testId }: { label: string; children
         {label} <span className="caret" aria-hidden="true">▾</span>
       </Press>
       {open && (
-        // a click on a row goes there and closes it
-        <span className="art-fold-pop" data-testid={`${testId}.pop`} onClickCapture={(e) => {
-          if ((e.target as HTMLElement).closest('.art-col-new, [aria-expanded]') === null) setOpen(false);
-        }}>
+        <span className="art-fold-pop" data-testid={`${testId}.pop`}>
           {children}
         </span>
       )}
