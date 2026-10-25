@@ -465,6 +465,8 @@ export function underCanopy(o: Office, b: Box, h: number): boolean {
 export function touches(o: Office, b: Box, corner: Corner, taken: readonly Placed[], seeds: readonly Box[], play: readonly Box[] = []): boolean {
   const area = areaOf(o, corner);
   if (!inZone(area, b, corner, seeds, play)) return false;
+  // the door's things stand against its wall, on the way-out side, each of them (designer m_41307): never on a rug or a pod's place inside
+  if (corner === 'door') return b.z1 >= area.z1 - TOUCH && seeds.some((s) => overlaps(b, s, TOUCH));
   if (corner === 'terrace' && (b.x0 <= area.x0 + TOUCH || b.x1 >= area.x1 - TOUCH || b.z0 <= area.z0 + TOUCH || b.z1 >= area.z1 - TOUCH)) return true;
   if (corner !== 'terrace' && (b.z0 <= area.z0 + TOUCH || b.x0 <= area.x0 + TOUCH)) return true;
   if (seeds.some((s) => overlaps(b, s, TOUCH))) return true;
