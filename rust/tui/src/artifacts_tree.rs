@@ -200,27 +200,40 @@ pub(crate) fn parent_name(f: &Folder, folders: &[Folder]) -> Option<String> {
     f.parent.as_deref().and_then(|p| by_id(folders, p)).map(|p| p.name.clone())
 }
 
-/// The library's projects, the most rows first: (name, rows).
-pub(crate) fn projects(rows: &[&Artifact], here: &str) -> Vec<(String, usize)> {
-    let mut out: Vec<(String, usize)> = Vec::new();
+/// One project of the library: its hub id (what is kept, picked and
+/// sent), its name (what shows), its rows.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Project {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) rows: usize,
+}
+
+/// The library's projects, the most rows first.
+pub(crate) fn projects(rows: &[&Artifact]) -> Vec<Project> {
+    let mut out: Vec<Project> = Vec::new();
     for a in rows {
-        let p = project_name(a, here);
-        match out.iter_mut().find(|(n, _)| *n == p) {
-            Some(e) => e.1 += 1,
-            None => out.push((p.to_string(), 1)),
+        match out.iter_mut().find(|p| p.id == a.project) {
+            Some(p) => p.rows += 1,
+            None => out.push(Project { id: a.project.clone(), name: project_words(a).to_string(), rows: 1 }),
         }
     }
-    out.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    out.sort_by(|a, b| b.rows.cmp(&a.rows).then(a.name.cmp(&b.name)));
     out
 }
 
-/// The row's project by name: this hub's own rows carry none.
-pub(crate) fn project_name<'a>(a: &'a Artifact, here: &'a str) -> &'a str {
-    if a.project.is_empty() {
-        here
-    } else {
+/// A row's project as it shows: its name, its hub id until the name is known.
+pub(crate) fn project_words(a: &Artifact) -> &str {
+    if a.project_name.is_empty() {
         &a.project
+    } else {
+        &a.project_name
     }
+}
+
+/// The name of the project with that hub id, among these rows.
+pub(crate) fn name_of(id: &str, rows: &[Artifact]) -> String {
+    rows.iter().find(|a| a.project == id).map_or_else(|| id.to_string(), |a| project_words(a).to_string())
 }
 
 /// The search split: its `in:<project>` (the last one) and the rest.
@@ -236,17 +249,18 @@ pub(crate) fn split_in(q: &str) -> (Option<String>, String) {
     (proj, rest.join(" "))
 }
 
-/// The project `in:<words>` names: an exact name, else the first that
-/// starts with them, else the first that has them.
-pub(crate) fn match_project<'a>(words: &str, projects: &'a [(String, usize)]) -> Option<&'a str> {
+/// The project `in:<words>` names (by its name: he types what he
+/// sees): an exact name, else the first that starts with them, else the
+/// first that has them. Its hub id.
+pub(crate) fn match_project<'a>(words: &str, projects: &'a [Project]) -> Option<&'a str> {
     let w = words.to_lowercase();
-    let low = |p: &str| p.to_lowercase();
+    let low = |p: &Project| p.name.to_lowercase();
     projects
         .iter()
-        .find(|(p, _)| low(p) == w)
-        .or_else(|| projects.iter().find(|(p, _)| low(p).starts_with(&w)))
-        .or_else(|| projects.iter().find(|(p, _)| low(p).contains(&w)))
-        .map(|(p, _)| p.as_str())
+        .find(|p| low(p) == w)
+        .or_else(|| projects.iter().find(|p| low(p).starts_with(&w)))
+        .or_else(|| projects.iter().find(|p| low(p).contains(&w)))
+        .map(|p| p.id.as_str())
 }
 
 #[cfg(test)]

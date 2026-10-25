@@ -39,7 +39,7 @@ pub(crate) enum Choice {
     /// make this folder (in that theme), then move it there (`m`) or
     /// not (`n`)
     Make { name: String, parent: Option<String>, then_move: bool },
-    /// show this project only (none: every project)
+    /// show this project only, by hub id (none: every project)
     Project(Option<String>),
 }
 
@@ -64,9 +64,8 @@ fn has(hay: &str, q: &str) -> bool {
 }
 
 /// The box's choices. `rows`: the library (a folder's newest work);
-/// `moved`: the folders you moved to on this visit; `here`: this
-/// project's name.
-pub(crate) fn rows(pick: &Pick, folders: &[Folder], all: &[&Artifact], moved: &[String], here: &str) -> Vec<Row> {
+/// `moved`: the folders you moved to on this visit.
+pub(crate) fn rows(pick: &Pick, folders: &[Folder], all: &[&Artifact], moved: &[String]) -> Vec<Row> {
     match pick {
         Pick::Move { from, query, .. } => {
             let q = query.trim();
@@ -83,7 +82,7 @@ pub(crate) fn rows(pick: &Pick, folders: &[Folder], all: &[&Artifact], moved: &[
         }
         Pick::Project { query, .. } => {
             let q = query.trim();
-            let projects = tree::projects(all, here);
+            let projects = tree::projects(all);
             let mut out = Vec::new();
             if q.is_empty() {
                 out.push(Row { choice: Choice::Project(None), words: words::all_projects.into(), dim: all.len().to_string() });
@@ -91,8 +90,8 @@ pub(crate) fn rows(pick: &Pick, folders: &[Folder], all: &[&Artifact], moved: &[
             out.extend(
                 projects
                     .into_iter()
-                    .filter(|(p, _)| q.is_empty() || has(p, q))
-                    .map(|(p, n)| Row { choice: Choice::Project(Some(p.clone())), words: p, dim: n.to_string() }),
+                    .filter(|p| q.is_empty() || has(&p.name, q))
+                    .map(|p| Row { choice: Choice::Project(Some(p.id)), words: p.name, dim: p.rows.to_string() }),
             );
             out.truncate(MAX);
             out

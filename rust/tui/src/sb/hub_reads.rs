@@ -386,7 +386,7 @@ pub(super) fn approvals(app: &mut App, ev: &HubEv, show: bool) {
 /// an open /artifacts marks what came new; the feed's chips are built
 /// again with the new titles.
 fn artifacts(app: &mut App, items: &[bise_proto::rows::Artifact], seen_ms: Option<u64>, folders: &[bise_proto::rows::Folder]) {
-    crate::artifacts::set_rows(items, seen_ms);
+    crate::artifacts::set_rows(items, seen_ms, &app.sb.project());
     crate::artifacts::set_folders(folders.to_vec());
     crate::artifacts_screen::on_list(app);
     app.cache.iter_mut().for_each(|c| *c = None);

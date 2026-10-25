@@ -27,7 +27,7 @@ fn mover(query: &str) -> Pick {
 fn m_filters_as_you_type_and_offers_the_typed_folder() {
     let fs = folders();
     let p = mover("pa");
-    let rows = rows(&p, &fs, &[], &[], "bise");
+    let rows = rows(&p, &fs, &[], &[]);
     let words: Vec<(&str, &str)> = rows.iter().map(|r| (r.words.as_str(), r.dim.as_str())).collect();
     assert_eq!(words, [("page heroes", "desktop app"), ("épargne", "")]);
     let out = text_of(&lines(&p, &rows, &fs, None, 80));
@@ -51,7 +51,7 @@ fn m_filters_as_you_type_and_offers_the_typed_folder() {
 #[test]
 fn m_leaves_out_its_own_folder_and_offers_unfiled() {
     let fs = folders();
-    let rows = rows(&mover(""), &fs, &[], &[], "bise");
+    let rows = rows(&mover(""), &fs, &[], &[]);
     assert!(!rows.iter().any(|r| r.choice == Choice::Folder("f-view".into())));
     assert_eq!(rows.last().map(|r| &r.choice), Some(&Choice::Unfiled));
 }
@@ -68,7 +68,7 @@ fn a_theme_slash_task_makes_the_task_folder_in_that_theme() {
 fn typing_moves_the_choice_back_to_the_first_and_arrows_stay_in_the_list() {
     let fs = folders();
     let mut p = mover("");
-    let rows = rows(&p, &fs, &[], &[], "bise");
+    let rows = rows(&p, &fs, &[], &[]);
     for _ in 0..10 {
         key(&mut p, &k(KeyCode::Down), &rows, &fs);
     }
@@ -95,16 +95,17 @@ fn n_names_the_folder_and_enter_makes_it() {
 fn p_lists_every_project_with_its_count() {
     let fs = folders();
     let rows_ = [
-        Artifact { id: "1".into(), ..Default::default() },
-        Artifact { id: "2".into(), project: "ai-docs".into(), ..Default::default() },
-        Artifact { id: "3".into(), ..Default::default() },
+        Artifact { id: "1".into(), project: "h-1".into(), project_name: "bise".into(), ..Default::default() },
+        Artifact { id: "2".into(), project: "h-2".into(), project_name: "ai-docs".into(), ..Default::default() },
+        Artifact { id: "3".into(), project: "h-1".into(), project_name: "bise".into(), ..Default::default() },
     ];
     let refs: Vec<&Artifact> = rows_.iter().collect();
     let p = Pick::Project { query: String::new(), sel: 0 };
-    let r = rows(&p, &fs, &refs, &[], "bise");
+    let r = rows(&p, &fs, &refs, &[]);
     let words: Vec<(&str, &str)> = r.iter().map(|r| (r.words.as_str(), r.dim.as_str())).collect();
     assert_eq!(words, [("all projects", "3"), ("bise", "2"), ("ai-docs", "1")]);
     let out = text_of(&lines(&p, &r, &fs, None, 80));
     assert!(out.contains("│ 3 ai-docs  1"), "{out}");
     assert_eq!(r[0].choice, Choice::Project(None));
+    assert_eq!(r[2].choice, Choice::Project(Some("h-2".into())), "a pick keeps the hub id, not the name");
 }

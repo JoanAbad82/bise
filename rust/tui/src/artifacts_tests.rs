@@ -28,7 +28,7 @@ fn the_hub_list_is_read_newest_first_with_its_versions() {
         {"id": "", "kind": "doc", "title": "no id", "agent": "", "version": 1, "at_ms": 0, "url": "", "new": true},
         {"id": "mine", "kind": "doc", "title": "", "agent": "", "by": "you", "version": 1, "at_ms": T - 200 * MIN, "url": "", "new": false},
     ]));
-    set_rows(&items, Some(T - 30 * MIN));
+    set_rows(&items, Some(T - 30 * MIN), "h-1");
     let rows = all();
     assert_eq!(rows.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(), ["pricing-page", "deck", "mine"], "an item without an id is left out");
     assert_eq!(new_count(), 2, "the items the hub marks new");
@@ -203,7 +203,7 @@ fn his_about_lead_is_the_artifacts_chip() {
         {"id": "mock", "title": "the mock", "kind": "site", "agent": "web", "at_ms": T, "version": 2, "new": false,
          "url": format!("{hub}/mock/v2/index.html"), "target": "/w/mock/index.html"},
     ]));
-    set_rows(&items, None);
+    set_rows(&items, None, "h-1");
     let st = ratatui::style::Style::default();
     let draw = |text: &str| crate::links::collect(|| crate::attach::chip_spans(text, st));
     let words = |spans: &[ratatui::text::Span<'static>]| spans.iter().map(|s| s.content.as_ref()).collect::<String>().replace('\u{a0}', " ");

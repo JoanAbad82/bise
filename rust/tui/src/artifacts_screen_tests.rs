@@ -22,7 +22,7 @@ fn f(id: &str, name: &str, parent: Option<&str>) -> Folder {
 }
 
 fn art(id: &str, title: &str, kind: &str, agent: &str, ago: u64, folder: Option<&str>) -> Artifact {
-    Artifact { id: id.into(), title: title.into(), kind: kind.into(), agent: agent.into(), ts_ms: T - ago, v: 1, target: format!("/w/{id}"), folder: folder.map(str::to_string), ..Default::default() }
+    Artifact { id: id.into(), title: title.into(), kind: kind.into(), agent: agent.into(), ts_ms: T - ago, v: 1, target: format!("/w/{id}"), folder: folder.map(str::to_string), project: "h-bise".into(), project_name: "bise".into(), ..Default::default() }
 }
 
 /// The mock's folders: desktop app (agent view, inbox, page heroes,
@@ -60,7 +60,7 @@ fn library() -> Vec<Artifact> {
         art("hero", "hero still, dark", "image", "bims-plugins", 90 * MIN, Some("f-hero")),
         art("head", "agent view head sheet", "image", "amb-home", 156 * MIN, Some("f-view")),
         art("target", "agent-target shots", "page", "agent-target", 209 * MIN, Some("f-view")),
-        Artifact { project: "bims".into(), ..art("town", "town signs", "image", "town-signs", 5 * 60 * MIN, Some("f-bims")) },
+        Artifact { project: "h-bims".into(), project_name: "bims".into(), ..art("town", "town signs", "image", "town-signs", 5 * 60 * MIN, Some("f-bims")) },
         art("mine", "q3 plan", "doc", "", 6 * 60 * MIN, None),
         art("folds", "open folds, dark", "image", "amb-win", 17 * DAY, Some("f-view")),
         art("delta", "ambient-app delta review", "doc", "architect", 17 * DAY + 10 * MIN, Some("f-view")),
@@ -79,7 +79,7 @@ fn screen() -> Screen {
     let mut fresh = Fresh::default();
     fresh.take(&library()[..1], Some(T - 50 * MIN));
     fresh.take(&library()[2..3], None);
-    Screen { here: "bise".into(), place: Place::Folder("f-view".into()), open_themes: vec!["f-desk".into()], sel: Some("fixes".into()), fresh, ..Default::default() }
+    Screen { place: Place::Folder("f-view".into()), open_themes: vec!["f-desk".into()], sel: Some("h-bise/fixes".into()), fresh, ..Default::default() }
 }
 
 fn assert_fits(out: &str, w: usize) {
@@ -187,7 +187,7 @@ fn in_all_artifacts_a_row_says_its_folder() {
 #[test]
 fn p_shows_one_project_and_the_counts_say_of() {
     let all = library();
-    let mut sc = Screen { project: Some("bise".into()), ..screen() };
+    let mut sc = Screen { project: Some("h-bise".into()), ..screen() };
     let out = render(&mut sc, &all, 144, 24);
     assert!(out.starts_with("artifacts  bise · 9 of 10 · 10 folders · 2 new · 2 unfiled"), "{out}");
     assert!(out.contains("│ desktop app / agent view  6 of 6"), "{out}");
@@ -217,7 +217,7 @@ fn the_search_looks_in_every_folder() {
 fn m_opens_the_picker_in_the_lists_place() {
     let all = library();
     let mut sc = screen();
-    sc.pick = Some(Pick::Move { key: "fixes".into(), title: "agent view fixes".into(), from: Some("f-view".into()), query: "pa".into(), sel: 0 });
+    sc.pick = Some(Pick::Move { key: "h-bise/fixes".into(), title: "agent view fixes".into(), from: Some("f-view".into()), query: "pa".into(), sel: 0 });
     let out = render(&mut sc, &all, 144, 24);
     assert!(out.contains("  all artifacts             10  │ ╭─ move \"agent view fixes\" to… ─"), "{out}");
     assert!(out.contains("│ │ 1 page heroes  desktop app"), "{out}");
@@ -231,7 +231,7 @@ fn m_opens_the_picker_in_the_lists_place() {
 #[test]
 fn v_opens_the_versions_under_the_row() {
     let all = library();
-    let mut sc = Screen { sel: Some("step2".into()), versions: Some(0), ..screen() };
+    let mut sc = Screen { sel: Some("h-bise/step2".into()), versions: Some(0), ..screen() };
     let out = render(&mut sc, &all, 144, 26);
     assert!(out.contains("│   ╭─ agent view step 2 · 2 versions"), "{out}");
     assert!(out.contains("│   │ › v2  new   39 min ago   2 notes open   the current one"), "{out}");
@@ -266,7 +266,7 @@ fn a_long_list_keeps_the_selection_in_view_and_says_how_many_more() {
     let mut sc = screen();
     let out = render(&mut sc, &all, 144, 20);
     assert!(out.contains("│ ↓ ") && out.contains(" more"), "{out}");
-    sc.sel = Some("old29".into());
+    sc.sel = Some("h-bise/old29".into());
     let out = render(&mut sc, &all, 144, 20);
     assert!(out.contains("old thing 29"), "{out}");
     let out = render(&mut sc, &all, 74, 20);
@@ -313,7 +313,35 @@ fn the_library_answer_reads_rows_and_folders() {
     let projects = vec![bise_proto::rows::LibraryProject { project: "h-1".into(), name: "bims".into(), items: vec![row] }];
     let rows = crate::artifacts::of_library(&projects);
     assert_eq!(rows.len(), 1);
-    assert_eq!((rows[0].project.as_str(), rows[0].folder.as_deref(), rows[0].key().as_str()), ("bims", Some("f-bims"), "bims/a1"));
+    assert_eq!((rows[0].project.as_str(), rows[0].project_name.as_str(), rows[0].folder.as_deref(), rows[0].key().as_str()), ("h-1", "bims", Some("f-bims"), "h-1/a1"));
+}
+
+/// A project he renames keeps its rows, its kept place, its pick and
+/// where a move goes: all of them go by hub id, the name only shows
+/// (architect m_40803).
+#[test]
+fn a_renamed_project_keeps_its_rows_its_place_and_its_moves() {
+    let mut all = library();
+    let mut sc = Screen { project: Some("h-bims".into()), place: Place::Folder("f-bims".into()), sel: Some("h-bims/town".into()), ..screen() };
+    let out = render(&mut sc, &all, 144, 24);
+    assert!(out.starts_with("artifacts  bims · 1 of 10"), "{out}");
+    assert!(out.contains("town signs"), "{out}");
+    for a in all.iter_mut().filter(|a| a.project == "h-bims") {
+        a.project_name = "bims and towns".into();
+    }
+    let out = render(&mut sc, &all, 144, 24);
+    assert!(out.starts_with("artifacts  bims and towns · 1 of 10"), "{out}");
+    assert!(out.contains("town signs"), "{out}");
+    assert_eq!(sc.sel.as_deref(), Some("h-bims/town"), "the selection stays on it");
+    // the kept screen (sb/keep.rs) says the place and the project by id
+    assert_eq!(crate::artifacts_tree::place_of(&crate::artifacts_tree::place_word(&sc.place)), sc.place);
+    assert_eq!(sc.project.as_deref(), Some("h-bims"));
+    // in:<name> finds it by its new name
+    let mut s2 = Screen { query: "in:towns".into(), ..screen() };
+    assert!(render(&mut s2, &all, 144, 24).starts_with("artifacts  bims and towns · 1 of 10"));
+    // a move goes to its hub id
+    let town = all.iter().find(|a| a.id == "town").unwrap();
+    assert_eq!(move_params(&town.project, &town.id, Some("f-view")), serde_json::json!({"project": "h-bims", "ids": ["town"], "folder": "f-view"}));
 }
 
 /// The designer's shots (m_40704): every state at 150 and 80 columns,
@@ -332,20 +360,20 @@ fn shots_for_the_designer() {
     };
     let esc = |s: &str| s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
     let all = library();
-    let pick_move = Some(Pick::Move { key: "fixes".into(), title: "agent view fixes".into(), from: Some("f-view".into()), query: "pa".into(), sel: 0 });
+    let pick_move = Some(Pick::Move { key: "h-bise/fixes".into(), title: "agent view fixes".into(), from: Some("f-view".into()), query: "pa".into(), sel: 0 });
     let pick_proj = Some(Pick::Project { query: String::new(), sel: 1 });
     let pick_new = Some(Pick::NewFolder { parent: Some("f-desk".into()), name: "plugins v2".into() });
     let filed: Vec<Artifact> = library().into_iter().filter(|a| a.folder.is_some()).collect();
     let states: Vec<(&str, Screen, &[Artifact])> = vec![
         ("a task folder, the list has the keys", screen(), &all),
         ("tab: the tree has the keys", Screen { in_tree: true, ..screen() }, &all),
-        ("all artifacts", Screen { place: Place::All, sel: Some("hero".into()), ..screen() }, &all),
+        ("all artifacts", Screen { place: Place::All, sel: Some("h-bise/hero".into()), ..screen() }, &all),
         ("m: move to…, typing \"pa\"", Screen { pick: pick_move, ..screen() }, &all),
         ("p: a project", Screen { pick: pick_proj, ..screen() }, &all),
-        ("p picked bise: counts say of", Screen { project: Some("bise".into()), ..screen() }, &all),
+        ("p picked bise: counts say of", Screen { project: Some("h-bise".into()), ..screen() }, &all),
         ("n: new folder in desktop app", Screen { pick: pick_new, ..screen() }, &all),
         ("/ search across folders", Screen { typing: true, query: "dark".into(), ..screen() }, &all),
-        ("v: versions", Screen { sel: Some("step2".into()), versions: Some(0), ..screen() }, &all),
+        ("v: versions", Screen { sel: Some("h-bise/step2".into()), versions: Some(0), ..screen() }, &all),
         ("unfiled, empty", Screen { place: Place::Unfiled, ..screen() }, &filed),
         ("first run", Screen { place: Place::All, ..screen() }, &[]),
     ];
@@ -357,7 +385,7 @@ fn shots_for_the_designer() {
         body.push_str(&format!("<h2>{}</h2>", if mode == Mode::Dark { "dark" } else { "light" }));
         for (name, sc, rows) in &states {
             for (cols, w) in [(150usize, 144usize), (80, 74)] {
-                let mut sc = Screen { pick: sc.pick.clone(), fresh: sc.fresh.clone(), open_themes: sc.open_themes.clone(), sel: sc.sel.clone(), place: sc.place.clone(), project: sc.project.clone(), query: sc.query.clone(), here: sc.here.clone(), ..Default::default() };
+                let mut sc = Screen { pick: sc.pick.clone(), fresh: sc.fresh.clone(), open_themes: sc.open_themes.clone(), sel: sc.sel.clone(), place: sc.place.clone(), project: sc.project.clone(), query: sc.query.clone(), ..Default::default() };
                 let st = states.iter().find(|s| s.0 == *name).unwrap();
                 sc.in_tree = st.1.in_tree;
                 sc.typing = st.1.typing;

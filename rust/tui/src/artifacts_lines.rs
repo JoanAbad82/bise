@@ -85,7 +85,7 @@ pub(crate) struct View {
     pub(crate) list: Vec<(Artifact, Vec<usize>)>,
     /// every row of the library (archived or not, as the screen shows)
     pub(crate) every: Vec<Artifact>,
-    /// the project shown (`p` or the search's `in:`)
+    /// the project shown, by hub id (`p` or the search's `in:`)
     pub(crate) project: Option<String>,
     /// the search's words, `in:` out
     pub(crate) words: String,
@@ -96,8 +96,8 @@ impl View {
         !self.words.trim().is_empty()
     }
     /// The rows in the project filter (every folder).
-    pub(crate) fn scoped<'a>(&'a self, here: &str) -> Vec<&'a Artifact> {
-        self.every.iter().filter(|a| self.project.as_deref().is_none_or(|p| tree::project_name(a, here) == p)).collect()
+    pub(crate) fn scoped(&self) -> Vec<&Artifact> {
+        self.every.iter().filter(|a| self.project.as_deref().is_none_or(|p| a.project == p)).collect()
     }
 }
 
@@ -108,15 +108,16 @@ pub(crate) fn view(sc: &Screen, all: &[Artifact], folders: &[Folder]) -> View {
     let every: Vec<Artifact> = all.iter().filter(|a| a.archived_at.is_some() == sc.archived).cloned().collect();
     let (inp, words) = tree::split_in(&sc.query);
     let refs: Vec<&Artifact> = every.iter().collect();
-    let projects = tree::projects(&refs, &sc.here);
+    let projects = tree::projects(&refs);
     let project = match inp {
-        Some(w) => tree::match_project(&w, &projects).map(str::to_string).or(Some(w)),
+        // a name no project has: nothing shows
+        Some(w) => Some(tree::match_project(&w, &projects).map_or(format!("in:{w}"), str::to_string)),
         None => sc.project.clone(),
     };
     let searching = !words.trim().is_empty();
     let list = every
         .iter()
-        .filter(|a| project.as_deref().is_none_or(|p| tree::project_name(a, &sc.here) == p))
+        .filter(|a| project.as_deref().is_none_or(|p| a.project == p))
         .filter(|a| searching || tree::holds(&sc.place, a, folders))
         .filter_map(|a| artifacts::find(a, &words).map(|h| (a.clone(), h)))
         .collect();
@@ -339,10 +340,10 @@ fn head(sc: &Screen, v: &View, folders: &[Folder], wide: bool) -> Line<'static> 
     let b = Style::default().fg(text()).add_modifier(Modifier::BOLD);
     let d = Style::default().fg(dim());
     let every: Vec<&Artifact> = v.every.iter().collect();
-    let scoped = v.scoped(&sc.here);
-    let n_projects = tree::projects(&every, &sc.here).len();
+    let scoped = v.scoped();
+    let n_projects = tree::projects(&every).len();
     let count = match &v.project {
-        Some(p) => format!("{} · {}", p, words::of_total(scoped.len(), every.len())),
+        Some(p) => format!("{} · {}", tree::name_of(p, &v.every), words::of_total(scoped.len(), every.len())),
         None if wide && n_projects > 1 => format!("{} from {}", every.len(), words::projects_n(n_projects)),
         None => every.len().to_string(),
     };
@@ -474,7 +475,7 @@ fn list_lines(sc: &mut Screen, v: &View, folders: &[Folder], put_away: usize, wi
         } else if v.searching() {
             "nothing matches. esc clears the search.".to_string()
         } else if let (Some(p), true) = (&v.project, v.every.iter().any(|a| tree::holds(&sc.place, a, folders))) {
-            format!("nothing from {} here. p shows every project.", p)
+            format!("nothing from {} here. p shows every project.", tree::name_of(p, &v.every))
         } else if sc.place == Place::Unfiled {
             "nothing unfiled: every artifact has its folder.".to_string()
         } else {
@@ -600,7 +601,7 @@ pub(crate) fn lines(sc: &mut Screen, all: &[Artifact], folders: &[Folder], width
     // the body, then a blank and the key bar
     let foot = 2;
     let body_h = height.saturating_sub(out.len() + foot).max(1);
-    let scoped = v.scoped(&sc.here);
+    let scoped = v.scoped();
     let every: Vec<&Artifact> = v.every.iter().collect();
     let fresh = |a: &Artifact| sc.fresh.row(a);
     let trows = tree::tree(folders, &scoped, &every, &sc.open_themes, &fresh);
@@ -614,7 +615,7 @@ pub(crate) fn lines(sc: &mut Screen, all: &[Artifact], folders: &[Folder], width
     let mut box_keys = None;
     if let Some(p) = sc.pick.clone() {
         let lib: Vec<&Artifact> = all.iter().collect();
-        let choices = pick::rows(&p, folders, &lib, &sc.moved, &sc.here);
+        let choices = pick::rows(&p, folders, &lib, &sc.moved);
         let theme_name = match &p {
             pick::Pick::NewFolder { parent: Some(id), .. } => folders.iter().find(|f| &f.id == id).map(|f| f.name.clone()),
             _ => None,

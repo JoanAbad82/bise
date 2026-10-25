@@ -51,10 +51,8 @@ pub(crate) struct Screen {
     /// the tree has the keys (tab); under 120 columns it shows in the
     /// list's place
     pub(crate) in_tree: bool,
-    /// one project only (`p`); none: every project
+    /// one project only (`p`), by hub id; none: every project
     pub(crate) project: Option<String>,
-    /// this hub's project, by name (its own rows carry none)
-    pub(crate) here: String,
     /// the box that is up (`m`, `p`, `n`)
     pub(crate) pick: Option<Pick>,
     /// the folders you moved to on this visit (`m` offers them first)
@@ -147,12 +145,10 @@ pub(crate) fn open(app: &mut App) {
     // the new ones stay marked while it is open
     let mut fresh = Fresh::default();
     fresh.take(&new, artifacts::seen_ms());
-    // this project's name until the library says it (`here`)
-    let here = crate::sb::workspace(app).and_then(|w| std::path::Path::new(&w).file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
     // the theme of the new one is open in the tree
     let folders = artifacts::folders();
     let open_themes = new.first().and_then(|a| tree::theme_of(&Place::Folder(a.folder.clone().unwrap_or_default()), &folders)).into_iter().collect();
-    app.artifacts = Some(Screen { sel, fresh, here, open_themes, ..Default::default() });
+    app.artifacts = Some(Screen { sel, fresh, open_themes, ..Default::default() });
     ask_library(app);
     // you looked: the header's `↗ N new` goes
     artifacts::mark_seen();
@@ -251,11 +247,10 @@ fn ask_library(app: &mut App) {
 
 /// The library came: the other projects' rows and the folders.
 pub(crate) fn on_library(app: &mut App, here: String, others: Vec<Artifact>, folders: Vec<Folder>) {
+    let _ = app;
+    artifacts::set_here_name(&here);
     artifacts::set_others(others);
     artifacts::set_folders(folders);
-    if let Some(sc) = app.artifacts.as_mut() {
-        sc.here = here;
-    }
 }
 
 // ---- keys and the mouse ----
@@ -409,8 +404,13 @@ fn run_choice(app: &mut App, c: Choice) {
 /// it to that project's hub (projects::target), the only writer of its
 /// meta.json. The new list comes in the `artifacts` event.
 fn move_to(app: &mut App, a: &Artifact, folder: Option<String>) {
-    let params = serde_json::json!({"project": a.project, "ids": [a.id], "folder": folder});
-    app.sb.call("artifacts/move", params, crate::sb::rpc::Then::Shown);
+    app.sb.call("artifacts/move", move_params(&a.project, &a.id, folder.as_deref()), crate::sb::rpc::Then::Shown);
+}
+
+/// `artifacts/move`'s params: always the row's hub id, never a name
+/// (architect m_40803).
+pub(crate) fn move_params(project: &str, id: &str, folder: Option<&str>) -> serde_json::Value {
+    serde_json::json!({"project": project, "ids": [id], "folder": folder})
 }
 
 /// `artifacts/folders` make (his edit: the hub writes folders.json);
@@ -440,8 +440,7 @@ pub(crate) fn on_folder_made(app: &mut App, id: String, folders: Vec<Folder>, th
         }
     }
     if let Some((project, aid)) = then {
-        let params = serde_json::json!({"project": project, "ids": [aid], "folder": id});
-        app.sb.call("artifacts/move", params, crate::sb::rpc::Then::Shown);
+        app.sb.call("artifacts/move", move_params(&project, &aid, Some(&id)), crate::sb::rpc::Then::Shown);
     }
 }
 
@@ -450,7 +449,7 @@ fn tree_rows(sc: &Screen) -> Vec<tree::TreeRow> {
     let all = artifacts::library();
     let folders = artifacts::folders();
     let v = crate::artifacts_lines::view(sc, &all, &folders);
-    let scoped = v.scoped(&sc.here);
+    let scoped = v.scoped();
     let every: Vec<&Artifact> = v.every.iter().collect();
     tree::tree(&folders, &scoped, &every, &sc.open_themes, &|a| sc.fresh.row(a))
 }
@@ -516,7 +515,7 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
         let folders = artifacts::folders();
         let lib = artifacts::library();
         let refs: Vec<&Artifact> = lib.iter().collect();
-        let choices = pick::rows(&p, &folders, &refs, &sc.moved, &sc.here);
+        let choices = pick::rows(&p, &folders, &refs, &sc.moved);
         match pick::key(&mut p, k, &choices, &folders) {
             Outcome::Stay => sc.pick = Some(p),
             Outcome::Close => sc.pick = None,

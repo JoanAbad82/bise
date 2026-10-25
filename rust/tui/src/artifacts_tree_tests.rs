@@ -4,8 +4,10 @@ fn f(id: &str, name: &str, parent: Option<&str>) -> Folder {
     Folder { id: id.into(), name: name.into(), parent: parent.map(str::to_string), by: "main".into(), named_by_you: false }
 }
 
-fn a(id: &str, folder: Option<&str>, agent: &str, project: &str, ts: u64) -> Artifact {
-    Artifact { id: id.into(), title: id.into(), folder: folder.map(str::to_string), agent: agent.into(), project: project.into(), ts_ms: ts, v: 1, ..Default::default() }
+/// a row of project `name` (its hub id `h-<name>`)
+fn a(id: &str, folder: Option<&str>, agent: &str, name: &str, ts: u64) -> Artifact {
+    let name = if name.is_empty() { "bise" } else { name };
+    Artifact { id: id.into(), title: id.into(), folder: folder.map(str::to_string), agent: agent.into(), project: format!("h-{name}"), project_name: name.into(), ts_ms: ts, v: 1, ..Default::default() }
 }
 
 /// desktop app (agent view, inbox), bims (no task folders), an empty
@@ -66,22 +68,24 @@ fn the_tree_puts_the_newest_theme_first_and_opens_only_open_themes() {
 fn the_project_filter_counts_of_every_project() {
     let (folders, rows) = library();
     let every: Vec<&Artifact> = rows.iter().collect();
-    let here: Vec<&Artifact> = rows.iter().filter(|r| project_name(r, "bise") == "bise").collect();
+    let here: Vec<&Artifact> = rows.iter().filter(|r| r.project == "h-bise").collect();
     let t = tree(&folders, &here, &every, &["f-desk".into()], &|_| false);
     let view = t.iter().find(|r| r.name == "agent view").unwrap();
     assert_eq!((view.count, view.total), (2, 3));
-    let p = projects(&every, "bise");
-    assert_eq!(p, [("bise".to_string(), 5), ("ai-docs".to_string(), 1), ("bims".to_string(), 1)]);
+    let p: Vec<(String, String, usize)> = projects(&every).into_iter().map(|p| (p.id, p.name, p.rows)).collect();
+    let want = [("h-bise", "bise", 5), ("h-ai-docs", "ai-docs", 1), ("h-bims", "bims", 1)];
+    assert_eq!(p, want.map(|(i, n, r)| (i.to_string(), n.to_string(), r)));
 }
 
 #[test]
 fn the_search_says_in_project() {
     assert_eq!(split_in("deck in:ai"), (Some("ai".into()), "deck".into()));
     assert_eq!(split_in("deck"), (None, "deck".into()));
-    let p = vec![("bise".to_string(), 5), ("ai-docs".to_string(), 2), ("bims".to_string(), 1)];
-    assert_eq!(match_project("ai", &p), Some("ai-docs"));
-    assert_eq!(match_project("BIMS", &p), Some("bims"));
-    assert_eq!(match_project("docs", &p), Some("ai-docs"));
+    let pr = |id: &str, name: &str, rows: usize| Project { id: id.into(), name: name.into(), rows };
+    let p = vec![pr("h-1", "bise", 5), pr("h-2", "ai-docs", 2), pr("h-3", "bims", 1)];
+    assert_eq!(match_project("ai", &p), Some("h-2"), "by name, to its hub id");
+    assert_eq!(match_project("BIMS", &p), Some("h-3"));
+    assert_eq!(match_project("docs", &p), Some("h-2"));
     assert_eq!(match_project("zzz", &p), None);
 }
 
