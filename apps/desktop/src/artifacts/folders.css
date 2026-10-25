@@ -61,9 +61,11 @@
 .art-link{color:var(--c-text);text-decoration:underline;text-underline-offset:2px}
 
 /* the lead and the bims still beside it (designer's lead rule: the vignette stays, no card) */
-.art-lead{display:flex;align-items:center;justify-content:space-between;gap:var(--s-4)}
-.art-lead > .b-lead{flex:1;min-width:0}
-.art-vignette{flex:none;width:calc(var(--s-6) * 5);aspect-ratio:440 / 264}
+/* out of the flow (ui-review qa g1 g2): the lead 24 under the bar and the filters 24 under the lead,
+   as on every page; the still sits at the top right and may bleed past the lead's height */
+.art-lead{position:relative}
+.art-lead > .b-lead{padding-right:calc(var(--s-6) * 5 + var(--s-4))}
+.art-vignette{position:absolute;top:calc(-1 * var(--s-4));right:0;width:calc(var(--s-6) * 5);aspect-ratio:440 / 264;pointer-events:none}
 .art-vignette > img{display:block;width:100%;height:100%;object-fit:contain}
 /* the kinds' counts in the bar's filter, text-3 */
 .art-n{margin-left:var(--s-1);color:var(--c-text-3)}

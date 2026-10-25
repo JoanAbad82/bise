@@ -111,6 +111,8 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const pendingMove = useRef<{ name: string; parent: string | null; keys: readonly string[] } | null>(null);
   const narrow = useNarrow();
   const searchRef = useRef<HTMLInputElement>(null);
+  // he moved the cursor (a key) or picked a card: its ring shows from then on (cards.css)
+  const [keyed, setKeyed] = useState(false);
   // the window's sidebar draws the library (ArtLibrary): the page draws no column of its own
   const sideLib = useLibraryShown();
 
@@ -256,7 +258,9 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const boxOf = (key: string): MenuAt => {
     const el = document.querySelector(`[data-row="${CSS.escape(key)}"]`) ?? ref.current;
     return el === null ? { x: 0, y: 0 } : atOf(el);
-  };  const onPick = (key: string, how: { meta: boolean; shift: boolean }) => {
+  };
+  const onPick = (key: string, how: { meta: boolean; shift: boolean }) => {
+    setKeyed(true);
     if (how.shift && anchorKey !== null) {
       const order = cards.map((c) => c.key);
       const [a, b] = [order.indexOf(anchorKey), order.indexOf(key)].sort((x, y) => x - y);
@@ -435,14 +439,24 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
                   ))}
                 </div>
               ) : (
-                <div className="art-tiles big" data-testid="artifacts.tiles">
-                  {themes.map((t) => (
-                    <BigTile key={t.id} folder={t} count={counts.get(t.id)} when={whenOf(lib.latest.get(t.id) ?? now, now)}
-                      cover={coverOf(lib, scoped, t.id)} thumb={(it) => <Thumb item={it} visible />} drop={drop} flash={flash === t.id}
-                      onOpen={() => { setAt({ at: 'folder', id: t.id }); }} onMenu={(e) => { setOver({ k: 'folder', id: t.id, at: { x: e.clientX, y: e.clientY } }); }}
-                      testId={`artifacts.tile.${t.id}`} />
-                  ))}
-                </div>
+                <>
+                  <div className="art-tiles big" data-testid="artifacts.tiles">
+                    {themes.filter((t) => (counts.get(t.id)?.total ?? 0) > 0).map((t) => (
+                      <BigTile key={t.id} folder={t} count={counts.get(t.id)} when={whenOf(lib.latest.get(t.id) ?? now, now)}
+                        cover={coverOf(lib, scoped, t.id)} thumb={(it) => <Thumb item={it} visible />} drop={drop} flash={flash === t.id}
+                        onOpen={() => { setAt({ at: 'folder', id: t.id }); }} onMenu={(e) => { setOver({ k: 'folder', id: t.id, at: { x: e.clientX, y: e.clientY } }); }}
+                        testId={`artifacts.tile.${t.id}`} />
+                    ))}
+                  </div>
+                  {/* an empty folder is a row, never a tile with nothing in it (app-polish #14) */}
+                  <div className="art-frows" data-testid="artifacts.tiles.empty">
+                    {themes.filter((t) => (counts.get(t.id)?.total ?? 0) === 0).map((t) => (
+                      <FolderListRow key={t.id} folder={t} count={counts.get(t.id)} when={whenOf(lib.latest.get(t.id) ?? now, now)} drop={drop} flash={flash === t.id}
+                        onOpen={() => { setAt({ at: 'folder', id: t.id }); }} onMenu={(e) => { setOver({ k: 'folder', id: t.id, at: { x: e.clientX, y: e.clientY } }); }}
+                        testId={`artifacts.tile.${t.id}`} />
+                    ))}
+                  </div>
+                </>
               )}
             </>
           )}
@@ -513,7 +527,12 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
 
   return (
     <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} data-narrow={narrow || undefined}
-      data-title-path={titlePath(lib, atNow, searchWords)} onKeyDown={onKeyDown}>
+      data-title-path={titlePath(lib, atNow, searchWords)} data-keyed={keyed || undefined}
+      onKeyDown={(e) => {
+        // the cursor's ring shows once he moves it (a key) or picks a card, never at load (ui-review)
+        if (!keyed && (e.key.startsWith('Arrow') || e.key === 'j' || e.key === 'k' || e.key === 'Home' || e.key === 'End')) setKeyed(true);
+        onKeyDown(e);
+      }}>
       {inBar}
       <div className="art-scroll" data-testid="artifacts.scroll">
         {/* the lead (designer's rule on #5): no card; the bims still stays beside it as a vignette */}

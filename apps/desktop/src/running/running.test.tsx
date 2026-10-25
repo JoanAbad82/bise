@@ -1,8 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import type { ReactElement, ReactNode } from 'react';
 import { BarSlot } from '@/app/barslot';
 import { formatRoute, parseRoute } from '@/app/route';
+import { createRouter, RouterContext } from '@/app/router';
+
+// the rows' menus (useEntityMenu, nm-menus) read the router: every render is inside one
+const Routed = ({ children }: { children: ReactNode }) => <RouterContext.Provider value={createRouter({ screen: 'running' })}>{children}</RouterContext.Provider>;
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: Routed });
 import type { Proc } from '@/proto';
 import type { ProcItem, RunningPorts } from './index';
 
