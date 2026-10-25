@@ -3,7 +3,7 @@
 // moving (rule 2): ··· (its menu), the pick circle, the extension at the picture's corner, a link's
 // '↗ domain'. One hue, for what is new: the pink 'new' chip (rule 3); the cursor and a pick are a
 // 2 px ink ring, several picked fill their circles. A stack: two sheets behind its cover and its
-// count at the top right ('16 shots saved in one turn: opens as a sheet'). Every mark has its tip
+// count at the top right ('16 shots saved in one turn'). Every mark has its tip
 // (page block tips). The picture inside the 16:10 box is art-thumbs' <Thumb>. Owner: art-grid.
 import { memo, type HTMLAttributes, type MouseEvent } from 'react';
 import { Press, tipAttrs } from '@/ds';

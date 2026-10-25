@@ -186,9 +186,12 @@ export function galleryView(items: readonly Item[], place: Place, now: number): 
 // ---- the marks' tips (page block 'tips'), one string per mark
 
 /** A stack's word: shots when they all are, else files. Pure. */
-const stackWhat = (s: Stack): string => (s.items.every((it) => kindOf(it.a.kind) === 'shots') ? library.kind_shots : library.kind_files);
+const stackWhat = (s: Stack): string => (s.items.every(isPicture) ? library.kind_shots : library.kind_files);
 
-/** A stack's count: '16 shots saved in one turn: opens as a sheet'. Pure. */
+/** A shot: its kind says so, or its file is an image (an agent's 'file' that is a png). Pure. */
+const isPicture = (it: Item): boolean => kindOf(it.a.kind) === 'shots' || IMAGES.has(extOf(it.a));
+
+/** A stack's count: '16 shots saved in one turn'. Pure. */
 export function countTip(s: Stack): string {
   return library.tip_stack({ n: s.items.length, what: stackWhat(s) });
 }
@@ -357,6 +360,7 @@ export function sheetLine(s: Stack, now: number): string {
 const IMAGES = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'svg']);
 const VIDEOS = new Set(['mp4', 'mov', 'webm', 'm4v']);
 const DOCS = new Set(['md', 'txt', 'docx', 'doc', 'rtf']);
+const MODELS = new Set(['glb', 'gltf', 'usdz', 'obj', 'fbx', 'stl', 'blend']);
 
 /** The list view's kind column (b-pages 'list view'): 'shots', 'image', 'page', 'doc · md', 'PR'. Pure. */
 export function listKind(c: Card): string {
@@ -372,7 +376,9 @@ export function listKind(c: Card): string {
   if (ext === 'pptx' || ext === 'key') return `${library.one_deck} · ${ext}`;
   if (k === 'page') return a.kind.toLowerCase() === 'link' ? library.one_link : library.one_page;
   if (k === 'shots') return library.one_image;
-  return ext !== '' ? ext : library.one_file;
+  if (MODELS.has(ext)) return `${library.kind_3d} · ${ext}`;
+  // any other file says its extension after the word (designer m_40850: no bare 'glb')
+  return ext !== '' ? `${library.one_file} · ${ext}` : library.one_file;
 }
 
 /** The list view's name: a stack says its count, 'agent view step 2 · 16 shots'. Pure. */

@@ -622,7 +622,7 @@
       "what"
     ],
     "one": null,
-    "text": "{n} {what} saved in one turn: opens as a sheet"
+    "text": "{n} {what} saved in one turn"
   },
   "library.type_folder": {
     "args": [],

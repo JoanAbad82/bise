@@ -19,8 +19,10 @@
 .art-vrow { box-sizing: border-box; }
 /* 16 between cards, 24 between rows (brief part 3) */
 .art-grow { display: grid; column-gap: var(--s-4); padding-bottom: var(--s-6); }
-.art-dh { padding: var(--s-4) 0 var(--s-2); font: 600 11.5px/16px var(--font-ui); color: var(--c-text-3); }
-.art-dh.first { padding-top: 0; }
+/* one rule (designer m_40850): 24 above every day head, the first included; after cards their row's
+   own 24 below is that room */
+.art-dh { padding: 0 0 var(--s-2); font: 600 11.5px/16px var(--font-ui); color: var(--c-text-3); }
+.art-dh.first { padding-top: var(--s-6); }
 
 .art-card { position: relative; min-width: 0; padding-top: var(--card-room); color: var(--c-text); font: var(--t-13) var(--font-ui); }
 .art-card-pic { position: relative; display: block; margin-right: var(--card-room); }
@@ -67,7 +69,8 @@
 .art-lr-th > :first-child { position: absolute; inset: 0; width: 100%; height: 100%; }
 .art-lr-a { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--c-text-2); }
 .art-lw { text-align: right; white-space: nowrap; color: var(--c-text-3); }
-.art-grid.list .art-dh { padding: var(--s-4) var(--pad-row-x) var(--s-1); }
+/* the list's rows touch: every head has its own 24 above */
+.art-grid.list .art-dh { padding: var(--s-6) var(--pad-row-x) var(--s-1); }
 @media (max-width: 900px) {
   .art-lh, .art-lr { grid-template-columns: 48px minmax(0, 1fr) 96px 64px; }
   .art-lh > :nth-child(3), .art-lr > :nth-child(3) { display: none; }

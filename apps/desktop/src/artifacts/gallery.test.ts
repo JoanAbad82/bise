@@ -47,6 +47,9 @@ describe('the cards: one agent, one turn, one title prefix make one stack', () =
     expect(sheetItems(s, 'dark').map((it) => it.a.id)).toEqual(['s1', 's2']);
     expect(sheetItems(s, null)).toHaveLength(4);
     expect(listName(s)).toBe('agent view step 2 · 4 shots');
+    // an agent's 'file' that is a png is a shot too (the shots' fixture saves pngs as files)
+    const files = cardsOf(shots.map((it) => ({ ...it, a: { ...it.a, kind: 'file' } })))[0] as Stack;
+    expect(sheetLine(files, NOW)).toBe('amb-home saved 4 shots in one turn · today 14:02');
   });
 });
 
@@ -83,6 +86,9 @@ describe('the line under a card says only what the place does not (density rule 
     expect(listKind(one(item(art('r', { path: '/x/review.md' }))))).toBe('doc · md');
     expect(listKind(one(item(art('p', { kind: 'page' }))))).toBe('page');
     expect(listKind(one(item(art('pr', { kind: 'pr', url: 'https://github.com/x/y/pull/3' }))))).toBe('PR');
+    // designer m_40850: a 3D model says so, any other file its word and extension, never a bare one
+    expect(listKind(one(item(art('m', { path: '/x/office.glb' }))))).toBe('3D · glb');
+    expect(listKind(one(item(art('d', { path: '/x/bise.dmg' }))))).toBe('file · dmg');
   });
 });
 

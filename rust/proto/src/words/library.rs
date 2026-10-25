@@ -215,8 +215,8 @@ crate::words! { library:
     tip_folder_more = "more: rename, merge, delete…";
     /// the crumb under 900 px
     tip_crumb = "the folders";
-    /// a stack's count, `16 shots saved in one turn: opens as a sheet` (what: kind_shots or kind_files)
-    tip_stack(n, what) = "{n} {what} saved in one turn: opens as a sheet";
+    /// a stack's count, `16 shots saved in one turn` (what: kind_shots or kind_files)
+    tip_stack(n, what) = "{n} {what} saved in one turn";
     /// a PR's or a link's ↗ on its card
     tip_leaves = "opens in your browser";
     /// a card's ···

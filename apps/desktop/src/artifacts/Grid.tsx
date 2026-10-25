@@ -43,7 +43,7 @@ export interface GridProps {
 
 /** Rows drawn while the scroller has no size yet (a first paint, a test's DOM). */
 const UNMEASURED = 12;
-const DAY_H = 40;
+const DAY_H = 24;
 const LIST_ROW_H = 44;
 
 export function ArtifactGrid({ cards, cols, view, now, place, days = true, cursor, picked, onPick, onOpen, onMenu, dragOf, scroller, testId }: GridProps) {
@@ -74,7 +74,8 @@ export function ArtifactGrid({ cards, cols, view, now, place, days = true, curso
   }, [scroller]);
   const size = (r: Row | undefined, i: number): number => {
     if (r === undefined) return 0;
-    if (r.kind === 'day') return i === 0 ? DAY_H - GAP_Y : DAY_H;
+    // a head: its 16 px line and 8 below; 24 above when first or in the list (else its row above's)
+    if (r.kind === 'day') return i === 0 || view === 'list' ? DAY_H + GAP_Y : DAY_H;
     return view === 'grid' ? rowHeight(width, across) : LIST_ROW_H;
   };
   // eslint-disable-next-line react-hooks/incompatible-library -- the virtualizer's functions are read each render, never memoized
@@ -130,9 +131,11 @@ export function ArtifactGrid({ cards, cols, view, now, place, days = true, curso
     );
   };
   return (
+    <>
+    {/* the list's head stays out of the virtual rows: they are placed from the box's top */}
+    {view === 'list' && <ListHead />}
     <div ref={box} className={`art-grid ${view}`} role="listbox" aria-multiselectable="true" data-testid={testId} data-cols={across}
       style={absolute ? { height: v.getTotalSize() } : undefined}>
-      {view === 'list' && <ListHead />}
       {shown.map((s) => {
         const r = rows[s.index];
         if (r === undefined) return null;
@@ -144,5 +147,6 @@ export function ArtifactGrid({ cards, cols, view, now, place, days = true, curso
         );
       })}
     </div>
+    </>
   );
 }

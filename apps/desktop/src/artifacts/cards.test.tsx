@@ -81,7 +81,7 @@ describe('the gallery, as he sees it', () => {
     expect(screen.queryByTestId('grid.card.h-1/s2')).toBeNull();
     const count = screen.getByTestId(`grid.card.${STACK}.count`);
     expect(count.textContent).toBe('4');
-    expect(count.getAttribute('data-tip')).toBe('4 shots saved in one turn: opens as a sheet');
+    expect(count.getAttribute('data-tip')).toBe('4 shots saved in one turn');
     expect(screen.getByTestId('grid.card.h-1/hero.new').textContent).toBe('new');
     expect(screen.queryByTestId(`grid.card.${STACK}.new`)).toBeNull();
     expect(screen.getByTestId('grid.card.h-1/pr.out').textContent).toBe('↗ github.com');
