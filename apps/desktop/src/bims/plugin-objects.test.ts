@@ -89,10 +89,10 @@ describe('defaultObject', () => {
 });
 
 describe('objectOf', () => {
-  it('on: the object; disabled: glass; invalid: glass and ✗; shadowed: nothing', () => {
+  it('on: the object; disabled: glass; invalid: lit and ✗; shadowed: nothing', () => {
     expect(objectOf(mainRow('docs'), NONE)).toEqual({ key: 'docs', obj: 'printer', n: 1, glass: false, pill: null, picked: false });
     expect(objectOf(mainRow('docs', 'disabled'), NONE)).toMatchObject({ glass: true, pill: null });
-    expect(objectOf(mainRow('docs', 'invalid'), NONE)).toMatchObject({ glass: true, pill: '✗' });
+    expect(objectOf(mainRow('docs', 'invalid'), NONE)).toMatchObject({ glass: false, pill: '✗' });
     expect(objectOf(mainRow('docs', 'shadowed'), NONE)).toBeNull();
     expect(objectOf(row('mistral:gmail', 'mistral', 'available'), NONE)).toBeNull();
   });
@@ -106,7 +106,7 @@ describe('objectOf', () => {
 
   it('a failed server marks it broken by its error field, ✗ over ?', () => {
     const parts = [{ kind: 'mcp', on: true, login: 'needs', error: 'exited at start' }];
-    expect(objectOf(row('linear', 'plugin', 'loaded', { parts }), NONE)).toMatchObject({ glass: true, pill: '✗' });
+    expect(objectOf(row('linear', 'plugin', 'loaded', { parts }), NONE)).toMatchObject({ glass: false, pill: '✗' });
     // a server he turned off does not break it
     expect(objectOf(row('linear', 'plugin', 'loaded', { parts: [{ kind: 'mcp', on: false, error: 'x' }] }), NONE)).toMatchObject({ glass: false, pill: null });
   });

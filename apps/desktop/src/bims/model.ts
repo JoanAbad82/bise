@@ -542,8 +542,8 @@ export interface OfficeRenderer {
   spotOf(name: string): { readonly x: number; readonly y: number; readonly u: number; readonly v: number } | null;
   /** where a stage's piece stands on the canvas, css px (the unlock moment's label); null off view */
   pieceOf(stage: number): { readonly x: number; readonly y: number } | null;
-  /** an office point (office units, y up) on the canvas, css px (an object's '?' / '✗' pill); null off view */
-  pointAt(x: number, y: number, z: number): { readonly x: number; readonly y: number } | null;
+  /** a plugin object's top as drawn on the canvas, css px (its '?' / '✗' pill sits there); null: not drawn or off view */
+  objectTopOf(key: string): { readonly x: number; readonly y: number } | null;
   /** a new project's welcome pins (Office pins): the inbox's top tray (render/inbox.ts; main's desk tray or top on a plan without one) or a ghost desk's middle on the floor, css px; null off view */
   pointOf(what: 'tray' | { readonly ghost: number }): { readonly x: number; readonly y: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */

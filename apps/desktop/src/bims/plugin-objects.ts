@@ -4,7 +4,7 @@
 // `bims.objects.<project>` = { <PluginId string>: { obj } } (architect m_40029: the prefs' one
 // writer, next to bims.map and bims.grow; an object so p4's spot joins it without a shape change).
 // Its look comes from the plugins event's typed fields only, never a status text: loaded = the
-// object, disabled = glass, invalid or a failed server = glass with the '✗' pill, a login he
+// object, disabled = glass, invalid or a failed server = lit with the '✗' pill, a login he
 // owes = the '?' pill; a shadowed row brings nothing (the plugin that wins it does).
 // Pure, no React, no three: the office driver and settings › plugins read it. Owner: bims-link.
 import type { JsonValue, Plugin } from '@/proto';
@@ -180,7 +180,8 @@ export function objectOf(row: PluginRow, picks: Picks): PluginObject | null {
     key,
     obj: pick ?? dflt.obj,
     ...(n === undefined ? {} : { n }),
-    glass: broken || !on,
+    // broken is not off (designer m_41417): a broken plugin's object stays lit, its '✗' says it failed; glass is for off
+    glass: !on && !broken,
     pill: broken ? '✗' : owesLogin(row) ? '?' : null,
     picked: pick !== undefined,
   };

@@ -1,6 +1,6 @@
 // His plugins' objects' '?' / '✗' pills over the office (bims-plugins p4 step 2): a broken plugin's
-// object (glass) gets the '✗', one that waits on his login the '?', each over its object's top, where
-// the office draws it now. Pure: the office (Office.tsx) gives it the canvas's projection.
+// object (glass) gets the '✗', one that waits on his login the '?', each on its object's drawn top (the gap a
+// bim's pill keeps over its head). Pure: the office (Office.tsx) gives it the canvas's projection.
 // Owner: bims-life.
 import type { Placed } from './corners';
 
@@ -12,15 +12,15 @@ export interface ObjPill {
   readonly y: number;
 }
 
-/** how far over an object's top its pill floats (office units) */
-export const PILL_LIFT = 0.3;
-
-/** The pills of the objects that have one and are in view, in the placed order. Pure. */
-export function objPillsOf(placed: readonly Placed[], at: (x: number, y: number, z: number) => { readonly x: number; readonly y: number } | null): ObjPill[] {
+/**
+ * The pills of the objects that have one and are in view, in the placed order: `topOf` gives an
+ * object's drawn top on the canvas (the pill sits on it as a bim's on its head: designer m_41417). Pure.
+ */
+export function objPillsOf(placed: readonly Placed[], topOf: (key: string) => { readonly x: number; readonly y: number } | null): ObjPill[] {
   const out: ObjPill[] = [];
   for (const p of placed) {
     if (p.pill === null) continue;
-    const s = at(p.x, p.foot.h + PILL_LIFT, p.z);
+    const s = topOf(p.key);
     if (s === null) continue;
     out.push({ key: p.key, pill: p.pill, x: Math.round(s.x), y: Math.round(s.y) });
   }

@@ -3,7 +3,7 @@
 // compact one when the office had no room for it) at its spot, turned, and a rug under each
 // corner's cluster. Built again only when the spots or the theme change (a still office draws no
 // frame for them). Owner: bims-life.
-import { type BufferGeometry, Group, Mesh } from 'three';
+import { Box3, type BufferGeometry, Group, Mesh } from 'three';
 import type { Corners, Rug } from '../corners';
 import { makeObject } from './objects';
 import type { Style } from './style';
@@ -21,6 +21,8 @@ export interface ObjectsLayer {
   readonly root: Group;
   /** draw these spots in this theme; the same ones again: nothing rebuilt */
   set(c: Corners, night: boolean): void;
+  /** the middle of an object's top as drawn (world units: its pill sits there, objpills.ts); null: not drawn */
+  topOf(key: string): { readonly x: number; readonly y: number; readonly z: number } | null;
   dispose(): void;
 }
 
@@ -29,6 +31,7 @@ export function makeObjectsLayer(style: Style): ObjectsLayer {
   root.name = 'plugin-objects';
   let drawn: Corners | null = null;
   let drawnNight = false;
+  const tops = new Map<string, { x: number; y: number; z: number }>();
 
   const clear = (): void => {
     for (const c of [...root.children]) {
@@ -56,6 +59,7 @@ export function makeObjectsLayer(style: Style): ObjectsLayer {
       drawn = c;
       drawnNight = night;
       clear();
+      tops.clear();
       for (const r of c.rugs) root.add(rug(r, night));
       for (const p of c.placed) {
         // a swapped one is already its compact id; makeObject's compact only scales the others
@@ -65,10 +69,15 @@ export function makeObjectsLayer(style: Style): ObjectsLayer {
         made.group.name = `obj:${p.key}`;
         made.group.userData.plugin = p.key;
         root.add(made.group);
+        made.group.updateMatrixWorld(true);
+        const b = new Box3().setFromObject(made.group);
+        if (!b.isEmpty()) tops.set(p.key, { x: (b.min.x + b.max.x) / 2, y: b.max.y, z: (b.min.z + b.max.z) / 2 });
       }
     },
+    topOf: (key) => tops.get(key) ?? null,
     dispose() {
       clear();
+      tops.clear();
       drawn = null;
     },
   };

@@ -507,7 +507,7 @@ export function Office({
         lastNew = JSON.stringify(tag);
         setNewTag(tag);
       }
-      const pills = objPillsOf(step.corners.placed, (x, y, z) => r?.pointAt(x, y, z) ?? null);
+      const pills = objPillsOf(step.corners.placed, (key) => r?.objectTopOf(key) ?? null);
       const pillSig = JSON.stringify(pills);
       if (pillSig !== lastPills) {
         lastPills = pillSig;
