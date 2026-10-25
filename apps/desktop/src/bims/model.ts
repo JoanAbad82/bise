@@ -528,8 +528,8 @@ export interface Look {
 export interface OfficeRenderer {
   /** the office changed (an agent came or left): rebuild the world */
   setOffice(office: Office, agents: readonly Agent[]): void;
-  /** his plugins' objects at their spots (corners.ts objectSpots, the driver's Step.corners): the next frame draws them */
-  setObjects(c: Corners): void;
+  /** his plugins' objects at their spots (corners.ts objectSpots, the driver's Step.corners); resolves once they are in the scene, true when their own chunk had to load first (the shell draws a frame then) */
+  setObjects(c: Corners): Promise<boolean>;
   /** css px; the camera fits the office to the width (never cropped), returns the height it takes */
   setSize(widthPx: number, maxHeightPx: number): number;
   /** his pinch and pan (zoom.ts): the view inside the fit; FIT is the whole office. The next frame shows it */

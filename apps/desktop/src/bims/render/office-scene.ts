@@ -30,7 +30,7 @@ import { seatChair } from './furniture';
 import { POOF_S } from './poof';
 import { makePoofs, type Poof } from './poofs';
 import type { Style } from './style';
-import { makeObjectsLayer } from './objects-layer';
+import type { ObjectsLayer } from './objects-layer';
 import { NO_CORNERS, type Corners } from '../corners';
 
 /** the length on screen (css px) the loop and the zigzag are sized for, its office length for that; the shadow's own length (plane.ts) */
@@ -74,8 +74,8 @@ export interface OfficeScene {
    * was, the ground may be wider).
    */
   prepare(look: Look): boolean;
-  /** his plugins' objects at their spots (corners.ts objectSpots); the same ones again: nothing rebuilt */
-  setObjects(c: Corners): void;
+  /** his plugins' objects at their spots (corners.ts objectSpots); the same ones again: nothing rebuilt. Resolves once they are in the scene: true when their chunk had to load first (the caller draws a frame then), false when the next frame drew them anyway */
+  setObjects(c: Corners): Promise<boolean>;
   /** pose every bim for t through this fit (planes size to it); null: no world yet */
   frame(t: number, frames: readonly BimFrame[], look: Look, fit: Fit, onRig?: OnRig): Motion | null;
   /** the backdrop behind it: the theme's page (themed: its palette's), violet in an eclipse; null before a world */
@@ -134,10 +134,18 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   let grow: Grow = NO_GROW;
   let growKey = growSig(NO_GROW);
   const unlock = makeUnlock(root, style);
-  // his plugins' objects (objects-layer.ts): over the world, rebuilt with the theme
-  const objects = makeObjectsLayer(style);
+  // his plugins' objects (objects-layer.ts, in its own chunk with the objects' makers: the bims
+  // chunk keeps its budget): loaded on the first objects, over the world, rebuilt with the theme
+  let objects: ObjectsLayer | null = null;
+  let loading: Promise<void> | null = null;
   let corners: Corners = NO_CORNERS;
-  root.add(objects.root);
+  const loadObjects = (): Promise<void> => {
+    loading ??= import('./objects-layer').then((m) => {
+      objects = m.makeObjectsLayer(style);
+      root.add(objects.root);
+    });
+    return loading;
+  };
   const bims = new Map<string, Bim>();
   const rigs = new Map<string, Rig>();
   /** his planes in flight, by bim and when it left ('name@12.30'): the mesh, its plan; each ends on its own catch */
@@ -188,7 +196,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     if (eggDecor) { root.remove(eggDecor.root); eggDecor.dispose(); }
     eggDecor = makeEggDecor(office, style, grow.stage);
     root.add(eggDecor.root);
-    objects.set(corners, isNight);
+    objects?.set(corners, isNight);
   }
 
   /** each desk's screen and lamp as its bim's last pose says, at the sky's lamps (a still office's too: the town's bake follows) */
@@ -474,7 +482,16 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     root,
     setObjects(c) {
       corners = c;
-      objects.set(c, night === true);
+      if (objects !== null) {
+        objects.set(c, night === true);
+        return Promise.resolve(false);
+      }
+      // none yet and none to draw: no chunk to load
+      if (c.placed.length === 0 && c.rugs.length === 0) return Promise.resolve(false);
+      return loadObjects().then(() => {
+        objects?.set(corners, night === true);
+        return true;
+      });
     },
     setOffice(o, as) {
       // another map: its bims dress for it (the look's wear)
@@ -500,7 +517,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         else {
           night = look.night;
           world?.page(look.night);
-          objects.set(corners, look.night);
+          objects?.set(corners, look.night);
         }
       }
       // t4: the eclipse turns the sky behind the office violet
@@ -598,7 +615,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     },
     world: () => world?.root ?? null,
     dispose() {
-      objects.dispose();
+      objects?.dispose();
       if (world) { root.remove(world.root); world.dispose(); world = null; }
       if (eggDecor) { eggDecor.dispose(); eggDecor = null; }
       unlock.dispose();

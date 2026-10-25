@@ -469,7 +469,10 @@ export function Office({
       // his plugins' objects: drawn again only when their spots changed (another office, a plugin more)
       if (step.corners !== drawnCorners) {
         drawnCorners = step.corners;
-        r.setObjects(step.corners);
+        // drawn at once when their chunk is in, else a frame once it loads (a still office draws none meanwhile)
+        void r.setObjects(step.corners).then((late) => {
+          if (late) kickRef.current();
+        });
       }
       // his drag or pinch: a sky blend due now waits until he lets go (bims m_33030)
       const hold = holder.current?.hasAttribute('data-drag') === true || Date.now() - lastWheel < HOLD_MS;
