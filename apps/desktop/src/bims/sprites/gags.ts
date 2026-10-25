@@ -27,14 +27,16 @@ export interface Actor {
 /** a point in the world: x, y, z */
 export type V = readonly [number, number, number];
 
-/** what moves with a gag's bims, frame by frame (studio.ts draws each kind) */
+/** what moves with a gag's bims, frame by frame (scene.ts draws each kind) */
 export type Bit =
-  /** a music note rising, how far through its rise (0..1, gone at 1) */
-  | { readonly kind: 'note'; readonly at: V; readonly k: number }
+  /** a music note rising, how far through its rise (0..1, gone at 1); `fade` shrinks it away (1 whole .. 0 gone) */
+  | { readonly kind: 'note'; readonly at: V; readonly k: number; readonly fade?: number }
   /** a sleeper's z rising, how far through (0..1) */
   | { readonly kind: 'z'; readonly at: V; readonly k: number }
-  /** the paper plane (render/plane.ts): its heading, its nose's pitch (up > 0), its fold (0 folded .. 1 open) */
-  | { readonly kind: 'plane'; readonly at: V; readonly dir: number; readonly pitch: number; readonly fold: number }
+  /** a sleep bubble swelling, how far through (0..1: it pops just before 1, gone at 1) */
+  | { readonly kind: 'bubble'; readonly at: V; readonly k: number }
+  /** the paper plane (render/plane.ts): its heading, its nose's pitch (up > 0), its bank, its fold (0 folded .. 1 open) */
+  | { readonly kind: 'plane'; readonly at: V; readonly dir: number; readonly pitch: number; readonly fold: number; readonly roll?: number }
   /** a small open book in its reader's hands: its reader's way, how far a page has turned (0..1) */
   | { readonly kind: 'book'; readonly at: V; readonly dir: number; readonly flip: number };
 
@@ -92,7 +94,7 @@ const RX = Math.cos(AZ), RZ = -Math.sin(AZ), FX = Math.sin(AZ), FZ = Math.cos(AZ
 /** the island's point u right, f toward you */
 export const spot = (u: number, f: number): { x: number; z: number } => ({ x: u * RX + f * FX, z: u * RZ + f * FZ });
 /** the way that faces u right, f toward you (dir 0 faces +z) */
-const facing = (u: number, f: number): number => Math.atan2(u * RX + f * FX, u * RZ + f * FZ);
+export const facing = (u: number, f: number): number => Math.atan2(u * RX + f * FX, u * RZ + f * FZ);
 /** what a bim holds before its chest: `fwd` ahead of it, `up` over its seat or feet */
 const held = (r: Partial<Rig>, fwd: number, up: number): V => {
   const d = r.dir ?? 0;

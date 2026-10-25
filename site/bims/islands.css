@@ -1,8 +1,10 @@
-/* the home bims' islands (page bims-home v7): their layer over the page, read by site/bims-islands.ts.
+/* the home bims' islands (page bims-home v7, live since v11): their layer over the page, read by site/bims-islands.ts.
+   A live island is its canvas (.cv, bigger than the box: the room for its moves), the sprites the no-WebGL fallback.
    Only the bims take pointers; the island's soft shadow is its slab's underside dropped and blurred,
    black 15 % light / 35 % dark (docs/brand/bims.md, the cube). */
 .bp { position:absolute; top:0; left:0; width:100%; overflow:clip; pointer-events:none; z-index:4; }
 .bp > div { position:absolute; transform-origin:0 0; }
+.bp .cv { position:absolute; pointer-events:none; }
 .bp .is, .bp .fr { position:absolute; background-repeat:no-repeat; background-size:100% 100%; }
 .bp i { position:absolute; pointer-events:auto; }
 .bp .sh { position:absolute; inset:0; filter:blur(9px); opacity:.15; transform:translateY(14px) scale(.92,.85); transform-origin:50% 100%; }

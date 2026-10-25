@@ -6,6 +6,7 @@
 // 'film' | 'ready' | 'lost', fn), destroy. No WebGL: nothing mounts, 'lost' fires, the poster stays.
 // ?herotest in the page's URL exposes window.__bimsHero (frames, frame ms, film time) to the checks;
 // ?herot=<s> starts the film there (a check's frame of a shot).
+// loadIslands: the home islands' live chunk (islands.ts), on the same engine.
 // Owner: hero-town.
 import css from './hero.css?inline';
 import type { Film, Theme } from './film';
@@ -56,6 +57,12 @@ const idle = (cb: () => void): void => {
   if ('requestIdleCallback' in window) window.requestIdleCallback(cb, { timeout: 1500 });
   else setTimeout(cb, 200);
 };
+
+/**
+ * The home islands, live (islands.ts, page bims-home v11): their chunk (islands.js), on the film's
+ * engine (three and the bims stay in film.js, which the page has loaded for the town already).
+ */
+export const loadIslands = (): Promise<typeof import('./islands')> => import('./islands');
 
 export function mount(el: HTMLElement, opts: MountOpts = {}): HeroTown {
   const fns = new Map<HeroEvent, Set<() => void>>();

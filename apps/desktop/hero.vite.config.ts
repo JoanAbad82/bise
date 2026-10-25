@@ -20,6 +20,8 @@ const ENTRY_BUDGET = 6 * 1024;
 // designer's ceiling of 1.5 MB all in (m_30837); the next step down is loading only the film's maps.
 // 290 since main grew 279 -> 284.5 KB with the workshop pods, town light and town paths (main m_35420)
 const FILM_BUDGET = 290 * 1024;
+/** the home islands' own chunk on top of film.js (designer's brief, bims-home v11: 40 KB gzip at most) */
+const ISLANDS_BUDGET = 40 * 1024;
 
 /** the maps' registries and table: the only modules that may import a map's file or list every map */
 const REGISTRIES = ['bims/maps/index.ts', 'bims/render/maps/index.ts', 'bims/maps/ids.ts'].map((f) => resolve(src, f));
@@ -80,6 +82,24 @@ function filmMaps(): Plugin {
   };
 }
 
+const FILM = resolve(src, 'hero/film.ts');
+const HERO = resolve(src, 'hero/hero.ts');
+let filmReach: Set<string> | null = null;
+/** a module the film reaches through static imports (the hero entry itself stays the entry) */
+function inFilm(id: string, info: (id: string) => { importedIds: readonly string[] } | null): boolean {
+  if (!filmReach) {
+    const seen = new Set<string>();
+    const walk = (m: string): void => {
+      if (seen.has(m) || m === HERO) return;
+      seen.add(m);
+      for (const d of info(m)?.importedIds ?? []) walk(d);
+    };
+    walk(FILM);
+    filmReach = seen;
+  }
+  return filmReach.has(id);
+}
+
 function budget(): Plugin {
   return {
     name: 'hero-budget',
@@ -89,7 +109,7 @@ function budget(): Plugin {
       for (const o of Object.values(bundle)) {
         if (o.type !== 'chunk') continue;
         const gz = gzipSync(o.code).length;
-        const max = o.isEntry ? ENTRY_BUDGET : FILM_BUDGET;
+        const max = o.isEntry ? ENTRY_BUDGET : o.name === 'islands' ? ISLANDS_BUDGET : FILM_BUDGET;
         console.log(`hero: ${o.fileName} ${kb(Buffer.byteLength(o.code))} minified, ${kb(gz)} gzip (budget ${kb(max)})`);
         if (gz > max) this.error(`hero: ${o.fileName} is ${kb(gz)} gzip, past its budget of ${kb(max)}`);
       }
@@ -115,7 +135,10 @@ export default defineConfig({
         entryFileNames: '[name].js',
         // stable names: the page preloads film.js in its <head> (design's hero-entry §1); kiln.js is
         // the shop of scenario A's end (kiln-app), loaded by the entry a few seconds before it rises
-        chunkFileNames: (c) => (c.name === 'kiln' ? 'kiln.js' : 'film.js'),
+        chunkFileNames: (c) => (c.name === 'kiln' ? 'kiln.js' : c.name === 'islands' ? 'islands.js' : 'film.js'),
+        // the home islands (src/hero/islands.ts) run on the film's engine: every module the film
+        // reaches stays in film.js, the islands' chunk holds only what is theirs alone
+        manualChunks: (id, { getModuleInfo }) => (inFilm(id, getModuleInfo) ? 'film' : undefined),
         format: 'es',
       },
     },
