@@ -243,14 +243,21 @@ measured_gb() {
 # the running jobs, for the queue's waiting line (main m_36953: 7 waiters
 # waited 3-5 h behind a hung --alone job no line named): "<slot> <agent or
 # folder> <N> min: <command>", '; ' between them
+# a reserve file's field <n>, from its first line only: an older heavy-run
+# wrote the command with its newlines (a node arg of JSON, release-53
+# m_41368), and every reader then got several lines: heavy-run failed on
+# 'n + 1 <json>' for every new job while that file was there
+rfield() { head -1 "$1" 2>/dev/null | cut -f"$2"; }
+# a whole number, or 0 (a broken field never reaches $(( )))
+num() { case "$1" in ''|*[!0-9]*) echo 0 ;; *) echo "$1" ;; esac; }
 holders() {
   local f p slot cwd who out=""
   for f in "$HOME/.bise/run/reserve/"*; do
     [ -e "$f" ] || continue
     p=${f##*.}; kill -0 "$p" 2>/dev/null || continue
     slot=${f##*/}; slot=${slot%.*}; slot=${slot%.lock}
-    cwd=$(cut -f2 "$f"); who=$(echo "$cwd" | sed -n 's#.*/worktrees/[^/]*/\([^/]*\)/.*#\1#p'); [ -n "$who" ] || who=${cwd##*/}
-    out="$out${out:+; }$slot $who $(( ($(date +%s) - $(stat -f %m "$f")) / 60 )) min: $(cut -f4 "$f" | cut -c1-60)"
+    cwd=$(rfield "$f" 2); who=$(echo "$cwd" | sed -n 's#.*/worktrees/[^/]*/\([^/]*\)/.*#\1#p'); [ -n "$who" ] || who=${cwd##*/}
+    out="$out${out:+; }$slot $who $(( ($(date +%s) - $(stat -f %m "$f")) / 60 )) min: $(rfield "$f" 4 | cut -c1-60)"
   done
   echo "$out"
 }
@@ -269,10 +276,10 @@ reserved_gb() {
     kill -0 "$p" 2>/dev/null || { rm -f "$f"; continue; }
     # its kind's measured share (field 5); a job that named its own
     # (HEAVY_RESERVE_GB: '-') or an older heavy-run's file: its reserve
-    k=$(cut -f5 "$f" 2>/dev/null)
+    k=$(rfield "$f" 5)
     case "$k" in full|cargo-warm|cargo-cold|other) n=$(( n + $(measured_gb "$k") )) ;;
-      *) n=$(( n + $(cut -f1 "$f" 2>/dev/null || echo 0) )) ;; esac
-    k=$(cut -f3 "$f" 2>/dev/null); [ -n "$k" ] && [ "$k" -gt "$top" ] 2>/dev/null && top=$k
+      *) n=$(( n + $(num "$(rfield "$f" 1)") )) ;; esac
+    k=$(num "$(rfield "$f" 3)"); [ "$k" -gt "$top" ] && top=$k
   done
   [ "$top" -gt "$kb" ] && n=$(( n - (top - kb) / 1048576 ))
   [ "$n" -lt 0 ] && n=0
@@ -325,7 +332,7 @@ shares() {
   local f kd g out=""
   for f in "$HOME/.bise/run/reserve/"*; do
     [ -e "$f" ] || continue; kill -0 "${f##*.}" 2>/dev/null || continue
-    kd=$(cut -f5 "$f"); case "$kd" in full|cargo-warm|cargo-cold|other) g=$(measured_gb "$kd") ;; *) g=$(cut -f1 "$f") ;; esac
+    kd=$(rfield "$f" 5); case "$kd" in full|cargo-warm|cargo-cold|other) g=$(measured_gb "$kd") ;; *) g=$(num "$(rfield "$f" 1)") ;; esac
     out="$out${out:+; }${f##*/} ${kd:--} $g"
   done
   echo "$out"
@@ -336,7 +343,7 @@ reclaimed_kb() {
   awk -F'\t' -v t0="$1" -v t1="$2" '$1 >= t0 && $1 <= t1 && $4 ~ /^[0-9.]+$/ { s += $4 } END { printf "%d\n", s * 1048576 }' \
     "$HOME/.bise/run/reclaim.log" 2>/dev/null || echo 0
 }
-export -f free_kb disk_under free_gb tell_hub tree reclaim cpu_cs disk_watch lane_during p90_gb measured_gb reclaimed_kb shares
+export -f free_kb disk_under free_gb tell_hub tree reclaim cpu_cs disk_watch lane_during p90_gb measured_gb reclaimed_kb shares rfield num
 
 # HEAVY_SLOTS (tests): use only the first n slots, whatever the power.
 # HEAVY_ON_BATTERY=0|1 (tests): the power as given, not pmset's
@@ -464,7 +471,7 @@ export HEAVY_MAX; HEAVY_MAX=$(max_min "$([ "$ALONE" = 1 ] && echo --alone)" "$@"
 # the nice level, then the command. HEAVY_SLOT="<slot> <pid of this shell>".
 export HEAVY_SUBMIT="${HEAVY_SUBMIT:-$(date +%s)}"
 JOB='export HEAVY_SLOT="${2##*/} $$"; rm -f "$1"; L="$HOME/.bise/run/heavy.log"
-c=$(printf "%s " "${@:4}" | cut -c1-160); t0=$(date +%s)
+c=$(printf "%s " "${@:4}" | tr "\n\t\r" "   " | cut -c1-160); t0=$(date +%s)
 printf "%s\t%s\t-\t%s\t%s\t%s\twaited=%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" "${HEAVY_WAITED:-}" >>"$L" 2>/dev/null
 touch "$HOME/.bise/run/last-start"
 rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; k0=$(free_kb)

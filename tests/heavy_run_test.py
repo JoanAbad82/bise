@@ -647,6 +647,33 @@ with tempfile.TemporaryDirectory() as home:
                   and "test-build" not in r.stdout, "a tree turned heavy: the light run refuses, no cargo: %r" % r.stdout[-400:])
         finally:
             subprocess.run(["git", "-C", repo, "worktree", "remove", "--force", lt], capture_output=True)
+    # a job's command with newlines (bims-clay's node run.mts '<JSON>',
+    # release-53 m_41368): its reserve file stays one line, and an older
+    # heavy-run's multi-line file no longer fails every new job
+    rdir = os.path.join(run, "reserve")
+    os.makedirs(rdir, exist_ok=True)
+    live = subprocess.Popen(["sleep", "60"])
+    try:
+        bad = os.path.join(rdir, "heavy9.lock.%d" % live.pid)
+        open(bad, "w").write('2\t/x\t100\tnode run.mts [{"fn":\n"a"},\n{"fn":"b"}]\tother\n')
+        r = subprocess.run([HEAVY, "sh", "-c", "true"], env=env, capture_output=True, text=True, timeout=60)
+        check(r.returncode == 0 and "syntax error" not in r.stderr and "operand expected" not in r.stderr,
+              "an old multi-line reserve file: a new job still runs: %r %r" % (r.returncode, r.stderr[-300:]))
+        os.remove(bad)
+        gon = os.path.join(home, "go_nl")
+        p = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', gon, '[{"fn":\n"a"}]'],
+                             env=env, stderr=subprocess.DEVNULL)
+        check(wait_for(lambda: [f for f in os.listdir(rdir) if f.startswith("heavy")], what="its reserve file"),
+              "the job with newlines runs")
+        mine = [f for f in os.listdir(rdir) if f.startswith("heavy")]
+        text = open(os.path.join(rdir, mine[0])).read()
+        check(text.count("\n") == 1 and '[{"fn": "a"}]' in text, "a command with newlines: its reserve file is one line: %r" % text)
+        open(gon, "w").close()
+        job_ends(p, 30)
+        last = open(log).read().splitlines()[-1]
+        check(last.count("\t") >= 6 and "rc=" in last, "its heavy.log end line is whole: %r" % last[-120:])
+    finally:
+        live.kill()
     # --install
     r = subprocess.run([HEAVY, "--install"], env=env, capture_output=True, text=True)
     dst = os.path.join(run, "heavy-run")
