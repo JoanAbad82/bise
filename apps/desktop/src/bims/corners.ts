@@ -155,14 +155,19 @@ export function boxOf(x: number, z: number, w: number, d: number, rot: number): 
   return { x0: x - hw, x1: x + hw, z0: z - hd, z1: z + hd };
 }
 
-const footOf = (obj: ObjId, compact: boolean): { obj: ObjId; foot: FootOf } => {
-  const swap = compact ? COMPACT[obj] : undefined;
-  if (swap !== undefined) return { obj: swap, foot: FEET[swap] };
-  const f = FEET[obj];
-  if (!compact) return { obj, foot: f };
+/** how small a thing is drawn: 0 itself, 1 its compact one (its swap, or scaled), 2 its swap scaled (the ping-pong's small babyfoot) */
+type Size = 0 | 1 | 2;
+const scaledFoot = (f: FootOf): FootOf => {
   const k = COMPACT_SCALE;
-  return { obj, foot: { w: f.w * k, d: f.d * k, h: f.h * k, ...(f.wall ? { wall: true as const } : {}) } };
+  return { w: f.w * k, d: f.d * k, h: f.h * k, ...(f.wall ? { wall: true as const } : {}) };
 };
+const footOf = (obj: ObjId, size: Size): { obj: ObjId; foot: FootOf } => {
+  const swap = size > 0 ? COMPACT[obj] : undefined;
+  if (swap !== undefined) return { obj: swap, foot: size === 2 ? scaledFoot(FEET[swap]) : FEET[swap] };
+  return { obj, foot: size === 0 ? FEET[obj] : scaledFoot(FEET[obj]) };
+};
+/** a placed thing's size, from what it drew */
+const sizeOf = (p: Placed): Size => (!p.compact ? 0 : p.scaled && p.obj !== p.of ? 2 : 1);
 
 const mid = (ps: readonly Pt[], or: Pt): Pt => (ps.length === 0 ? or : { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, z: ps.reduce((s, p) => s + p.z, 0) / ps.length });
 const hull = (bs: readonly Box[]): Box => ({ x0: Math.min(...bs.map((b) => b.x0)), x1: Math.max(...bs.map((b) => b.x1)), z0: Math.min(...bs.map((b) => b.z0)), z1: Math.max(...bs.map((b) => b.z1)) });
@@ -524,7 +529,15 @@ export function objectSpots(o: Office, objs: readonly PluginObject[], prev: read
     if (at === null) todo.push(p);
     else placed.push(at);
   }
+  const missed: PluginObject[] = [];
   for (const p of todo) {
+    const at = place(c, p, placed);
+    if (at === null) missed.push(p);
+    else placed.push(at);
+  }
+  // one more try for what found no room, once the others stand: a swap in another corner (the
+  // ping-pong's babyfoot) has their side to stand by now
+  for (const p of missed) {
     const at = place(c, p, placed);
     if (at === null) left.push(p);
     else placed.push(at);
@@ -532,18 +545,18 @@ export function objectSpots(o: Office, objs: readonly PluginObject[], prev: read
   return { placed, left, rugs: rugsOf(o, placed, c.keep) };
 }
 
-function placedOf(p: PluginObject, obj: ObjId, compact: boolean, foot: FootOf, corner: Corner, t: Try): Placed {
+function placedOf(p: PluginObject, obj: ObjId, size: Size, foot: FootOf, corner: Corner, t: Try): Placed {
   return {
     key: p.key, obj, of: p.obj, ...(p.n === undefined ? {} : { n: p.n }), glass: p.glass, pill: p.pill,
-    x: t.x, z: t.z, rot: t.rot, compact, scaled: compact && COMPACT[p.obj] === undefined, foot, corner, box: boxOf(t.x, t.z, foot.w, foot.d, t.rot),
+    x: t.x, z: t.z, rot: t.rot, compact: size > 0, scaled: size === 2 || (size === 1 && COMPACT[p.obj] === undefined), foot, corner, box: boxOf(t.x, t.z, foot.w, foot.d, t.rot),
   };
 }
 
 /** its spot of before, while it is still free and the same object; null: it moves */
 function kept(c: Ctx, p: PluginObject, before: Placed, taken: readonly Placed[]): Placed | null {
-  const { obj, foot } = footOf(p.obj, before.compact);
+  const { obj, foot } = footOf(p.obj, sizeOf(before));
   if (before.obj !== obj || before.of !== p.obj) return null;
-  return free(c, before.box, before.corner, areaOf(c.o, before.corner), taken, foot.h) ? placedOf(p, obj, before.compact, foot, before.corner, before) : null;
+  return free(c, before.box, before.corner, areaOf(c.o, before.corner), taken, foot.h) ? placedOf(p, obj, sizeOf(before), foot, before.corner, before) : null;
 }
 
 function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null {
@@ -552,12 +565,14 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
   const corners: readonly Corner[] = also === undefined ? [home] : [home, also];
   // a tall thing tries a wall first, its compact one at a wall next, then standing free (touching its corner's others)
   const walled = AGAINST.has(p.obj);
-  const modes: readonly (readonly [boolean, boolean])[] = walled ? [[false, true], [true, true], [false, false], [true, false]] : [[false, false], [true, false]];
-  for (const [compact, against] of modes) {
-    if (compact && COMPACT[p.obj] === undefined && !(FEET[p.obj].w * FEET[p.obj].d > 1)) continue;
-    const { obj, foot } = footOf(p.obj, compact);
+  // last, a swap scaled down (the ping-pong's small babyfoot: the one a babyfoot plugin would take)
+  const swapped = COMPACT[p.obj] === undefined ? [] : [[2, false] as const];
+  const modes: readonly (readonly [Size, boolean])[] = walled ? [[0, true], [1, true], [0, false], [1, false], ...swapped] : [[0, false], [1, false], ...swapped];
+  for (const [size, against] of modes) {
+    if (size === 1 && COMPACT[p.obj] === undefined && !(FEET[p.obj].w * FEET[p.obj].d > 1)) continue;
+    const { obj, foot } = footOf(p.obj, size);
     // a swap may stand in its own corner too (a yard's terrace with no room for the ping-pong: its babyfoot by the nap place)
-    const own = compact && obj !== p.obj ? CORNER[obj] : undefined;
+    const own = size > 0 && obj !== p.obj ? CORNER[obj] : undefined;
     for (const corner of own === undefined || corners.includes(own) ? corners : [...corners, own]) {
       const area = areaOf(c.o, corner);
       const seeds = seedOfCorner(c, corner);
@@ -565,7 +580,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
       if ((against && corner !== 'terrace') || corner === 'hang') {
         for (const t of wallTries(c, corner, foot)) {
           const b = boxOf(t.x, t.z, foot.w, foot.d, t.rot);
-          if (touches(c.o, b, corner, taken, seeds, play) && free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, compact, foot, corner, t);
+          if (touches(c.o, b, corner, taken, seeds, play) && free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, size, foot, corner, t);
         }
         continue;
       }
@@ -580,7 +595,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
         if (!inZone(area, b, corner, seeds, play)) continue;
         if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1 || keptIn(c.keep, b) > 0) continue;
         if (!touches(c.o, b, corner, taken, seeds, play)) continue;
-        if (free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, compact, foot, corner, { x: q.x, z: q.z, rot: turn });
+        if (free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, size, foot, corner, { x: q.x, z: q.z, rot: turn });
       }
     }
   }
