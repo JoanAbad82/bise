@@ -1,13 +1,15 @@
 // src/main · the application menu with its Agent menu (bise fait mac, d4): each window tells main
 // the items of the agent it shows (window.bise.agentMenu, app/menus/use.ts useAgentMenuBar; null:
 // none), and the menu bar shows the focused window's, its keys live; a pick goes back to that
-// window (IPC.agentMenu). No window focused (another app in front, an off-screen test window that
+// window (IPC.agentMenu). No agent in view: the menu stays, every item dimmed (designer m_42681).
+// No window focused (another app in front, an off-screen test window that
 // never took the keys): the last focused one's, ui-review m_42540. Rebuilt when a window's items or
 // the focus change, never on the same items. index.ts installs it once; ipc.ts hands it each window's items. Owner: nm-menus.
 import { app, BrowserWindow, Menu, type WebContents } from 'electron';
 import { IPC, type PopupItem } from '../shared/api';
 import { menuTemplate, type MenuOptions } from './menu';
 import { nativeItems, sfSymbol } from './menu-popup';
+import { AGENT_MENU_IDLE } from '../app/menus/registry';
 
 /** Each window's items, by its webContents id. */
 const byWin = new Map<number, readonly PopupItem[]>();
@@ -40,7 +42,7 @@ function build(): void {
   shown = key;
   const agent =
     f === undefined
-      ? undefined
+      ? nativeItems(AGENT_MENU_IDLE, () => undefined, sfSymbol, true, true)
       : nativeItems(
           f.items,
           (id) => {
@@ -49,7 +51,7 @@ function build(): void {
           sfSymbol,
           true,
         );
-  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate({ ...base, ...(agent !== undefined ? { agent } : {}) })));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate({ ...base, agent })));
 }
 
 /** Installs the application menu (index.ts, once); it follows the focus from then on. */

@@ -21,13 +21,15 @@ export const sfSymbol: MenuIcon = (symbol) => {
 /**
  * The registry's items as Electron's template; a pick calls `pick(id)`. `register`: whether the
  * keys fire (the menu bar's) or are only shown (a popup's: the menu bar or the window's own keys do
- * the work). Pure but for `icon`.
+ * the work). `dim`: every item dimmed (the menu bar's Agent menu with no agent in view, designer
+ * m_42681: the bar stays stable). Pure but for `icon`.
  */
-export function nativeItems(items: readonly PopupItem[], pick: (id: string) => void, icon: MenuIcon, register: boolean): MenuItemConstructorOptions[] {
+export function nativeItems(items: readonly PopupItem[], pick: (id: string) => void, icon: MenuIcon, register: boolean, dim = false): MenuItemConstructorOptions[] {
   return items.map((i): MenuItemConstructorOptions => {
     if (i.type === 'separator') return { type: 'separator' };
     const img = i.icon === undefined ? undefined : icon(i.icon);
-    if (i.type === 'submenu') return { label: i.label, submenu: nativeItems(i.items, pick, icon, register), ...(img !== undefined ? { icon: img } : {}) };
+    const off = dim ? { enabled: false } : {};
+    if (i.type === 'submenu') return { label: i.label, submenu: nativeItems(i.items, pick, icon, register, dim), ...off, ...(img !== undefined ? { icon: img } : {}) };
     const id = i.id;
     return {
       id,
@@ -35,6 +37,7 @@ export function nativeItems(items: readonly PopupItem[], pick: (id: string) => v
       ...(i.accelerator !== undefined ? { accelerator: i.accelerator, registerAccelerator: register } : {}),
       ...(i.checked !== undefined ? { type: 'checkbox' as const, checked: i.checked } : {}),
       ...(img !== undefined ? { icon: img } : {}),
+      ...off,
       click: () => {
         pick(id);
       },

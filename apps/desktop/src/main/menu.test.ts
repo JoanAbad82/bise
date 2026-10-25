@@ -6,7 +6,7 @@ import { externalUrl } from './external';
 import { menuTarget, menuTemplate } from './menu';
 import { nativeItems, popupPoint } from './menu-popup';
 import { menuWindow } from './agentmenu';
-import { KEYS, menuOf } from '../app/menus/registry';
+import { AGENT_MENU_IDLE, KEYS, menuOf } from '../app/menus/registry';
 import { menus } from '../proto/words_menus.gen';
 
 function flat(items: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
@@ -148,8 +148,13 @@ describe("the Agent menu (bise fait mac, d4): the agent in view's '…' in the m
   const items = menuOf({ e: { kind: 'agent', project: 'acme', agent: 'perf' }, row: perf, pinned: false, reply: false });
   const base = { platform: 'darwin' as const, appName: 'bise', dev: true, send: () => undefined };
 
-  it('hidden with no agent in view; with one, its items, keys live, a pick says its id', () => {
-    expect(menuTemplate(base).some((m) => m.label === menus.agent_menu)).toBe(false);
+  it("with no agent in view: the same menu, every item dimmed (designer m_42681); with one, its items, keys live, a pick says its id", () => {
+    const idle = menuTemplate({ ...base, agent: nativeItems(AGENT_MENU_IDLE, () => undefined, () => undefined, true, true) }).find((m) => m.label === menus.agent_menu);
+    const idleItems = flat((idle?.submenu ?? []) as MenuItemConstructorOptions[]).filter((i) => i.type !== 'separator');
+    expect(idleItems.length).toBeGreaterThan(0);
+    expect(idleItems.every((i) => i.enabled === false)).toBe(true);
+    // d4's items, none hidden for want of an agent
+    expect(idleItems.map((i) => i.id).filter((id) => id !== undefined)).toEqual(expect.arrayContaining(['rename', 'pin', 'changes', 'move-right', 'new-window', 'stop', 'archive']));
     const picked: string[] = [];
     const t = menuTemplate({ ...base, agent: nativeItems(items, (id) => picked.push(id), () => undefined, true) });
     const agent = t.find((m) => m.label === menus.agent_menu);

@@ -23,7 +23,7 @@ import { appPages } from './pages';
 import { MAIN, parseRoute } from './route';
 import { useRoute, useRouter } from './router';
 import './palette.css';
-import { AppIcon, Input, Kbd, Press, type AppIconName } from '@/ds';
+import { AppIcon, ArtName, Input, Kbd, Press, type AppIconName } from '@/ds';
 
 /** The kept view bit: ⌘K open (lead m_11997, keep.ts: an open panel, no age). */
 const OPEN_KEY = 'palette.open';
@@ -349,7 +349,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
                     </span>
                     <span className="nm">
                       {h.parent !== undefined && <span className="up">{h.parent} › </span>}
-                      <Marked text={h.name} q={q} />
+                      {/* an artifact's title is its chip, accent on its tint (designer m_42681, taste rule 13) */}
+                      {h.kind === 'artifact' ? (
+                        <ArtName testId={`app.palette.item.${String(n)}.chip`}>
+                          <Marked text={h.name} q={q} />
+                        </ArtName>
+                      ) : (
+                        <Marked text={h.name} q={q} />
+                      )}
                       {h.of !== undefined && <span className="up"> · {h.of}</span>}
                       {h.detail === BROWSER_MARK ? (
                         <span className="d">

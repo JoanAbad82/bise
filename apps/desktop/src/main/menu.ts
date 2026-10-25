@@ -5,7 +5,7 @@
 // and shows in the menu bar with its key. bise's own items (settings ⌘,,
 // inbox ⌘I, find ⌘F, terminal ⌃`, File › save a copy ⌘S) only send a MenuAction to the focused window's
 // renderer, which decides what it means (src/shared/api.ts onMenu). The Agent menu (bise fait mac,
-// d4) is the agent in view's '…' with its keys live, hidden when no agent is (main/agentmenu.ts).
+// d4) is the agent in view's '…' with its keys live, every item dimmed when no agent is (main/agentmenu.ts).
 // Owner: nm-menus.
 import type { MenuItemConstructorOptions } from 'electron';
 import { menus } from '../proto/words_menus.gen';
@@ -32,7 +32,8 @@ export interface MenuOptions {
   /**
    * The Agent menu (bise fait mac, d4): the focused window's agent in view, its items as its '…'
    * gives them (app/menus/registry.ts, converted by menu-popup.ts nativeItems with their keys
-   * live); none: no agent in view, the menu is hidden (main/agentmenu.ts).
+   * live); with no agent in view agentmenu.ts gives every item dimmed (designer m_42681: the bar
+   * stays stable). None: no Agent menu (a test's template).
    */
   readonly agent?: readonly MenuItemConstructorOptions[];
 }

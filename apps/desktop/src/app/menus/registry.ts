@@ -7,12 +7,13 @@
 // command the hub has (rename, stop, archive, unarchive, proc_stop, scheduled_stop) or a move of the
 // app's own (a tab, a window, the Finder, the clipboard, a pin): Schedule…, Fork and New side thread
 // stay hidden until the hub has them (native-lead m_42173). Shown or hidden comes from the rows'
-// typed fields (archived, status, main, changes, state, ended_ms), never from words. Pure.
+// typed fields (archived, status, main, changes, state, ended_ms), never from words. Pure; its
+// imports are relative: main's bundle reads it too (agentmenu.ts AGENT_MENU_IDLE), with no '@/' alias.
 // Owner: nm-menus.
-import type { Agent, Artifact, Proc, ProjectRow, ScheduledTask } from '@/proto';
-import { menus } from '@/proto/words_menus.gen';
-import type { PopupItem } from '@/shared/api';
-import type { Entity } from '@/shared/entity';
+import type { Agent, Artifact, Proc, ProjectRow, ScheduledTask } from '../../proto';
+import { menus } from '../../proto/words_menus.gen';
+import type { PopupItem } from '../../shared/api';
+import type { Entity } from '../../shared/entity';
 
 /** What an item does; the id a picked menu resolves (window.bise.popupMenu, the Agent menu's pick). */
 export type Act =
@@ -167,6 +168,17 @@ function agentMenu(a: Agent, pinned: boolean, reply: boolean): PopupItem[] {
     [...when(live && a.status === 'working', item('stop', menus.stop)), ...when(live && !a.main, item('archive', menus.archive)), ...when(a.archived, item('restore', menus.restore))],
   ]);
 }
+
+/**
+ * The menu bar's Agent menu with no agent in view: every item an agent can have, in d4's order,
+ * shown dimmed (main/agentmenu.ts; designer m_42681: the menu bar stays the same, only items with
+ * no command behind them are hidden). Pure.
+ */
+export const AGENT_MENU_IDLE: readonly PopupItem[] = agentMenu(
+  { name: '', main: false, status: 'working', archived: false, title: '', purpose: '', since_ms: 0, waits: 0, dir: '', path: '/', branch: '-', changes: { files: 1, add: 0, del: 0 }, watching: [] },
+  false,
+  true,
+);
 
 /** A project: Rename · Copy › · Open in new window (its main), Open in ›. */
 function projectMenu(p: ProjectRow): PopupItem[] {

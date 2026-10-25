@@ -5,7 +5,7 @@
 // view (main/agentmenu.ts), with the same items. Every screen wires it in its own files:
 // <ListRow onContextMenu={m.onContextMenu} end={<MoreButton menu={m} />} />. The facts are read
 // from the store when the menu opens (no subscription per row). Owner: nm-menus.
-import { useEffect, useMemo, type MouseEvent } from 'react';
+import { useContext, useEffect, useMemo, type MouseEvent } from 'react';
 import type { EntityMenu } from '@/ds';
 import type { Agent, Artifact, Proc, ProjectRow, ScheduledTask } from '@/proto';
 import { threadKey, useAgents, useStore, type Store } from '@/store';
@@ -17,7 +17,7 @@ import { closable } from '../panel/model';
 import { isPinned, pin, pinsOf } from '../pins';
 import type { Prefs } from '@/settings/prefs';
 import { MAIN, type Route } from '../route';
-import { useRoute, useRouter, type Router } from '../router';
+import { RouterContext, useRoute, useRouter, type Router } from '../router';
 import { emitAction } from '../menu';
 import { askEntityAction } from './actions';
 import { menuOf, type Act, type MenuFacts } from './registry';
@@ -94,7 +94,7 @@ export function inView(route: Route, project: string, agent: string, main: boole
 }
 
 /** The real effects, for this window. */
-function fxOf(store: Store, router: Router): MenuFx {
+function fxOf(store: Store, router: Router | null): MenuFx {
   const bise = biseOf();
   return {
     command: (cmd) => {
@@ -102,14 +102,14 @@ function fxOf(store: Store, router: Router): MenuFx {
     },
     stop: (project, agent) => {
       const main = store.agents(project).find((a) => a.name === agent)?.main === true;
-      if (inView(router.get(), project, agent, main)) emitAction('stop');
+      if (router !== null && inView(router.get(), project, agent, main)) emitAction('stop');
       else store.stop(project, agent);
     },
     rename: (e) => {
       if (askEntityAction('rename', e)) return;
       // nobody shows it to rename in place: the page that can
-      if (e.kind === 'agent') router.go({ screen: 'agents', project: e.project });
-      else if (e.kind === 'project') router.go({ screen: 'settings', page: 'projects' });
+      if (e.kind === 'agent') router?.go({ screen: 'agents', project: e.project });
+      else if (e.kind === 'project') router?.go({ screen: 'settings', page: 'projects' });
     },
     openTab,
     openWindow: (to) => bise?.openWindow?.(to),
@@ -135,7 +135,7 @@ function moreBox(): PopupAt | undefined {
 }
 
 /** Opens `e`'s menu now (under `at`, else at the pointer) and runs his pick. */
-async function show(e: Entity, store: Store, router: Router, at: PopupAt | undefined): Promise<void> {
+async function show(e: Entity, store: Store, router: Router | null, at: PopupAt | undefined): Promise<void> {
   const popup = biseOf()?.popupMenu;
   if (popup === undefined) return;
   const facts = factsOf(e, readsOf(store));
@@ -148,7 +148,8 @@ async function show(e: Entity, store: Store, router: Router, at: PopupAt | undef
 /** `e`'s menu: onContextMenu for a right click on its row or tab, open() for its '…'. */
 export function useEntityMenu(e: Entity): EntityMenu {
   const store = useStore();
-  const router = useRouter();
+  // a row drawn outside the shell's router (a screen's own test, the gallery) still has its menu
+  const router = useContext(RouterContext);
   // an Entity is a fresh object each render: its key is its identity
   const key = entityKey(e);
   return useMemo(
@@ -174,7 +175,7 @@ export function agentInView(route: Route): Entity | undefined {
 
 /**
  * In the shell: the menu bar's Agent menu is the agent in view's (its items again on every change
- * of its row), hidden when none is; a pick there runs like the '…'s.
+ * of its row); none in view: main dims every item (agentmenu.ts); a pick there runs like the '…'s.
  */
 export function useAgentMenuBar(): void {
   const store = useStore();
