@@ -50,6 +50,8 @@ const CLOSED = 0.25;
 export const NEAR_PX = 22;
 /** whether a bim seen through a fit of `scale` (world units per css px) draws its small details. Pure. */
 export const nearAt = (scale: number): boolean => scale > 0 && 1 / scale >= NEAR_PX;
+/** an afro's half-width: inside the shoulders' (0.24 + a sleeve's 0.078), as the old afro sat inside the old shoulders */
+const AFRO_W = 0.29;
 /** the rigid parts, each baked into one mesh (two with a far level of detail) */
 export const PARTS = ['head', 'body', 'armL', 'armR', 'legL', 'legR'] as const;
 
@@ -258,7 +260,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       add(style.ball(0.06), mat(WORLD.paper), hat, 0, 0.28, 0);
       break;
     case 'afro':
-      add(style.ball(0.27), mat(o.hair), hat, 0, 0.1, -0.05).scale.set(1.05, 0.85, 1);
+      // never wider than the shoulders (designer m_41390 1): AFRO_W half-width at the clay head's size
+      add(style.ball(0.27), mat(o.hair), hat, 0, 0.1, -0.05).scale.set(AFRO_W / (0.27 * HAT_K), 0.85, 0.95);
       break;
     case 'bun':
       add(style.cap(0.226, 0.42), mat(o.hair), hat, 0, 0.02, -0.01);
@@ -302,7 +305,10 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.58, 0.215);
       add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.47, 0.215);
       for (let i = 0; i < 3; i++) add(style.box(0.11, 0.025, 0.02), neon, body, 0.05, 0.525, 0.215).rotation.z = (i * Math.PI) / 3;
-      add(style.box(0.3, 0.03, 0.03), mat(WORLD.gold, 0.2), body, 0, 0.7, 0.2);
+      // the chain hangs as a thin U from the collar, its lowest point over the :* (designer m_41390 2),
+      // leaning back with the chest so it lies on the hoodie
+      const chain = add(new TorusGeometry(0.08, 0.011, 6, 18, Math.PI), mat(WORLD.gold, 0.2), body, 0, 0.735, 0.148);
+      chain.rotation.set(-0.5, 0, Math.PI, 'XYZ');
       break;
     }
   }
