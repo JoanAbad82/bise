@@ -1,12 +1,15 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { BarSlot } from '@/app/barslot';
 import type { Card } from '@/proto';
 import { inbox } from '@/proto/words_inbox.gen';
 import { formatRoute, parseRoute } from '@/app/route';
 import { InboxView } from './List';
 import type { InboxRecord, Jump } from './past';
 
+// the window's bar, where the page's search goes (InBar)
+beforeEach(() => { render(<BarSlot />); });
 afterEach(cleanup);
 
 const NOW = new Date(2026, 9, 14, 15, 0).getTime();
@@ -30,6 +33,9 @@ function mount() {
   return { answered, jumps, root: screen.getByTestId('inbox.screen') };
 }
 
+/** the rows shown, in their order (data-row: the list keys scroll by it) */
+const rowsOf = () => [...screen.getByTestId('inbox.list').querySelectorAll('[data-row]')].map((r) => r.getAttribute('data-row'));
+
 describe('the inbox screen', () => {
   it("is the route 'inbox/all'; the bare 'inbox' stays the block's ask", () => {
     expect(parseRoute('inbox/all')).toEqual({ screen: 'inbox' });
@@ -39,18 +45,40 @@ describe('the inbox screen', () => {
 
   it('shows what waits first, then the past by day, two lines each', () => {
     mount();
-    // the hero card: its name, its sentence, how many wait (the accent) and the oldest's age
-    const top = screen.getByTestId('inbox.hero');
+    // the lead (no hero card, no name: the bar has it): how many wait (the accent) and the oldest's age
+    const top = screen.getByTestId('inbox.lead');
+    expect(screen.queryByTestId('inbox.hero')).toBeNull();
     expect(top.querySelector('.facts')?.textContent).toBe('1 waiting · the oldest 12 min ago');
     expect(top.querySelector('.wait')?.textContent).toBe('1 waiting');
-    expect(screen.getByTestId('inbox.waiting.head').textContent).toBe('waiting for you · 1');
-    const rows = [...screen.getByTestId('inbox.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-row'));
-    expect(rows).toEqual(['w:shop/3', 'p:shop/1', 'p:bise/2', 'p:shop/5']);
+    // the group label in sentence case, its count in the accent apart
+    const head = screen.getByTestId('inbox.waiting.head');
+    expect(head.textContent).toBe(`${inbox.group_waiting}1`);
+    expect(head.querySelector('.n.wait')?.textContent).toBe('1');
+    expect(rowsOf()).toEqual(['w:shop/3', 'p:shop/1', 'p:bise/2', 'p:shop/5']);
+    // ListRow: two lines, the asker and the question, then where, when and #id
+    expect(screen.getByTestId('inbox.row.w:shop/3').className).toContain('b-lrow');
+    expect(screen.getByTestId('inbox.row.w:shop/3').textContent).toContain('storefront · 12 min');
     expect(screen.getByTestId('inbox.row.p:shop/1.said').textContent).toBe('you: only for Safari 16 · in the inbox');
     // the option's words, never its digit
     expect(screen.getByTestId('inbox.row.p:bise/2.said').textContent).toBe('you: A · on a page');
-    expect(screen.getByTestId('inbox.row.p:shop/5').className).toContain('gone');
+    expect(screen.getByTestId('inbox.row.p:shop/5').closest('.ip-row')?.className).toContain('gone');
     expect(screen.getByTestId('inbox.row.p:shop/5.said').textContent).toBe('withdrawn: checkout answered itself');
+    // no key line at the foot any more: the rows' tips say what ⏎ does
+    expect(screen.queryByTestId('inbox.keys')).toBeNull();
+    expect(screen.getByTestId('inbox.row.w:shop/3.open').getAttribute('data-tip')).toBe(inbox.row_tip_wait);
+    expect(screen.getByTestId('inbox.row.p:shop/1.open').getAttribute('data-tip')).toBe(inbox.row_tip_past);
+  });
+
+  it('the chosen row is --c-active and shows its answer; a click picks and answers through the port', () => {
+    const { answered } = mount();
+    expect(screen.getByTestId('inbox.row.w:shop/3').className).toContain('on');
+    fireEvent.click(screen.getByTestId('inbox.row.w:shop/3.answer'));
+    expect(answered).toEqual(['shop#3']);
+    fireEvent.click(screen.getByTestId('inbox.row.p:shop/1.open'));
+    expect(screen.getByTestId('inbox.row.p:shop/1').className).toContain('on');
+    expect(screen.queryByTestId('inbox.row.w:shop/3.answer')).toBeNull();
+    // one row rule: only the chosen one is on
+    expect(document.querySelectorAll('.b-lrow.on')).toHaveLength(1);
   });
 
   it('⏎ on a waiting item opens it above the composer; on a past one opens it whole in the pane; ⌘⏎ goes to his answer', () => {
@@ -59,7 +87,6 @@ describe('the inbox screen', () => {
     expect(answered).toEqual(['shop#3']);
     expect(screen.queryByTestId('inbox.detail')).toBeNull();
     fireEvent.keyDown(root, { key: 'ArrowDown' });
-    expect(screen.getByTestId('inbox.keys.enter').textContent).toBe('⏎ open');
     fireEvent.keyDown(root, { key: 'Enter' });
     // the first action: the item whole beside the list, nothing jumped
     expect(jumps).toEqual([]);
@@ -69,7 +96,7 @@ describe('the inbox screen', () => {
     fireEvent.keyDown(root, { key: 'Enter', metaKey: true });
     expect(jumps).toEqual([{ kind: 'thread', project: 'shop', agent: 'perf', card: 1, pos: 40 }]);
     // a click on a page answer opens it in the pane; its button opens the page at its block
-    fireEvent.click(screen.getByTestId('inbox.row.p:bise/2'));
+    fireEvent.click(screen.getByTestId('inbox.row.p:bise/2.open'));
     expect(jumps).toHaveLength(1);
     expect(screen.getByTestId('inbox.detail.go').textContent).toBe('open the page at your answer⌘⏎');
     fireEvent.click(screen.getByTestId('inbox.detail.go'));
@@ -96,7 +123,8 @@ describe('the inbox screen', () => {
     // a pick: its option marked ✓, no bubble; the page he answered on as a chip
     expect(screen.getByTestId('inbox.detail.question').textContent).toBe('la ligne d’attente?');
     expect(screen.getByTestId('inbox.detail.option.1').getAttribute('aria-current')).toBe('true');
-    expect(screen.getByTestId('inbox.detail.option.1').textContent).toBe('✓A');
+    expect(screen.getByTestId('inbox.detail.option.1').textContent).toBe('A');
+    expect(screen.getByTestId('inbox.detail.option.1').querySelector('.b-app-icon')).not.toBeNull();
     expect(screen.getByTestId('inbox.detail.option.2').textContent).toBe('2B');
     expect(screen.queryByTestId('inbox.detail.said')).toBeNull();
     expect(screen.getByTestId('inbox.detail.page').textContent).toBe('↗ the wait line · page · v3');
@@ -112,14 +140,24 @@ describe('the inbox screen', () => {
 
   it('filters by state and searches with /', () => {
     const { root } = mount();
+    // the segmented filter (ds Filters): the chosen one is aria-selected
+    expect(screen.getByTestId('inbox.state.all').getAttribute('aria-selected')).toBe('true');
     fireEvent.click(screen.getByTestId('inbox.state.withdrawn'));
-    expect([...screen.getByTestId('inbox.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-row'))).toEqual(['p:shop/5']);
+    expect(screen.getByTestId('inbox.state.withdrawn').getAttribute('aria-selected')).toBe('true');
+    expect(rowsOf()).toEqual(['p:shop/5']);
     fireEvent.click(screen.getByTestId('inbox.state.all'));
     fireEvent.keyDown(root, { key: '/' });
-    expect(document.activeElement).toBe(screen.getByTestId('inbox.search'));
-    fireEvent.change(screen.getByTestId('inbox.search'), { target: { value: 'safari' } });
-    expect([...screen.getByTestId('inbox.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-row'))).toEqual(['p:shop/1']);
-    fireEvent.keyDown(screen.getByTestId('inbox.search'), { key: 'Escape' });
-    expect(screen.getAllByRole('option')).toHaveLength(4);
+    const field = screen.getByTestId('inbox.search.input');
+    expect(document.activeElement).toBe(field);
+    fireEvent.change(field, { target: { value: 'safari' } });
+    expect(rowsOf()).toEqual(['p:shop/1']);
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(rowsOf()).toHaveLength(4);
+  });
+
+  it('says so, once, when nothing is there or nothing matches (ds Empty)', () => {
+    render(<InboxView cards={[]} records={[]} names={NAMES} projects={PROJECTS} now={NOW} ports={{ answer: () => undefined, jump: () => undefined }} />);
+    expect(screen.getByTestId('inbox.empty').className).toBe('b-empty');
+    expect(screen.getByTestId('inbox.empty').textContent).toBe(inbox.screen_empty);
   });
 });

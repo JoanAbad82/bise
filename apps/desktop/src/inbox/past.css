@@ -1,94 +1,60 @@
-/* src/inbox (inbox-screen): the inbox screen (designer's inbox-history pick A, m_24212). ds tokens
-   only; the artifacts and scheduled screens' head, filters, day heads and key line. One left edge:
-   the heads, the rows' text and the key line on the title's edge, a row's tint 8 px out. */
-.ip-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s-5) var(--pad-page-x) 0; box-sizing: border-box; outline: none; }
-/* the hero, the filters and the list (with the pane beside it) in one scroller, the key line under
-   it (designer m_39330: the hero scrolls away with the page). A size container: the pane stays in
-   view (sticky) at most the scroller's height */
-.ip-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; container-type: size; margin: 0 calc(-1 * var(--pad-row-x)); padding: 0 var(--pad-row-x); }
-/* a row cut by the scroller's end fades out over 16 px, like the thread's end (designer m_25639) */
-.ip-scroll { mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-4)), transparent); }
-.ip-crumb { padding: 0; border: 0; background: none; font: inherit; color: var(--c-text-2); cursor: pointer; }
-.ip-crumb:hover { color: var(--c-text); }
-.ip-filters { flex: none; display: flex; align-items: center; gap: var(--gap-inline); margin: var(--gap-section) 0 var(--s-2); min-width: 0; }
-.ip-states { display: inline-flex; gap: var(--gap-inline); }
-.ip-state { height: var(--s-6); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: 999px; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); box-shadow: inset 0 0 0 1px var(--c-line); }
-.ip-state:hover { color: var(--c-text); background: var(--c-hover); }
-.ip-state.on { color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-ink); }
-.ip-state:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
-.ip-search { margin-left: auto; flex: 0 1 220px; min-width: 120px; }
-.ip-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }
+/* src/inbox (nm-pages-a, bise fait mac: page native-mac §6, mockup 6): the inbox screen. ds tokens
+   only. The page's name is in the window's bar; the lead (ds PageLead), its filters 24 under it
+   (ds FilterRow), the group labels and the rows (ds GroupLabel, ListRow) are the ds's: here only
+   the column, the rows' words, the pane and the floating composer's room. One left edge: the lead,
+   the filters and the rows' tint on the column's edge, a row's content 12 in (mockup 6). */
+.ip-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; outline: none; }
+/* one scroller: the lead and the filters scroll away with the list (designer m_39330); a size
+   container, so the pane stays in view (sticky) at most its height; the floating composer's room
+   at its foot (--float-room: the last row never sits under it) */
+.ip-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; container-type: size; padding: var(--s-6) var(--pad-page-x) var(--float-room); }
+.ip-search { margin-left: auto; }
 
-.ip-list { margin: 0 calc(-1 * var(--pad-row-x)); }
-/* the right bar's day heads */
-.ip-day-h { padding: var(--s-4) var(--pad-row-x) var(--gap-tight); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
-/* the pink is only in 'waiting for you' */
-.ip-wait-h { color: var(--c-accent); }
-/* a row: 32 px for its first line; a past one's answer on a second line in text-2 */
-.ip-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: var(--gap-block); align-items: center; min-height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); font: var(--t-13) var(--font-ui); color: var(--c-text); }
-.ip-row:hover { background: var(--c-hover); }
-.ip-row.on { background: color-mix(in srgb, var(--c-text) 9%, transparent); }
-.ip-past { grid-template-rows: var(--h-row) auto; padding-bottom: var(--s-2); }
-.ip-g { font: var(--t-13) var(--font-mono); color: var(--c-text-2); text-align: center; }
-.ip-wait .ip-g { color: var(--c-accent); }
-.ip-one { display: flex; gap: var(--gap-inline); min-width: 0; overflow: hidden; white-space: nowrap; }
-.ip-who { flex: none; font-weight: 500; }
-.ip-q { overflow: hidden; text-overflow: ellipsis; }
-.ip-end { color: var(--c-text-3); text-align: right; white-space: nowrap; }
-.ip-two { grid-column: 2 / 4; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: calc(-1 * var(--s-1)); font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.ip-list { margin-top: var(--s-2); }
+.ip-who { margin-right: var(--s-2); font-weight: 600; }
+.ip-q { color: var(--c-text); }
+/* '?' waits on him: the accent's one use on a row */
+.ip-ask { color: var(--c-accent); }
+.ip-dash { display: block; width: var(--s-2); height: 1px; background: currentColor; }
 /* withdrawn: dim, the reason on its second line */
-.ip-past.gone .ip-one, .ip-past.gone .ip-g { color: var(--c-text-3); }
-.ip-past.gone .ip-two { color: var(--c-text-3); }
-.ip-empty { padding: var(--s-8) 0; font: var(--t-14) var(--font-read); color: var(--c-text-2); }
-.ip-keys { flex: none; display: flex; gap: 3ch; padding: var(--s-2) 0 var(--s-3); border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
-.ip-keys b { font-weight: 500; color: var(--c-text-2); }
+.ip-row.gone .ip-who, .ip-row.gone .ip-q { color: var(--c-text-3); }
+.ip-answer { height: var(--h-control-sm); }
 
 /* the list and, beside it, the pane with one past item whole (⏎, space, a click: inbox-open) */
 .ip-body { display: flex; align-items: flex-start; }
-.ip-body > .ip-list, .ip-body > .ip-empty { flex: 1 1 auto; min-width: 0; }
+.ip-body > .ip-list, .ip-body > .b-empty { flex: 1 1 auto; min-width: 0; }
 .ip-body.paned > .ip-list { flex: 1 1 56%; min-width: 360px; }
-.ip-row.open { box-shadow: inset 2px 0 0 var(--c-ink); }
-.ip-pane { position: sticky; top: 0; max-height: 100cqh; box-sizing: border-box; flex: 0 1 44%; min-width: 320px; min-height: 0; display: flex; flex-direction: column; margin-left: var(--gap-block); padding-left: var(--s-5); border-left: 1px solid var(--c-line); }
-.ip-p-head { flex: none; display: flex; align-items: center; gap: var(--gap-inline); min-height: var(--h-row); }
+.ip-pane { position: sticky; top: 0; max-height: 100cqh; box-sizing: border-box; flex: 0 1 44%; min-width: 320px; min-height: 0; display: flex; flex-direction: column; margin-left: var(--s-3); padding-left: var(--s-5); border-left: 1px solid var(--c-line); }
+.ip-p-head { flex: none; display: flex; align-items: center; gap: var(--s-2); min-height: var(--h-group); }
 .ip-p-head .ip-d-k { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ip-p-head .ip-crumb { display: none; }
-.ip-p-close { flex: none; width: var(--h-control-sm); height: var(--h-control-sm); padding: 0; border: 0; border-radius: var(--r-2); background: none; font: var(--t-14) var(--font-ui); color: var(--c-text-3); cursor: pointer; }
+.ip-crumb { display: none; align-items: center; gap: var(--s-1); padding: 0; border: 0; background: none; font: 400 var(--f-ui); color: var(--c-text-2); }
+.ip-crumb:hover { color: var(--c-text); }
+.ip-p-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--h-control-sm); height: var(--h-control-sm); padding: 0; border: 0; border-radius: var(--r-1); background: none; color: var(--c-text-3); }
 .ip-p-close:hover { color: var(--c-text); background: var(--c-hover); }
 .ip-p-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-2) 0 var(--s-4); }
-.ip-d-chip { align-self: flex-start; height: var(--h-control-sm); padding: 0 var(--pad-control-x-sm); border: 1px solid var(--c-line); border-radius: 999px; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); cursor: pointer; }
+.ip-d-chip { align-self: flex-start; height: var(--h-control-sm); padding: 0 var(--s-3); border: 1px solid var(--c-line); border-radius: var(--r-1); background: none; font: 400 var(--f-meta); color: var(--c-text-2); }
 .ip-d-chip:hover { color: var(--c-text); background: var(--c-hover); }
-.ip-d-k { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
-.ip-d-q { font: 600 17px/1.3 var(--font-ui); color: var(--c-text); }
-.ip-d-opts { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--s-1); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
-.ip-d-opts li { padding: var(--s-1) var(--s-2); margin: 0 calc(-1 * var(--s-2)); border-radius: var(--r-2); }
-.ip-d-opts li.on { color: var(--c-text); background: color-mix(in srgb, var(--c-text) 9%, transparent); }
-.ip-d-n { display: inline-block; width: 2.5ch; font-family: var(--font-mono); color: var(--c-text-3); }
+.ip-d-k { font: 400 var(--f-meta); color: var(--c-text-3); }
+.ip-d-q { font: 600 var(--f-lead); color: var(--c-text); }
+.ip-d-opts { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--s-1); font: 400 var(--f-ui); color: var(--c-text-2); }
+.ip-d-opts li { display: flex; align-items: center; padding: var(--s-1) var(--s-2); margin: 0 calc(-1 * var(--s-2)); border-radius: var(--r-1); }
+.ip-d-opts li.on { color: var(--c-text); background: var(--c-active); }
+.ip-d-n { display: inline-flex; flex: none; width: var(--s-5); color: var(--c-text-3); }
 .ip-d-opts li.on .ip-d-n { color: var(--c-text); }
 /* his answer as his bubble, at the right as in the thread */
-.ip-d-said { align-self: flex-end; max-width: 75%; padding: var(--pad-card); border: 1px solid var(--c-line); border-radius: var(--r-3, 12px); background: var(--c-raised); font: var(--t-14) var(--font-read); color: var(--c-text); }
-.ip-d-gone { font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
-.ip-d-next { font: var(--t-13) var(--font-read); color: var(--c-text-2); }
-.ip-d-go { align-self: flex-start; margin-top: var(--s-2); display: inline-flex; align-items: center; gap: var(--gap-inline); height: var(--h-control-sm); padding: 0 var(--pad-control-x-sm); border: 1px solid var(--c-line); border-radius: var(--r-2); background: none; font: var(--t-13) var(--font-ui); color: var(--c-text); cursor: pointer; }
+.ip-d-said { align-self: flex-end; max-width: 75%; padding: var(--s-3) var(--s-4); border: 1px solid var(--c-line); border-radius: var(--r-4); background: var(--c-raised); font: 400 var(--f-read); color: var(--c-text); }
+.ip-d-gone { font: 400 var(--f-ui); color: var(--c-text-3); }
+.ip-d-next { font: 400 var(--f-read); color: var(--c-text-2); }
+.ip-d-go { align-self: flex-start; margin-top: var(--s-2); display: inline-flex; align-items: center; gap: var(--s-2); height: var(--h-control-sm); padding: 0 var(--s-3); border: 1px solid var(--c-line); border-radius: var(--r-1); background: none; font: 400 var(--f-ui); color: var(--c-text); }
 .ip-d-go:hover { background: var(--c-hover); }
-.ip-d-go:focus-visible, .ip-d-chip:focus-visible, .ip-p-close:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
-.ip-d-go kbd { font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
+.ip-d-go:focus-visible, .ip-d-chip:focus-visible, .ip-p-close:focus-visible, .ip-crumb:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
+.ip-d-go kbd { font: 400 var(--f-kbd); color: var(--c-text-3); }
 
-.ip-narrow-only { display: none; }
-/* the projects menu's 'projects' head shows only at 800, where the agents join it under theirs */
-.ip-heads-narrow > .b-picker-ghead { display: none; }
-/* 800: the agents into the projects menu, 'withdrawn' too; the rows drop the project and the
-   'where' whole, never half (the detail keeps them) */
+/* 800: the pane takes the list's place, '← inbox' back */
 @media (max-width: 900px) {
-  .ip-screen { padding: var(--s-4) var(--s-4) 0; }
-  .ip-filters { gap: var(--s-1); }
-  .ip-search { flex-basis: 160px; }
-  .ip-wide-only, .ip-filters .ip-wide-only, .ip-proj, .ip-where { display: none; }
-  .ip-narrow-only { display: revert; }
-  .ip-heads-narrow > .b-picker-ghead { display: flex; }
-  span.ip-narrow-only { display: inline; }
-  /* the pane takes the list's place, '‹ inbox' back */
+  .ip-scroll { padding: var(--s-4) var(--s-4) var(--float-room); }
   .ip-body.paned > .ip-list { display: none; }
   .ip-pane { flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; border: 0; }
-  .ip-p-head .ip-crumb { display: inline; }
+  .ip-p-head .ip-crumb { display: inline-flex; }
   .ip-p-close { display: none; }
 }

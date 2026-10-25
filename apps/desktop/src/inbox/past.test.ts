@@ -3,7 +3,7 @@ import type { Card } from '@/proto';
 import { inbox } from '@/proto/words_inbox.gen';
 import { hero } from '@/proto/words_hero.gen';
 import { age } from './InboxCard';
-import { ALL, dayHead, endWords, heroFacts, jumpOf, lineTwo, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
+import { ALL, dayHead, heroFacts, jumpOf, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
 // at collect time: waiting.ts pulls ./Block (the inbox UI), too slow to transform inside a test's 5 s at load
 import { waitingCount } from './waiting';
 
@@ -58,18 +58,9 @@ describe('the rows words', () => {
     expect(saidWords(rec(1, { pick_n: 1 }))).toBe('keep both');
     expect(saidWords(rec(1, { said: 'only for Safari 16' }))).toBe('only for Safari 16');
   });
-  it("says the record's second line, and drops the 'where' whole when narrow", () => {
+  it('says where he answered', () => {
     expect(whereWords({ kind: 'thread', agent: 'old' })).toBe("in old's thread");
     expect(whereWords({ kind: 'unknown' })).toBe(inbox.where_inbox);
-    const r = rec(1, { said: 'yes', where: { kind: 'page', page: 'p' }, line2: 'you: yes · on a page' });
-    expect(lineTwo(r)).toBe('you: yes · on a page');
-    expect(lineTwo(r, true)).toBe('you: yes');
-    const w = rec(1, { state: 'withdrawn', reason: 'agent stopped', line2: 'withdrawn: its agent stopped' });
-    expect(lineTwo(w, true)).toBe('withdrawn: its agent stopped');
-  });
-  it('drops the project when narrow', () => {
-    expect(endWords('shop', at(0, 14, 2), NAMES, false, null)).toBe('storefront · 14:02');
-    expect(endWords('shop', at(0, 14, 2), NAMES, true, null)).toBe('14:02');
   });
 });
 

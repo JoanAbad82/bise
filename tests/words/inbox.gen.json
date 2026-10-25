@@ -248,15 +248,15 @@
     "one": null,
     "text": "esc to {to} instead"
   },
-  "inbox.filter_agents": {
+  "inbox.filter_label": {
     "args": [],
     "one": null,
-    "text": "agents"
+    "text": "show"
   },
-  "inbox.filter_projects": {
+  "inbox.group_waiting": {
     "args": [],
     "one": null,
-    "text": "projects"
+    "text": "waiting for you"
   },
   "inbox.head": {
     "args": [],
@@ -344,11 +344,6 @@
     "one": null,
     "text": "full screen"
   },
-  "inbox.key_go": {
-    "args": [],
-    "one": null,
-    "text": "go to your answer"
-  },
   "inbox.key_got_it": {
     "args": [],
     "one": null,
@@ -398,11 +393,6 @@
     "args": [],
     "one": null,
     "text": "pick"
-  },
-  "inbox.key_prev_next": {
-    "args": [],
-    "one": null,
-    "text": "previous / next"
   },
   "inbox.key_says_no": {
     "args": [],
@@ -713,6 +703,16 @@
     "args": [],
     "one": null,
     "text": "restart to update"
+  },
+  "inbox.row_tip_past": {
+    "args": [],
+    "one": null,
+    "text": "⏎ open · ⌘⏎ go to your answer"
+  },
+  "inbox.row_tip_wait": {
+    "args": [],
+    "one": null,
+    "text": "⏎ answer"
   },
   "inbox.screen_empty": {
     "args": [],

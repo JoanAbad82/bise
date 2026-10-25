@@ -1,18 +1,23 @@
-// The running screen (designer's running-procs; sidebar row '∿ running', route running): what
-// his agents left running in every project, grouped project > agent, 'running · N' or 'ended
-// today · N', and the selected one's output beside it (head: its command, agent · project,
-// open ↗ / stop; meta: state and age, port, pid, cpu and memory, folder; a read-only terminal
-// that follows its end). While shown the core asks every running hub for its list every 2 s
+// The processes screen (bise fait mac: page native-mac §6 and §8; designer's running-procs; route
+// running): what his agents left running in every project. The page's name and its search
+// (InBar, '/') are in the window's bar; under it the lead (ds PageLead), the filter (ds Filters:
+// 'running N' / 'ended today N'), a ds GroupLabel per project, one ds ListRow per process (its
+// command in mono 12, then agent · address · age; a --c-ok dot while it runs; the chosen one's
+// 'open'; its '…' and a right click are its menu, useEntityMenu), and the selected one's output
+// beside it (head: meta, find ⌘F, open ↗ / stop; a read-only terminal that follows its end; no
+// key line at the foot, the keys in the tips). The floating composer's room at the list's foot. While shown the core asks every running hub for its list every 2 s
 // (core cmd processes_all, architect m_38378). Stop asks nothing: 'stopping…', then its hub's
 // row says how it ended. A row that ends while the screen is open stays where it was until he
-// leaves or switches the filter (designer m_38389). Owner: procs-desktop.
+// leaves or switches the filter (designer m_38389). Owner: nm-pages-a (procs-desktop's before).
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { nextHit, type Hit } from './find';
 import type { Terminal as Xterm } from '@xterm/xterm';
-import { Empty, Field, PageHero, Press, Seg, tipAttrs } from '@/ds';
+import { AppIcon, BarSearch, Empty, Field, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageLead, Press, RowAction, tipAttrs } from '@/ds';
+import { useEntityMenu } from '@/app/menus/use';
 import { Code } from '@/thread/Code';
 import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
+import { InBar } from '@/app/barslot';
 import { useKeptScroll } from '@/app/keep';
 import { useProjects, useStore } from '@/store';
 import { useBarAgents } from '@/app/baragents';
@@ -110,6 +115,7 @@ export function RunningView({
   };
   const [filter, setFilter] = useState<Filter>(() => (endedOne(opened) ? 'ended' : 'running'));
   const [q, setQ] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
   // what he stopped from here, until its hub says it ended
   const [stopping, setStopping] = useState<ReadonlySet<string>>(new Set());
   // the rows seen running while 'running' is shown: one that ends stays in place (designer m_38389)
@@ -170,7 +176,7 @@ export function RunningView({
       else return false;
     } else if (e.key === 's' && x) stop(x);
     else if (e.key === 'o' && x) openUrl(x);
-    else if (e.key === '/') document.querySelector<HTMLInputElement>('[data-testid="running.search"]')?.focus();
+    else if (e.key === '/') searchRef.current?.focus();
     else return false;
     return true;
   };
@@ -193,89 +199,46 @@ export function RunningView({
   return (
     <section ref={ref} className={`run-screen${cur ? ' has-pane' : ''}`} data-testid="running.screen" tabIndex={-1} onKeyDown={onKeyDown}>
       <div className="run-main">
-        {/* one scroller: the hero scrolls away with the list (designer m_39330) */}
+        {/* one scroller: the lead scrolls away with the list (designer m_39330); its foot keeps the
+            floating composer's room (--float-room) */}
         <div className="run-scroll" data-testid="running.scroll">
-        <PageHero
-          name={running.heading}
+        <PageLead
           sentence={hero.processes_say}
           // 'in N projects' only on every project's list: a scoped one is one place (designer m_38700)
           facts={<span data-testid="running.sub">{`${scoped ? running.count_running({ n: counts.running }) : running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}</span>}
-          testId="running.hero"
+          testId="running.lead"
         />
-        <div className="run-bar">
-          {/* the plugins place's tabs: text, the chosen one underlined, its count in text-3 (designer m_41694 #3) */}
-          <Seg
-            items={FILTERS.map((f) => (
-              <span key={f} data-testid={`running.filter.${f}`} aria-selected={filter === f}>
-                {f === 'running' ? running.state_running : running.ended_today} <span className="run-n">{f === 'running' ? counts.running : counts.ended}</span>
-              </span>
-            ))}
-            on={FILTERS.indexOf(filter)}
-            onPick={(i) => { pick(FILTERS[i] ?? 'running'); }}
-            testId="running.filters"
+        <FilterRow testId="running.filters">
+          <Filters
+            items={FILTERS.map((f) => ({ id: f, label: <>{f === 'running' ? running.state_running : running.ended_today}<span className="run-n">{f === 'running' ? counts.running : counts.ended}</span></> }))}
+            on={filter}
+            label={running.filter_label}
+            onPick={(id) => { pick(id === 'ended' ? 'ended' : 'running'); }}
+            testId="running.filter"
           />
-          <span className="run-search">
-            <Field slash placeholder={running.search} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="running.search" />
-          </span>
-        </div>
+          {/* the page's search, in the window's bar (app-polish #4) */}
+          <InBar>
+            <BarSearch ref={searchRef} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="running.search" />
+          </InBar>
+        </FilterRow>
         {order.length === 0 ? (
-          <div className="run-empty" data-testid="running.empty">
-            {q !== '' ? running.none_match : filter === 'running' ? running.empty : running.empty_ended}
-          </div>
+          <Empty testId="running.empty" title={q !== '' ? running.none_match : filter === 'running' ? running.empty : running.empty_ended} />
         ) : (
-          <div className="run-list" role="listbox" data-testid="running.list">
+          <div className="run-list" data-testid="running.list">
             {groups.map((g) => (
-              <div key={g.key} className="run-group" data-testid={`running.group.${g.key}`}>
-                {/* one head per project; none with one project: the hero says it (designer m_41694 #2) */}
-                {groups.length > 1 && <div className="run-ghead">{g.projectName}</div>}
+              <div key={g.key} role="group" aria-label={g.projectName} data-testid={`running.group.${g.key}`}>
+                {/* one label per project; none with one project: the lead says it (designer m_41694 #2) */}
+                {groups.length > 1 && <GroupLabel>{g.projectName}</GroupLabel>}
                 {g.items.map((x) => {
                   const k = keyOf(x);
-                  const s = stateOf(x.p, stopping.has(k));
-                  const m = markOf(s);
-                  const u = urlWords(x.p, s);
-                  const c = rowCmd(x.p.cmd, x.p.cwd);
                   return (
-                    <div
-                      key={k}
-                      className={`run-row${k === sel ? ' on' : ''}${k === open ? ' open' : ''}`}
-                      role="option"
-                      aria-selected={k === sel}
-                      data-row={k}
-                      data-state={s.k}
-                      data-testid={`running.row.${k}`}
+                    <ProcRow key={k} x={x} k={k} on={k === sel} s={stateOf(x.p, stopping.has(k))} now={now} home={home}
                       onClick={() => {
                         setSel(k);
                         setOpen(k);
+                        ref.current?.focus({ preventScroll: true });
                       }}
-                    >
-                      <span className={`run-mark ${m.tone}`} data-testid={`running.row.${k}.mark`} {...tipAttrs(markTip(x.p, s, now))}>{m.glyph}</span>
-                      {/* its program by name, its arguments dimmer; the whole command in its tip (designer m_41694 #1) */}
-                      <span className="run-cmd" data-testid={`running.row.${k}.cmd`} {...tipAttrs(`${x.p.cmd}\n${tipOf(x.p, home)}`)}>
-                        <span className="run-prog">{c.prog}</span>
-                        {c.args !== '' && <span className="run-args">{` ${c.args}`}</span>}
-                      </span>
-                      <span className="run-agent">{x.p.agent}</span>
-                      {u !== null ? (
-                        <a
-                          className="run-url"
-                          href={u.url}
-                          data-testid={`running.row.${k}.url`}
-                          {...tipAttrs(u.tip)}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            ports.open(u.url);
-                          }}
-                        >
-                          {u.row}
-                        </a>
-                      ) : (
-                        <span />
-                      )}
-                      <span className="run-end" data-testid={`running.row.${k}.end`}>
-                        {endWords(x.p, s, now)}
-                      </span>
-                    </div>
+                      onOpen={(url) => { ports.open(url); }} />
                   );
                 })}
               </div>
@@ -295,6 +258,7 @@ export function RunningView({
           onBack={() => { setOpen(null); }}
           onStop={() => { stop(cur); }}
           onOpen={() => { openUrl(cur); }}
+          onFind={() => { setFinding(true); }}
           find={finding ? <Find term={term} onDone={() => { setFinding(false); ref.current?.focus({ preventScroll: true }); }} /> : null}
         />
       ) : (
@@ -340,7 +304,7 @@ function Find({ term, onDone }: { term: { readonly current: Xterm | null }; onDo
   );
 }
 
-function Pane({ x, st, now, where, onTerm, onBack, onStop, onOpen, find }: { x: ProcItem; st: ReturnType<typeof stateOf>; now: number; where: string; onTerm: (t: Xterm | null) => void; onBack: () => void; onStop: () => void; onOpen: () => void; find: ReactNode }) {
+function Pane({ x, st, now, where, onTerm, onBack, onStop, onOpen, onFind, find }: { x: ProcItem; st: ReturnType<typeof stateOf>; now: number; where: string; onTerm: (t: Xterm | null) => void; onBack: () => void; onStop: () => void; onOpen: () => void; onFind: () => void; find: ReactNode }) {
   const u = urlWords(x.p, st);
   const live = st.k === 'running' || st.k === 'stopping';
   // stop is the only danger: a first click asks, the second stops (designer m_41694 #8)
@@ -349,13 +313,15 @@ function Pane({ x, st, now, where, onTerm, onBack, onStop, onOpen, find }: { x: 
   return (
     <aside className="run-pane" data-testid="running.pane">
       <div className="run-phead">
-        <Press look="run-back" onClick={onBack} data-testid="running.back">{`‹ ${running.heading}`}</Press>
+        <Press look="run-back" onClick={onBack} data-testid="running.back"><AppIcon name="back" size={14} />{running.heading}</Press>
         <div className="run-meta" data-testid="running.pane.meta">
           {metaOf(x, st, now, where).map((m) => (
             <span key={m.k} className={`run-m-${m.k}`} {...tipAttrs(m.k === 'where' ? cwd : undefined)}>{m.w}</span>
           ))}
         </div>
         <span className="run-pacts">
+          {/* ⌘F's find over the output: the key in its tip (no key line at the foot, bise fait mac §6) */}
+          <Press look="run-icon" onClick={onFind} aria-label={running.key_find} data-testid="running.pane.find" {...tipAttrs(running.find_tip)}><AppIcon name="search" size={16} /></Press>
           {u !== null && (
             <Press look="run-act" onClick={onOpen} data-testid="running.pane.open" {...tipAttrs(u.tip)}>{running.open}</Press>
           )}
@@ -380,15 +346,47 @@ function Pane({ x, st, now, where, onTerm, onBack, onStop, onOpen, find }: { x: 
       </pre>
       {find}
       <Output project={x.project} agent={x.p.agent} id={x.p.id} none={x.p.out === 'none' || x.p.out === 'unknown'} live={live} quiet={quietWords(x.p, st, now)} onTerm={onTerm} />
-      <div className="run-keys" data-testid="running.keys">
-        <span><b>↓</b> {running.key_follow}</span>
-        <span className="run-k-find"><b>⌘F</b> {running.key_find}</span>
-        <span className="run-k-copy"><b>⌘C</b> {running.key_copy}</span>
-        {live && <span><b>s</b> {running.key_stop}</span>}
-        {u !== null && <span><b>o</b> {running.key_open}</span>}
-        <span><b>esc</b> {running.key_back}</span>
-      </div>
     </aside>
+  );
+}
+
+/** A row's state column (§8's line icons, no glyph): a --c-ok dot while it runs, a check when it
+ *  ended well, an x in --c-err when it failed, a dash otherwise; its tip says which. */
+function Mark({ s }: { s: ReturnType<typeof stateOf> }) {
+  const m = markOf(s);
+  if (s.k === 'running' || s.k === 'stopping') return <span className="run-dot" />;
+  if (m.tone === 'ink') return <AppIcon name="check" size={14} />;
+  if (m.tone === 'err') return <span className="run-err"><AppIcon name="close" size={14} /></span>;
+  return <span className="run-dash" />;
+}
+
+/** One process (ds ListRow): its program in mono and its arguments dimmer, then its agent, its
+ *  address and its age; the chosen one's 'open' (its address); its '…' and a right click are its
+ *  menu (useEntityMenu: stop, open in a tab...). */
+function ProcRow({ x, k, on, s, now, home, onClick, onOpen }: {
+  x: ProcItem; k: string; on: boolean; s: ReturnType<typeof stateOf>; now: number; home: string | undefined;
+  onClick: () => void; onOpen: (url: string) => void;
+}) {
+  const menu = useEntityMenu({ kind: 'process', project: x.project, agent: x.p.agent, id: x.p.id });
+  const u = urlWords(x.p, s);
+  const c = rowCmd(x.p.cmd, x.p.cwd);
+  return (
+    <div className="run-row" data-row={k} data-state={s.k}>
+      <ListRow on={on} testId={`running.row.${k}`} onClick={onClick} onContextMenu={menu.onContextMenu}
+        // the whole command in its tip (designer m_41694 #1)
+        tip={`${x.p.cmd}\n${tipOf(x.p, home)}`}
+        state={<span className="run-mark" data-testid={`running.row.${k}.mark`} {...tipAttrs(markTip(x.p, s, now))}><Mark s={s} /></span>}
+        title={<span className="run-cmd" data-testid={`running.row.${k}.cmd`}><span className="run-prog">{c.prog}</span>{c.args !== '' && <span className="run-args">{` ${c.args}`}</span>}</span>}
+        sub={<>
+          {x.p.agent}
+          {u !== null && <span data-testid={`running.row.${k}.url`}>{` · ${u.row}`}</span>}
+          {' · '}<span data-testid={`running.row.${k}.end`}>{endWords(x.p, s, now)}</span>
+        </>}
+        end={<>
+          {on && u !== null && <RowAction onClick={() => { onOpen(u.url); }} tip={u.tip} testId={`running.row.${k}.go`}>{running.open}</RowAction>}
+          <MoreButton menu={menu} testId={`running.row.${k}.more`} />
+        </>} />
+    </div>
   );
 }
 

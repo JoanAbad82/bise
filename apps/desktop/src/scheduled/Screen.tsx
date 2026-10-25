@@ -1,17 +1,22 @@
-// The scheduled screen (desktop-screens v6, designer m_11837; sidebar row '◷ scheduled', route
-// scheduled): what wakes his agents, and when. The list (what it asks | wakes | how often | next
-// run) and one task in a 400 px pane at the right (under 1000 px it replaces the list, with
-// '‹ scheduled'). x stops one after asking in place. The keys are the shared list keys
-// (app/listkeys.ts) plus the TUI's r, x, / and esc (tui-parity m_22176). Owner: amb-mac (amb-kit's before).
-import { useState, type KeyboardEvent } from 'react';
-import { Button, Empty, Field, PageHero } from '@/ds';
+// The scheduled screen (bise fait mac: page native-mac §6, mockup 8; route scheduled, the rail's
+// clock): what wakes his agents, and when. The page's name is in the window's bar; under it the lead
+// (ds PageLead: its sentence, how many run and the next run), the search, then the tasks by project
+// (ds GroupLabel), one ds ListRow each (its name and how often, then who it wakes and its next run;
+// its '…' and a right click are its menu, useEntityMenu). One task opens in a 400 px pane at the
+// right (under 1000 px it replaces the list, with '← scheduled'); stop asks in place there. The keys
+// are the shared list keys (app/listkeys.ts) plus the TUI's r, x, / and esc (tui-parity m_22176).
+// The floating composer's room at the foot (--float-room). Owner: nm-pages-a (amb-mac's before).
+import { useRef, useState, type KeyboardEvent } from 'react';
+import { AppIcon, BarSearch, Button, Empty, GroupLabel, ListRow, MoreButton, PageLead, Press } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
+import { InBar } from '@/app/barslot';
+import { useEntityMenu } from '@/app/menus/use';
 import { useStore } from '@/store';
 import { useKeptScroll } from '@/app/keep';
 import { scheduled } from '@/proto/words_scheduled.gen';
 import { useAllScheduled } from './hooks';
-import { asks, bySoonest, heroFacts, matches, endsWords, howOften, keyOf, nextRunWords, nextWords, runsWords, wakes, type Task } from './model';
+import { ahead, asks, bySoonest, byProject, heroFacts, matches, endsWords, howOften, keyOf, nextRunWords, runsWords, wakes, type Task } from './model';
 import './scheduled.css';
 
 export interface ScheduledPorts {
@@ -47,6 +52,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
   const shown = q === '' ? list : list.filter((x) => matches(x, q));
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const cur = list.find((x) => keyOf(x) === (open ?? '')) ?? null;
   const stop = (x: Task) => {
     ports.stop(x.project, x.t.id);
@@ -72,7 +78,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
       setOpen(keyOf(x));
       setAsking(true);
     } else if (e.key === 'r' && ports.runNow && x) ports.runNow(x.project, x.t.id);
-    else if (e.key === '/' && !cur) document.querySelector<HTMLInputElement>('[data-testid="scheduled.search"]')?.focus();
+    else if (e.key === '/' && !cur) searchRef.current?.focus();
     else return false;
     return true;
   };
@@ -98,6 +104,14 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
       move(e.key === 'ArrowDown' ? 1 : -1);
     }
   };
+  const groups = byProject(shown);
+  // a click picks and opens the task, and gives the keys back to the list (a row's button keeps none)
+  const pick = (x: Task) => {
+    setSel(keyOf(x));
+    setOpen(keyOf(x));
+    setAsking(false);
+    ref.current?.focus({ preventScroll: true });
+  };
   return (
     <section
       ref={ref}
@@ -107,49 +121,37 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
       onKeyDown={onKeyDown}
     >
       <div className="sch-main">
-        {/* one scroller: the hero scrolls away with the list (designer m_39330), the key line stays */}
+        {/* one scroller: the lead scrolls away with the list (designer m_39330); its foot keeps the
+            floating composer's room (--float-room) */}
         <div className="sch-scroll" data-testid="scheduled.scroll">
-        <PageHero name={scheduled.heading} sentence={hero.scheduled_say} facts={heroFacts(list, now)} testId="scheduled.hero" />
+        <PageLead sentence={hero.scheduled_say} facts={heroFacts(list, now)} testId="scheduled.lead" />
         {list.length > 0 && (
-          <span className="sch-search">
-            <Field slash placeholder={scheduled.search_placeholder} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
-          </span>
+          // the page's search, in the window's bar (app-polish #4)
+          <InBar>
+            <BarSearch ref={searchRef} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
+          </InBar>
         )}
         {list.length === 0 ? (
           <Empty testId="scheduled.empty" title={scheduled.empty_desktop} />
         ) : shown.length === 0 ? (
           <Empty testId="scheduled.none" title={scheduled.none_match_desktop} />
         ) : (
-          <div className="sch-list" role="listbox" data-testid="scheduled.list">
-            <div className="sch-row sch-cols" aria-hidden="true">
-              <span>{scheduled.col_what}</span>
-              <span>{scheduled.label_wakes}</span>
-              <span>{scheduled.label_how_often}</span>
-              <span>{scheduled.label_next_run}</span>
-            </div>
-            {shown.map((x) => (
-              <div key={keyOf(x)} className={`sch-row${keyOf(x) === selKey ? ' on' : ''}${cur && keyOf(cur) === keyOf(x) ? ' open' : ''}`} role="option"
-                aria-selected={keyOf(x) === selKey} data-row={keyOf(x)} data-testid={`scheduled.row.${String(x.t.id)}`}
-                onClick={() => { setSel(keyOf(x)); setOpen(keyOf(x)); setAsking(false); }}>
-                <span className="sch-asks" title={x.t.words}>{asks(x.t)}</span>
-                <span className="sch-dim">{wakes(x)}</span>
-                <span className="sch-dim">{howOften(x.t)}</span>
-                <span className="sch-next">{nextWords(x.t, now)}</span>
+          <div className="sch-list" data-testid="scheduled.list">
+            {groups.map((g) => (
+              <div key={g.project} role="group" aria-label={g.name}>
+                <GroupLabel testId={`scheduled.group.${g.project}`}>{g.name}</GroupLabel>
+                {g.items.map((x) => (
+                  <Row key={keyOf(x)} x={x} on={keyOf(x) === selKey} now={now} onClick={() => { pick(x); }} />
+                ))}
               </div>
             ))}
           </div>
         )}
         </div>
-        <div className="sch-keys" data-testid="scheduled.keys">
-          <span><b>⏎</b> {scheduled.key_open}</span>
-          {ports.runNow && <span><b>r</b> {scheduled.key_run_now}</span>}
-          <span><b>x</b> {scheduled.key_stop}</span>
-          <span><b>/</b> {scheduled.key_search}</span>
-        </div>
       </div>
       {cur && (
         <aside className="sch-pane" data-testid="scheduled.pane">
-          <Button kind="ghost" onClick={() => { setOpen(null); setAsking(false); }} testId="scheduled.back">{`‹ ${scheduled.heading}`}</Button>
+          <Press look="sch-back" onClick={() => { setOpen(null); setAsking(false); }} data-testid="scheduled.back"><AppIcon name="back" size={14} />{scheduled.heading}</Press>
           {/* the head, then its words once (designer m_12105: no title repeating the quote) */}
           {/* its name, never its id; who it wakes dim beside it, as the TUI's opened head (designer m_15929) */}
           <div className="sch-title" data-testid="scheduled.pane.title">
@@ -164,7 +166,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
             <dt>{scheduled.label_how_often}</dt><dd>{howOften(cur.t)}</dd>
             <dt>{scheduled.label_next_run}</dt><dd>{nextRunWords(cur.t, now)}</dd>
             <dt>{scheduled.label_it_ends}</dt><dd>{endsWords(cur.t, now)}</dd>
-            {cur.t.page != null && cur.t.page !== '' && (<><dt>{scheduled.label_keeps_fresh}</dt><dd>{`↗ ${cur.t.page}`}</dd></>)}
+            {cur.t.page != null && cur.t.page !== '' && (<><dt>{scheduled.label_keeps_fresh}</dt><dd>{cur.t.page}</dd></>)}
           </dl>
           <div className="sch-label">{scheduled.its_runs}</div>
           <div className="sch-runs">{cur.t.done === 0 ? scheduled.none_yet : runsWords(cur.t)}</div>
@@ -172,19 +174,35 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
             <div className="sch-ask" role="group" data-testid="scheduled.ask">
               <span>{scheduled.stop_ask_desktop({ agent: cur.t.agent })}</span>
               <span className="sch-acts">
-                <Button kind="danger" onClick={() => { stop(cur); }} testId="scheduled.ask.stop">{`${scheduled.key_stop} ⏎`}</Button>
-                <Button kind="ghost" onClick={() => { setAsking(false); }} testId="scheduled.ask.keep">{`${scheduled.key_keep} esc`}</Button>
+                <Button kind="danger" onClick={() => { stop(cur); }} testId="scheduled.ask.stop">{scheduled.key_stop}</Button>
+                <Button kind="ghost" onClick={() => { setAsking(false); }} testId="scheduled.ask.keep">{scheduled.key_keep}</Button>
               </span>
             </div>
           ) : (
             <div className="sch-acts">
-              {/* the act, then its key dim, as the list foot's '⏎ open   x stop' (designer m_15929) */}
-              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">{scheduled.key_run_now} <span className="sch-key">r</span></Button>}
-              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">{scheduled.key_stop} <span className="sch-key">x</span></Button>
+              {/* the act; its key in its tip (no key words on the button, bise fait mac §6) */}
+              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">{scheduled.key_run_now}</Button>}
+              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">{scheduled.key_stop}</Button>
             </div>
           )}
         </aside>
       )}
     </section>
+  );
+}
+
+/** One task's row (ds ListRow): its name and how often, then who it wakes and its next run; its '…'
+ *  and a right click are its menu (useEntityMenu: stop, and what nm-menus gives a scheduled task). */
+function Row({ x, on, now, onClick }: { x: Task; on: boolean; now: number; onClick: () => void }) {
+  const menu = useEntityMenu({ kind: 'scheduled', project: x.project, id: x.t.id });
+  const next = x.t.next_ms != null ? scheduled.next_at({ at: ahead(x.t.next_ms, now) }) : undefined;
+  return (
+    <div data-row={keyOf(x)}>
+      <ListRow on={on} testId={`scheduled.row.${String(x.t.id)}`} tip={x.t.words} onClick={onClick} onContextMenu={menu.onContextMenu}
+        state={<AppIcon name="scheduled" size={14} />}
+        title={<><span className="sch-name">{asks(x.t)}</span><span className="sch-often">{howOften(x.t)}</span></>}
+        sub={next === undefined ? x.t.agent : `${x.t.agent} · ${next}`}
+        end={<MoreButton menu={menu} testId={`scheduled.row.${String(x.t.id)}.more`} />} />
+    </div>
   );
 }

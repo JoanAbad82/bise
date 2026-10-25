@@ -77,6 +77,16 @@
     "one": null,
     "text": "rc {rc}"
   },
+  "running.filter_label": {
+    "args": [],
+    "one": null,
+    "text": "show"
+  },
+  "running.find_tip": {
+    "args": [],
+    "one": null,
+    "text": "find · ⌘F"
+  },
   "running.find_words": {
     "args": [],
     "one": null,
@@ -100,35 +110,10 @@
     "one": null,
     "text": "jump to end ↓"
   },
-  "running.key_back": {
-    "args": [],
-    "one": null,
-    "text": "back"
-  },
-  "running.key_copy": {
-    "args": [],
-    "one": null,
-    "text": "copy"
-  },
   "running.key_find": {
     "args": [],
     "one": null,
     "text": "find"
-  },
-  "running.key_follow": {
-    "args": [],
-    "one": null,
-    "text": "follows the end"
-  },
-  "running.key_open": {
-    "args": [],
-    "one": null,
-    "text": "open"
-  },
-  "running.key_stop": {
-    "args": [],
-    "one": null,
-    "text": "stop"
   },
   "running.keys_head": {
     "args": [],

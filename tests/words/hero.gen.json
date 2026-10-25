@@ -42,7 +42,7 @@
   "hero.inbox_say": {
     "args": [],
     "one": null,
-    "text": "what your agents wait on you for, from every project. answer here or in their thread; only what needs you gets in."
+    "text": "what your agents wait on you for, from every project."
   },
   "hero.new_ones": {
     "args": [

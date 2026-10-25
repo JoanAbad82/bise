@@ -132,16 +132,10 @@ crate::words! { running:
     tip_thread_row = "open its output";
     /// the output's head: stop it
     stop = "stop";
-    /// the output's keys line, after ↓
-    key_follow = "follows the end";
-    /// the output's keys line, after ⌘F (and the find field's placeholder)
+    /// the output's find: its button's VoiceOver name and the find field's placeholder
     key_find = "find";
-    /// the output's keys line, after ⌘C
-    key_copy = "copy";
-    /// the output's keys line, after s
-    key_stop = "stop";
-    /// the output's keys line, after o
-    key_open = "open";
-    /// the output's keys line, after esc
-    key_back = "back";
+    /// the output's find button's tip, with its key
+    find_tip = "find · ⌘F";
+    /// the state filter, for VoiceOver (bise fait mac's segmented filter)
+    filter_label = "show";
 }

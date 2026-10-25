@@ -1,49 +1,34 @@
-/* src/running: the running screen (designer's running-procs). ds tokens only, 4 px grid, no accent. */
+/* src/running (nm-pages-a, bise fait mac: page native-mac §6 and §8): the processes screen. ds tokens
+   only, 4 px grid, no accent. The lead, the filters, the group labels and the rows are the ds's
+   (PageLead, FilterRow + Filters, GroupLabel, ListRow): here only the column, the rows' words and
+   marks, and the selected one's output beside the list. */
 .run-screen { display: flex; height: 100%; min-height: 0; outline: none; }
-.run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: var(--s-5) var(--pad-page-x) 0; box-sizing: border-box; }
-/* the hero, the filters and the list in one scroller (designer m_39330: the hero scrolls away) */
-/* beside the pane (always, over 1000 px) the list is its own column: the page's centring would squeeze it
-   (its % is the screen's), so its sides are the pane's, 16 (designer m_41694 #13) */
-.run-screen .run-main { padding-inline: var(--s-4); }
-@media (max-width: 1000px) { .run-screen:not(.has-pane) .run-main { padding-inline: var(--pad-page-x); } }
-.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
-.run-scroll > * { flex: none; }
-.run-bar { flex: none; display: flex; align-items: flex-end; justify-content: space-between; gap: var(--gap-block); margin-bottom: var(--s-2); border-bottom: 1px solid var(--c-line); }
-/* the plugins place's tabs (designer m_41694 #3): the bar draws their rule; their counts in text-3 */
-.run-bar > .b-seg { border-bottom: 0; }
-.run-bar .b-seg > span { white-space: nowrap; }
-.run-n { margin-left: var(--s-1); color: var(--c-text-3); font-variant-numeric: tabular-nums; }
-.run-search { width: 220px; padding-bottom: var(--s-1); }
-.run-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }
-/* one left edge: the heads and the row text on the column's; rows hang 8 px past for their fill (designer m_41701) */
-.run-list { margin: 0 calc(-1 * var(--pad-row-x)); padding-bottom: var(--s-4); }
-.run-group + .run-group { margin-top: var(--s-3); }
-.run-ghead { min-height: var(--h-row-tight); display: flex; align-items: center; padding: 0 var(--pad-row-x); font: 600 var(--t-12) var(--font-ui); color: var(--c-text-3); }
-/* mark · command · agent · address · time; rows 32 high, touching (designer m_41694 #2) */
-.run-row { display: grid; grid-template-columns: 16px minmax(120px, 1fr) minmax(0, max-content) auto auto; gap: var(--s-3); align-items: center; height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); font: var(--t-13) var(--font-ui); color: var(--c-text); }
-.run-row:hover { background: var(--c-hover); }
-.run-row.on, .run-row.open { background: var(--c-raised); }
-.run-row > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.run-mark { font: 500 var(--t-13) var(--font-mono); text-align: left; }
-.run-mark.dim { color: var(--c-text-3); }
-.run-mark.ink { color: var(--c-text); }
-.run-mark.err { color: var(--c-err); }
-.run-cmd { font: var(--t-13) var(--font-mono); }
+.run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+/* the lead, the filters and the list in one scroller (designer m_39330: the lead scrolls away); the
+   floating composer's room at its foot (--float-room). Beside the pane (always, over 1000 px) the
+   list is its own column: the page's centring would squeeze it, so its sides are the pane's, 16
+   (designer m_41694 #13) */
+.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--s-6) var(--s-4) var(--float-room); box-sizing: border-box; }
+@media (max-width: 1000px) { .run-screen:not(.has-pane) .run-scroll { padding-inline: var(--pad-page-x); } }
+.run-n { margin-left: var(--s-1); color: var(--c-text-3); }
+.run-search { margin-left: auto; }
+.run-list { margin-top: var(--s-2); }
+/* the state column: a --c-ok dot while it runs, a check, a --c-err x, a dash (§8) */
+.run-mark { display: inline-flex; align-items: center; }
+.run-dot { display: block; width: var(--s-2); height: var(--s-2); border-radius: 50%; background: var(--c-ok); }
+.run-err { display: inline-flex; color: var(--c-err); }
+.run-dash { display: block; width: var(--s-2); height: 1px; background: currentColor; }
+/* the command in mono 12 (§8), its program then its arguments dimmer */
+.run-cmd { font: 400 var(--f-mono); }
 .run-prog { color: var(--c-text); }
 .run-args { color: var(--c-text-2); }
-.run-agent { font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
-/* its address, quiet: ':5173 ↗', underlined on hover only (designer m_41694 #4) */
-.run-url { font: var(--t-13) var(--font-mono); color: var(--c-text-2); text-decoration: none; white-space: nowrap; }
-.run-url:hover { color: var(--c-text); text-decoration: underline; text-underline-offset: 2px; }
-.run-end { color: var(--c-text-3); text-align: right; font: var(--t-12) var(--font-ui); font-variant-numeric: tabular-nums; }
-.run-row[data-state='stopping'] .run-end { color: var(--c-text-3); }
-.run-empty { padding: var(--s-8) 0; font: var(--t-14) var(--font-read); color: var(--c-text-2); }
+.run-row[data-state='stopping'] .l2 { color: var(--c-text-3); }
 
 /* the selected one's output: beside the list, half the screen; its sides the list's (16, designer m_41694 #13) */
 .run-pane { container: run-pane / inline-size; flex: 0 0 52%; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid var(--c-line); padding: var(--s-5) var(--s-4) 0; gap: var(--s-3); }
 .run-pane.none { padding-top: var(--s-8); }
 .run-phead { display: flex; align-items: center; gap: var(--s-3); min-width: 0; min-height: var(--h-control-sm); }
-.run-back { display: none; border: 0; background: transparent; padding: 0; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.run-back { display: none; align-items: center; gap: var(--s-1); border: 0; background: transparent; padding: 0; font: 400 var(--f-ui); color: var(--c-text-2); }
 .run-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; overflow: hidden; gap: var(--s-4); white-space: nowrap; font: var(--t-12) var(--font-ui); color: var(--c-text-2); font-variant-numeric: tabular-nums; }
 .run-meta > span { flex: none; }
 .run-meta > .run-m-where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -71,18 +56,17 @@
 .run-jump { position: absolute; right: var(--s-3); bottom: var(--s-3); height: var(--h-control-sm); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: var(--r-2); background: var(--c-bg, var(--p-bg)); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
 .run-jump:hover { color: var(--c-text); }
 .run-none { flex: 1 1 auto; margin: 0; padding: var(--s-2) 0; font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
-.run-keys { flex: none; display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; gap: 3ch; padding: var(--s-2) 0 var(--s-3); border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
-/* one line each, a narrow pane drops parts whole (designer m_41800 #1 #2): the head pid, then cpu · MB; the keys
-   ⌘C copy, then ⌘F find; the state, open / stop and 'esc back' (last) always stay */
+.run-icon { display: inline-flex; align-items: center; justify-content: center; width: var(--h-control-sm); height: var(--h-control-sm); padding: 0; border: 0; border-radius: var(--r-1); background: none; color: var(--c-text-3); }
+.run-icon:hover { color: var(--c-text); background: var(--c-hover); }
+.run-icon:focus-visible, .run-act:focus-visible, .run-back:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
+/* one line, a narrow pane drops parts whole (designer m_41800 #1 #2): the head pid, then cpu · MB */
 @container run-pane (max-width: 560px) { .run-m-pid { display: none; } }
-@container run-pane (max-width: 480px) { .run-m-usage { display: none; } .run-k-copy { display: none; } }
-@container run-pane (max-width: 400px) { .run-k-find { display: none; } }
-.run-keys b { font-weight: 500; color: var(--c-text-2); }
+@container run-pane (max-width: 480px) { .run-m-usage { display: none; } }
 
-/* under 1000 px the output replaces the list, with '‹ running' */
+/* under 1000 px the output replaces the list, with '← processes' */
 @media (max-width: 1000px) {
   .run-screen.has-pane .run-main { display: none; }
   .run-screen.has-pane .run-pane { flex: 1 1 auto; border-left: 0; }
-  .run-back { display: inline; }
+  .run-back { display: inline-flex; }
   .run-pane.none { display: none; }
 }

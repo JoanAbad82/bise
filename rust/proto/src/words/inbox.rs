@@ -53,10 +53,6 @@ crate::words! { inbox:
     all_projects = "all projects";
     /// the desktop's agent filter: every agent
     all_agents = "all agents";
-    /// the desktop filter menu's head over the projects (800)
-    filter_projects = "projects";
-    /// the desktop filter menu's head over the agents (800)
-    filter_agents = "agents";
     /// the desktop's state filter: all
     state_all = "all";
     /// the desktop's state filter: waiting
@@ -67,6 +63,14 @@ crate::words! { inbox:
     state_withdrawn = "withdrawn";
     /// the desktop's search field, and its `/` key
     search = "search";
+    /// the desktop's state filter, for VoiceOver (bise fait mac's segmented filter)
+    filter_label = "show";
+    /// the desktop's group label over the open items (its count after it, in the accent)
+    group_waiting = "waiting for you";
+    /// the desktop's tip on a waiting row: what ⏎ does
+    row_tip_wait = "⏎ answer";
+    /// the desktop's tip on a past row: what ⏎ and ⌘⏎ do
+    row_tip_past = "⏎ open · ⌘⏎ go to your answer";
     /// the desktop screen with nothing at all
     screen_empty = "nothing yet. what your agents ask you waits here, and stays once you answer.";
     /// the desktop screen when the filter keeps nothing
@@ -146,10 +150,6 @@ crate::words! { inbox:
     key_answer = "answer";
     /// a key's words: pick an option
     key_pick = "pick";
-    /// a key's words: previous / next (the desktop's detail)
-    key_prev_next = "previous / next";
-    /// a key's words: go to his answer (the desktop's ⌘⏎)
-    key_go = "go to your answer";
     /// a key's words: back to his message (the TUI's esc)
     key_back_message = "back to your message";
     /// a key's words: a closed question's words go as a message

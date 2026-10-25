@@ -1,65 +1,37 @@
-/* src/scheduled (amb-kit): the scheduled screen (desktop-screens v6, designer m_11837). ds tokens only. */
+/* src/scheduled (nm-pages-a, bise fait mac: page native-mac §6, mockup 8): the scheduled screen.
+   ds tokens only. The lead, the filters' row, the group labels and the rows are the ds's (PageLead,
+   FilterRow, GroupLabel, ListRow): here only the column, the rows' words and one task's pane. */
 .sch-screen { display: flex; height: 100%; min-height: 0; outline: none; }
-.sch-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: var(--s-5) var(--pad-page-x) 0; box-sizing: border-box; container-type: inline-size; container-name: sch-list; }
-/* the hero, the search and the list in one scroller, the key line under it (designer m_39330) */
-.sch-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
-.sch-scroll > * { flex: none; }
-/* one left edge (designer m_21274): the heads, the row text and the key line sit on the title's edge;
-   the list runs --pad-row-x out on both sides so a row's tint and hover hang 8 px past the content */
-.sch-list { margin: 0 calc(-1 * var(--pad-row-x)); }
-/* 'what it does' (the names) is never dropped: it keeps 140 px; when the list narrows (a task's pane
-   open at 1100, a small window) 'how often' goes first, then 'next run', then 'wakes', which is cut
-   with … before it goes (designer m_16028, f5ff0e72's red) */
-.sch-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 190px) 170px 110px; gap: var(--gap-block); align-items: center; min-height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); font: var(--t-13) var(--font-ui); color: var(--c-text); }
-.sch-row > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.sch-cols { min-height: var(--h-row-tight); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
-/* a column's head takes its column's alignment: 'next run' ends where its times end */
-.sch-cols > :nth-child(4) { text-align: right; }
-.sch-row:not(.sch-cols):hover { background: var(--c-hover); }
-.sch-row.on { background: color-mix(in srgb, var(--c-text) 9%, transparent); }
-.sch-dim { color: var(--c-text-2); }
-.sch-next { color: var(--c-text-2); text-align: right; }
-.sch-keys { flex: none; display: flex; gap: 3ch; padding: var(--s-2) 0 var(--s-3); border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
-.sch-keys b { font-weight: 500; color: var(--c-text-2); }
+.sch-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+/* the lead, the search and the list in one scroller (designer m_39330); the floating composer's
+   room at its foot (--float-room: the last row never sits under it) */
+.sch-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--s-6) var(--pad-page-x) var(--float-room); box-sizing: border-box; }
+.sch-search { margin-left: auto; }
+.sch-list { margin-top: var(--s-2); }
+.sch-name { margin-right: var(--s-2); font-weight: 600; }
+.sch-often { color: var(--c-text-2); }
 
 /* one task: a 400 px pane at the right */
-.sch-pane { flex: none; width: 400px; box-sizing: border-box; overflow-y: auto; padding: var(--pad-panel); border-left: 1px solid var(--c-line); display: flex; flex-direction: column; gap: var(--s-2); }
-.sch-pane > .b-btn:first-child { display: none; align-self: flex-start; }
-.sch-k3 { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
-.sch-title { font: 600 17px/1.3 var(--font-ui); color: var(--c-text); }
+.sch-pane { flex: none; width: 400px; box-sizing: border-box; overflow-y: auto; padding: var(--s-4); border-left: 1px solid var(--c-line); display: flex; flex-direction: column; gap: var(--s-2); }
+.sch-back { display: none; align-self: flex-start; align-items: center; gap: var(--s-1); height: var(--h-control-sm); padding: 0; border: 0; background: none; font: 400 var(--f-ui); color: var(--c-text-2); }
+.sch-back:hover { color: var(--c-text); }
+.sch-back:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
+.sch-title { font: 600 var(--f-lead); color: var(--c-text); }
 /* the opened head (designer m_15929): its name, then who it wakes dim, as the TUI's opened head */
-.sch-title .sch-k3-sub { margin-left: var(--gap-inline); font: 400 var(--t-12) var(--font-ui); color: var(--c-text-3); }
-/* a button's key beside its word, dim, as the list foot's '⏎ open   x stop' */
-.sch-key { margin-left: var(--gap-inline); font: 500 var(--t-12) var(--font-mono); opacity: 0.55; }
-.sch-label { margin-top: var(--s-2); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
-.sch-quote { margin: 0; padding: var(--s-2) var(--s-3); border-radius: 9px; background: var(--c-raised); font: var(--t-13)/1.5 var(--font-read); color: var(--c-text); white-space: pre-wrap; }
-.sch-kv { display: grid; grid-template-columns: 96px 1fr; gap: var(--s-2) var(--gap-block); margin: var(--gap-tight) 0 0; font: var(--t-13) var(--font-ui); }
+.sch-title .sch-k3-sub { margin-left: var(--s-2); font: 400 var(--f-meta); color: var(--c-text-3); }
+/* a label in sentence case, 12/500 text-3 (no spaced capitals) */
+.sch-label { margin-top: var(--s-2); font: 500 var(--f-meta); color: var(--c-text-3); }
+.sch-quote { margin: 0; padding: var(--s-2) var(--s-3); border-radius: var(--r-2); background: var(--c-raised); font: 400 var(--f-read); color: var(--c-text); white-space: pre-wrap; }
+.sch-kv { display: grid; grid-template-columns: 96px 1fr; gap: var(--s-2) var(--s-3); margin: var(--s-1) 0 0; font: 400 var(--f-ui); }
 .sch-kv dt { color: var(--c-text-2); }
 .sch-kv dd { margin: 0; color: var(--c-text); }
-.sch-runs { font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
-.sch-acts { display: flex; gap: var(--gap-inline); margin-top: var(--gap-block); }
-.sch-ask { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--gap-block); font: var(--t-13) var(--font-ui); color: var(--c-text); }
-/* under 1000 px the task replaces the list, with '‹ scheduled' */
+.sch-runs { font: 400 var(--f-ui); color: var(--c-text-2); }
+.sch-acts { display: flex; gap: var(--s-2); margin-top: var(--s-3); }
+.sch-ask { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3); font: 400 var(--f-ui); color: var(--c-text); }
+/* under 1000 px the task replaces the list, with '← scheduled' */
 @media (max-width: 1000px) {
   .sch-screen.has-pane .sch-main { display: none; }
   .sch-screen.has-pane .sch-pane { flex: 1 1 auto; width: auto; border-left: 0; }
-  .sch-pane > .b-btn:first-child { display: inline-flex; }
-  .sch-main { padding: var(--s-4) var(--s-4) 0; }
+  .sch-back { display: inline-flex; }
+  .sch-scroll { padding: var(--s-4) var(--s-4) var(--float-room); }
 }
-/* the drop order, by the list's own width (4 columns need 140 + 190 + 170 + 110 + gaps) */
-@container sch-list (max-width: 680px) {
-  .sch-row { grid-template-columns: minmax(140px, 1fr) minmax(0, 190px) 120px; }
-  .sch-row > :nth-child(3) { display: none; }
-}
-@container sch-list (max-width: 460px) {
-  .sch-row { grid-template-columns: minmax(140px, 1fr) minmax(0, 190px); }
-  .sch-row > :nth-child(3), .sch-row > :nth-child(4) { display: none; }
-}
-@container sch-list (max-width: 300px) {
-  .sch-row { grid-template-columns: minmax(0, 1fr); }
-  .sch-row > :nth-child(n + 2) { display: none; }
-}
-
-/* the search ('/' focuses it, the TUI's): on the row under the head, at the right */
-.sch-search { flex: none; align-self: flex-end; width: 220px; margin-bottom: var(--s-2); }
-.sch-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }

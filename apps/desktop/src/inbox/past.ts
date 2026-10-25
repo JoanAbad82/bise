@@ -10,7 +10,7 @@ import { inbox } from '@/proto/words_inbox.gen';
 import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { dayOf, timeOf } from '@/artifacts/model';
-import { age, titleOf } from './InboxCard';
+import { age } from './InboxCard';
 import { idOf } from './id';
 
 export type { InboxRecord, Where as InboxWhere } from '@/proto/inbox';
@@ -162,33 +162,12 @@ export function saidWords(r: InboxRecord): string {
   return opt ?? said;
 }
 
-/**
- * A past row's second line: the record's own words (words::second_line, 'you: only for Safari 16 ·
- * in the inbox', 'withdrawn: <why>'). `narrow` (800): the 'where' goes whole, the detail keeps it. Pure.
- */
-export function lineTwo(r: InboxRecord, narrow = false): string {
-  if (!narrow || r.state !== 'answered' || r.where == null) return r.line2;
-  const tail = ` · ${whereWords(r.where)}`;
-  return r.line2.endsWith(tail) ? r.line2.slice(0, -tail.length) : r.line2;
-}
-
-/** A row's right column: 'storefront · 14:02' (the project left out when narrow and it is the one in view). Pure. */
-export function endWords(project: string, ms: number, names: Readonly<Record<string, string>>, narrow: boolean, here: string | null): string {
-  const t = timeOf(ms);
-  if (narrow && (here === null || here === project)) return t;
-  return `${names[project] ?? project} · ${t}`;
-}
-
-/** A waiting row's right column: 'storefront · 12 min', 'bise · page · 1 d'. Pure. */
-export function waitEnd(w: WaitRow, names: Readonly<Record<string, string>>, now: number, narrow: boolean): string {
+/** A waiting row's second line: 'storefront · 12 min', 'bise · page · 1 d' (its #id after it). Pure. */
+export function waitEnd(w: WaitRow, names: Readonly<Record<string, string>>, now: number): string {
   const a = age(now - w.card.since_ms);
-  if (narrow) return a;
   const p = names[w.project] ?? w.project;
   return w.glyph === '¶' ? inbox.wait_end_page({ project: p, age: a }) : `${p} · ${a}`;
 }
-
-/** A waiting row's words: the card's title ('perf asks', 'merge #381?') is the asker's, the question after. */
-export const waitTitle = (w: WaitRow): string => titleOf(w.card);
 
 /**
  * Where a past row goes (his ask, m_24212 (5)): a page answer opens the page at its block; else

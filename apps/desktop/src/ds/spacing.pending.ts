@@ -22,7 +22,6 @@ export const PENDING_HAND: Readonly<Record<string, number>> = {
   "capsule/capsule.css": 1,
   "composer/composer.css": 1,
   "ds/css/thread.css": 4,
-  "inbox/past.css": 4,
   "log/log.css": 3,
   "plugins/plugins.css": 2,
   "quote/quote.css": 1,
@@ -50,10 +49,8 @@ export const PENDING_TYPE: Readonly<Record<string, number>> = {
   "ds/css/spotlight.css": 1,
   "ds/css/window.css": 1,
   "inbox/inbox.css": 1,
-  "inbox/past.css": 1,
   "log/log.css": 1,
   "plugins/plugins.css": 2,
-  "scheduled/scheduled.css": 1,
   "thread/thread.css": 1,
   "welcome/welcome.css": 1,
 };

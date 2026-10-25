@@ -94,6 +94,18 @@ export function bySoonest(items: readonly Task[]): Task[] {
 
 export const keyOf = (x: Task): string => `${x.project}#${String(x.t.id)}`;
 
+/** The tasks by project (the page's groups), in the order given (bySoonest's: the group of the
+ *  soonest task first); a group's name is its project's, else its id. Pure. */
+export function byProject(items: readonly Task[]): { project: string; name: string; items: Task[] }[] {
+  const out: { project: string; name: string; items: Task[] }[] = [];
+  for (const x of items) {
+    const g = out.find((o) => o.project === x.project);
+    if (g) g.items.push(x);
+    else out.push({ project: x.project, name: x.projectName !== '' ? x.projectName : x.project, items: [x] });
+  }
+  return out;
+}
+
 /** The search: its name or words, who it wakes, its project; case does not count. Pure. */
 export const matches = (x: Task, q: string): boolean =>
   [x.t.name ?? '', x.t.words, x.t.agent, x.projectName].some((s) => s.toLowerCase().includes(q.trim().toLowerCase()));

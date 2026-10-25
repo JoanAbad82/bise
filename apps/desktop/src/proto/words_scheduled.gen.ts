@@ -54,8 +54,6 @@ export const scheduled = {
   count_watching: (a: { n: string | number }): string => String(a.n) + " watching",
   /** the TUI's search line, after `/ ` */
   find_hint: "find: an agent, a name, the words",
-  /** the desktop's search field */
-  search_placeholder: "search scheduled tasks",
   /** the TUI's list when the search finds none */
   none_match: "nothing scheduled matches.",
   /** the desktop's list when the search finds none */
@@ -96,8 +94,6 @@ export const scheduled = {
   key_or: "or",
   /** key: the TUI's search */
   key_find: "find",
-  /** key: the desktop's search */
-  key_search: "search",
   /** key: the search is done */
   key_done: "done",
   /** key: move the selection while searching */
@@ -150,8 +146,6 @@ export const scheduled = {
   label_it_ends: "it ends",
   /** opened label: the page it keeps fresh */
   label_keeps_fresh: "keeps fresh",
-  /** the desktop list's first column head */
-  col_what: "what it does",
   /** opened, so far (TUI): when it last ran */
   last_at: (a: { at: string | number }): string => "last " + String(a.at),
   /** when it ends: after its one run */

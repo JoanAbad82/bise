@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { BarSlot } from '@/app/barslot';
 import { formatRoute, parseRoute } from '@/app/route';
 import { ahead, endsWords, howOften, nextRunWords, ordinal, runsWords, ScheduledView, type ScheduledTask, type Task } from './index';
 import { scheduled } from '@/proto/words_scheduled.gen';
 
+// the window's bar, where the page's search goes (InBar)
+beforeEach(() => { render(<BarSlot />); });
 afterEach(cleanup);
 
 const NOW = new Date(2026, 9, 3, 14, 0).getTime();
@@ -39,21 +42,27 @@ describe('the scheduled screen', () => {
     const stopped: string[] = [];
     const tasks = [T(task(9, { words: 'the morning digest', agent: 'main', every: 'day 07:30', next_ms: at(1, 7, 30), times: null, done: 2 }), 'home', 'bise'), T(task(4))];
     render(<ScheduledView tasks={tasks} ports={{ stop: (p, id) => stopped.push(`${p}#${String(id)}`) }} now={NOW} />);
-    const rows = screen.getByTestId('scheduled.list').querySelectorAll('[role=option]');
+    const rows = screen.getByTestId('scheduled.list').querySelectorAll('.b-lrow');
     expect([...rows].map((r) => r.getAttribute('data-testid'))).toEqual(['scheduled.row.4', 'scheduled.row.9']);
-    expect(rows[0]?.textContent).toContain('deploy-watch · storefront');
+    // by project (ds GroupLabel, sentence case), the soonest's project first
+    expect([...screen.getByTestId('scheduled.list').querySelectorAll('.b-glabel')].map((g) => g.textContent)).toEqual(['storefront', 'bise']);
+    // two lines: its name and how often, then who it wakes and its next run
+    expect(rows[0]?.querySelector('.l1')?.textContent).toBe('check the deploy of storefrontevery 5 min');
+    expect(rows[0]?.querySelector('.l2')?.textContent).toBe(`deploy-watch · ${scheduled.next_at({ at: '14:22' })}`);
     // 'how often' holds only the rhythm; the count is the pane's 'its runs' (designer m_12105)
-    expect(rows[0]?.textContent).toContain('every 5 min');
     expect(rows[0]?.textContent).not.toContain(scheduled.n_of({ count: 6, total: 24 }));
-    // the hero's facts: how many run, then the soonest run
-    expect(screen.getByTestId('scheduled.hero').querySelector('.facts')?.textContent).toMatch(/^2 running · next at /);
+    // its '…' (the menu: stop and the rest, nm-menus) at its end; no text action link
+    expect(screen.getByTestId('scheduled.row.4.more')).toBeTruthy();
+    // the lead (no hero card): how many run, then the soonest run
+    expect(screen.queryByTestId('scheduled.hero')).toBeNull();
+    expect(screen.getByTestId('scheduled.lead').querySelector('.facts')?.textContent).toMatch(/^2 running · next at /);
+    expect(screen.queryByTestId('scheduled.keys')).toBeNull();
     const root = screen.getByTestId('scheduled.screen');
     fireEvent.keyDown(root, { key: 'Enter' });
     // its name (else its words' first line), never its id; who it wakes beside it (designer m_15929)
     expect(screen.getByTestId('scheduled.pane.title').textContent).toBe('check the deploy of storefrontdeploy-watch · storefront');
     expect(screen.getByTestId('scheduled.pane').textContent).not.toContain('#4');
-    // the act, then its key: 'stop' + a dim 'x'
-    expect(screen.getByTestId('scheduled.stop').textContent).toBe(`${scheduled.key_stop} x`);
+    expect(screen.getByTestId('scheduled.stop').textContent).toBe(scheduled.key_stop);
     expect(screen.getByTestId('scheduled.pane').textContent).toContain(`${scheduled.nth_of({ nth: '7th', total: 24 })} · 14:22`);
     expect(screen.getByTestId('scheduled.pane.words').textContent).toContain('say so only when it fails');
     expect(screen.queryByTestId('scheduled.run')).toBeNull();
@@ -70,7 +79,8 @@ describe('the scheduled screen', () => {
     const tasks = [T(task(1, { next_ms: at(0, 15, 0) })), T(task(2, { agent: 'perf', words: 'rerun the bench', next_ms: at(0, 16, 0) })), T(task(3, { next_ms: at(0, 17, 0) }))];
     render(<ScheduledView tasks={tasks} ports={{ stop: () => undefined }} now={NOW} />);
     const root = screen.getByTestId('scheduled.screen');
-    const on = () => screen.getByTestId('scheduled.list').querySelector('[aria-selected=true]')?.getAttribute('data-testid');
+    const on = () => screen.getByTestId('scheduled.list').querySelector('.b-lrow.on')?.getAttribute('data-testid');
+    const shown = () => [...screen.getByTestId('scheduled.list').querySelectorAll('.b-lrow')].map((r) => r.getAttribute('data-testid'));
     fireEvent.keyDown(root, { key: 'Home' });
     expect(on()).toBe('scheduled.row.1');
     fireEvent.keyDown(root, { key: 'ArrowUp' });
@@ -79,7 +89,7 @@ describe('the scheduled screen', () => {
     fireEvent.keyDown(root, { key: 'j' });
     fireEvent.keyDown(root, { key: 'Enter' });
     expect(on()).toBe('scheduled.row.3');
-    expect(screen.getByTestId('scheduled.row.3').className).toContain('open');
+    expect(screen.getByTestId('scheduled.pane')).toBeTruthy();
     fireEvent.keyDown(root, { key: 'ArrowUp' });
     expect(on(), 'a task is open: the moves stay put').toBe('scheduled.row.3');
     fireEvent.keyDown(root, { key: 'Escape' });
@@ -87,14 +97,14 @@ describe('the scheduled screen', () => {
     fireEvent.keyDown(root, { key: 'k' });
     expect(on()).toBe('scheduled.row.2');
     fireEvent.keyDown(root, { key: '/' });
-    const field = screen.getByTestId('scheduled.search');
+    const field = screen.getByTestId('scheduled.search.input');
     expect(document.activeElement).toBe(field);
     fireEvent.change(field, { target: { value: 'bench' } });
-    expect([...screen.getByTestId('scheduled.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-testid'))).toEqual(['scheduled.row.2']);
+    expect(shown()).toEqual(['scheduled.row.2']);
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(document.activeElement).toBe(root);
     fireEvent.keyDown(root, { key: 'Escape' });
-    expect(screen.getByTestId('scheduled.list').querySelectorAll('[role=option]')).toHaveLength(3);
+    expect(shown()).toHaveLength(3);
   });
 
   it('nothing scheduled says how one comes', () => {

@@ -14,11 +14,6 @@
     "one": null,
     "text": "by {who}"
   },
-  "scheduled.col_what": {
-    "args": [],
-    "one": null,
-    "text": "what it does"
-  },
   "scheduled.count_active": {
     "args": [
       "n"
@@ -210,11 +205,6 @@
     "one": null,
     "text": "run now"
   },
-  "scheduled.key_search": {
-    "args": [],
-    "one": null,
-    "text": "search"
-  },
   "scheduled.key_stop": {
     "args": [],
     "one": null,
@@ -388,11 +378,6 @@
     ],
     "one": "{n} run so far",
     "text": "{n} runs so far"
-  },
-  "scheduled.search_placeholder": {
-    "args": [],
-    "one": null,
-    "text": "search scheduled tasks"
   },
   "scheduled.set_for": {
     "args": [

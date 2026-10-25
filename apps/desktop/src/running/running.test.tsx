@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { BarSlot } from '@/app/barslot';
 import { formatRoute, parseRoute } from '@/app/route';
 import type { Proc } from '@/proto';
 import type { ProcItem, RunningPorts } from './index';
@@ -11,6 +12,8 @@ vi.mock('./Output', () => ({
 }));
 const { RunningView } = await import('./Screen');
 
+// the window's bar, where the page's search goes (InBar)
+beforeEach(() => { render(<BarSlot />); });
 afterEach(cleanup);
 
 const NOW = new Date(2026, 9, 23, 14, 6).getTime();
@@ -43,7 +46,7 @@ function ports(): RunningPorts & { log: string[] } {
     open: (u) => log.push(`open ${u}`),
   };
 }
-const rowIds = () => [...screen.getByTestId('running.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-row'));
+const rowIds = () => [...screen.getByTestId('running.list').querySelectorAll('[data-row]')].map((r) => r.getAttribute('data-row'));
 
 describe('the running screen', () => {
   it("the route is 'running', or 'running/<project>/<agent>/<id>' for one's output", () => {
@@ -63,13 +66,23 @@ describe('the running screen', () => {
 
   it("groups by project, running ones under 'running N', ended ones under 'ended today N'", () => {
     render(<RunningView items={[stripe, dev, failed, nohup]} ports={ports()} now={NOW} />);
-    expect(screen.getByTestId('running.filter.running').textContent).toBe('running 3');
-    expect(screen.getByTestId('running.filter.ended').textContent).toBe('ended today 1');
-    expect(screen.getAllByTestId(/^running\.group\./u).map((g) => g.querySelector('.run-ghead')?.textContent)).toEqual(['storefront', 'tele']);
+    // the segmented filter (ds Filters), its count apart in text-3
+    expect(screen.getByTestId('running.filter.running').textContent).toBe('running3');
+    expect(screen.getByTestId('running.filter.running').querySelector('.run-n')?.textContent).toBe('3');
+    expect(screen.getByTestId('running.filter.ended').textContent).toBe('ended today1');
+    expect(screen.getByTestId('running.filter.running').getAttribute('aria-selected')).toBe('true');
+    // the lead (no hero card) and one group label per project (ds GroupLabel)
+    expect(screen.queryByTestId('running.hero')).toBeNull();
+    expect(screen.getAllByTestId(/^running\.group\./u).map((g) => g.querySelector('.b-glabel')?.textContent)).toEqual(['storefront', 'tele']);
     expect(screen.getByTestId('running.sub').textContent).toBe('3 running in 2 projects · 1 listening');
     expect(rowIds()).toEqual(['shop/checkout/bg1', 'shop/perf/bg3', 'tele/p99/p9.1']);
-    expect(screen.getByTestId('running.row.shop/perf/bg3.url').textContent).toBe(':5173 ↗');
-    expect(screen.getByTestId('running.row.shop/perf/bg3.url').getAttribute('data-tip')).toBe('open localhost:5173');
+    // its address on the second line; the chosen row's 'open' opens it (its tip says where)
+    expect(screen.getByTestId('running.row.shop/perf/bg3.url').textContent).toBe(' · :5173 ↗');
+    fireEvent.click(screen.getByTestId('running.row.shop/perf/bg3.open'));
+    expect(screen.getByTestId('running.row.shop/perf/bg3.go').getAttribute('data-tip')).toBe('open localhost:5173');
+    // every row has its '…' (its menu: stop, open in a tab: nm-menus); no glyph as a mark
+    expect(screen.getByTestId('running.row.shop/perf/bg3.more')).toBeTruthy();
+    expect(screen.getByTestId('running.row.shop/perf/bg3.mark').querySelector('.run-dot')).not.toBeNull();
     expect(screen.getByTestId('running.row.shop/perf/bg3.mark').getAttribute('data-tip')).toBe('running');
     expect(screen.getByTestId('running.row.shop/perf/bg3.end').textContent).toBe('14 min');
     fireEvent.click(screen.getByTestId('running.filter.ended'));
@@ -81,10 +94,10 @@ describe('the running screen', () => {
   it("one project: no head, the hero says it; a row's program by name, its whole command in its tip (designer m_41694 #1 #2)", () => {
     const py = at('shop', proc({ id: 'bg5', agent: 'perf', cmd: '/Library/Developer/CommandLineTools/usr/bin/python3 -m http.server 8765' }));
     render(<RunningView items={[dev, py]} ports={ports()} now={NOW} />);
-    expect(document.querySelector('.run-ghead')).toBeNull();
+    expect(document.querySelector('.b-glabel')).toBeNull();
     const cmd = screen.getByTestId('running.row.shop/perf/bg5.cmd');
     expect(cmd.textContent).toBe('python3 -m http.server 8765');
-    expect(cmd.getAttribute('data-tip')?.split('\n')[0]).toBe(py.p.cmd);
+    expect(screen.getByTestId('running.row.shop/perf/bg5.open').getAttribute('data-tip')?.split('\n')[0]).toBe(py.p.cmd);
   });
 
   it("in the bar's scope (a project's, an agent's 'all ›') its head names no projects (designer m_38700)", () => {
@@ -95,7 +108,7 @@ describe('the running screen', () => {
   it("s stops the selected one at once: 'stopping…', then its hub's row says how; it stays in place", () => {
     const p = ports();
     const v = render(<RunningView items={[dev, stripe]} ports={p} now={NOW} />);
-    fireEvent.click(screen.getByTestId('running.row.shop/perf/bg3'));
+    fireEvent.click(screen.getByTestId('running.row.shop/perf/bg3.open'));
     fireEvent.keyDown(screen.getByTestId('running.screen'), { key: 's' });
     expect(p.log).toContain('stop shop/perf/bg3');
     expect(screen.getByTestId('running.row.shop/perf/bg3.end').textContent).toBe('stopping…');
@@ -118,7 +131,7 @@ describe('the running screen', () => {
     expect(screen.getByTestId('running.out').getAttribute('data-live')).toBe('true');
     fireEvent.keyDown(screen.getByTestId('running.screen'), { key: 'o' });
     expect(p.log).toContain('open http://127.0.0.1:5173');
-    fireEvent.click(screen.getByTestId('running.row.tele/p99/p9.1'));
+    fireEvent.click(screen.getByTestId('running.row.tele/p99/p9.1.open'));
     expect(screen.getByTestId('running.out').getAttribute('data-none')).toBe('true');
     expect(screen.queryByTestId('running.pane.open')).toBeNull();
     fireEvent.keyDown(screen.getByTestId('running.screen'), { key: 'Escape' });

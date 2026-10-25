@@ -18,7 +18,6 @@ export const PENDING_CLASSES: readonly string[] = [
   'pr-dot',
   'q-copy',
   'q-key',
-  'sch-asks',
   'th-answered',
   'th-link-off',
   'th-restored',

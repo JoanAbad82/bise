@@ -1,26 +1,30 @@
-// The inbox screen's view (designer's inbox-history pick A, m_24212 (2)-(6); route inbox/all,
-// sidebar row '? inbox'): the hero card ('inbox', its sentence, '3 waiting · the oldest 2 h ago'), the filters (projects,
-// agents, all / waiting / answered / withdrawn, '/' search), 'waiting for you · N' first (⏎ opens
-// the item above this screen's composer, as ⌘I), then the past by day, two lines each, read-only.
+// The inbox screen's view (bise fait mac: page native-mac §6, mockup 6; designer's inbox-history
+// pick A, m_24212 (2)-(6); route inbox/all, the rail's inbox): the page's name is in the window's
+// bar, its search there too (InBar, '/'); under the bar the lead (ds PageLead: its sentence, '3
+// waiting · the oldest 2 h ago', the accent on what waits), the filters 24 under it (ds Filters:
+// all / waiting / answered / withdrawn; the projects and agents menus), 'waiting for you N' first
+// (ds GroupLabel; ⏎ or the chosen row's 'answer' opens the item above the composer, as ⌘I: the
+// store's one answer path), then the past by day, one ds ListRow each (two lines), read-only. The
+// rows' order is the hub's (Card.rank, given). No key line at the foot: the rows' tips say the keys.
 // A past row's first action (his ask, inbox-open): ⏎, space or a click opens the whole item in the
 // pane beside the list (Pane: the question, every option with his pick marked or his words, where
 // and when, the page he answered on); the pane follows the selection (↑↓), esc closes it. The
 // second: ⌘⏎ (or the pane's button, or o) goes to his answer: the thread at that very entry,
-// however old, or the page at its block. The list keys are app/listkeys.ts's. At 800 the agents go
-// into the projects menu, 'withdrawn' too, the rows drop the project and the 'where', whole, and
-// the pane takes the list's place (past.css). From props: the store's wiring is InboxScreen
-// (InboxScreen.tsx). Owner: inbox-screen.
-import { useEffect, useState, type KeyboardEvent } from 'react';
+// however old, or the page at its block. The list keys are app/listkeys.ts's. At 800 the pane takes
+// the list's place (past.css). The floating composer's room at the foot (--float-room). From props:
+// the store's wiring is InboxScreen (InboxScreen.tsx). Owner: nm-pages-a (inbox-screen's before).
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
-import { Dropdown, Field, HeroWait, PageHero, Press } from '@/ds';
+import { InBar } from '@/app/barslot';
+import { AppIcon, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, LeadWait, ListRow, PageLead, Press, RowAction } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
 import { CardId } from './CardId';
 import { idOf } from './id';
 import { timeOf } from '@/artifacts/model';
-import { ALL, askersOf, closedMs, dayHead, heroFacts, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
+import { ALL, askersOf, closedMs, dayHead, heroFacts, jumpOf, jumpWords, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
 import './past.css';
 
 /** A state filter's words. */
@@ -61,6 +65,7 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
   const [f, setF] = useState<Filter>(ALL);
   // the pane is open: it shows the selected row while that is a past one (it follows ↑↓)
   const [paned, setPaned] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const lists = listsOf(cards, records, names, f, now);
   const pastBy = new Map(lists.days.flatMap((d) => d.rows.map((r) => [r.key, r] as const)));
   const waitBy = new Map(lists.waiting.map((w) => [w.key, w] as const));
@@ -87,7 +92,7 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
       return true;
     }
     if (e.key === ' ' && k !== null && pastBy.has(k)) setPaned(true);
-    else if (e.key === '/') document.querySelector<HTMLInputElement>('[data-testid="inbox.search"]')?.focus();
+    else if (e.key === '/') searchRef.current?.focus();
     else if (e.key === 'Escape' && f.q !== '') setF({ ...f, q: '' });
     else return false;
     return true;
@@ -135,78 +140,63 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
   const facts = heroFacts(cards, now);
   const empty = cards.length === 0 && records.length === 0;
   const none = lists.order.length === 0;
+  // a click picks the row and gives the keys back to the list (a row's button keeps none: listkeys)
+  const pick = (key: string) => {
+    setSel(key);
+    ref.current?.focus({ preventScroll: true });
+  };
   return (
     <section ref={ref} tabIndex={-1} className="ip-screen" data-testid="inbox.screen" onKeyDown={onKeyDown}>
-      {/* one scroller: the hero and the filters scroll away with the list (designer m_39330); the
-          key line stays at the screen's foot */}
+      {/* one scroller: the lead and the filters scroll away with the list (designer m_39330); its
+          foot keeps the floating composer's room (--float-room) */}
       <div className="ip-scroll" data-testid="inbox.scroll"
         onScroll={onEnd === undefined ? undefined : (e) => {
           const el = e.currentTarget;
           if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) onEnd();
         }}>
-      <PageHero name={inbox.head} sentence={hero.inbox_say} facts={<>{facts.wait !== undefined && <><HeroWait>{facts.wait}</HeroWait>{' · '}</>}{facts.rest}</>} testId="inbox.hero" />
-      {(
-        <div className="ip-filters">
-          <Dropdown label={f.project === '' ? inbox.all_projects : (names[f.project] ?? f.project)} testId="inbox.projects"
-            groups={[
-              // 800: each part under its head, two choices (designer m_26260); wide, no head
-              { id: 'projects', head: inbox.filter_projects, look: 'ip-heads-narrow', rows: [
-                { id: 'p:', name: inbox.all_projects, current: f.project === '', testId: 'inbox.projects.all' },
-                ...projects.map((p) => ({ id: `p:${p.project}`, name: p.name !== '' ? p.name : p.project, current: f.project === p.project, testId: `inbox.projects.${p.project}` })),
-              ] },
-              // 800: the agents and 'withdrawn' come in here (past.css shows them only narrow)
-              { id: 'agents', head: inbox.filter_agents, look: 'ip-narrow-only', rows: [
-                { id: 'a:', name: inbox.all_agents, current: f.agent === '', testId: 'inbox.projects.agents.all' },
-                ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.projects.agent.${a}` })),
-                { id: 'withdrawn', name: inbox.state_withdrawn, current: f.state === 'withdrawn', testId: 'inbox.projects.withdrawn' },
-              ] },
-            ]}
-            onPick={(id) => {
-              if (id === 'withdrawn') set({ state: f.state === 'withdrawn' ? 'all' : 'withdrawn' });
-              else if (id.startsWith('a:')) set({ agent: id.slice(2) });
-              else set({ project: id.slice(2) });
-            }} />
-          <Dropdown extra="ip-wide-only" label={f.agent === '' ? inbox.all_agents : shownName(f.agent)} testId="inbox.agents"
-            groups={[{ id: 'agents', rows: [
-              { id: 'a:', name: inbox.all_agents, current: f.agent === '', testId: 'inbox.agents.all' },
-              ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.agents.${a}` })),
-            ] }]}
-            onPick={(id) => { set({ agent: id.slice(2) }); }} />
-          <span className="ip-states">
-            {STATES.map((s) => (
-              <Press key={s} look={`ip-state${f.state === s ? ' on' : ''}${s === 'withdrawn' ? ' ip-wide-only' : ''}`} aria-pressed={f.state === s}
-                onClick={() => { set({ state: s }); }} data-testid={`inbox.state.${s}`}>
-                {STATE_WORDS[s]}
-              </Press>
-            ))}
-          </span>
-          <span className="ip-search">
-            <Field slash placeholder={inbox.search} value={f.q} onChange={(e) => { search(e.currentTarget.value); }} onKeyDown={searchKey} testId="inbox.search" />
-          </span>
-        </div>
-      )}
+      <PageLead sentence={hero.inbox_say} facts={<>{facts.wait !== undefined && <><LeadWait>{facts.wait}</LeadWait>{' · '}</>}{facts.rest}</>} testId="inbox.lead" />
+      <FilterRow testId="inbox.filters">
+        <Filters items={STATES.map((s) => ({ id: s, label: STATE_WORDS[s] }))} on={f.state} label={inbox.filter_label}
+          onPick={(id) => { set({ state: id as StateFilter }); }} testId="inbox.state" />
+        <Dropdown look="pop" label={f.project === '' ? inbox.all_projects : (names[f.project] ?? f.project)} testId="inbox.projects"
+          groups={[{ id: 'projects', rows: [
+            { id: 'p:', name: inbox.all_projects, current: f.project === '', testId: 'inbox.projects.all' },
+            ...projects.map((p) => ({ id: `p:${p.project}`, name: p.name !== '' ? p.name : p.project, current: f.project === p.project, testId: `inbox.projects.${p.project}` })),
+          ] }]}
+          onPick={(id) => { set({ project: id.slice(2) }); }} />
+        <Dropdown look="pop" label={f.agent === '' ? inbox.all_agents : shownName(f.agent)} testId="inbox.agents"
+          groups={[{ id: 'agents', rows: [
+            { id: 'a:', name: inbox.all_agents, current: f.agent === '', testId: 'inbox.agents.all' },
+            ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.agents.${a}` })),
+          ] }]}
+          onPick={(id) => { set({ agent: id.slice(2) }); }} />
+        {/* the page's search, in the window's bar (app-polish #4: filters left, search right, one height) */}
+        <InBar>
+          <BarSearch ref={searchRef} value={f.q} onChange={(e) => { search(e.currentTarget.value); }} onKeyDown={searchKey} testId="inbox.search" />
+        </InBar>
+      </FilterRow>
       <div className={`ip-body${cur ? ' paned' : ''}`}>
       {empty ? (
-        <div className="ip-empty" data-testid="inbox.empty">{inbox.screen_empty}</div>
+        <Empty title={inbox.screen_empty} testId="inbox.empty" />
       ) : none ? (
-        <div className="ip-empty" data-testid="inbox.none">{inbox.screen_none}</div>
+        <Empty title={inbox.screen_none} testId="inbox.none" />
       ) : (
-        <div className="ip-list" role="listbox" data-testid="inbox.list">
+        <div className="ip-list" data-testid="inbox.list">
           {lists.waiting.length > 0 && (
-            <>
-              <div className="ip-day-h ip-wait-h" data-testid="inbox.waiting.head">{inbox.list_waiting({ n: lists.waiting.length })}</div>
+            <div role="group" aria-label={inbox.group_waiting}>
+              <GroupLabel count={lists.waiting.length} waits tip={hero.waiting({ n: lists.waiting.length })} testId="inbox.waiting.head">{inbox.group_waiting}</GroupLabel>
               {lists.waiting.map((w) => (
-                <WaitLine key={w.key} w={w} on={w.key === sel} end={waitEnd(w, names, now, false)} narrowEnd={waitEnd(w, names, now, true)}
-                  onClick={() => { setSel(w.key); ports.answer(w.card.project, w.card.id); }} />
+                <WaitLine key={w.key} w={w} on={w.key === sel} end={waitEnd(w, names, now)}
+                  onPick={() => { pick(w.key); }} onAnswer={() => { pick(w.key); ports.answer(w.card.project, w.card.id); }} />
               ))}
-            </>
+            </div>
           )}
           {lists.days.map((d) => (
             <div key={d.day} role="group" aria-label={d.title}>
-              <div className="ip-day-h" data-testid={`inbox.day.${d.day}`}>{d.title}</div>
+              <GroupLabel testId={`inbox.day.${d.day}`}>{d.title}</GroupLabel>
               {d.rows.map((p) => (
-                <PastLine key={p.key} p={p} on={p.key === sel} open={p.key === cur?.key} project={names[p.r.project] ?? p.r.project}
-                  onClick={() => { setSel(p.key); setPaned(true); }} />
+                <PastLine key={p.key} p={p} on={p.key === sel} project={names[p.r.project] ?? p.r.project}
+                  onClick={() => { pick(p.key); setPaned(true); }} />
               ))}
             </div>
           ))}
@@ -220,67 +210,41 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
       )}
       </div>
       </div>
-      <div className="ip-keys" data-testid="inbox.keys">
-        {cur ? (
-          <>
-            <span><b>↑↓</b> {inbox.key_prev_next}</span>
-            <span data-testid="inbox.keys.go"><b>⌘⏎</b> {inbox.key_go}</span>
-            <span><b>esc</b> {inbox.key_close}</span>
-          </>
-        ) : sel !== null && pastBy.has(sel) ? (
-          <>
-            {/* what ⏎ and ⌘⏎ do on the selected row (designer m_25639; inbox-open) */}
-            <span data-testid="inbox.keys.enter"><b>⏎</b> {inbox.key_open}</span>
-            <span data-testid="inbox.keys.go"><b>⌘⏎</b> {inbox.key_go}</span>
-            <span><b>/</b> {inbox.search}</span>
-            <span><b>esc</b> {inbox.key_back}</span>
-          </>
-        ) : (
-          <>
-            <span data-testid="inbox.keys.enter"><b>⏎</b> {inbox.key_answer}</span>
-            <span><b>/</b> {inbox.search}</span>
-            <span><b>esc</b> {inbox.key_back}</span>
-          </>
-        )}
-      </div>
     </section>
   );
 }
 
-
-function WaitLine({ w, on, end, narrowEnd, onClick }: { w: WaitRow; on: boolean; end: string; narrowEnd: string; onClick: () => void }) {
+/** A waiting row: '?' in the accent, the asker then the question, 'project · age · #id'; the chosen
+ *  one shows its 'answer' (⏎), which opens it above the composer as ⌘I. */
+function WaitLine({ w, on, end, onPick, onAnswer }: { w: WaitRow; on: boolean; end: string; onPick: () => void; onAnswer: () => void }) {
   return (
-    <div className={`ip-row ip-wait${on ? ' on' : ''}`} role="option" aria-selected={on} data-row={w.key} data-testid={`inbox.row.${w.key}`} onClick={onClick}>
-      <span className="ip-g">{w.glyph}</span>
-      <span className="ip-one">
-        <span className="ip-who">{w.title}</span>
-        <span className="ip-q">{w.question}</span>
-      </span>
-      <span className="ip-end"><span className="ip-wide-only">{end}</span><span className="ip-narrow-only">{narrowEnd}</span><CardId id={w.card.id} testId={`inbox.row.${w.key}.id`} /></span>
+    <div className="ip-row" data-row={w.key}>
+      <ListRow on={on} testId={`inbox.row.${w.key}`} tip={inbox.row_tip_wait}
+        state={<span className="ip-ask">{w.glyph}</span>}
+        title={<><span className="ip-who">{w.title}</span><span className="ip-q">{w.question}</span></>}
+        sub={<>{end}<CardId id={w.card.id} testId={`inbox.row.${w.key}.id`} /></>}
+        end={on ? <RowAction onClick={onAnswer} tip={inbox.row_tip_wait} testId={`inbox.row.${w.key}.answer`}>{inbox.key_answer}</RowAction> : undefined}
+        onClick={onPick} />
     </div>
   );
 }
 
-function PastLine({ p, on, open, project, onClick }: { p: PastRow; on: boolean; open: boolean; project: string; onClick: () => void }) {
+/** A past row: a check (answered) or a dash (withdrawn, dim), the asker then the question, his
+ *  answer or the reason, the project, when, #id. ⏎ or a click opens it whole in the pane. */
+function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; project: string; onClick: () => void }) {
   const r = p.r;
-  const short = lineTwo(r, true);
+  const ms = closedMs(r);
+  const answered = r.state === 'answered';
   return (
-    <div className={`ip-row ip-past${on ? ' on' : ''}${open ? ' open' : ''}${r.state !== 'answered' ? ' gone' : ''}`} role="option" aria-selected={on} data-row={p.key}
-      data-testid={`inbox.row.${p.key}`} onClick={onClick}>
-      <span className="ip-g">{p.glyph}</span>
-      <span className="ip-one">
-        <span className="ip-who">{shownName(r.asker)}</span>
-        <span className="ip-q">{r.question}</span>
-      </span>
-      <span className="ip-end"><span className="ip-proj">{`${project} · `}</span>{closedMs(r) > 0 ? timeOf(closedMs(r)) : ''}<CardId id={r.card} lead={closedMs(r) > 0} testId={`inbox.row.${p.key}.id`} /></span>
-      <span className="ip-two" data-testid={`inbox.row.${p.key}.said`}>
-        {/* the 'where' in its own span, which 800 drops whole (past.css) */}
-        {short}{short !== r.line2 && <span className="ip-where">{r.line2.slice(short.length)}</span>}
-      </span>
+    <div className={`ip-row${answered ? '' : ' gone'}`} data-row={p.key}>
+      <ListRow on={on} testId={`inbox.row.${p.key}`} tip={inbox.row_tip_past}
+        state={answered ? <AppIcon name="check" size={14} /> : <span className="ip-dash" />}
+        title={<><span className="ip-who">{shownName(r.asker)}</span><span className="ip-q">{r.question}</span></>}
+        sub={<><span data-testid={`inbox.row.${p.key}.said`}>{r.line2}</span>{` · ${project}`}{ms > 0 && ` · ${timeOf(ms)}`}<CardId id={r.card} testId={`inbox.row.${p.key}.id`} /></>}
+        onClick={onClick} />
     </div>
   );
 }
-
 /**
  * One past item, whole, in the pane beside the list (his ask, inbox-open): who asked where and
  * when, the question whole, every option with the one he picked marked (or his words as his
@@ -310,9 +274,9 @@ function Pane({ row, now, names, next, meta, onJump, onClose, onPage }: {
   return (
     <aside className="ip-pane" aria-label={inbox.detail_label({ agent: shownName(r.asker) })} data-testid="inbox.detail">
       <div className="ip-p-head">
-        <Press look="ip-crumb" onClick={onClose} data-testid="inbox.detail.back">{`‹ ${inbox.head}`}</Press>
+        <Press look="ip-crumb" onClick={onClose} data-testid="inbox.detail.back"><AppIcon name="back" size={14} />{inbox.head}</Press>
         <span className="ip-d-k">{inbox.detail_asked({ agent: shownName(r.asker), project: names[r.project] ?? r.project, when: whenOf(r.asked_ms, now) })}</span>
-        <Press look="ip-p-close" onClick={onClose} aria-label={inbox.detail_close_label} title={inbox.detail_close_tip} data-testid="inbox.detail.close">×</Press>
+        <Press look="ip-p-close" onClick={onClose} aria-label={inbox.detail_close_label} data-tip={inbox.detail_close_tip} data-testid="inbox.detail.close"><AppIcon name="close" size={16} /></Press>
       </div>
       <div className="ip-p-body">
         <div className="ip-d-q" data-testid="inbox.detail.question">{r.question}</div>
@@ -320,7 +284,7 @@ function Pane({ row, now, names, next, meta, onJump, onClose, onPage }: {
           <ol className="ip-d-opts" data-testid="inbox.detail.options">
             {r.options.map((o, i) => (
               <li key={`${String(i)}:${o}`} className={picked === i ? 'on' : undefined} data-testid={`inbox.detail.option.${String(i + 1)}`} aria-current={picked === i ? 'true' : undefined}>
-                <span className="ip-d-n">{picked === i ? '✓' : i + 1}</span>{o}
+                <span className="ip-d-n">{picked === i ? <AppIcon name="check" size={14} /> : i + 1}</span>{o}
               </li>
             ))}
           </ol>
