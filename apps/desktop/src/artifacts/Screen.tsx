@@ -14,7 +14,7 @@
 // deletes (a dialog). Every move and folder edit has its undo (⌘Z, and the toast's). The grid, the
 // cards, the stacks and the list view are art-grid's (Grid.tsx, Sheet.tsx). Owner: art-folders.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { AppIcon, BarSearch, Button, Empty, FilterRow, Filters, GroupLabel, MoreButton, PageBanner, Press, Sheet, tipAttrs, Toast, type EntityMenu } from '@/ds';
+import { AppIcon, BarSearch, Button, Empty, FilterRow, Filters, GroupLabel, MoreButton, PageBanner, Press, sentenceCase, Sheet, tipAttrs, Toast, type EntityMenu } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { library } from '@/proto/words_library.gen';
 import { useFolders, useProjects, useStore } from '@/store';
@@ -25,7 +25,8 @@ import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
 import { rowKey, useLook } from './List';
 import { usePutInMessage } from './Open';
-import { useGoArtifact } from './leave';
+import { leaves, useGoArtifact } from './leave';
+import { openTab } from '@/app/panel/tabs';
 import { AddButton, AddDrop, useAddPlace } from './Drops';
 import { ArtifactGrid } from './Grid';
 import { StackSheet } from './Sheet';
@@ -157,7 +158,12 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const isTheme = curId !== null && (lib.byId.get(curId)?.parent ?? null) === null;
 
   const goArtifact = useGoArtifact();
-  const openIt = (it: Item) => { goArtifact(it.project, it.a.id, it.a); };
+  // one opens in a tab of the panel on the right (plan native-mac-plan v4 §1: the page stays); a
+  // browser-only one (a PR, a link) in his browser, as before
+  const openIt = (it: Item) => {
+    if (leaves(it.a)) goArtifact(it.project, it.a.id, it.a);
+    else openTab({ kind: 'artifact', project: it.project, id: it.a.id });
+  };
   const look = useLook(openIt);
   const put = usePutInMessage();
   const putIt = (it: Item) => { put(it.project, it.a); };
@@ -361,7 +367,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   );
   const crumb = crumbOf(lib, atNow);
   // under 900 px the column folds into the crumb: the place's title opens it (page v7 'à 800 px')
-  const fold = <FoldCrumb label={crumb.length === 0 ? library.all_artifacts : crumb.map((c) => c.name).join(' / ')} testId="artifacts.fold">{column}</FoldCrumb>;
+  const fold = <FoldCrumb label={crumb.length === 0 ? sentenceCase(library.all_artifacts) : crumb.map((c) => c.name).join(' / ')} testId="artifacts.fold">{column}</FoldCrumb>;
   const current = atNow.at === 'folder' ? lib.byId.get(atNow.id) : undefined;
   // the window's bar (mockup 7): the kinds the place holds (ds Filters: all, then each kind with its
   // count), the search ('/'), + add files

@@ -11,7 +11,7 @@
 // Under 900 px the same rows sit in the crumb's popover (Fold.tsx). A pure render of its props:
 // Screen.tsx holds the state. Owner: nm-pages-a (art-folders' before).
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
-import { AppIcon, Input, Press, tipAttrs, type AppIconName } from '@/ds';
+import { AppIcon, Input, Press, sentenceCase, tipAttrs, type AppIconName } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { countWords, type At, type Count, type Folder, type Library } from './folders';
 
@@ -77,9 +77,9 @@ export function FolderColumn(p: ColumnProps) {
   return (
     <nav className={`art-col${p.side === true ? ' side' : ''}`} aria-label={library.library_head} data-testid={testId}>
       <div className="art-col-head">{library.library_head}</div>
-      <PlaceRow icon="artifacts" name={library.all_artifacts} on={at.at === 'all'} onGo={() => { p.onGo({ at: 'all' }); }} testId={`${testId}.all`} />
+      <PlaceRow icon="artifacts" name={sentenceCase(library.all_artifacts)} on={at.at === 'all'} onGo={() => { p.onGo({ at: 'all' }); }} testId={`${testId}.all`} />
       <PlaceRow icon="scheduled" name={library.recent} on={at.at === 'recent'} onGo={() => { p.onGo({ at: 'recent' }); }} testId={`${testId}.recent`} />
-      <PlaceRow icon="inbox" name={library.unfiled} on={at.at === 'unfiled'} count={counts.get('unfiled')} countAtRest
+      <PlaceRow icon="inbox" name={sentenceCase(library.unfiled)} on={at.at === 'unfiled'} count={counts.get('unfiled')} countAtRest
         over={p.drop?.over === 'unfiled'} drop={p.drop} dropId="unfiled" flash={p.flash === 'unfiled'}
         onGo={() => { p.onGo({ at: 'unfiled' }); }} testId={`${testId}.unfiled`} />
       {/* the folders' label, its + at its end (mockup 7): a field for a new folder's name */}

@@ -2,7 +2,7 @@
 // bibliothèque'): 'all projects ▾', its menu with each project's count (the most first) and the
 // typed way at its foot ('type a name in the search: "in:ai-docs"'); a picked one reads 'ai-docs'
 // with a × that shows every project again. Read side only: the library stays one. Owner: art-folders.
-import { Dropdown, IconButton, tipAttrs } from '@/ds';
+import { Dropdown, IconButton, sentenceCase, tipAttrs } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import type { Item } from './model';
 
@@ -22,9 +22,9 @@ export function ProjectScope({ all, project, projectName, onPick, testId }: { al
   const example = rows.find((r) => r.project !== '')?.name ?? 'harness';
   return (
     <span className="art-scope" data-on={project !== '' || undefined}>
-      <Dropdown label={project === '' ? library.all_projects : projectName} testId={testId}
+      <Dropdown label={project === '' ? sentenceCase(library.all_projects) : projectName} testId={testId}
         groups={[{ id: 'projects', rows: [
-          { id: 'p:', name: library.all_projects, trailing: String(all.length), current: project === '', testId: `${testId}.all` },
+          { id: 'p:', name: sentenceCase(library.all_projects), trailing: String(all.length), current: project === '', testId: `${testId}.all` },
           ...rows.map((r) => ({ id: `p:${r.project}`, name: r.name, trailing: String(r.n), current: project === r.project, testId: `${testId}.${r.project}` })),
         ] }]}
         keyline={library.scope_hint({ example })}

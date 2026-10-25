@@ -79,7 +79,7 @@ crate::words! { running:
     /// its tip: `open localhost:5173`
     url_tip(port) = "open localhost:{port}";
     /// the output's head: stop asks once more before it stops
-    stop_confirm = "stop it?";
+    stop_confirm = "Stop it?";
     /// the output scrolled up from its end: back to it
     jump_end = "jump to end ↓";
     /// the output beside the list when none is picked
@@ -127,11 +127,11 @@ crate::words! { running:
     /// the search field's placeholder (`/` focuses it)
     search = "search";
     /// the output's head: open its address
-    open = "open";
+    open = "Open";
     /// the tip of a thread's `$` row whose command runs in the background (`∿ 14 min`)
     tip_thread_row = "open its output";
     /// the output's head: stop it
-    stop = "stop";
+    stop = "Stop";
     /// the output's find: its button's VoiceOver name and the find field's placeholder
     key_find = "find";
     /// the output's find button's tip, with its key

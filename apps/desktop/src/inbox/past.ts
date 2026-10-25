@@ -10,6 +10,7 @@ import { inbox } from '@/proto/words_inbox.gen';
 import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { dayOf, timeOf } from '@/artifacts/model';
+import { sentenceCase } from '@/ds/case';
 import { age } from './InboxCard';
 import { idOf } from './id';
 
@@ -114,7 +115,8 @@ export function listsOf(cards: readonly Card[], records: readonly InboxRecord[],
     const row: PastRow = { key: pastKey(r), r, glyph: r.state === 'answered' ? '✓' : '–' };
     const last = days[days.length - 1];
     if (last !== undefined && last.day === d) (last.rows as PastRow[]).push(row);
-    else days.push({ day: d, title: dayHead(ms, now), rows: [row] });
+    // a group label: sentence case (designer m_43052); the day word itself is the TUI's too
+    else days.push({ day: d, title: sentenceCase(dayHead(ms, now)), rows: [row] });
   }
   return { waiting, days, order: [...waiting.map((w) => w.key), ...days.flatMap((d) => d.rows.map((r) => r.key))] };
 }

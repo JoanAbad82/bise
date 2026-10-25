@@ -9,6 +9,8 @@ import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, revealPathOf, saveOf, splitArchived, timeOf, versions, whenWords, type Item } from './model';
 import { emitAction } from '@/app/menu';
+import { panelState } from '@/app/panel/state';
+import { entityKey } from '@/shared/entity';
 import { aboutWords, ArtLibrary, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { hero } from '@/proto/words_hero.gen';
 import { library } from '@/proto/words_library.gen';
@@ -328,8 +330,13 @@ describe('artifacts screens', () => {
       const list = screen.getByTestId('artifacts.screen');
       fireEvent.keyDown(list, { key: 'c', metaKey: true });
       expect(copied).toEqual(['http://127.0.0.1:47123/p/notes']);
+      const before = router.get();
       fireEvent.keyDown(list, { key: 'v' });
-      expect(router.get()).toEqual({ screen: 'artifacts', project: 'shop-1', id: 'notes' });
+      // it opens in a tab of the panel on the right, in front; the page stays (nm-panel's openTab)
+      const key = entityKey({ kind: 'artifact', project: 'shop-1', id: 'notes' });
+      expect(panelState.get().tabs.active).toBe(key);
+      expect(router.get()).toEqual(before);
+      panelState.reset();
       cleanup();
       mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
       expect(screen.getByTestId('artifact.versions')).toBeTruthy();

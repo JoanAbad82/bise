@@ -7,7 +7,7 @@
 // are the shared list keys (app/listkeys.ts) plus the TUI's r, x, / and esc (tui-parity m_22176).
 // The floating composer's room at the foot (--float-room). Owner: nm-pages-a (amb-mac's before).
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { AppIcon, BarSearch, Button, Empty, GroupLabel, ListRow, MoreButton, PageBanner, Press } from '@/ds';
+import { AppIcon, BarSearch, Button, Empty, GroupLabel, ListRow, MoreButton, PageBanner, Press, sentenceCase } from '@/ds';
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
@@ -177,15 +177,15 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
             <div className="sch-ask" role="group" data-testid="scheduled.ask">
               <span>{scheduled.stop_ask_desktop({ agent: cur.t.agent })}</span>
               <span className="sch-acts">
-                <Button kind="danger" onClick={() => { stop(cur); }} testId="scheduled.ask.stop">{scheduled.key_stop}</Button>
-                <Button kind="ghost" onClick={() => { setAsking(false); }} testId="scheduled.ask.keep">{scheduled.key_keep}</Button>
+                <Button kind="danger" onClick={() => { stop(cur); }} testId="scheduled.ask.stop">{sentenceCase(scheduled.key_stop)}</Button>
+                <Button kind="ghost" onClick={() => { setAsking(false); }} testId="scheduled.ask.keep">{sentenceCase(scheduled.key_keep)}</Button>
               </span>
             </div>
           ) : (
             <div className="sch-acts">
               {/* the act; its key in its tip (no key words on the button, bise fait mac §6) */}
-              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">{scheduled.key_run_now}</Button>}
-              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">{scheduled.key_stop}</Button>
+              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">{sentenceCase(scheduled.key_run_now)}</Button>}
+              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">{sentenceCase(scheduled.key_stop)}</Button>
             </div>
           )}
         </aside>

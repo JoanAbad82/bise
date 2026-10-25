@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { nextHit, type Hit } from './find';
 import type { Terminal as Xterm } from '@xterm/xterm';
-import { AppIcon, BarSearch, Empty, Field, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageBanner, Press, RowAction, tipAttrs } from '@/ds';
+import { AppIcon, BarSearch, Empty, Field, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageBanner, Press, RowAction, sentenceCase, tipAttrs } from '@/ds';
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { useEntityMenu } from '@/app/menus/use';
 import { Code } from '@/thread/Code';
@@ -218,7 +218,7 @@ export function RunningView({
         />
         <FilterRow testId="running.filters">
           <Filters
-            items={FILTERS.map((f) => ({ id: f, label: <>{f === 'running' ? running.state_running : running.ended_today}<span className="run-n">{f === 'running' ? counts.running : counts.ended}</span></> }))}
+            items={FILTERS.map((f) => ({ id: f, label: <>{sentenceCase(f === 'running' ? running.state_running : running.ended_today)}<span className="run-n">{f === 'running' ? counts.running : counts.ended}</span></> }))}
             on={filter}
             label={running.filter_label}
             onPick={(id) => { pick(id === 'ended' ? 'ended' : 'running'); }}

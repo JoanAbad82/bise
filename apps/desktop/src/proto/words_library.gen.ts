@@ -15,15 +15,15 @@ export const library = {
   /** facts: how many have no folder, `23 unfiled` */
   unfiled_n: (a: { n: string | number }): string => String(a.n) + " unfiled",
   /** the library's first label, over all artifacts, recent and unfiled (and its VoiceOver name) */
-  library_head: "library",
+  library_head: "Library",
   /** the column's first row: every artifact, the folders as tiles */
   all_artifacts: "all artifacts",
   /** the column's row of the newest, whatever their folder */
-  recent: "recent",
+  recent: "Recent",
   /** the column's row of what has no folder */
   unfiled: "unfiled",
   /** the column's head over the folders */
-  folders: "folders",
+  folders: "Folders",
   /** the + on the folders' label: its tip and VoiceOver name (it makes a folder inline) */
   new_folder_tip: "new folder",
   /** a theme's folded task rows, `11 more` */
@@ -81,7 +81,7 @@ export const library = {
   /** the same toggle's tip, with its key */
   archived_tip: "show the archived ones · a",
   /** the + in the bar (its tip when no project takes it) and the empty page's action */
-  add_files: "add files",
+  add_files: "Add files",
   /** a project filter that leaves a folder empty */
   none_from: (a: { project: string | number }): string => "nothing from " + String(a.project) + " in this folder.",
   /** the picker's title for one, `move "agent view fixes" to…` */
@@ -109,33 +109,33 @@ export const library = {
   /** the toast's what for several, `3 artifacts` */
   n_artifacts: (a: { n: number }): string => a.n === 1 ? String(a.n) + " artifact" : String(a.n) + " artifacts",
   /** the toast's undo */
-  undo: "undo",
+  undo: "Undo",
   /** a card's menu: open it */
-  menu_open: "open",
+  menu_open: "Open",
   /** a card's menu: Quick Look */
-  menu_look: "quick look",
+  menu_look: "Quick look",
   /** a card's menu: its versions */
-  menu_versions: "versions",
+  menu_versions: "Versions",
   /** a card's menu: copy its link */
-  menu_copy: "copy link",
+  menu_copy: "Copy link",
   /** a card's menu: show in Finder */
-  menu_finder: "show in Finder",
+  menu_finder: "Show in Finder",
   /** a card's menu: move it */
-  menu_move: "move to…",
+  menu_move: "Move to…",
   /** a card's menu, a folder's menu: rename it */
-  menu_rename: "rename",
+  menu_rename: "Rename",
   /** a folder's menu */
-  menu_new_inside: "new folder inside",
+  menu_new_inside: "New folder inside",
   /** a folder's menu */
-  menu_merge: "merge into…",
+  menu_merge: "Merge into…",
   /** a folder's menu */
-  menu_delete: "delete folder…",
+  menu_delete: "Delete folder…",
   /** how many he picked, `3 picked` */
   picked: (a: { n: string | number }): string => String(a.n) + " picked",
   /** the bar's action */
-  put_in_message: "put in a message",
+  put_in_message: "Put in a message",
   /** the bar's action */
-  archive: "archive",
+  archive: "Archive",
   /** the merge picker's title, `merge "page heroes" into…` */
   merge_into: (a: { name: string | number }): string => "merge \"" + String(a.name) + "\" into…",
   /** the merge picker's foot, `its 22 artifacts move there; "page heroes" goes away. ⌘Z undoes it.` */
@@ -145,9 +145,9 @@ export const library = {
   /** the delete dialog's sentence (nothing else is deleted) */
   delete_say: (a: { n: number }): string => a.n === 1 ? "its " + String(a.n) + " artifact moves to unfiled. its file, versions and notes stay." : "its " + String(a.n) + " artifacts move to unfiled. their files, versions and notes stay.",
   /** the delete dialog's cancel */
-  cancel: "cancel",
+  cancel: "Cancel",
   /** the delete dialog's action */
-  delete_folder: "delete folder",
+  delete_folder: "Delete folder",
   /** the results' head, `17 found for "dark"` */
   found: (a: { n: string | number; q: string | number }): string => String(a.n) + " found for \"" + String(a.q) + "\"",
   /** the results' head, where it looked and its keys */
@@ -155,7 +155,7 @@ export const library = {
   /** a group's more, `all 6 ›` */
   all_n: (a: { n: string | number }): string => "all " + String(a.n) + " ›",
   /** the kind filter's first (in the window's bar), `all 17` */
-  all_kinds: "all",
+  all_kinds: "All",
   /** the kind filter, for VoiceOver */
   kinds_label: "kinds",
   /** no result: the head */
@@ -221,13 +221,13 @@ export const library = {
   /** a stack open, its first chip: `all 16` */
   sheet_all: (a: { n: string | number }): string => "all " + String(a.n),
   /** the list view's head: the name column */
-  col_name: "name",
+  col_name: "Name",
   /** the list view's head */
-  col_made_by: "made by",
+  col_made_by: "Made by",
   /** the list view's head */
-  col_kind: "kind",
+  col_kind: "Kind",
   /** the list view's head */
-  col_when: "when",
+  col_when: "When",
   /** the list view's kind column, one artifact */
   one_image: "image",
   /** the list view's kind column */

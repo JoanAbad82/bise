@@ -5,7 +5,7 @@
 // under a project filter), the pink dot, the headers and crumbs, the hero's facts, the tiles'
 // covers, the m picker's rows, the search across folders (grouped by folder, 4 a group, kind chips)
 // and its nearest match. Pure: the screen (Screen.tsx) and its parts call these. Owner: art-folders.
-import { iconKindOf, type IconKind } from '@/ds';
+import { iconKindOf, sentenceCase, type IconKind } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { hero } from '@/proto/words_hero.gen';
 import type { Folder } from '@/proto';
@@ -195,7 +195,7 @@ export function crumbOf(lib: Library, at: At): { name: string; at: At }[] {
     case 'recent':
       return [{ name: library.recent, at }];
     case 'unfiled':
-      return [{ name: library.unfiled, at }];
+      return [{ name: sentenceCase(library.unfiled), at }];
     case 'folder': {
       const f = lib.byId.get(at.id);
       if (f === undefined) return [];
@@ -300,7 +300,7 @@ export function moveRows(lib: Library, typed: string, recentIds: readonly string
     const recent = recentIds.filter((id) => id !== from && lib.byId.has(id)).slice(0, 3).map((id) => row(lib.byId.get(id) as Folder));
     const list = inside === null ? lib.themes : (lib.tasks.get(inside) ?? []);
     const all: MoveRow[] = list.filter((f) => f.id !== from).map(row);
-    if (inside === null && from !== null) all.push({ id: 'unfiled', name: library.unfiled, where: '' });
+    if (inside === null && from !== null) all.push({ id: 'unfiled', name: sentenceCase(library.unfiled), where: '' });
     const r = number(recent, 1);
     return { recent: r, all: inside === null ? all : number(all, r.length + 1), make: null };
   }
@@ -385,7 +385,7 @@ export function groupByFolder(lib: Library, items: readonly Item[]): Group[] {
     const k = id ?? '';
     let g = groups.get(k);
     if (g === undefined) {
-      g = { id, title: id === null ? library.unfiled : pathOf(lib, id), items: [] };
+      g = { id, title: id === null ? sentenceCase(library.unfiled) : pathOf(lib, id), items: [] };
       groups.set(k, g);
     }
     g.items.push(it);

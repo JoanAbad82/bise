@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ds } from "@/proto/words_ds.gen";
 import { entityKey } from "@/shared/entity";
-import { APP_ICONS, AppIcon, BannerWait, BarSearch, Filters, GroupLabel, ListRow, MoreButton, PageBanner, RowAction, type EntityMenu } from "./index";
+import { APP_ICONS, AppIcon, BannerWait, BarSearch, Filters, GroupLabel, ListRow, MoreButton, PageBanner, roomOf, RowAction, sentenceCase, type EntityMenu } from "./index";
 import { clippers, noClip } from "./noclip";
 
 afterEach(cleanup);
@@ -51,6 +51,18 @@ describe("PageBanner", () => {
     const r = render(<PageBanner title="t" sentence="s" icon="inbox" edge="page" testId="b" />);
     expect(r.getByTestId("b").getAttribute("data-edge")).toBe("page");
     expect(r.getByTestId("b").style.getPropertyValue("--banner-gutter")).toBe("");
+  });
+
+  it("its right margin as a band, so its sizes key on the content area (ui-review on 40829c85f)", () => {
+    expect([0, 24, 92, 172].map(roomOf)).toEqual(["24", "24", "92", "172"]);
+    const { getByTestId } = render(<PageBanner title="t" sentence="s" icon="inbox" gutter={172} testId="b" />);
+    expect(getByTestId("b").getAttribute("data-room")).toBe("172");
+  });
+});
+
+describe("sentenceCase", () => {
+  it("a chrome label's first letter up, the rest as written", () => {
+    expect(["run now", "show in Finder", "", "Open"].map(sentenceCase)).toEqual(["Run now", "Show in Finder", "", "Open"]);
   });
 });
 

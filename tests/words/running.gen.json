@@ -177,7 +177,7 @@
   "running.open": {
     "args": [],
     "one": null,
-    "text": "open"
+    "text": "Open"
   },
   "running.opening": {
     "args": [
@@ -252,12 +252,12 @@
   "running.stop": {
     "args": [],
     "one": null,
-    "text": "stop"
+    "text": "Stop"
   },
   "running.stop_confirm": {
     "args": [],
     "one": null,
-    "text": "stop it?"
+    "text": "Stop it?"
   },
   "running.stopped_by_you": {
     "args": [],

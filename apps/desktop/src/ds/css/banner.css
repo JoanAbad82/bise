@@ -29,11 +29,29 @@
   :root:not([data-theme="light"]) .b-banner .vis > .light{display:none}
   :root:not([data-theme="light"]) .b-banner .vis > .dark{display:block}
 }
+/* the sizes key on the content area (designer's < 1000 and < 760): the banner's width + 24 + its
+   right margin (data-room: 24, 92 with the world as a bubble, 172 with the world; ui-review) */
 @container b-banner (max-width: 951px){
-  .b-banner > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
-  .b-banner .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
+  .b-banner[data-room="24"] > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
+  .b-banner[data-room="24"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
+}
+@container b-banner (max-width: 883px){
+  .b-banner[data-room="92"] > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
+  .b-banner[data-room="92"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
+}
+@container b-banner (max-width: 803px){
+  .b-banner[data-room="172"] > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
+  .b-banner[data-room="172"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
 }
 @container b-banner (max-width: 711px){
-  .b-banner > .in{padding-right:var(--s-6)}
-  .b-banner .vis{display:none}
+  .b-banner[data-room="24"] > .in{padding-right:var(--s-6)}
+  .b-banner[data-room="24"] .vis{display:none}
+}
+@container b-banner (max-width: 643px){
+  .b-banner[data-room="92"] > .in{padding-right:var(--s-6)}
+  .b-banner[data-room="92"] .vis{display:none}
+}
+@container b-banner (max-width: 563px){
+  .b-banner[data-room="172"] > .in{padding-right:var(--s-6)}
+  .b-banner[data-room="172"] .vis{display:none}
 }

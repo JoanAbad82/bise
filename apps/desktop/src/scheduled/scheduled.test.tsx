@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { BarSlot } from '@/app/barslot';
 import { formatRoute, parseRoute } from '@/app/route';
 import { createRouter, RouterContext } from '@/app/router';
+import { sentenceCase } from '@/ds/case';
 
 // the rows' menus (useEntityMenu, nm-menus) read the router: every render is inside one
 const Routed = ({ children }: { children: ReactNode }) => <RouterContext.Provider value={createRouter({ screen: 'scheduled' })}>{children}</RouterContext.Provider>;
@@ -68,7 +69,7 @@ describe('the scheduled screen', () => {
     // its name (else its words' first line), never its id; who it wakes beside it (designer m_15929)
     expect(screen.getByTestId('scheduled.pane.title').textContent).toBe('check the deploy of storefrontdeploy-watch · storefront');
     expect(screen.getByTestId('scheduled.pane').textContent).not.toContain('#4');
-    expect(screen.getByTestId('scheduled.stop').textContent).toBe(scheduled.key_stop);
+    expect(screen.getByTestId('scheduled.stop').textContent).toBe(sentenceCase(scheduled.key_stop));
     expect(screen.getByTestId('scheduled.pane').textContent).toContain(`${scheduled.nth_of({ nth: '7th', total: 24 })} · 14:22`);
     expect(screen.getByTestId('scheduled.pane.words').textContent).toContain('say so only when it fails');
     expect(screen.queryByTestId('scheduled.run')).toBeNull();

@@ -33,12 +33,12 @@
   "inbox.all_agents": {
     "args": [],
     "one": null,
-    "text": "all agents"
+    "text": "All agents"
   },
   "inbox.all_projects": {
     "args": [],
     "one": null,
-    "text": "all projects"
+    "text": "All projects"
   },
   "inbox.allow": {
     "args": [],
@@ -256,7 +256,7 @@
   "inbox.group_waiting": {
     "args": [],
     "one": null,
-    "text": "waiting for you"
+    "text": "Waiting for you"
   },
   "inbox.head": {
     "args": [],
@@ -744,22 +744,22 @@
   "inbox.state_all": {
     "args": [],
     "one": null,
-    "text": "all"
+    "text": "All"
   },
   "inbox.state_answered": {
     "args": [],
     "one": null,
-    "text": "answered"
+    "text": "Answered"
   },
   "inbox.state_waiting": {
     "args": [],
     "one": null,
-    "text": "waiting"
+    "text": "Waiting"
   },
   "inbox.state_withdrawn": {
     "args": [],
     "one": null,
-    "text": "withdrawn"
+    "text": "Withdrawn"
   },
   "inbox.the_branch": {
     "args": [],

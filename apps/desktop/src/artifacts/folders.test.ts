@@ -76,7 +76,7 @@ describe('the library', () => {
     expect(pathOf(lib, 'f-view')).toBe('desktop app / agent view');
     expect(crumbOf(lib, { at: 'folder', id: 'f-view' }).map((c) => c.name)).toEqual(['desktop app', 'agent view']);
     expect(titlePath(lib, { at: 'folder', id: 'f-view' }, '')).toBe('artifacts / desktop app / agent view');
-    expect(titlePath(lib, { at: 'unfiled' }, '')).toBe('artifacts / unfiled');
+    expect(titlePath(lib, { at: 'unfiled' }, '')).toBe('artifacts / Unfiled');
     // searching: the search, whatever place was open
     expect(titlePath(lib, { at: 'folder', id: 'f-view' }, 'dark')).toBe(`artifacts / ${library.crumb_search({ q: 'dark' })}`);
   });
@@ -111,7 +111,7 @@ describe('the m picker', () => {
   it('shows the recent folders first with digits, then every theme, and leaves out the one it is in', () => {
     const rows = moveRows(lib, '', ['f-hero', 'f-view', 'f-rue'], 'f-view');
     expect(rows.recent.map((r) => [r.name, r.where, r.digit])).toEqual([['page heroes', 'desktop app', 1], ['36 rue de Montreuil', '', 2]]);
-    expect(rows.all.map((r) => r.name)).toEqual(['desktop app', '36 rue de Montreuil', 'unfiled']);
+    expect(rows.all.map((r) => r.name)).toEqual(['desktop app', '36 rue de Montreuil', 'Unfiled']);
     expect(rows.all[0]?.opens).toBe(true);
     expect(rows.make).toBeNull();
   });
@@ -152,7 +152,7 @@ describe('search across folders', () => {
 
   it('groups by folder, unfiled its own group', () => {
     const groups = groupByFolder(lib, ITEMS);
-    expect(groups.map((g) => [g.title, g.items.length])).toEqual([['desktop app / agent view', 2], ['desktop app / page heroes', 1], ['36 rue de Montreuil', 2], ['unfiled', 2]]);
+    expect(groups.map((g) => [g.title, g.items.length])).toEqual([['desktop app / agent view', 2], ['desktop app / page heroes', 1], ['36 rue de Montreuil', 2], ['Unfiled', 2]]);
   });
 
   it('counts its kind chips, the most first', () => {
@@ -180,15 +180,15 @@ describe('the scope, the menus, the drag, the commands', () => {
 
   it('a card menu has its keys; several picked: what applies to all', () => {
     expect(cardRows({ finder: true, several: 1 }).map((r) => `${r.name} ${r.key}`)).toEqual([
-      'open ⏎', 'quick look space', 'versions v', 'put in a message @', 'copy link ⌘C', 'show in Finder r', 'move to… m', 'archive ⌫',
+      'Open ⏎', 'Quick look space', 'Versions v', 'Put in a message @', 'Copy link ⌘C', 'Show in Finder r', 'Move to… m', 'Archive ⌫',
     ]);
     expect(cardRows({ finder: false, several: 1 }).some((r) => r.id === 'finder')).toBe(false);
     expect(cardRows({ finder: true, several: 3 }).map((r) => r.id)).toEqual(['move', 'put', 'archive']);
   });
 
   it('a folder menu offers a folder inside only on a theme (two levels at most)', () => {
-    expect(folderRows(true).map((r) => r.name)).toEqual(['rename', 'new folder inside', 'merge into…', 'delete folder…']);
-    expect(folderRows(false).map((r) => r.name)).toEqual(['rename', 'merge into…', 'delete folder…']);
+    expect(folderRows(true).map((r) => r.name)).toEqual(['Rename', 'New folder inside', 'Merge into…', 'Delete folder…']);
+    expect(folderRows(false).map((r) => r.name)).toEqual(['Rename', 'Merge into…', 'Delete folder…']);
   });
 
   it('drags the picked ones when the card is one of them, else itself', () => {

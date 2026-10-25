@@ -30,7 +30,7 @@ export interface PageBannerProps {
 export function PageBanner({ title, sentence, facts, visual, icon, edge = "column", gutter = 0, testId }: PageBannerProps) {
   const style = gutter > 0 ? ({ "--banner-gutter": `${String(gutter)}px` } as CSSProperties) : undefined;
   return (
-    <header className="b-banner" data-edge={edge} style={style} data-testid={testId}>
+    <header className="b-banner" data-edge={edge} data-room={roomOf(gutter)} style={style} data-testid={testId}>
       <div className="in">
         <div className="txt">
           <h1 className="title">{title}</h1>
@@ -44,6 +44,13 @@ export function PageBanner({ title, sentence, facts, visual, icon, edge = "colum
     </header>
   );
 }
+
+/**
+ * The banner's right margin as a band (banner.css keys its sizes on the content area, which is the
+ * banner's width + 24 + this margin): '24' (no side, or the panel open), '92' (the world as a
+ * bubble), '172' (the world). Pure.
+ */
+export const roomOf = (gutter: number): "24" | "92" | "172" => (gutter <= 24 ? "24" : gutter <= 92 ? "92" : "172");
 
 /** the part of a banner's facts that waits on him: the accent's only use in a banner */
 export function BannerWait({ children }: { children: ReactNode }) {

@@ -73,9 +73,9 @@ describe('the running screen', () => {
   it("groups by project, running ones under 'running N', ended ones under 'ended today N'", () => {
     render(<RunningView items={[stripe, dev, failed, nohup]} ports={ports()} now={NOW} />);
     // the segmented filter (ds Filters), its count apart in text-3
-    expect(screen.getByTestId('running.filter.running').textContent).toBe('running3');
+    expect(screen.getByTestId('running.filter.running').textContent).toBe('Running3');
     expect(screen.getByTestId('running.filter.running').querySelector('.run-n')?.textContent).toBe('3');
-    expect(screen.getByTestId('running.filter.ended').textContent).toBe('ended today1');
+    expect(screen.getByTestId('running.filter.ended').textContent).toBe('Ended today1');
     expect(screen.getByTestId('running.filter.running').getAttribute('aria-selected')).toBe('true');
     // the lead (no hero card) and one group label per project (ds GroupLabel)
     expect(screen.queryByTestId('running.hero')).toBeNull();
@@ -167,7 +167,7 @@ describe('the running screen', () => {
     const p = ports();
     render(<RunningView items={[dev]} ports={p} now={NOW} opened="shop/perf/bg3" />);
     fireEvent.click(screen.getByTestId('running.pane.stop'));
-    expect(screen.getByTestId('running.pane.stop').textContent).toBe('stop it?');
+    expect(screen.getByTestId('running.pane.stop').textContent).toBe('Stop it?');
     expect(p.log.filter((l) => l.startsWith('stop'))).toHaveLength(0);
     fireEvent.click(screen.getByTestId('running.pane.stop'));
     expect(p.log).toContain('stop shop/perf/bg3');

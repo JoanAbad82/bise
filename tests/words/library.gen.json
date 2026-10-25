@@ -3,7 +3,7 @@
   "library.add_files": {
     "args": [],
     "one": null,
-    "text": "add files"
+    "text": "Add files"
   },
   "library.all_artifacts": {
     "args": [],
@@ -18,7 +18,7 @@
   "library.all_kinds": {
     "args": [],
     "one": null,
-    "text": "all"
+    "text": "All"
   },
   "library.all_n": {
     "args": [
@@ -42,7 +42,7 @@
   "library.archive": {
     "args": [],
     "one": null,
-    "text": "archive"
+    "text": "Archive"
   },
   "library.archived_n": {
     "args": [
@@ -59,7 +59,7 @@
   "library.cancel": {
     "args": [],
     "one": null,
-    "text": "cancel"
+    "text": "Cancel"
   },
   "library.clear_search": {
     "args": [],
@@ -78,22 +78,22 @@
   "library.col_kind": {
     "args": [],
     "one": null,
-    "text": "kind"
+    "text": "Kind"
   },
   "library.col_made_by": {
     "args": [],
     "one": null,
-    "text": "made by"
+    "text": "Made by"
   },
   "library.col_name": {
     "args": [],
     "one": null,
-    "text": "name"
+    "text": "Name"
   },
   "library.col_when": {
     "args": [],
     "one": null,
-    "text": "when"
+    "text": "When"
   },
   "library.count_from": {
     "args": [
@@ -119,7 +119,7 @@
   "library.delete_folder": {
     "args": [],
     "one": null,
-    "text": "delete folder"
+    "text": "Delete folder"
   },
   "library.delete_q": {
     "args": [
@@ -165,7 +165,7 @@
   "library.folders": {
     "args": [],
     "one": null,
-    "text": "folders"
+    "text": "Folders"
   },
   "library.found": {
     "args": [
@@ -270,7 +270,7 @@
   "library.library_head": {
     "args": [],
     "one": null,
-    "text": "library"
+    "text": "Library"
   },
   "library.looked_in": {
     "args": [],
@@ -285,52 +285,52 @@
   "library.menu_copy": {
     "args": [],
     "one": null,
-    "text": "copy link"
+    "text": "Copy link"
   },
   "library.menu_delete": {
     "args": [],
     "one": null,
-    "text": "delete folder…"
+    "text": "Delete folder…"
   },
   "library.menu_finder": {
     "args": [],
     "one": null,
-    "text": "show in Finder"
+    "text": "Show in Finder"
   },
   "library.menu_look": {
     "args": [],
     "one": null,
-    "text": "quick look"
+    "text": "Quick look"
   },
   "library.menu_merge": {
     "args": [],
     "one": null,
-    "text": "merge into…"
+    "text": "Merge into…"
   },
   "library.menu_move": {
     "args": [],
     "one": null,
-    "text": "move to…"
+    "text": "Move to…"
   },
   "library.menu_new_inside": {
     "args": [],
     "one": null,
-    "text": "new folder inside"
+    "text": "New folder inside"
   },
   "library.menu_open": {
     "args": [],
     "one": null,
-    "text": "open"
+    "text": "Open"
   },
   "library.menu_rename": {
     "args": [],
     "one": null,
-    "text": "rename"
+    "text": "Rename"
   },
   "library.menu_versions": {
     "args": [],
     "one": null,
-    "text": "versions"
+    "text": "Versions"
   },
   "library.merge_into": {
     "args": [
@@ -508,12 +508,12 @@
   "library.put_in_message": {
     "args": [],
     "one": null,
-    "text": "put in a message"
+    "text": "Put in a message"
   },
   "library.recent": {
     "args": [],
     "one": null,
-    "text": "recent"
+    "text": "Recent"
   },
   "library.recent_first": {
     "args": [],
@@ -666,7 +666,7 @@
   "library.undo": {
     "args": [],
     "one": null,
-    "text": "undo"
+    "text": "Undo"
   },
   "library.unfiled": {
     "args": [],

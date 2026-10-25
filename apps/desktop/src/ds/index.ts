@@ -32,7 +32,7 @@ export * from "./pagehero";
 export * from "./icons";
 export * from "./icons-app";
 export * from "./banner";
-export * from "./lead";
+export * from "./case";
 export * from "./filters";
 export * from "./listrow";
 export * from "./more";

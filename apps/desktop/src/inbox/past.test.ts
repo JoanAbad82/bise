@@ -32,7 +32,7 @@ describe('listsOf: waiting first, then the past by day', () => {
   it('groups and orders', () => {
     const l = listsOf(cards, records, NAMES, ALL, NOW);
     expect(l.waiting.map((w) => [w.glyph, w.title])).toEqual([['?', 'search'], ['¶', 'bise']]);
-    expect(l.days.map((d) => [d.title, d.rows.map((r) => r.r.card)])).toEqual([['today', [1, 2]], ['yesterday', [5]]]);
+    expect(l.days.map((d) => [d.title, d.rows.map((r) => r.r.card)])).toEqual([['Today', [1, 2]], ['Yesterday', [5]]]);
     expect(l.order).toEqual(['w:shop/3', 'w:shop/4', 'p:shop/1', 'p:shop/2', 'p:shop/5']);
   });
   it('filters by state, asker and words', () => {
@@ -77,9 +77,9 @@ it('heads a day as words::day_head', () => {
 
 it('a record without a close time sits on the day it was asked; none known: earlier, never 1970', () => {
   const l = listsOf([], [rec(1, { at_ms: 0, asked_ms: at(1, 9, 0) }), rec(2, { at_ms: 0, asked_ms: 0 })], NAMES, ALL, NOW);
-  expect(l.days.map((d) => d.title)).toEqual(['yesterday', 'earlier']);
+  expect(l.days.map((d) => d.title)).toEqual(['Yesterday', 'Earlier']);
   const tiny = listsOf([], [rec(3, { at_ms: 2000, asked_ms: 1000 }), rec(4, { at_ms: 900, asked_ms: 500 })], NAMES, ALL, NOW);
-  expect(tiny.days.map((d) => d.title)).toEqual(['earlier']);
+  expect(tiny.days.map((d) => d.title)).toEqual(['Earlier']);
 });
 
 describe('jumpOf: where a past row goes', () => {

@@ -45,23 +45,23 @@ export const inbox = {
   /** the TUI's keys with nothing selected */
   list_keys_none: "esc back",
   /** the desktop's project filter: every project */
-  all_projects: "all projects",
+  all_projects: "All projects",
   /** the desktop's agent filter: every agent */
-  all_agents: "all agents",
-  /** the desktop's state filter: all */
-  state_all: "all",
+  all_agents: "All agents",
+  /** the desktop's state filter: all (a tab name: sentence case, designer m_43052) */
+  state_all: "All",
   /** the desktop's state filter: waiting */
-  state_waiting: "waiting",
+  state_waiting: "Waiting",
   /** the desktop's state filter: answered */
-  state_answered: "answered",
+  state_answered: "Answered",
   /** the desktop's state filter: withdrawn */
-  state_withdrawn: "withdrawn",
+  state_withdrawn: "Withdrawn",
   /** the desktop's search field, and its `/` key */
   search: "search",
   /** the desktop's state filter, for VoiceOver (bise fait mac's segmented filter) */
   filter_label: "show",
   /** the desktop's group label over the open items (its count after it, in the accent) */
-  group_waiting: "waiting for you",
+  group_waiting: "Waiting for you",
   /** the desktop's tip on a waiting row: what ⏎ does */
   row_tip_wait: "⏎ answer",
   /** the desktop's tip on a past row: what ⏎ and ⌘⏎ do */
