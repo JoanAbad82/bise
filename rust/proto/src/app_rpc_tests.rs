@@ -100,8 +100,12 @@ fn a_bad_request_is_answered_by_its_code() {
 
 #[test]
 fn initialize_says_what_this_core_serves() {
-    let r = AppInitResult::now();
+    let r = AppInitResult::now("/h/cache/thumbs");
     assert_eq!(r.proto, PROTO);
+    assert_eq!(r.thumbs_dir, "/h/cache/thumbs");
+    // an older core's answer reads with no thumbs folder
+    let old: AppInitResult = serde_json::from_value(serde_json::json!({"proto": 1, "methods": [], "notifications": []})).unwrap();
+    assert_eq!(old.thumbs_dir, "");
     assert_eq!(r.methods, methods());
     assert_eq!(r.notifications, notifications());
     let p: AppInit = serde_json::from_value(serde_json::json!({"proto": 1, "client": {"name": "bise-desktop"}})).unwrap();

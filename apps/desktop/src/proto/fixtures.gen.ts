@@ -112,6 +112,9 @@ export const hub_ev: readonly HubEv[] = [
   {"ev":"activity","item":{"agent":"perf","at_ms":1791100502000,"kind":"report","report":"done"},"project":"acme-1a2b3c4d"},
   {"agent":"perf","bytes":184320,"ev":"completion","family":"anthropic","hits":[2],"project":"acme-1a2b3c4d","rows":[{"blocks":[{"body":{"kind":"code","lang":"json","text":"{\n  \"max_tokens\": 32000\n}"},"label":"params"},{"body":{"kind":"code","lang":"json","text":"[]"},"label":"tools · 46"}],"bytes":72400,"head":"anthropic · claude-opus-5-5 · 46 tools","n":0,"role":"request","tokens":18100},{"blocks":[{"body":{"kind":"md","text":"You are perf."}}],"bytes":39200,"head":"the system prompt · 212 lines","n":1,"role":"system","tokens":9800},{"blocks":[{"body":{"kind":"md","text":"i'll bench it first."}},{"body":{"kind":"code","lang":"bash","text":"pnpm bench web/product --runs 3"},"label":"tool_use · bash"}],"bytes":210,"head":"i'll bench it first.","n":2,"role":"assistant","tokens":53}],"slot":{"at_ms":1791100171000,"kind":"turn","model":"anthropic/claude-opus-5-5","req":41,"slot":1},"slots":[{"at_ms":1791100160000,"kind":"turn","model":"anthropic/claude-opus-5-5","req":40,"slot":0},{"at_ms":1791100171000,"kind":"turn","model":"anthropic/claude-opus-5-5","req":41,"slot":1}]},
   {"agent":"perf","entry":{"at_ms":1791100032000,"kind":"tools","pos":32,"text":"ran 1 command","tools":{"count":1,"items":[{"at_ms":1791100032000,"code":"{\"command\":\"pnpm dev\",\"description\":\"start the dev server\"}","id":9,"intent":"start the dev server","kind":"run","ms":30000,"name":"bash","pos":32,"state":"ok","text":"start the dev server"}],"summary":"ran 1 command"}},"ev":"entry","project":"acme-1a2b3c4d"},
+  {"ev":"artifacts_moved","moved":[{"from":"f-abcdefghij","id":"perf-notes"},{"id":"report-html"}],"project":"acme-1a2b3c4d"},
+  {"ev":"folders","folders":[{"by":"you","id":"f-abcdefghij","name":"docs","named_by_you":true},{"by":"main","id":"f-klmnopqrst","name":"pricing","named_by_you":false,"parent":"f-abcdefghij"}],"made":"f-klmnopqrst","project":"acme-1a2b3c4d"},
+  {"ev":"library","folders":[{"by":"you","id":"f-abcdefghij","name":"docs","named_by_you":true}],"here":"acme","project":"acme-1a2b3c4d","projects":[{"items":[{"agent":"design","at_ms":1791100010000,"folder":"f-abcdefghij","id":"hero","kind":"image","new":false,"title":"hero","turn":1791100009000,"url":"/s/hero.png","version":1}],"name":"site","project":"site-9f8e7d6c"}]},
 ];
 
 /** rust/proto/fixtures/hub_cmd.jsonl */
@@ -207,6 +210,9 @@ export const hub_cmd: readonly HubCmd[] = [
   {"agent":"perf","before":13893632,"cmd":"log","find":"hero","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"completion","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"completion","find":"bench","project":"acme-1a2b3c4d","provider":"openai/gpt-5","raw":true,"slot":3},
+  {"cmd":"artifacts_move","folder":"f-abcdefghij","ids":["perf-notes","report-html"],"keep_undo":true,"project":"acme-1a2b3c4d","to":"site"},
+  {"cmd":"artifacts_folders","op":{"make":{"name":"pricing","parent":"f-abcdefghij"}},"project":"acme-1a2b3c4d"},
+  {"cmd":"artifacts_library","project":"acme-1a2b3c4d"},
 ];
 
 /** rust/proto/fixtures/core_ev.jsonl */
@@ -290,6 +296,7 @@ export const core_ev: readonly CoreEv[] = [
   {"answer":"Hi! How can I help you today?","ev":"provider_check","id":"anthropic","label":"opus 5.5","lines":["main uses anthropic/claude-opus-5-5.","small jobs and auto's checker use claude-haiku-4-5."],"main":"anthropic/claude-opus-5-5","model":"anthropic/claude-opus-5-5","name":"Anthropic","pasted":true,"state":"works"},
   {"ev":"provider_check","id":"anthropic","label":"opus 5.5","model":"anthropic/claude-opus-5-5","name":"Anthropic","pasted":true,"said":"invalid x-api-key","state":"failed","url":"https://platform.claude.com/settings/keys","why":"wrong_key"},
   {"answer":"Hello!","ev":"provider_check","id":"chatgpt","label":"gpt-6.1-sol","main":"chatgpt/gpt-6.1-sol","model":"chatgpt/gpt-6.1-sol","name":"ChatGPT","state":"works"},
+  {"ev":"library_folders","folders":[{"by":"you","id":"f-abcdefghij","name":"docs","named_by_you":true}],"made":"f-abcdefghij","notice":"moved 2 artifacts to docs"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -394,6 +401,9 @@ export const app_cmd: readonly AppCmd[] = [
   {"agent":"perf","cmd":"stop"},
   {"agent":"perf","cmd":"archive","stop_first":true},
   {"agent":"perf","cmd":"unarchive"},
+  {"cmd":"folders","op":{"merge":{"from":"f-abcdefghij","into":"f-klmnopqrst"}}},
+  {"cmd":"folders","op":"undo"},
+  {"cmd":"folders_move","folder":"f-klmnopqrst","items":[{"from":"f-abcdefghij","id":"perf-notes","project":"acme-1a2b3c4d"},{"id":"hero","project":"site-9f8e7d6c"}]},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

@@ -321,7 +321,7 @@ pub fn update<T>(home: &Home, f: impl FnOnce(&mut Vec<Project>) -> Result<T, Str
 }
 
 /// An exclusive flock on `path`, held until the file is dropped.
-fn lock(path: &Path) -> Result<std::fs::File, String> {
+pub(crate) fn lock(path: &Path) -> Result<std::fs::File, String> {
     use std::os::unix::io::AsRawFd;
     let f = std::fs::OpenOptions::new()
         .create(true)

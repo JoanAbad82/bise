@@ -11,7 +11,7 @@ says what is built and how to work on it.
 | `office/sdk/src/` | the sources: `core/` (zip, XML, OPC, anchors, outline, diff), `run.ts`, one folder per module (`sheets/`, `slides/`, `docs/`) |
 | `office/sdk/src/anchor.gen.ts` | the `Anchor` type, generated from `bise_proto::anchor` (never hand-edited) |
 | `office/dist/office.js` | the built bundle, **committed**: one ESM file, no node imports |
-| `office/fixtures/` | `tiny.xlsx`, `tiny.pptx`, `tiny.docx`, made by `make.mjs` from our own XML |
+| `office/fixtures/` | `tiny.xlsx`, `tiny.pptx`, `tiny.docx`, made by `make.ts` from our own XML |
 | `office/sdk/test/` | the tests, run on the built bundle with `node --test` |
 | `tests/office_check.sh` | the gate's check (below) |
 
@@ -31,16 +31,16 @@ TextDecoder are used when the host has them, else its own UTF-8:
 
 A second bundle, `office/dist/office-view.js`, is the viewer's alone:
 docx-preview (Apache-2.0) and jszip (taken under MIT) to draw a docx in a
-browser, `platform: "browser"`, a 2 MB budget `build.mjs` enforces. It
+browser, `platform: "browser"`, a 2 MB budget `build.ts` enforces. It
 never goes into `office.js`, which stays DOM-free
-(`test/viewer.test.mjs` imports it with no window).
+(`test/viewer.test.ts` imports it with no window).
 
 A third, `office/dist/office-sheet.js`, is the viewer's xlsx grid (page
 xlsx-univer, architect m_37322): Univer (Apache-2.0, open-source packages
 only; no Univer Pro), React and what they bundle, ~7 MB, loaded by
 kit/office/sheet.js alone when an xlsx is shown. It is **built, never
 committed** (a 7 MB blob per rebuild in a public history): `scripts/bins.sh
-office-sheet` builds it from `src/view/sheet.ts`, `build.mjs` and the
+office-sheet` builds it from `src/view/sheet.ts`, `build.ts` and the
 lockfile into its cache (keyed by their content) and places it with its
 `.key`; run.sh and versions.sh call it, and `tests/office_check.sh` fails
 when it is missing or stale. Univer's hyphenation dictionaries (5 MB) are
@@ -53,7 +53,7 @@ what exceljs keeps (carry.ts: charts, pivots) comes through. The saves go to
 file on disk and the artifact's next version, one per sitting.
 
 Cargo and nix never run pnpm, so the other bundles are committed like generated
-code. `build.mjs` builds with esbuild `platform: "neutral"` (a node import
+code. `build.ts` builds with esbuild `platform: "neutral"` (a node import
 fails the build) and refuses a bundle that still names `require("…")`,
 `node:`, `process.env` or `Buffer.from`.
 
@@ -63,7 +63,7 @@ fails the build) and refuses a bundle that still names `require("…")`,
 pnpm -C office/sdk install
 pnpm -C office/sdk build        # writes office/dist/office.js: commit it with the sources
 pnpm -C office/sdk check        # typecheck + the bundle is fresh + the tests
-node office/fixtures/make.mjs   # the fixtures again (same bytes each run)
+node --experimental-strip-types office/fixtures/make.ts   # the fixtures again (same bytes each run)
 ```
 
 The gate: `tests/office_check.sh` typechecks, rebuilds the bundle in memory
@@ -123,11 +123,11 @@ bise office check q3.pptx        # the problems as JSON
   (an exception, a refusal, the cap) on stderr, exit 1.
 
 No polyfills and no timers in the bundle (architect m_23798). A module a
-library requires but the SDK never runs is a row of `build.mjs`'s `STUBS`
+library requires but the SDK never runs is a row of `build.ts`'s `STUBS`
 table (`{module, reason}`): the bundle gets a stub that throws
 `office: <module> is not available (<reason>)` on any use. A module we
 replace with our own code is a row of `REPLACED`. Any other node import
-still fails the build; `build.mjs` also fails past 3 MB.
+still fails the build; `build.ts` also fails past 3 MB.
 
 ## The API every module shares
 
@@ -263,7 +263,7 @@ deck.check();                                  // overflow, off_slide, empty_pla
 - **check()** measures text with average glyph widths of a sans font: an
   estimate. `shrink` autofit (PowerPoint's) makes an overflow a warning.
 - **Quick Look check** (macOS, off-screen, not in `pnpm check`):
-  `~/.bise/run/heavy-run --low node --test office/sdk/test/slides.quicklook.mjs`
+  `~/.bise/run/heavy-run --low node --experimental-strip-types --test office/sdk/test/slides.quicklook.ts`
   makes one deck per layout, a table, an image, each chart kind and the
   edited fixture, and fails when `qlmanage -t` draws no thumbnail of one.
 - Not in v1: editing a chart's series, SmartArt, animations, speaker
@@ -283,7 +283,7 @@ await run.write("q3.xlsx", await book.save());
 
 - On exceljs 4.4's workbook model and xforms, not its XLSX class: `io.ts`
   reads and writes the parts over our zip with a sync SAX pass, so no
-  stream, timer or `Buffer` is ever reached (`test/sheets-bare.test.mjs`
+  stream, timer or `Buffer` is ever reached (`test/sheets-bare.test.ts`
   runs it in a context with no host globals). `book.exceljs` is the raw
   Workbook for what the API does not do (using it counts as an edit).
 - **Nothing lost silently** (`carry.ts`). What exceljs does not model
@@ -315,7 +315,7 @@ await run.write("q3.xlsx", await book.save());
   array formulas and functions outside the list above (Excel computes
   them), a sheet password (`protect()` without one works).
 - Off-screen check on a Mac: `~/.bise/run/heavy-run --low node --test
-  office/sdk/test/sheets.quicklook.mjs` (Quick Look thumbnails of a made
+  office/sdk/test/sheets.quicklook.ts` (Quick Look thumbnails of a made
   workbook, the rich fixture edited and tiny.xlsx edited).
 
 ## Anchors
@@ -407,6 +407,6 @@ images and fonts as `data:`/`blob:`, inline styles (docx-preview needs
 them), nothing from another origin, no `frame-ancestors` (the desktop frames
 it from file://). No token in the shell: the viewer has no `/api` yet.
 
-Tests: `office/sdk/test/viewer.test.mjs` (the renderers' pure parts, the
+Tests: `office/sdk/test/viewer.test.ts` (the renderers' pure parts, the
 bundles' split; `gate.sh` runs it when `office/` or `kit/office/` changed),
 `pages::artifact` and `pages::site` unit tests (routes, frame_url, CSP).

@@ -1,0 +1,7 @@
+/* the kind icons (icons.tsx): 16 px line icons in currentColor; the screen sets their color (text-3). */
+.b-kind-icon,
+.b-play-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}

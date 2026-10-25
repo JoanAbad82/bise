@@ -1,4 +1,4 @@
-// What the bundle gives exceljs for `require("uuid")` (build.mjs REPLACED):
+// What the bundle gives exceljs for `require("uuid")` (build.ts REPLACED):
 // exceljs names its conditional-formatting extensions with a v4 uuid. Ours
 // counts from a seed reset on each save, so the same workbook saves to the
 // same bytes, and needs no crypto.getRandomValues (bise office run has none).

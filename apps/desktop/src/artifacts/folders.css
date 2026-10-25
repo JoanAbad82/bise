@@ -1,0 +1,155 @@
+/* The artifacts page in folders (Screen.tsx, Column.tsx, Tiles.tsx, Search.tsx, MovePicker.tsx,
+   Menus.tsx, Fold.tsx; page artifacts-gallery v7, block 'les mesures'): the 200 px column, 24 to the
+   cards; rows of --h-row-tight; one hue, the accent, for what is new (the dot); selection a 2 px ink
+   ring; shadows only on what floats (picker, menu, selection bar, toast, ghost). Owner: art-folders. */
+
+.art-lib{display:grid;grid-template-columns:200px minmax(0,1fr);gap:var(--s-6);align-items:start}
+.art-screen[data-narrow] .art-lib{grid-template-columns:minmax(0,1fr)}
+.art-main{min-width:0}
+
+/* the column */
+.art-col{position:sticky;top:0;display:flex;flex-direction:column;font-size:var(--t-13)}
+.art-col-row{display:flex;align-items:center;gap:var(--s-2);height:var(--h-row-tight);padding:0 var(--s-2);border-radius:var(--r-1);color:var(--c-text-2);text-align:left}
+.art-col-row:hover{background:var(--c-hover)}
+.art-col-row[aria-current]{background:var(--c-active);color:var(--c-text);font-weight:500}
+.art-col-row[data-over]{box-shadow:inset 0 0 0 2px var(--c-text)}
+.art-col-row.in{padding-left:var(--s-6)}
+.art-col-row .nm{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.art-col-row .end{position:relative;flex:none;display:flex;align-items:center;justify-content:flex-end;min-width:var(--s-6);color:var(--c-text-3);font-size:var(--t-12);font-variant-numeric:tabular-nums}
+.art-col-more .nm,.art-col-new .nm{color:var(--c-text-3)}
+.art-col-head{display:flex;align-items:flex-end;height:var(--h-row);padding:0 var(--s-2);font-size:var(--t-11);letter-spacing:.06em;text-transform:uppercase;color:var(--c-text-3)}
+.art-folder-icon{flex:none;color:var(--c-text-3)}
+/* density rule 2: the count on hover or focus, in the dot's place; nothing moves */
+.end .dot{width:6px;height:6px;border-radius:50%;background:var(--c-accent)}
+.end .ct{display:none}
+/* the tree: the dot when something in it is new, else nothing; a hover never changes it (the count
+   lives in the head; designer m_40850). Only unfiled keeps its count, and a drop flashes it */
+.end[data-rest] .ct,.end[data-flash] .ct,
+.art-tile:hover .end .ct,.art-tile:focus-visible .end .ct{display:inline}
+.end[data-rest] .dot,.end[data-flash] .dot,
+.art-tile:hover .end .dot,.art-tile:focus-visible .end .dot{display:none}
+.end[data-flash] .ct{color:var(--c-text);font-weight:600}
+.art-col-edit{display:flex;align-items:center;height:var(--h-row-tight);padding:0 var(--s-1)}
+.art-col-edit.in{padding-left:var(--s-5)}
+.art-col-input{flex:1;min-width:0;height:var(--h-control-sm);padding:0 var(--s-2);border-radius:var(--r-1);border:1px solid var(--c-line-strong);background:var(--c-surface);color:var(--c-text);font:inherit}
+
+/* the fold under 900 px: the crumb opens the same rows */
+.art-fold{position:relative;display:inline-flex}
+.art-main > .art-fold{margin:0 0 var(--s-2)}
+.art-fold-crumb{display:inline-flex;align-items:center;gap:var(--s-1);height:var(--h-control);padding:0 var(--s-2);border-radius:var(--r-1);font-size:var(--t-15);font-weight:600;color:var(--c-text)}
+.art-fold-crumb:hover{background:var(--c-hover)}
+.art-fold-crumb .caret{color:var(--c-text-3);font-size:var(--t-12)}
+.art-fold-pop{position:absolute;top:calc(100% + var(--s-1));left:0;z-index:20;width:240px;max-height:60vh;overflow:auto;padding:var(--s-1);border-radius:var(--r-2);background:var(--c-solid);box-shadow:var(--e-2)}
+.art-fold-pop .art-col{position:static}
+
+/* the place's header: its path, its ···, its line */
+.art-head{margin:0 0 var(--s-3)}
+.art-head-t{display:flex;align-items:center;gap:var(--s-2)}
+.art-head-t .t{font-size:var(--t-17);font-weight:600;color:var(--c-text)}
+.art-head-s{margin:var(--s-1) 0 0;font-size:var(--t-13);color:var(--c-text-3)}
+.art-link{color:var(--c-text);text-decoration:underline;text-underline-offset:2px}
+
+/* the head's line: the place's path and ··· left; the scope, the search, ▦ ☰, + add right (designer m_40850) */
+.art-headline{display:flex;align-items:center;gap:var(--s-2);min-width:0}
+.art-headline .art-head-t{min-width:0}
+.art-filters-end{display:flex;align-items:center;gap:var(--s-2);margin-left:auto;flex:none}
+/* the kind chips: their own row under the head, one row never wrapped, the rest in '+2 ⌄' */
+.art-chips{position:relative;display:flex;align-items:center;gap:var(--s-1);flex-wrap:nowrap;min-width:0;margin:0 0 var(--s-2);overflow:hidden}
+.art-chips-ruler{position:absolute;top:0;left:0;display:flex;gap:inherit;visibility:hidden;pointer-events:none;white-space:nowrap}
+/* the fold's sample: room for the trigger's caret */
+.art-chips-ruler .fold{padding-right:var(--s-6)}
+.art-chip{display:inline-flex;align-items:center;gap:var(--s-1);height:var(--h-control-sm);padding:0 var(--s-2);border-radius:var(--r-1);font-size:var(--t-13);color:var(--c-text-2)}
+.art-chip:hover{background:var(--c-hover)}
+.art-chip[aria-pressed="true"]{background:var(--c-active);color:var(--c-text)}
+.art-chip .n{color:var(--c-text-3);font-variant-numeric:tabular-nums}
+.art-scope{display:inline-flex;align-items:center}
+.art-scope-x{display:inline-flex}
+.art-views{display:inline-flex;align-items:center;gap:0}
+
+/* the sections of all artifacts */
+.art-sect{display:flex;align-items:baseline;justify-content:space-between;margin:var(--s-4) 0 var(--s-2);font-size:var(--t-12);font-weight:600;color:var(--c-text-3)}
+.art-sect .sort{font-weight:400}
+
+/* the tiles: big on all artifacts (a 3-thumbnail cover), small inside a theme */
+.art-tiles{display:grid;gap:var(--s-6) var(--s-4)}
+.art-tiles.big{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin:0 0 var(--s-4)}
+.art-tiles.small{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--s-2);margin:0 0 var(--s-6)}
+.art-tile{display:flex;flex-direction:column;min-width:0;text-align:left;border-radius:var(--r-2);color:var(--c-text)}
+.art-tile[data-over] .cover,.art-tile.small[data-over]{box-shadow:0 0 0 2px var(--c-text)}
+.art-tile .cover{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:var(--s-1);aspect-ratio:16/10;padding:var(--s-1);border-radius:var(--r-2);background:var(--c-sunken);overflow:hidden}
+.art-tile .cover[data-n="1"],.art-tile .cover[data-n="0"]{grid-template-columns:1fr;grid-template-rows:1fr}
+.art-tile .cover[data-n="2"]{grid-template-rows:1fr}
+.art-tile .pic{position:relative;min-width:0;min-height:0;border-radius:var(--r-1);background:var(--c-surface);overflow:hidden}
+.art-tile .pic:first-child{grid-row:1 / -1}
+.art-tile .pic.none{display:flex;align-items:center;justify-content:center;color:var(--c-text-3)}
+.art-tile .pic > *{width:100%;height:100%;object-fit:cover}
+/* an empty folder: the same tile, a 20 px folder glyph in text-3 at its centre (designer m_40850) */
+.art-tile .pic.none > svg{width:20px;height:auto}
+.art-tile .nm{display:flex;align-items:center;gap:var(--s-2);margin:var(--s-2) 0 0;font-size:var(--t-13);font-weight:500}
+.art-tile .nm .t,.art-tile.small .t{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.art-tile .nm .dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--c-accent)}
+.art-tile .ln{margin:0;font-size:var(--t-12);color:var(--c-text-3);font-variant-numeric:tabular-nums}
+.art-tile .ln[data-flash]{color:var(--c-text);font-weight:600}
+.art-tile.small{flex-direction:row;align-items:center;gap:var(--s-2);height:var(--h-control-lg);padding:0 var(--s-3);background:var(--c-sunken);font-size:var(--t-13)}
+.art-tile.small:hover{background:var(--c-hover)}
+/* the folders in the ☰ list: rows at the list's height, on top of its rows */
+.art-frows{display:flex;flex-direction:column;margin:0 0 var(--s-4)}
+.art-frow{display:grid;grid-template-columns:auto minmax(0,1fr) auto 64px 72px;align-items:center;gap:var(--s-2);min-height:var(--h-row);padding:0 var(--pad-row-x);border-radius:var(--r-2);font-size:var(--t-13);color:var(--c-text);text-align:left}
+.art-frow:hover{background:var(--c-hover)}
+.art-frow[data-over]{box-shadow:inset 0 0 0 2px var(--c-text)}
+.art-frow > svg{width:16px;height:auto;color:var(--c-text-3)}
+.art-frow .t{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.art-frow .dot{width:6px;height:6px;border-radius:50%;background:var(--c-accent)}
+.art-frow .ct,.art-frow .when{color:var(--c-text-3);font-size:var(--t-12);font-variant-numeric:tabular-nums;text-align:right}
+.art-frow .ct[data-flash]{color:var(--c-text);font-weight:600}
+.art-tile.small .t{flex:1}
+
+/* search */
+.art-found{margin:0 0 var(--s-3);font-size:var(--t-13);color:var(--c-text-3)}
+.art-found b{font-weight:600;color:var(--c-text)}
+.art-group{margin:0 0 var(--s-6)}
+.art-group-head{display:flex;align-items:baseline;gap:var(--s-2);margin:0 0 var(--s-2);font-size:var(--t-12);font-weight:600;color:var(--c-text-3)}
+.art-group-head .t{color:var(--c-text-2)}
+.art-group-head .n{font-weight:400;font-variant-numeric:tabular-nums}
+.art-group-all{margin-left:auto;font-weight:400;color:var(--c-text-2)}
+.art-group-all:hover{color:var(--c-text)}
+
+/* search's no-result page and the results' column */
+.art-none,.art-results{min-width:0}
+
+/* the empty pages: one sentence each, one action at most */
+.art-empty-box{max-width:56ch;margin:var(--s-10) auto;text-align:center}
+.art-empty-box .t{font-size:var(--t-15);font-weight:600;color:var(--c-text)}
+.art-empty-box .s{margin:var(--s-2) 0 0;font-size:var(--t-13);line-height:1.5;color:var(--c-text-2)}
+.art-empty-box .acts{display:flex;justify-content:center;gap:var(--s-2);margin:var(--s-4) 0 0}
+
+/* what floats: the selection bar, the toast, the ghost, a menu's point */
+.art-selbar{position:absolute;left:50%;bottom:var(--s-5);z-index:30;transform:translateX(-50%);display:flex;align-items:center;gap:var(--s-1);height:var(--s-10);padding:0 var(--s-1) 0 var(--s-4);border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-2);white-space:nowrap;font-size:var(--t-13)}
+.art-selbar .n{margin-right:var(--s-2);font-weight:600;color:var(--c-text)}
+.art-selbar .sep{width:1px;height:var(--s-5);margin:0 var(--s-1);background:var(--c-line)}
+.art-selbar-a{display:inline-flex;align-items:center;gap:var(--s-2);height:var(--h-control-sm);padding:0 var(--s-2);border-radius:var(--r-1);color:var(--c-text)}
+.art-selbar-a:hover{background:var(--c-hover)}
+.art-selbar-a .k{font-family:var(--font-mono);font-size:var(--t-11);color:var(--c-text-3)}
+.art-toast{position:absolute;left:50%;bottom:var(--s-5);z-index:30;transform:translateX(-50%)}
+.art-ghost{position:fixed;top:0;left:0;padding:0;border-radius:var(--r-2);transform:translateX(-200vw) rotate(-4deg);box-shadow:var(--e-2);overflow:visible}
+.art-ghost > :first-child{display:block;width:100%;aspect-ratio:16/10;border-radius:var(--r-2);overflow:hidden}
+.art-ghost-n{position:absolute;top:calc(-1 * var(--s-2));right:calc(-1 * var(--s-2));min-width:var(--s-5);height:var(--s-5);padding:0 var(--s-1);border-radius:var(--s-3);background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-12);font-weight:600;line-height:20px;text-align:center}
+.art-menu-at{position:fixed;width:0;height:0}
+
+/* the m picker's head: its title and its field */
+.b-picker-head:has(.art-move-head){height:auto;padding:var(--s-2) var(--s-3)}
+.art-move-head{display:flex;flex-direction:column;gap:var(--s-2);width:100%;min-width:0}
+.art-move-title{overflow:hidden;text-overflow:ellipsis;color:var(--c-text-2)}
+.art-move-field{height:var(--h-control-sm);padding:0 var(--s-2);border-radius:var(--r-1);border:1px solid var(--c-line-strong);background:var(--c-surface);color:var(--c-text);font:inherit;font-size:var(--t-13)}
+.art-merge-say{display:block;font-size:var(--t-12);line-height:1.5;color:var(--c-text-3)}
+
+/* the hero's bims still (bims-plugins' renderer, 440x264 at 2x): the light one, the dark one in the
+   dark theme (his pick, else the system's) */
+.b-hero .vig > .art-hero-still{object-fit:contain}
+.b-hero .vig > .art-hero-still.dark{display:none}
+[data-theme="dark"] .b-hero .vig > .art-hero-still.light{display:none}
+[data-theme="dark"] .b-hero .vig > .art-hero-still.dark{display:block}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .b-hero .vig > .art-hero-still.light{display:none}
+  :root:not([data-theme="light"]) .b-hero .vig > .art-hero-still.dark{display:block}
+}

@@ -168,7 +168,7 @@ def main(argv):
         driver_dir = os.path.join(REPO, DRIVER)
         left = [r for r in rows if r not in groups]
         if left:
-            groups.update(groups_from_source(left, open(os.path.join(driver_dir, "driver.mjs")).read()))
+            groups.update(groups_from_source(left, open(os.path.join(driver_dir, "driver.ts")).read()))
         if any(r not in groups for r in rows):
             say("no group found for %s: every group runs (slower)" % [r for r in rows if r not in groups])
             groups = {}
@@ -197,7 +197,7 @@ def main(argv):
                 say("the candidate build failed: %s" % r.stdout[-400:])
                 return 1
         # the rows file: each red's step words and the row() that holds it (the driver's gate)
-        named = row_names(rows, open(os.path.join(REPO, DRIVER, "driver.mjs")).read())
+        named = row_names(rows, open(os.path.join(REPO, DRIVER, "driver.ts")).read())
         with open(os.path.join(out, "rows.txt"), "w") as f:
             f.write("".join(r + "\n" for r in rows) + "".join(n + "\n" for n in sorted(set(named.values()))))
         env = dict(os.environ, AS_HE_DOES_ONLY="quick", AS_HE_DOES_ROWS_FILE=os.path.join(out, "rows.txt"),

@@ -296,18 +296,27 @@ fn inspect(rest: &[String]) -> Result<Inspect, String> {
     })
 }
 
-/// `sb artifact add|list|archive|unarchive`.
+/// `sb artifact add|move|folders|list|archive|unarchive`.
 fn artifact(rest: &[String]) -> Result<Artifact, String> {
-    let usage = "usage: sb artifact add <path or link> [--title \"<t>\"] [--kind <k>] | sb artifact list [<words>] [--agent <a>] [--archived] | sb artifact archive|unarchive <id>... | --agent <a> | --before <YYYY-MM-DD[THH:MM]> | --kind <k>";
-    let (pos, o) = parse_args(rest, &["title", "kind", "agent", "before"], &["archived"])?;
+    let usage = "usage: sb artifact add <path or link> [--title \"<t>\"] [--kind <k>] [--folder <name|theme/task>] | sb artifact move <id>... <folder> | --unfiled | sb artifact folders | sb artifact list [<words>] [--agent <a>] [--archived] | sb artifact archive|unarchive <id>... | --agent <a> | --before <YYYY-MM-DD[THH:MM]> | --kind <k>";
+    let (pos, o) = parse_args(rest, &["title", "kind", "agent", "before", "folder"], &["archived", "unfiled"])?;
     let opt = |k: &str| o.contains_key(k).then(|| str_of(&o, k));
     let agent = || opt("agent").map(|a| a.trim_start_matches('@').to_string());
     Ok(match pos.first().map(String::as_str) {
         Some("add") => {
             let [target] = &pos[1..] else { return Err(usage.into()) };
             let cwd = std::env::current_dir().map(|d| d.to_string_lossy().to_string()).unwrap_or_default();
-            Artifact::Add { target: target.clone(), cwd, title: opt("title"), kind: opt("kind"), known_only: false, changed: None }
+            Artifact::Add { target: target.clone(), cwd, title: opt("title"), kind: opt("kind"), known_only: false, changed: None, folder: opt("folder") }
         }
+        Some("move") => {
+            let ids = |p: &[String]| p.iter().map(|i| i.trim_start_matches("artifact:").to_string()).collect::<Vec<_>>();
+            match (o.contains_key("unfiled"), &pos[1..]) {
+                (true, [_, ..]) => Artifact::Move { ids: ids(&pos[1..]), folder: None },
+                (false, [first @ .., folder]) if !first.is_empty() => Artifact::Move { ids: ids(first), folder: Some(folder.clone()) },
+                _ => return Err(usage.into()),
+            }
+        }
+        Some("folders") if pos.len() == 1 => Artifact::Folders,
         Some("list") => Artifact::List { words: pos[1..].join(" "), agent: agent(), archived: o.contains_key("archived") },
         Some(d @ ("archive" | "unarchive")) => {
             if pos.len() == 1 && !["agent", "kind", "before"].iter().any(|k| o.contains_key(*k)) {

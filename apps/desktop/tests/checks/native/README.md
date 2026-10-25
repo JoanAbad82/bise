@@ -30,11 +30,12 @@ config. They run offscreen through `tests/harness` like every check: `pnpm test:
 
 Run (opt-in, ~5 min, the VM up only during the run, 4 GB, 2 cores, headless, refused under 8 GB free):
 
-    # the guest kit: biseqa (vm/biseqa.swift, swiftc -O), node (cp -c of yours), stub/{core-stub,stub-lib}.mjs,
+    # the guest kit: biseqa (vm/biseqa.swift, swiftc -O), node (cp -c of yours), stub/{core-stub,stub-lib}.mts,
     # world.jsonl (rust/proto/fixtures core_ev + hub_ev), black.png and white.png at screen size
     # or larger (a small one sits on Preview's black full-screen backdrop: both glass reads over black),
-    # and the stubs laid out as in apps/desktop (tests/harness/fakes/*.mjs + src/proto/app_methods.gen.ts:
-    # core-stub.mjs reads ../../../src/proto/app_methods.gen.ts)
+    # and the stubs laid out as in apps/desktop (tests/harness/fakes/*.mts + src/proto/app_methods.gen.ts:
+    # core-stub.mts reads ../../../src/proto/app_methods.gen.ts; node runs it with
+    # NODE_OPTIONS="--experimental-strip-types --disable-warning=ExperimentalWarning")
     # the app: pnpm dist with BISE_PACK_BISE=<a wrapper running the core stub on the kit's node>,
     # BISE_PACK_HELPER, BISE_PACK_SIGN_DIR, then ditto -c -k --keepParent bise.app <zipdir>/bise.zip
     # (a shared folder loses the app's framework symlinks: the zip keeps them), from a launchd job

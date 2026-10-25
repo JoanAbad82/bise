@@ -1,6 +1,6 @@
 // UTF-8 for a host with no TextEncoder/TextDecoder (bend-jsrt is V8 and
 // deno_core, no web APIs). fflate's own fallback mangles characters past
-// U+FFFF (an emoji comes back as another one: test/bare.test.mjs), so the
+// U+FFFF (an emoji comes back as another one: test/bare.test.ts), so the
 // SDK has its own. The host's codec is used when there is one.
 
 type Codec = { encode(s: string): Uint8Array; decode(b: Uint8Array): string };

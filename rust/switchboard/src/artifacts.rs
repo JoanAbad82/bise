@@ -9,6 +9,14 @@
 //!   page store's layout, written by the pages module): every page gets
 //!   in by itself, with its versions and open notes.
 //!
+//! Folders (docs/artifacts.md, "Folders"): an artifact's library folder
+//! is `folder` in its meta.json; a page's is in `artifacts/filed.json`
+//! (`{"<page id>": "<folder id>"}`: the page store owns the page's
+//! meta.json). Both are written only by [`Store::move_to`] (and a new
+//! artifact's add), and read in one place, [`Store::all`]; the join with
+//! the library (`bise_home::library`) is [`resolve_folders`], for this
+//! hub's rows and another project's ([`rows_of`]).
+//!
 //! Plain functions over the state folder; the daemon's thread is the only
 //! writer, so there is no lock.
 
@@ -17,6 +25,7 @@ use crate::artifacts_turns::{self, Place, Rev, Sitting, Turn};
 use bise_proto::anchor::Anchor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// The largest file (or folder, summed) bise keeps a copy of.
@@ -92,6 +101,11 @@ pub struct Meta {
     pub cwd: String,
     #[serde(default)]
     pub versions: Vec<Version>,
+    /// Its folder's id in the library (`bise_home::library`), raw: a
+    /// reader resolves it ([`folder_of`]); none: unfiled. One folder per
+    /// artifact, written only by its own hub ([`Store::move_to`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder: Option<String>,
 }
 
 impl Meta {
@@ -124,6 +138,17 @@ pub struct Add {
     /// What the save changed, as the writer said it (`bise office run`);
     /// None: it said nothing.
     pub changed: Option<Vec<Anchor>>,
+    /// The folder it goes in (a library folder's id), see [`Filed`].
+    pub folder: Option<Filed>,
+}
+
+/// An add's folder: `Asked` (`--folder`) files it, a next version too;
+/// `Default` (its task's folder) only files a new artifact, so a next
+/// version stays where he put it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Filed {
+    Asked(String),
+    Default(String),
 }
 
 /// The answer to an add.
@@ -465,7 +490,7 @@ impl Store {
 
     /// The page server's base (`http://127.0.0.1:<port>`), from
     /// `<state>/pages.port`.
-    fn pages_base(&self) -> Option<String> {
+    pub fn pages_base(&self) -> Option<String> {
         let port = std::fs::read_to_string(self.state.join("pages.port")).ok()?;
         let port: u16 = port.trim().parse().ok()?;
         Some(format!("http://127.0.0.1:{}", port))
@@ -588,9 +613,16 @@ impl Store {
                     source: source.clone(),
                     cwd: a.cwd.clone(),
                     versions: Vec::new(),
+                    folder: match &a.folder {
+                        Some(Filed::Asked(f) | Filed::Default(f)) => Some(f.clone()),
+                        None => None,
+                    },
                 }
             }
         };
+        if let Some(Filed::Asked(f)) = &a.folder {
+            meta.folder = Some(f.clone());
+        }
         if let Some(t) = a.title.as_ref().filter(|t| !t.trim().is_empty()) {
             meta.title = t.trim().to_string();
         }
@@ -705,11 +737,13 @@ impl Store {
     pub fn all(&self) -> Vec<Meta> {
         let mut out = self.stored();
         let base = self.pages_base();
+        let filed = self.pages_filed();
         for p in self.pages() {
             let mut m = page_meta(&p, base.as_deref());
             if out.iter().any(|o| o.id == m.id) {
                 m.id = format!("{}-page", m.id);
             }
+            m.folder = filed.get(&m.id).cloned();
             out.push(m);
         }
         out.sort_by(|a, b| {
@@ -722,6 +756,46 @@ impl Store {
     /// One artifact by id (`artifact:<id>`).
     pub fn get(&self, id: &str) -> Option<Meta> {
         self.all().into_iter().find(|m| m.id == id)
+    }
+
+    /// `artifacts/filed.json`: the pages' folders, `{"<page id>": "<folder
+    /// id>"}` (a page's meta.json is the page store's; this store keeps
+    /// what it files).
+    fn filed_file(&self) -> PathBuf {
+        self.dir().join("filed.json")
+    }
+
+    fn pages_filed(&self) -> BTreeMap<String, String> {
+        read_json(&self.filed_file()).unwrap_or_default()
+    }
+
+    /// File `ids` in `folder` (a library folder's id, checked by the
+    /// caller; none: unfiled), all or none: an unknown id moves nothing.
+    /// Each one's folder before, raw (his undo puts it back).
+    pub fn move_to(&self, ids: &[String], folder: Option<&str>) -> Result<Vec<(String, Option<String>)>, String> {
+        let all = self.all();
+        let metas = ids
+            .iter()
+            .map(|id| all.iter().find(|m| &m.id == id).ok_or_else(|| format!("no artifact {id}")))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut filed = self.pages_filed();
+        let mut out = Vec::new();
+        for m in metas {
+            out.push((m.id.clone(), m.folder.clone()));
+            if m.by == "page" {
+                match folder {
+                    Some(f) => filed.insert(m.id.clone(), f.to_string()),
+                    None => filed.remove(&m.id),
+                };
+            } else {
+                self.save(&Meta { folder: folder.map(str::to_string), ..m.clone() })?;
+            }
+        }
+        if out.iter().any(|(id, _)| all.iter().any(|m| &m.id == id && m.by == "page")) {
+            let bytes = serde_json::to_vec_pretty(&filed).map_err(|e| e.to_string())?;
+            write_atomic(&self.filed_file(), &bytes)?;
+        }
+        Ok(out)
     }
 
     /// The open notes of a page, per version: (open, done).
@@ -787,6 +861,9 @@ impl Store {
             "pr": pr_of(&cur.target).map(|(repo, n)| json!({"repo": repo, "number": n})),
             "keys": keys(m, workspace),
             "versions": m.versions.iter().map(version).collect::<Vec<_>>(),
+            // raw: the hub resolves it against the library (artifacts_ev)
+            "folder": m.folder,
+            "turn": cur.turn.as_ref().map(|t| t.started_ms),
         })
     }
 
@@ -867,12 +944,35 @@ fn page_meta(p: &PageMeta, base: Option<&str>) -> Meta {
         created_ms: p.created_ms,
         source: url(last, true),
         cwd: String::new(),
+        folder: None,
         versions: p
             .versions
             .iter()
             .map(|v| Version { v: v.n, at_ms: v.at_ms, target: url(v.n, v.n == last), ..Default::default() })
             .collect(),
     }
+}
+
+/// The rows' `folder`, raw from their metas, as readers read it: the
+/// live library folder it resolves to (a merged one's target), else
+/// none (a deleted or unknown id: unfiled). The one join of the
+/// artifacts and the library, for this hub's rows and another
+/// project's (artifacts/library).
+pub fn resolve_folders(rows: &mut [Value], lib: &bise_home::library::Library) {
+    for r in rows.iter_mut() {
+        let f = r.get("folder").and_then(Value::as_str).and_then(|f| bise_home::library::resolve(lib, f)).map(|f| f.id.clone());
+        r["folder"] = json!(f);
+    }
+}
+
+/// Another project's rows, read from its state folder (artifacts/library):
+/// the same store reader as this hub's own, agents by their stored names,
+/// folders resolved.
+pub fn rows_of(state: &Path, workspace: &str, lib: &bise_home::library::Library) -> Vec<Value> {
+    let store = Store::new(state);
+    let mut rows = store.rows(&|_: &str| None, workspace);
+    resolve_folders(&mut rows, lib);
+    rows
 }
 
 /// Every form a reply may name it by (E's plain links and paths): the

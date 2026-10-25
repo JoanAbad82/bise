@@ -81,6 +81,10 @@ pub enum Cmd {
     /// The window: the projects it shows now (replaces the set; the core
     /// decides what it holds, core/hubs.rs).
     Shown { projects: Vec<String> },
+    /// his change of the artifacts library's folders (core/library.rs)
+    Folders { op: bise_proto::rows::FolderOp },
+    /// his move of artifacts across projects (core/library.rs)
+    FoldersMove { items: Vec<bise_proto::app_cmd::FolderItem>, folder: Option<String> },
     /// The window's running screen shown or left (core/hubs.rs `processes_all`).
     ProcessesAll { on: bool },
     /// The window: a command for a project's hub (bise-proto's `HubCmd`
@@ -154,6 +158,8 @@ impl Cmd {
             AppCmd::EveryStop { id } => Cmd::EveryStop { id },
             AppCmd::FakeWords { text } => Cmd::FakeWords { text },
             AppCmd::Shown { projects } => Cmd::Shown { projects },
+            AppCmd::Folders { op } => Cmd::Folders { op },
+            AppCmd::FoldersMove { items, folder } => Cmd::FoldersMove { items, folder },
             AppCmd::ProcessesAll { on } => Cmd::ProcessesAll { on },
             AppCmd::AgentPreview { agent } => Cmd::AgentPreview { agent: agent_name(&cmd, &agent)? },
             AppCmd::AgentHistory { agent, before, limit } => Cmd::AgentHistory {

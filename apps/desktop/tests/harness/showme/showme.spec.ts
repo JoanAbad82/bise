@@ -1,4 +1,4 @@
-// 'show me': one screen in one state, out of his sight, to PNGs. Driven by showme.mjs through the
+// 'show me': one screen in one state, out of his sight, to PNGs. Driven by showme.mts through the
 // env var SHOWME (JSON): { surface, state, framesMs, out, size }.
 //   surface  desktop      the app (apps/desktop/out) on the scripted core (fixture world) and helper;
 //                         state = a route (bise, inbox, agent/<p>/<a>, ...),

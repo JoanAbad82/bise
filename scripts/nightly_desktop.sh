@@ -97,7 +97,7 @@ for f in sorted(glob.glob(os.path.join(d, "*.json"))):
             print("as-he-does/%s: %s" % (mode, name))
 PY
 }
-# test:land's red checks, from land.mjs' "known reds (tests/known_reds.txt): a (owner, since x), …"
+# test:land's red checks, from land.mts' "known reds (tests/known_reds.txt): a (owner, since x), …"
 # and "NEW reds (not in tests/known_reds.txt): b, c" lines: one name per line
 land_reds() { # <land.log>
   python3 -B - "$1" <<'PY'
@@ -160,7 +160,7 @@ for s in "${steps[@]}"; do
       { deps && ( cd "$here/apps/desktop" && "$pnpm" build && "$pnpm" test:land ); } >"$out/land.log" 2>&1; rc=$?
       if [ $rc = 0 ]; then record land green
       else
-        # its reds by name (land.mjs' known/NEW lines: each a desktop check's spec name), so a tag
+        # its reds by name (land.mts' known/NEW lines: each a desktop check's spec name), so a tag
         # can match them to known_reds; no such line (it didn't run its checks): one unknown red
         n=0
         while IFS= read -r r; do [ -n "$r" ] && { reds+=("$r"); n=$((n + 1)); }; done < <(land_reds "$out/land.log")

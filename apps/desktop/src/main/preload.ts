@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type FileFacts, type MenuAction, type NotifyAuth, type SaveResult, type Surface, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type FileFacts, type MenuAction, type NotifyAuth, type SaveResult, type Surface, type ThumbAnswer, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -106,6 +106,10 @@ const api: BiseApi = {
   fileFacts: async (path) => {
     const f: unknown = await ipcRenderer.invoke(IPC.fileFacts, path);
     return typeof f === 'object' && f !== null && typeof (f as FileFacts).bytes === 'number' ? (f as FileFacts) : null;
+  },
+  thumb: async (req, want) => {
+    const t: unknown = await ipcRenderer.invoke(IPC.thumb, req, want);
+    return typeof t === 'object' && t !== null ? (t as ThumbAnswer) : null;
   },
   saveImage: async (bytes) => {
     const p: unknown = await ipcRenderer.invoke(IPC.saveImage, bytes);

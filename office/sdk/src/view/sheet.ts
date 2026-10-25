@@ -17,7 +17,7 @@ import { FUniver } from "@univerjs/core/facade";
 import { defaultTheme } from "@univerjs/themes";
 import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import enUS from "@univerjs/preset-sheets-core/locales/en-US";
-// @ts-expect-error esbuild's text loader (build.mjs): the stylesheet as a string
+// @ts-expect-error esbuild's text loader (build.ts): the stylesheet as a string
 import css from "@univerjs/preset-sheets-core/lib/index.css";
 import type { UWorkbook } from "../sheets/univer.ts";
 

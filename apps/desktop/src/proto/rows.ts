@@ -842,7 +842,19 @@ keys?: Array<string>,
  * (`bise_proto::office::live_words`, the same the viewer's
  * `/a/<id>/events` sends); none for a page, a link, or v1 at rest
  */
-live?: ArtifactLive | null, };
+live?: ArtifactLive | null, 
+/**
+ * its folder in the library (a [`Folder`]'s id), resolved by the hub
+ * (a merged folder's artifacts read as the one it went into, a
+ * deleted one's as none): the one field a reader reads. None: unfiled
+ */
+folder?: string, 
+/**
+ * when the turn that made its current version started (ms), one turn
+ * of its agent: the grid stacks one agent's turn; none for his adds,
+ * a page, a row from before it
+ */
+turn?: number, };
 
 /**
  * An artifact that is a pull request: its repo (`owner/name`) and number.
@@ -891,6 +903,45 @@ back?: ArtifactBack, };
  * version it opens.
  */
 export type ArtifactBack = { text: string, v: number, };
+
+/**
+ * A folder of the artifacts library (`bise_home::library`, one list for
+ * every project): a theme (no parent) or a task folder in one.
+ */
+export type Folder = { id: string, name: string, parent?: string, 
+/**
+ * `you`, or the agent that made it
+ */
+by: string, 
+/**
+ * he made or renamed it: an agent never renames it
+ */
+named_by_you: boolean, };
+
+/**
+ * A change of the library's folders (`artifacts/folders`, the desktop
+ * core's `folders`): his, so it takes the undo slot.
+ */
+export type FolderOp = { "make": { name: string, parent?: string, } } | { "rename": { id: string, name: string, } } | { "nest": { id: string, parent?: string, } } | { "merge": { from: string, into: string, } } | { "delete": { id: string, } } | "undo";
+
+/**
+ * An artifact his move moved, and its folder before (`artifacts/move`'s
+ * answer, for his undo).
+ */
+export type ArtifactMoved = { id: string, from?: string, };
+
+/**
+ * Another project's artifacts (`artifacts/library`'s answer).
+ */
+export type LibraryProject = { 
+/**
+ * its hub id
+ */
+project: string, 
+/**
+ * its name in the projects registry
+ */
+name: string, items: Array<Artifact>, };
 
 /**
  * A live scheduled task of a project (`sb every`), the `scheduled`

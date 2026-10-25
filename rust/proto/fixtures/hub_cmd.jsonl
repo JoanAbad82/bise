@@ -89,3 +89,6 @@
 {"cmd":"log","project":"acme-1a2b3c4d","agent":"perf","before":13893632,"find":"hero"}
 {"cmd":"completion","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"completion","project":"acme-1a2b3c4d","agent":"perf","slot":3,"provider":"openai/gpt-5","raw":true,"find":"bench"}
+{"cmd":"artifacts_move","project":"acme-1a2b3c4d","ids":["perf-notes","report-html"],"folder":"f-abcdefghij","to":"site","keep_undo":true}
+{"cmd":"artifacts_folders","project":"acme-1a2b3c4d","op":{"make":{"name":"pricing","parent":"f-abcdefghij"}}}
+{"cmd":"artifacts_library","project":"acme-1a2b3c4d"}

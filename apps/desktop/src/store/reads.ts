@@ -8,6 +8,7 @@ import type {
   ComputerAgent,
   Agent,
   Artifact,
+  Folder,
   Entry,
   Found,
   IndexRow,
@@ -178,6 +179,10 @@ export class StoreReads extends StoreBase {
   }
   artifacts(project: string): readonly Artifact[] {
     return this.facts.artifacts[project] ?? EMPTY;
+  }
+  /** the library's folders, shared by every project (the newest artifacts event's); none until a hub said */
+  folders(): readonly Folder[] {
+    return this.slice<readonly Folder[]>("library:folders", EMPTY);
   }
   worktrees(project: string): readonly Worktree[] {
     return this.slice(`worktrees:${project}`, EMPTY);

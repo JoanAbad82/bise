@@ -153,9 +153,11 @@ pub fn unrepair(paths: &Paths) -> Value {
 }
 
 /// The extension's files (relative path, bytes), sorted, without its tests
-/// and its build stamp.
-fn extension_files(src: &Path) -> Vec<(String, Vec<u8>)> {
-    fn walk(root: &Path, dir: &Path, out: &mut Vec<(String, Vec<u8>)>) {
+/// and its build stamp. With `shipped`, also without its TypeScript sources
+/// (*.ts, tsconfig.json): Chrome runs the committed .js emitted from them,
+/// as store/build.sh's zip.
+fn extension_files(src: &Path, shipped: bool) -> Vec<(String, Vec<u8>)> {
+    fn walk(root: &Path, dir: &Path, shipped: bool, out: &mut Vec<(String, Vec<u8>)>) {
         let Ok(rd) = std::fs::read_dir(dir) else { return };
         for e in rd.flatten() {
             let p = e.path();
@@ -164,14 +166,16 @@ fn extension_files(src: &Path) -> Vec<(String, Vec<u8>)> {
                 continue;
             }
             if p.is_dir() {
-                walk(root, &p, out);
+                walk(root, &p, shipped, out);
+            } else if shipped && (rel.ends_with(".ts") || p.file_name().is_some_and(|n| n == "tsconfig.json")) {
+                continue;
             } else if let Ok(b) = std::fs::read(&p) {
                 out.push((rel, b));
             }
         }
     }
     let mut out = Vec::new();
-    walk(src, src, &mut out);
+    walk(src, src, shipped, &mut out);
     out.sort();
     out
 }
@@ -179,7 +183,7 @@ fn extension_files(src: &Path) -> Vec<(String, Vec<u8>)> {
 /// A stable id of the extension's content (FNV-1a 64 over paths and bytes).
 pub fn extension_build(src: &Path) -> String {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for (rel, bytes) in extension_files(src) {
+    for (rel, bytes) in extension_files(src, true) {
         for b in rel.bytes().chain([0u8]).chain(bytes.iter().copied()).chain([0u8]) {
             h ^= b as u64;
             h = h.wrapping_mul(0x0000_0100_0000_01b3);
@@ -202,9 +206,10 @@ pub fn sync_extension(src: &Path, dst: &Path) -> std::io::Result<bool> {
         return Ok(false);
     }
     // the code first, the stamp last: a worker never sees a new build.json
-    // next to old code
-    let old: Vec<String> = extension_files(dst).into_iter().map(|(r, _)| r).collect();
-    let new = extension_files(src);
+    // next to old code. The old list keeps the .ts an older sync copied, so
+    // they are removed.
+    let old: Vec<String> = extension_files(dst, false).into_iter().map(|(r, _)| r).collect();
+    let new = extension_files(src, true);
     for (rel, bytes) in &new {
         let p = dst.join(rel);
         if let Some(d) = p.parent() {
@@ -281,6 +286,32 @@ mod tests {
         assert_ne!(extension_build(&src), b1);
         assert_eq!(std::fs::read_to_string(dst.join("lib/a.js")).unwrap(), "2");
         assert!(!dst.join("old.js").exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// js-to-ts: the sources are .ts with their emitted .js beside them.
+    /// Only the .js reach the loaded folder (as store/build.sh's zip), and a
+    /// .ts an older sync copied there is removed.
+    #[test]
+    fn the_extension_syncs_without_its_typescript_sources() {
+        let d = std::env::temp_dir().join(format!("cu-sync-ts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let (src, dst) = (d.join("v1"), d.join("stable"));
+        std::fs::create_dir_all(src.join("lib")).unwrap();
+        std::fs::create_dir_all(&dst).unwrap();
+        std::fs::write(src.join("manifest.json"), "{}").unwrap();
+        for f in ["sw.ts", "sw.js", "lib/a.ts", "lib/a.js", "build.d.ts", "tsconfig.json"] {
+            std::fs::write(src.join(f), f).unwrap();
+        }
+        std::fs::write(dst.join("old.ts"), "stale").unwrap();
+        let b1 = extension_build(&src);
+        std::fs::write(src.join("sw.ts"), "edited").unwrap();
+        assert_eq!(extension_build(&src), b1, "a .ts edit alone is not a new build");
+        assert!(sync_extension(&src, &dst).unwrap());
+        assert!(dst.join("sw.js").is_file() && dst.join("lib/a.js").is_file());
+        for f in ["sw.ts", "lib/a.ts", "build.d.ts", "tsconfig.json", "old.ts"] {
+            assert!(!dst.join(f).exists(), "{f} reached the loaded folder");
+        }
         let _ = std::fs::remove_dir_all(&d);
     }
 

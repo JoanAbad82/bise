@@ -1,0 +1,90 @@
+/* src/artifacts (art-grid): the gallery's cards, their grid by day, the list behind ☰ and a stack's
+   contact sheet (page artifacts-gallery v7, blocks b-pages and b-card). The three density rules:
+   one line under a name; the marks (···, the pick circle, the extension, ↗) on hover or focus
+   only, in place, nothing moving; one hue for what is new, a 2 px ink ring for the cursor and a
+   pick, no shadow on a card (nothing here floats). ds tokens; the card's own measures (the mock's)
+   are named once on .art-grid. */
+
+.art-grid, .art-sheet-wrap {
+  /* a stack's two sheets stick out 6 px up and right: every card keeps that room, so rows align */
+  --card-room: 6px;
+  /* the marks sit 6 px in from the picture's corners */
+  --card-mark: 6px;
+  --card-menu: var(--s-6);
+  --card-pick: 18px;
+  /* the list behind ☰: 44 px rows, a 48 px picture */
+  --list-row-h: 44px;
+}
+.art-grid { position: relative; width: 100%; outline: none; }
+.art-vrow { box-sizing: border-box; }
+/* 16 between cards, 24 between rows (brief part 3) */
+.art-grow { display: grid; column-gap: var(--s-4); padding-bottom: var(--s-6); }
+/* one rule (designer m_40850): 24 above every day head, the first included; after cards their row's
+   own 24 below is that room */
+.art-dh { padding: 0 0 var(--s-2); font: 600 11.5px/16px var(--font-ui); color: var(--c-text-3); }
+.art-dh.first { padding-top: var(--s-6); }
+
+.art-card { position: relative; min-width: 0; padding-top: var(--card-room); color: var(--c-text); font: var(--t-13) var(--font-ui); }
+.art-card-pic { position: relative; display: block; margin-right: var(--card-room); }
+.art-card-th { position: relative; display: block; aspect-ratio: 16 / 10; border-radius: var(--r-2); overflow: hidden;
+  background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.art-card-th > :first-child { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* a stack: two sheets behind its cover, 3 and 6 px up and right */
+.art-card-s1, .art-card-s2 { position: absolute; inset: 0; border-radius: var(--r-2); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.art-card-s1 { transform: translate(3px, -3px); }
+.art-card-s2 { transform: translate(var(--card-room), calc(-1 * var(--card-room))); }
+
+/* the marks on the picture's corners: small, quiet, on the page's ground */
+.art-card-x, .art-card-n, .art-card-lk { position: absolute; z-index: 1; line-height: 1.6; background: var(--c-bg, var(--p-bg)); box-shadow: 0 0 0 1px var(--c-line); }
+.art-card-x { left: var(--card-mark); bottom: var(--card-mark); padding: 0 var(--s-1); border-radius: var(--r-1); font: 10.5px/1.5 var(--font-mono); color: var(--c-text-2); }
+.art-card-n { right: var(--card-mark); top: var(--card-mark); padding: 0 var(--card-mark); border-radius: var(--r-pill); font: 600 11px/1.6 var(--font-ui); color: var(--c-text); }
+.art-card-lk { right: var(--card-mark); bottom: var(--card-mark); padding: 0 var(--card-mark); border-radius: var(--r-1); font: 11px/1.6 var(--font-ui); color: var(--c-text-2); }
+.art-card-ck, .art-card-mb { position: absolute; z-index: 2; top: var(--card-mark); display: flex; align-items: center; justify-content: center; padding: 0; border: 0; }
+.art-card-ck { left: var(--card-mark); width: var(--card-pick); height: var(--card-pick); border-radius: 50%; background: var(--c-bg, var(--p-bg)); box-shadow: inset 0 0 0 1.5px var(--c-text-2); font: 600 11px/1 var(--font-ui); color: var(--p-bg); }
+.art-card-ck.y { background: var(--c-ink); box-shadow: none; }
+.art-card-mb { right: calc(2 * var(--card-mark)); width: var(--card-menu); height: var(--card-menu); border-radius: var(--r-1); background: var(--c-bg, var(--p-bg)); box-shadow: 0 0 0 1px var(--c-line); font: 700 12px/1 var(--font-ui); letter-spacing: 1px; color: var(--c-text); }
+.art-card-pic:not(.stack) .art-card-mb { right: var(--card-mark); }
+
+/* rule 2: the extension, ↗, the circle and ··· on hover or focus only; a filled circle stays */
+.art-card-x, .art-card-lk, .art-card-ck, .art-card-mb { visibility: hidden; }
+.art-card:hover .art-card-x, .art-card:hover .art-card-lk, .art-card:hover .art-card-ck, .art-card:hover .art-card-mb,
+.art-card:focus-within .art-card-x, .art-card:focus-within .art-card-lk, .art-card:focus-within .art-card-ck, .art-card:focus-within .art-card-mb,
+.art-card-ck.y { visibility: visible; }
+.art-card:hover .art-card-th { box-shadow: inset 0 0 0 1px var(--c-text-3); }
+/* rule 3: the cursor and a pick, a 2 px ink ring */
+.art-card.on .art-card-th, .art-card.picked .art-card-th { box-shadow: 0 0 0 2px var(--c-ink); }
+
+.art-card-tt { display: flex; align-items: center; gap: var(--card-room); min-width: 0; margin-top: var(--s-2); font-weight: 500; line-height: 18px; }
+.art-card-t1 { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.art-card-mt { display: block; margin-top: calc(var(--s-1) / 2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--t-12) var(--font-ui); line-height: 16px; color: var(--c-text-3); }
+
+/* the list behind ☰: 48 px picture, name, made by, kind, when */
+.art-lh, .art-lr { display: grid; grid-template-columns: 48px minmax(0, 1fr) 168px 96px 64px; gap: var(--s-3); align-items: center; padding: 0 var(--pad-row-x); }
+.art-lh { padding-bottom: var(--card-room); margin-bottom: var(--s-1); border-bottom: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.art-lr { height: var(--list-row-h); border-radius: var(--r-1); color: var(--c-text); font: var(--t-13) var(--font-ui); }
+.art-lr:hover { background: var(--c-hover); }
+.art-lr.on, .art-lr.picked { background: color-mix(in srgb, var(--c-text) 8%, transparent); }
+.art-lr .art-t { font-weight: 500; }
+.art-lr-th { position: relative; display: block; width: 48px; aspect-ratio: 16 / 10; border-radius: var(--r-1); overflow: hidden; background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.art-lr-th > :first-child { position: absolute; inset: 0; width: 100%; height: 100%; }
+.art-lr-a { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--c-text-2); }
+.art-lw { text-align: right; white-space: nowrap; color: var(--c-text-3); }
+/* the list's rows touch: every head has its own 24 above */
+.art-grid.list .art-dh { padding: var(--s-6) var(--pad-row-x) var(--s-1); }
+@media (max-width: 900px) {
+  .art-lh, .art-lr { grid-template-columns: 48px minmax(0, 1fr) 96px 64px; }
+  .art-lh > :nth-child(3), .art-lr > :nth-child(3) { display: none; }
+}
+
+/* a stack open: its contact sheet */
+.art-sheet-wrap { outline: none; }
+.art-sheet-sub { margin-bottom: var(--s-4); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.art-sheet-chips { display: flex; flex-wrap: wrap; gap: var(--gap-inline); margin-bottom: var(--s-4); }
+.art-chip { height: var(--s-6); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: var(--r-pill); background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); box-shadow: inset 0 0 0 1px var(--c-line); }
+.art-chip:hover { color: var(--c-text); background: var(--c-hover); }
+.art-chip.on { color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-ink); }
+.art-chip:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
+.art-sheet { display: grid; gap: var(--s-4); }
+.art-card.sheet { padding-top: 0; }
+.art-card.sheet .art-card-pic { margin-right: 0; }
+.art-sheet-cp { display: block; margin-top: var(--card-room); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 11px/1.4 var(--font-mono); color: var(--c-text-3); }

@@ -36,7 +36,7 @@ if [ -n "${FAKE_REDS:-}" ]; then v=red; echo "$FAKE_REDS" | tr '|' '\\n' > "$out
 printf '%s\\t%s\\t%s\\t%s\\n' "2026-10-18T05:00:00" "$sha" "$v" "$out" >> "$BISE_HOME/run/nightly/desktop-runs.tsv"
 [ "$v" = green ] && exit 0 || exit 1
 """
-# a fake covmap.mjs checks (DESKTOP_TAG_CHECKS): FAKE_CHECK_REDS (names, '|'-separated), FAKE_CHECK_RC
+# a fake covmap.mts checks (DESKTOP_TAG_CHECKS): FAKE_CHECK_REDS (names, '|'-separated), FAKE_CHECK_RC
 FAKE_CHECKS = """#!/usr/bin/env bash
 echo "checks $*" >> "$FAKE_LOG"
 d="$3/desktop-cov-run"; mkdir -p "$d"

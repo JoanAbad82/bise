@@ -1,3 +1,4 @@
+// stays JS: the computer-use spike, a frozen record the design docs cite; never typechecked.
 // Spike driver: a throwaway Chrome profile, the spike extension loaded
 // Run: node docs/research/computer-use-spike/run.mjs (macOS, Chrome installed).
 // It runs a headless Chrome on a temp profile for ~15 s, then quits it.

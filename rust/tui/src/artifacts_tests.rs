@@ -28,7 +28,7 @@ fn the_hub_list_is_read_newest_first_with_its_versions() {
         {"id": "", "kind": "doc", "title": "no id", "agent": "", "version": 1, "at_ms": 0, "url": "", "new": true},
         {"id": "mine", "kind": "doc", "title": "", "agent": "", "by": "you", "version": 1, "at_ms": T - 200 * MIN, "url": "", "new": false},
     ]));
-    set_rows(&items, Some(T - 30 * MIN));
+    set_rows(&items, Some(T - 30 * MIN), "h-1");
     let rows = all();
     assert_eq!(rows.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(), ["pricing-page", "deck", "mine"], "an item without an id is left out");
     assert_eq!(new_count(), 2, "the items the hub marks new");
@@ -36,13 +36,11 @@ fn the_hub_list_is_read_newest_first_with_its_versions() {
     assert_eq!(rows[2].title, "mine", "no title: its id");
     let p = &rows[0];
     assert_eq!(p.versions.iter().map(|x| x.v).collect::<Vec<_>>(), [1, 2, 3]);
-    assert_eq!(p.last_words(), "v3 · 2 notes open");
     assert!(p.is_link());
     assert_eq!(p.where_words("/w"), "127.0.0.1:47438/p/pricing-page");
     let doc = Artifact { target: "/w/acme/docs/q3-plan.md".into(), ..Default::default() };
     assert_eq!(doc.where_words("/w/acme"), "docs/q3-plan.md");
     assert_eq!(doc.where_words("/w/other"), "/w/acme/docs/q3-plan.md");
-    assert_eq!(rows[1].last_words(), "");
     mark_seen();
     assert_eq!(new_count(), 0);
 }
@@ -60,12 +58,8 @@ fn a_gone_file_says_so_and_opens_the_copy() {
         gone: true,
         ..Default::default()
     };
-    assert_eq!(a.agent_words(), "subs-lead · archived");
-    assert_eq!(a.last_words(), "▲ gone from disk · bise kept a copy");
     assert_eq!(a.open_target(None), "/store/subs.md");
     assert_eq!(how(&a, None, false), How::Editor("/store/subs.md".into()));
-    let none = Artifact { copy: None, ..a };
-    assert_eq!(none.last_words(), "▲ gone from disk");
 }
 
 #[test]
@@ -209,7 +203,7 @@ fn his_about_lead_is_the_artifacts_chip() {
         {"id": "mock", "title": "the mock", "kind": "site", "agent": "web", "at_ms": T, "version": 2, "new": false,
          "url": format!("{hub}/mock/v2/index.html"), "target": "/w/mock/index.html"},
     ]));
-    set_rows(&items, None);
+    set_rows(&items, None, "h-1");
     let st = ratatui::style::Style::default();
     let draw = |text: &str| crate::links::collect(|| crate::attach::chip_spans(text, st));
     let words = |spans: &[ratatui::text::Span<'static>]| spans.iter().map(|s| s.content.as_ref()).collect::<String>().replace('\u{a0}', " ");

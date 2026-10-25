@@ -81,7 +81,7 @@ side panel, and the unit tests.
 
 The runtime (architect m_23799, replacing m_23769): no polyfills and no
 timers. Sheets runs exceljs's workbook model through our own xlsx driver
-(fflate, saxes), with a build-time stub table in `build.mjs` (each stub a
+(fflate, saxes), with a build-time stub table in `build.ts` (each stub a
 `{module, reason}` row that throws; an unknown node import still fails the
 build; owner: office-sheets). Docs and slides create and edit on our own
 OOXML layer (slides: no `pptxgenjs`, a small chart writer of ours). Script

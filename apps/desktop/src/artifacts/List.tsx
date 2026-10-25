@@ -1,11 +1,16 @@
-// The artifacts' rows (desktop-screens v6, designer m_11837): the screen's one-line rows with
-// columns (glyph, title + 'new', kind, made by, when), and panel A's two-line rows for one project
-// (amb-win's Panel.tsx mounts <ArtifactList project onOpen />). Both grouped by day; the list keys are
-// app/listkeys.ts's (↑↓ jk pgup pgdn home end, ⏎ opens), the row's are rowKey's (space looks, v, c, r,
-// @). Owner: amb-mac (amb-kit's before).
-import { memo, useState, type KeyboardEvent, type Ref } from 'react';
+// The artifacts' rows: the gallery's list view behind ☰ (ListHead, ListRow: page artifacts-gallery
+// v7, art-grid; Grid.tsx draws them), and panel A's two-line rows for one project, grouped by day
+// (amb-win's Panel.tsx mounts <ArtifactList project onOpen />). The list keys are app/listkeys.ts's
+// (↑↓ jk pgup pgdn home end, ⏎ opens), the row's are rowKey's (space looks, v, c, r, @), the
+// gallery's too. Owner: amb-mac (amb-kit's before); the list view art-grid.
+import { memo, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type Ref } from 'react';
 import { useListKeys } from '@/app/listkeys';
+import { tipAttrs } from '@/ds';
 import { byDay, glyphOf, keyOf, kindWords, madeBy, revealPathOf, splitArchived, timeOf, type Item } from './model';
+import { isNew, lineTip, listKind, listName, topOf, whenOf, whoOf, type Card } from './gallery';
+import { library } from '@/proto/words_library.gen';
+import type { PickHow } from './Card';
+import { Thumb } from './thumbs';
 import { useAllArtifacts } from './hooks';
 import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
 import { leaves, LEAVES, useGoArtifact } from './leave';
@@ -24,8 +29,6 @@ export interface RowsProps {
   onLook?: (it: Item) => void;
   /** @: put it in a message (none: @ does nothing) */
   onPut?: (it: Item) => void;
-  /** 'screen': one line, columns; 'panel': two lines, one project */
-  form: 'screen' | 'panel';
   testId: string;
 }
 
@@ -90,15 +93,15 @@ export function useLook(open: (it: Item) => void): (it: Item) => void {
 }
 
 /** The rows grouped by day; the keys are its screen's (useListKeys + rowKey), a click picks a row. */
-export function ArtifactRows({ items, now, sel, onSel, onOpen, form, testId }: RowsProps) {
+export function ArtifactRows({ items, now, sel, onSel, onOpen, testId }: RowsProps) {
   const groups = byDay(items, now);
   return (
-    <div className={`art-list ${form}`} role="listbox" data-testid={testId}>
+    <div className="art-list panel" role="listbox" data-testid={testId}>
       {groups.map((g) => (
         <div key={g.day} className="art-day" data-testid={`${testId}.day.${g.day}`}>
           <div className="art-day-h">{g.title}</div>
           {g.items.map((it) => (
-            <ArtRow key={keyOf(it)} it={it} on={sel === keyOf(it)} form={form} testId={`${testId}.row.${it.a.id}`}
+            <ArtRow key={keyOf(it)} it={it} on={sel === keyOf(it)} testId={`${testId}.row.${it.a.id}`}
               onPick={() => { onSel(keyOf(it)); }} onOpen={() => { onOpen(it); }} />
           ))}
         </div>
@@ -107,8 +110,8 @@ export function ArtifactRows({ items, now, sel, onSel, onOpen, form, testId }: R
   );
 }
 
-const ArtRow = memo(function ArtRow({ it, on, form, onPick, onOpen, testId, ref }: {
-  it: Item; on: boolean; form: 'screen' | 'panel'; onPick: () => void; onOpen: () => void; testId: string; ref?: Ref<HTMLDivElement>;
+const ArtRow = memo(function ArtRow({ it, on, onPick, onOpen, testId, ref }: {
+  it: Item; on: boolean; onPick: () => void; onOpen: () => void; testId: string; ref?: Ref<HTMLDivElement>;
 }) {
   const a = it.a;
   const title = (
@@ -124,19 +127,60 @@ const ArtRow = memo(function ArtRow({ it, on, form, onPick, onOpen, testId, ref 
     <div ref={ref} className={`art-row${on ? ' on' : ''}`} role="option" aria-selected={on} data-testid={testId} data-row={keyOf(it)}
       data-leaves={out || undefined} onClick={onPick} onDoubleClick={onOpen}>
       <span className="art-g" aria-hidden="true">{glyphOf(a.kind)}</span>
-      {form === 'screen' ? (
-        <>
-          {title}
-          <span className="art-k" title={out ? 'opens in your browser' : undefined}>{kind}</span>
-          <span className="art-by">{madeBy(it)}</span>
-          <span className="art-w">{timeOf(a.at_ms)}</span>
-        </>
-      ) : (
-        <span className="art-two">
-          {title}
-          <span className="art-sub">{`${kind} · ${madeBy(it, false)} · ${timeOf(a.at_ms)}`}</span>
-        </span>
-      )}
+      <span className="art-two">
+        {title}
+        <span className="art-sub">{`${kind} · ${madeBy(it, false)} · ${timeOf(a.at_ms)}`}</span>
+      </span>
+    </div>
+  );
+});
+
+/** The gallery's list view's head (☰, page block b-pages 'list view'): name, made by, kind, when. */
+export function ListHead() {
+  return (
+    <div className="art-lh" aria-hidden="true">
+      <span />
+      <span>{library.col_name}</span>
+      <span>{library.col_made_by}</span>
+      <span>{library.col_kind}</span>
+      <span className="art-lw">{library.col_when}</span>
+    </div>
+  );
+}
+
+/**
+ * One row of the gallery's list view (☰): a small picture (no marks on it), the name ('· 16
+ * shots' for a stack) with its new chip, who made it, the kind in words (the list says it, the
+ * cards never), when. A click picks as a card's, a double click opens.
+ */
+export const ListRow = memo(function ListRow({ card, on, picked, now, visible, onPick, onOpen, onMenu, dragOf, testId }: {
+  card: Card;
+  on: boolean;
+  picked: boolean;
+  now: number;
+  visible: boolean;
+  onPick: (key: string, how: PickHow) => void;
+  onOpen: (card: Card) => void;
+  onMenu?: (key: string, at: { x: number; y: number }) => void;
+  dragOf?: (key: string) => HTMLAttributes<HTMLElement>;
+  testId: string;
+}) {
+  const it = topOf(card);
+  const name = listName(card);
+  return (
+    <div {...dragOf?.(card.key)} className={`art-lr${on ? ' on' : ''}${picked ? ' picked' : ''}`} role="option" aria-selected={on || picked}
+      data-row={card.key} data-testid={testId}
+      onClick={(e: MouseEvent) => { onPick(card.key, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey }); }}
+      onDoubleClick={() => { onOpen(card); }}
+      onContextMenu={onMenu === undefined ? undefined : (e) => { e.preventDefault(); onMenu(card.key, { x: e.clientX, y: e.clientY }); }}>
+      <span className="art-lr-th"><Thumb item={it} visible={visible} /></span>
+      <span className="art-title">
+        <span className="art-t" {...tipAttrs(name)}>{name}</span>
+        {isNew(card) && <span className="art-new" data-testid={`${testId}.new`}>{panel.new_chip}</span>}
+      </span>
+      <span className="art-lr-a" {...tipAttrs(lineTip(card))}>{whoOf(it.a)}</span>
+      <span className="art-lr-a">{listKind(card)}</span>
+      <span className="art-lw">{whenOf(it.a.at_ms, now)}</span>
     </div>
   );
 });
@@ -189,7 +233,7 @@ export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { 
   return (
     <div ref={ref} tabIndex={-1} onKeyDown={onKeyDown} data-testid={`${testId}.keys`}>
       <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={openIt} onLook={look}
-        onPut={put1} form="panel" testId={testId} />
+        onPut={put1} testId={testId} />
       {more}
     </div>
   );

@@ -10,8 +10,6 @@ crate::words! { hero:
     // ---- the sentences
     /// the inbox screen's hero sentence
     inbox_say = "what your agents wait on you for, from every project. answer here or in their thread; only what needs you gets in.";
-    /// the artifacts screen's hero sentence
-    artifacts_say = "what your agents made for you to look at: pages, docs, decks, sheets. each one keeps its versions and your notes.";
     /// the scheduled screen's hero sentence
     scheduled_say = "what runs on its own: a check every few minutes, a morning summary, a wait for a build to end. an agent sets it up; you can stop any of it.";
     /// the processes screen's hero sentence

@@ -6,7 +6,7 @@ import { appendFile, existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type FileFacts, type MenuAction, type SaveResult } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type FileFacts, type MenuAction, type SaveResult, type ThumbAnswer } from '../shared/api';
 import { saveCopy } from './savecopy';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
@@ -15,8 +15,10 @@ import { externalUrl } from './external';
 import { isOffscreen, noAsks, offscreenGrants } from './offscreen';
 import { imageDir, saveImage } from './images';
 import { pickedFilesInTest, pickedInTest } from './pick';
-import { allowedPath } from './reveal';
+import { allowedPath, realLookable } from './reveal';
 import { probePage } from './probe';
+import { thumbsDir } from './thumbs/cache';
+import { thumb, type ThumbEnv } from './thumbs/make';
 
 // the page's async clipboard API (navigator.clipboard): its permissions
 const CLIPBOARD_PERMS = new Set(['clipboard-read', 'clipboard-sanitized-write']);
@@ -157,6 +159,10 @@ export function installIpc(testMode: boolean): void {
   });
   ipcMain.handle(IPC.fileIcon, (_e, raw: unknown): Promise<string | null> => fileIcon(raw, testMode));
   ipcMain.handle(IPC.fileFacts, (_e, raw: unknown): FileFacts | null => fileFacts(raw));
+  // art-thumbs: an artifact card's picture, kept per version in bise's thumbs cache (thumbs/make.ts); its
+  // reads behind the realpath fence (architect m_39772: a symlink in a project can't reach out)
+  const thumbEnv: ThumbEnv = { root: thumbsDir, lookable: (raw) => realLookable(raw, [homedir(), ...roots]), quickLook: !testMode && !isOffscreen(process.env, testMode) };
+  ipcMain.handle(IPC.thumb, (_e, raw: unknown, want: unknown): Promise<ThumbAnswer | null> => thumb(thumbEnv, raw, want));
   // a window's full screen now (window.bise.onFullScreen's first call)
   ipcMain.handle(IPC.fullScreen, (e): boolean => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);
   ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));

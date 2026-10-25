@@ -1,3 +1,4 @@
+// stays JS: an eslint.config.ts needs jiti, a dependency for what this file does as is.
 // ESLint for bise desktop: typed rules (typescript-eslint strictTypeChecked)
 // on every .ts/.tsx through the two tsconfigs, React hooks rules on the
 // renderer, plain JS rules on the scripts. `pnpm lint` fails on any warning.
@@ -7,10 +8,12 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['out/', 'dist/', 'node_modules/', '.harness-cache/', 'src/proto/', 'tests/nightly/rec/'] },
+  { ignores: ['out/', 'dist/', 'node_modules/', '.harness-cache/', 'src/proto/', 'tests/nightly/rec/',
+    // emitted from their .ts (scripts/ts_emit.ts): the .ts is linted
+    'tests/harness/coverage/hook.js', 'tests/harness/pageapp/main.js'] },
   js.configs.recommended,
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['**/*.ts', '**/*.tsx', '**/*.mts'],
     extends: [...tseslint.configs.strictTypeChecked],
     languageOptions: {
       parserOptions: {

@@ -118,7 +118,10 @@ mod help;
 mod approvals_screen;
 mod logview;
 mod artifacts;
+mod artifacts_lines;
+mod artifacts_pick;
 mod artifacts_screen;
+mod artifacts_tree;
 mod scheduled;
 mod scheduled_screen;
 // running-procs: /processes (/running its alias), its rows, its output and less

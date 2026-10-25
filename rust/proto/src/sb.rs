@@ -555,7 +555,19 @@ pub enum Artifact {
         /// reads it; anything but a list is none)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         changed: Option<Value>,
+        /// `--folder <name|id|theme/task>`: a library folder, made by
+        /// the agent when the path is not there
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<String>,
     },
+    /// `sb artifact move <id>... <folder> | --unfiled`
+    Move {
+        ids: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<String>,
+    },
+    /// `sb artifact folders`: the library's folders, one line each
+    Folders,
     List {
         #[serde(default)]
         words: String,

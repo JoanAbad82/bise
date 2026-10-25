@@ -8,7 +8,7 @@ import type { InboxRecord, StateFilter } from './inbox';
 import type { Completion, CompletionAsk, LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
-import type { Agent, ApprovalMode, ApprovalRule, ArchivedAgent, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Growth, Merged, Model, Page, Place, Pr, Proc, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
+import type { Agent, ApprovalMode, ApprovalRule, ArchivedAgent, Artifact, ArtifactMoved, Card, CheckerKind, DevServer, Feature, FlowMode, Folder, FolderOp, Growth, LibraryProject, Merged, Model, Page, Place, Pr, Proc, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
 import type { Entry, FindHit } from './thread';
 
 export type JobState = "running" | "done" | "failed";
@@ -54,7 +54,7 @@ cmds: Array<string>,
  * a hub newer than the app reads the app's update channel at once
  * (desktop-dist, architect m_25198)
  */
-built?: string | null, } | { "ev": "agents", project: string, agents: Array<Agent>, places?: Array<Place>, archived?: Array<ArchivedAgent> | null, } | { "ev": "cards", project: string, cards: Array<Card>, others?: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "thread_hits", project: string, agent: string, rid: number, needle: string, hits: Array<FindHit>, upto: number, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "partial", project: string, agent: string, call: string, off: number, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, seen_ms?: number | null, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, ended?: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "processes", project: string, items: Array<Proc>, } | { "ev": "proc_out", project: string, agent: string, id: string, at: number, data: string, end: number, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
+built?: string | null, } | { "ev": "agents", project: string, agents: Array<Agent>, places?: Array<Place>, archived?: Array<ArchivedAgent> | null, } | { "ev": "cards", project: string, cards: Array<Card>, others?: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "thread_hits", project: string, agent: string, rid: number, needle: string, hits: Array<FindHit>, upto: number, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "partial", project: string, agent: string, call: string, off: number, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, seen_ms?: number | null, folders?: Array<Folder>, } | { "ev": "artifacts_moved", project: string, moved: Array<ArtifactMoved>, } | { "ev": "folders", project: string, folders: Array<Folder>, made?: string | null, } | { "ev": "library", project: string, here: string, projects: Array<LibraryProject>, folders: Array<Folder>, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, ended?: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "processes", project: string, items: Array<Proc>, } | { "ev": "proc_out", project: string, agent: string, id: string, at: number, data: string, end: number, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
 /**
  * the whole output's size in bytes (the unit of the cap: '4 KB
  * of 18 KB shown'), when the session log answered; none for the
@@ -226,7 +226,16 @@ parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, voice?: boo
  * his `@agent …` from another thread): the hub leaves one route row
  * there. Only a trace: an unknown or archived one writes none
  */
-from?: string | null, } | { "cmd": "scheduled_run", project: string, id: number, } | { "cmd": "artifacts_add", project: string, agent: string, target: string, title?: string | null, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
+from?: string | null, } | { "cmd": "scheduled_run", project: string, id: number, } | { "cmd": "artifacts_add", project: string, agent: string, target: string, title?: string | null, 
+/**
+ * a library folder's id: the artifact goes there
+ */
+folder?: string | null, } | { "cmd": "artifacts_move", project: string, ids: Array<string>, folder?: string | null, to?: string | null, 
+/**
+ * the undo slot is the caller's (the desktop core's move across
+ * projects records it whole): the hub leaves it
+ */
+keep_undo?: boolean, } | { "cmd": "artifacts_folders", project: string, op: FolderOp, } | { "cmd": "artifacts_library", project: string, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
 
 /**
  * draft: the kind of an [`HubEv::Error`], one enum for every typed

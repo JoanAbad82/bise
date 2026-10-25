@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, PluginPreview, PluginsSummary, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, PluginPreview, PluginsSummary, ProjectRow, RoleRow, ScheduledTask, Worktree, Folder } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import type { Proc } from '@/proto';
 import { keep } from '@/app/keep';
@@ -108,6 +108,8 @@ export const useBrowseSources = (): readonly string[] => useSlice('browse_source
 /** the add sheet's preview waiting for his click */
 export const usePluginPreview = (): { readonly token: string; readonly preview: PluginPreview } | null => useSlice('plugin_preview', (s) => s.pluginPreview());
 export const useArtifacts = (project: string): readonly Artifact[] => useSlice(`artifacts:${project}`, (s) => s.artifacts(project));
+/** the library's folders, the same for every project (artifacts/folders.ts reads them) */
+export const useFolders = (): readonly Folder[] => useSlice('library:folders', (s) => s.folders());
 export const useScheduled = (project: string): readonly ScheduledTask[] => useSlice(`scheduled:${project}`, (s) => s.scheduled(project));
 export const useWorktrees = (project: string): readonly Worktree[] => useSlice(`worktrees:${project}`, (s) => s.worktrees(project));
 /** a project's processes (HubEv processes): running, then ended in the last 24 h; none until its hub said */

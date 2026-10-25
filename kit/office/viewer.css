@@ -5,7 +5,7 @@
    kit/office/select.css; designer m_24098). */
 
 html, body { margin: 0; height: 100%; background: var(--surface-made); color: var(--ink); }
-/* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.mjs) */
+/* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.ts) */
 :where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
 :is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
 body { font: var(--text-ui) / 1.4 var(--font-ui); }

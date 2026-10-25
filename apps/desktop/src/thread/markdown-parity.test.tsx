@@ -2,7 +2,7 @@
 // md-artifact (architect m_38679): a .md artifact (kit/office/markdown.js on office-md.js, micromark
 // + GFM) reads as an answer does. The thread's Markdown draws office/fixtures/gfm.md with the block
 // structure the viewer draws it with (office/fixtures/gfm.blocks.json; the viewer's side:
-// office/sdk/test/viewer.test.mjs).
+// office/sdk/test/viewer.test.ts).
 import { readFileSync } from 'node:fs';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';

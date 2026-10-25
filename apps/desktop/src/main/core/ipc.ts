@@ -14,6 +14,8 @@ import { binPath } from '../paths';
 import { configOf, coreLogOf } from './env';
 import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
+import { thumbsDirOf } from '../thumbs/cache';
+import { startThumbs } from '../thumbs/make';
 import { DictationRoutes, type Route } from './dictation';
 import { SubRoutes } from './subs';
 import { answeredEv, lateAnsweredEv, refusedEv, RESTARTED_WORDS, sendRefusedEv } from '../../shared/local';
@@ -205,6 +207,10 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         latest.keep(ev);
         for (const l of [...listeners]) l(ev);
         broadcast(CORE_IPC.ev, ev);
+      },
+      // the core's home hands over where the cards' pictures go (bise_home thumbs_cache, architect m_39772)
+      onInit: (result) => {
+        startThumbs(thumbsDirOf(result));
       },
       onAnswer: (cmd, result) => {
         const ak = answerKey(cmd);

@@ -15,7 +15,7 @@ command -v qlmanage >/dev/null || { echo "FAIL docs-ql: no qlmanage (macOS only)
 cat > "$out/make.mjs" <<EOF
 import { writeFileSync, readFileSync } from "node:fs";
 import { docs, checkPackage, core } from "$here/../../dist/office.js";
-import { sample } from "$here/docs-sample.mjs";
+import { sample } from "$here/docs-sample.ts";
 const out = process.argv[2];
 const made = await sample();
 const tiny = await docs.open(new Uint8Array(readFileSync("$here/../../fixtures/tiny.docx")));
@@ -34,7 +34,8 @@ for (const [name, doc] of [["created.docx", made], ["edited.docx", tiny]]) {
 }
 process.exit(bad ? 1 : 0);
 EOF
-node "$out/make.mjs" "$out"
+# docs-sample.ts by type stripping (flagged on node < 22.18, js-to-ts)
+NODE_OPTIONS="--experimental-strip-types --disable-warning=ExperimentalWarning" node "$out/make.mjs" "$out"
 
 fail=0
 for f in created edited; do

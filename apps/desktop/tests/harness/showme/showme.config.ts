@@ -1,4 +1,4 @@
-// Playwright config for 'show me' only (showme.mjs runs it): one test, one worker.
+// Playwright config for 'show me' only (showme.mts runs it): one test, one worker.
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({

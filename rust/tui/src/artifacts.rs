@@ -65,7 +65,20 @@ pub(crate) struct Artifact {
     pub(crate) keys: Vec<String>,
     /// oldest first
     pub(crate) versions: Vec<Version>,
+    /// its folder's id, as the hub resolved it (a merged folder's reads
+    /// as the one it went into); none: unfiled
+    pub(crate) folder: Option<String>,
+    /// its project's hub id (bise_home::hub_id): its key and where a
+    /// move goes (architect m_40803)
+    pub(crate) project: String,
+    /// its project's name in the registry, for display only (he can
+    /// rename a project: nothing is kept or sent by it)
+    pub(crate) project_name: String,
 }
+
+/// A folder of the library (`~/.bise/library/folders.json`, shared by
+/// every project): a theme, or a task folder inside one (`parent`).
+pub(crate) use bise_proto::rows::Folder;
 
 impl Artifact {
     /// The kind as a row says it: `PR` in capitals, the rest as is.
@@ -76,30 +89,6 @@ impl Artifact {
     /// Has more than one version: the row shows `v3`.
     pub(crate) fn versioned(&self) -> bool {
         self.v > 1 || self.versions.len() > 1
-    }
-
-    /// The agent's column: `subs-lead · archived`.
-    pub(crate) fn agent_words(&self) -> String {
-        let who = if self.agent.is_empty() { self.by.clone() } else { self.agent.clone() };
-        if self.archived {
-            format!("{} · archived", who)
-        } else {
-            who
-        }
-    }
-
-    /// The last column at 150: `v3 · 2 notes open`, `127.0.0.1:4747`,
-    /// `▲ gone from disk · bise kept a copy`.
-    pub(crate) fn last_words(&self) -> String {
-        if self.gone {
-            return gone_words(self.copy.is_some());
-        }
-        let v = self.versioned().then(|| format!("v{}", self.v));
-        match (v, self.detail.is_empty()) {
-            (Some(v), true) => v,
-            (Some(v), false) => format!("{} · {}", v, self.detail),
-            (None, _) => self.detail.clone(),
-        }
     }
 
     /// A link (http, https), not a file.
@@ -181,6 +170,12 @@ struct Store {
     new: u64,
     /// when you last looked (the hub's `seen_ms`; an older hub: none)
     seen_ms: Option<u64>,
+    /// the library's folders (the `artifacts` event's, every project's)
+    folders: Vec<Folder>,
+    /// the other projects' rows (`artifacts/library`), newest first
+    others: Vec<Artifact>,
+    /// this hub's id, and its name in the registry (the library's `here`)
+    here: (String, String),
 }
 
 thread_local! {
@@ -223,6 +218,9 @@ impl Artifact {
             pr: r.pr.as_ref().map(|p| Pr { repo: p.repo.clone(), number: p.number, branch: String::new() }),
             keys: r.keys.clone(),
             versions,
+            folder: r.folder.clone(),
+            project: String::new(),
+            project_name: String::new(),
         }
     }
 }
@@ -230,8 +228,8 @@ impl Artifact {
 /// The hub's list (`hub/artifacts`): the whole list, newest first; `new`
 /// the ones it marks new (made or changed since he last looked, not his
 /// own: the header's count), `seen_ms` when he last looked.
-pub(crate) fn set_rows(items: &[bise_proto::rows::Artifact], seen_ms: Option<u64>) {
-    let mut rows: Vec<Artifact> = items.iter().filter(|r| !r.id.is_empty()).map(Artifact::of_row).collect();
+pub(crate) fn set_rows(items: &[bise_proto::rows::Artifact], seen_ms: Option<u64>, project: &str) {
+    let mut rows: Vec<Artifact> = items.iter().filter(|r| !r.id.is_empty()).map(|r| Artifact { project: project.to_string(), ..Artifact::of_row(r) }).collect();
     rows.sort_by_key(|a| std::cmp::Reverse(a.ts_ms));
     let new = items.iter().filter(|r| r.new).count() as u64;
     STORE.with(|st| {
@@ -239,6 +237,7 @@ pub(crate) fn set_rows(items: &[bise_proto::rows::Artifact], seen_ms: Option<u64
         st.rows = rows;
         st.new = new;
         st.seen_ms = seen_ms;
+        st.here.0 = project.to_string();
     });
 }
 
@@ -255,6 +254,65 @@ pub(crate) fn all() -> Vec<Artifact> {
 
 pub(crate) fn get(id: &str) -> Option<Artifact> {
     STORE.with(|st| st.borrow().rows.iter().find(|a| a.id == id).cloned())
+}
+
+/// The library (`/artifacts`): this project's rows and every other
+/// project's, newest first.
+pub(crate) fn library() -> Vec<Artifact> {
+    STORE.with(|st| {
+        let st = st.borrow();
+        let name = if st.here.1.is_empty() { &st.here.0 } else { &st.here.1 };
+        let own = st.rows.iter().map(|a| Artifact { project_name: name.clone(), ..a.clone() });
+        let mut rows: Vec<Artifact> = own.chain(st.others.iter().cloned()).collect();
+        rows.sort_by_key(|a| std::cmp::Reverse(a.ts_ms));
+        rows
+    })
+}
+
+/// This project's name in the registry (the library's `here`).
+pub(crate) fn set_here_name(name: &str) {
+    STORE.with(|st| st.borrow_mut().here.1 = name.to_string());
+}
+
+/// One row of the library by its key ([`Artifact::key`]).
+pub(crate) fn get_key(key: &str) -> Option<Artifact> {
+    library().into_iter().find(|a| a.key() == key)
+}
+
+/// The library's folders.
+pub(crate) fn folders() -> Vec<Folder> {
+    STORE.with(|st| st.borrow().folders.clone())
+}
+
+pub(crate) fn set_folders(folders: Vec<Folder>) {
+    STORE.with(|st| st.borrow_mut().folders = folders);
+}
+
+/// The other projects' rows (`artifacts/library`'s answer).
+pub(crate) fn set_others(rows: Vec<Artifact>) {
+    STORE.with(|st| st.borrow_mut().others = rows);
+}
+
+/// The other projects' rows of `artifacts/library`'s answer, each with
+/// its project's name, newest first.
+pub(crate) fn of_library(projects: &[bise_proto::rows::LibraryProject]) -> Vec<Artifact> {
+    let mut rows: Vec<Artifact> = projects
+        .iter()
+        .flat_map(|p| {
+            p.items.iter().filter(|r| !r.id.is_empty()).map(|r| Artifact { project: p.project.clone(), project_name: p.name.clone(), ..Artifact::of_row(r) })
+        })
+        .collect();
+    rows.sort_by_key(|a| std::cmp::Reverse(a.ts_ms));
+    rows
+}
+
+impl Artifact {
+    /// Its key in the library, the one way every row is kept, picked
+    /// and moved: `<hub id>/<id>` (ids are a project's own; a project's
+    /// name can change, its hub id cannot: architect m_40803).
+    pub(crate) fn key(&self) -> String {
+        format!("{}/{}", self.project, self.id)
+    }
 }
 
 pub(crate) fn new_count() -> u64 {

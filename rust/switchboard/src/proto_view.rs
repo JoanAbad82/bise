@@ -484,6 +484,8 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_ba
                 keys: r.get("keys").and_then(Value::as_array).map_or_else(Vec::new, |k| k.iter().filter_map(|x| x.as_str().map(String::from)).collect()),
                 // daemon/art.rs art_live_rows: bise_proto::office::live_words
                 live: r.get("live").and_then(|l| serde_json::from_value(l.clone()).ok()),
+                folder: Some(s(r, "folder")).filter(|f| !f.is_empty()),
+                turn: r.get("turn").and_then(Value::as_u64),
                 target,
             }
         })

@@ -115,7 +115,7 @@ const chromiumArgs = (o: LaunchOptions): string[] =>
     ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-audio-capture=${o.micWav}`]
     : [];
 
-/** The nightly's map run's folder (BISE_HARNESS_COVERAGE, covmap.mjs run), else undefined. */
+/** The nightly's map run's folder (BISE_HARNESS_COVERAGE, covmap.mts run), else undefined. */
 const coverageDir = (): string | undefined => process.env['BISE_HARNESS_COVERAGE'] || undefined;
 let coverageLaunches = 0;
 
@@ -129,7 +129,7 @@ function coverageLaunch(): { out: string; hook: string } | undefined {
   let spec = 'unknown';
   try { spec = path.relative(path.resolve(__dirname, '..'), test.info().file); } catch { /* not in a test */ }
   coverageLaunches += 1;
-  return { out: path.join(dir, spec.split(path.sep).join('__'), String(coverageLaunches)), hook: path.join(__dirname, 'coverage', 'hook.cjs') };
+  return { out: path.join(dir, spec.split(path.sep).join('__'), String(coverageLaunches)), hook: path.join(__dirname, 'coverage', 'hook.js') };
 }
 
 const killTree = (pid: number | undefined): void => {
@@ -186,7 +186,7 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
   const sentinel = new Sentinel(h, (why) => { stopped = why; killTree(app?.process().pid); });
   await sentinel.start();
   try {
-    // the nightly's map run (BISE_HARNESS_COVERAGE): V8's coverage of every JS target (coverage/hook.cjs)
+    // the nightly's map run (BISE_HARNESS_COVERAGE): V8's coverage of every JS target (coverage/hook.js, emitted from hook.ts)
     const cov = coverageLaunch();
     if (cov) appEnv['BISE_HARNESS_COVERAGE_OUT'] = cov.out;
     app = await electron.launch({ executablePath: harnessElectron(), args: [...(cov ? ['-r', cov.hook] : []), ...chromiumArgs(o), ...args], env: appEnv });

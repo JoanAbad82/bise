@@ -48,7 +48,7 @@ exec "$@"
 """
 
 
-# the coverage step (apps/desktop/tests/harness/coverage/covmap.mjs): checks red or green, a
+# the coverage step (apps/desktop/tests/harness/coverage/covmap.mts): checks red or green, a
 # tooling that never ran, a map refused (review-gates m_29723)
 FAKE_COVMAP = """const [mode] = process.argv.slice(2);
 const e = process.env;
@@ -66,7 +66,7 @@ if (mode === 'checks') {
     console.log('covmap checks: 1/1 green; 2 not run: cut by the night end'); process.exit(3);
   }
   if (e.FAKE_COV_CHECKS === 'red') { console.log('FAIL keep-red'); process.exit(1); }
-  // the hook broke: covmap.mjs's checksVerdict reruns the checks without coverage for the verdict
+  // the hook broke: covmap.mts's checksVerdict reruns the checks without coverage for the verdict
   if (e.FAKE_COV_CHECKS === 'nohook') { console.log('covmap checks: 3/3 green (the coverage hook never took a coverage: this is the run without coverage; no map tonight)'); process.exit(0); }
   if (e.FAKE_COV_CHECKS === 'nohook-red') { console.log('FAIL keep-red'); console.log('covmap checks: 2/3 green (the coverage hook never took a coverage: this is the run without coverage; no map tonight)'); process.exit(1); }
   console.log('covmap checks: 3/3 green'); process.exit(0);
@@ -120,7 +120,7 @@ def main():
             f.write(FAKE_GATE)
         cov = os.path.join(repo, "apps", "desktop", "tests", "harness", "coverage")
         os.makedirs(cov)
-        with open(os.path.join(cov, "covmap.mjs"), "w") as f:
+        with open(os.path.join(cov, "covmap.mts"), "w") as f:
             f.write(FAKE_COVMAP)
         with open(os.path.join(repo, "tests", "desktop_pick_audit.py"), "w") as f:
             f.write(FAKE_AUDIT)

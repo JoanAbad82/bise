@@ -316,7 +316,7 @@ impl Core {
         }
     }
 
-    fn setup_error(&mut self, cmd: &str, text: &str) {
+    pub(super) fn setup_error(&mut self, cmd: &str, text: &str) {
         self.emit(json!({"ev": "error", "cmd": cmd, "text": text}));
     }
 

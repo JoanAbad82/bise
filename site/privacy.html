@@ -13,7 +13,7 @@
 var d=t?t==="1":matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.dataset.theme=d?"dark":"light";})();
 </script>
 <style>
-  /* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.mjs) */
+  /* the hand on every thing he can click, the arrow when disabled (kit/pointer.check.ts) */
   :where(button,a[href],select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=link],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:pointer}
   :is(:disabled,[aria-disabled="true"]),:is(:disabled,[aria-disabled="true"]) *{cursor:default!important}
   :root, [data-theme="light"] { --paper:#f2ede2; --ink:#1d1a17; --dim:#5a5349; --kick:#8a8174; --pen:#c8264a; --rule:#d9d1c2; --chip:#e8e1d3; }

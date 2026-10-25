@@ -42,7 +42,7 @@ const parse = (out: string): World => JSON.parse(out.slice(out.indexOf('{'))) as
  * outside ~/.bise/gate, a dead hub, or a world whose bise build is gone.
  */
 export function realWorld(): World {
-  // the runner said the world didn't come up (covmap.mjs RealWorld): red at once, no wait
+  // the runner said the world didn't come up (covmap.mts RealWorld): red at once, no wait
   const none = process.env['BISE_CHECKS_NO_WORLD'];
   if (none) throw new Error(`no world up: ${none} (covmap checks said why)`);
   let w: World;

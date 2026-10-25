@@ -74,6 +74,12 @@ pub(crate) enum Then {
     /// `log/completion` (`/debug completion <provider>`): the rows the
     /// hub's runtime made for that provider (logview.rs)
     Completion,
+    /// `artifacts/library` (/artifacts): the other projects' rows and
+    /// the folders (artifacts_screen.rs)
+    Library,
+    /// `artifacts/folders` make (/artifacts' `n`, `m`'s ctrl+⏎): the
+    /// folders, the one made, and the row (project, id) to move into it
+    FolderMade(Option<(String, String)>),
 }
 
 /// The requests waiting for their answer, by id (cells: a popup asks
@@ -199,6 +205,19 @@ fn run(app: &mut App, then: Then, r: Response) {
         (Then::Usage, Ok(v)) => {
             if let Ok(Some(ev)) = bise_proto::rpc::ev_of_result("usage/read", v) {
                 crate::usage_screen::answered(app, ev);
+            }
+        }
+        (Then::Library, Ok(v)) => {
+            if let Ok(Some(bise_proto::hub::HubEv::Library { here, projects, folders, .. })) = bise_proto::rpc::ev_of_result("artifacts/library", v) {
+                crate::artifacts_screen::on_library(app, here, crate::artifacts::of_library(&projects), folders);
+            }
+        }
+        (Then::FolderMade(then), Ok(v)) => {
+            if let Ok(Some(bise_proto::hub::HubEv::Folders { folders, made, .. })) = bise_proto::rpc::ev_of_result("artifacts/folders", v) {
+                match made {
+                    Some(id) => crate::artifacts_screen::on_folder_made(app, id, folders, then),
+                    None => crate::artifacts::set_folders(folders),
+                }
             }
         }
         (Then::Completion, Ok(v)) => {

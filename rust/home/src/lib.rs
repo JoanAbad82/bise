@@ -4,6 +4,7 @@
 //! Every bise environment variable and the environment of each bise child
 //! process: [`env`] (issue 11). A workspace's hub id: [`hub_id`]. The
 //! projects registry (`projects.json`, bise layout only): [`projects`].
+//! The artifacts library's folders (`library/folders.json`): [`library`].
 //!
 //! Two layouts:
 //!
@@ -38,6 +39,7 @@ pub mod clock;
 pub mod env;
 pub mod hub_id;
 pub mod hub_state;
+pub mod library;
 pub mod migrate;
 pub mod prefs;
 pub mod projects;
@@ -321,6 +323,14 @@ impl Home {
     /// `<root>/cache`: rebuildable files (indexes, the providers' models).
     pub fn cache_dir(&self) -> PathBuf {
         self.root.join("cache")
+    }
+
+    /// `<root>/cache/thumbs`: the desktop app's artifact card pictures, one
+    /// 480 px PNG per artifact version (`<project>/<id>-v<n>.<sig>.png`);
+    /// rebuildable, pruned by the app past its cap. The app gets it in
+    /// `initialize`'s result (`AppInitResult::thumbs_dir`).
+    pub fn thumbs_cache(&self) -> PathBuf {
+        self.cache_dir().join("thumbs")
     }
 
     /// The plugins' enable state (`$BEND_PLUGINS_STATE`).

@@ -330,6 +330,7 @@ fn the_migration_copies_the_user_files_and_moves_the_idle_hubs() {
     // bridge writes its own)
     assert!(!h.cache_dir().join("mcp-index.txt").exists() && !bise.join("mcp-index.txt").exists());
     assert_eq!(read(h.cache_dir().join("models.toml")), "m");
+    assert_eq!(h.thumbs_cache(), bise.join("cache").join("thumbs"));
     assert_eq!(read(h.drafts_dir().join("ws.json")), "{}");
     assert!(!bise.join("run").exists());
     assert!(d.join(".bend-harness/config.toml").exists() && st.join("hints.json").exists(), "old files stay");

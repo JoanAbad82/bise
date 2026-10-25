@@ -18,6 +18,7 @@
 //   commit/<p>/<sha>           one commit already on main, read-only
 //   branch/<p>/<branch>        a branch's diff by its name ('/diff sb/x'; the branch keeps its slashes)
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
+//   artifacts[/<p>]/~/<place>  the library at a place: recent, unfiled, f/<folder id> (artifacts/folders.ts atPath)
 //   environments/<p>           its worktrees and dev servers
 //   settings[/<page>] | onboarding    amb-home's screens
 //   plugins[/skills | /p/<id>] the plugins place (every kind, or skills only: /skills), a plugin's page
@@ -42,7 +43,8 @@ export type Route =
   | { screen: 'feature'; project: string; name: string }
   | { screen: 'commit'; project: string; sha: string }
   | { screen: 'branch'; project: string; branch: string }
-  | { screen: 'artifacts'; project: string; id?: string }
+  /** `at`: the library's place (artifacts/folders.ts atPath: 'recent', 'unfiled', 'f/<id>'); none: all artifacts */
+  | { screen: 'artifacts'; project: string; id?: string; at?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'scheduled' }
   /**
@@ -122,8 +124,9 @@ export function formatRoute(r: Route): string {
       return `branch/${r.project}/${r.branch}`;
     case 'artifacts':
       // project '': every project's (the sidebar's '↗ artifacts', amb-kit)
-      if (r.project === '') return 'artifacts';
-      return r.id === undefined ? `artifacts/${r.project}` : `artifacts/${r.project}/${r.id}`;
+      if (r.id !== undefined) return `artifacts/${r.project}/${r.id}`;
+      if (r.at !== undefined) return r.project === '' ? `artifacts/~/${r.at}` : `artifacts/${r.project}/~/${r.at}`;
+      return r.project === '' ? 'artifacts' : `artifacts/${r.project}`;
     case 'settings':
       return r.page === undefined ? 'settings' : `settings/${r.page}`;
     case 'lab':
@@ -207,10 +210,19 @@ export function parseRoute(path: string): Route {
       const branch = rest.join('/');
       return p !== undefined && NAME.test(p) && rest.length > 0 && rest.every((x) => NAME.test(x)) ? { screen: 'branch', project: p, branch } : nf;
     }
-    case 'artifacts':
+    case 'artifacts': {
+      // the library's place after a '~' (never a project id nor an artifact's)
+      const t = args.indexOf('~');
+      if (t === 0 || t === 1) {
+        const at = args.slice(t + 1).join('/');
+        const p = t === 1 ? (args[0] ?? '') : '';
+        if (at === '' || !args.slice(t + 1).every((x) => NAME.test(x)) || (t === 1 && !NAME.test(p))) return nf;
+        return { screen: 'artifacts', project: p, at };
+      }
       if (args.length === 0) return { screen: 'artifacts', project: '' };
       if (one !== undefined) return { screen: 'artifacts', project: one };
       return a !== undefined && b !== undefined ? { screen: 'artifacts', project: a, id: b } : nf;
+    }
     case 'settings':
       if (args.length === 0) return { screen: 'settings' };
       return one !== undefined ? { screen: 'settings', page: one } : nf;

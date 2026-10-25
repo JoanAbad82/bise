@@ -24,7 +24,7 @@ const BIMS_BUDGET = 860 * 1024;
 // only when the place shows (plug-desktop p7).
 const PLUGINS_BUDGET = 760 * 1024;
 
-// Source maps only in the nightly's coverage-map build (BISE_DESKTOP_SOURCEMAP=1, covmap.mjs run:
+// Source maps only in the nightly's coverage-map build (BISE_DESKTOP_SOURCEMAP=1, covmap.mts run:
 // fast-try p2, architect m_29221 #3): V8 sees the bundles, the maps name the source files that ran.
 // pnpm build and a release ship none (gate.sh land fails on a .map in out/).
 const sourcemap = process.env['BISE_DESKTOP_SOURCEMAP'] === '1';

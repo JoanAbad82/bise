@@ -166,7 +166,7 @@ def tree_bise(bh, repo, env):
 
 def checks_run(bh, sha, repo, env):
     """The last run of the desktop checks on exactly `sha` (<bh>/run/nightly/checks-verdicts.tsv,
-    the nightly's or a tag's own); none there or one with no result: covmap.mjs checks runs now,
+    the nightly's or a tag's own); none there or one with no result: covmap.mts checks runs now,
     in heavy-run's release lane, and its line goes in the file."""
     tsv = os.path.join(bh, "run", "nightly", "checks-verdicts.tsv")
     run = last_run(read(tsv), sha)
@@ -183,7 +183,9 @@ def checks_run(bh, sha, repo, env):
             f.write("%s\t%s\tnone\t%s\n" % (run["when"], sha, run["out"]))
         raise TagError("the desktop checks of %s: %s (this tree's bise didn't build): no checks run, no tag" % (sha[:12], why))
     fake = env.get("DESKTOP_TAG_CHECKS")
-    cmd = (["bash", fake] if fake else ["node", os.path.join(repo, "apps", "desktop", "tests", "harness", "coverage", "covmap.mjs")]) + ["checks", "--gate-dir", out]
+    # node runs the .ts itself (type stripping, until engines >= 22.18 makes it the default)
+    strip = "NODE_OPTIONS=--experimental-strip-types --disable-warning=ExperimentalWarning"
+    cmd = (["bash", fake] if fake else ["env", strip, "node", os.path.join(repo, "apps", "desktop", "tests", "harness", "coverage", "covmap.mts")]) + ["checks", "--gate-dir", out]
     say("no desktop checks run of %s yet: running them now, in a heavy slot; its out: %s" % (sha[:12], out))
     rc = subprocess.run(heavy_argv(["/usr/bin/caffeinate", "-is"] + cmd, os.path.join(bh, "run", "heavy.lock"), prio=True), cwd=repo, env=env).returncode
     verdict = {0: "green", 1: "red"}.get(rc, "none")

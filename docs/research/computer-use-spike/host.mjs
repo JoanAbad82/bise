@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// stays JS: the computer-use spike, a frozen record the design docs cite; never typechecked.
 // Minimal native host: 4-byte LE length + JSON, echo with the host pid.
 let buf = Buffer.alloc(0);
 process.stdin.on("data", (d) => {

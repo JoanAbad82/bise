@@ -34,6 +34,21 @@ export function useNewArtifacts(): number {
   return useAllArtifacts().filter((it) => it.a.new).length;
 }
 
+/** Every project's artifacts as one list, newest first, read from the store now (useAllArtifacts' rows, uncached; a feature test's view). */
+export function allItems(store: Store, only?: string): readonly Item[] {
+  const shown = store.projects().filter((p) => only === undefined || only === '' || p.project === only);
+  return build(store, shown.map((p) => p.project), shown.map(nameOf));
+}
+
+function build(store: Store, list: readonly string[], nm: readonly string[]): Item[] {
+  const items: Item[] = [];
+  list.forEach((p, i) => {
+    for (const a of store.artifacts(p)) items.push({ project: p, projectName: nm[i] ?? p, a });
+  });
+  items.sort((x, y) => y.a.at_ms - x.a.at_ms);
+  return items;
+}
+
 // the last snapshot per (ids, names) and the arrays it was built from: one per key, so panel A's
 // one-project list and the global screen, mounted together, never rebuild each other's (amb-win
 // m_12088: a shared one made each getSnapshot a new array, and React's tearing check loops)
@@ -46,11 +61,7 @@ function snapshot(store: Store, ids: string, names: string): readonly Item[] {
   const key = `${ids}\u0000${names}`;
   const was = last.get(key);
   if (was !== undefined && was.from.length === from.length && was.from.every((x, i) => x === from[i])) return was.items;
-  const items: Item[] = [];
-  list.forEach((p, i) => {
-    for (const a of from[i] ?? []) items.push({ project: p, projectName: nm[i] ?? p, a });
-  });
-  items.sort((x, y) => y.a.at_ms - x.a.at_ms);
+  const items = build(store, list, nm);
   last.set(key, { from, items });
   return items;
 }

@@ -8,7 +8,7 @@ use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult, DiffView};
 use crate::ops::{BranchRow, ReleaseEv, UpdateEv, VersionItem};
 use crate::parts::Part;
-use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, Proc, ScheduledTask, UsageRow, Worktree};
+use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, ArtifactMoved, Card, Folder, FolderOp, LibraryProject, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, Proc, ScheduledTask, UsageRow, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -119,12 +119,34 @@ pub enum HubEv {
     /// or changed since he last looked (`artifacts_seen` clears it)
     /// `seen_ms`: when he last looked (an item's `new` is after it, not
     /// his own); none from an older hub
+    /// `folders`: the library's folders (every project's, the live ones),
+    /// read at send time; an item's `folder` is one of them or none. A
+    /// hub sends it again when the library file changed (his edit in the
+    /// desktop core); none from an older hub
     Artifacts {
         project: Project,
         items: Vec<Artifact>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         seen_ms: Option<u64>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        folders: Vec<Folder>,
     },
+    /// the answer to `artifacts_move`: each artifact moved and its folder
+    /// before (his undo)
+    ArtifactsMoved { project: Project, moved: Vec<ArtifactMoved> },
+    /// the answer to `artifacts_folders`: the folders after his change;
+    /// `made` the folder a make made (or found)
+    Folders {
+        project: Project,
+        folders: Vec<Folder>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        made: Option<String>,
+    },
+    /// the answer to `artifacts_library`: the other registered projects'
+    /// artifacts, read from their stores (this hub's own are in
+    /// `artifacts`), and the folders; `here` this project's own name in
+    /// the registry (its rows' project name)
+    Library { project: Project, here: String, projects: Vec<LibraryProject>, folders: Vec<Folder> },
     /// the live scheduled tasks (`sb every`) of the project, at hello, on
     /// `scheduled` and whenever one is set, runs, stops or ends
     /// `ended` (P4c-4a, none from an older hub): the ones that ended in
@@ -480,7 +502,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -865,7 +887,30 @@ pub enum HubCmd {
         target: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         title: Option<String>,
+        /// a library folder's id: the artifact goes there
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<String>,
     },
+    /// his move of artifacts to a library folder (none: unfiled), all or
+    /// none: `artifacts_moved` answers. `to`: the project they are in
+    /// (a hub id or a registry name; none: this one), another is
+    /// forwarded to its hub, started if needed
+    ArtifactsMove {
+        project: Project,
+        ids: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<String>,
+        /// the undo slot is the caller's (the desktop core's move across
+        /// projects records it whole): the hub leaves it
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        keep_undo: bool,
+    },
+    /// his change of the library's folders: `folders` answers
+    ArtifactsFolders { project: Project, op: FolderOp },
+    /// the other projects' artifacts, read once: `library` answers
+    ArtifactsLibrary { project: Project },
     /// the TUI's focus moved to `focus` (an agent's name): the hub's
     /// "who is he looking at" (sb-core's ClientFocus)
     Focus { project: Project, focus: String },
@@ -928,7 +973,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "artifacts_move", "artifacts_folders", "artifacts_library", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -999,6 +1044,9 @@ impl HubCmd {
             | HubCmd::Branches { project }
             | HubCmd::ScheduledRun { project, .. }
             | HubCmd::ArtifactsAdd { project, .. }
+            | HubCmd::ArtifactsMove { project, .. }
+            | HubCmd::ArtifactsFolders { project, .. }
+            | HubCmd::ArtifactsLibrary { project }
             | HubCmd::Focus { project, .. }
             | HubCmd::Versions { project }
             | HubCmd::VersionInfo { project }

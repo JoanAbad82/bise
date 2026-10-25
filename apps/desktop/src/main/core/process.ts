@@ -33,6 +33,8 @@ export interface CoreHooks {
   readonly onAnswer?: (cmd: Readonly<Record<string, unknown>>, result: unknown) => void;
   /** a request's error: the command as the window sent it, and the core's or its hub's words (architect m_23524) */
   readonly onRefused?: (cmd: Readonly<Record<string, unknown>>, error: RpcErr) => void;
+  /** initialize's result (AppInitResult), at each start: the paths the core hands over (thumbs_dir) */
+  readonly onInit?: (result: unknown) => void;
 }
 
 export interface CoreOptions {
@@ -171,6 +173,7 @@ export class CoreProcess {
         this.hooks.log(refusedLog('initialize', l.error));
         return;
       }
+      this.hooks.onInit?.(l.result);
       child.stdin.write(INITIALIZED_LINE);
       this.answered = true;
       this.setState('up');

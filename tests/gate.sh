@@ -205,8 +205,13 @@ map_paths() {  # <changed path>...
       # the skills teach the SDK through bise office run (architect m_23951)
       plugins/sheets/*|plugins/slides/*|plugins/docs/*|rust/jsrt/*) office_skills=1 ;;
     esac
-    # the kit's node checks (kit/*.check.mjs, no deps, ~0.1 s)
-    case "$f" in kit/*) kit=1 ;; esac
+    # the kit's node checks (kit/*.check.ts, no deps, ~0.1 s), and the page scripts' types
+    # and emit, bise.dev's (site/) with them
+    case "$f" in kit/*|site/*) kit=1 ;; esac
+    # the extension's unit tests and the computer-use scripts' types (~2 s)
+    case "$f" in computer-use/extension/*|computer-use/bench/*|computer-use/tsconfig.node.json) cu=1 ;; esac
+    # the as-he-does driver and pagedrive: fx's unit test and their types (~3 s)
+    case "$f" in dev/plugins/ambient-qa/*.ts|dev/plugins/ambient-qa/as-he-does/*.ts|dev/plugins/ambient-qa/tsconfig.json) aqa=1 ;; esac
     # the words ratchet (tests/word_lint.py, issue 29): the tests it lints,
     # the catalog and its generated words, its list (quick runs it always)
     case "$f" in
@@ -227,7 +232,46 @@ map_paths() {  # <changed path>...
   fi
 }
 # node as the desktop lanes find it (desktop_path): the hub's land queue has no shell setup
-kit_check() { local f; desktop_path; for f in "$root"/kit/check.mjs "$root"/kit/*.check.mjs; do echo "node ${f#"$root"/}"; node "$f" || return 1; done; }
+# Node runs the repo's .ts scripts by type stripping: flagged before node 22.18 (js-to-ts,
+# architect m_40557: the runners set it, never a shebang). Goes when engines says >=22.18.
+TS_NODE_OPTIONS="--experimental-strip-types --disable-warning=ExperimentalWarning"
+# the checks, then their types (office/sdk owns typescript: skipped without its node_modules)
+kit_check() {
+  local f tsc="$root/office/sdk/node_modules/.bin/tsc"; desktop_path
+  for f in "$root"/kit/check.ts "$root"/kit/*.check.ts; do echo "node ${f#"$root"/}"; NODE_OPTIONS="$TS_NODE_OPTIONS" node "$f" || return 1; done
+  if [ -x "$tsc" ]; then
+    echo "tsc -p kit/tsconfig.node.json"; "$tsc" -p "$root/kit/tsconfig.node.json" || return 1
+    # the page scripts: their types, and the committed .js is what their .ts emits
+    echo "tsc -p kit/tsconfig.json"; "$tsc" -p "$root/kit/tsconfig.json" || return 1
+    # the artifact viewer's modules (kit/office): theirs, on office/dist's types
+    echo "tsc -p kit/office/tsconfig.json"; "$tsc" -p "$root/kit/office/tsconfig.json" || return 1
+    # bise.dev's own scripts (Vercel serves the committed .js)
+    echo "tsc -p site/tsconfig.json"; "$tsc" -p "$root/site/tsconfig.json" || return 1
+    echo "ts_emit kit/tsconfig.json kit/office/tsconfig.json site/tsconfig.json --check"
+    NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/kit/tsconfig.json" "$root/kit/office/tsconfig.json" "$root/site/tsconfig.json" --check || return 1
+  else echo "skipped kit types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
+}
+# the extension's unit tests (no browser), then the types of its tests and the bench
+cu_check() {
+  local tsc="$root/office/sdk/node_modules/.bin/tsc"; desktop_path
+  echo "node --test computer-use/extension/test/unit.test.ts"
+  NODE_OPTIONS="$TS_NODE_OPTIONS" node --test "$root/computer-use/extension/test/unit.test.ts" || return 1
+  if [ -x "$tsc" ]; then echo "tsc -p computer-use/tsconfig.node.json"; "$tsc" -p "$root/computer-use/tsconfig.node.json" || return 1
+    # the extension's own code: its types, and the committed .js is what its .ts emits
+    echo "tsc -p computer-use/extension/tsconfig.json"; "$tsc" -p "$root/computer-use/extension/tsconfig.json" || return 1
+    echo "ts_emit computer-use/extension/tsconfig.json --check"
+    NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/computer-use/extension/tsconfig.json" --check || return 1
+  else echo "skipped computer-use types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
+}
+# the as-he-does helpers' unit test, then the types of the driver and pagedrive (Playwright's
+# types are apps/desktop's: skipped without its node_modules, like desktop_check)
+aqa_check() {
+  local tsc="$root/apps/desktop/node_modules/.bin/tsc"; desktop_path
+  echo "node --test dev/plugins/ambient-qa/as-he-does/fx.test.ts"
+  NODE_OPTIONS="$TS_NODE_OPTIONS" node --test "$root/dev/plugins/ambient-qa/as-he-does/fx.test.ts" || return 1
+  if [ -x "$tsc" ]; then echo "tsc -p dev/plugins/ambient-qa/tsconfig.json"; "$tsc" -p "$root/dev/plugins/ambient-qa/tsconfig.json" || return 1
+  else echo "skipped ambient-qa types: no apps/desktop/node_modules (pnpm -C apps/desktop install)"; fi
+}
 if [ "$mode" = wait ]; then
   arg="${2:?usage: gate.sh wait <bg .out file | pid>}"
   if [ -f "$arg" ]; then pid="$(cat "${arg%.out}.pid" 2>/dev/null)"; rcf="${arg%.out}.rc"; else pid="$arg"; rcf=; fi
@@ -407,7 +451,7 @@ if [ "$mode" = land ]; then
   map_paths $changed
   dwhy=""; [ -n "$changed" ] && dwhy="$(desktop_why $changed)"
   src=0; printf '%s\n' "$changed" | grep -qE '\.(rs|bend|ts|tsx|py)$' && src=1
-  if [ $src = 0 ] && [ -z "$pkgs" ] && [ -z "$dwhy" ] && [ "${proto_ts:-0}${office:-0}${kit:-0}${words:-0}${bendw:-0}" = 00000 ]; then
+  if [ $src = 0 ] && [ -z "$pkgs" ] && [ -z "$dwhy" ] && [ "${proto_ts:-0}${office:-0}${kit:-0}${cu:-0}${aqa:-0}${words:-0}${bendw:-0}" = 0000000 ]; then
     echo "GATE land GREEN (0s): no step for these paths"; exit 0
   fi
 fi
@@ -777,6 +821,8 @@ if [ "$mode" = land ]; then
   [ -n "$dwhy" ] && { tests/desktop_pick_shadow.sh land "$base" "$head" || true; }
   [ "${office:-0}" = 1 ] && lstep office_check tests/office_check.sh strict
   [ "${kit:-0}" = 1 ] && lstep kit kit_check
+  [ "${cu:-0}" = 1 ] && lstep computer_use cu_check
+  [ "${aqa:-0}" = 1 ] && lstep ambient_qa aqa_check
   echo "GATE land GREEN ($((SECONDS - t0))s):${ran:- no step for these paths}"
   exit 0
 fi
@@ -809,6 +855,8 @@ if [ "$mode" = full ]; then
   python3 tests/shims_check.py || { echo "GATE full FAILED"; exit 1; }
   # sb-core's records by position only in bend/hub/gen/ (state-schema, ~0.1 s)
   python3 tests/state_guard.py || { echo "GATE full FAILED"; exit 1; }
+  # no new hand-written JS (js-to-ts, ~0.1 s)
+  python3 tests/js_guard.py || { echo "GATE full FAILED"; exit 1; }
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
   # the e2e/tmux tests this change can break (tests/test_map.py; the user's
@@ -888,6 +936,9 @@ python3 "$root/tests/shims_check.py" || { echo "GATE quick FAILED"; exit 1; }
 # sb-core's records built or opened only in bend/hub/gen/ (tests/state_guard.py, state-schema)
 python3 "$root/tests/state_guard.py" --self-test >/dev/null || { python3 "$root/tests/state_guard.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 python3 "$root/tests/state_guard.py" || { echo "GATE quick FAILED"; exit 1; }
+# no new hand-written JS: generated, vendored or on tests/js_allowlist.txt (js-to-ts, ~0.1 s)
+python3 "$root/tests/js_guard.py" --self-test >/dev/null || { python3 "$root/tests/js_guard.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+python3 "$root/tests/js_guard.py" || { echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the crates' compile-time reads outside rust/ map to their crate (tests/include_map.py)
@@ -901,7 +952,7 @@ python3 -B "$root/tests/keep_logs_test.py" >/dev/null || { python3 -B "$root/tes
 python3 -B "$root/tests/runtime_check_test.py" >/dev/null || { python3 -B "$root/tests/runtime_check_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 if [ -d "$root/apps/desktop" ]; then
-  node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test >/dev/null || { node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test; echo "GATE quick FAILED"; exit 1; }
+  NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/apps/desktop/tests/harness/coverage/covmap.mts" --self-test >/dev/null || { NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/apps/desktop/tests/harness/coverage/covmap.mts" --self-test; echo "GATE quick FAILED"; exit 1; }
 fi
 # no new Bool.pick walk that never stops; the list of old ones only shrinks; no
 # def that calls itself twice with the same arguments (2^n: hub-tick) (tests/pick_gate.py)
@@ -1018,6 +1069,12 @@ fi
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
 # the office SDK: office/dist/office.js is what office/sdk/src builds, and its tests pass on it
 [ "${office:-0}" = 1 ] && step office_check tests/office_check.sh
+# the kit's node checks and their types (land had them, quick did not: js-to-ts)
+[ "${kit:-0}" = 1 ] && step kit kit_check
+# the extension's unit tests and the computer-use scripts' types
+[ "${cu:-0}" = 1 ] && step computer_use cu_check
+# the as-he-does helpers' unit test and the driver's types
+[ "${aqa:-0}" = 1 ] && step ambient_qa aqa_check
 # the office skills' scripts, through bise office run (skipped with words when bise or bend-jsrt is not built)
 [ "${office_skills:-0}" = 1 ] && step office_skills python3 tests/office_skills_check.py
 # then the desktop's own checks, when the change reaches it (tests/test_map.py desktop)

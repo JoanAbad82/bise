@@ -107,11 +107,17 @@ pub struct AppInitResult {
     pub proto: u32,
     pub methods: Vec<String>,
     pub notifications: Vec<String>,
+    /// where the app keeps its artifact card pictures
+    /// (`bise_home::Home::thumbs_cache`); '' from an older core: the app
+    /// makes none
+    #[serde(default)]
+    pub thumbs_dir: String,
 }
 
 impl AppInitResult {
-    pub fn now() -> AppInitResult {
-        AppInitResult { proto: PROTO, methods: methods(), notifications: notifications() }
+    /// This core's answer; `thumbs_dir` its home's thumbs cache.
+    pub fn now(thumbs_dir: &str) -> AppInitResult {
+        AppInitResult { proto: PROTO, methods: methods(), notifications: notifications(), thumbs_dir: thumbs_dir.to_string() }
     }
 }
 

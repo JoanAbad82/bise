@@ -39,6 +39,7 @@ import {
 } from "./side";
 import { useWaitingTotal } from "./Sidebar";
 import { usePanelColumn } from "@/bims/view";
+import { usePlaceCrumb } from "@/artifacts/crumb";
 
 export type Width = "narrow" | "mid" | "wide";
 
@@ -402,9 +403,11 @@ export function Titlebar({ frame }: { frame: FrameState }) {
   const placeWaits =
     frame.panel === undefined ? 0 : frame.panel.project === "" ? waits : (rows.find((r) => r.project === frame.panel?.project)?.waits ?? 0);
   const name = (p: string) => rows.find((r) => r.project === p)?.name ?? p;
-  const crumb = crumbOf(route, name);
+  // the artifacts library's place after 'artifacts' (artifacts/crumb.ts)
+  const place = usePlaceCrumb();
+  const crumb = crumbOf(route, name, place);
   // an earlier crumb's route, by its place (the last: where he is, no route) — crumbGoOf, pure
-  const go = crumbGoOf(route, name).map((s) => s.go);
+  const go = crumbGoOf(route, name, place).map((s) => s.go);
   const panelOn =
     frame.panel !== undefined && (frame.panel.docked || frame.over === "panel");
   return (

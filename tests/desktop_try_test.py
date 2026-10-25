@@ -63,10 +63,11 @@ def pure():
           "a HEAVY_SLOT of no ancestor (a daemon that outlived its job), or no pid: not in a slot")
     run3 = os.path.join(tempfile.mkdtemp(prefix="dt-slot-"), ".bise", "run")
     os.makedirs(run3)
-    mjs = os.path.join(ROOT, "apps", "desktop", "tests", "harness", "heavy.mjs")
+    heavy_ts = os.path.join(ROOT, "apps", "desktop", "tests", "harness", "heavy.mts")
     probe = {"py": [sys.executable, "-c", "import sys; sys.path.insert(0, %r); import heavy_slot; print(heavy_slot.under_heavy_slot())"
                     % os.path.join(ROOT, "scripts")],
-             "node": ["node", "--input-type=module", "-e", "import(%r).then((m) => console.log(m.underHeavySlot() ? 'True' : 'False'))" % mjs]}
+             "node": ["node", "--experimental-strip-types", "--disable-warning=ExperimentalWarning", "--input-type=module", "-e",
+                      "import(%r).then((m) => console.log(m.underHeavySlot() ? 'True' : 'False'))" % heavy_ts]}
     env0 = {k: v for k, v in os.environ.items() if k != "HEAVY_SLOT"}
     for n in ("heavy.lock", "heavy3.lock", "heavy4.lock"):
         for lang, argv in probe.items():

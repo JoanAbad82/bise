@@ -7,7 +7,7 @@
 // Today the window is the Store: its port is an outbox (a sink: it answers nothing and holds no
 // state; the hub's answers come in through given()). When state-machine's step lands (fast-try
 // p4), the outbox becomes step's outputs and only this file changes, never a test.
-import { Latest, Store, threadKey, type AnswerFrom, type Effect, type InboxItem, type Pending } from './app';
+import { allItems, galleryView, libraryView, Latest, Store, threadKey, type AnswerFrom, type CardView, type Effect, type InboxItem, type LibraryView, type Pending, type Place } from './app';
 import type { Cmd, Gesture, Here, Input } from './inputs';
 
 export interface Feature {
@@ -31,6 +31,10 @@ export interface Feature {
     sending(): boolean;
     /** A thread's rows of his messages not echoed yet, oldest first: sending, or failed with why (the store's pending, ThreadRows' usePending). */
     pending(project: string, agent: string): readonly Pending[];
+    /** The artifacts gallery's cards in this place (one project's with `only`), in order: name, line, a stack's count, new (artifacts/gallery.ts galleryView over hooks.ts allItems). */
+    gallery(place: Place, only?: string): readonly CardView[];
+    /** The artifacts library under a project scope ('' every project): the hero's facts, each folder's count ('14 of 74') and new ones, unfiled's count (artifacts/folders.ts libraryView over the store's folders and hooks.ts allItems). */
+    library(project?: string, projectName?: string): LibraryView;
   };
 }
 
@@ -119,6 +123,8 @@ export function feature(now = 1_791_100_000_000): Feature {
       inbox: () => store.inboxItems(),
       sending: () => store.sending(),
       pending: (project, agent) => store.pending(threadKey(project, agent)),
+      gallery: (place, only) => galleryView(allItems(store, only), place, clock),
+      library: (project = '', projectName = '') => libraryView(store.folders(), allItems(store), project, projectName),
     },
   };
   return f;
