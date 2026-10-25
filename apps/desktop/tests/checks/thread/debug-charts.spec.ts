@@ -6,6 +6,7 @@
 // clears, and a click on the series' peak opens that message.
 // Shots: debug-charts-<width>-<theme>.png, for designer (page debug-viz v5). Owner: debug-viz.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { debug } from '../../../src/proto/words_debug.gen';
 
 const ACME = 'acme-1a2b3c4d';
 type Part = { role: string; kind: string; names?: string[]; tokens: number };
@@ -31,7 +32,7 @@ function request() {
       { role: 'system', kind: 'tools', names: ['edit'], tokens: 900 },
       { role: 'system', kind: 'params', tokens: 40 },
     ], 'request', 'anthropic · claude-opus-5-5 · 3 tools'),
-    rowOf(1, [{ role: 'system', kind: 'prompt', tokens: 18900 }], 'system', 'the system prompt · 412 lines'),
+    rowOf(1, [{ role: 'system', kind: 'prompt', tokens: 18900 }], 'system', 'system prompt, 412 lines'),
     rowOf(2, [{ role: 'user', kind: 'summary', tokens: 3400 }], 'user', 'Summary of the earlier conversation:'),
   ];
   for (let n = 3; n < 240; n++) {
@@ -89,9 +90,9 @@ for (const width of [1400, 1100] as const) {
 
         // two clicks down: tool result, then bash; the list keeps their messages
         await page.getByTestId('comp.chart.bar.tool_result').click();
-        await expect(page.getByTestId('comp.filter.group')).toContainText('tool result');
+        await expect(page.getByTestId('comp.filter.group')).toContainText(debug.role_tool_result);
         await page.getByTestId('comp.chart.bar.n:bash').click();
-        await expect(page.getByTestId('comp.chart.crumbs')).toHaveText('all › tool result › bash');
+        await expect(page.getByTestId('comp.chart.crumbs')).toHaveText(`${debug.crumb_all} › ${debug.role_tool_result} › bash`);
         const count = await page.getByTestId('comp.list').locator('[data-testid^="comp.row."][data-n]').count();
         expect(count).toBeGreaterThan(0);
         expect(count).toBeLessThan(240);
