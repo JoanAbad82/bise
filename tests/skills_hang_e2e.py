@@ -14,7 +14,7 @@ the scripted provider, a HOME of the test's own:
   ~/.agents/skills/alpha         a good skill
 1. main's first model call comes within 30 s of the hub's start;
 2. main's session index (the bridge's D/skills-index.txt) holds alpha,
-   not stuck (and the plugins' own `plugin:skill` ones, not pinned),
+   not stuck (and the built-in skills, not pinned),
    and its first request lists alpha;
 3. nothing is left reading the FIFO.
 A regular file whose read hangs cannot be faked for a Rust reader
@@ -57,10 +57,12 @@ def main():
         idxs = glob.glob(os.path.join(E.env["BEND_RUN_DIR"], "*", "plugins", "skills-index.txt"))
         idx = "".join(open(f).read() for f in idxs)
         names = [l.split("\t")[0] for l in idx.splitlines()]
-        # the bridge also lists the plugins' own skills (`docs:docs`, a
-        # plugin:skill name): alpha once, never stuck, nothing else of HOME's
-        check(names.count("alpha") == 1 and "stuck" not in names, "main's session index holds alpha, not stuck: %r" % idx)
-        check(all(":" in n for n in names if n != "alpha"), "main's session index: HOME's skills are alpha alone: %r" % idx)
+        # the bridge also lists the built-in skills (the plugins' `docs:docs`,
+        # the repo's bise-demo), not pinned here: of the test's HOME, alpha
+        # alone, never stuck
+        mine = os.path.realpath(home) + os.sep
+        ours = [l.split("\t")[0] for l in idx.splitlines() if os.path.realpath(l.split("\t")[-1]).startswith(mine)]
+        check(ours == ["alpha"] and "stuck" not in names, "main's session index holds alpha alone of HOME's, not stuck: %r" % idx)
         body = json.dumps(E.fake_requests()[0])
         check("alpha" in body and "stuck" not in body, "main's first request lists alpha, not stuck")
         held = subprocess.run(["lsof", fifo], capture_output=True, text=True).stdout
