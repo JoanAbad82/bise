@@ -250,7 +250,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   ),
   composer: () => (
     <div className="g-main">
-      <ComposerFrame send="off" tab="you → bise · opus · high" keys="@ file   $ skills   / commands   ⌘I inbox" testId="ds.composer">
+      <ComposerFrame send="off" tab="you → bise · opus · high" testId="ds.composer">
         <ComposerStill placeholder="ask bise, or tell it what to do" />
       </ComposerFrame>
       <ComposerFrame send="on" tab="you → telemetry · main" focus quote={<Quote>1 “workers: [Worker; 4],” decode_pool.rs:13-14 · 2 lines</Quote>}>

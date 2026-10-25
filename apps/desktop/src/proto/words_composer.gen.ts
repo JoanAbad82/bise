@@ -92,8 +92,6 @@ export const composer = {
   bar_copied: "copied",
   /** key bar, the sign-in again: copy the link */
   bar_copy_link: "copy the link",
-  /** desktop key bar, text selected in the field: typing replaces it */
-  bar_replace: "to replace it",
   /** key bar: cut */
   bar_cut: "cut",
   /** held ctrl: quit (no turn to interrupt) */
@@ -166,16 +164,6 @@ export const composer = {
   tip_voice_mode: "ctrl+r twice starts voice mode: talk with the agent in view",
   /** a tip: /theme (both apps) */
   tip_theme: "/theme switches between light and dark",
-  /** a desktop tip: ⇧⏎ */
-  tip_newline_mac: "⇧⏎ adds a new line",
-  /** a desktop tip: tab while the agent works */
-  tip_queue: "tab queues a message while the agent works",
-  /** a desktop tip: emoji */
-  tip_emoji: ":tada: puts 🎉, a : and two letters list them",
-  /** a desktop tip: the @ list's folders */
-  tip_folder: "→ opens a folder in the @ list, ← goes up",
-  /** a desktop tip: a code fence */
-  tip_fence: "a ``` block keeps ⏎ for new lines until you close it",
   /** the flash after ⇧⇥ to auto, with the checker off */
   approvals_auto_off: "edits run, commands ask you",
   /** the flash after ⇧⇥ to auto */
@@ -352,8 +340,6 @@ export const composer = {
   queue_fold: "fold the queued messages",
   /** the desktop's empty composer, by default */
   placeholder_bise: "write to bise",
-  /** the desktop's voice mode button */
-  voice_button: "voice",
   /** the desktop's + button */
   attach_files: "attach files",
   /** the desktop's empty composer in an agent's thread */
@@ -382,6 +368,22 @@ export const composer = {
   tab_worktree_on: (a: { branch: string | number }): string => "ψ worktree, on " + String(a.branch),
   /** the tab's place tip: his checkout */
   tab_own_folder: (a: { path: string | number }): string => "your own folder: " + String(a.path),
+  /** the strip's place: his own checkout */
+  ctx_local: "local",
+  /** the strip's place: a worktree */
+  ctx_worktree: "worktree",
+  /** the strip's place on the empty home: where main starts its agents */
+  ctx_new_worktree: "new worktree",
+  /** the tip of 'new worktree' on the empty home */
+  ctx_new_worktree_tip: "main starts its agents in a new worktree",
+  /** the tip of the strip's branch */
+  ctx_branch_tip: (a: { branch: string | number }): string => "on branch " + String(a.branch),
+  /** the tip of the strip's project when it is not a picker */
+  ctx_project_tip: (a: { path: string | number }): string => "the project's folder: " + String(a.path),
+  /** the strip's project picker: its name and tip */
+  ctx_project_pick: (a: { project: string | number }): string => String(a.project) + " · pick another project",
+  /** the project picker's title */
+  ctx_projects: "projects",
   /** the context ring's tip */
   ring_tip: (a: { pct: string | number; agent: string | number; tokens: string | number }): string => String(a.pct) + "% of " + String(a.agent) + "'s context used · " + String(a.tokens) + " tokens · compacts at 90%",
   /** ctrl+1 with nothing in the inbox */

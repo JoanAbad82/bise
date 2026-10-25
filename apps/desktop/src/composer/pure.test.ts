@@ -6,7 +6,6 @@ import { agoWords, artifactRows, emojiRows, pickedChip } from './pick';
 import TUI_EMOJI from '../../../../rust/tui/src/emoji.tsv?raw';
 import DESKTOP_EMOJI from './emoji.tsv?raw';
 import COMPOSER_PARTS from '../../../../rust/proto/fixtures/composer_parts.json';
-import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
 import { noVisionLine } from './message';
 import { isImagePath } from './sources';
 import { colorLines, cssText, proseRuns } from './mdcolor';
@@ -424,40 +423,6 @@ describe('artifacts in the @ list (commands.rs, W11)', () => {
   });
 });
 
-describe('the key bar (keybar.rs, W9)', () => {
-  const st = { voice: null, fileList: false, quoting: false, selected: false, images: false, busy: false, typing: false } as const;
-  const line = (m: Parameters<typeof barPairs>[0], typing = false) => barPairs(m, typing).map(([k, l]) => `${k} ${l}`).join('   ');
-  it('one set of keys per mode, in the TUI\'s order', () => {
-    expect(line(barMode(st))).toBe('@ file   $ skills   / commands');
-    expect(barMode({ ...st, voice: 'recording', fileList: true })).toBe('recording');
-    expect(line('recording')).toBe('any key stop   esc cancel');
-    expect(barMode({ ...st, fileList: true, selected: true })).toBe('file');
-    expect(line('file')).toContain('→ open a folder');
-    expect(barMode({ ...st, quoting: true })).toBe('quote');
-    expect(line('quote')).toBe('type to ask about it   tab quote   ⌘C copy   esc drop');
-    expect(barMode({ ...st, selected: true, busy: true })).toBe('selection');
-    expect(barMode({ ...st, busy: true, images: true })).toBe('steer');
-    expect(line('steer', true)).toBe('tab queue   ⏎ steer   ⌃C stop');
-    expect(line('steer', false)).toBe('⌃C stop');
-    // designer m_25146: his queued messages wait: on an empty field ↑ edits the newest
-    expect(barPairs('steer', false, true).map(([k, l]) => `${k} ${l}`).join('   ')).toBe('↑ edit queued   ⌃C stop');
-    expect(barPairs('steer', true, true).map(([k, l]) => `${k} ${l}`).join('   ')).toBe('tab queue   ⏎ steer   ⌃C stop');
-    expect(line(barMode({ ...st, images: true }))).toBe('⌘V paste image   @ file   $ skills   / commands');
-  });
-  it('a tip every 5 minutes, never while he types, only at rest', () => {
-    const c = startTip(null, 0);
-    expect(c.index).toBe(0);
-    expect(startTip(TIPS.length - 1, 0).index).toBe(0);
-    expect(startTip(2, 0).index).toBe(3);
-    expect(tickTip(c, TIP_EVERY_MS - 1, false)).toBe(c);
-    expect(tickTip(c, TIP_EVERY_MS, true)).toBe(c);
-    expect(tickTip(c, TIP_EVERY_MS, false)).toEqual({ index: 1, since: TIP_EVERY_MS });
-    expect(tipShown('rest', false)).toBe(true);
-    expect(tipShown('rest', true)).toBe(false);
-    expect(tipShown('steer', false)).toBe(false);
-  });
-});
-
 describe('sending: no-vision line and prefixes (attach.rs, sb.rs)', () => {
   it('the no-vision line names the model and says image', () => {
     expect(noVisionLine('mistral-small')).toBe("mistral-small does not support image input (bise's model catalog): not sent");
@@ -493,13 +458,3 @@ describe('live markdown colors (B9/W8)', () => {
   });
 });
 
-describe("the tip line retires after 7 days of use (designer's desktop-delight tuck away)", () => {
-  it('counts each day once, and retires on an 8th', async () => {
-    const { countDay, TIP_DAYS } = await import('./keybar');
-    expect(countDay([], '2026-10-14')).toEqual({ days: ['2026-10-14'], retired: false });
-    expect(countDay(['2026-10-14'], '2026-10-14')).toEqual({ days: ['2026-10-14'], retired: false });
-    const seven = Array.from({ length: TIP_DAYS }, (_, i) => `2026-10-${String(10 + i)}`);
-    expect(countDay(seven, '2026-10-16').retired, 'a 7th day still shows').toBe(false);
-    expect(countDay(seven, '2026-10-30')).toEqual({ days: seven, retired: true });
-  });
-});

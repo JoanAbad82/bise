@@ -132,8 +132,9 @@ export interface ComposerFrameProps {
   send: Send;
   onSend?: MouseEventHandler<HTMLButtonElement>;
   disabled?: boolean;
-  /** "@ file   $ skills   / commands   ⌘I inbox" */
-  keys?: ReactNode;
+  /** the box's first row, above the field (bise fait mac's context strip: project · place · branch),
+   *  ruled off from the field; none: the field first */
+  head?: ReactNode;
   /** the lines he quoted, the dock, the inbox tabs: above the box */
   quote?: ReactNode;
   dock?: ReactNode;
@@ -141,15 +142,15 @@ export interface ComposerFrameProps {
   /** shown focused without focus (the gallery); live, :focus-within does it */
   focus?: boolean;
   /** off the thread, at rest (designer m_41569, ui-review-app #1): unfocused, the box is one line, no
-   *  tab, no tool row, no key bar; it grows back at its focus. The caller sets it only while nothing
-   *  is typed, answered, quoted or said on the key line */
+   *  tab, no head, no tool row; it grows back at its focus. The caller sets it only while nothing
+   *  is typed, answered, quoted or said on its notice line */
   fold?: boolean;
   /** the whole frame is the input: a press on its padding or empty area (not on the editor, a chip, a
    * button, the dock, the tabs or a quote) calls this to focus the editor, the caret at the end (his round 2) */
   onBoxDown?: () => void;
   /** in the box at its left, before the editor (voice mode's grey pearl while he types) */
   lead?: ReactNode;
-  /** a key pressed anywhere in the frame, before the editor takes it (a key-line notice goes at his first key) */
+  /** a key pressed anywhere in the frame, before the editor takes it (a notice goes at his first key) */
   onKeyDownCapture?: KeyboardEventHandler<HTMLDivElement> | undefined;
   testId?: string;
 }
@@ -161,9 +162,9 @@ export function boxPress(target: EventTarget | null): boolean {
   // a disabled control (send while the draft is empty) does nothing of its own: the press focuses the field
   return el.closest('[contenteditable="true"], button:not(:disabled), a, input, textarea, [role=button], [role=menu], .b-chip, .b-dock, .b-tabs, .b-quote') === null;
 }
-/** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (the editor, then its
- *  32 px row: tools left, tools and send right), the keys */
-export function ComposerFrame({ children, tab, answering, answerTip, quiet, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, fold, onBoxDown, lead, onKeyDownCapture, testId }: ComposerFrameProps) {
+/** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (its head, the editor,
+ *  then its row: tools left, tools and send right) */
+export function ComposerFrame({ children, tab, answering, answerTip, quiet, tools, toolsEnd, sent = 0, send, onSend, disabled, head, quote, dock, tabs, focus, fold, onBoxDown, lead, onKeyDownCapture, testId }: ComposerFrameProps) {
   return (
     <div className={cx("b-composer", disabled && "is-disabled", fold && "fold")} data-testid={testId} data-fold={fold || undefined} onKeyDownCapture={onKeyDownCapture}
       onMouseDown={onBoxDown && ((e) => {
@@ -177,7 +178,8 @@ export function ComposerFrame({ children, tab, answering, answerTip, quiet, tool
       {quote}
       {/* answering, the tab is the pink border's label: its tip says where his words go (designer m_26683) */}
       {tab != null && <div className={cx("tab", answering && "acc", answering && quiet && "quiet")} data-testid={sub(testId, "tab")} {...(answering ? tipAttrs(answerTip) : {})}>{tab}</div>}
-      <div className={cx("box", focus && "is-focus", answering && "ans")} data-testid={sub(testId, "box")} data-answering={answering || undefined}>
+      <div className={cx("box", focus && "is-focus", answering && "ans", answering && quiet && "quiet")} data-testid={sub(testId, "box")} data-answering={answering || undefined}>
+        {head != null && <div className="head" data-testid={sub(testId, "head")}>{head}</div>}
         <div className="line">
           {lead}
           <div className="in">{children}</div>
@@ -194,7 +196,6 @@ export function ComposerFrame({ children, tab, answering, answerTip, quiet, tool
           </button>
         </div>
       </div>
-      {keys != null && <div className="keys">{keys}</div>}
     </div>
   );
 }

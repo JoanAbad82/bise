@@ -2,8 +2,7 @@
 // m_21510; ctrl: zen-hints, the TUI's rust/tui/src/ctrlhint.rs): ⌥ held numbers the right bar's
 // agents ⌥1-9, ⌘ held numbers the left bar's places (bise ⌘0, the projects ⌘1-9 in keys.ts's
 // order) and puts ⌘[ ⌘] beside ‹ ›, ⌘I on the inbox's head; ctrl held lights the inbox rows'
-// numbers (ctrl+N), says ⌃O on each fold and ⌃Y on a code block's copy, and the composer's key
-// line lists every key of the held modifier of the moment (keybar.ts heldPairs). ONE
+// numbers (ctrl+N), says ⌃O on each fold and ⌃Y on a code block's copy. ONE
 // delay for all three, so a quick ⌘K, ⌥1 or ctrl+r never flashes them; release, any other key, a
 // click, a scroll or the window losing focus hides them all at once, no fade. One listener for the
 // window (a store), however many rows read it. Owner: amb-win.

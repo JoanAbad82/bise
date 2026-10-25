@@ -1,11 +1,14 @@
 /* bise desktop window · the composer and the dock above it: quote, dock (question, approval, inbox), options, tabs */
-.b-composer{padding:var(--s-2) var(--pad-column) var(--s-4)}
+/* bise fait mac, mockup 1: one raised box, 672 wide at most (48 in from its column), 16 from the bottom, r 16, --e-1 */
+.b-composer{padding:0 0 var(--s-4)}
 /* the tab glued to the box's top (designer's composer-strip A): 32 px, 16 px in from each side, r 12 on top, a 1 px line with none at the bottom (the box's line is its edge), 2% of the text over the box's fill; sans 13, its items 16 px apart; the accent on its 7% tint while his words answer a card */
 .b-composer .tab{display:flex;align-items:center;gap:var(--s-4);box-sizing:border-box;height:var(--h-control);margin:0 var(--s-4);padding:0 var(--s-3);border-radius:var(--r-3) var(--r-3) 0 0;box-shadow:inset 1px 1px 0 var(--c-line),inset -1px 0 0 var(--c-line);background:linear-gradient(color-mix(in srgb,var(--c-text) 2%,transparent),color-mix(in srgb,var(--c-text) 2%,transparent)),var(--c-raised);font:var(--t-13) var(--font-ui);color:var(--c-text-2);white-space:nowrap;overflow:hidden}
 .b-composer .tab.acc{color:var(--c-accent);background:linear-gradient(color-mix(in srgb,var(--c-accent) 7%,transparent),color-mix(in srgb,var(--c-accent) 7%,transparent)),var(--c-raised)}
-/* the box: r 16, padding 12/12/8/16, a 1 px line and no shadow; the field over its 32 px row of controls */
-.b-composer .box{display:flex;flex-direction:column;gap:var(--s-2);padding:var(--s-3) var(--s-3) var(--s-2) var(--s-4);border-radius:var(--r-4);background:var(--c-raised);box-shadow:0 0 0 1px var(--c-line);transition:box-shadow 120ms var(--ease-out)}
-.b-composer .box.is-focus{box-shadow:0 0 0 1px var(--c-focus)}
+/* the box: r 16, --c-raised, --e-1; its head (the context strip, 32, a rule under it), the field (14/22, padding 12 16 8), the tools (40: 28 controls 4 apart, padding 0 8 4) */
+.b-composer .box{display:flex;flex-direction:column;width:min(calc(var(--w-col) - var(--s-12)),calc(100% - var(--s-12)));margin-inline:auto;overflow:hidden;border-radius:var(--r-4);background:var(--c-raised);box-shadow:var(--e-1);transition:box-shadow 120ms var(--ease-out)}
+.b-composer .box.is-focus,.b-composer .box:focus-within{box-shadow:var(--e-1),0 0 0 1px var(--c-focus)}
+.b-composer .box>.head{display:flex;align-items:center;gap:var(--s-4);min-width:0;height:var(--s-8);padding:0 var(--s-4);box-shadow:inset 0 -1px 0 var(--c-line);background:color-mix(in srgb,var(--c-text) 2%,transparent);font:var(--f-meta);color:var(--c-text-2);white-space:nowrap;position:relative}
+.b-composer .box.ans:not(.quiet)>.head{background:color-mix(in srgb,var(--c-accent) 7%,transparent)}
 /* his words answer a question (composer-target A, designer m_26531): the tab's line, the box's 1.5 px border and the send in the accent; 120 ms both ways (esc drops it). An approval never: words never approve */
 .b-composer .tab{transition:color 120ms var(--ease-out),box-shadow 120ms var(--ease-out),background-color 120ms var(--ease-out)}
 .b-composer .tab.acc{box-shadow:inset 1px 1px 0 var(--c-accent),inset -1px 0 0 var(--c-accent)}
@@ -19,19 +22,16 @@
 .b-composer .send{transition:background-color 120ms var(--ease-out),color 120ms var(--ease-out)}
 .b-composer .box.ans .send:not(.stop){background:var(--c-accent);color:var(--c-on-ink)}
 .b-composer .box.ans .send.off{opacity:.5}
-.b-composer .box .line{display:flex;align-items:flex-start;gap:var(--gap-inline);min-width:0}
-.b-composer .box .row{display:flex;align-items:center;gap:var(--gap-inline);height:var(--h-control);min-width:0}
+.b-composer .box .line{display:flex;align-items:flex-start;gap:var(--gap-inline);min-width:0;padding:var(--s-3) var(--s-4) var(--s-2)}
+.b-composer .box .row{display:flex;align-items:center;gap:var(--s-1);height:var(--s-10);padding:0 var(--s-2) var(--s-1);min-width:0}
 .b-composer .box .row .sp{flex:1;min-width:0}
-.b-composer .in{flex:1;font:var(--t-15)/1.45 var(--font-read)}
+.b-composer .in{flex:1;font:var(--f-read)}
 .b-composer .in .ph{color:var(--c-text-3)}
 .b-composer .in .cur{display:inline-block;width:2px;height:1.1em;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
-/* folded off the thread, at rest (ui-review-app #1, designer m_41569): one line, back whole at its focus;
-   that line keeps its round send at the right, the field and the send centred on one row, 8 px around the send (his bug m_43032) */
-.b-composer.fold:not(:focus-within) .tab,.b-composer.fold:not(:focus-within) .box .row>:not(.send),.b-composer.fold:not(:focus-within) .keys{display:none}
-.b-composer.fold:not(:focus-within) .box{flex-direction:row;align-items:center;padding-block:var(--s-2);padding-right:var(--s-2)}
-.b-composer.fold:not(:focus-within) .box .line{flex:1;align-items:center}
-.b-composer .keys{font:var(--t-11) var(--font-mono);color:var(--c-text-3);padding:var(--s-2) var(--s-1) 0;white-space:pre}
-.b-composer .send{width:var(--h-control);height:var(--h-control);border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-13);flex:none}
+/* folded off the thread, at rest (ui-review-app #1, designer m_41569): one line, back whole at its focus */
+.b-composer.fold:not(:focus-within) .tab,.b-composer.fold:not(:focus-within) .box .head,.b-composer.fold:not(:focus-within) .box .row{display:none}
+
+.b-composer .send{width:var(--h-control-sm);height:var(--h-control-sm);border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-13);flex:none}
 .b-composer .send.off{background:var(--c-active);color:var(--c-text-3)}
 .b-composer .send.stop{border-radius:8px}
 /* the send's touch (designer's desktop-delight touch 2): the arrow lifts 4 px and comes back, a small ∿ rises 10 px over the button and fades, 240 ms; under reduced motion nothing moves */

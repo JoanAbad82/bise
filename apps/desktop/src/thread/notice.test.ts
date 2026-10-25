@@ -1,31 +1,31 @@
-// The composer's key-line notice (his m_29126: a refused '/bime' stayed in a box under the
+// The composer's notice (his m_29126: a refused '/bime' stayed in a box under the
 // composer for many messages and pushed it up): what shows there, and which keys end it.
 import { describe, expect, it } from 'vitest';
 import { endsLine, monoRuns } from '@/composer';
-import { keyLineOf, refusedSlashOf } from './ThreadComposer';
+import { noticeOf, refusedSlashOf } from './ThreadComposer';
 import type { HubLine } from '@/store';
 
 const refused: HubLine = { text: 'unknown command: /bime · see /help', level: 'error' };
 const plain: HubLine = { text: 'drop of @perf cancelled', level: 'note' };
 
-describe('keyLineOf', () => {
-  it("a refused line is the key line's error, on every screen", () => {
-    expect(keyLineOf(refused, null, false)).toEqual({ line: { level: 'err', text: refused.text, testId: 'confirm.notice' }, hub: refused });
-    expect(keyLineOf(refused, null, true)?.line.level).toBe('err');
+describe('noticeOf', () => {
+  it("a refused line is the notice's error, on every screen", () => {
+    expect(noticeOf(refused, null, false)).toEqual({ line: { level: 'err', text: refused.text, testId: 'confirm.notice' }, hub: refused });
+    expect(noticeOf(refused, null, true)?.line.level).toBe('err');
   });
   it("the refused line wins over the composer's own note", () => {
-    expect(keyLineOf(refused, { level: 'info', text: 'nothing waits' }, false)?.hub).toBe(refused);
+    expect(noticeOf(refused, { level: 'info', text: 'nothing waits' }, false)?.hub).toBe(refused);
   });
   it("the composer's note shows, owned by no hub line", () => {
-    expect(keyLineOf(null, { level: 'info', text: 'nothing waits' }, false)).toEqual({ line: { level: 'info', text: 'nothing waits', testId: 'composer.answer.note' }, hub: null });
+    expect(noticeOf(null, { level: 'info', text: 'nothing waits' }, false)).toEqual({ line: { level: 'info', text: 'nothing waits', testId: 'composer.answer.note' }, hub: null });
   });
   it("a plain hub line shows only where no thread row says it", () => {
-    expect(keyLineOf(plain, null, false)).toBeNull();
-    expect(keyLineOf(plain, null, true)).toEqual({ line: { level: 'info', text: plain.text, testId: 'confirm.notice' }, hub: plain });
-    expect(keyLineOf({ ...plain, restart: true, back: true }, null, true)).toBeNull();
+    expect(noticeOf(plain, null, false)).toBeNull();
+    expect(noticeOf(plain, null, true)).toEqual({ line: { level: 'info', text: plain.text, testId: 'confirm.notice' }, hub: plain });
+    expect(noticeOf({ ...plain, restart: true, back: true }, null, true)).toBeNull();
   });
   it('nothing said: nothing shows', () => {
-    expect(keyLineOf(null, null, true)).toBeNull();
+    expect(noticeOf(null, null, true)).toBeNull();
   });
 });
 

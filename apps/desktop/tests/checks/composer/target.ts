@@ -39,8 +39,7 @@ export const T = {
   /** the lab's 'a turn runs' box (a running turn: tab queues) and the queued messages */
   busy: '[data-testid="lab.busy"]',
   queued: '[data-testid="composer.queue.rows"] > [role="listitem"]',
-  /** the key bar under the field, and the lab's switches for K4 and W9 (asked of amb-web m_10035) */
-  keys: '[data-testid="composer.keys"]',
+  /** the lab's switches for K4 and W9 (asked of amb-web m_10035) */
   vision: '[data-testid="lab.vision"]',
   voiceMode: '[data-testid="lab.voice"]',
   /** the mic in the key line (data-state off|recording|transcribing; hidden while a take runs), the

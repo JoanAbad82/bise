@@ -1,12 +1,12 @@
-// The composer's tab (designer's composer-strip A, his pick, m_23965): who and where his words go,
-// glued to the box's top. 'to perf' + the gust while it works, 'ψ sb/perf' (or 'shared folder'),
-// the project where the crumb doesn't name it, and on the right 'context 42k · 17%'. Short, it
-// drops whole items: the project, then the context, then the place; the label always stays.
-// Answering a card: '↳ answering search · <question>' and 'esc to bise instead' on the right; short,
-// the question goes first, then that end; '↳ answering search' never goes (answerFit). Which of
-// these states makes it pink (an item, words opening with another agent's @name, an open artifact,
-// an agent that is not main): pinkState.
-// Pure: ComposerTab.tsx draws and measures it. Owner: amb-win.
+// The composer's context strip (bise fait mac, mockup 1; it replaced designer's composer-strip A tab):
+// the box's first row, where his words go: the project, the place (local or worktree, its path in
+// the tip) and the branch in mono, and on the right the context ring or the screen's own words.
+// Short, it drops whole items: the right end first, then the place, then the project; the branch
+// stays (stripFit). Answering a card: '↳ answering search · <question>' and 'esc to bise instead'
+// on the right; short, the question goes first, then that end; '↳ answering search' never goes
+// (answerFit). Which states make it pink (an item, words opening with another agent's @name, an
+// open artifact, an agent that is not main): pinkState.
+// Pure: ComposerTab.tsx draws and measures it. Owner: nm-composer.
 import { composer } from '../proto/words.gen';
 import { MAIN } from '../app/route';
 
@@ -14,9 +14,11 @@ import { MAIN } from '../app/route';
  *  a worktree by its own folder's name after the ψ; the tip says what it is. */
 export interface TabPlace {
   readonly name: string;
-  /** a worktree: the ψ before its name, the name mono */
+  /** a worktree ('worktree' in the strip), else his own checkout ('local') */
   readonly worktree: boolean;
   readonly tip: string;
+  /** the branch it works on (its worktree's, else the checkout's); none: not known */
+  readonly branch?: string | undefined;
 }
 
 /** What the tab says. */
@@ -25,8 +27,6 @@ export interface TabWords {
   readonly label: string;
   /** where it works; undefined: not said (bise's own main) */
   readonly place?: TabPlace | undefined;
-  /** the project's name, only where the screen's crumb doesn't name it */
-  readonly project?: string | undefined;
   /** 'context 42k · 17%' ('' or undefined: none, as at 0%): the ring's */
   readonly context?: string | undefined;
   /** whose context it is, as the ring's tip names it ('perf', 'bise') */
@@ -48,49 +48,53 @@ export function worktreeName(path: string): string {
 }
 
 /**
- * Where an agent works, as the tab says it (designer m_24790, his m_24782): in a worktree 'ψ <its
- * folder's name>' with wt-sign's signed tip (`wt`, its Place's path and tip words); in his checkout
- * the project folder's name and 'your own folder: <path>'; nothing for bise's own main. Pure.
+ * Where an agent works, as the strip says it (designer m_24790, his m_24782): a worktree by its
+ * folder's name with wt-sign's signed tip (`wt`, its Place's path and tip words), on its branch; his
+ * checkout by the project folder's name and 'your own folder: <path>', on the checkout's branch;
+ * nothing for bise's own main. Pure.
  */
 export function tabPlace(
-  a: { branch?: string | null; worktree?: string | null } | undefined,
+  a: { branch?: string | null; checkout_branch?: string | null; worktree?: string | null } | undefined,
   home: boolean,
   wt: { path?: string | null; tip: string } | undefined,
   project: string | undefined,
   tilde: (path: string) => string,
 ): TabPlace | undefined {
   if (a === undefined || home) return undefined;
-  if (wt !== undefined && wt.path != null && wt.path !== '') return { name: worktreeName(wt.path), worktree: true, tip: wt.tip };
-  if (a.worktree != null && a.worktree !== '') return { name: worktreeName(a.worktree), worktree: true, tip: wt?.tip ?? composer.tab_worktree_at({ path: tilde(a.worktree) }) };
-  if (a.branch != null && a.branch !== '') return { name: a.branch, worktree: true, tip: wt?.tip ?? composer.tab_worktree_on({ branch: a.branch }) };
+  const own = a.branch != null && a.branch !== '' ? a.branch : undefined;
+  if (wt !== undefined && wt.path != null && wt.path !== '') return { name: worktreeName(wt.path), worktree: true, tip: wt.tip, branch: own };
+  if (a.worktree != null && a.worktree !== '') return { name: worktreeName(a.worktree), worktree: true, tip: wt?.tip ?? composer.tab_worktree_at({ path: tilde(a.worktree) }), branch: own };
+  if (own !== undefined) return { name: own, worktree: true, tip: wt?.tip ?? composer.tab_worktree_on({ branch: own }), branch: own };
   if (project === undefined || project === '') return undefined;
-  return { name: folderName(project), worktree: false, tip: composer.tab_own_folder({ path: tilde(project) }) };
+  const co = a.checkout_branch != null && a.checkout_branch !== '' ? a.checkout_branch : undefined;
+  return { name: folderName(project), worktree: false, tip: composer.tab_own_folder({ path: tilde(project) }), branch: co };
 }
 
-/** Which optional items fit beside the label. */
-export interface TabFit {
-  readonly branch: boolean;
+/** Which of the strip's items show. */
+export interface StripFit {
   readonly project: boolean;
-  readonly context: boolean;
+  readonly place: boolean;
+  /** the right end: the context ring, or the screen's words */
+  readonly end: boolean;
 }
 
 /**
- * The items that fit in `avail` px: the label always; then each optional item whole or not at all,
- * the project dropped first, then the context, then the branch (designer m_23965 (2)). `gap` is
- * the space between two items. A width of 0 is an item that isn't there. Pure.
+ * The strip's items that fit in `avail` px, each whole or not at all: the right end goes first,
+ * then the place, then the project; the branch always stays (its own css cut past that). `gap` is
+ * the space between two items (16); a width of 0 is an item that isn't there. Pure.
  */
-export function tabFit(w: { avail: number; gap: number; label: number; branch: number; project: number; context: number }): TabFit {
-  const sum = (on: TabFit): number => {
-    const items = [w.label, on.branch ? w.branch : 0, on.project ? w.project : 0, on.context ? w.context : 0].filter((x) => x > 0);
+export function stripFit(w: { avail: number; gap: number; project: number; place: number; branch: number; end: number }): StripFit {
+  const sum = (on: StripFit): number => {
+    const items = [on.project ? w.project : 0, on.place ? w.place : 0, w.branch, on.end ? w.end : 0].filter((x) => x > 0);
     return items.reduce((n, x) => n + x, 0) + w.gap * Math.max(0, items.length - 1);
   };
-  const tries: TabFit[] = [
-    { branch: true, project: true, context: true },
-    { branch: true, project: false, context: true },
-    { branch: true, project: false, context: false },
+  const tries: StripFit[] = [
+    { project: true, place: true, end: true },
+    { project: true, place: true, end: false },
+    { project: true, place: false, end: false },
   ];
   for (const t of tries) if (sum(t) <= w.avail) return t;
-  return { branch: false, project: false, context: false };
+  return { project: false, place: false, end: false };
 }
 
 /**

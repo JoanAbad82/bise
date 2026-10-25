@@ -6,7 +6,10 @@
 // what he asked for: a pick, a paste, a chip, dictation, ↑ through the drafts, a send that clears.
 //
 // Mounted once per screen (React never re-creates the editor: the initial config is read once,
-// the callbacks go through refs). The frame around it is amb-kit's ComposerFrame.
+// the callbacks go through refs). The frame around it is amb-kit's ComposerFrame: its head is the
+// screen's context strip (thread/ComposerTab.tsx), with this composer's one-off notice at its right;
+// its row the screen's tools, then the mic and send. No key bar (bise fait mac): the keys work, their
+// words live in the menus and the controls' tips. Owner: nm-composer.
 import {
   memo,
   useEffect,
@@ -17,32 +20,19 @@ import {
   type JSX,
   type ReactNode,
 } from "react";
-import { ComposerFrame, cutWords, Press } from "@/ds";
+import { AppIcon, ComposerFrame, cutWords, Press, tipAttrs } from "@/ds";
 import "./composer.css";
 import { composer } from "../proto/words.gen";
 import type { ComposerActions, FieldBar } from "./actions";
-import { endsLine, monoRuns, type KeyLine } from "./keyline";
+import { endsLine, monoRuns, type Notice } from "./notice";
 import { PmField } from "./pm/PmField";
 import { QueueDrawer, type QueueDrawerProps } from "./QueueDrawer";
-
-/** What the screen gives the drawer; the composer adds whether its field is empty. */
-export type QueueSlot = Omit<QueueDrawerProps, "fieldEmpty" | "testId">;
-import {
-  barMode,
-  barPairs,
-  heldPairs,
-  type HeldCtx,
-  type HeldMod,
-  startTip,
-  tickTip,
-  tipShown,
-  TIPS,
-  countDay,
-  type TipClock,
-} from "./keybar";
 import type { Outgoing } from "./message";
 import { NO_SOURCES, type ComposerSources } from "./sources";
 import type { Store } from "./drafts";
+
+/** What the screen gives the drawer; the composer adds whether its field is empty. */
+export type QueueSlot = Omit<QueueDrawerProps, "fieldEmpty" | "testId">;
 
 export interface ComposerProps {
   /** Whose composer this is (`<project>/<agent>`): its draft, history and queue are kept per target. */
@@ -57,17 +47,14 @@ export interface ComposerProps {
   readonly sources?: ComposerSources;
   /** Where drafts live (localStorage by default; tests pass their own). */
   readonly store?: Store;
-  /** the tab glued to the box's top (who and where: thread/ComposerTab.tsx); none: the box alone */
-  readonly tab?: ReactNode;
-  /** his words answer a question: the frame's accent (tab, border, send) and the border's tip */
+  /** the box's first row (the context strip: thread/ComposerTab.tsx); none: the field first */
+  readonly head?: ReactNode;
+  /** his words answer a question: the frame's accent (strip, border, send) and the border's tip */
   readonly answering?: boolean;
   readonly answerTip?: string | undefined;
   /** with `answering`: lines only, no fill (an agent that is not main, agent-target) */
   readonly quiet?: boolean;
-  /** off the thread (the dock under a page): folded to one line at rest, while nothing is typed,
-   *  answered or said on its key line (ui-review-app #1) */
-  readonly fold?: boolean;
-  /** the box's bottom row, left ('+', the mode menu), and right before send (the model menu) */
+  /** the box's bottom row, left ('+', the mode menu), and right before the mic and send (the model menu) */
   readonly tools?: ReactNode;
   readonly toolsEnd?: ReactNode;
   /** K2: ⏎ on an empty field: the screen's act (the TUI's: sign in again after expiry, ...) */
@@ -79,12 +66,6 @@ export interface ComposerProps {
   readonly placeholder?: string;
   /** the placeholder's droppable end (PmField placeholderTail) */
   readonly placeholderTail?: string | undefined;
-  /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
-  readonly keys?: string;
-  /** Voice in this composer: recording, then transcribing (the key bar's voice keys). */
-  readonly voice?: "recording" | "transcribing" | null;
-  /** Text is selected in the thread: typing asks about it (the key bar says so). */
-  readonly quoting?: boolean;
   readonly onSend: (out: Outgoing) => void;
   /** His words' start at each change (their first text, '' when a chip opens them): the screen reads a leading `@name` (thread/lead.ts). */
   readonly onLead?: (text: string) => void;
@@ -94,7 +75,7 @@ export interface ComposerProps {
   readonly onQueue?: (out: Outgoing) => void;
   /** ↑ in the empty field: the screen takes its newest queued message back into it; false: none. */
   readonly onEditNewest?: () => boolean;
-  /** The queued messages' drawer above the tab (QueueDrawer.tsx); unset or no rows: none. */
+  /** The queued messages' drawer above the box (QueueDrawer.tsx); unset or no rows: none. */
   readonly queue?: QueueSlot;
   /** A command line he ran (`/model opus`): the screen runs it (a core cmd or a screen). */
   readonly onCommand?: (name: string, args: string) => void;
@@ -104,25 +85,13 @@ export interface ComposerProps {
   readonly onReady?: (a: ComposerActions) => void;
   /** in the box at its left, before the field (voice mode's grey pearl while he types) */
   readonly lead?: ReactNode;
-  /** a modifier held alone (app/held.ts) and the screen's facts: the bar lists that modifier's
-   *  keys (keybar.ts heldPairs, the TUI's ctrlhint.rs); ⌘ or ⌥ held, the ⌃R mic and voice step out */
-  readonly held?: { readonly mod: HeldMod; readonly ctx: HeldCtx } | null;
-  /** a one-off line for him (a refused command, the hub's word on his answer): it takes the key
-   *  line's place, same row, same height (nothing moves); `onLineDone` at his first key in the frame */
-  readonly line?: KeyLine | null;
+  /** a one-off notice for him (a refused command, the hub's word on his answer): at the strip's
+   *  right, nothing moves; `onLineDone` at his first key in the frame */
+  readonly line?: Notice | null;
   readonly onLineDone?: () => void;
+  /** whether the field holds something to send (the floating composer stays open while it does) */
+  readonly onCanSend?: (can: boolean) => void;
   readonly testId?: string;
-}
-
-/** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
-const TIP_KEY = "bise.composer.v1.tip";
-/** The days he used the composer, until the tips retire (keybar.ts countDay). */
-const TIP_DAYS_KEY = "bise.composer.v1.tipdays";
-
-/** Today as a local 'YYYY-MM-DD'. */
-function localDay(now: number): string {
-  const d = new Date(now);
-  return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export const Composer = memo(function Composer(
@@ -132,17 +101,13 @@ export const Composer = memo(function Composer(
     target,
     busy = false,
     sources = NO_SOURCES,
-    tab,
+    head,
     answering,
     answerTip,
     quiet,
-    fold = false,
     tools,
     toolsEnd,
     placeholder = composer.placeholder_bise,
-    keys,
-    voice = null,
-    quoting = false,
     lead,
     testId = "composer",
   } = props;
@@ -168,85 +133,27 @@ export const Composer = memo(function Composer(
     dictating: null,
   });
   const dictating = field.dictating;
-  const mode = barMode({ ...field, voice: voice ?? dictating, quoting, busy });
-  // a held modifier lists its keys in the default, steer, selection, image and quote modes (the
-  // TUI's keybar.rs keys_line); a take or the @ list keep theirs
-  const held = props.held != null && mode !== "recording" && mode !== "transcribing" && mode !== "file" ? props.held : null;
-  // ⌘ or ⌥ held: the line shows only that modifier's keys (designer m_25695), the ⌃R mic and voice step out
-  const otherMod = held !== null && held.mod !== "Control";
-
-  // the tip: the one after the last session's, the next every 5 minutes, never while he types
-  const [tip, setTip] = useState<TipClock | null>(null);
-  // after 7 days of use the tips retire (designer's desktop-delight tuck away)
-  const [retired, setRetired] = useState(false);
-  const typing = useRef(false);
-  useEffect(() => {
-    typing.current = field.typing;
-  });
-  useEffect(() => {
-    const raw = store.getItem(TIP_KEY);
-    const saved = raw === null ? null : Number(raw);
-    let kept: string[] = [];
-    try {
-      const parsed: unknown = JSON.parse(store.getItem(TIP_DAYS_KEY) ?? "[]");
-      if (Array.isArray(parsed)) kept = parsed.filter((x): x is string => typeof x === "string");
-    } catch {
-      kept = [];
-    }
-    const day = countDay(kept, localDay(Date.now()));
-    store.setItem(TIP_DAYS_KEY, JSON.stringify(day.days));
-    let clock = startTip(Number.isInteger(saved) ? saved : null, Date.now());
-    store.setItem(TIP_KEY, String(clock.index));
-    // the first tip shows on the next tick (no render cascade from inside the effect)
-    const first = window.setTimeout(() => {
-      setRetired(day.retired);
-      setTip(clock);
-    }, 0);
-    const timer = window.setInterval(() => {
-      const next = tickTip(clock, Date.now(), typing.current);
-      if (next === clock) return;
-      clock = next;
-      setTip(next);
-      store.setItem(TIP_KEY, String(next.index));
-    }, 30_000);
-    return () => {
-      window.clearTimeout(first);
-      window.clearInterval(timer);
-    };
-  }, [store]);
-  // one tip at a time, on an empty composer (focused: css/composer.css hides it otherwise), never once retired
-  const tipText =
-    tip !== null && !retired && tipShown(mode, field.typing) ? TIPS[tip.index] : undefined;
+  const notice = props.line ?? null;
 
   return (
     <ComposerFrame
       testId={testId}
-      tab={tab}
+      head={
+        head == null && notice === null ? undefined : (
+          <>
+            {head}
+            {notice !== null && <NoticeLine line={notice} />}
+          </>
+        )
+      }
       answering={answering}
       answerTip={answerTip}
       {...(quiet === true ? { quiet } : {})}
-      fold={fold && !canSend && answering !== true && props.line == null}
       tools={tools}
-      toolsEnd={toolsEnd}
-      sent={sent}
-      // the whole box is the input: a press on its padding or empty area focuses the editor, caret at the end
-      onBoxDown={() => {
-        actions.current?.focusEnd();
-      }}
-      lead={lead}
-      onKeyDownCapture={
-        props.line == null
-          ? undefined
-          : (e) => {
-              if (endsLine(e.key)) cb.current.onLineDone?.();
-            }
-      }
-      keys={
-        props.line != null ? (
-          // the key line's place, the same row and height: nothing moves (keyline.ts)
-          <KeyLineView line={props.line} />
-        ) : <>
-          {sources.dictate !== undefined && !otherMod && (
+      toolsEnd={
+        <>
+          {toolsEnd}
+          {sources.dictate !== undefined && (
             <Mic
               state={dictating}
               onClick={() => {
@@ -256,49 +163,20 @@ export const Composer = memo(function Composer(
               testId={testId}
             />
           )}
-          {sources.voice !== undefined && keys === undefined && !otherMod && (
-            // voice mode with the agent in view (designer's voice-window page (1)): ∿, or ctrl+r twice
-            <Press
-              look="mic voice"
-              onMouseDown={(e) => {
-                e.preventDefault(); // the field keeps the caret
-              }}
-              onClick={sources.voice}
-              aria-label={composer.bar_voice_mode}
-              title={`${composer.bar_voice_mode} · ⌃R ⌃R`}
-              // while a take runs the key line is only its keys (designer m_22785)
-              hidden={dictating !== null}
-              data-testid={`${testId}.voice`}
-            >
-              <span className="kk">⌃R⌃R</span> {composer.voice_button}
-            </Press>
-          )}
-          <span
-            className="pairs"
-            data-testid={`${testId}.keys`}
-            data-mode={keys === undefined ? (held !== null ? `held-${held.mod}` : mode) : "fixed"}
-          >
-            {keys ??
-              (held !== null ? heldPairs(held.mod, { ...held.ctx, busy, typing: field.typing, selected: field.selected }) : barPairs(mode, field.typing, (props.queue?.rows.length ?? 0) > 0)).map(([k, l]) => (
-                <span key={k + l} className="pair">
-                  {k !== "" && <span className="kk">{k}</span>} {l}
-                </span>
-              ))}
-          </span>
-          {keys === undefined && field.chips === true ? (
-            // the attachment list's one key (designer's composer-attachments A)
-            <span className="tip" data-testid={`${testId}.tip`}>
-              {composer.box_tip}
-            </span>
-          ) : (
-            keys === undefined &&
-            tipText !== undefined && (
-              <span className="tip rest-tip" data-testid={`${testId}.tip`}>
-                {composer.tip_ascii({ words: tipText })}
-              </span>
-            )
-          )}
         </>
+      }
+      sent={sent}
+      // the whole box is the input: a press on its padding or empty area focuses the editor, caret at the end
+      onBoxDown={() => {
+        actions.current?.focusEnd();
+      }}
+      lead={lead}
+      onKeyDownCapture={
+        notice === null
+          ? undefined
+          : (e) => {
+              if (endsLine(e.key)) cb.current.onLineDone?.();
+            }
       }
       quote={
         <>
@@ -332,7 +210,10 @@ export const Composer = memo(function Composer(
         command={(name, args) => {
           cb.current.onCommand?.(name, args);
         }}
-        onCanSend={setCanSend}
+        onCanSend={(can) => {
+          setCanSend(can);
+          cb.current.onCanSend?.(can);
+        }}
         onLead={(t) => {
           cb.current.onLead?.(t);
         }}
@@ -359,11 +240,11 @@ export const Composer = memo(function Composer(
   );
 });
 
-/** The one-off line on the key line's place (designer m_29135): its mark, then its words in sans
- *  with the commands and paths in mono (keyline.ts monoRuns), cut after a whole word with one glued
- *  '…' to the row's room, the whole words in its tip. Its words are drawn here, not by React (each
- *  try of the cut measures them). */
-function KeyLineView({ line }: { line: KeyLine }): JSX.Element {
+/** The one-off notice at the context strip's right (designer m_29135): its mark, then its words in
+ *  sans with the commands and paths in mono (notice.ts monoRuns), cut after a whole word with one
+ *  glued '…' to the strip's room, the whole words in its tip. Its words are drawn here, not by React
+ *  (each try of the cut measures them). */
+function NoticeLine({ line }: { line: Notice }): JSX.Element {
   const words = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     const el = words.current;
@@ -395,9 +276,9 @@ function KeyLineView({ line }: { line: KeyLine }): JSX.Element {
   }, [line.text]);
   return (
     <span
-      className={`line ${line.level}`}
+      className={`notice ${line.level}`}
       role={line.level === "err" ? "alert" : "status"}
-      title={line.text}
+      {...tipAttrs(line.text)}
       data-testid={line.testId}
       data-level={line.level}
     >
@@ -409,9 +290,9 @@ function KeyLineView({ line }: { line: KeyLine }): JSX.Element {
   );
 }
 
-/** The mic control in the key line (bar I): its key at rest. While a take runs it hides: the take's
- *  chip in the field shows the voice, the key line says 'any key stop · esc cancel' (designer
- *  m_22700: never twice). Its own state only: the field never re-renders. */
+/** The mic (bar I, mockup 1): 28, its words and ⌃R in its tip. While a take runs it hides: the
+ *  take's chip in the field shows the voice (designer m_22700: never twice). ⌃R twice is voice mode
+ *  (pm/dictation.ts), with no button of its own. Its own state only: the field never re-renders. */
 function Mic({
   state,
   onClick,
@@ -423,17 +304,18 @@ function Mic({
 }): JSX.Element {
   return (
     <Press
-      look="mic"
+      look="cmp-tool cmp-mic"
       onMouseDown={(e) => {
         e.preventDefault(); // the field keeps the caret
       }}
       onClick={onClick}
-      aria-label="dictate"
+      aria-label={composer.bar_dictate}
+      {...tipAttrs(composer.bar_dictate, "⌃R")}
       hidden={state !== null}
       data-testid={`${testId}.mic`}
       data-state={state ?? "off"}
     >
-      <span className="kk">⌃R</span> dictate
+      <AppIcon name="mic" />
     </Press>
   );
 }

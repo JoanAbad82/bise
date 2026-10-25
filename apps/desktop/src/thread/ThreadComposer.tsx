@@ -1,16 +1,18 @@
 // The thread's composer (amb-web's Composer with this thread's target, sources, drafts, answers
-// and slash commands), also mounted under an open artifact and in the bottom block; and its pure
-// helpers (about-an-artifact words, the docked card's target). Split out of ThreadScreen.tsx (the
-// file cap). Owner: amb-win.
+// and slash commands), also mounted under an open artifact and in the floating composer
+// (composer/float); its head the context strip (ComposerTab.tsx), its notice the hub's word on his
+// last line; and its pure helpers (about-an-artifact words, the docked card's target, the notice).
+// Split out of ThreadScreen.tsx (the file cap). Owner: nm-composer.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ANCHOR_EVENT, type AnchorAct } from '@/artifacts/useFrameNote';
 import { load, save } from '@/composer/drafts';
 import { shownName } from '@/agents/model';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
-import type { ComposerActions, KeyLine } from '@/composer';
+import type { ComposerActions, Notice } from '@/composer';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useApprovals, useCards, useCommands, useCoreEvent, useFiles, useNotice, useSkills, useStore, type HubLine } from '@/store';
 import { useRouter } from '@/app/router';
+import { MAIN } from '@/app/route';
 import { pickCommands, slashLine, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { keptStorage } from '@/app/keep';
@@ -18,7 +20,7 @@ import { cardDraftKey, leaveClosed, openInbox } from '@/inbox';
 import { emptyEnterAct } from './head';
 import { computerRowOf, computerState } from './ComputerLine';
 import type { Agent } from '@/proto';
-import { ComposerTab } from './ComposerTab';
+import { ComposerTab, type StripProject } from './ComposerTab';
 import { useThreadQueue } from './ThreadQueue';
 import { AttachTool, ModelTool, ModeTool } from './ComposerTools';
 import { pinkState, type TabWords } from './tab';
@@ -26,7 +28,6 @@ import { leadAgent, leadMessage } from './lead';
 import { composerWords } from './head';
 import { ABOUT_HEAD } from '@/artifacts/maker';
 import { otherTip } from '@/app/tipwords';
-import { useComposerHeld } from './foldHint';
 import { aboutParts, aboutText } from './about';
 import { composer } from '../proto/words.gen';
 
@@ -46,29 +47,35 @@ export const ThreadComposer = memo(function ThreadComposer({
   answer,
   onStop,
   onEscape,
-  quoting,
   onReady,
   onSent,
   about,
   aboutPink,
-  keys,
+  voiceTyping = false,
   lead,
   mark,
   hubNotes = false,
-  fold = false,
+  strip,
+  placeOnly = false,
+  onCanSend,
 }: {
   project: string;
   agent: string;
   busy: boolean;
-  /** the tab over the box (designer's composer-strip A): 'to perf', where it works, the context */
+  /** the context strip's words (the box's head): where it works, the context; bare, the label */
   tab: TabWords;
   /** after the label's first part: the addressee's working gust (LabelMark), else none */
   mark?: ReactNode;
   /** the hub's plain lines show on the key line too (a screen with no thread: no HubNoteRow says them) */
   hubNotes?: boolean;
-  /** the dock under a page off the thread: one line at rest, whole at its focus (ui-review-app #1) */
-  fold?: boolean;
-  /** the tab's right instead of the context: 'esc to bise instead' while it answers, 'tab back to voice' */
+  /** the strip's project segment and what picking another does (the thread: go to its main; the
+   *  empty home: the addressee); none: the strip says no project */
+  strip?: StripProject | undefined;
+  /** the empty home: the strip's place is 'new worktree' (main starts its agents in one) */
+  placeOnly?: boolean;
+  /** the field holds something to send (the floating composer stays unfolded while it does) */
+  onCanSend?: (can: boolean) => void;
+  /** the strip's right instead of the context: 'esc to bise instead' while it answers, 'tab back to voice' */
   tabEnd?: string | undefined;
   /** the addressee's row: its model menu in the box's row (none: no menu) */
   me?: Agent | undefined;
@@ -81,7 +88,6 @@ export const ThreadComposer = memo(function ThreadComposer({
   onStop: () => void;
   /** an esc the composer's lists didn't take (R18): the screen's (route_cancel, stop); false: nothing to do, the window may go up (esc-up.ts) */
   onEscape?: () => boolean;
-  quoting: boolean;
   onReady: (a: ComposerActions) => void;
   /** his send went (the demo tour's step) */
   onSent: () => void;
@@ -89,8 +95,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   about?: { id: string; title: string; url: string };
   /** the open artifact's words go to a live sub-agent (art-target): the pink, with this tip, while no item is open */
   aboutPink?: string | undefined;
-  /** a fixed key line (voice mode while he types: '⏎ send   tab back to voice   esc leave') */
-  keys?: string | undefined;
+  /** voice mode while he types (designer's voice-window (1)): no @name lead, no pink of its own */
+  voiceTyping?: boolean;
   /** in the box at its left (voice mode's grey pearl while he types) */
   lead?: ReactNode;
 }) {
@@ -137,7 +143,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   const sources = useComposerSources(project, extra, agent);
   // his words opening with `@<a live agent>` (at-start, lead.ts): that agent's pink while he types,
   // the send goes to its thread and the window opens it; never on an item, an artifact or voice
-  const leads = answer === null && about === undefined && keys === undefined;
+  const leads = answer === null && about === undefined && !voiceTyping;
   const live = useMemo(() => sources.agents.map((a) => a.name), [sources.agents]);
   const [leadTo, setLeadTo] = useState<string | null>(null);
   const onLead = useCallback(
@@ -355,7 +361,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   // the one pink state (tab.ts pinkState): an open question, an open artifact's live maker, or an
   // agent that is not main (agent-target); an item open wins (an approval's plain line)
   const leadTip = atTo === null ? undefined : composer.lead_tip({ agent: shownName(atTo), here: shownName(agent) });
-  const ps = pinkState({ answer, leadTip, aboutPink, about: about !== undefined, agent, voiceTyping: keys !== undefined, otherTip: (a) => otherTip(shownName(a)) });
+  const ps = pinkState({ answer, leadTip, aboutPink, about: about !== undefined, agent, voiceTyping, otherTip: (a) => otherTip(shownName(a)) });
   const pink = ps.pink;
   const pinkTip = ps.tip;
   const attach = useCallback((paths: readonly string[]) => {
@@ -381,14 +387,17 @@ export const ThreadComposer = memo(function ThreadComposer({
   const label = atTo === null ? tab.label : `${ABOUT_HEAD}${composerWords(shownName(atTo)).label}`;
   const tabWords = useMemo(() => (bare ? { label, ...(whole ? { whole } : {}) } : tab), [bare, whole, tab, label]);
   const endWords = atTo === null || flash !== null ? end : composer.lead_end({ here: shownName(agent) });
-  const tabEl = <ComposerTab words={tabWords} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} testId="composer.tab" />;
-  // a modifier held alone: the key line lists its keys (the TUI's ctrlhint.rs key bar)
-  const held = useComposerHeld();
-  // the one line on the key line's place (keyLineOf): it goes at his first key in the frame (esc
+  // the strip's project: the screen's, else this one, its picker going to the picked project's main
+  const goProject = useCallback((p: string) => {
+    router.go({ screen: 'thread', project: p, agent: MAIN });
+  }, [router]);
+  const stripProject = useMemo(() => strip ?? { id: project, onPick: goProject }, [strip, project, goProject]);
+  const tabEl = <ComposerTab words={tabWords} bare={bare || atTo !== null} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} project={stripProject} newPlace={placeOnly} testId="composer.ctx" />;
+  // the one notice at the strip's right (noticeOf): it goes at his first key in the frame (esc
   // too), at any send or command, a note also after LINE_MS; never outlives his next message,
   // never moves the composer (designer m_29135)
   const hubLine = useNotice(project);
-  const shown = useMemo(() => keyLineOf(hubLine, note, hubNotes), [hubLine, note, hubNotes]);
+  const shown = useMemo(() => noticeOf(hubLine, note, hubNotes), [hubLine, note, hubNotes]);
   const lineDone = useCallback(() => {
     setNote(null);
     if (shown?.hub != null) store.dropNotice(project, shown.hub);
@@ -405,20 +414,19 @@ export const ThreadComposer = memo(function ThreadComposer({
   useEffect(() => {
     doneRef.current = lineDone;
   });
-  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} fold={fold && !quoting} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
   return field;
 });
 
-/** How long a key-line note stays when he does nothing (designer m_29135; an error has no timer). */
+/** How long a notice stays when he does nothing (designer m_29135; an error has no timer). */
 export const LINE_MS = 8000;
 
 /**
- * The one line on the composer's key line (his m_29126: a refused '/bime' stayed in a box under it
- * for many messages and pushed the composer up): the hub's refused line first (his words to fix),
- * then the composer's own note, then the hub's plain line where no thread row shows it (`hubNotes`).
- * Pure.
+ * The composer's one notice (his m_29126: a refused '/bime' stayed in a box under it for many
+ * messages and pushed the composer up): the hub's refused line first (his words to fix), then the
+ * composer's own note, then the hub's plain line where no thread row shows it (`hubNotes`). Pure.
  */
-export function keyLineOf(hub: HubLine | null, note: AnswerNote | null, hubNotes: boolean): { line: KeyLine; hub: HubLine | null } | null {
+export function noticeOf(hub: HubLine | null, note: AnswerNote | null, hubNotes: boolean): { line: Notice; hub: HubLine | null } | null {
   if (hub !== null && hub.level === 'error') return { line: { level: 'err', text: hub.text, testId: 'confirm.notice' }, hub };
   if (note !== null) return { line: { level: note.level, text: note.text, testId: 'composer.answer.note' }, hub: null };
   if (hubNotes && hub !== null && hub.back !== true) return { line: { level: 'info', text: hub.text, testId: 'confirm.notice' }, hub };

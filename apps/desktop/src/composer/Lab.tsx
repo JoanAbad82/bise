@@ -518,8 +518,6 @@ export function ComposerLab(): JSX.Element {
         target="lab/main"
         busy={busy}
         sources={vision ? SOURCES : TEXT_ONLY}
-        voice={voice ? "recording" : null}
-        tab="to bise · lab"
         onSend={sent}
         onQueue={queue.onQueue}
         onEditNewest={queue.onEditNewest}

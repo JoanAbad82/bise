@@ -40,7 +40,6 @@ export const PENDING_TYPE: Readonly<Record<string, number>> = {
   "artifacts/thumbs/thumbs.css": 1,
   "bims/office.css": 1,
   "capsule/capsule.css": 2,
-  "composer/composer.css": 1,
   "ds/css/capsule.css": 1,
   "ds/css/controls.css": 1,
   "ds/css/onboarding.css": 2,

@@ -97,7 +97,6 @@ describe('dictation in the composer', () => {
     });
     expect(mic.calls).toEqual(['start d1']);
     expect(getByTestId('composer.mic').dataset.state).toBe('recording');
-    expect(getByTestId('composer.keys').dataset.mode).toBe('recording');
     await step(() => {
       mic.say('d1', { text: 'on garde' });
     });

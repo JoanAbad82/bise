@@ -321,11 +321,6 @@
     "one": null,
     "text": "quote"
   },
-  "composer.bar_replace": {
-    "args": [],
-    "one": null,
-    "text": "to replace it"
-  },
   "composer.bar_resize": {
     "args": [],
     "one": null,
@@ -474,6 +469,52 @@
     "args": [],
     "one": null,
     "text": "go to an agent"
+  },
+  "composer.ctx_branch_tip": {
+    "args": [
+      "branch"
+    ],
+    "one": null,
+    "text": "on branch {branch}"
+  },
+  "composer.ctx_local": {
+    "args": [],
+    "one": null,
+    "text": "local"
+  },
+  "composer.ctx_new_worktree": {
+    "args": [],
+    "one": null,
+    "text": "new worktree"
+  },
+  "composer.ctx_new_worktree_tip": {
+    "args": [],
+    "one": null,
+    "text": "main starts its agents in a new worktree"
+  },
+  "composer.ctx_project_pick": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "{project} · pick another project"
+  },
+  "composer.ctx_project_tip": {
+    "args": [
+      "path"
+    ],
+    "one": null,
+    "text": "the project's folder: {path}"
+  },
+  "composer.ctx_projects": {
+    "args": [],
+    "one": null,
+    "text": "projects"
+  },
+  "composer.ctx_worktree": {
+    "args": [],
+    "one": null,
+    "text": "worktree"
   },
   "composer.demo": {
     "args": [],
@@ -933,16 +974,6 @@
     "one": null,
     "text": "esc puts your draft away, ↑ brings it back"
   },
-  "composer.tip_emoji": {
-    "args": [],
-    "one": null,
-    "text": ":tada: puts 🎉, a : and two letters list them"
-  },
-  "composer.tip_fence": {
-    "args": [],
-    "one": null,
-    "text": "a ``` block keeps ⏎ for new lines until you close it"
-  },
   "composer.tip_find_agent": {
     "args": [],
     "one": null,
@@ -953,11 +984,6 @@
     "one": null,
     "text": "ctrl+o opens everything folded"
   },
-  "composer.tip_folder": {
-    "args": [],
-    "one": null,
-    "text": "→ opens a folder in the @ list, ← goes up"
-  },
   "composer.tip_inbox": {
     "args": [],
     "one": null,
@@ -967,16 +993,6 @@
     "args": [],
     "one": null,
     "text": "shift+⏎ adds a new line"
-  },
-  "composer.tip_newline_mac": {
-    "args": [],
-    "one": null,
-    "text": "⇧⏎ adds a new line"
-  },
-  "composer.tip_queue": {
-    "args": [],
-    "one": null,
-    "text": "tab queues a message while the agent works"
   },
   "composer.tip_scheduled": {
     "args": [],
@@ -1017,11 +1033,6 @@
     ],
     "one": null,
     "text": "{provider} can't transcribe with {model}. /voice picks another model."
-  },
-  "composer.voice_button": {
-    "args": [],
-    "one": null,
-    "text": "voice"
   },
   "composer.voice_cant_hear": {
     "args": [

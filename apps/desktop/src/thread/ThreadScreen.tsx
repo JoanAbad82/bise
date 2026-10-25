@@ -48,7 +48,7 @@ import { trackRoutes, useHeld } from './routes';
 import { OpenArtifactContext } from './openArtifact';
 import { ThreadDrop } from '@/artifacts/Drops';
 import { createFolds, FoldsContext } from './folds';
-import { ThreadVoice, TYPING_END, typingLabelOf, useVoiceHere, VoiceTypePearl, VOICE_TYPING_KEYS } from '@/voicemode';
+import { ThreadVoice, TYPING_END, typingLabelOf, useVoiceHere, VoiceTypePearl } from '@/voicemode';
 import { FirstRunSlot, Rows } from './ThreadRows';
 import { WelcomeSlot } from '@/welcome/Welcome';
 import { useThreadQuote } from './threadQuote';
@@ -477,7 +477,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             tab={tab}
             tabEnd={voice === 'typing' ? TYPING_END : answering !== null ? answering.end : artifact?.end}
             me={addr}
-            keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
+            voiceTyping={voice === 'typing'}
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
             mark={labelMark}
             placeholder={answering?.placeholder ?? (artifact !== undefined ? artifact.placeholder : composerWords(title).placeholder)}
@@ -488,7 +488,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             answer={answerOf(answering)}
             onStop={stop}
             onEscape={escape}
-            quoting={quoting}
             onReady={onComposer}
             onSent={onSent}
           />

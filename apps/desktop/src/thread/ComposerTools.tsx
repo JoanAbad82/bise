@@ -1,12 +1,13 @@
-// The composer box's bottom row (designer's composer-strip A, m_23965 (4)): what he changes about
-// where his words go. Left: '+' (attach files, macOS's panel through window.bise.pickFiles) and the
-// approvals mode menu ('yolo ⌄' / 'approvals ⌄'); right, before send: the model and effort menu
-// ('<b>opus 5.5</b> high ⌄'). The chips get the 6% hover; their pickers (ds Picker, designer m_24786)
-// open 8 px above the box, the mode's on its chip's left edge, the model's on its right edge. Answering a card: '+'
-// only (a model or a mode means nothing for an answer). Short: the effort label goes into its menu
-// (css), the mode never drops. Owner: amb-win.
+// The composer box's tool row (bise fait mac, mockup 1: 40 high): what he changes about where his
+// words go. Left: '+' 28 (attach files, macOS's panel through window.bise.pickFiles) and the
+// approvals mode menu, 28 ('yolo' in --c-err while on: nothing asks before it acts); right, before
+// the mic and send: the model and effort menu, 12 text-2 ('opus 5.5 · high ⌄'). Their pickers (ds
+// Picker, designer m_24786) open 8 px above the box, the mode's on its chip's left edge, the
+// model's on its right edge. Answering a card: '+' only (a model or a mode means nothing for an
+// answer). Short: the effort label goes into its menu (css), the mode never drops. Owner:
+// nm-composer.
 import { useCallback, useRef, useState } from 'react';
-import { PickerPop, PickerSeg, PickerTrigger, Press } from '@/ds';
+import { AppIcon, PickerPop, PickerSeg, PickerTrigger, Press, tipAttrs } from '@/ds';
 import type { Agent } from '@/proto';
 import { useApprovals, useModels, useStore } from '@/store';
 import { useRouter } from '@/app/router';
@@ -39,10 +40,10 @@ export function AttachTool({ onPick }: { onPick: (paths: readonly string[]) => v
         });
       }}
       aria-label={composer.attach_files}
-      data-tip={composer.attach_files}
+      {...tipAttrs(composer.attach_files)}
       data-testid="composer.attach"
     >
-      +
+      <AppIcon name="plus" />
     </Press>
   );
 }
@@ -63,7 +64,7 @@ export function ModeTool({ project }: { project: string }) {
   };
   return (
     <>
-      <PickerTrigger ref={trigger} extra="cmp-menu" open={open} onClick={toggle} tip={`${modeWords(now)}: ${what(now)} · ⇧⇥ switches`} testId="composer.mode">
+      <PickerTrigger ref={trigger} extra={now === 'yolo' ? 'cmp-menu cmp-yolo' : 'cmp-menu'} open={open} onClick={toggle} tip={`${modeWords(now)}: ${what(now)} · ⇧⇥ switches`} testId="composer.mode">
         {modeWords(approvals.mode)}
       </PickerTrigger>
       {open && (
@@ -118,10 +119,10 @@ export function ModelTool({ project, a }: { project: string; a: Agent }) {
     }));
   return (
     <>
-      <PickerTrigger ref={trigger} extra="cmp-menu" open={open} onClick={toggle}
+      <PickerTrigger ref={trigger} extra="cmp-menu cmp-model" open={open} onClick={toggle}
         tip={[w.model, provider, w.effort === '' ? '' : `effort ${w.effort}`].filter((x) => x !== '').join(' · ')} testId="composer.model">
-        <b>{w.model}</b>
-        {w.effort !== '' && <span className="eff"> {w.effort}</span>}
+        {w.model}
+        {w.effort !== '' && <span className="eff"> · {w.effort}</span>}
       </PickerTrigger>
       {open && (
         <PickerPop

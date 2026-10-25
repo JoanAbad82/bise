@@ -1,10 +1,11 @@
-// The one-off line on the key line's place (Composer `line`, his m_29126: a refused '/bime' stayed
-// in a box under the composer for many messages and pushed it up; designer m_29135): its words in
-// sans, its commands and paths in mono, cut after a whole word with one glued '…'; and the keys
-// that end it. Pure.
+// The composer's one-off notice (Composer `line`, his m_29126: a refused '/bime' stayed in a box
+// under the composer for many messages and pushed it up; designer m_29135), shown at the right of
+// the context strip since the key bar went (bise fait mac): its words in sans, its commands and
+// paths in mono, cut after a whole word with one glued '…'; and the keys that end it. Pure.
+// Owner: nm-composer.
 
-/** A line on the key line's place: an error ('✗' in the error color) or a note ('·'), words text-2. */
-export interface KeyLine {
+/** A notice: an error ('✗' in the error color) or a note ('·'), words text-2. */
+export interface Notice {
   readonly level: "err" | "info";
   readonly text: string;
   /** its test id (the screen's: what said it) */

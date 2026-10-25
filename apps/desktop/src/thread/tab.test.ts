@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answerFit, answerHead, contextOf, folderName, pinkState, ringTip, tabFit, tabPlace, wordCut, worktreeName } from './tab';
+import { answerFit, answerHead, contextOf, folderName, pinkState, ringTip, stripFit, tabPlace, wordCut, worktreeName } from './tab';
 
 describe("the composer's one pink state (composer-target A, art-target, agent-target)", () => {
   const base = { answer: null, aboutPink: undefined, about: false, agent: 'perf', voiceTyping: false, otherTip: (a: string) => `to ${a}, not bise` };
@@ -25,26 +25,27 @@ describe("the composer's one pink state (composer-target A, art-target, agent-ta
   });
 });
 
-describe("the composer's tab (designer's composer-strip A)", () => {
-  const w = { gap: 16, label: 60, branch: 80, project: 90, context: 120 };
+describe("the composer's context strip (bise fait mac, mockup 1)", () => {
+  const w = { gap: 16, project: 90, place: 80, branch: 120, end: 60 };
   it('shows every item when they fit', () => {
-    expect(tabFit({ ...w, avail: 60 + 80 + 90 + 120 + 3 * 16 })).toEqual({ branch: true, project: true, context: true });
+    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 60 + 3 * 16 })).toEqual({ project: true, place: true, end: true });
   });
-  it('drops whole items: the project first, then the context, then the branch; the label stays', () => {
-    expect(tabFit({ ...w, avail: 60 + 80 + 90 + 120 + 3 * 16 - 1 })).toEqual({ branch: true, project: false, context: true });
-    expect(tabFit({ ...w, avail: 60 + 80 + 120 + 2 * 16 - 1 })).toEqual({ branch: true, project: false, context: false });
-    expect(tabFit({ ...w, avail: 60 + 80 + 16 - 1 })).toEqual({ branch: false, project: false, context: false });
-    expect(tabFit({ ...w, avail: 10 })).toEqual({ branch: false, project: false, context: false });
+  it('drops whole items: the right end first, then the place, then the project; the branch stays', () => {
+    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 60 + 3 * 16 - 1 })).toEqual({ project: true, place: true, end: false });
+    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 2 * 16 - 1 })).toEqual({ project: true, place: false, end: false });
+    expect(stripFit({ ...w, avail: 90 + 120 + 16 - 1 })).toEqual({ project: false, place: false, end: false });
+    expect(stripFit({ ...w, avail: 10 })).toEqual({ project: false, place: false, end: false });
   });
   it('an item that is not there takes no room and no gap', () => {
-    expect(tabFit({ gap: 16, label: 60, branch: 80, project: 0, context: 120, avail: 60 + 80 + 120 + 2 * 16 })).toEqual({ branch: true, project: true, context: true });
+    expect(stripFit({ gap: 16, project: 0, place: 80, branch: 120, end: 60, avail: 80 + 120 + 60 + 2 * 16 })).toEqual({ project: true, place: true, end: true });
   });
   it("says where it works by its folder's name: a worktree after the ψ, his checkout bare, nothing for bise's own main (his m_24782)", () => {
     const t = (p: string) => p.replace('/Users/g', '~');
     const wt = { path: '/Users/g/.bise/worktrees/harness-3abb2bd8/composer-strip/harness', tip: 'ψ worktree: its own copy of the repo, on sb/composer-strip · ~/.bise/worktrees/harness-3abb2bd8/composer-strip/harness' };
-    expect(tabPlace({ branch: 'sb/composer-strip' }, false, wt, '/Users/g/code/harness', t)).toEqual({ name: 'composer-strip', worktree: true, tip: wt.tip });
-    expect(tabPlace({ branch: null }, false, undefined, '/Users/g/lab/bend-lab/harness', t)).toEqual({ name: 'harness', worktree: false, tip: 'your own folder: ~/lab/bend-lab/harness' });
-    expect(tabPlace({ branch: 'sb/ui', worktree: '/Users/g/.bise/worktrees/h-1/ui/storefront' }, false, undefined, '/p', t)).toEqual({ name: 'ui', worktree: true, tip: 'ψ worktree: ~/.bise/worktrees/h-1/ui/storefront' });
+    expect(tabPlace({ branch: 'sb/composer-strip' }, false, wt, '/Users/g/code/harness', t)).toEqual({ name: 'composer-strip', worktree: true, tip: wt.tip, branch: 'sb/composer-strip' });
+    expect(tabPlace({ branch: null }, false, undefined, '/Users/g/lab/bend-lab/harness', t)).toEqual({ name: 'harness', worktree: false, tip: 'your own folder: ~/lab/bend-lab/harness', branch: undefined });
+    expect(tabPlace({ branch: null, checkout_branch: 'main' }, false, undefined, '/Users/g/lab/bend-lab/harness', t)?.branch).toBe('main');
+    expect(tabPlace({ branch: 'sb/ui', worktree: '/Users/g/.bise/worktrees/h-1/ui/storefront' }, false, undefined, '/p', t)).toEqual({ name: 'ui', worktree: true, tip: 'ψ worktree: ~/.bise/worktrees/h-1/ui/storefront', branch: 'sb/ui' });
     expect(tabPlace({ branch: 'x' }, true, wt, '/p', t)).toBeUndefined();
     expect(tabPlace(undefined, false, wt, '/p', t)).toBeUndefined();
     expect(worktreeName('/w/x/repo')).toBe('repo');

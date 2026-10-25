@@ -59,11 +59,9 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
         placeholder={answering?.placeholder ?? words.placeholder}
         answer={answerOf(answering)}
         onStop={stop}
-        quoting={false}
         onReady={NOOP}
         onSent={NOOP}
         hubNotes
-        fold
       />
     </div>
   );

@@ -503,7 +503,6 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             placeholder={answering?.placeholder ?? words.placeholder}
             answer={answerOf(answering)}
             onStop={onStop}
-            quoting={false}
             onReady={noop}
             onSent={noop}
             {...(about === undefined ? {} : { about })}

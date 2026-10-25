@@ -10,8 +10,8 @@ const rules = readFileSync(join(__dirname, 'composer.css'), 'utf8').replace(/\/\
 
 describe('composer controls hover (bar O.6)', () => {
   it.each([
-    // the key line's controls: the words go grey -> ink, never a fill (his m_29136)
-    ['the mic', /\.keys \.mic:hover,\s*\.b-composer \.keys \.mic:hover \.kk\s*\{[^}]*color: var\(--c-text\)/],
+    // the tool row's '+', mic and menus: the 6% fill and ink (mockup 1: 28 square)
+    ['the tools (+, the mic)', /\.cmp-tool:hover,\s*\.b-composer \.cmp-tool\[aria-expanded='true'\]\s*\{[^}]*background: var\(--c-hover\)/],
     ['the send (on or stop, never off)', /\.send:not\(:disabled\):not\(\.off\):hover\s*\{[^}]*background:/],
   ])('%s has a hover', (_, rule) => {
     expect(rules).toMatch(rule);
@@ -22,11 +22,7 @@ describe('composer controls hover (bar O.6)', () => {
     expect(picker).toMatch(/\.b-picker-row\.on\s*\{[^}]*background:/);
   });
 
-  it("the mic is as wide as its words, no padding, no fill on hover: the key line's gaps are even (his m_29136)", () => {
-    const mic = /\.keys \.mic \{([^}]*)\}/.exec(rules)?.[1] ?? '';
-    expect(mic).toMatch(/padding: 0;/);
-    expect(mic).toMatch(/margin: 0;/);
-    expect(mic).not.toMatch(/min-width/);
-    expect(rules).not.toMatch(/\.keys \.mic:hover\s*\{[^}]*background:/);
+  it('the mic is a 28 square tool beside send, like the +', () => {
+    expect(rules).toMatch(/\.b-composer \.cmp-plus,\s*\.b-composer \.cmp-mic\s*\{[^}]*width: var\(--h-control-sm\)/);
   });
 });

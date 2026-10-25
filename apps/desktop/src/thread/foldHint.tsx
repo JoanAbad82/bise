@@ -3,8 +3,7 @@
 // after its words. Owner: amb-win.
 import { useContext, useSyncExternalStore, type ReactNode } from 'react';
 import { Kbd } from '@/ds';
-import { useHeld, useModHeld } from '@/app/held';
-import type { HeldCtx, HeldMod } from '@/composer/keybar';
+import { useModHeld } from '@/app/held';
 import { FoldsContext, type FoldAll } from './folds';
 
 /** ctrl+o's word now: 'collapse' once a ctrl+o (or ⌘E) opened every fold, else 'expand'. Pure. */
@@ -17,27 +16,6 @@ function useAllFolds(): FoldAll {
     (l) => folds.subscribe(l),
     () => folds.get(),
   );
-}
-
-/** What the composer's key bar lists while a modifier is held (keybar.ts heldPairs): the thread's
- *  facts, read from the window once when the hold starts (the inbox block's count and open item,
- *  a fold, a code block, the right bar's agents). None while nothing is held. */
-export function useComposerHeld(): { mod: HeldMod; ctx: HeldCtx } | null {
-  const mod = useHeld();
-  const all = useAllFolds();
-  if (mod === null) return null;
-  const block = document.querySelector<HTMLElement>('[data-testid="inbox.block"]');
-  const list = document.querySelector('[data-testid="thread.list"]');
-  return {
-    mod,
-    ctx: {
-      fold: list?.querySelector('.b-fold[role="button"]') != null ? foldWord(all.open) : null,
-      inbox: Number(block?.dataset.count ?? 0),
-      itemOpen: block?.dataset.open !== undefined,
-      code: list?.querySelector('.th-code') != null,
-      agents: document.querySelectorAll('[data-testid^="app.right.agent."]').length,
-    },
-  };
 }
 
 /** The fold's hint while ctrl is held alone, else none. */

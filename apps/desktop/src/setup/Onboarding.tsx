@@ -232,7 +232,6 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
             <Composer
               target="onboarding/first"
               placeholder={settings.onb_first_placeholder}
-              keys=""
               onSend={(out) => {
                 const r = firstSend(s, out.text);
                 if (r !== null) run(r);
