@@ -182,7 +182,7 @@ export function Route(props: RouteProps | HandoffProps) {
 }
 
 export interface SchedHeadProps {
-  /** '◷ main scheduled dashboards · every 30m · next 16:56' (the hub's words; the ◷ is the row's) */
+  /** '◷ bise scheduled dashboards · every 30 min · next 16:56' (the hub's words as thread/entry schedHead names them; the ◷ is the row's) */
   children: ReactNode;
   /** its words show under it; a click toggles them. Unset: nothing opens, the head is plain words */
   open?: boolean;

@@ -72,9 +72,11 @@ def hub_now(c, method):
 
 
 def agent_row(c, name):
-    """`name`'s row in the latest hub/agents."""
-    now = hub_now(c, "hub/agents") or {"agents": []}
-    return next((a for a in now["agents"] if a["name"] == name), None)
+    """`name`'s row in the latest hub/agents, the archived list merged
+    (e2e.merge_archived: an archived agent's row has `archived: true`)."""
+    with c.lock:
+        now = (c.state or {}).get("agents", [])
+    return next((a for a in now if a["name"] == name), None)
 
 
 def idle(c, name, timeout=30):

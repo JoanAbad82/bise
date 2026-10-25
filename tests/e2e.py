@@ -352,6 +352,18 @@ PROTO = 1
 SAID = {"hub/notice": "notice"}
 
 
+def merge_archived(c, live, archived):
+    """agents-light (ad6321c7f): an agents event's live rows, then each
+    archived one as a row with `archived: true`. The event's `archived`
+    list replaces the one kept on `c` when it has one (always the first
+    event of a connection); none keeps it. bise_proto's Archived::merge,
+    the Rust clients' one merge."""
+    if archived is not None:
+        c.archived = list(archived)
+    kept = getattr(c, "archived", [])
+    return list(live) + [dict(a, archived=True, main=False) for a in kept]
+
+
 class Client:
     """A JSON-RPC 2.0 client of hub.sock (client-protocol): `initialize`
     first, then the hub-wide notifications (hub/agents, hub/cards...)
@@ -395,6 +407,8 @@ class Client:
             st = dict(self.state or {"agents": [], "cards": []})
             key = method.split("/")[1]
             st[key] = params.get(key, [])
+            if method == "hub/agents":
+                st["agents"] = merge_archived(self, st["agents"], params.get("archived"))
             self.state = st
 
     def _read(self):

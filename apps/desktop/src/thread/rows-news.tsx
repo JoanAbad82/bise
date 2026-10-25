@@ -146,7 +146,7 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const s = e.scheduled;
   const head = s?.head ?? e.text;
   const words = s?.words ?? '';
-  // one line (H3, designer m_19832): '◷ main scheduled the p99 check · every 30 min · next 20:11 ▸',
+  // one line (H3, designer m_19832): '◷ bise scheduled the p99 check · every 30 min · next 20:11 ▸',
   // cut with …; '▸' only when it has words to open
   return (
     <div className="th-sched" data-testid={`thread.scheduled.${e.pos}`} data-id={s?.id}>

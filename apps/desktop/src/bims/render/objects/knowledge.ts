@@ -223,43 +223,58 @@ const blackboard: Maker = (g) => {
   return { w: 1.5, d: 0.62, h: 1.9 };
 };
 
-/** a dinosaur's skeleton on its museum plinth: a T. rex walking, its spine in vertebrae, ribs, the skull, steel supports, the brass plaque */
+/** a dinosaur's skeleton on its museum plinth: a T. rex walking, level, its bones thick enough to read at the office's distance; the big skull, jaw open, two tiny arms, steel supports, the brass plaque */
 const dinosaur: Maker = (g) => {
   g.contact(1.7, 0.66);
   g.box(1.66, 0.18, 0.62, WOOD_D, 0, 0.09, 0, 0.03);
   g.box(1.56, 0.02, 0.52, WOOD_L, 0, 0.19, 0, 0.01);
   g.box(0.32, 0.08, 0.01, BRASS, 0.3, 0.1, 0.33, 0.004);
-  // the spine: tail low at the right, hips, the back, the neck up to the head at the left
-  const spine = (i: number): [number, number] => { const u = i / 18; return [0.78 - u * 1.3, 0.55 + Math.sin(u * Math.PI * 0.95) * 0.45 + u * 0.18]; };
-  for (let i = 0; i <= 18; i++) { const [x, y] = spine(i); g.ball(0.035 + Math.sin((i / 18) * Math.PI) * 0.02, BONE, x, y, 0); }
-  for (let i = 0; i < 18; i++) { const [a, b] = [spine(i), spine(i + 1)]; rod(g, [a[0], a[1], 0], [b[0], b[1], 0], 0.04, darker(BONE, 0.92)); }
-  // ribs: pairs hanging down from the back, shorter toward the hips
+  // the spine, level like a T. rex walks: the neck at the left, the hips, the tail held up behind (designer m_40606)
+  const N = 20;
+  const spine = (i: number): [number, number] => { const u = i / N; return [-0.32 + u * 1.1, 0.97 + Math.max(0, 1 - u / 0.2) * 0.1 + Math.sin(u * Math.PI) * 0.03]; };
+  const thick = (i: number): number => 0.04 + 0.04 * Math.max(0, 1 - Math.abs(i / N - 0.35) / 0.65);
+  for (let i = 0; i <= N; i++) {
+    const [x, y] = spine(i), r = thick(i);
+    g.ball(r, BONE, x, y, 0);
+    if (i % 2 === 0 && i < N - 2) g.box(0.03, r * 0.9, 0.045, darker(BONE, 0.95), x, y + r * 1.1, 0, 0.01);
+  }
+  for (let i = 0; i < N; i++) { const [a, b] = [spine(i), spine(i + 1)]; rod(g, [a[0], a[1], 0], [b[0], b[1], 0], 0.06, darker(BONE, 0.92)); }
+  // ribs: curved pairs hanging from the chest, longest in the middle
   for (let k = 0; k < 6; k++) {
-    const [x, y] = spine(8 + k);
-    const l = 0.32 - Math.abs(k - 2) * 0.03;
-    for (const s of [-1, 1]) rod(g, [x, y - 0.02, s * 0.03], [x + 0.04, y - l, s * 0.13], 0.025, BONE);
+    const [x, y] = spine(3 + k);
+    const l = 0.36 - Math.abs(k - 2.5) * 0.04;
+    for (const s of [-1, 1]) { rod(g, [x, y - 0.03, s * 0.04], [x + 0.02, y - l * 0.5, s * 0.16], 0.038, BONE); rod(g, [x + 0.02, y - l * 0.5, s * 0.16], [x + 0.05, y - l, s * 0.09], 0.034, BONE); }
   }
-  // the skull, its jaw a little open, the eye holes; tiny arms
-  const [hx, hy] = spine(18);
-  const sk = g.at(hx - 0.08, hy + 0.02, 0); sk.root.rotation.z = -0.15;
-  sk.box(0.34, 0.15, 0.15, BONE, 0, 0, 0, 0.04);
-  for (const s of [-1, 1]) sk.box(0.06, 0.05, 0.01, INK, 0.06, 0.03, s * 0.073, 0.015);
-  const jaw = sk.at(0.04, -0.07, 0); jaw.root.rotation.z = 0.22; jaw.box(0.28, 0.05, 0.12, darker(BONE, 0.92), -0.1, 0, 0, 0.02);
-  for (let k = 0; k < 4; k++) sk.cone(0.01, 0.03, CREAM, -0.14 + k * 0.05, -0.085, 0.05);
-  const [ax, ay] = spine(14);
-  for (const s of [-1, 1]) { rod(g, [ax, ay - 0.08, s * 0.08], [ax - 0.05, ay - 0.2, s * 0.1], 0.025, BONE); rod(g, [ax - 0.05, ay - 0.2, s * 0.1], [ax - 0.12, ay - 0.22, s * 0.1], 0.02, BONE); }
-  // the legs from the hips: thigh, shin, foot on the plinth; the steel supports
-  const [px, py] = spine(5);
-  for (const [s, step] of [[-1, 0.12], [1, -0.1]] as const) {
-    const knee: [number, number, number] = [px + step * 0.3 - 0.1, py - 0.38, s * 0.13];
-    const ankle: [number, number, number] = [px + step - 0.02, 0.32, s * 0.14];
-    g.ball(0.06, BONE, px, py - 0.05, s * 0.1);
-    rod(g, [px, py - 0.05, s * 0.1], knee, 0.06, BONE);
-    rod(g, knee, ankle, 0.045, BONE);
-    rod(g, ankle, [ankle[0] - 0.1, 0.23, s * 0.14], 0.04, BONE);
-    g.box(0.16, 0.03, 0.08, BONE, ankle[0] - 0.12, 0.215, s * 0.14, 0.012);
+  // the neck up to a big skull: cranium, snout, the eye and the window holes, teeth, the jaw wide open
+  const [nx, ny] = spine(0);
+  rod(g, [nx, ny, 0], [nx - 0.1, ny + 0.12, 0], 0.08, BONE); g.ball(0.06, BONE, nx - 0.06, ny + 0.07, 0);
+  const sk = g.at(nx - 0.16, ny + 0.17, 0); sk.root.rotation.z = 0.06;
+  sk.box(0.26, 0.2, 0.2, BONE, 0, 0, 0, 0.05);
+  sk.box(0.26, 0.14, 0.15, BONE, -0.22, -0.02, 0, 0.04);
+  for (const s of [-1, 1]) { sk.box(0.07, 0.06, 0.012, INK, 0.02, 0.04, s * 0.128, 0.02); sk.box(0.08, 0.04, 0.012, INK, -0.2, 0.0, s * 0.098, 0.015); }
+  for (let k = 0; k < 5; k++) for (const s of [-1, 1]) sk.cone(0.014, 0.04, CREAM, -0.32 + k * 0.045, -0.105, s * 0.055).rotation.x = Math.PI;
+  const jaw = sk.at(0.1, -0.09, 0); jaw.root.rotation.z = 0.42;
+  jaw.box(0.42, 0.07, 0.15, darker(BONE, 0.93), -0.2, 0, 0, 0.025);
+  for (let k = 0; k < 5; k++) for (const s of [-1, 1]) jaw.cone(0.012, 0.035, CREAM, -0.36 + k * 0.045, 0.05, s * 0.05);
+  // two tiny arms under the chest
+  const [ax, ay] = spine(3);
+  for (const s of [-1, 1]) { rod(g, [ax, ay - 0.12, s * 0.12], [ax - 0.06, ay - 0.24, s * 0.15], 0.045, BONE); rod(g, [ax - 0.06, ay - 0.24, s * 0.15], [ax - 0.13, ay - 0.21, s * 0.15], 0.035, BONE); g.ball(0.025, BONE, ax - 0.06, ay - 0.24, s * 0.15); }
+  // the pelvis and both hind legs, one forward one back: thigh, shin, foot bones, the toes on the plinth
+  const [px, py] = spine(9);
+  g.box(0.26, 0.14, 0.22, BONE, px, py - 0.1, 0, 0.04);
+  for (const [s, step] of [[1, -0.12], [-1, 0.1]] as const) {
+    const hip: [number, number, number] = [px, py - 0.12, s * 0.15];
+    const knee: [number, number, number] = [px - 0.1 + step, 0.62, s * 0.16];
+    const ankle: [number, number, number] = [px + 0.08 + step, 0.34, s * 0.16];
+    const toe: [number, number, number] = [px - 0.04 + step, 0.24, s * 0.16];
+    g.ball(0.09, BONE, ...hip);
+    rod(g, hip, knee, 0.1, BONE); g.ball(0.06, BONE, ...knee);
+    rod(g, knee, ankle, 0.08, BONE); g.ball(0.05, BONE, ...ankle);
+    rod(g, ankle, toe, 0.06, BONE);
+    g.box(0.22, 0.04, 0.12, BONE, toe[0] - 0.04, 0.22, toe[2], 0.015);
   }
-  for (const [x, y] of [spine(6), spine(13)]) g.cyl(0.012, y - 0.24, STEEL, x, 0.2 + (y - 0.24) / 2, -0.06);
+  // the steel supports, under the chest and the tail
+  for (const [x, y] of [spine(5), spine(15)]) g.cyl(0.016, y - 0.24, STEEL, x, 0.2 + (y - 0.24) / 2, 0);
   return { w: 1.7, d: 0.64, h: 1.45 };
 };
 
