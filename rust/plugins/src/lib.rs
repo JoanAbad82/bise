@@ -48,6 +48,7 @@ pub mod login;
 pub mod marketplace;
 pub mod model;
 pub mod oauth;
+pub mod parent;
 pub mod remote;
 pub mod remove;
 pub mod report;

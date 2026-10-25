@@ -744,3 +744,63 @@ fn an_unknown_tool_relists_the_session_and_drops_a_stale_entry_once() {
     stop_bridge(warm);
     let _ = std::fs::remove_dir_all(&base);
 }
+
+/// The REPL's exit ends its bridge at once, and with it every server
+/// (release-53, agents/new: a bridge left after the app closed). The
+/// REPL is killed and not reaped, and the chores tick is 10 s: a bridge
+/// that polls kill(0), or looks at its parent on a tick, fails this; one
+/// that hears the exit as an event passes.
+#[test]
+fn a_bridge_and_its_servers_are_gone_within_a_second_or_two_of_its_repl() {
+    let (base, plugins) = fixture_root("parent-exit");
+    let starts = base.join("starts.txt");
+    // two plugins (one tool name each), one server each; the wrapper
+    // writes the server's pid
+    let ok = std::process::Command::new("cp").arg("-R").arg(plugins.join("hello-plugin")).arg(plugins.join("hello-two")).status().unwrap().success();
+    assert!(ok);
+    let manifest = plugins.join("hello-two/plugin.json");
+    std::fs::write(&manifest, std::fs::read_to_string(&manifest).unwrap().replace("\"name\": \"hello-plugin\"", "\"name\": \"hello-two\"")).unwrap();
+    for p in ["hello-plugin", "hello-two"] {
+        std::fs::write(
+            plugins.join(p).join("mcp.json"),
+            format!(
+                r#"{{"mcpServers":{{"echo":{{"command":"sh","args":["-c","echo $$ >> {}; exec python3 -B \"$0\"","${{PLUGIN_ROOT}}/server.py"]}}}}}}"#,
+                starts.display()
+            ),
+        )
+        .unwrap();
+    }
+    let dir = base.join("run/plugins");
+    let mut parent = std::process::Command::new("sleep").arg("60").spawn().unwrap();
+    let opts = bridge::Opts { chores: Duration::from_secs(10), ..bridge::Opts::new(dir.clone(), Some(parent.id()), roots_of(&base, Some(plugins))) };
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let r = bridge::serve(opts);
+        let _ = done_tx.send(r.is_ok());
+    });
+    wait_until("the bridge ready", || dir.join("ready").exists());
+    wait_until("both tools in the index", || ["hello_plugin", "hello_two"].iter().all(|ns| index(&dir).contains(&format!(" {ns} shout :"))));
+    // listed, then stopped: a call to each runs it again
+    for ns in ["hello_plugin", "hello_two"] {
+        let i = index(&dir);
+        let line = i.lines().find(|l| l.contains(&format!(" {ns} shout :"))).unwrap();
+        let rest = line.split(' ').next().unwrap().strip_prefix("http://").unwrap().to_string();
+        let (host, path) = rest.split_at(rest.find('/').unwrap());
+        let (_, b) = post(&mut BufReader::new(TcpStream::connect(host).unwrap()), path, SHOUT);
+        assert!(b.contains(":X"), "{b}");
+    }
+    let alive = |pid: u32| std::process::Command::new("kill").args(["-0", &pid.to_string()]).stderr(std::process::Stdio::null()).status().unwrap().success();
+    let pids: Vec<u32> = std::fs::read_to_string(&starts).unwrap().lines().map(|l| l.trim().parse().unwrap()).filter(|p| alive(*p)).collect();
+    assert_eq!(pids.len(), 2, "both servers running: {:?}", std::fs::read_to_string(&starts));
+    let t0 = Instant::now();
+    // killed, not reaped yet: an exited process that kill(0) still finds
+    // (a zombie until its parent waits), so only the exit event sees it
+    parent.kill().unwrap();
+    let ended = done_rx.recv_timeout(Duration::from_secs(2));
+    parent.wait().unwrap();
+    assert_eq!(ended, Ok(true), "the bridge still serves {:?} after its REPL exited", t0.elapsed());
+    for p in &pids {
+        assert!(!alive(*p), "server {p} outlived its bridge");
+    }
+    let _ = std::fs::remove_dir_all(&base);
+}
