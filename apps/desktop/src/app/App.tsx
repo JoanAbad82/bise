@@ -13,8 +13,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { createRouter, RouterContext, useRoute, useRouter, type SavedHistory } from './router';
 import { useHistoryWays } from './esc-up';
 import { useAnswerJumps } from '@/thread/useAnswerJumps';
-import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
-import { BottomBlock } from '@/thread/Bottom';
+import { formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { askInbox, useInboxAsks } from './inboxAsk';
 import { keep } from './keep';
 import { useMainRoutes, useMenuRouting } from './menu';
@@ -42,7 +41,7 @@ import { Over, Titlebar, useFrame } from './Frame';
 import { PanelHost } from './panel/Host';
 import { SideHost } from './side3d/Host';
 import { FloatHost } from '@/composer/float/Host';
-import { ArtifactRoute, artOf } from './ArtifactView';
+import { ArtifactRoute } from './ArtifactView';
 import { panelState } from './panel/state';
 import { doPanelKey } from './panel/keys';
 import { TipLayer } from './TipLayer';
@@ -315,23 +314,9 @@ function Current({ top }: { top: ReactNode }) {
       <div className="app-screen">
         <ScreenOf key={formatRoute(route)} route={route} />
       </div>
-      <RouteBottom route={route} />
       <RouteTerminal route={route} />
     </Main>
   );
-}
-
-/**
- * b1: the one inbox + composer block at the bottom of a screen with no composer of its own,
- * writing to whom the route says (bottomTarget); kept across screens of the same target (no
- * route key), so his draft stays when he moves from an agent's review to its changes.
- */
-function RouteBottom({ route }: { route: Route }) {
-  const home = useProjects().find((p) => p.home)?.project;
-  // an artifact open has its one composer, the maker's (beside it, or under the page under 1000 px)
-  if (artOf(route) !== undefined) return null;
-  const t = bottomTarget(route, home);
-  return t === null ? null : <BottomBlock key={`${t.project}/${t.agent}`} project={t.project} agent={t.agent} />;
 }
 
 /** The terminal panel of the project in view (bise's own on bise, the inbox, settings). */

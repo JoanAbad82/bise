@@ -1,0 +1,127 @@
+/* The floating composer (Host.tsx; page native-mac §6, mockups 6-8): fixed at the shell's root, 24
+   from the bottom, centred on the content's column (its left set inline). At rest a 560 × 44 pill,
+   r 22, --c-overlay over --glass, --e-2: '+', the field on one line, the mic, send. Focused 640, r 16,
+   its head 40 (─ 28, 'to bise ⌄' 13/500, the grip) over a 48 field. Open 640 × 560 (70% of the
+   window's height at most), --e-3, the mini thread scrolls over the field and its rule. It unfolds
+   in --d-base --ease-out (0 under reduce motion, the tokens' fallback). */
+.cmp-float {
+  position: fixed;
+  z-index: 40;
+  bottom: var(--float-bottom);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  width: var(--float-w);
+  max-width: calc(100vw - var(--s-12));
+  border-radius: var(--r-5);
+  background: var(--c-overlay);
+  backdrop-filter: var(--glass);
+  box-shadow: var(--e-2);
+  transition:
+    width var(--d-base) var(--ease-out),
+    height var(--d-base) var(--ease-out),
+    border-radius var(--d-base) var(--ease-out),
+    box-shadow var(--d-base) var(--ease-out);
+}
+.cmp-float[data-state='focus'],
+.cmp-float[data-state='open'] {
+  width: var(--float-w-focus);
+  border-radius: var(--r-4);
+}
+.cmp-float[data-state='open'] {
+  height: min(var(--float-h-open), var(--float-max-h));
+  box-shadow: var(--e-3);
+}
+/* the head: ─ 28, 'to bise ⌄' 13/500, the grip at its right; a rule under it */
+.cmp-float .hd {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--s-10);
+  padding: 0 var(--s-2);
+  box-shadow: inset 0 -1px 0 var(--c-line);
+  font: 500 var(--f-ui);
+  color: var(--c-text);
+}
+/* 'to bise ⌄': the ds PickerTrigger's chip in the head's 13/500 */
+.cmp-float .hd .cmp-float-to {
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+}
+/* an inbox item open here: its label; in the accent only while his words answer its question (an
+   approval waits for its buttons: his words go as a plain message) */
+.cmp-float .hd .cmp-float-ans {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-2);
+}
+.cmp-float .hd .cmp-float-ans.acc {
+  color: var(--c-accent);
+}
+.cmp-float .hd .grip {
+  margin-left: auto;
+  color: var(--c-text-3);
+}
+/* the mini thread: the addressee's own rows, scrolling over the field */
+.cmp-float .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* the composer inside: no frame of its own (the float is the frame), one row: '+', the field, the
+   mic, send; 44 at rest, 48 focused; a rule over it when the thread is open */
+.cmp-float .b-composer {
+  flex: none;
+  padding: 0;
+}
+.cmp-float .b-composer .box,
+.cmp-float .b-composer .box:focus-within,
+.cmp-float .b-composer .box.is-focus {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: var(--float-h);
+  padding: 0 var(--s-2);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.cmp-float[data-state='focus'] .b-composer .box,
+.cmp-float[data-state='open'] .b-composer .box {
+  min-height: var(--s-12);
+}
+.cmp-float[data-state='open'] .b-composer .box,
+.cmp-float[data-state='open'] .b-composer .box:focus-within {
+  box-shadow: inset 0 1px 0 var(--c-line);
+}
+.cmp-float .b-composer .box > .line {
+  order: 1;
+  flex: 1 1 auto;
+  padding: var(--s-2) 0;
+}
+.cmp-float .b-composer .box > .row {
+  display: contents;
+}
+.cmp-float .b-composer .box > .row > * {
+  order: 2;
+}
+.cmp-float .b-composer .box > .row > .cmp-plus {
+  order: 0;
+}
+.cmp-float .b-composer .box > .row > .sp {
+  display: none;
+}
+.cmp-float .b-composer .in .b-field {
+  max-height: calc(var(--float-max-h) / 2);
+}
+/* the inbox item opened here (^1-3, ⌘I): over the head, inside the float's frame */
+.cmp-float .inbox-block {
+  margin: var(--s-2) var(--s-2) 0;
+}

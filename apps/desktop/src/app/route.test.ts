@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, routeOfOpen, shownOf, startRouteOf, upOf, type Route } from './route';
+import { formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, routeOfOpen, shownOf, startRouteOf, upOf, type Route } from './route';
 import { createRouter, restoreHistory, stepOf } from './router';
 import { escTarget } from './esc-up';
 
@@ -224,21 +224,6 @@ describe("the projects the window shows (the core's 'shown')", () => {
     // the sidebar's open folders show their agents (R26): their running hubs too, once each
     expect(shownOf('home-1', { screen: 'thread', project: 'shop', agent: 'perf' }, ['shop', 'docs'])).toEqual(['home-1', 'shop', 'docs']);
     expect(shownOf(undefined, { screen: 'scheduled' })).toEqual([]);
-  });
-});
-
-describe('b1: the bottom block writes to whom the route says', () => {
-  it("a review to its agent, a project's screen to its main, a screen of no project to bise; none where a composer is", () => {
-    expect(bottomTarget({ screen: 'review', project: 'shop', agent: 'perf' }, 'home-1')).toEqual({ project: 'shop', agent: 'perf' });
-    expect(bottomTarget({ screen: 'agents', project: 'shop' }, 'home-1')).toEqual({ project: 'shop', agent: MAIN });
-    expect(bottomTarget({ screen: 'changes', project: 'shop' }, 'home-1')).toEqual({ project: 'shop', agent: MAIN });
-    expect(bottomTarget({ screen: 'artifacts', project: '' }, 'home-1')).toEqual({ project: 'home-1', agent: MAIN });
-    expect(bottomTarget({ screen: 'settings' }, 'home-1')).toEqual({ project: 'home-1', agent: MAIN });
-    expect(bottomTarget({ screen: 'scheduled' }, 'home-1')).toEqual({ project: 'home-1', agent: MAIN });
-    expect(bottomTarget({ screen: 'settings' }, undefined)).toBeNull();
-    expect(bottomTarget({ screen: 'thread', project: 'shop', agent: 'perf' }, 'home-1')).toBeNull();
-    expect(bottomTarget({ screen: 'bise' }, 'home-1')).toBeNull();
-    expect(bottomTarget({ screen: 'onboarding' }, 'home-1')).toBeNull();
   });
 });
 

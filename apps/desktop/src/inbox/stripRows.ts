@@ -1,58 +1,19 @@
-// The thread's inbox strip (bar W7/K24), pure: which of a project's items
-// it lists, numbered for ctrl+1-9, which rows show and how many fold into
-// '+ n more', and the key that opens row N. Strip.tsx draws it. Owner:
-// amb-home.
+// The inbox block's rows (Block.tsx; the thread's own strip, Strip.tsx, went with the dock in bise
+// fait mac), pure: how many rows fit, a row's words, the ctrl+N that opens row N, and the keys on
+// an open card. Owner: nm-composer.
 //
-// The TUI's (rust/tui/src/sb/card_draw.rs): its own box above the divider,
-// a row per item numbered in the inbox's order (row N is what ctrl+N
-// opens), at most STRIP_ROWS rows then '+ n more', the item open in place
-// where its row was. Not ported: approvals that came together sharing a
-// row (order.ts says why).
+// The TUI's (rust/tui/src/sb/card_draw.rs): a row per item numbered in the inbox's order (row N is
+// what ctrl+N opens), at most STRIP_ROWS rows then '+ n more'. Not ported: approvals that came
+// together sharing a row (order.ts says why).
 import type { Card } from '@/proto';
 import { inbox } from '@/proto/words_inbox.gen';
-import { cardKey, sortCards } from './order';
+import { aboutOf } from './about';
 
 /** At most this many item rows in the box, then '+ n more' (card_draw.rs STRIP_ROWS). */
 export const STRIP_ROWS = 3;
 
 /** ctrl+1 to ctrl+9 open rows 1 to 9. */
 export const STRIP_KEYS = 9;
-
-/** The project's items in the inbox's order, the ones acted on here left out. */
-export function stripList(cards: readonly Card[], project: string, gone: ReadonlySet<string>): Card[] {
-  return sortCards(cards.filter((c) => c.project === project)).filter((c) => !gone.has(cardKey(c)));
-}
-
-export interface StripRow<C extends Card = Card> {
-  readonly card: C;
-  /** its number: ctrl+n opens it */
-  readonly n: number;
-  /** open in place */
-  readonly open: boolean;
-}
-
-export interface StripView<C extends Card = Card> {
-  readonly rows: readonly StripRow<C>[];
-  /** the items folded into '+ n more' */
-  readonly more: number;
-  /** the first of them (a click on '+ n more' opens it) */
-  readonly next: C | undefined;
-}
-
-/**
- * The rows the box shows: the first STRIP_ROWS, and the open item where
- * its number puts it when it is further down; the rest fold into '+ n more'.
- */
-export function stripView<C extends Card>(list: readonly C[], open: string | null): StripView<C> {
-  const rows: StripRow<C>[] = [];
-  let next: C | undefined;
-  list.forEach((card, i) => {
-    const isOpen = cardKey(card) === open;
-    if (i < STRIP_ROWS || isOpen) rows.push({ card, n: i + 1, open: isOpen });
-    else next ??= card;
-  });
-  return { rows, more: list.length - rows.length, next };
-}
 
 /** The block + the composer leave the thread at least this share of the window (designer m_26234). */
 export const THREAD_MIN = 0.4;
@@ -96,12 +57,6 @@ export function stripKey(e: CtrlDigit): number | undefined {
   return m ? Number(m[1]) : undefined;
 }
 
-/** What ctrl+n opens: row n's item (none: no such row, or n past STRIP_KEYS). */
-export function stripOpen(list: readonly Card[], n: number): string | undefined {
-  const c = n >= 1 && n <= STRIP_KEYS ? list[n - 1] : undefined;
-  return c ? cardKey(c) : undefined;
-}
-
 export interface RowWords {
   /** the agent alone, on every row: its sign says what it is (designer m_26234) */
   readonly who: string;
@@ -140,7 +95,21 @@ export function rowWords(c: Card): RowWords {
   return { who, cmd: first !== '', what: lines.length > 1 ? inbox.cmd_lines({ first, n: lines.length }) : first, note };
 }
 
-/** A row's words: who, then the question's first line (the TUI's `? t3 · npm publish`). */
-export function stripWords(c: Card): { who: string; what: string } {
-  return { who: c.agent, what: c.question.split('\n')[0] ?? '' };
+type CardKey = { t: 'pick' | 'on'; n: number } | { t: 'close' } | { t: 'later' } | { t: 'page' };
+
+/** A key on the open card (no words typed): its act, or none. Pure. */
+export function cardKeyOf(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>, c: Card, on: number | null): CardKey | null {
+  if (e.key === 'Escape') return { t: 'later' };
+  if (e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Backspace') return { t: 'close' };
+  // ⌘O: a page's item opens its page beside (notif-artifact); no bare letter takes an empty composer
+  if (e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'o' && aboutOf(c) != null) return { t: 'page' };
+  if (e.metaKey || e.ctrlKey || e.altKey) return null;
+  const ns = c.options.map((o) => o.n);
+  if (/^[1-9]$/.test(e.key) && ns.includes(Number(e.key))) return { t: 'pick', n: Number(e.key) };
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && ns.length > 0) {
+    const at = on === null ? -1 : ns.indexOf(on);
+    const i = on === null ? (e.key === 'ArrowRight' ? 0 : ns.length - 1) : at + (e.key === 'ArrowRight' ? 1 : -1);
+    return { t: 'on', n: ns[Math.max(0, Math.min(ns.length - 1, i))] ?? ns[0] ?? 1 };
+  }
+  return null;
 }

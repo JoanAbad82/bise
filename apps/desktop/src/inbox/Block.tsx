@@ -1,6 +1,6 @@
 // The inbox block (b2, the user's card #476 'b + the native notification'; designer's mocks on page
 // inbox-native v2): ONE inbox, every project's open items, as the TUI's, mounted once by the shell
-// right above the composer under every screen (amb-win's b1: ThreadScreen, BottomBlock); in a
+// right above the composer under every screen (amb-win's b1: ThreadScreen; off a thread, the floating composer); in a
 // project's view only that project's items, on bise's view and the inbox screen every project's
 // (scope.ts, his inbox-scope ask; an explicit open of another project's item widens it). Folded it is
 // 'inbox · 3 waiting  ⌃1–3 open', a line per item up to 3 (fewer in a short window), then '+ N more ·
@@ -24,8 +24,7 @@ import { useMenuAction } from '@/app/menu';
 import { cardKey } from './order';
 import { pickWaits, takesWords } from './model';
 import { withRefused, type InboxItem } from './listed';
-import { fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
-import { cardKeyOf } from './Strip';
+import { cardKeyOf, fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
 import { ArtWords } from './artWords';
 import { InboxZero, useInboxZero } from './Zero';
 import { useOptAct } from './optAct';

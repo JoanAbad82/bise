@@ -409,7 +409,7 @@ crate::words! { composer:
     tab_worktree_on(branch) = "ψ worktree, on {branch}";
     /// the tab's place tip: his checkout
     tab_own_folder(path) = "your own folder: {path}";
-    // ---- the context strip (bise fait mac, nm-composer)
+    // ---- the context strip and the floating composer (bise fait mac, nm-composer)
 
     /// the strip's place: his own checkout
     ctx_local = "local";
@@ -427,6 +427,20 @@ crate::words! { composer:
     ctx_project_pick(project) = "{project} · pick another project";
     /// the project picker's title
     ctx_projects = "projects";
+    /// the floating composer's addressee ('to bise ⌄')
+    float_to(agent) = "to {agent}";
+    /// the addressee picker's title
+    float_to_title = "send to";
+    /// the floating composer's empty field
+    float_ask(agent) = "ask {agent}";
+    /// the floating composer's ─ button
+    float_fold = "fold it";
+    /// the floating composer's grip, folded: its mini thread opens
+    float_open = "show the thread";
+    /// the floating composer's grip, open: its mini thread folds
+    float_close = "hide the thread";
+    /// the floating composer, for VoiceOver
+    float_name = "composer";
     /// the context ring's tip
     ring_tip(pct, agent, tokens) = "{pct}% of {agent}'s context used · {tokens} tokens · compacts at 90%";
     /// ctrl+1 with nothing in the inbox

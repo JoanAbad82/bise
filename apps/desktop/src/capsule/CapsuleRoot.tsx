@@ -15,7 +15,7 @@ import {
 } from "react";
 import { newAgent } from "@/agents/actions";
 import { InboxCard } from "@/inbox";
-import { cardKeyOf } from "@/inbox/Strip";
+import { cardKeyOf } from "@/inbox/stripRows";
 import type { Card, Grant, HelperEv } from "@/proto";
 import { threadKey, useHeard, useLevel, usePrefs, useProjects, useRefusedList, useShot, useStore } from "@/store";
 import { withRefused } from "@/inbox/listed";

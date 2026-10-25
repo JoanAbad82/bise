@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
-import { cardKey } from './order';
-import { fitRows, rowWords, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
+import { cardKeyOf, fitRows, rowWords, stripKey } from './stripRows';
 
 const card = (id: number, rank: number, project = 'acme', question = `q${String(id)}`): Card => ({
   id,
@@ -24,53 +23,13 @@ const key = (code: string, mods: Partial<Record<'metaKey' | 'ctrlKey' | 'altKey'
   ...mods,
 });
 
-describe('the inbox strip (W7/K24)', () => {
-  const cards = [card(4, 1), card(1, 2), card(2, 0), card(3, 1, 'other'), card(5, 3), card(6, 3)];
-
-  it("lists the project's items in the inbox's order, the ones acted on here left out", () => {
-    expect(stripList(cards, 'acme', new Set()).map((c) => c.id)).toEqual([2, 4, 1, 5, 6]);
-    expect(stripList(cards, 'acme', new Set(['acme-4'])).map((c) => c.id)).toEqual([2, 1, 5, 6]);
-  });
-
-  it("shows STRIP_ROWS rows numbered from 1, the rest as '+ n more'", () => {
-    const list = stripList(cards, 'acme', new Set());
-    const v = stripView(list, null);
-    expect(v.rows.map((r) => [r.card.id, r.n])).toEqual([
-      [2, 1],
-      [4, 2],
-      [1, 3],
-    ]);
-    expect(v.more).toBe(2);
-    expect(v.next?.id).toBe(5);
-  });
-
-  it('an open item further down shows where its number puts it, out of the more', () => {
-    const list = stripList(cards, 'acme', new Set());
-    const v = stripView(list, 'acme-6');
-    expect(v.rows.map((r) => [r.card.id, r.n, r.open])).toEqual([
-      [2, 1, false],
-      [4, 2, false],
-      [1, 3, false],
-      [6, 5, true],
-    ]);
-    expect(v.more).toBe(1);
-    expect(v.next?.id).toBe(5);
-  });
-
-  it('ctrl+N (ctrl alone, by code) opens row N, as the TUI; ctrl+2 opens item 2', () => {
-    const list = stripList(cards, 'acme', new Set());
+describe("the inbox block's rows (W7/K24)", () => {
+  it('ctrl+N (ctrl alone, by code) opens row N, as the TUI', () => {
     expect(stripKey(key('Digit2', { ctrlKey: true }))).toBe(2);
-    expect(stripOpen(list, 2)).toBe(cardKey(card(4, 1)));
-    expect(stripOpen(list, 5)).toBe('acme-6');
-    expect(stripOpen(list, 6)).toBeUndefined();
     expect(stripKey(key('Digit0', { ctrlKey: true }))).toBeUndefined();
     expect(stripKey(key('Digit2'))).toBeUndefined();
     expect(stripKey(key('Digit2', { ctrlKey: true, metaKey: true }))).toBeUndefined();
     expect(stripKey(key('Digit2', { ctrlKey: true, shiftKey: true }))).toBeUndefined();
-  });
-
-  it("a row says who and the question's first line", () => {
-    expect(stripWords(card(7, 0, 'acme', 'npm publish?\nit is 2.5.0'))).toEqual({ who: 't7', what: 'npm publish?' });
   });
 
   it("a row's words as the TUI's box_row: who, '$ ' and a command's lines, a patch's counts, the first line with words, the note", () => {
@@ -93,5 +52,20 @@ describe('the inbox strip (W7/K24)', () => {
     expect(fitRows({ win: 300, fixed: 280, row: 28, items: 5 })).toBe(1);
     // 3 items: no '+ n more' row, 3 rows fit where 3 + more did not
     expect(fitRows({ win: 500, fixed: 200, row: 28, items: 3 })).toBe(3);
+  });
+});
+
+describe("the keys on an open card (cardKeyOf)", () => {
+  it('digits that are options pick, ←→ walk, ⌘⌫ closes, esc puts off', () => {
+    const k = (k_: string, mods: Partial<Record<'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({ key: k_, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
+    const c: Card = { ...card(1, 0), options: [{ n: 1, label: "a" }, { n: 2, label: "b" }] };
+    expect(cardKeyOf(k('2'), c, null)).toEqual({ t: 'pick', n: 2 });
+    expect(cardKeyOf(k('3'), c, null)).toBeNull();
+    expect(cardKeyOf(k('ArrowRight'), c, null)).toEqual({ t: 'on', n: 1 });
+    expect(cardKeyOf(k('ArrowRight'), c, 2)).toEqual({ t: 'on', n: 2 });
+    expect(cardKeyOf(k('ArrowLeft'), c, null)).toEqual({ t: 'on', n: 2 });
+    expect(cardKeyOf(k('Backspace', { metaKey: true }), c, null)).toEqual({ t: 'close' });
+    expect(cardKeyOf(k('Escape'), c, null)).toEqual({ t: 'later' });
+    expect(cardKeyOf(k('2', { ctrlKey: true }), c, null)).toBeNull();
   });
 });

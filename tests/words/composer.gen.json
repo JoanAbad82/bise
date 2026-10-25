@@ -586,6 +586,45 @@
     "one": null,
     "text": "try: “"
   },
+  "composer.float_ask": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "ask {agent}"
+  },
+  "composer.float_close": {
+    "args": [],
+    "one": null,
+    "text": "hide the thread"
+  },
+  "composer.float_fold": {
+    "args": [],
+    "one": null,
+    "text": "fold it"
+  },
+  "composer.float_name": {
+    "args": [],
+    "one": null,
+    "text": "composer"
+  },
+  "composer.float_open": {
+    "args": [],
+    "one": null,
+    "text": "show the thread"
+  },
+  "composer.float_to": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "to {agent}"
+  },
+  "composer.float_to_title": {
+    "args": [],
+    "one": null,
+    "text": "send to"
+  },
   "composer.hint_auto_jev": {
     "args": [
       "who"

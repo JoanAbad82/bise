@@ -7,23 +7,23 @@
 /* the box: r 16, --c-raised, --e-1; its head (the context strip, 32, a rule under it), the field (14/22, padding 12 16 8), the tools (40: 28 controls 4 apart, padding 0 8 4) */
 .b-composer .box{display:flex;flex-direction:column;width:min(calc(var(--w-col) - var(--s-12)),calc(100% - var(--s-12)));margin-inline:auto;overflow:hidden;border-radius:var(--r-4);background:var(--c-raised);box-shadow:var(--e-1);transition:box-shadow 120ms var(--ease-out)}
 .b-composer .box.is-focus,.b-composer .box:focus-within{box-shadow:var(--e-1),0 0 0 1px var(--c-focus)}
-.b-composer .box>.head{display:flex;align-items:center;gap:var(--s-4);min-width:0;height:var(--s-8);padding:0 var(--s-4);box-shadow:inset 0 -1px 0 var(--c-line);background:color-mix(in srgb,var(--c-text) 2%,transparent);font:var(--f-meta);color:var(--c-text-2);white-space:nowrap;position:relative}
+.b-composer .box>.head{display:flex;align-items:center;gap:var(--s-4);min-width:0;height:var(--s-8);padding:0 var(--s-4);box-shadow:inset 0 -1px 0 var(--c-line);background:color-mix(in srgb,var(--p-chip) 70%,transparent);font:var(--f-meta);color:var(--c-text-2);white-space:nowrap;position:relative}
 .b-composer .box.ans:not(.quiet)>.head{background:color-mix(in srgb,var(--c-accent) 7%,transparent)}
 /* his words answer a question (composer-target A, designer m_26531): the tab's line, the box's 1.5 px border and the send in the accent; 120 ms both ways (esc drops it). An approval never: words never approve */
 .b-composer .tab{transition:color 120ms var(--ease-out),box-shadow 120ms var(--ease-out),background-color 120ms var(--ease-out)}
 .b-composer .tab.acc{box-shadow:inset 1px 1px 0 var(--c-accent),inset -1px 0 0 var(--c-accent)}
 .b-composer .tab.acc .lbl{color:var(--c-accent)}
 .b-composer .tab.acc .who{font-weight:600}
-/* his words go to an agent that is not main (agent-target, designer m_28208): lines only, the tab on its plain fill; the send 50% accent while empty as above */
+/* his words go to an agent that is not main (agent-target, designer m_28208): since bise fait mac no accent at all (designer's rule: the accent only on what waits on him; ui-review L1 #1): the placeholder names the agent, the border's tip says it */
 /* only the 'to perf' label is accent: ψ and its folder stay text-3 (designer m_28237) */
 .b-composer .tab.acc.quiet [data-item="place"],.b-composer .tab.acc.quiet [data-item="place"] .g{color:var(--c-text-3)}
 .b-composer .tab.acc.quiet{background:linear-gradient(color-mix(in srgb,var(--c-text) 2%,transparent),color-mix(in srgb,var(--c-text) 2%,transparent)),var(--c-raised)}
-.b-composer .box.ans,.b-composer .box.ans.is-focus,.b-composer .box.ans:focus-within{box-shadow:0 0 0 1.5px var(--c-accent)}
+.b-composer .box.ans:not(.quiet),.b-composer .box.ans:not(.quiet).is-focus,.b-composer .box.ans:not(.quiet):focus-within{box-shadow:0 0 0 1.5px var(--c-accent)}
 .b-composer .send{transition:background-color 120ms var(--ease-out),color 120ms var(--ease-out)}
-.b-composer .box.ans .send:not(.stop){background:var(--c-accent);color:var(--c-on-ink)}
-.b-composer .box.ans .send.off{opacity:.5}
+.b-composer .box.ans:not(.quiet) .send:not(.stop){background:var(--c-accent);color:var(--c-on-ink)}
+.b-composer .box.ans:not(.quiet) .send.off{opacity:.5}
 .b-composer .box .line{display:flex;align-items:flex-start;gap:var(--gap-inline);min-width:0;padding:var(--s-3) var(--s-4) var(--s-2)}
-.b-composer .box .row{display:flex;align-items:center;gap:var(--s-1);height:var(--s-10);padding:0 var(--s-2) var(--s-1);min-width:0}
+.b-composer .box .row{display:flex;align-items:center;gap:var(--s-1);box-sizing:border-box;height:var(--s-10);padding:0 var(--s-2) var(--s-1);min-width:0}
 .b-composer .box .row .sp{flex:1;min-width:0}
 .b-composer .in{flex:1;font:var(--f-read)}
 .b-composer .in .ph{color:var(--c-text-3)}

@@ -1,6 +1,6 @@
 // The thread's composer (amb-web's Composer with this thread's target, sources, drafts, answers
 // and slash commands), also mounted under an open artifact and in the floating composer
-// (composer/float); its head the context strip (ComposerTab.tsx), its notice the hub's word on his
+// (composer/float, `floating`: no strip, '+' alone); its head the context strip (ComposerTab.tsx), its notice the hub's word on his
 // last line; and its pure helpers (about-an-artifact words, the docked card's target, the notice).
 // Split out of ThreadScreen.tsx (the file cap). Owner: nm-composer.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -57,6 +57,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   hubNotes = false,
   strip,
   placeOnly = false,
+  floating = false,
   onCanSend,
 }: {
   project: string;
@@ -73,6 +74,9 @@ export const ThreadComposer = memo(function ThreadComposer({
   strip?: StripProject | undefined;
   /** the empty home: the strip's place is 'new worktree' (main starts its agents in one) */
   placeOnly?: boolean;
+  /** the floating composer's (composer/float): no strip (its head says whom it writes to), '+'
+   *  alone in the tools (no mode, no model) */
+  floating?: boolean;
   /** the field holds something to send (the floating composer stays unfolded while it does) */
   onCanSend?: (can: boolean) => void;
   /** the strip's right instead of the context: 'esc to bise instead' while it answers, 'tab back to voice' */
@@ -371,12 +375,12 @@ export const ThreadComposer = memo(function ThreadComposer({
     () => (
       <>
         <AttachTool onPick={attach} />
-        {!answering && <ModeTool project={project} />}
+        {!answering && !floating && <ModeTool project={project} />}
       </>
     ),
-    [attach, answering, project],
+    [attach, answering, project, floating],
   );
-  const toolsEnd = answering || me === undefined ? undefined : <ModelTool project={project} a={me} />;
+  const toolsEnd = answering || floating || me === undefined ? undefined : <ModelTool project={project} a={me} />;
   // answering, the tab holds only 'answering <agent> · <question>' and the way back: its place and
   // context come back with a plain message (designer m_24517)
   // (the pink artifact's tab the same: '↳ to perf · about “…”' and 'esc to bise instead')
@@ -414,7 +418,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   useEffect(() => {
     doneRef.current = lineDone;
   });
-  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={floating ? undefined : tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
   return field;
 });
 

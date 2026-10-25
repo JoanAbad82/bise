@@ -123,12 +123,6 @@ body:has(.app-shell) {
   flex-direction: column;
   min-height: 0;
 }
-.app-bottom.th-screen {
-  flex: none;
-  height: auto;
-  padding: var(--s-2) 0 0;
-  border-top: 1px solid var(--c-line);
-}
 
 .app-notyet,
 .app-notfound {
