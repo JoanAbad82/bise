@@ -1,12 +1,15 @@
 /* src/ds · ListRow and GroupLabel (listrow.tsx; page native-mac §6, mockup 6): the one row rule of
    every page that is no thread. 52 high, two lines 13/18 + 12/16, padding 0 12, r 8, the state
-   column 16, 12 between the parts; the chosen row --c-active, the hover --c-hover. */
+   column 16, 12 between the parts; the chosen row --c-active, the hover --c-hover. The glyph sits at
+   its column's start: the page's 12 edge, with the group label's words and the lead (designer
+   m_42136). A row's action (RowAction): 28, padding 0 12, r 6, a 1 px ring, 13/500, on --c-seg-on (lighter than
+   the row by night, as the chosen filter). */
 .b-lrow{display:flex;align-items:center;gap:var(--s-3);height:var(--h-list-row);padding:0 var(--s-3) 0 0;border-radius:var(--r-2);color:var(--c-text)}
 .b-lrow:hover{background:var(--c-hover)}
 .b-lrow.on{background:var(--c-active)}
 .b-lrow>.body{display:flex;align-items:center;gap:var(--s-3);flex:1;min-width:0;height:100%;margin:0;padding:0 0 0 var(--s-3);border:0;border-radius:var(--r-2);background:none;color:inherit;font:inherit;text-align:left}
 .b-lrow>.body:focus-visible{outline:2px solid var(--c-focus);outline-offset:-2px}
-.b-lrow .state{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--w-state);font:600 var(--f-ui);color:var(--c-text-3)}
+.b-lrow .state{display:inline-flex;align-items:center;justify-content:flex-start;flex:none;width:var(--w-state);font:600 var(--f-ui);color:var(--c-text-3)}
 .b-lrow .lines{display:flex;flex-direction:column;flex:1;min-width:0}
 .b-lrow .l1{font:400 var(--f-ui);color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .b-lrow .l2{font:400 var(--f-meta);color:var(--c-text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -14,3 +17,7 @@
 .b-glabel{display:flex;align-items:center;gap:var(--s-2);height:var(--h-group);margin:var(--s-4) 0 0;padding:0 var(--s-3);font:500 var(--f-meta);color:var(--c-text-3)}
 .b-glabel .n{color:var(--c-text-3)}
 .b-glabel .n.wait{color:var(--c-accent)}
+.b-ract{display:inline-flex;align-items:center;flex:none;box-sizing:border-box;height:var(--h-control-sm);margin:0;padding:0 var(--s-3);border:0;border-radius:var(--r-1);background:var(--c-seg-on);box-shadow:inset 0 0 0 1px var(--c-line-strong);font:500 var(--f-ui);color:var(--c-text);white-space:nowrap}
+.b-ract:hover{background:var(--c-hover)}
+.b-ract:active{background:var(--c-press)}
+.b-ract:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--c-line-strong),0 0 0 2px var(--c-focus)}

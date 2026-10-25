@@ -21,6 +21,8 @@ export type Entity =
   | { readonly kind: 'agent'; readonly project: string; readonly agent: string }
   /** a project by its hub id (the home hub's too, never '') */
   | { readonly kind: 'project'; readonly project: string }
+  /** a project's bims office (the world's click opens it in a tab: nm-side m_42152) */
+  | { readonly kind: 'office'; readonly project: string }
   /** an artifact by its id, in its store's project (the hub id, the shared library's too) */
   | { readonly kind: 'artifact'; readonly project: string; readonly id: string }
   /** a pull request of a project, by its number */
@@ -33,8 +35,8 @@ export type Entity =
   | { readonly kind: 'process'; readonly project: string; readonly agent: string; readonly id: string }
   /** a plugin by its id */
   | { readonly kind: 'plugin'; readonly id: string }
-  /** a scheduled task by the hub's id (rows::ScheduledTask.id) */
-  | { readonly kind: 'scheduled'; readonly id: number }
+  /** a scheduled task by its hub's id (rows::ScheduledTask.id: ids are per hub, nm-menus m_42167) */
+  | { readonly kind: 'scheduled'; readonly project: string; readonly id: number }
   /** a tab of the panel itself (its own menu: close, close others, move...) */
   | { readonly kind: 'tab'; readonly id: string };
 
@@ -43,7 +45,7 @@ export type EntityKind = Entity['kind'];
 
 /**
  * One string per entity, the same for the same thing: a tab's id, a map's key, a test id's last
- * part ('agent:acme/perf', 'pr:acme/12', 'scheduled:7'). Pure.
+ * part ('agent:acme/perf', 'pr:acme/12', 'scheduled:acme/7'). Pure.
  */
 export function entityKey(e: Entity): string {
   switch (e.kind) {
@@ -51,6 +53,8 @@ export function entityKey(e: Entity): string {
       return `agent:${e.project}/${e.agent}`;
     case 'project':
       return `project:${e.project}`;
+    case 'office':
+      return `office:${e.project}`;
     case 'artifact':
       return `artifact:${e.project}/${e.id}`;
     case 'pr':
@@ -64,7 +68,7 @@ export function entityKey(e: Entity): string {
     case 'plugin':
       return `plugin:${e.id}`;
     case 'scheduled':
-      return `scheduled:${String(e.id)}`;
+      return `scheduled:${e.project}/${String(e.id)}`;
     case 'tab':
       return `tab:${e.id}`;
   }

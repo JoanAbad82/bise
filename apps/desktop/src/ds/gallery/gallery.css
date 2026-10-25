@@ -45,5 +45,6 @@ html,body{margin:0;background:#777}
 .g-mac{width:var(--w-col)}
 .g-mac-end{margin-left:auto}
 .g-mac-q{color:var(--c-accent)}
-.g-mac-icons{gap:var(--s-3);color:var(--c-text-2)}
+.g-mac-icons{gap:var(--s-3);margin-top:var(--s-4);color:var(--c-text-2)}
+.g-mac-gap{height:var(--s-6)}
 .g-hover .b-lrow{background:var(--c-hover)}

@@ -5,7 +5,8 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ds } from "@/proto/words_ds.gen";
-import { APP_ICONS, AppIcon, BarSearch, Filters, GroupLabel, LeadWait, ListRow, MoreButton, PageLead, type EntityMenu } from "./index";
+import { entityKey } from "@/shared/entity";
+import { APP_ICONS, AppIcon, BarSearch, Filters, GroupLabel, LeadWait, ListRow, MoreButton, PageLead, RowAction, type EntityMenu } from "./index";
 import { clippers, noClip } from "./noclip";
 
 afterEach(cleanup);
@@ -97,6 +98,30 @@ describe("ListRow", () => {
     fireEvent.click(getByTestId("r.open"));
     fireEvent.contextMenu(getByTestId("r"));
     expect([open.mock.calls.length, m.right]).toEqual([1, 1]);
+  });
+});
+
+describe("RowAction", () => {
+  it("a real button with its words, its tip and its click", () => {
+    const go = vi.fn();
+    const { getByTestId } = render(<RowAction onClick={go} tip="answer perf" testId="a">answer</RowAction>);
+    const b = getByTestId("a");
+    expect([b.tagName, b.className, b.textContent, b.dataset["tip"]]).toEqual(["BUTTON", "b-ract", "answer", "answer perf"]);
+    fireEvent.click(b);
+    expect(go).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("entityKey (shared/entity.ts)", () => {
+  it("one key per thing, the same for the same ids, the kind first", () => {
+    expect([
+      entityKey({ kind: "agent", project: "acme", agent: "perf" }),
+      entityKey({ kind: "office", project: "acme" }),
+      entityKey({ kind: "pr", project: "acme", number: 12 }),
+      entityKey({ kind: "diff", project: "acme", agent: "perf" }),
+      entityKey({ kind: "diff", project: "acme", agent: "perf", path: "src/a.rs" }),
+      entityKey({ kind: "scheduled", project: "acme", id: 7 }),
+    ]).toEqual(["agent:acme/perf", "office:acme", "pr:acme/12", "diff:acme/perf", "diff:acme/perf/src/a.rs", "scheduled:acme/7"]);
   });
 });
 

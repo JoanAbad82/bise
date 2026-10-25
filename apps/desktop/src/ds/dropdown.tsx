@@ -32,8 +32,8 @@ export function Caret() {
 export interface PickerTriggerProps {
   /** its words (the current value) */
   children: ReactNode;
-  /** chip (default): the 28 px tool chip; field: the settings' Field, full width */
-  look?: "chip" | "field";
+  /** chip (default): the 28 px tool chip; field: the settings' Field, full width; pop: a page's filter menu (28, a 1 px ring: native-mac §6) */
+  look?: "chip" | "field" | "pop";
   /** a screen's own signed addition (a class with its rule in the screen's css: the ds lint checks it) */
   extra?: string;
   /** its menu shows (aria-expanded, the chip's tint) */
@@ -92,7 +92,7 @@ export function PickerPop({ anchor, box, align = "auto", side = "below", match =
 export interface DropdownProps extends Omit<PickerPopProps, "anchor" | "onClose" | "testId"> {
   /** the trigger's words */
   label: ReactNode;
-  look?: "chip" | "field";
+  look?: "chip" | "field" | "pop";
   extra?: string;
   /** the trigger's name in words (aria-label) */
   name?: string;
