@@ -62,10 +62,10 @@ export function gardenOf(o: Office): Box {
   return { x0: o.x0, x1, z0: t.z1, z1: t.z1 + size(o.D) };
 }
 
-/** the network's walk out of the square into the wing: from main's desk along its line, then down the wing's middle */
+/** the network's walk out of the square into the wing: from main's desk along its line, then along the wing's open front (its back wall's floor stays for things) */
 function wingLegs(o: Office, w: Box): Leg[] {
   const from: Pt = { x: o.mainDesk.x, z: o.mainDesk.z };
-  const z = (w.z0 + w.z1) / 2;
+  const z = w.z1 - WING_IN;
   const a: Pt = { x: w.x0 + WING_IN, z: from.z };
   const b: Pt = { x: w.x0 + WING_IN, z };
   const c: Pt = { x: w.x1 - WING_END, z };
