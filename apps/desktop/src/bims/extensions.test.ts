@@ -100,7 +100,7 @@ describe("his sketch's growth", () => {
     expect(overlaps(g.wing ?? { x0: 0, x1: 0, z0: 0, z1: 0 }, { x0: o.x0, x1: o.x0 + o.W, z0: 0, z1: o.D })).toBe(false);
   });
 
-  it('grows the loft only so far (each map grows in its own step)', () => {
-    expect([...GROWS]).toEqual(['loft']);
+  it('grows the maps with a back wall so far (the open ones in their own step)', () => {
+    expect([...GROWS].sort()).toEqual(['campus', 'haveli', 'kyoto', 'loft', 'nordic', 'patio', 'riad', 'tropical', 'workshop']);
   });
 });
