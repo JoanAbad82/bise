@@ -31,10 +31,9 @@ async function openCards(w: World, project: string): Promise<HubCard[]> {
   return [...cards, ...others];
 }
 
-/** A sidebar row's pink count (none drawn: 0). */
-async function countOf(s: Session, testId: string): Promise<number> {
-  const el = s.page.locator(`[data-testid="${testId}.count"]`);
-  return (await el.count()) === 0 ? 0 : Number((await el.first().textContent()) ?? '0');
+/** Whether a mark is drawn (bise fait mac: the rail's inbox dot, an agent row's accent dot; no counts). */
+async function drawn(s: Session, selector: string): Promise<boolean> {
+  return (await s.page.locator(selector).count()) > 0;
 }
 
 /** What every surface says of the card and the counts, beside the hubs' truth. */
@@ -44,25 +43,26 @@ async function surfaces(s: Session, w: World, name: string, shop: string, key: s
   return {
     strip: await s.page.locator(`[data-testid="strip.card.${key}"]`).count(),
     block: await s.page.locator(`[data-testid="inbox.block.card.${key}"]`).count(),
-    shopCount: await countOf(s, `app.sidebar.project.${shop}`),
-    shopTruth: (await openCards(w, name)).length,
+    // the sidebar's dot on one of the project's agents, the rail's inbox dot: drawn when something waits
+    shopDot: await drawn(s, `[data-testid^="app.side.agent.${shop}."][data-testid$=".waits"]`),
+    shopTruth: (await openCards(w, name)).length > 0,
     // bise's ask is listed only beside a real item (inbox/Block.tsx asksNotify)
-    inboxCount: (await countOf(s, 'app.sidebar.inbox')) - (sum > 0 ? ask : 0),
-    inboxTruth: sum,
+    inboxDot: await drawn(s, '[data-testid="app.rail.inbox.dot"]'),
+    inboxTruth: sum + (sum > 0 ? ask : 0) > 0,
   };
 }
 
 /** On a red: the hubs' open cards and the inbox screen's waiting rows, side by side. */
 async function why(s: Session, w: World): Promise<string> {
   const hubs = await Promise.all(w.hubs.map(async (h) => `${h.project}: ${(await openCards(w, h.project)).map((c) => `#${String(c.id)} ${(c.question ?? c.text ?? '').slice(0, 40)}`).join(' | ')}`));
-  await s.page.locator('[data-testid="app.sidebar.inbox"]').click();
+  await s.page.locator('[data-testid="app.rail.inbox"]').click();
   await s.page.waitForTimeout(1000);
   const rows = await s.page.locator('[data-testid^="inbox.row.w:"]').evaluateAll((els) => els.filter((e) => /^inbox\.row\.w:[^.]+$/u.test(e.getAttribute('data-testid') ?? '')).map((e) => `${e.getAttribute('data-testid') ?? ''}: ${e.textContent.slice(0, 80)}`));
   return `hubs:\n  ${hubs.join('\n  ')}\ninbox screen:\n  ${rows.join('\n  ')}`;
 }
 
 const settled = (r: Record<string, unknown>): boolean =>
-  r['strip'] === 0 && r['block'] === 0 && r['shopCount'] === r['shopTruth'] && r['inboxCount'] === r['inboxTruth'];
+  r['strip'] === 0 && r['block'] === 0 && r['shopDot'] === r['shopTruth'] && r['inboxDot'] === r['inboxTruth'];
 
 /** What the case does before he answers. */
 type Before = 'none' | 'visit';
@@ -88,7 +88,7 @@ async function answerThenOpen(name: string, question: string, n: number, before:
     if (before === 'visit') {
       await expect(page.locator('[data-testid="thread.list"]')).toBeVisible({ timeout: 20_000 });
       await expect(page.locator(`[data-testid="strip.card.${key}"], [data-testid="inbox.block"]`).first(), 'the card waits in its thread').toBeVisible({ timeout: 20_000 });
-      await page.locator('[data-testid="app.sidebar.inbox"]').click();
+      await page.locator('[data-testid="app.rail.inbox"]').click();
     }
     // 1. the inbox screen: its row, opened above the composer, his pick n
     const row = page.locator(`[data-testid="inbox.row.${wkey}"]`);
@@ -105,7 +105,7 @@ async function answerThenOpen(name: string, question: string, n: number, before:
     await expect(row, 'gone from the inbox screen').toHaveCount(0, { timeout: 10_000 });
 
     // 2. the project's thread, from the sidebar
-    await page.locator(`[data-testid="app.sidebar.project.${project}"]`).click();
+    await page.locator(`[data-testid="app.side.agent.${project}.main"]`).click();
     await expect(page.locator('[data-testid="thread.list"]')).toBeVisible({ timeout: 20_000 });
     let last: Record<string, unknown> = {};
     const reads = async (): Promise<boolean> => settled((last = await surfaces(s, w, name, project, key, ask)));
@@ -114,7 +114,7 @@ async function answerThenOpen(name: string, question: string, n: number, before:
     await page.screenshot({ path: test.info().outputPath(`${name}-${before}-after.png`) });
 
     // 3. back on the inbox screen: not there again
-    await page.locator('[data-testid="app.sidebar.inbox"]').click();
+    await page.locator('[data-testid="app.rail.inbox"]').click();
     await expect(page.locator(`[data-testid="inbox.row.${wkey}"]`), 'not back on the inbox screen').toHaveCount(0);
   } finally {
     await s.close();

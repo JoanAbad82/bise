@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { badgeOf, CountKeeper, titleOf } from './counts';
+import { badgeOf, CountKeeper } from './counts';
 
 const card = (id: number): Record<string, unknown> => ({ id });
 
@@ -53,15 +53,10 @@ describe('CountKeeper', () => {
   });
 });
 
-describe('badge and title', () => {
+describe('badge', () => {
   it('the badge is the waiting count, none at 0, 99+ past 99', () => {
     expect(badgeOf({ waiting: 0, working: 5 })).toBe('');
     expect(badgeOf({ waiting: 2, working: 0 })).toBe('2');
     expect(badgeOf({ waiting: 120, working: 0 })).toBe('99+');
-  });
-  it('the title names what waits and what works', () => {
-    expect(titleOf({ waiting: 0, working: 0 })).toBe('bise');
-    expect(titleOf({ waiting: 2, working: 3 })).toBe('bise · 2 waiting · 3 working');
-    expect(titleOf({ waiting: 0, working: 1 })).toBe('bise · 1 working');
   });
 });

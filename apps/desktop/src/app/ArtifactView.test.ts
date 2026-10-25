@@ -15,15 +15,3 @@ describe("an artifact's route (its tab in the panel, the maker's thread in the c
     expect(isFrameEsc(null)).toBe(false);
   });
 });
-
-import { initialsOf } from './SideRail';
-
-describe("the rail's project initials (designer m_20435 (f))", () => {
-  it("two words: their first letters; one word: its first letter; capitals", () => {
-    expect(initialsOf('storefront')).toBe('S');
-    expect(initialsOf('gift-cards')).toBe('GC');
-    expect(initialsOf('my shop app')).toBe('MS');
-    expect(initialsOf('élan')).toBe('É');
-    expect(initialsOf('')).toBe('');
-  });
-});

@@ -1546,8 +1546,6 @@ export const settings = {
   plugins_waits_login: (a: { name: string | number }): string => String(a.name) + " needs a login",
   /** sidebar tip: a plugin whose server failed */
   plugins_waits_error: (a: { name: string | number }): string => String(a.name) + " failed to start",
-  /** sidebar: the dot's tip (new things to connect he hasn't looked at) */
-  plugins_side_new: "something new to connect",
   /** place: under the title */
   plugins_place_sub: "what your agents can use, in every project",
   /** place: the head's counts */

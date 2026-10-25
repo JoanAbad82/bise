@@ -13,19 +13,24 @@
 // READY_LINE once the main window's page has loaded.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions } from 'electron';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface, type WindowOpen } from '../shared/api';
-import { glassOf } from './glass';
+import { app, BrowserWindow, nativeTheme, screen, systemPreferences, type BrowserWindowConstructorOptions } from 'electron';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, READY_LINE, ROUTE_ENV, SURFACE_ARG, type A11y, type Surface, type WindowOpen } from '../shared/api';
+import { a11yNow } from './a11y';
+import { glassOf, OPAQUE, type GlassLook } from './glass';
 import { readKeep, writeKeep } from './keep';
-import { framesText, keepFrame, MAIN_SIZE, openFrame, parseFrames, type Screen } from './mainsize';
+import { doubleClickOf, framesText, keepFrame, MAIN_SIZE, openFrame, parseFrames, type Screen } from './mainsize';
 import { isOffscreen } from './offscreen';
 import { OFF, OFF_DISPLAY, type Rect } from './place';
 
 // -30000: off every display (place.ts, read by offscreen.ts too without Electron)
 export { OFF };
 
-/** macOS's window buttons in the sidebar's top room, the title bar's --h-bar 40 (app.css .b-lights). */
-export const LIGHTS = { x: 16, y: 15 } as const;
+/**
+ * macOS's window buttons in the window's bar (bise fait mac, page native-mac §6): x 20, and 12 px
+ * lights from y 20, so centred at 26 in the 52 px bar (--h-bar). Full screen hides them; the page
+ * keeps their room (nothing moves).
+ */
+export const LIGHTS = { x: 20, y: 20 } as const;
 
 /** The webPreferences every bise window shares. */
 export function webPreferences(surface: Surface, testMode: boolean): BrowserWindowConstructorOptions['webPreferences'] {
@@ -43,18 +48,47 @@ export function webPreferences(surface: Surface, testMode: boolean): BrowserWind
 /**
  * Loads the renderer for `surface` (its URL says which: '?surface=window' or
  * '?surface=capsule', so tests and the guard tell the two pages apart:
- * qa-type m_9675), on `route` when given ('#route=<route>').
+ * qa-type m_9675), on `route` when given ('#route=<route>'). `own`: a window of its own
+ * (openWindowOf: '?own=settings'), which never keeps its route as the main window's.
  */
-export function loadRenderer(win: BrowserWindow, surface: Surface, route: string | undefined): void {
+export function loadRenderer(win: BrowserWindow, surface: Surface, route: string | undefined, own?: WindowOpen['kind']): void {
   const hash = route === undefined || route === '' ? '' : `route=${encodeURIComponent(route)}`;
+  const query: Record<string, string> = { surface, ...(own === undefined ? {} : { own }) };
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
   if (!app.isPackaged && devUrl !== undefined && devUrl !== '') {
     const u = new URL(devUrl);
-    u.searchParams.set('surface', surface);
+    for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v);
     u.hash = hash;
     void win.loadURL(u.toString());
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { surface }, ...(hash === '' ? {} : { hash }) });
+    void win.loadFile(join(__dirname, '../renderer/index.html'), { query, ...(hash === '' ? {} : { hash }) });
+  }
+}
+
+/** The glass's look now: reduce transparency (a11y.ts) and the theme of its opaque ground. */
+export function glassLook(a: A11y = a11yNow()): GlassLook {
+  return { reduceTransparency: a.reduceTransparency, dark: nativeTheme.shouldUseDarkColors };
+}
+
+/** A bise window's glass after a change of macOS's settings (a11y.ts): vibrancy off and an opaque ground, or back. */
+export function applyGlass(win: BrowserWindow, a: A11y, testMode: boolean): void {
+  if (win.isDestroyed()) return;
+  const g = glassOf('window', process.platform, testMode, glassLook(a));
+  if (process.platform !== 'darwin' || testMode) return;
+  // GlassOptions' vibrancy is the constructor's, wider than setVibrancy's (no 'appearance-based' here)
+  win.setVibrancy((g.vibrancy ?? null) as Parameters<BrowserWindow['setVibrancy']>[0]);
+  win.setBackgroundColor(g.backgroundColor ?? (nativeTheme.shouldUseDarkColors ? OPAQUE.dark : OPAQUE.light));
+}
+
+/** A double-click on a bise window's bar (window.bise.barDoubleClick): zoom or minimise, as his Mac says. */
+export function barDoubleClick(win: BrowserWindow | null): void {
+  if (win === null || win.isDestroyed()) return;
+  const pref = process.platform === 'darwin' ? systemPreferences.getUserDefault('AppleActionOnDoubleClick', 'string') : '';
+  const act = doubleClickOf(pref);
+  if (act === 'minimize') win.minimize();
+  else if (act === 'zoom') {
+    if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
   }
 }
 
@@ -66,7 +100,6 @@ const OFF_SCREEN: Screen = { id: 'off', ...OFF_DISPLAY };
 
 export class MainWindow {
   private win: BrowserWindow | null = null;
-  private title = 'bise';
   private keepTimer: NodeJS.Timeout | null = null;
 
   /**
@@ -116,12 +149,6 @@ export class MainWindow {
     return this.win;
   }
 
-  /** The window's title (counts.ts: 'bise · 2 waiting'), kept for the next window too. */
-  setTitle(title: string): void {
-    this.title = title;
-    this.win?.setTitle(title);
-  }
-
   /**
    * `how`: 'front' as always; after a quiet moment's update (update/run.ts) 'inactive' (on screen,
    * never taking focus from what he is in) or 'hidden' (its window wasn't shown: the Dock's click shows it).
@@ -137,19 +164,16 @@ export class MainWindow {
       // focusable false: a stray focus() can never activate the app over his;
       // the harness draws the caret with CDP focus emulation.
       ...(test ? { focusable: false } : {}),
-      title: this.title,
+      // its title is the page's (what he looks at: 'perf', 'inbox'; app/title.ts), never 'bise' alone
+      title: 'bise',
       // one set of controls (his try round 3): macOS's lights over the
       // sidebar's top room, no title bar and no title text; the page's
       // sidebar top and heads are its drag regions (app.css)
       ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: LIGHTS } : {}),
-      ...glassOf('window', process.platform, test),
+      ...glassOf('window', process.platform, test, glassLook()),
       webPreferences: webPreferences('window', test),
     });
     this.win = win;
-    // the title is main's (the counts), never the page's <title>
-    win.on('page-title-updated', (e) => {
-      e.preventDefault();
-    });
     win.on('closed', () => {
       if (this.win === win) this.win = null;
     });
@@ -165,13 +189,7 @@ export class MainWindow {
       this.keepTimer = null;
       this.keepFrame(win);
     });
-    // macOS full screen hides the lights: the page drops their room (lead m_15020, amb-win)
-    win.on('enter-full-screen', () => {
-      win.webContents.send(IPC.fullScreen, true);
-    });
-    win.on('leave-full-screen', () => {
-      win.webContents.send(IPC.fullScreen, false);
-    });
+    // macOS full screen hides the lights; the page keeps their room: nothing moves (bise fait mac)
     if (test) {
       win.webContents.once('did-finish-load', () => {
         process.stdout.write(`${READY_LINE}\n`);
@@ -202,14 +220,71 @@ export class MainWindow {
   }
 }
 
+/** The settings window's size (page native-mac §6: its own window, ⌘,). */
+export const SETTINGS_SIZE = { width: 780, height: 600 } as const;
+/** An artifact's or an agent's own window, first open. */
+export const OWN_SIZE = { width: 1100, height: 760 } as const;
+
+/** Which open own window a WindowOpen goes to: settings has one, the others one per route. Pure. */
+export const ownKey = (to: WindowOpen): string => (to.kind === 'settings' ? 'settings' : `${to.kind}:${to.route}`);
+
 /**
- * A window of its own (window.bise.openWindow with a WindowOpen; bise fait mac): settings (780 ×
- * 600, one at a time), an artifact, an agent's thread. The contract nm-ds set for the wave; nm-frame
- * fills it (nm-settings and nm-panel call it).
+ * The windows of their own (window.bise.openWindow with a WindowOpen; bise fait mac): settings
+ * (780 × 600, one at a time: opening it again brings it to the front on the asked page; the page
+ * reopens on its last page itself, app/title.ts ownStart), an artifact, an agent's thread (one
+ * window per route). The same renderer bundle as the main window, on that route, '?own=<kind>'.
  */
-export const openWindowOf: (to: WindowOpen) => void = () => {
-  // STUB(native-mac): nm-frame
-};
+export class OwnWindows {
+  private readonly open_ = new Map<string, BrowserWindow>();
+
+  constructor(
+    private readonly testMode: boolean,
+    private readonly offscreen = false,
+  ) {}
+
+  /** Every own window open now (a11y's glass change reaches them too). */
+  all(): BrowserWindow[] {
+    return [...this.open_.values()].filter((w) => !w.isDestroyed());
+  }
+
+  open(to: WindowOpen): void {
+    const key = ownKey(to);
+    const had = this.open_.get(key);
+    if (had !== undefined && !had.isDestroyed()) {
+      if (to.route !== '') had.webContents.send(IPC.route, to.route);
+      if (!this.testMode && !this.offscreen) {
+        if (had.isMinimized()) had.restore();
+        had.show();
+        had.focus();
+      }
+      return;
+    }
+    const test = this.testMode;
+    const size = to.kind === 'settings' ? SETTINGS_SIZE : OWN_SIZE;
+    const win = new BrowserWindow({
+      ...size,
+      ...(to.kind === 'settings' ? { minWidth: SETTINGS_SIZE.width, minHeight: SETTINGS_SIZE.height, fullscreenable: false } : { minWidth: MAIN_SIZE.minWidth }),
+      ...(test || this.offscreen ? { x: OFF, y: OFF } : {}),
+      show: false,
+      ...(test ? { focusable: false } : {}),
+      title: 'bise',
+      ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: LIGHTS } : {}),
+      ...glassOf('window', process.platform, test, glassLook()),
+      webPreferences: webPreferences('window', test),
+    });
+    this.open_.set(key, win);
+    win.on('closed', () => {
+      if (this.open_.get(key) === win) this.open_.delete(key);
+    });
+    if (!test) {
+      win.once('ready-to-show', () => {
+        if (this.offscreen) return;
+        win.show();
+      });
+    }
+    loadRenderer(win, 'window', to.route, to.kind);
+  }
+}
 
 /** What the renderer sent to openWindow: a route (or nothing) for the main window, or a WindowOpen. Pure. */
 export function windowTarget(raw: unknown): { readonly main: string | undefined } | { readonly own: WindowOpen } {

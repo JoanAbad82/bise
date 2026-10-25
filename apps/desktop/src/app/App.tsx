@@ -34,10 +34,11 @@ import { BranchScreen } from '@/review/BranchScreen';
 import { PrsScreen } from '@/review/PrsScreen';
 import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
-import { Main, Win } from '@/ds';
+import { Main } from '@/ds';
 import { Sidebar, useWaitingTotal } from './Sidebar';
+import { SideRail } from './SideRail';
 import { useZen, useZenWatch } from './zen';
-import { Over, Titlebar, useFrame } from './Frame';
+import { Bar, Over, SIDEBAR_WIDTH_LABEL, useFrame } from './Frame';
 import { PanelHost } from './panel/Host';
 import { SideHost } from './side3d/Host';
 import { FloatHost } from '@/composer/float/Host';
@@ -56,7 +57,9 @@ import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
 import { AddSheetHost } from '@/settings/AddSheet';
 import { pickerPort } from '@/settings/picker';
-import { addProject } from './addProject';
+import { newAgent, NewAgentHost } from './newagent';
+import { useA11yRoot, useGroundRoot } from './a11yroot';
+import { ownWindow, routeKeyOf } from './own';
 import { Splitter } from './Splitter';
 import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
 import { panel } from '@/terminal/panel';
@@ -76,8 +79,10 @@ export function App() {
   // the window reopens where he left it, after a reload, an update swap or the next day (m_11763);
   // its back and forward places come back after a reload only (the window's session)
   useEffect(() => {
+    // a window of its own keeps its route apart, or none (own.ts)
+    const key = routeKeyOf(ownWindow());
     const save = () => {
-      keep.setView('route', formatRoute(router.get()));
+      if (key !== null) keep.setView(key, formatRoute(router.get()));
       try {
         sessionStorage.setItem(HISTORY_KEY, JSON.stringify(router.saved()));
       } catch {
@@ -103,6 +108,13 @@ export function App() {
  * closed, amb-mac 339d3e5e) is bise's thread with the panel shown.
  */
 function firstRoute(): Route {
+  // the settings window reopens on its last page; an artifact's or an agent's on its route (own.ts)
+  const own = ownWindow();
+  if (own !== undefined) {
+    const asked = startRouteOf(window.location.hash);
+    if (own === 'settings') return keptRoute('route.settings') ?? asked ?? { screen: 'settings' };
+    return asked ?? { screen: 'bise' };
+  }
   if (TERMINAL.test(window.location.hash)) {
     panel.show();
     return { screen: 'bise' };
@@ -141,8 +153,8 @@ function sessionHistory(): SavedHistory | undefined {
 }
 
 /** Where he was when the window last closed (keep.ts), unless that was a test lab. */
-function keptRoute(): Route | undefined {
-  const s = keep.view('route');
+function keptRoute(key = 'route'): Route | undefined {
+  const s = keep.view(key);
   if (typeof s !== 'string' || s === '') return undefined;
   const r = parseRoute(s);
   return r.screen === 'notfound' || r.screen === 'lab' ? undefined : r;
@@ -186,6 +198,10 @@ function Shell() {
   // answer-in-thread A: his answer to another project's card takes the window to it
   useAnswerJumps(router);
   useStill();
+  // macOS's reduce transparency / motion and increase contrast on <html> (a11yroot.ts)
+  useA11yRoot();
+  // no vibrancy under the page (the harness, a non-Mac): the frame paints its own ground
+  useGroundRoot();
   // the done kiss: who just finished, for every mark of the window (Marks.tsx)
   useKissWatch();
   const [palette, setPalette] = usePaletteOpen();
@@ -252,7 +268,20 @@ function Shell() {
         </div>
       ) : (
         <>
-          <Win side={side ? <Sidebar onSearch={openPalette} /> : null} main={<Current top={<Titlebar frame={frame} />} />} aside={<PanelHost />} />
+          {/* the frame (bise fait mac, mockup 1): the bar over everything, the rail always, the
+              sidebar (0 wide when hidden: it stays mounted, inert, so ⌘\ animates its 220 ms), the
+              screen, the tabbed panel (nm-panel's PanelHost, its own width) */}
+          <div className="app-frame" data-testid="app.frame">
+            <Bar frame={frame} />
+            <SideRail />
+            <div className="app-sidecol" inert={!side} data-testid="app.sidecol">
+              <Sidebar onSearch={openPalette} />
+            </div>
+            <Current />
+            <div className="app-panelcol">
+              <PanelHost />
+            </div>
+          </div>
           {/* his try a43609b2: both side columns resize by their border (designer m_19374); a folded
               sidebar opens again by a drag from the window's left edge */}
           {frame.width !== 'narrow' && (
@@ -265,7 +294,7 @@ function Shell() {
               onReset={() => {
                 frame.reset('side');
               }}
-              label="sidebar width"
+              label={SIDEBAR_WIDTH_LABEL}
               testId="app.split.side"
             />
           )}
@@ -302,15 +331,15 @@ function Shell() {
   );
 }
 
-function Current({ top }: { top: ReactNode }) {
+function Current() {
   const route = useRoute();
   // a screen remounts when its route changes: no state of one thread
   // leaks into the next (the old window showed shop's thread under bise)
   return (
     <Main testId="app.main">
-      {top}
       <HubMoments />
       <AddHost />
+      <NewAgentHost />
       <div className="app-screen">
         <ScreenOf key={formatRoute(route)} route={route} />
       </div>
@@ -508,7 +537,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
       else if ('palette' in act) openPalette();
       else if ('help' in act) openHelp();
       else if ('frame' in act) frameRef.current(act.frame);
-      else if ('addProject' in act) addProject(router);
+      else if ('newAgent' in act) newAgent(act.newAgent);
       else if ('panel' in act) doPanelKey(act.panel, { route: router.get(), home: store.projects().find((p) => p.home)?.project, openFolder: (p) => { const path = store.projects().find((x) => x.project === p)?.path; if (path) void window.bise.openPath(path); } });
       else emitAction(act.screen);
     };

@@ -48,7 +48,7 @@ async function roomShows(s: Session): Promise<boolean> {
   return colours.size >= 64;
 }
 
-test('the plugins place: the sidebar row, the band, the list, a page, add', async () => {
+test('the plugins place: the rail button, the band, the list, a page, add', async () => {
   test.setTimeout(90_000);
   const core = new FakeCore();
   const s = await launchDesktop({ core, helper: new FakeHelper(), route: 'bise' });
@@ -56,9 +56,9 @@ test('the plugins place: the sidebar row, the band, the list, a page, add', asyn
     await s.app.evaluate(({ BrowserWindow }, size) => {
       for (const w of BrowserWindow.getAllWindows()) w.setSize(size.w, size.h);
     }, { w: W, h: H });
-    const row = s.page.getByTestId('app.sidebar.plugins');
+    // the rail's plugins button (bise fait mac: no count on the rail; the place says what waits)
+    const row = s.page.getByTestId('app.rail.plugins');
     await expect(row).toBeVisible();
-    await expect(s.page.getByTestId('app.sidebar.plugins.count')).toHaveText('3');
     await row.click();
     await expect(s.page.getByTestId('plugins.place')).toBeVisible();
     await expect(s.page.getByTestId('plugins.counts')).toHaveText(`${settings.plugins_place_counts({ on: 16, off: 2 })} · ${settings.plugins_place_waits({ n: 3 })}`);
@@ -93,7 +93,7 @@ test('the plugins place: the sidebar row, the band, the list, a page, add', asyn
     await s.page.getByTestId('plugins.part.blender#mcp:blender.fold').click();
     await shot(s, '6-page-blender');
     await s.page.goBack().catch(() => undefined);
-    await s.page.getByTestId('app.sidebar.plugins').click();
+    await s.page.getByTestId('app.rail.plugins').click();
     // add
     await s.page.getByTestId('plugins.add').click();
     await expect(s.page.getByTestId('plugins.add.menu')).toBeVisible();

@@ -37,6 +37,7 @@ pub mod common;
 pub mod composer;
 pub mod debug;
 pub mod ds;
+pub mod frame;
 pub mod hero;
 pub mod inbox;
 pub mod library;
@@ -70,6 +71,7 @@ pub const ALL: &[(&str, &[Word])] = &[
     ("composer", composer::WORDS),
     ("debug", debug::WORDS),
     ("ds", ds::WORDS),
+    ("frame", frame::WORDS),
     ("hero", hero::WORDS),
     ("inbox", inbox::WORDS),
     ("library", library::WORDS),

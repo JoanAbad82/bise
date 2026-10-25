@@ -166,8 +166,6 @@ export function installIpc(testMode: boolean): void {
   // reads behind the realpath fence (architect m_39772: a symlink in a project can't reach out)
   const thumbEnv: ThumbEnv = { root: thumbsDir, lookable: (raw) => realLookable(raw, [homedir(), ...roots]), quickLook: !testMode && !isOffscreen(process.env, testMode) };
   ipcMain.handle(IPC.thumb, (_e, raw: unknown, want: unknown): Promise<ThumbAnswer | null> => thumb(thumbEnv, raw, want));
-  // a window's full screen now (window.bise.onFullScreen's first call)
-  ipcMain.handle(IPC.fullScreen, (e): boolean => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);
   ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));
   ipcMain.handle(IPC.pickFiles, (e): Promise<readonly string[]> => pickFiles(BrowserWindow.fromWebContents(e.sender), testMode));
   ipcMain.handle(IPC.popupMenu, (e, items: unknown, at: unknown): Promise<string | null> => popupMenu(BrowserWindow.fromWebContents(e.sender), Array.isArray(items) ? (items as PopupItem[]) : [], (at ?? undefined) as PopupAt | undefined));

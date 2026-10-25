@@ -1,7 +1,8 @@
 // The counts outside the app (bar T: W33/N10, the TUI's tab title
 // "#2 ●3 · harness"): with the window in the back, the Dock's badge says how
-// many cards wait for him, and the window's title says it with the agents at
-// work. Pure: index.ts feeds it the core's events and draws what it returns.
+// many cards wait for him, and the menu bar's ':*' says it with the agents at
+// work (the window's title is what he looks at since bise fait mac: app/title.ts).
+// Pure: index.ts feeds it the core's events and draws what it returns.
 //
 // A project's open cards: its hub's own `cards` event once one came (the
 // store's rule, src/store/store.ts), else its `projects` row's cards, else
@@ -84,12 +85,4 @@ function num(v: unknown): number {
 export function badgeOf(c: Counts): string {
   if (c.waiting <= 0) return '';
   return c.waiting > 99 ? '99+' : String(c.waiting);
-}
-
-/** The main window's title: 'bise', or 'bise · 2 waiting · 3 working'. */
-export function titleOf(c: Counts): string {
-  const parts = ['bise'];
-  if (c.waiting > 0) parts.push(`${c.waiting} waiting`);
-  if (c.working > 0) parts.push(`${c.working} working`);
-  return parts.join(' · ');
 }

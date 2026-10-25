@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { centred, framesText, keepFrame, MAIN_SIZE, MARGIN, NO_FRAMES, openFrame, parseFrames, screenOf, type Screen } from './mainsize';
+import { centred, doubleClickOf, framesText, keepFrame, MAIN_SIZE, MARGIN, NO_FRAMES, openFrame, parseFrames, screenOf, type Screen } from './mainsize';
 
 // two displays side by side: a laptop (menu bar 25, Dock 70) and an external one to its right
 const LAPTOP: Screen = { id: '1', bounds: { x: 0, y: 0, width: 1512, height: 982 }, workArea: { x: 0, y: 25, width: 1512, height: 887 } };
@@ -78,5 +78,14 @@ describe('the frames file', () => {
       expect(openFrame(parseFrames(t), [LAPTOP], LAPTOP), String(t)).toEqual(openFrame(NO_FRAMES, [LAPTOP], LAPTOP));
     }
     expect(parseFrames('{"last":"7","frames":{}}').last).toBeNull();
+  });
+});
+
+describe('doubleClickOf', () => {
+  it("follows macOS's AppleActionOnDoubleClick: zoom when unset or Maximize, else minimise or nothing", () => {
+    expect(doubleClickOf('')).toBe('zoom');
+    expect(doubleClickOf('Maximize')).toBe('zoom');
+    expect(doubleClickOf('Minimize')).toBe('minimize');
+    expect(doubleClickOf('None')).toBe('none');
   });
 });

@@ -185,6 +185,8 @@ export interface BiseApi {
    * agent's thread; main/windows.ts openWindowOf, nm-frame's).
    */
   readonly openWindow: (to?: string | WindowOpen) => void;
+  /** A double-click on the window's bar: zoom or minimise, as macOS's AppleActionOnDoubleClick says (main/windows.ts). */
+  readonly barDoubleClick: () => void;
   /**
    * Shows a native menu (Electron's Menu.popup, drawn by macOS) at the pointer, or under `at` (a
    * '…' button's box, in the window's CSS px); resolves the picked item's id, null when he closes it
@@ -214,12 +216,6 @@ export interface BiseApi {
    * pages server's /a/<id>/… or /p/<id>, framelink.ts): the panel opens it. Returns the unsubscribe.
    */
   readonly onArtifactLink: (listener: (link: ArtifactLink) => void) => () => void;
-  /**
-   * This window in macOS full screen or not: called at once with the state now, then on every
-   * enter / leave (lead m_15020: macOS hides the lights in full screen, so the sidebar's 40 px
-   * room for them goes). Returns the unsubscribe.
-   */
-  readonly onFullScreen: (listener: (full: boolean) => void) => () => void;
   /** `bise ambient-core`, run by main (src/main/core): its events in, typed commands out. */
   readonly core: CorePort;
   /** The terminal panel's shells (src/main/term): one `bise pty` per project, kept while hidden. */
@@ -511,9 +507,8 @@ export const IPC = {
   micSettings: 'bise:mic-settings',
   /** a window -> main: one line for app.log next to core.log (the field's dictation; never his words) */
   appLog: 'bise:app-log',
-  /** main -> a window: it entered (true) or left (false) full screen; invoke: the state now */
-  fullScreen: 'bise:full-screen',
   openWindow: 'bise:open-window',
+  barDoubleClick: 'bise:bar-double-click',
   popupMenu: 'bise:popup-menu',
   /** a window -> main: its Agent menu's items (null: none); main -> the window: the picked id */
   agentMenu: 'bise:agent-menu',

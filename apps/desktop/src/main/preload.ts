@@ -21,7 +21,6 @@ interface Pushed {
   [IPC.helperEv]: HelperEv;
   [IPC.fnVoice]: null;
   [IPC.capsuleState]: CapsuleState;
-  [IPC.fullScreen]: boolean;
   [IPC.notifyState]: NotifyAuth;
   [IPC.route]: string;
   [IPC.artifactLink]: ArtifactLink;
@@ -194,6 +193,9 @@ const api: BiseApi = {
   openWindow: (to) => {
     ipcRenderer.send(IPC.openWindow, to);
   },
+  barDoubleClick: () => {
+    ipcRenderer.send(IPC.barDoubleClick);
+  },
   popupMenu: async (items, at) => {
     const id: unknown = await ipcRenderer.invoke(IPC.popupMenu, items, at);
     return typeof id === 'string' ? id : null;
@@ -206,13 +208,6 @@ const api: BiseApi = {
   onA11y: (listener) => listen(IPC.a11y, listener),
   onRoute: (listener) => listen(IPC.route, listener),
   onArtifactLink: (listener) => listen(IPC.artifactLink, listener),
-  onFullScreen: (listener) => {
-    const off = listen(IPC.fullScreen, listener);
-    void ipcRenderer.invoke(IPC.fullScreen).then((full: unknown) => {
-      listener(full === true);
-    });
-    return off;
-  },
   core: coreBridge(ipcRenderer),
   term: {
     open: async (project, cols, rows, n) => (await ipcRenderer.invoke(IPC.termOpen, project, cols, rows, n ?? 0)) as TermOpened,

@@ -4,7 +4,6 @@ import type { Agent, ProjectRow } from '@/proto';
 import { computerDot, crumbGoOf, crumbOf, folds, moreWords, panelAt, panelWords, panelProject, projectSide, signOf, turnShort } from './side';
 import { keyAction, type KeyLike } from './keys';
 import type { Route } from './route';
-import { newWords } from './Sidebar';
 import { PAGES } from '@/settings/pages';
 
 const NOW = new Date(2026, 9, 7, 14, 0).getTime();
@@ -128,22 +127,18 @@ describe('the frame', () => {
     // every project's artifacts: its word is the only crumb, the last
     expect(crumbGoOf({ screen: 'artifacts', project: '' }, name)).toEqual([]);
   });
-  it('the keys: ⌘\\ the sidebar, ⌥⌘0 the panel, ⌘N add a project, ⌘, settings', () => {
+  it('the keys: ⌘\\ the sidebar, ⌥⌘0 the panel, ⌘N New agent in the project in view, ⌘, settings', () => {
     const k = (code: string, m: Partial<KeyLike> = {}): KeyLike => ({ key: '', code, metaKey: true, altKey: false, ctrlKey: false, shiftKey: false, ...m });
     const ctx = { route: { screen: 'bise' as const }, projects: [], agents: () => [], typing: false };
     expect(keyAction(k('Backslash'), ctx)).toEqual({ frame: 'sidebar' });
     expect(keyAction(k('Digit0', { altKey: true }), ctx)).toEqual({ frame: 'panel' });
     expect(keyAction(k('Digit0'), ctx)).toEqual({ go: { screen: 'bise' } });
-    expect(keyAction(k('KeyN'), ctx)).toEqual({ addProject: true });
+    // no project known yet: nothing; else the route's project, bise's own on bise's thread
+    expect(keyAction(k('KeyN'), ctx)).toBeUndefined();
+    const home = { ...ctx, projects: [{ project: 'home-1', home: true } as never] };
+    expect(keyAction(k('KeyN'), home)).toEqual({ newAgent: 'home-1' });
+    expect(keyAction(k('KeyN'), { ...home, route: { screen: 'thread' as const, project: 'acme', agent: 'perf' } })).toEqual({ newAgent: 'acme' });
     expect(keyAction(k('Comma'), ctx)).toEqual({ go: { screen: 'settings' } });
-  });
-});
-
-describe("the artifacts row's new ones (tui-parity R17)", () => {
-  it("'1 new · designer' when one agent made them, '3 new' from several, nothing when none", () => {
-    expect(newWords(1, ['designer'])).toBe('1 new · designer');
-    expect(newWords(3, ['perf', 'search'])).toBe('3 new');
-    expect(newWords(0, [])).toBe('');
   });
 });
 

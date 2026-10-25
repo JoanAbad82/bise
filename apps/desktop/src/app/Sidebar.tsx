@@ -1,105 +1,46 @@
-// The sidebar (designer's desktop-screens v6/v7, signed): 'search or jump
-// ⌘K', bise, '? inbox' (the pink waiting count), '↗ artifacts' and '◷ scheduled' for every project at once,
-// then his projects, each with its mark (desktop-delight v2: the '∿' gust at
-// work, '?' when it asks him, '·' quiet; a click opens 'bise · storefront')
-// and his pink count; bise's row leads with its ':*' (Marks.tsx); the project's ⋯ menu
-// lists its agents by priority (active, quiet, archived: projmenu.ts); '+ add a project' and settings at the foot.
-// Places only (designer's desktop-right-bar v5, ambient-lead m_20087): the
-// agents of the place shown are in the right bar (RightBar.tsx). Owner: amb-win.
+// The sidebar (bise fait mac, page native-mac §6, mockup 1): beside the rail under the bar, 240
+// wide (200-320 by its border, kept: frame-state.ts), --p-raised 82% with a 12 top-left corner.
+// 'New agent ⌘N' and 'Search ⌘K' first, then 'Pinned' (pins.ts) and 'Projects': each project a
+// folder row (a click folds it), its live agents in the hub's rank under it, the first 4 then
+// 'Show N more', at a row's end only the dot (it waits on him) or the ring (it works): siderows.ts
+// decides, this draws. Its head stays, its list scrolls; a right click on an agent or a project
+// opens its menu (useEntityMenu, nm-menus'). On the artifacts library (decision d2) it shows
+// '← Projects' and the library (artifacts' ArtLibrary) at the same width, a 160 ms crossfade.
+// Owner: nm-frame.
 //
-// It reads only projects, the route and counts (numbers, so a snapshot never
-// changes for nothing): a thread's entries never re-render it.
-import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
-import { IconButton, Kbd, PickerPop, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
+// Each project's block and each pin read their own project's agents (useAgents): an event
+// re-renders the block it touches, never the sidebar, and a thread's entries never do.
+import { memo, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { AppIcon, Input, tipAttrs, type AppIconName, Press } from '@/ds';
 import type { ProjectRow } from '@/proto';
+import { frame } from '@/proto/words_frame.gen';
 import { panel } from '@/proto/words_panel.gen';
-import { useAgents, useHubRefused, usePluginsSummary, useProjects, useStore, type Store } from '@/store';
-import { settings } from '@/proto/words.gen';
-import { sideOf } from '@/plugins/model';
-import { useNewToConnect } from '@/plugins/seen';
-import { RefusedLine } from './Refused';
-import { useProjectWaiting, useWaitingCount } from '@/inbox/waiting';
-import { useNow } from './clock';
-import { menuGroupsOf } from './projmenu';
-import { MAIN, projectOf, type Route } from './route';
-import { addProject } from './addProject';
+import { useAgents, useProjects, useStore } from '@/store';
+import { numbersOf } from '@/agents/model';
+import { ArtLibrary } from '@/artifacts';
+import { useWaitingCount } from '@/inbox/waiting';
+import { useEntityMenu } from './menus/use';
+import { useEntityAction } from './menus/actions';
+import { MAIN, projectOf } from './route';
 import { useRoute, useRouter } from './router';
-import { projectSide } from './side';
-import { useKeptScroll } from './keep';
-import { LiveBiseMark, ProjectMark } from './Marks';
-import { whoOf } from './markstates';
+import { keep, useKeptScroll } from './keep';
 import { useModHeld } from './held';
-import { goneTip, newTip, projectTip, scheduledTip, waitsTip, workingTip } from './tipwords';
+import { usePinned, type Pin } from './pins';
+import { newAgent } from './newagent';
+import { addProject } from './addProject';
+import { pinRowOf, projectBlockOf, projectsOf, type RowEnd, type SideRow } from './siderows';
 
-/** His projects in his order, bise's own out (it is the bise row). Pure. */
-export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
-  return rows.filter((p) => !p.home).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-}
-
-/** What waits on him across every project: bise's pink count, the narrow titlebar's 'n waiting'. */
-/** What waits on him, one number everywhere: the inbox's own list, bise's asks included (designer m_25690). */
+/** What waits on him, one number everywhere: the inbox's own list (designer m_25690). */
 export function useWaitingTotal(): number {
   return useWaitingCount();
 }
 
-/** A number summed over projects' store slices, re-read when one of them changes. */
-function useSum(prefix: string, ids: string, count: (store: Store, project: string) => number): number {
-  const store = useStore();
-  return useSyncExternalStore(
-    (cb) => {
-      const offs = ids === '' ? [] : ids.split('\n').map((p) => store.subscribe(`${prefix}:${p}`, cb));
-      return () => {
-        for (const off of offs) off();
-      };
-    },
-    () => (ids === '' ? 0 : ids.split('\n').reduce((n, p) => n + count(store, p), 0)),
-  );
-}
-
-/** Who made the new artifacts across these projects, in a stable order. */
-function useNewMakers(ids: string): string[] {
-  const store = useStore();
-  const names = useSyncExternalStore(
-    (cb) => {
-      const offs = ids === '' ? [] : ids.split('\n').map((p) => store.subscribe(`artifacts:${p}`, cb));
-      return () => {
-        for (const off of offs) off();
-      };
-    },
-    () => {
-      const who = new Set<string>();
-      for (const p of ids === '' ? [] : ids.split('\n')) for (const a of store.artifacts(p)) if (a.new && a.agent !== '') who.add(a.agent);
-      return [...who].sort().join('\n');
-    },
-  );
-  return useMemo(() => (names === '' ? [] : names.split('\n')), [names]);
-}
-
-/** The artifacts row's end: '1 new · designer' when one agent made them, else '3 new'; '' when none is new. Pure. */
-export function newWords(fresh: number, makers: readonly string[]): string {
-  if (fresh <= 0) return '';
-  return makers.length === 1 ? panel.count_new_by({ n: fresh, who: makers[0] ?? '' }) : panel.count_new({ n: fresh });
-}
-
-/** '2 new · designer': the 'n new' part in the accent, as the artifacts' own 'new' chip (amb-kit, try gate D4); its words say it without the color. */
-function NewEnd({ words }: { words: string }) {
-  if (words === '') return null;
-  const at = words.indexOf(' · ');
-  return (
-    <>
-      <span className="app-new">{at < 0 ? words : words.slice(0, at)}</span>
-      {at < 0 ? '' : words.slice(at)}
-    </>
-  );
-}
-
-/** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count, each mark with its tip; ⌘ held: its number. */
-/** A row's name; cut ('…'), it carries the ds tip with the whole name (designer m_38093) */
-function CutName({ name }: { name: ReactNode }) {
+/** A row's name; cut ('…'), it carries the ds tip with the whole name (designer m_38093). */
+function CutName({ name }: { name: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const el = ref.current;
-    if (el === null || typeof name !== 'string') return undefined;
+    if (el === null) return undefined;
     const sync = () => {
       if (el.scrollWidth > el.clientWidth) el.setAttribute('data-tip', name);
       else el.removeAttribute('data-tip');
@@ -108,286 +49,315 @@ function CutName({ name }: { name: ReactNode }) {
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(sync);
     ro.observe(el);
-    return () => { ro.disconnect(); };
+    return () => {
+      ro.disconnect();
+    };
   }, [name]);
-  return <span ref={ref} className="nm">{name}</span>;
+  return (
+    <span ref={ref} className="nm">
+      {name}
+    </span>
+  );
 }
 
-function SRow({ kind, lead, name, end, endErr, endTip, count, countTip, hint, on, title, onClick, testId, children }: {
-  kind: 'top' | 'pj' | 'ag' | 'more' | 'ft';
-  lead: ReactNode;
-  name: ReactNode;
+/** A row's end: the accent dot (it waits on him) or the ring (it works), each with its tip; nothing else. */
+function End({ end, testId }: { end: RowEnd; testId: string }) {
+  if (end === 'waits') return <span className="app-s-dot" {...tipAttrs(panel.asks_you)} data-testid={`${testId}.waits`} />;
+  if (end === 'works') return <span className="app-s-ring" {...tipAttrs(panel.state_working)} data-testid={`${testId}.works`} />;
+  return null;
+}
+
+function Row({ kind, icon, name, end, on, stopped, expanded, onClick, onContextMenu, testId }: {
+  kind: 'top' | 'project' | 'agent' | 'more' | 'back';
+  icon?: AppIconName;
+  name: string;
   end?: ReactNode;
-  endErr?: boolean;
-  /** the end's hover tip (tipwords.ts) */
-  endTip?: string | undefined;
-  count?: number;
-  /** the count's hover tip */
-  countTip?: string;
-  /** ⌘ held: its ⌘ digit, a 16 px kbd at the row's end in place of the count (held.ts) */
-  hint?: number | undefined;
   on?: boolean;
-  title?: string;
-  onClick?: () => void;
-  testId?: string;
-  children?: ReactNode;
+  stopped?: boolean;
+  /** a project's row: its agents shown */
+  expanded?: boolean;
+  onClick: () => void;
+  onContextMenu?: (e: MouseEvent<HTMLElement>) => void;
+  testId: string;
 }) {
-  // ⌘ held: the digit takes the whole right end, its words hide like the count (designer m_21692)
-  const tail =
-    hint !== undefined ? (
-      <span className="app-keyhint" title={`⌘${String(hint)}`} data-testid={testId === undefined ? undefined : `${testId}.hint`}>
-        <Kbd>{hint}</Kbd>
-      </span>
-    ) : (
-      <>
-        {end != null && end !== '' && (
-          <span className={endErr === true ? 'app-m err' : 'app-m'} {...tipAttrs(endTip)} data-testid={testId === undefined ? undefined : `${testId}.end`}>
-            {end}
-          </span>
-        )}
-        {count !== undefined && count > 0 && (
-          <span className="app-cnt" {...tipAttrs(countTip)} data-testid={testId === undefined ? undefined : `${testId}.count`}>
-            {count}
-          </span>
-        )}
-      </>
-    );
   return (
-    <div className={`b-row app-r ${kind}${on === true ? ' on' : ''}`} role="button" tabIndex={-1} aria-current={on === true || undefined} title={title}
-      onClick={onClick} data-testid={testId}>
-      <span className="app-g">{lead}</span>
+    <Press
+      look={`app-s-row ${kind}${on === true ? ' on' : ''}${stopped === true ? ' stopped' : ''}`}
+      aria-current={on === true ? 'page' : undefined}
+      aria-expanded={expanded}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      data-testid={testId}
+    >
+      {icon !== undefined && <AppIcon name={icon} size={16} />}
       <CutName name={name} />
-      {children}
-      {children != null ? (
-        // a row with a ⋯ (a project's): its end words in a box of a kept width at the row's end;
-        // the ⋯ shows over it, flush right, and the words give way (app.css .app-more)
-        <span className="app-tail">{tail}</span>
-      ) : (
-        tail
-      )}
+      {end != null && <span className="app-s-end">{end}</span>}
+    </Press>
+  );
+}
+
+function Label({ children, end, testId }: { children: string; end?: ReactNode; testId: string }) {
+  return (
+    <div className="app-s-label" role="heading" aria-level={2} data-testid={testId}>
+      <span>{children}</span>
+      {end}
     </div>
   );
 }
 
-/** The window in macOS full screen (amb-mac f58585d2: told at once, then on each enter/leave). */
-function useFullScreen(): boolean {
-  const [full, setFull] = useState(false);
-  useEffect(() => {
-    // the page outside Electron (a component test) has no preload
-    const on = (window as Partial<Window>).bise?.onFullScreen;
-    return on === undefined ? undefined : on(setFull);
-  }, []);
-  return full;
-}
-
-/** The sidebar's list scrolled off its top (its rows pass under the field): for the fade. */
-function useSideScrolled(): boolean {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const el = document.querySelector<HTMLElement>('[data-testid="app.sidebar"]');
-    if (el === null) return;
-    const f = () => {
-      setScrolled(el.scrollTop > 0);
-    };
-    f();
-    el.addEventListener('scroll', f, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', f);
-    };
-  }, []);
-  return scrolled;
+/** A kept set of project ids (the folded ones, the ones whose 'Show N more' is open): keep.ts. */
+function useKeptSet(key: string): readonly [ReadonlySet<string>, (id: string) => void] {
+  const [set, setSet] = useState<ReadonlySet<string>>(() => {
+    const v = keep.view(key);
+    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  });
+  const flip = (id: string) => {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    keep.setView(key, [...next]);
+    setSet(next);
+  };
+  return [set, flip];
 }
 
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
-  const router = useRouter();
-  // where he was in a long sidebar comes back after a reload (keep.ts)
-  useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.sidebar"]'));
-  const full = useFullScreen();
-  const scrolled = useSideScrolled();
   const route = useRoute();
-  const rows = useProjects();
-  const home = rows.find((p) => p.home);
-  const inView = projectOf(route);
-  // the route's project comes into view in a long sidebar (designer's R31 read: shop below the fold
-  // on shop's route); nearest edge, so a row already in view never moves
-  useEffect(() => {
-    if (inView === undefined) return;
-    document.querySelector(`[data-testid="app.sidebar.project.${CSS.escape(inView)}"]`)?.scrollIntoView({ block: 'nearest' });
-  }, [inView]);
-  const waits = useWaitingTotal();
-  const ids = rows.map((p) => p.project).join('\n');
-  const fresh = useSum('artifacts', ids, (s, p) => s.artifacts(p).filter((a) => a.new).length);
-  // tui-parity R17: who made the new ones ('↗ 1 new · designer'), until he opens the artifacts
-  const makers = useNewMakers(ids);
-  const scheduled = useSum('scheduled', ids, (s, p) => s.scheduled(p).length);
-  const projects = projectsOf(rows);
-  // ⌘ held alone: every place shows its ⌘ digit (bise 0, the projects 1-9 in keys.ts's order)
-  const cmd = useModHeld('Meta');
-  const add = () => {
-    addProject(router);
-  };
+  const home = useProjects().find((p) => p.home)?.project;
+  // d2: the artifacts library takes the projects' place on artifacts, at the same width
+  const library = route.screen === 'artifacts';
+  const here = projectOf(route) ?? home;
   return (
-    <Side
-      testId="app.sidebar"
-      // the lights' room is drawn in the sticky top below, with the search (his shot m_14497)
-      lights={false}
-      foot={
-        <>
-          <SRow kind="ft" lead="+" name={panel.add_project} end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.add" />
-          <SRow kind="ft" lead="⚙" name="settings" end={<kbd>⌘,</kbd>} onClick={() => { router.go({ screen: 'settings' }); }} testId="app.sidebar.settings" />
-        </>
-      }
-    >
-      {/* his shot (ambient-lead m_14497): in a long sidebar the whole column scrolled, so the
-          search field rode up under macOS's lights. The lights' 40 px room and the field stay put
-          at the top; only the rows scroll under them. In full screen there are no lights: no room
-          (amb-me's onFullScreen). Scrolled, the edge under the field fades over 16 px like the
-          thread's top, so a half-hidden row reads as 'more above' (designer m_15023). */}
-      <div className={`app-side-top${full ? ' full' : ''}${scrolled ? ' scrolled' : ''}`} data-testid="app.sidebar.top" data-full={full} data-scrolled={scrolled}>
-        <div className="b-lights" data-testid="app.sidebar.lights" />
-        <SearchButton label={panel.search} keys="⌘K" onClick={onSearch} testId="app.sidebar.search" />
+    <aside className="app-side" data-testid="app.sidebar" data-library={library || undefined}>
+      <div className="app-s-head">
+        <Row
+          kind="top"
+          icon="rename"
+          name={frame.new_agent}
+          end={<kbd>⌘N</kbd>}
+          onClick={() => {
+            if (here !== undefined) newAgent(here);
+          }}
+          testId="app.side.new"
+        />
+        <Row kind="top" icon="search" name={frame.search} end={<kbd>⌘K</kbd>} onClick={onSearch} testId="app.side.search" />
       </div>
-      <SRow
-        kind="top"
-        lead={<LiveBiseMark testId="app.sidebar.bise.mark" />}
-        name={panel.bise}
-        hint={cmd ? 0 : undefined}
-        on={route.screen === 'bise' || (home !== undefined && inView === home.project && route.screen === 'thread' && route.agent === MAIN)}
-        onClick={() => { router.go({ screen: 'bise' }); }}
-        testId="app.sidebar.bise"
-      />
-      <SRow kind="top" lead="?" name={panel.inbox} count={waits} countTip={waitsTip(waits, true)}
-        on={route.screen === 'inbox'} onClick={() => { router.go({ screen: 'inbox' }); }} testId="app.sidebar.inbox" />
-      <SRow kind="top" lead="↗" name={panel.artifacts} end={<NewEnd words={newWords(fresh, makers)} />} endTip={newTip(fresh, makers)}
-        on={route.screen === 'artifacts' && route.project === ''}
-        onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
-      <SRow kind="top" lead="◷" name={panel.scheduled} end={scheduled > 0 ? String(scheduled) : ''} endTip={scheduledTip(scheduled)} on={route.screen === 'scheduled'}
-        onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
-      <PluginsRow on={route.screen === 'plugins'} onClick={() => { router.go({ screen: 'plugins' }); }} />
-      {/* no 'processes' row here: too technical for the sidebar (Gabriel, designer m_38642); the right
-          bar's PROCESSES, ⌘K and /processes open the screen */}
-      <SectionHead>{panel.projects}</SectionHead>
-      {projects.length === 0 && <SRow kind="more" lead="+" name={panel.add_project} end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
-      {projects.map((p, i) => (
-        <ProjectItem key={p.project} p={p} on={inView === p.project} route={route} hint={cmd && i < 9 ? i + 1 : undefined} />
-      ))}
-    </Side>
+      {/* the swap is a crossfade (app.css .app-s-swap): a new key fades the other list in */}
+      <div className="app-s-swap" key={library ? 'library' : 'projects'}>
+        {library ? <LibraryList /> : <ProjectList />}
+      </div>
+    </aside>
   );
 }
 
-/**
- * '⊞ plugins' (page plugins v48, plugins-ui m_40135): the plugins on, faint; when some wait on him
- * (a login, a server that failed) their number in the accent, inbox's count, no pill; a faint ink
- * dot while something new to connect waits that he hasn't seen in the place (the app's view state,
- * plugins/seen.ts). Every number is the core's summary (bise's home's); its tip says what waits.
- */
-function PluginsRow({ on, onClick }: { on: boolean; onClick: () => void }) {
-  const summary = usePluginsSummary();
-  const side = sideOf(summary);
-  const dot = useNewToConnect(summary);
-  return (
-    <SRow kind="top" lead="⊞" name={panel.plugins} end={side.end === '' && !dot ? '' : <PluginsEnd n={side.end} dot={dot} />} endTip={side.waits > 0 ? undefined : side.tip}
-      count={side.waits} countTip={side.tip} on={on} onClick={onClick} testId="app.sidebar.plugins" />
-  );
-}
-
-function PluginsEnd({ n, dot }: { n: string; dot: boolean }) {
-  return (
-    <>
-      {n}
-      {dot && <span className="app-newdot" {...tipAttrs(settings.plugins_side_new)} data-testid="app.sidebar.plugins.dot" />}
-    </>
-  );
-}
-
-const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: ProjectRow; on: boolean; route: Route; hint: number | undefined }) {
+/** d2: '← Projects' back (esc and ⌘[ too: router's back), then the library (nm-pages-a's ArtLibrary). */
+function LibraryList() {
   const router = useRouter();
-  const refused = useHubRefused(p.project) !== null;
-  // his pink count: the inbox's own items of this project (what he just answered left out), never the row's raw count
-  const side = projectSide(p, refused, useProjectWaiting(p));
-  const who = whoOf(useAgents(p.project));
-  const [menu, setMenu] = useState(false);
-  const more = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="app-s-list" data-testid="app.side.library">
+      <Row
+        kind="back"
+        icon="back"
+        name={frame.projects}
+        onClick={() => {
+          if (router.canBack()) router.back();
+          else router.go({ screen: 'bise' });
+        }}
+        testId="app.side.back"
+      />
+      <ArtLibrary />
+    </div>
+  );
+}
+
+function ProjectList() {
+  const rows = useProjects();
+  const pins = usePinned();
+  const [folded, fold] = useKeptSet('frame.side.folded');
+  const [more, showMore] = useKeptSet('frame.side.more');
+  // where he was in a long sidebar comes back after a reload (keep.ts)
+  useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.side.list"]'));
+  const projects = projectsOf(rows);
+  return (
+    <div className="app-s-list" data-testid="app.side.list">
+      {pins.length > 0 && <PinnedList pins={pins} />}
+      <Label testId="app.side.label.projects" end={<AddProject />}>
+        {frame.projects}
+      </Label>
+      {projects.map((p) => (
+        <ProjectBlock
+          key={p.project}
+          p={p}
+          pinned={pins.filter((x) => x.project === p.project).map((x) => x.agent)}
+          folded={folded.has(p.project)}
+          all={more.has(p.project)}
+          fold={fold}
+          showMore={showMore}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** 'Pinned' and its rows; nothing while no pin is live (a pin whose agent left is never shown). */
+function PinnedList({ pins }: { pins: readonly Pin[] }) {
+  const rows = pins.map((p) => <PinItem key={`${p.project}/${p.agent}`} pin={p} />);
+  return (
+    <div className="app-s-pins" data-testid="app.side.pinned">
+      <Label testId="app.side.label.pinned">{frame.pinned}</Label>
+      {rows}
+    </div>
+  );
+}
+
+function PinItem({ pin }: { pin: Pin }) {
+  const route = useRoute();
+  const agents = useAgents(pin.project);
+  const at = route.screen === 'thread' && route.project === pin.project ? route.agent : undefined;
+  const r = pinRowOf(pin.project, pin.agent, agents, at);
+  return r === null ? null : <SideItem r={r} />;
+}
+
+/** One project's block: it reads its own agents and its own ⌥ numbers (held while ⌥ is down). */
+const ProjectBlock = memo(function ProjectBlock({ p, pinned, folded, all, fold, showMore }: {
+  p: ProjectRow;
+  pinned: readonly string[];
+  folded: boolean;
+  all: boolean;
+  fold: (p: string) => void;
+  showMore: (p: string) => void;
+}) {
+  const route = useRoute();
+  const agents = useAgents(p.project);
+  // agent-rank: the hub's rank as ⌥ numbers, held while ⌥ is down and 5 s after a jump (agents/model)
+  const alt = useModHeld('Alt');
+  const at = route.screen === 'thread' && route.project === p.project ? route.agent : undefined;
+  const rows = projectBlockOf({ p, agents, numbers: numbersOf(p.project, agents, alt), pinned, folded, all, ...(at === undefined ? {} : { at }) });
   return (
     <>
-      <SRow
-        kind="pj"
-        lead={<ProjectMark p={p} tip={projectTip(p, who)} testId={`app.sidebar.project.${p.project}.mark`} />}
-        name={p.name}
-        end={side.text}
-        endErr={side.err}
-        endTip={side.err ? (p.missing === true ? goneTip(p.path) : undefined) : workingTip(p.working)}
-        count={side.count}
-        countTip={waitsTip(side.count)}
-        hint={hint}
-        on={on && route.screen === 'thread' && route.agent === MAIN}
-        onClick={() => { router.go({ screen: 'thread', project: p.project, agent: MAIN }); }}
-        testId={`app.sidebar.project.${p.project}`}
-      >
-        {/* ⋯, the ds's row IconButton: on hover or focus, flush at the row's right end */}
-        <span className={menu ? 'app-more on' : 'app-more'}>
-          <IconButton
-            ref={more}
-            size="row"
-            label={panel.project_menu({ name: p.name })}
-            pressed={menu}
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenu((m) => !m);
-            }}
-            testId={`app.sidebar.project.${p.project}.menu`}
-          >
-            ⋯
-          </IconButton>
-        </span>
-      </SRow>
-      {menu && <ProjectMenu p={p} anchor={more} onClose={() => { setMenu(false); }} />}
-      {/* its hub refused this core: the hub's words and a retry, open or closed (lead m_11347) */}
-      <RefusedLine project={p.project} name={p.name} className="app-refused" testId={`app.sidebar.project.${p.project}.refused`} />
+      {rows.map((r) => (
+        <SideItem key={r.kind === 'agent' ? `a:${r.a.name}` : r.kind} r={r} fold={fold} showMore={showMore} />
+      ))}
     </>
   );
 });
 
-/** A project's ⋯ menu (the ds PickerPop from its ⋯), by priority (projmenu.ts): 'all agents',
- *  then 'active', 'quiet', 'archived' (the newest 5, '+ N more' to /archived); each row wears the
- *  right bar's mark, its end in sans words ('waits' in the accent); a row opens its thread. */
-function ProjectMenu({ p, anchor, onClose }: { p: ProjectRow; anchor: RefObject<HTMLButtonElement | null>; onClose: () => void }) {
+function SideItem({ r, fold, showMore }: { r: SideRow; fold?: (p: string) => void; showMore?: (p: string) => void }) {
+  switch (r.kind) {
+    case 'label':
+      return null;
+    case 'project':
+      return <ProjectItem p={r.p} open={r.open} end={r.end} fold={fold} />;
+    case 'agent':
+      return <AgentItem project={r.project} name={r.a.name} main={r.a.main} on={r.on} end={r.end} stopped={r.stopped} pinned={r.pinned} />;
+    case 'more':
+      return (
+        <Row
+          kind="more"
+          name={r.open ? frame.show_less : frame.show_more({ n: r.n })}
+          onClick={() => {
+            showMore?.(r.project);
+          }}
+          testId={`app.side.more.${r.project}`}
+        />
+      );
+  }
+}
+
+/** '+' at the Projects label's end: add a project (the add-a-project sheet). */
+function AddProject() {
   const router = useRouter();
-  const now = useNow();
-  const groups = menuGroupsOf(useAgents(p.project), now);
-  const id = `app.sidebar.project.${p.project}.menu`;
   return (
-    <PickerPop
-      anchor={anchor}
-      align="start"
-      groups={[
-        { id: 'all', rows: [{ id: 'agents', name: panel.all_agents, testId: `${id}.agents` }] },
-        ...groups.map((g) => ({
-          id: g.head,
-          head: g.head,
-          rows: [
-            ...g.rows.map((r) => ({
-              id: `a:${r.agent.name}`,
-              name: r.agent.name,
-              text: r.agent.name,
-              glyph: <span className={`app-sign ${r.tone}`} data-testid={`${id}.${g.head}.${r.agent.name}.mark`}>{r.glyph}</span>,
-              trailing: <span className={r.acc ? 'app-pm-end acc' : 'app-pm-end'}>{r.end}</span>,
-              testId: `${id}.${g.head}.${r.agent.name}`,
-            })),
-            ...(g.more > 0 ? [{ id: 'more', name: `+ ${String(g.more)} more`, testId: `${id}.archived.more` }] : []),
-          ],
-        })),
-      ]}
-      onPick={(pick) => {
-        onClose();
-        router.go(
-          pick === 'agents' ? { screen: 'agents', project: p.project }
-          : pick === 'more' ? { screen: 'agents', project: p.project, archived: true }
-          : { screen: 'thread', project: p.project, agent: pick.slice(2) },
-        );
+    <Press
+      look="app-s-add"
+      aria-label={panel.add_project}
+      {...tipAttrs(panel.add_project)}
+      onClick={() => {
+        addProject(router);
       }}
-      onClose={onClose}
-      testId={`${id}.list`}
+      data-testid="app.side.add"
+    >
+      <AppIcon name="plus" size={14} />
+    </Press>
+  );
+}
+
+function ProjectItem({ p, open, end, fold }: { p: ProjectRow; open: boolean; end: RowEnd; fold: ((p: string) => void) | undefined }) {
+  const store = useStore();
+  const menu = useEntityMenu({ kind: 'project', project: p.project });
+  const [renaming, setRenaming] = useState(false);
+  // the menu's Rename takes its new name here, inline (app/menus/actions.ts)
+  useEntityAction('rename', (e) => {
+    if (e.kind !== 'project' || e.project !== p.project) return false;
+    setRenaming(true);
+    return true;
+  });
+  const id = `app.side.project.${p.project}`;
+  if (renaming) {
+    const done = (name: string | null) => {
+      setRenaming(false);
+      const n = name?.trim() ?? '';
+      if (n !== '' && n !== p.name) store.command({ cmd: 'project_rename', project: p.project, name: n });
+    };
+    return (
+      <div className="app-s-row project" data-testid={`${id}.rename`}>
+        <AppIcon name="folder" size={16} />
+        <Input
+          look="app-s-rename"
+          autoFocus
+          defaultValue={p.name}
+          aria-label={p.name}
+          onFocus={(e) => {
+            e.currentTarget.select();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') done(e.currentTarget.value);
+            else if (e.key === 'Escape') {
+              e.stopPropagation();
+              done(null);
+            }
+          }}
+          onBlur={(e) => {
+            done(e.currentTarget.value);
+          }}
+          data-testid={`${id}.rename.field`}
+        />
+      </div>
+    );
+  }
+  return (
+    <Row
+      kind="project"
+      icon="folder"
+      name={p.name}
+      expanded={open}
+      end={<End end={end} testId={id} />}
+      onClick={() => {
+        fold?.(p.project);
+      }}
+      onContextMenu={menu.onContextMenu}
+      testId={id}
+    />
+  );
+}
+
+function AgentItem({ project, name, main, on, end, stopped, pinned }: { project: string; name: string; main: boolean; on: boolean; end: RowEnd; stopped: boolean; pinned: boolean }) {
+  const router = useRouter();
+  const menu = useEntityMenu({ kind: 'agent', project, agent: name });
+  const id = pinned ? `app.side.pin.${project}.${name}` : `app.side.agent.${project}.${name}`;
+  return (
+    <Row
+      kind="agent"
+      // a project's lead is bise, as everywhere (the TUI's panel too)
+      name={main ? panel.bise : name}
+      on={on}
+      stopped={stopped}
+      end={<End end={end} testId={id} />}
+      onClick={() => {
+        router.go({ screen: 'thread', project, agent: main ? MAIN : name });
+      }}
+      onContextMenu={menu.onContextMenu}
+      testId={id}
     />
   );
 }

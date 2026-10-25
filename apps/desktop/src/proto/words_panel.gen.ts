@@ -22,8 +22,6 @@ export const panel = {
   count_inbox: (a: { n: string | number }): string => String(a.n) + " in the inbox",
   /** what came new: the TUI top edge's short form, the sidebar's and ARTIFACTS' folded end */
   count_new: (a: { n: string | number }): string => String(a.n) + " new",
-  /** the sidebar's artifacts end when one agent made them all */
-  count_new_by: (a: { n: string | number; who: string | number }): string => String(a.n) + " new · " + String(a.who),
   /** the TUI top edge's new artifacts */
   new_artifacts: (a: { n: number }): string => a.n === 1 ? String(a.n) + " new artifact" : String(a.n) + " new artifacts",
   /** a row of hidden rows: the TUI panel's `↑ 6 more`, the sidebar's fold */
@@ -226,12 +224,6 @@ export const panel = {
   projects: "projects",
   /** no project yet */
   add_project: "add a project",
-  /** the search button */
-  search: "search or jump",
-  /** a project's ⋯ button */
-  project_menu: (a: { name: string | number }): string => String(a.name) + ": its agents, what needs you first",
-  /** a project's ⋯ menu: every agent */
-  all_agents: "all agents",
   /** a project row: its folder is gone */
   folder_gone: "folder gone",
   /** a project row: its hub refused this core */

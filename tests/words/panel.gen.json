@@ -35,11 +35,6 @@
     "one": null,
     "text": "agents"
   },
-  "panel.all_agents": {
-    "args": [],
-    "one": null,
-    "text": "all agents"
-  },
   "panel.archived": {
     "args": [],
     "one": null,
@@ -135,14 +130,6 @@
     ],
     "one": null,
     "text": "{n} new"
-  },
-  "panel.count_new_by": {
-    "args": [
-      "n",
-      "who"
-    ],
-    "one": null,
-    "text": "{n} new · {who}"
   },
   "panel.count_prs": {
     "args": [
@@ -500,13 +487,6 @@
     "one": null,
     "text": "preview of {agent}"
   },
-  "panel.project_menu": {
-    "args": [
-      "name"
-    ],
-    "one": null,
-    "text": "{name}: its agents, what needs you first"
-  },
   "panel.projects": {
     "args": [],
     "one": null,
@@ -598,11 +578,6 @@
     ],
     "one": null,
     "text": "only {agent}'s scheduled tasks and alarms · all › shows {project}'s"
-  },
-  "panel.search": {
-    "args": [],
-    "one": null,
-    "text": "search or jump"
   },
   "panel.show_less": {
     "args": [],

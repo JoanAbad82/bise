@@ -17,7 +17,7 @@ import { app, BrowserWindow, ipcMain, nativeTheme, session } from 'electron';
 import { BADGE_LINE, CORE_IPC, IPC, TEST_DIST_UPDATE_ENV, TEST_ENV, TEST_MOVE_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { capsuleFramesDir } from './capsuleframe';
-import { badgeOf, CountKeeper, titleOf, type Counts } from './counts';
+import { badgeOf, CountKeeper, type Counts } from './counts';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { adoptLoginEnv } from './loginenv';
@@ -39,7 +39,8 @@ import { themeSourceOf } from './theme';
 import { drivingOf } from './update/moment';
 import { askWindow, bounded, fakeDistUpdate, QUIT_SWAP_MS, systemIdleS, takeAfter, Updates, updateTarget } from './update/run';
 import { installTrySwapIpc } from './update/tryrun';
-import { MainWindow, openWindowOf, windowTarget } from './windows';
+import { applyGlass, barDoubleClick, MainWindow, OwnWindows, windowTarget } from './windows';
+import { a11yTestMode, onA11yChange } from './a11y';
 import { fenceOffscreen, isOffscreen, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenActivation } from './offscreen';
 import { Notifier } from './notify/run';
 import { langOf } from './notify/plan';
@@ -207,10 +208,22 @@ void app.whenReady().then(() => {
   ipcMain.on(IPC.quit, () => {
     app.quit();
   });
+  // the windows of their own: settings, an artifact, an agent's thread (windows.ts OwnWindows)
+  const own = new OwnWindows(testMode, offscreen);
   ipcMain.on(IPC.openWindow, (_e, raw: unknown) => {
     const to = windowTarget(raw);
-    if ('own' in to) openWindowOf(to.own);
+    if ('own' in to) own.open(to.own);
     else main.open(to.main);
+  });
+  // a double-click on a window's bar: zoom or minimise, as his Mac says (windows.ts)
+  ipcMain.on(IPC.barDoubleClick, (e) => {
+    barDoubleClick(BrowserWindow.fromWebContents(e.sender));
+  });
+  // macOS's accessibility settings (a11y.ts): every window hears a change, the main and own windows' glass follows
+  a11yTestMode(testMode);
+  onA11yChange((a) => {
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(IPC.a11y, a);
+    for (const w of [main.window, ...own.all()]) if (w !== null) applyGlass(w, a, testMode);
   });
   // the menu bar's ':*' (tray.ts), its look from the counts below
   const tray = testMode ? null : new BiseTray(capsule, main);
@@ -241,11 +254,11 @@ void app.whenReady().then(() => {
   onCoreEvent((ev) => {
     notifier.onCoreEvent(ev);
   });
-  // the counts outside the app (counts.ts): the Dock's badge, the window's title
+  // the counts outside the app (counts.ts): the Dock's badge, the menu bar's ':*' (the window's title
+  // is the page's: what he looks at, app/title.ts)
   const counts = new CountKeeper();
   const showCounts = (c: Counts | null) => {
     if (c === null) return;
-    main.setTitle(titleOf(c));
     tray?.show(c);
     // test mode has no Dock icon: the badge is a stdout line the harness reads
     if (testMode) process.stdout.write(`${BADGE_LINE} ${JSON.stringify(badgeOf(c))}

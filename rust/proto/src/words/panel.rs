@@ -24,8 +24,6 @@ crate::words! { panel:
     count_inbox(n) = "{n} in the inbox";
     /// what came new: the TUI top edge's short form, the sidebar's and ARTIFACTS' folded end
     count_new(n) = "{n} new";
-    /// the sidebar's artifacts end when one agent made them all
-    count_new_by(n, who) = "{n} new · {who}";
     /// the TUI top edge's new artifacts
     new_artifacts(n) = one "{n} new artifact" | "{n} new artifacts";
     /// a row of hidden rows: the TUI panel's `↑ 6 more`, the sidebar's fold
@@ -242,12 +240,6 @@ crate::words! { panel:
     projects = "projects";
     /// no project yet
     add_project = "add a project";
-    /// the search button
-    search = "search or jump";
-    /// a project's ⋯ button
-    project_menu(name) = "{name}: its agents, what needs you first";
-    /// a project's ⋯ menu: every agent
-    all_agents = "all agents";
     /// a project row: its folder is gone
     folder_gone = "folder gone";
     /// a project row: its hub refused this core

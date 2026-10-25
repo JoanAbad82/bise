@@ -1,10 +1,9 @@
-// The window's frame around the screens (designer's desktop-screens v6/v7,
-// signed): the titlebar over the main column ('storefront › perf'), the
-// width classes (under 1000 px the sidebar is hidden and slides over the
-// window with a 45% scrim, esc or a click outside closes it, and the titlebar
-// shows the sidebar button (⌘\) and 'n waiting' in the accent), and whether
-// the sidebar shows; the tabbed panel's tabs and its ▯ mount in the title bar
-// (<BarTabs/>), its state is app/panel/state.ts (nm-panel's). Owner: nm-frame (bise fait mac; amb-win before).
+// The window's frame (bise fait mac, page native-mac §6, mockup 1): the bar over the whole width
+// (Bar: the lights' room, the sidebar button, ‹ ›, the title and its subtitle, the page's slot,
+// the panel's tabs and ▯ through <BarTabs/>, nm-panel's), the width classes (under 1000 px the
+// sidebar slides over the window with a 45% scrim, esc or a click outside closes it), and whether
+// the sidebar shows (its kept state: frame-state.ts; ⌘\ and the bar's button hide and show it in
+// 220 ms). The tabbed panel's state is app/panel/state.ts (nm-panel's). Owner: nm-frame.
 import {
   useCallback,
   useEffect,
@@ -13,10 +12,11 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { Chip, IconButton, Kbd, Pearl, PickerPop, Press } from "@/ds";
+import { AppIcon, Kbd, PickerPop, Press, tipAttrs, type AppIconName } from "@/ds";
+import { frame } from "@/proto/words_frame.gen";
 import { useModHeld } from "./held";
-import { useProjects } from "@/store";
-import { formatRoute, type Route } from "./route";
+import { useAgents, useProjects } from "@/store";
+import { formatRoute, MAIN, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
@@ -24,8 +24,8 @@ import { BarTabs } from "./panel/BarTabs";
 import { BarSlot } from "./barslot";
 import { frameLeft, useLeft } from "./frame-state";
 import { SIDE, sideWidthOf, UNFOLD_PX } from "./resize";
-import { crumbGoOf, crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
-import { useWaitingTotal } from "./Sidebar";
+import { crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
+import { barTitleOf, windowTitleOf } from "./title";
 import { panelToggle, usePanelBox } from "./panel/state";
 import { usePlaceCrumb } from "@/artifacts/crumb";
 
@@ -33,6 +33,9 @@ export type Width = "narrow" | "mid" | "wide";
 
 const widthOf = (w: number): Width =>
   w < NARROW_PX ? "narrow" : w < PANEL_OPEN_PX ? "mid" : "wide";
+
+/** The sidebar border's VoiceOver name (App.tsx's Splitter). */
+export const SIDEBAR_WIDTH_LABEL = frame.sidebar_width;
 
 /** The window's width class: re-renders its reader only when it crosses 1000 or 1100 px. */
 export function useWidth(): Width {
@@ -157,8 +160,8 @@ const MENU_PLACES = 10;
 const LONG_PRESS_MS = 500;
 
 /**
- * ‹ › right after the lights (designer's desktop-history; amb-web, m_19808): 28 px, 4 px apart.
- * Nothing on a side: that arrow stays, faint at 45%, no hover, no tooltip, so the crumb never
+ * ‹ › after the sidebar button (designer's desktop-history; bise fait mac: the line icons): 28 px, 4
+ * px apart. Nothing on a side: that arrow stays, faint, no hover, no tooltip, so the title never
  * moves. A right-click or a long press opens the last 10 places on that side (the ds menu).
  */
 function HistoryArrows({ name }: { name: (p: string) => string }) {
@@ -176,7 +179,7 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
   }, []);
   const arrow = (side: Side) => {
     const can = side === "back" ? router.canBack() : router.canForward();
-    const label = side === "back" ? "back" : "forward";
+    const label = side === "back" ? frame.back : frame.forward;
     const open = () => {
       if (can) setMenu(side);
     };
@@ -209,21 +212,22 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
           clearTimeout(press.current);
         }}
       >
-        <IconButton
-          label={label}
-          keys={can ? (side === "back" ? "⌘[" : "⌘]") : ""}
-          state={can ? undefined : "disabled"}
+        <Press
+          look="app-bar-b"
+          aria-label={label}
+          disabled={!can}
+          {...tipAttrs(can ? frame.tip_key({ what: label, key: side === "back" ? "⌘[" : "⌘]" }) : undefined)}
           onClick={() => {
             if (long.current) return;
             if (side === "back") router.back();
             else router.forward();
           }}
-          testId={`app.title.${label}`}
+          data-testid={`app.bar.${side}`}
         >
-          {side === "back" ? "‹" : "›"}
-        </IconButton>
+          <AppIcon name={side} size={16} />
+        </Press>
         {cmd && can && (
-          <span className="app-keyhint float" data-testid={`app.title.${label}.hint`}>
+          <span className="app-keyhint float" data-testid={`app.bar.${side}.hint`}>
             <Kbd>{side === "back" ? "⌘[" : "⌘]"}</Kbd>
           </span>
         )}
@@ -237,7 +241,7 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
                 rows: router.places(side, MENU_PLACES).map((r, i) => ({
                   id: String(i + 1),
                   name: crumbOf(r, name).join(" › "),
-                  testId: `app.title.${label}.place`,
+                  testId: `app.bar.${side}.place`,
                 })),
               },
             ]}
@@ -246,14 +250,14 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
               router.jump(side, Number(id));
             }}
             onClose={closeMenu}
-            testId={`app.title.${label}.menu`}
+            testId={`app.bar.${side}.menu`}
           />
         )}
       </span>
     );
   };
   return (
-    <span className="app-hist" data-testid="app.title.history">
+    <span className="app-hist" data-testid="app.bar.history">
       {arrow("back")}
       {arrow("forward")}
     </span>
@@ -293,87 +297,114 @@ function StatusSlot({ children }: { children?: ReactNode }) {
   );
 }
 
-/** The titlebar over the main column: the sidebar button and what waits when the sidebar is away, the crumb, the panel's button. */
-export function Titlebar({ frame }: { frame: FrameState }) {
+/**
+ * The window's bar (bise fait mac, page native-mac §6, mockup 1): 52 high over the whole width,
+ * transparent on the window's vibrancy (--p-bg 30%), no rule under it, the window's drag region
+ * (a double-click zooms or minimises as his Mac says: window.bise.barDoubleClick). Its lead holds
+ * macOS's lights' room (x 20, 12 each, 8 apart, then 24), the sidebar button and ‹ ›, over the rail
+ * and the sidebar; then the title (13/600) and its subtitle (13/400 text-2, 8 after) from 16 left of
+ * the content; the status pill; the page's slot (barslot.tsx); the panel's tabs and ▯ (BarTabs,
+ * nm-panel's). Its buttons 28 × 28, the icons 16, 4 apart, no-drag. Full screen keeps the lights'
+ * room: nothing moves.
+ */
+/** The thread's agent's own title ('profiling the hub'), first in the bar's subtitle; '' elsewhere and on a project's main. */
+function useAgentTitle(route: Route): string {
+  const project = route.screen === "thread" ? route.project : "";
+  const agents = useAgents(project);
+  if (route.screen !== "thread" || route.agent === MAIN) return "";
+  return agents.find((a) => a.name === route.agent)?.title ?? "";
+}
+
+export function Bar({ frame: state }: { frame: FrameState }) {
   const route = useRoute();
   const router = useRouter();
   const rows = useProjects();
-  const waits = useWaitingTotal();
   const name = (p: string) => rows.find((r) => r.project === p)?.name ?? p;
   // the artifacts library's place after 'artifacts' (artifacts/crumb.ts)
   const place = usePlaceCrumb();
-  const crumb = crumbOf(route, name, place);
-  // an earlier crumb's route, by its place (the last: where he is, no route) — crumbGoOf, pure
-  const go = crumbGoOf(route, name, place).map((s) => s.go);
+  const what = useAgentTitle(route);
+  const t = barTitleOf(route, name, place, what);
+  // the window's title is what he looks at (title.ts): macOS's Window menu, Mission Control
+  const winTitle = windowTitleOf(t);
+  useEffect(() => {
+    document.title = winTitle;
+  }, [winTitle]);
+  const shown = state.side || state.over === "side";
   return (
-    <div
-      className={frame.side ? "app-title" : "app-title away"}
-      data-testid="app.title"
+    <header
+      className="app-bar"
+      data-testid="app.bar"
+      onDoubleClick={(e) => {
+        // the bar's own ground only: a double-click on a control is the control's
+        if (e.target !== e.currentTarget && (e.target as HTMLElement).closest("button, a, input, [role='button'], [role='tab']") !== null) return;
+        (window as Partial<Window>).bise?.barDoubleClick();
+      }}
     >
-      {!frame.side && (
-        <>
-          <span className="app-title-lights" />
-          <IconButton
-            label="sidebar"
-            keys="⌘\\"
-            size="bar"
-            pressed={frame.over === "side"}
-            onClick={() => {
-              frame.toggle("sidebar");
-            }}
-            testId="app.title.sidebar"
-          >
-            <span className="app-tg-glyph" aria-hidden="true">
-              <span />
-            </span>
-          </IconButton>
-          {waits > 0 && (
-            <Chip
-              tone="acc"
-              onClick={() => {
-                frame.toggle("sidebar");
-              }}
-              testId="app.title.waiting"
-            >
-              <Pearl size={14} mood="need" />
-              {waits} waiting
-            </Chip>
-          )}
-        </>
-      )}
-      <HistoryArrows name={name} />
-      <span className="app-crumb" data-testid="app.title.crumb">
-        {crumb.map((c, i) => (
-          <span
-            key={`${String(i)} ${c}`}
-            className={i === crumb.length - 1 ? "last" : undefined}
-          >
-            {i > 0 && <span className="app-crumb-sep">›</span>}
-            {go[i] === undefined ? (
-              c
-            ) : (
-              // an earlier crumb goes where it names (his ask): the project's main, that agent,
-              // that screen; the last one is where he is, plain
-              <Press
-                look="app-crumb-go"
-                onClick={() => {
-                  router.go(go[i] as Route);
-                }}
-                data-testid={`app.title.crumb.${String(i)}`}
-              >
-                {c}
-              </Press>
-            )}
+      <div className="app-bar-lead" data-testid="app.bar.lead">
+        <BarButton
+          icon="sidebar"
+          label={shown ? frame.hide_sidebar : frame.show_sidebar}
+          keys="⌘\\"
+          pressed={false}
+          onClick={() => {
+            state.toggle("sidebar");
+          }}
+          testId="app.bar.sidebar"
+        />
+        <HistoryArrows name={name} />
+      </div>
+      <div className="app-bar-title" data-testid="app.bar.title">
+        <span className="t" data-testid="app.bar.title.text">
+          {t.title}
+        </span>
+        {t.sub.length > 0 && (
+          <span className="s" data-testid="app.bar.title.sub">
+            {t.sub.map((p, i) => (
+              <span key={`${String(i)} ${p.c}`}>
+                {i > 0 && " · "}
+                {p.go === undefined ? (
+                  p.c
+                ) : (
+                  // an earlier part of where he is goes there (his ask): the project's main, that agent
+                  <Press
+                    look="app-bar-go"
+                    onClick={() => {
+                      router.go(p.go as Route);
+                    }}
+                    data-testid={`app.bar.title.go.${String(i)}`}
+                  >
+                    {p.c}
+                  </Press>
+                )}
+              </span>
+            ))}
           </span>
-        ))}
-      </span>
+        )}
+      </div>
       <StatusSlot>
         <TitleStatus />
       </StatusSlot>
       {/* the page's search and action (barslot.tsx: a page's <InBar>) */}
       <BarSlot />
-      {/* bise fait mac: the panel's tabs in the bar (nm-panel's mount point) */}
+      {/* the panel's tabs and its ▯ (nm-panel's mount point) */}
       <BarTabs />
-    </div>
+    </header>
+  );
+}
+
+/** A bar button: 28 × 28, its line icon 16, its tip with its key; no-drag (app.css). */
+function BarButton({ icon, label, keys, pressed, disabled, onClick, testId }: { icon: AppIconName; label: string; keys?: string; pressed?: boolean; disabled?: boolean; onClick: () => void; testId: string }) {
+  return (
+    <Press
+      look="app-bar-b"
+      aria-label={label}
+      aria-pressed={pressed}
+      disabled={disabled}
+      {...tipAttrs(keys === undefined || keys === "" ? label : frame.tip_key({ what: label, key: keys }))}
+      onClick={onClick}
+      data-testid={testId}
+    >
+      <AppIcon name={icon} size={16} />
+    </Press>
   );
 }

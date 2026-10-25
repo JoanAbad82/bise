@@ -121,3 +121,10 @@ export function parseFrames(text: string | null): Frames {
 export function framesText(kept: Frames): string {
   return JSON.stringify({ v: 1, last: kept.last, frames: kept.frames });
 }
+
+/** What a double-click on the window's bar does, from macOS's AppleActionOnDoubleClick ('Maximize' when unset: zoom). Pure. */
+export function doubleClickOf(pref: string): 'zoom' | 'minimize' | 'none' {
+  if (pref === 'Minimize') return 'minimize';
+  if (pref === 'None') return 'none';
+  return 'zoom';
+}

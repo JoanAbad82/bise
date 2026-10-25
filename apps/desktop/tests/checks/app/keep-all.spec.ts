@@ -102,7 +102,7 @@ test("app/keep-all: threads: two targets' drafts, ⌘F, an open row, the termina
       await expect(field(page), "perf's composer").toBeVisible({ timeout: 10_000 });
       await field(page).click();
       await page.keyboard.type(PERF);
-      await page.getByTestId(`app.sidebar.project.${ACME}`).click();
+      await page.getByTestId(`app.side.agent.${ACME}.main`).click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'main', { timeout: 5000 });
       await field(page).click();
       await page.keyboard.type(MAIN);
@@ -125,7 +125,7 @@ test("app/keep-all: threads: two targets' drafts, ⌘F, an open row, the termina
       await caretAtEnd(page, field(page), PERF, `${c}, perf's composer`);
       await page.screenshot({ path: test.info().outputPath(`threads-${c.replace(/\W+/g, '-')}.png`) });
       // the other target's draft: acme main's
-      await page.getByTestId(`app.sidebar.project.${ACME}`).click();
+      await page.getByTestId(`app.side.agent.${ACME}.main`).click();
       await expect.soft(field(page), `${c}: acme main's words`).toContainText(MAIN, { timeout: 5000 });
       await page.getByTestId('app.right.agent.perf').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf', { timeout: 5000 });

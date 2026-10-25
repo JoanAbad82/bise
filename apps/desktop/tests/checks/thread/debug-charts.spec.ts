@@ -75,7 +75,7 @@ for (const width of [1400, 1100] as const) {
         await core.send(request() as never);
         // at 1400 the right bar closed: the pane is over 880, the charts a column; at 1100 the bar
         // open: under 880, the charts above the list behind three tabs
-        if (width === 1400) await page.getByTestId('app.title.panel').click();
+        if (width === 1400) await page.getByTestId('app.panel.toggle').click();
         const charts = page.getByTestId('comp.charts');
         await expect(charts).toBeVisible({ timeout: 15_000 });
         const keys = await charts.locator('.lg-bar').evaluateAll((bs) => bs.map((b) => b.getAttribute('data-testid')));

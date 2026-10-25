@@ -1,5 +1,6 @@
-/* The shell's layout (amb-win): the window fills the Electron window; the
-   look is desktop-ds v5's (src/ds, amb-kit), never forked here. */
+/* The shell's layout: the window fills the Electron window, the frame of bise fait mac (page
+   native-mac §6, mockup 1) around the screens; the look is the ds's (src/ds), never forked here.
+   Owner: nm-frame. */
 /* the window's page never scrolls and has no margin (his try d94b7996: the body's default 8 px
    margin around a 100vh shell made a window-wide scrollbar): only inner panes scroll */
 html:has(.app-shell),
@@ -8,73 +9,388 @@ body:has(.app-shell) {
   height: 100%;
   overflow: hidden;
 }
+
+/* bise fait mac: the window's frame (page native-mac §6, mockup 1). One grid over the window: the
+   bar (52) over everything, then the rail (56, always), the sidebar (240, 200-320; 0 when hidden,
+   220 ms), the screen, the panel (PanelHost: its own width). The bar and the rail are transparent
+   on the window's vibrancy (--p-bg 30%); the sidebar --p-raised 82% with a 12 top-left corner; the
+   screen opaque. */
 .app-shell {
   height: 100vh;
   overflow: hidden;
 }
-
-.app-shell > .b-win {
+.app-frame {
   height: 100%;
+  display: grid;
+  grid-template-columns: var(--w-rail) var(--side-col, 0px) minmax(0, 1fr) auto;
+  grid-template-rows: var(--h-bar) minmax(0, 1fr);
+  background: color-mix(in srgb, var(--p-bg) 30%, transparent);
+  transition: grid-template-columns var(--d-base) var(--ease-out);
+}
+.app-shell:not(.no-side) {
+  --side-col: var(--side-w);
+}
+/* nothing native under the page (the harness, a non-Mac) or reduce transparency: the frame's own
+   opaque ground in his theme, so the bar and the rail never sit on Electron's white */
+:root[data-no-vibrancy] .app-shell,
+:root[data-reduce-transparency] .app-shell {
+  background: var(--p-bg);
+}
+/* the drag of a border follows the pointer: no animation then */
+:root.app-resizing .app-frame,
+:root.app-resizing .app-bar-lead {
+  transition: none;
+}
+/* the sidebar's column: it stays mounted when hidden (0 wide, inert), so ⌘\ animates */
+.app-sidecol {
+  grid-row: 2;
+  grid-column: 2;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.app-sidecol > .app-side {
+  flex: none;
+  width: var(--side-w);
+}
+/* the screen, opaque, and the panel (PanelHost: its own width) */
+.app-frame > .b-main {
+  grid-row: 2;
+  grid-column: 3;
+  min-width: 0;
+  min-height: 0;
+  background: var(--c-solid);
+}
+.app-panelcol {
+  grid-row: 2;
+  grid-column: 4;
+  min-height: 0;
+  display: flex;
+}
+/* the bar: the whole width, the window's drag region; its controls are not */
+.app-bar {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: var(--h-bar);
+  padding-right: var(--s-3);
+  -webkit-app-region: drag;
+  white-space: nowrap;
+}
+.app-bar button,
+.app-bar a,
+.app-bar input,
+.app-bar [role='button'],
+.app-bar [role='tab'] {
+  -webkit-app-region: no-drag;
+}
+/* over the rail and the sidebar: the lights' room (20 + 3 × 12 + 2 × 8 + 24 = 96), the sidebar
+   button, ‹ ›, 4 apart; at least that wide when the sidebar is hidden */
+.app-bar-lead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  width: max(calc(var(--w-rail) + var(--side-col, 0px)), calc(var(--s-6) * 4 + var(--h-control-sm) * 3 + var(--s-1) * 2 + var(--s-4)));
+  padding-left: calc(var(--s-6) * 4);
+  transition: width var(--d-base) var(--ease-out);
+}
+.app-bar-b {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-control-sm);
+  height: var(--h-control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--c-text-2);
+}
+.app-bar-b:hover:not(:disabled) {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+.app-bar-b:active:not(:disabled),
+.app-bar-b[aria-pressed='true'] {
+  background: var(--c-active);
+  color: var(--c-text);
+}
+.app-bar-b:disabled {
+  color: var(--c-text-3);
+  opacity: 0.6;
+}
+.app-bar-b:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 0;
+}
+/* the title from 16 left of the content, its subtitle 8 after */
+.app-bar-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding-left: var(--s-4);
+  overflow: hidden;
+}
+.app-bar-title .t {
+  flex: none;
+  font: 600 var(--f-ui);
+  color: var(--c-text);
+}
+.app-bar-title .s {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 var(--f-ui);
+  color: var(--c-text-2);
+}
+.app-bar-go:hover {
+  color: var(--c-text);
+  text-decoration: underline;
+}
+.app-bar-go:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--s-1);
 }
 
-/* one set of window controls (his try round 3, amb-mac): macOS's own lights
-   over the sidebar (titleBarStyle hiddenInset, src/main/windows.ts), so the
-   ds frame's drawn dots, radius and shadow go (the window is the frame), and
-   the sidebar's top and each screen's head move the window */
-.app-shell > .b-win {
-  border-radius: 0;
-  box-shadow: none;
+/* the rail: always there, transparent, its buttons 36 r 8, 4 apart, 8 from the top, 16 from the bottom */
+.app-rail {
+  grid-row: 2;
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 0;
+  padding: var(--s-2) 0 var(--s-4);
 }
-.app-shell .b-lights {
-  /* the window's title bar (--h-bar 40, designer's desktop-spacing): macOS's lights sit in it
-     (src/main/windows.ts LIGHTS) */
-  height: var(--h-bar);
+.app-rail-b {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--s-8) + var(--s-1));
+  height: calc(var(--s-8) + var(--s-1));
   padding: 0;
-  -webkit-app-region: drag;
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--c-text-2);
 }
-.app-shell .b-lights i {
-  display: none;
+.app-rail-b:hover {
+  background: var(--c-hover);
 }
-/* the sidebar's top: macOS's lights' --h-bar room and the search field, put at the top of the
-   sidebar's scroll (his shot, ambient-lead m_14497: a long sidebar scrolled the field up under
-   the lights). Opaque, so the rows scrolling under it never show through */
-.app-side-top {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+.app-rail-b.on {
+  background: var(--c-active);
+  color: var(--c-text);
+}
+.app-rail-b:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 0;
+}
+/* ':*' in mono, 15/600 (his rule: never handwritten, never serif): the lead's size, the mono face */
+.app-rail-mark {
+  font: 600 var(--f-lead);
+  font-family: var(--font-mono);
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+/* inbox's dot: 8, the accent, 6 from the button's top and right; only while something waits */
+.app-rail-dot {
+  position: absolute;
+  top: calc(var(--s-1) + var(--s-1) / 2);
+  right: calc(var(--s-1) + var(--s-1) / 2);
+  width: var(--s-2);
+  height: var(--s-2);
+  border-radius: 50%;
+  background: var(--c-accent);
+}
+.app-rail-gap {
+  flex: 1;
+}
+
+/* the sidebar: --p-raised 82%, a 12 top-left corner, 8 inside; its head stays, its list scrolls */
+.app-side {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top-left-radius: var(--r-3);
+  background: color-mix(in srgb, var(--p-raised) 82%, transparent);
+}
+.app-s-head {
   flex: none;
   display: flex;
   flex-direction: column;
-  margin: 0 calc(-1 * var(--pad-list));
-  padding: 0 var(--pad-list) var(--gap-tight);
-  background: linear-gradient(var(--c-sidebar), var(--c-sidebar)), var(--c-solid);
+  padding: var(--s-2) 0 0;
 }
-/* the field: a bar control (--h-control-sm 28), 4 px under the lights' band, the rows 4 px under
-   it (designer m_21057: field 44-72, bise from 76) */
-.app-side-top .b-search {
+.app-s-swap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* d2's crossfade: 160 ms (the base 220 × 8/11, so 0 under reduce motion), no slide */
+  animation: app-s-fade calc(var(--d-base) * 8 / 11) var(--ease-out);
+}
+@keyframes app-s-fade {
+  from {
+    opacity: 0;
+  }
+}
+/* Pinned: its label and rows, over Projects */
+.app-s-pins {
+  display: flex;
+  flex-direction: column;
+}
+.app-s-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--s-2);
+  overflow-anchor: auto;
+}
+.app-s-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: calc(100% - var(--s-4));
+  height: var(--h-row-tight);
+  margin: 0 var(--s-2);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--c-text);
+  font: 400 var(--f-ui);
+  text-align: left;
+}
+.app-s-row > svg {
+  flex: none;
+  color: var(--c-text-2);
+}
+.app-s-row:hover {
+  background: var(--c-hover);
+}
+.app-s-row.on {
+  background: var(--c-active);
+}
+.app-s-row:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+.app-s-row .nm {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-s-row.project {
+  font-weight: 500;
+}
+/* the project's inline rename (the menu's Rename): the row's own font, a focus ring as its frame */
+.app-s-rename {
+  flex: 1;
+  min-width: 0;
   height: var(--h-control-sm);
-  margin-top: var(--gap-tight);
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: var(--c-solid);
+  color: var(--c-text);
+  font: 500 var(--f-ui);
+  outline: 2px solid var(--c-focus);
 }
-/* full screen: no lights, so no room for them; a little air above the field */
-.app-side-top.full .b-lights {
-  height: 10px;
+/* an agent: its text at x 40 (8 margin + 32) */
+.app-s-row.agent {
+  padding-left: var(--s-8);
 }
-/* scrolled: the rows under the field fade out over 16 px, as under the thread's head (designer
-   m_15023), so a half-hidden row reads as 'more above' instead of being cut flat */
-.app-side-top::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  height: 16px;
-  pointer-events: none;
+.app-s-row.agent.stopped {
+  color: var(--c-text-2);
+}
+.app-s-row.more {
+  padding-left: var(--s-8);
+  color: var(--c-text-3);
+}
+.app-s-end {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--c-text-3);
+  font: 400 var(--f-meta);
+}
+.app-s-end kbd {
+  font: inherit;
+}
+/* what asks something, at a row's end: the accent dot 6 (it waits on him) or the ring 10 (it works) */
+.app-s-dot {
+  width: calc(var(--s-1) + var(--s-1) / 2);
+  height: calc(var(--s-1) + var(--s-1) / 2);
+  border-radius: 50%;
+  background: var(--c-accent);
+}
+.app-s-ring {
+  width: calc(var(--s-2) + var(--s-1) / 2);
+  height: calc(var(--s-2) + var(--s-1) / 2);
+  border-radius: 50%;
+  border: 1.5px solid var(--c-text-3);
+  border-right-color: transparent;
+  animation: app-s-spin 1s linear infinite;
+}
+@keyframes app-s-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+:root[data-still] .app-s-ring {
+  animation: none;
+}
+.app-s-label {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--h-row-tight);
+  margin: var(--s-3) var(--s-2) 0;
+  padding: 0 var(--s-2);
+  color: var(--c-text-3);
+  font: 500 var(--f-meta);
+}
+.app-s-label > span {
+  flex: 1;
+}
+.app-s-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--s-5));
+  height: calc(var(--s-5));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--c-text-3);
   opacity: 0;
-  background: linear-gradient(var(--c-solid), transparent);
 }
-.app-side-top.scrolled::after {
+.app-s-label:hover .app-s-add,
+.app-s-add:focus-visible {
   opacity: 1;
 }
+.app-s-add:hover {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+
 .app-shell .b-head {
   -webkit-app-region: drag;
 }
@@ -102,19 +418,6 @@ body:has(.app-shell) {
   -webkit-app-region: drag;
 }
 
-/* the ds frame's columns fill the window (its own min-height is a mockup's) */
-.app-shell > .b-win > .cols {
-  height: 100%;
-}
-
-.app-shell .b-side,
-.app-shell .b-main {
-  min-height: 0;
-}
-
-.app-shell .b-side {
-  overflow: auto;
-}
 
 /* b1: the screen fills what the bottom block (inbox + composer) leaves */
 .app-screen {
@@ -209,90 +512,6 @@ body:has(.app-shell) {
   padding: var(--s-1) var(--s-2) var(--s-2) var(--s-5);
 }
 
-/* The sidebar (designer's desktop-screens v6/v7): 240 px, rows 28 px, radius 6, a 15 px mono
-   sign column; agents indented 23 px; the pink only for what waits on him */
-.app-shell .b-win > .cols {
-  grid-template-columns: var(--side-w, 240px) minmax(0, 1fr) auto;
-}
-.app-shell.no-side .b-win > .cols {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.app-shell .b-side {
-  /* rows touch, 28 apart: the rounded hover parts them (--pad-row-x) */
-  gap: 0;
-  padding: 0 var(--pad-list) 0;
-  border-right: 1px solid var(--c-line);
-}
-.app-r kbd,
-.app-title kbd {
-  font-family: var(--font-mono);
-  font-size: var(--t-11);
-  color: var(--c-text-3);
-  background: none;
-  border: 0;
-  padding: 0;
-}
-.app-r {
-  flex: none;
-  position: relative;
-  height: var(--h-row-tight);
-  gap: var(--gap-inline);
-  padding: 0 var(--pad-row-x);
-  border-radius: 6px;
-  cursor: pointer;
-}
-.app-r .nm {
-  flex: 1;
-  min-width: 0;
-}
-/* a project's end words ('∿ 1' and its pink count) in a box of a kept width: its folder and ⋯
-   buttons before it stay put when the words change */
-.app-r .app-tail {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--gap-inline);
-  min-width: 56px;
-}
-/* at rest the end box is only as wide as its words: the name takes the row up to them; the kept
-   width comes back only under the ⋯ (hover, open, focus) so the name never runs under it */
-.app-r:not(:hover):not(:has(.app-more.on, .app-more:focus-within)) .app-tail {
-  min-width: 0;
-}
-.app-r.ag {
-  padding-left: var(--s-6);
-  color: var(--c-text);
-}
-.app-r.pj .nm,
-.app-r.top[data-testid='app.sidebar.bise'] .nm {
-  font-weight: 600;
-}
-.app-r.more,
-.app-r.ft {
-  color: var(--c-text-3);
-}
-.app-r.more {
-  padding-left: var(--s-6);
-}
-.app-r.ft:hover,
-.app-r.more:hover {
-  color: var(--c-text);
-}
-/* the 18 px mark column (desktop-delight v2): bise's ':*', a project's mark, the top rows' signs */
-.app-g {
-  flex: none;
-  width: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  color: var(--c-text-2);
-}
-/* bise's ':*' at rest in text-3; the accent when something waits (the ds's .waits) */
-.app-g .b-bise:not(.waits) {
-  color: var(--c-text-3);
-}
 .app-sign.ink {
   color: var(--c-text);
 }
@@ -305,38 +524,7 @@ body:has(.app-shell) {
 .app-sign.dim {
   color: var(--c-text-2);
 }
-/* a project ⋯ menu row's end: words he reads, sans text-3 12 (designer m_26470), 'waits' in the accent */
-.app-pm-end {
-  font: var(--t-12) var(--font-ui);
-  color: var(--c-text-3);
-}
-.app-pm-end.acc {
-  color: var(--c-accent);
-}
-.app-m {
-  flex: none;
-  color: var(--c-text-3);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-.app-m.err {
-  color: var(--c-err, var(--c-accent));
-}
-/* what waits on him: the accent number, no pill (designer's sidebar spec, page plugins v48), the
-   same for inbox, a project and plugins */
-.app-cnt {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 18px;
-  height: 18px;
-  color: var(--c-accent);
-  font-size: 12px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-/* ⌘ held: a place's ⌘ digit, a 16 px kbd at the row's end in place of the count (held.ts) */
+/* ⌘ held: a key's kbd at a row's end (held.ts) */
 .app-keyhint {
   flex: none;
   display: inline-flex;
@@ -359,159 +547,8 @@ body:has(.app-shell) {
   padding: 0 var(--s-1);
   background: var(--c-window);
 }
-/* the head 'projects': 11.5 px, 600, text-3, no capitals */
-.app-shell .b-side .b-sh {
-  /* 16 above, a 16 px line, 4 below: the rows under it start on the 4 px grid */
-  padding: var(--s-4) var(--pad-row-x) var(--gap-tight);
-  font-size: 11.5px;
-  line-height: var(--s-4);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  text-transform: none;
-}
-/* a project's ⋯ button: on hover or focus, flush at the row's right end (Benjamin, his 👍), over
-   the end box, out of the flow: nothing moves when it shows. The end words and the count give way
-   under it, like the ⌘ digit; the ⌘ digit wins while ⌘ is held */
-.app-more {
-  position: absolute;
-  top: 50%;
-  right: var(--pad-row-x);
-  display: inline-flex;
-  opacity: 0;
-  transform: translateY(-50%);
-}
-.app-r:hover .app-more,
-.app-more.on,
-.app-more:focus-within {
-  opacity: 1;
-}
-.app-r:hover:has(.app-more) .app-tail,
-.app-r:has(.app-more.on) .app-tail,
-.app-r:has(.app-more:focus-within) .app-tail {
-  visibility: hidden;
-}
-.app-r:has(.app-keyhint) .app-tail {
-  visibility: visible;
-}
-.app-r:has(.app-keyhint) .app-more:not(.on) {
-  opacity: 0;
-  pointer-events: none;
-}
-/* the foot: '+ add a project ⌘N', '⚙ settings ⌘,', on top of the scrolled rows, hit at their
-   centre and changing on hover (qa-flows' O.6 clicks audit) */
-[data-testid='app.sidebar'] {
-  min-height: 0;
-  overflow-y: auto;
-}
-.app-shell .b-side .foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: auto;
-  padding: var(--s-2) 0;
-  border-top: 1px solid var(--c-line);
-  /* the sidebar's tint on an opaque base: --c-sidebar is see-through (the window's vibrancy), and
-     rows scrolled under the foot showed through it (try gate R31, 30 agents) */
-  background: linear-gradient(var(--c-sidebar), var(--c-sidebar)), var(--c-solid);
-}
-.app-r.ft:hover {
-  background: var(--c-hover);
-}
-
-/* the titlebar over the main column: --h-bar, the window's drag region */
-.app-title {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--gap-inline);
-  height: var(--h-bar);
-  padding: 0 var(--s-3) 0 var(--s-4);
-  border-bottom: 1px solid var(--c-line);
-  -webkit-app-region: drag;
-  white-space: nowrap;
-}
-.app-title button {
-  -webkit-app-region: no-drag;
-}
-.app-title.away {
-  padding-left: 0;
-}
-/* the left bar folded to its icon rail while an artifact is open under 1200 px (designer
-   m_20435 (f)): 56 px, the lights' room on top, bise, ↗, ◷, then each project's initials */
-.app-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--s-1);
-  min-height: 0;
-  overflow-y: auto;
-  padding-bottom: var(--s-3);
-  border-right: 1px solid var(--c-line);
-  background: var(--c-sidebar);
-}
-.app-rail-lights {
-  flex: none;
-  height: var(--h-bar);
-  -webkit-app-region: drag;
-}
-.app-rail-sep {
-  flex: none;
-  width: 24px;
-  height: 1px;
-  margin: var(--s-1) 0;
-  background: var(--c-line);
-}
-.app-rail-g {
-  color: var(--c-text-2);
-  font-size: var(--t-14);
-}
-.app-rail-init {
-  color: var(--c-text-2);
-  font: 600 var(--t-11) var(--font-ui);
-  letter-spacing: 0.02em;
-}
-/* the rail sits under the lights already: the title bar keeps no room of its own for them */
-.app-shell.rail .app-title-lights {
-  width: 20px;
-}
-/* macOS's own lights sit here when the sidebar is away */
-.app-title-lights {
-  flex: none;
-  width: 76px;
-}
-/* the sidebar button's glyph (an IconButton's child): a box with its sidebar line */
-.app-tg-glyph {
-  position: relative;
-  display: block;
-  width: 18px;
-  height: 14px;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1.5px currentColor;
-}
-/* a glyph, drawn: its line a step in from the box's side, half a step from its top and bottom */
-.app-tg-glyph span {
-  position: absolute;
-  left: var(--s-1);
-  top: calc(var(--s-1) / 2);
-  bottom: calc(var(--s-1) / 2);
-  width: 1.5px;
-  background: currentColor;
-}
-.app-crumb {
-  /* its own width: the status slot takes the free room, and the crumb only cuts when there is none */
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--c-text-2);
-  font-size: var(--t-13, 13px);
-}
-/* the status slot (designer's desktop-notices v2): the room between the crumb's end +16 (the bar's
-   gap 8 + 8) and the toggle (the bar's gap, 8), what it holds on its right end; the slot drags,
-   what it holds doesn't */
+/* the status slot (designer's desktop-notices v2): the room between the title's end +8 and the
+   page's slot, what it holds on its right end; the slot drags, what it holds doesn't */
 .app-title-status {
   flex: 1 1 0;
   min-width: 0;
@@ -539,51 +576,15 @@ body:has(.app-shell) {
 .app-barslot > * {
   -webkit-app-region: no-drag;
 }
-.app-crumb .last {
-  color: var(--c-text);
-  font-weight: 600;
-}
-.app-crumb-sep {
-  margin: 0 var(--s-2);
-  color: var(--c-text-3);
-}
-/* an earlier crumb (his ask): it goes where it names — the project's main, that agent, that
-   screen; the last one is where he is, plain. text-2 as the crumb, ink and underlined on hover */
-.app-crumb-go:hover {
-  color: var(--c-text);
-  text-decoration: underline;
-}
-/* its focus ring whole around the word (designer m_33506): 2 px, 2 px out, r 4; the crumb's
-   overflow: hidden clipped the ds one to a caret-like bar, so the crumb gets 4 px of room inside
-   (padding) and gives it back outside (margin): nothing moves */
-.app-crumb:has(.app-crumb-go) {
-  padding: var(--s-1);
-  margin: calc(-1 * var(--s-1));
-}
-.app-crumb-go:focus-visible {
-  outline: 2px solid var(--c-focus);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-/* ‹ › right after the lights (designer's desktop-history): 28 px, 4 apart, the crumb at 8 (the
-   title's gap is 10, so the pair takes 2 back); nothing on a side: faint at 45%, no hover */
+/* ‹ › after the sidebar button (designer's desktop-history): 28 px, 4 apart */
 .app-hist {
   flex: none;
   display: flex;
   gap: var(--s-1);
-  margin-right: calc(var(--s-1) * -0.5);
 }
 .app-hist-arrow {
   position: relative;
   display: flex;
-}
-.app-hist .b-ibtn {
-  font-size: var(--t-17);
-}
-.app-hist .b-ibtn:disabled {
-  opacity: 0.45;
-  background: none;
-  color: var(--c-text-3);
 }
 /* what slides over the window (under 1000 px): the sidebar from the left, the panel from the
    right, over a 45% scrim of the window's paper; esc or a click on the scrim closes it */
@@ -607,16 +608,14 @@ body:has(.app-shell) {
   animation: app-slide var(--d-fast, 0.16s) var(--ease-out, ease-out);
 }
 .app-over.left {
-  left: 0;
-  /* the whole bar, also when it slides over its 56 px rail (--side-w is the rail's then) */
-  width: var(--side-full, var(--side-w, 240px));
+  /* beside the rail, under the bar: the rail and the lights stay */
+  top: var(--h-bar);
+  left: var(--w-rail);
+  width: var(--side-w);
 }
-.app-over.left .b-side {
+.app-over.left > .app-side {
   flex: 1;
-  background: var(--c-solid, var(--c-sidebar));
-}
-.app-over.left .b-side .foot {
-  background: var(--c-solid, var(--c-sidebar));
+  background: var(--c-solid);
 }
 .app-over.right {
   right: 0;
@@ -646,13 +645,7 @@ body:has(.app-shell) {
   .app-over {
     animation: none;
   }
-}
-
-.app-new {
-  color: var(--c-accent);
-}
-
-/* the last crash report, opened in the window (designer's voice-window part 2) */
+}/* the last crash report, opened in the window (designer's voice-window part 2) */
 .app-report {
   display: flex;
   flex-direction: column;
@@ -692,10 +685,8 @@ body:has(.app-shell) {
   touch-action: none;
 }
 .app-split.side {
-  left: calc(var(--side-w) - var(--s-1));
-}
-.app-shell.no-side .app-split.side {
-  left: 0;
+  top: var(--h-bar);
+  left: calc(var(--w-rail) + var(--side-col, 0px) - var(--s-1));
 }
 .app-split.panel {
   right: calc(var(--panel-w) - var(--s-1));
@@ -728,14 +719,4 @@ body:has(.app-shell) {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--c-text-2);
-}
-/* '⊞ plugins': the faint ink dot while something new to connect waits unseen (page plugins v48) */
-.app-newdot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  margin-left: var(--s-2);
-  border-radius: 50%;
-  background: var(--c-text-3);
-  vertical-align: middle;
 }

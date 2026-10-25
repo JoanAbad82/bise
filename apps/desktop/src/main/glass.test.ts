@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { glassOf } from './glass';
+import { glassOf, OPAQUE } from './glass';
 
 describe('glassOf', () => {
   it('the capsule is real glass on macOS: vibrancy that stays on while bise is not the active app, a clear background, macOS shadow and corners', () => {
@@ -15,6 +15,12 @@ describe('glassOf', () => {
 
   it('the main window: vibrancy under the page, following the window', () => {
     expect(glassOf('window', 'darwin', false)).toEqual({ vibrancy: 'under-window', visualEffectState: 'followWindow', backgroundColor: '#00000000' });
+  });
+
+  it("reduce transparency: no vibrancy, the theme's opaque ground", () => {
+    expect(glassOf('window', 'darwin', false, { reduceTransparency: true, dark: true })).toEqual({ backgroundColor: OPAQUE.dark });
+    expect(glassOf('window', 'darwin', false, { reduceTransparency: true, dark: false })).toEqual({ backgroundColor: OPAQUE.light });
+    expect(glassOf('window', 'darwin', false, { reduceTransparency: false, dark: true })).toEqual({ vibrancy: 'under-window', visualEffectState: 'followWindow', backgroundColor: '#00000000' });
   });
 
   it('test mode and other systems: no glass', () => {
