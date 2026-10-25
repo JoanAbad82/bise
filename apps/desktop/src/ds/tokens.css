@@ -242,14 +242,20 @@
   --d-press: 0ms; --d-fast: 0ms; --d-base: 0ms; --d-slow: 0ms; --d-mood: 0ms;
   --world-hover: var(--world);
 }
-/* increase contrast: stronger rules and a solid focus ring */
+/* increase contrast (designer, native-lead m_43631): every rule the strong one, the selected tint
+   at 16 % (not 10), the faint words that carry meaning (marks, meta, the working arc) in text-2,
+   and a solid focus ring */
 @media (prefers-contrast: more) { :root, [data-theme] {
-  --c-line: color-mix(in srgb, var(--p-text) 28%, transparent);
   --c-line-strong: color-mix(in srgb, var(--p-text) 50%, transparent);
+  --c-line: var(--c-line-strong);
+  --c-active: color-mix(in srgb, var(--p-text) 16%, transparent);
+  --c-text-3: var(--p-dim);
   --c-focus: var(--p-text);
 } }
 :root[data-increase-contrast], :root[data-increase-contrast] [data-theme] {
-  --c-line: color-mix(in srgb, var(--p-text) 28%, transparent);
   --c-line-strong: color-mix(in srgb, var(--p-text) 50%, transparent);
+  --c-line: var(--c-line-strong);
+  --c-active: color-mix(in srgb, var(--p-text) 16%, transparent);
+  --c-text-3: var(--p-dim);
   --c-focus: var(--p-text);
 }
