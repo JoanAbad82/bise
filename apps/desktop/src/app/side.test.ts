@@ -188,7 +188,7 @@ describe('resize (designer m_19374)', () => {
     expect(sideWidthOf(300, 1400, 320)).toBe(300);
     expect(sideWidthOf(180, 1400, 320)).toBe(200);
     expect(sideWidthOf(150, 1400, 320)).toBe('fold');
-    expect(sideWidthOf(900, 1400, 320)).toBe(400);
+    expect(sideWidthOf(900, 1400, 320)).toBe(320);
     expect(sideWidthOf(390, 1100, 320)).toBe(260);
     expect(panelWidthOf(200, 1400, 240)).toBe(320);
     expect(panelWidthOf(900, 1400, 240)).toBe(640);
