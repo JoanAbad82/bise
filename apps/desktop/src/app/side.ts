@@ -203,7 +203,7 @@ export function crumbOf(route: Route, name: (project: string) => string, place: 
  * The crumb's segments before the last, as his way back along them (his ask, desktop-history's
  * third way besides ‹ and esc): each earlier one a route, the last (where he is) plain. The
  * project's name → its main's thread, an agent's name (a review's, a log's) → its thread,
- * settings' word → its root; a screen's own word ('agents', 'changes'…) is where he is, and the
+ * settings' word → its root, 'plugins' → its list; a screen's own word ('agents', 'changes'…) is where he is, and the
  * words that name one thing of the project (a feature, a commit, a branch) stay plain. Pure.
  */
 export function crumbGoOf(route: Route, name: (project: string) => string, place: PlaceCrumb = () => []): { c: string; go?: Route }[] {
@@ -223,6 +223,10 @@ export function crumbGoOf(route: Route, name: (project: string) => string, place
     if (route.screen === 'running' && route.scope !== undefined)
       return { c, go: { screen: 'thread', project: route.scope.project, agent: i === 0 ? MAIN : (route.scope.agent ?? MAIN) } };
     if (c === panel.crumb_settings) return { c, go: { screen: 'settings' } };
+    // a plugin's page: 'plugins' → the list it came from (skills' list keeps its kind)
+    if (route.screen === 'plugins' && i === 0)
+      return { c, go: route.kind === undefined ? { screen: 'plugins' } : { screen: 'plugins', kind: route.kind } };
+    // 'lab' alone stays plain: test-only, no lab index to go to
     return { c };
   });
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
 import { computerDot, crumbGoOf, crumbOf, folds, moreWords, panelAt, panelWords, panelProject, projectSide, signOf, turnShort } from './side';
 import { keyAction, type KeyLike } from './keys';
+import type { Route } from './route';
 import { newWords } from './Sidebar';
 
 const NOW = new Date(2026, 9, 7, 14, 0).getTime();
@@ -196,6 +197,46 @@ describe('resize (designer m_19374)', () => {
     expect(panelWidthOf(700, 1400, 240)).toBe(640);
     expect(keptWidth('x', 200, 400, 240)).toBe(240);
     expect(keptWidth(999, 200, 400, 240)).toBe(400);
+  });
+});
+
+describe("every crumb kind: each segment before the last opens that place (his ask: 'plugins' on a plugin's page goes back)", () => {
+  const name = () => 'storefront';
+  const place = (at: string) => (at === 'f/f-view' ? [{ name: 'desktop app', at: 'f/f-desk' }, { name: 'agent view', at: 'f/f-view' }] : []);
+  // one route per crumb kind with more than one segment; 'lab' is out: test-only, no lab index to go to
+  const kinds: Route[] = [
+    { screen: 'thread', project: 'p', agent: 'perf' },
+    { screen: 'agents', project: 'p' },
+    { screen: 'agents', project: 'p', archived: true },
+    { screen: 'changes', project: 'p' },
+    { screen: 'prs', project: 'p' },
+    { screen: 'environments', project: 'p' },
+    { screen: 'review', project: 'p', agent: 'perf' },
+    { screen: 'debug', project: 'p', agent: 'perf' },
+    { screen: 'feature', project: 'p', name: 'billing' },
+    { screen: 'commit', project: 'p', sha: 'a1b2c3d4e5f6' },
+    { screen: 'branch', project: 'p', branch: 'sb/x' },
+    { screen: 'artifacts', project: 'p' },
+    { screen: 'artifacts', project: 'p', at: 'f/f-view' },
+    { screen: 'artifacts', project: '', at: 'f/f-view' },
+    { screen: 'settings', page: 'general' },
+    { screen: 'plugins', id: 'computer' },
+    { screen: 'plugins', kind: 'skills', id: 'mistral:gmail' },
+    { screen: 'running', scope: { project: 'p' } },
+    { screen: 'running', scope: { project: 'p', agent: 'perf' } },
+  ];
+  for (const route of kinds) {
+    it(JSON.stringify(route), () => {
+      const crumb = crumbOf(route, name, place);
+      expect(crumb.length).toBeGreaterThan(1);
+      const go = crumbGoOf(route, name, place);
+      expect(go.map((s) => s.c)).toEqual(crumb.slice(0, -1));
+      for (const s of go) expect(s.go, `'${s.c}' goes nowhere`).toBeDefined();
+    });
+  }
+  it("a plugin's page: 'plugins' opens the plugins list it came from (skills' list keeps its kind)", () => {
+    expect(crumbGoOf({ screen: 'plugins', id: 'computer' }, name)).toEqual([{ c: 'plugins', go: { screen: 'plugins' } }]);
+    expect(crumbGoOf({ screen: 'plugins', kind: 'skills', id: 'mistral:gmail' }, name)).toEqual([{ c: 'plugins', go: { screen: 'plugins', kind: 'skills' } }]);
   });
 });
 
