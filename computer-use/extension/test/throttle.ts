@@ -7,32 +7,32 @@
 //   lifecycle  attached + Page.setWebLifecycleState {state: "active"}
 // Then: the poll rate over the last minute, and one click whose result
 // needs a 100 ms timer (does the action work, how long).
-// Run: node --max-old-space-size=1024 computer-use/extension/test/throttle.mjs [minutes]
+// Run: node --experimental-strip-types --max-old-space-size=1024 computer-use/extension/test/throttle.ts [minutes]
 // Result: $TMPDIR/cu-throttle.json.
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { servePages, fakeBroker, launch, loadExtension, sleep } from "./harness.mjs";
+import { servePages, fakeBroker, launch, loadExtension, sleep, resultOf } from "./harness.ts";
 
 const minutes = Number(process.argv[2] || 6.5);
 const pages = await servePages();
 const broker = await fakeBroker();
 const b = await launch({ brokerPort: broker.port, startUrl: pages.base + "next.html?user" });
-const out = { minutes, modes: {} };
+const out: { minutes: number; modes: Record<string, unknown>; lifecycleCall?: string; error?: string } = { minutes, modes: {} };
 try {
   await sleep(1500);
   const ext = await loadExtension(b);
   await broker.until(() => broker.hellos.length > 0);
   const modes = ["plain", "attached", "lifecycle"];
-  const target = {};
+  const target: Record<string, string> = {};
   for (const m of modes) {
     const r = await broker.request("throttle-" + m, "open", { url: pages.base + "poll.html?" + m });
-    target[m] = r.result.target;
+    target[m] = resultOf(r).target;
   }
   // attached: a snapshot attaches (and sets focus emulation); lifecycle: plus the lifecycle call.
   await broker.request("throttle-attached", "snapshot", { target: target.attached });
   await broker.request("throttle-lifecycle", "snapshot", { target: target.lifecycle });
   const lid = Number(target.lifecycle.slice(4));
-  out.lifecycleCall = await ext.ev(`chrome.debugger.sendCommand({tabId: ${lid}}, "Page.setWebLifecycleState", {state: "active"}).then(() => "ok", e => String(e))`);
+  out.lifecycleCall = await ext.ev<string>(`chrome.debugger.sendCommand({tabId: ${lid}}, "Page.setWebLifecycleState", {state: "active"}).then(() => "ok", e => String(e))`);
   const t0 = Date.now();
   console.log(`waiting ${minutes} min…`);
   await sleep(minutes * 60_000);
@@ -40,7 +40,7 @@ try {
     const id = Number(target[m].slice(4));
     const tab = await ext.ev(`chrome.tabs.get(${id}).then(t => ({ status: t.status, discarded: t.discarded, frozen: t.frozen }))`);
     // A frozen tab runs no script: read it once the action woke it up.
-    const read = () => ext.ev(`chrome.scripting.executeScript({target: {tabId: ${id}}, world: "MAIN", func: () => ({ ticks: window.ticks.slice(), vis: document.visibilityState })}).then(r => r[0].result, e => null)`);
+    const read = () => ext.ev<{ ticks: number[]; vis: string } | null>(`chrome.scripting.executeScript({target: {tabId: ${id}}, world: "MAIN", func: () => ({ ticks: window.ticks.slice(), vis: document.visibilityState })}).then(r => r[0].result, e => null)`);
     const t1 = Date.now();
     let info = await read();
     const readBeforeAct = !!info;
@@ -66,7 +66,7 @@ try {
     console.log(m, JSON.stringify(out.modes[m]));
   }
 } catch (e) {
-  out.error = String(e.stack || e);
+  out.error = String((e instanceof Error && e.stack) || e);
   console.log(out.error);
 } finally {
   writeFileSync(path.join(process.env.TMPDIR || "/tmp", "cu-throttle.json"), JSON.stringify(out, null, 1));

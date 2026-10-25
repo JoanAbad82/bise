@@ -54,7 +54,7 @@ async function checkBuild() {
 }
 checkBuild();
 
-// For the tests (test/e2e.mjs reads it through CDP on this worker).
+// For the tests (test/e2e.ts reads it through CDP on this worker).
 globalThis.bise = { agents, tabs, log, connected: () => !!port, detached, build: BUILD, checkBuild, recover };
 
 connect();

@@ -207,6 +207,8 @@ map_paths() {  # <changed path>...
     esac
     # the kit's node checks (kit/*.check.ts, no deps, ~0.1 s)
     case "$f" in kit/*) kit=1 ;; esac
+    # the extension's unit tests and the computer-use scripts' types (~2 s)
+    case "$f" in computer-use/extension/*|computer-use/bench/*|computer-use/tsconfig.node.json) cu=1 ;; esac
     # the words ratchet (tests/word_lint.py, issue 29): the tests it lints,
     # the catalog and its generated words, its list (quick runs it always)
     case "$f" in
@@ -236,6 +238,14 @@ kit_check() {
   for f in "$root"/kit/check.ts "$root"/kit/*.check.ts; do echo "node ${f#"$root"/}"; NODE_OPTIONS="$TS_NODE_OPTIONS" node "$f" || return 1; done
   if [ -x "$tsc" ]; then echo "tsc -p kit/tsconfig.node.json"; "$tsc" -p "$root/kit/tsconfig.node.json" || return 1
   else echo "skipped kit types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
+}
+# the extension's unit tests (no browser), then the types of its tests and the bench
+cu_check() {
+  local tsc="$root/office/sdk/node_modules/.bin/tsc"; desktop_path
+  echo "node --test computer-use/extension/test/unit.test.ts"
+  NODE_OPTIONS="$TS_NODE_OPTIONS" node --test "$root/computer-use/extension/test/unit.test.ts" || return 1
+  if [ -x "$tsc" ]; then echo "tsc -p computer-use/tsconfig.node.json"; "$tsc" -p "$root/computer-use/tsconfig.node.json" || return 1
+  else echo "skipped computer-use types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
 }
 if [ "$mode" = wait ]; then
   arg="${2:?usage: gate.sh wait <bg .out file | pid>}"
@@ -416,7 +426,7 @@ if [ "$mode" = land ]; then
   map_paths $changed
   dwhy=""; [ -n "$changed" ] && dwhy="$(desktop_why $changed)"
   src=0; printf '%s\n' "$changed" | grep -qE '\.(rs|bend|ts|tsx|py)$' && src=1
-  if [ $src = 0 ] && [ -z "$pkgs" ] && [ -z "$dwhy" ] && [ "${proto_ts:-0}${office:-0}${kit:-0}${words:-0}${bendw:-0}" = 00000 ]; then
+  if [ $src = 0 ] && [ -z "$pkgs" ] && [ -z "$dwhy" ] && [ "${proto_ts:-0}${office:-0}${kit:-0}${cu:-0}${words:-0}${bendw:-0}" = 000000 ]; then
     echo "GATE land GREEN (0s): no step for these paths"; exit 0
   fi
 fi
@@ -786,6 +796,7 @@ if [ "$mode" = land ]; then
   [ -n "$dwhy" ] && { tests/desktop_pick_shadow.sh land "$base" "$head" || true; }
   [ "${office:-0}" = 1 ] && lstep office_check tests/office_check.sh strict
   [ "${kit:-0}" = 1 ] && lstep kit kit_check
+  [ "${cu:-0}" = 1 ] && lstep computer_use cu_check
   echo "GATE land GREEN ($((SECONDS - t0))s):${ran:- no step for these paths}"
   exit 0
 fi
@@ -1029,6 +1040,8 @@ fi
 [ "${office:-0}" = 1 ] && step office_check tests/office_check.sh
 # the kit's node checks and their types (land had them, quick did not: js-to-ts)
 [ "${kit:-0}" = 1 ] && step kit kit_check
+# the extension's unit tests and the computer-use scripts' types
+[ "${cu:-0}" = 1 ] && step computer_use cu_check
 # the office skills' scripts, through bise office run (skipped with words when bise or bend-jsrt is not built)
 [ "${office_skills:-0}" = 1 ] && step office_skills python3 tests/office_skills_check.py
 # then the desktop's own checks, when the change reaches it (tests/test_map.py desktop)

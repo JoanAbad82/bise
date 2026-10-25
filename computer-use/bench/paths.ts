@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The paths the bench never takes (docs/computer-use-ship.md §5), on the
-// real stack (stack-lib.mjs: headless throwaway Chrome + the extension +
+// real stack (stack-lib.ts: headless throwaway Chrome + the extension +
 // this tree's host and broker), the test playing an agent over C3:
 //
 //   1. the debugging bar's Cancel: a stop by the user (C6 cancel_bar), the
@@ -15,7 +15,7 @@
 //      the call fails no_browser at once, the other browser goes on, a
 //      relaunched browser works again
 //
-//   node --max-old-space-size=1024 computer-use/bench/paths.mjs --bise <path> [only...]
+//   node --experimental-strip-types --max-old-space-size=1024 computer-use/bench/paths.ts --bise <path> [only...]
 //
 // ~1.5 min (4 waits for the worker's alarm). Exit 1 when a check fails.
 // The Web Store check needs the network (skipped without it).
@@ -23,16 +23,17 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import { startStack, sleep } from "./stack-lib.mjs";
+import { startStack, sleep, type CallReply } from "./stack-lib.ts";
+import { portOf, type TargetInfo } from "../extension/test/harness.ts";
 
 const args = process.argv.slice(2);
 const bi = args.indexOf("--bise");
 const bise = path.resolve(bi >= 0 ? args[bi + 1] : "bise");
 const only = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--bise");
-const want = (name) => !only.length || only.includes(name);
+const want = (name: string) => !only.length || only.includes(name);
 
-const results = [];
-const check = (name, ok, detail = "") => {
+const results: { name: string; ok: boolean }[] = [];
+const check = (name: string, ok: unknown, detail: unknown = "") => {
   results.push({ name, ok: !!ok });
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail === "" ? "" : "  " + (typeof detail === "string" ? detail : JSON.stringify(detail)).slice(0, 400)}`);
 };
@@ -45,17 +46,22 @@ const PDF = ["%PDF-1.4", "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj", "2 0 obj<
 const PAGE = `<!doctype html><title>Paths</title><h1>Paths</h1><button onclick="this.textContent='pressed'">Press</button>
 <a href="https://chromewebstore.google.com/category/extensions">store</a> <a href="chrome://settings">settings</a>`;
 const server = createServer((req, res) => {
-  if (req.url.startsWith("/doc.pdf")) { res.writeHead(200, { "content-type": "application/pdf" }); res.end(PDF); return; }
+  if (req.url?.startsWith("/doc.pdf")) { res.writeHead(200, { "content-type": "application/pdf" }); res.end(PDF); return; }
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
   res.end(PAGE);
 });
-await new Promise((r) => server.listen(0, "127.0.0.1", r));
-const base = `http://127.0.0.1:${server.address().port}/`;
+await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+const base = `http://127.0.0.1:${portOf(server)}/`;
 
 const s = await startStack({ bise });
-const tabId = (target) => Number(String(target).slice(4));
-const attachedTo = async (ext, id) => (await ext.ev("chrome.debugger.getTargets()")).some((t) => t.tabId === id && t.attached);
-const waitFor = async (f, ms = 10_000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await f()) return true; await sleep(100); } return false; };
+const tabId = (target: unknown) => Number(String(target).slice(4));
+const attachedTo = async (ext: typeof s.ext, id: number) => (await ext.ev<{ tabId?: number; attached: boolean }[]>("chrome.debugger.getTargets()")).some((t) => t.tabId === id && t.attached);
+/** The tab an open must give (a path can't go on without it). */
+const opened = (r: CallReply) => {
+  if (!r.ok) throw new Error(`open: ${r.error.code}: ${r.error.message}`);
+  return r.result.target;
+};
+const waitFor = async (f: () => boolean | Promise<boolean>, ms = 10_000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await f()) return true; await sleep(100); } return false; };
 
 try {
   // ---- 1. the debugging bar's Cancel
@@ -78,7 +84,8 @@ try {
     const ev = await waitFor(() => s.events().some((e) => e.agent === "cancel-me" && e.event === "stopped" && e.by === "cancel_bar"));
     check("cancel: events.jsonl says stopped by cancel_bar (main's feed: \"you pressed Cancel in Chrome\")", ev, s.events());
     check("cancel: state.json marks the agent stopped", (await a.call("status")).result?.me?.stopped === true);
-    for (const [op, a2] of [["snapshot", { target: T }], ["act", { target: T, action: "click", locator: { role: "button", name: "Press" } }], ["open", { url: base }]]) {
+    const steps: [string, object][] = [["snapshot", { target: T }], ["act", { target: T, action: "click", locator: { role: "button", name: "Press" } }], ["open", { url: base }]];
+    for (const [op, a2] of steps) {
       const x = await a.call(op, a2);
       check(`cancel: ${op} after it fails \`stopped\``, !x.ok && x.error?.code === "stopped", x.error);
     }
@@ -101,7 +108,7 @@ try {
     const store = await a.call("open", { url: "https://chromewebstore.google.com/" });
     check("refused: open the Web Store", !store.ok && store.error?.code === "refused" && /extension store/.test(store.error.message), store.error);
 
-    const T = (await a.call("open", { url: base })).result.target;
+    const T = opened(await a.call("open", { url: base }));
     await a.call("snapshot", { target: T });
     const toSettings = await a.call("act", { target: T, action: "click", locator: { role: "link", name: "settings" } });
     check("refused: a link to chrome://settings does nothing (Chrome blocks it), the tab stays", toSettings.ok && toSettings.result.url === base, toSettings.error || toSettings.result.url);
@@ -127,11 +134,12 @@ try {
   // ---- 3. the user closes the agent's tab group
   if (want("group")) {
     const a = await s.agent("grouped");
-    const T = (await a.call("open", { url: base })).result.target;
+    const T = opened(await a.call("open", { url: base }));
     await a.call("snapshot", { target: T });
     // the user closes the group: its tabs go, Chrome removes the group
-    const { targetInfos } = await s.b.send("Target.getTargets");
+    const { targetInfos } = await s.b.send<{ targetInfos: TargetInfo[] }>("Target.getTargets");
     const page = targetInfos.find((t) => t.type === "page" && t.url === base);
+    if (!page) throw new Error("the agent's page is not a target");
     await s.b.send("Target.closeTarget", { targetId: page.targetId });
     const ev = await waitFor(() => s.events().some((e) => e.agent === "grouped" && e.event === "stopped" && e.by === "group_closed"));
     check("group: closing it by hand stops the agent (group_closed)", ev, s.events().filter((e) => e.agent === "grouped"));
@@ -144,12 +152,13 @@ try {
   // ---- 4. the service worker stopped
   if (want("worker")) {
     const a = await s.agent("sleepy");
-    const T = (await a.call("open", { url: base })).result.target;
+    const T = opened(await a.call("open", { url: base }));
     await a.call("snapshot", { target: T });
     // what Chrome does to an MV3 worker it suspends: stop it
-    const { targetInfos } = await s.b.send("Target.getTargets");
+    const { targetInfos } = await s.b.send<{ targetInfos: TargetInfo[] }>("Target.getTargets");
     const page = targetInfos.find((t) => t.type === "page");
-    const { sessionId } = await s.b.send("Target.attachToTarget", { targetId: page.targetId, flatten: true });
+    if (!page) throw new Error("no page target");
+    const { sessionId } = await s.b.send<{ sessionId: string }>("Target.attachToTarget", { targetId: page.targetId, flatten: true });
     await s.b.send("ServiceWorker.enable", {}, sessionId);
     await s.b.send("ServiceWorker.stopAllWorkers", {}, sessionId);
     const gone = await waitFor(() => s.connected() === 0, 5000);
@@ -173,7 +182,7 @@ try {
     check("quit: two browsers connected at once", s.connected() === 2, s.connected());
     const c = await s.agent("on-second");
     const T2 = (await c.call("open", { url: base })).result?.target;
-    const onSecond = (await s.ext.ev("chrome.tabs.query({})")).some((t) => t.id === tabId(T2));
+    const onSecond = (await s.ext.ev<{ id: number }[]>("chrome.tabs.query({})")).some((t) => t.id === tabId(T2));
     check("quit: a new agent's open goes to the most recent browser", onSecond, T2);
     check("quit: the first agent keeps its tab in the first browser", (await a.call("snapshot", { target: T1 })).ok);
     // a call in flight in the first browser when it quits (crash, cmd+q, the Mac shutting down)
@@ -209,7 +218,7 @@ try {
     // accessory app, no window, never in front. Granting Screen Recording
     // makes macOS quit it and open it again (Quit & Reopen); the broker
     // must pick the new one up on the same socket, with no restart.
-    const devhost = path.join(process.env.CU_DEV_DIR || path.join(process.env.HOME, ".bise/cache/cu-apps-dev"), "bise Computer Use dev.app/Contents/MacOS/cu-devhost");
+    const devhost = path.join(process.env.CU_DEV_DIR || path.join(process.env.HOME ?? "", ".bise/cache/cu-apps-dev"), "bise Computer Use dev.app/Contents/MacOS/cu-devhost");
     if (!existsSync(devhost)) {
       console.log(`skip helper: no dev host at ${devhost} (computer-use/macos-app/scripts/bundle.sh --debug --devhost)`);
     } else {
@@ -222,8 +231,8 @@ try {
       // (without Accessibility, apps is no_permission: still its answer).
       const ctl = await s.agent(null);
       const a = await s.agent("app-bot");
-      const answered = (r) => r.ok || r.error?.code === "no_permission";
-      const known = (r) => r.ok && typeof r.result?.screen_recording === "boolean";
+      const answered = (r: CallReply) => r.ok || r.error?.code === "no_permission";
+      const known = (r: CallReply) => r.ok && typeof r.result?.screen_recording === "boolean";
       const p0 = await ctl.call("permissions");
       check("helper: the real helper answers the setup poll", known(p0), p0.result || p0.error);
       const a0 = await a.call("apps");
@@ -250,7 +259,7 @@ try {
     }
   }
 } catch (e) {
-  check("no crash", false, String(e.stack || e));
+  check("no crash", false, String((e instanceof Error && e.stack) || e));
 } finally {
   await s.stop();
   server.close();

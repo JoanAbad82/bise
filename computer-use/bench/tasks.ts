@@ -1,4 +1,4 @@
-// The bench's tasks: 10 on the local pages (pages.mjs), 3 on public
+// The bench's tasks: 10 on the local pages (pages.ts), 3 on public
 // read-only sites. Each task has
 //   prompt   what an agent gets in the model-in-the-loop run (wave 2)
 //   program  a reference run_typescript program using the `computer`
@@ -7,7 +7,15 @@
 //   check    the program's output -> true when the task is done
 // Programs close the tabs they open (5 tabs at most per agent).
 
-export const TASKS = [
+export type Task = {
+  id: string;
+  kind: string;
+  prompt: string;
+  program: string;
+  check: (out: string) => boolean;
+};
+
+export const TASKS: Task[] = [
   {
     id: "search",
     kind: "local",

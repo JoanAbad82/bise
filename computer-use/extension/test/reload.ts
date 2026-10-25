@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 // A loaded-unpacked extension reloads itself when bise syncs a new build
 // into its folder (sw.js checkBuild; rust browsers::sync_extension).
-// Headless, throwaway profile: node computer-use/extension/test/reload.mjs
+// Headless, throwaway profile: node --experimental-strip-types computer-use/extension/test/reload.ts
 import { cpSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
-import { extDir, fakeBroker, launch, loadExtension, sleep } from "./harness.mjs";
+import { extDir, fakeBroker, launch, loadExtension, sleep, type TargetInfo } from "./harness.ts";
 
-const checks = [];
-const check = (name, ok, info) => { checks.push(!!ok); console.log(`${ok ? "ok  " : "FAIL"} ${name}${info !== undefined ? "  " + JSON.stringify(info) : ""}`); };
+const checks: boolean[] = [];
+const check = (name: string, ok: unknown, info?: unknown) => { checks.push(!!ok); console.log(`${ok ? "ok  " : "FAIL"} ${name}${info !== undefined ? "  " + JSON.stringify(info) : ""}`); };
 
 const dir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "cu-ext-"));
 cpSync(extDir, dir, { recursive: true, filter: (s) => !s.includes(`${path.sep}test`) });
-const stamp = (b) => {
+const stamp = (b: string) => {
   writeFileSync(path.join(dir, "build.js"), `export const BUILD = "${b}";\n`);
   writeFileSync(path.join(dir, "build.json"), JSON.stringify({ build: b }) + "\n");
 };
@@ -36,7 +36,7 @@ try {
   let gone = false;
   for (let i = 0; i < 25 && !gone; i++) {
     await sleep(200);
-    const { targetInfos } = await b.send("Target.getTargets");
+    const { targetInfos } = await b.send<{ targetInfos: TargetInfo[] }>("Target.getTargets");
     gone = !targetInfos.some((t) => t.type === "service_worker" && t.url.includes(ext.id));
   }
   check("a new build on disk: the extension reloads itself", gone);

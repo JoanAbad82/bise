@@ -1,13 +1,13 @@
-// The bench's local test pages (served on 127.0.0.1 by bench.mjs). Small
+// The bench's local test pages (served on 127.0.0.1 by bench.ts). Small
 // on purpose: each one holds the trap a task measures (auto-wait, a
 // banner that may show, two look-alike buttons, a lazy list...).
 
-const page = (title, body, script = "") => `<!doctype html>
+const page = (title: string, body: string, script = "") => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <style>body{font:15px system-ui;margin:24px;max-width:720px} .row{margin:6px 0}</style></head>
 <body>${body}${script ? `<script>${script}</script>` : ""}</body></html>`;
 
-export const PAGES = {
+export const PAGES: Record<string, string> = {
   "search.html": page("Shop search", `
 <h1>Cables</h1>
 <form id="f" role="search"><input type="search" aria-label="Search products" id="q"><button>Search</button></form>

@@ -1,6 +1,6 @@
 // The page as text (contract C2) and the locators of C1, from the nodes of
 // CDP Accessibility.getFullAXTree. Pure: no chrome.* here, so node tests
-// (test/unit.test.mjs) run it on recorded trees.
+// (test/unit.test.ts) run it on recorded trees.
 
 // Chrome's internal roles → the ARIA names C2 uses on web and apps.
 const ROLE_MAP = {

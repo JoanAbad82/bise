@@ -2,12 +2,12 @@
 // End to end: a throwaway Chrome (or Edge: --browser edge) with the
 // extension, the test plays bise's broker over the fake native host (C4)
 // and drives every op and action on the local pages of test/pages/.
-// Run: node --max-old-space-size=1024 computer-use/extension/test/e2e.mjs [--browser chrome|edge]
+// Run: node --experimental-strip-types --max-old-space-size=1024 computer-use/extension/test/e2e.ts [--browser chrome|edge]
 // Headless, on a temp profile (~1 min): no window shows; it quits the browser at the end.
 // Result: $TMPDIR/cu-e2e-<browser>.json; exit code 1 when a check fails.
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { servePages, fakeBroker, launch, loadExtension, pageSession, sleep, EXT_ID, installed } from "./harness.mjs";
+import { servePages, fakeBroker, launch, loadExtension, pageSession, sleep, EXT_ID, installed, resultOf, type Reply, type Result } from "./harness.ts";
 
 const browser = process.argv.includes("--browser") ? process.argv[process.argv.indexOf("--browser") + 1] : "chrome";
 if (!installed(browser)) {
@@ -15,8 +15,8 @@ if (!installed(browser)) {
   process.exit(0);
 }
 
-const results = [];
-const check = (name, ok, detail = "") => {
+const results: { name: string; ok: boolean; detail: unknown }[] = [];
+const check = (name: string, ok: unknown, detail: unknown = "") => {
   results.push({ name, ok: !!ok, detail });
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  " + (typeof detail === "string" ? detail : JSON.stringify(detail)) : ""}`);
 };
@@ -32,15 +32,19 @@ try {
   const ext = await loadExtension(b);
   check("extension id is the pinned one", ext.id === EXT_ID, ext.id);
   check("hello on the native port", await broker.until(() => broker.hellos.length > 0, 10_000), broker.hellos[0]);
-  const hello = broker.hellos[0] || {};
-  check("hello names the browser and versions", hello.browser === (browser === "edge" ? "edge" : "chrome") && /^\d+\./.test(hello.version) && hello.extension_version === "0.1.1", hello);
+  const hello: { browser?: string; version?: string; extension_version?: string } = broker.hellos[0] || {};
+  check("hello names the browser and versions", hello.browser === (browser === "edge" ? "edge" : "chrome") && /^\d+\./.test(String(hello.version)) && hello.extension_version === "0.1.1", hello);
 
-  const req = async (agent, op, args) => {
-    const r = await broker.request(agent, op, args);
+  const req = async <T = Result>(agent: string, op: string, args: object) => {
+    const r = await broker.request<T>(agent, op, args);
     return r;
   };
-  const act = (agent, target, action, rest = {}) => req(agent, "act", { target, action, ...rest });
-  const win = () => ext.ev("chrome.windows.getAll({populate: true}).then(ws => ws.map(w => ({id: w.id, focused: w.focused, tabs: w.tabs.map(t => ({id: t.id, active: t.active, groupId: t.groupId, url: t.url}))})))");
+  /** One row of the tabs op. */
+  type TabRow = { target: string; user_touched: boolean };
+  const tabsOf = (agent: string) => req<TabRow[]>(agent, "tabs", {});
+  const act = (agent: string, target: string, action: string, rest = {}) => req(agent, "act", { target, action, ...rest });
+  type Win = { id: number; focused: boolean; tabs: { id: number; active: boolean; groupId: number; url: string }[] };
+  const win = () => ext.ev<Win[]>("chrome.windows.getAll({populate: true}).then(ws => ws.map(w => ({id: w.id, focused: w.focused, tabs: w.tabs.map(t => ({id: t.id, active: t.active, groupId: t.groupId, url: t.url}))})))");
   const userTab = async () => (await win()).flatMap((w) => w.tabs).find((t) => t.url.includes("?user"));
   const before = await userTab();
   check("user's tab active at start", before?.active, before);
@@ -51,15 +55,15 @@ try {
   const o3 = await req(B, "open", { url: pages.base + "form.html" });
   check("open returns target, url, title", o1.ok && /^tab:\d+$/.test(o1.result.target) && o1.result.title === "Test shop", o1.result || o1.error);
   check("open summary", o1.result?.summary === "opened a tab · 127.0.0.1:" + new URL(pages.base).port, o1.result?.summary);
-  const T1 = o1.result.target, T2 = o2.result.target, T3 = o3.result.target;
-  const groups = await ext.ev("chrome.tabGroups.query({}).then(gs => gs.map(g => ({title: g.title, color: g.color, collapsed: g.collapsed})))");
+  const T1 = resultOf(o1).target, T2 = resultOf(o2).target, T3 = resultOf(o3).target;
+  const groups = await ext.ev<{ title: string; color: string; collapsed: boolean }[]>("chrome.tabGroups.query({}).then(gs => gs.map(g => ({title: g.title, color: g.color, collapsed: g.collapsed})))");
   check("one pink, open group per agent", groups.length === 2 && groups.every((g) => g.color === "pink" && !g.collapsed) && groups.some((g) => g.title === "bise · api-v2") && groups.some((g) => g.title === "bise · pr-designer"), groups);
   const ws = await win();
   const tabsA = ws.flatMap((w) => w.tabs).filter((t) => [T1, T2].includes("tab:" + t.id));
   check("agent tabs share one group", tabsA.length === 2 && tabsA[0].groupId === tabsA[1].groupId && tabsA.every((t) => !t.active), tabsA);
   check("user's tab still active after open", (await userTab())?.active);
 
-  const lt = await req(A, "tabs", {});
+  const lt = await tabsOf(A);
   check("tabs lists this agent's tabs only", lt.ok && lt.result.length === 2 && lt.result.every((t) => [T1, T2].includes(t.target) && t.user_touched === false), lt.result);
   const foreign = await req(B, "snapshot", { target: T1 });
   check("another agent's tab is not_found", !foreign.ok && foreign.error.code === "not_found", foreign.error);
@@ -71,9 +75,9 @@ try {
   check("snapshot lines carry roles, names, refs", /- button "Add to cart" \[e\d+\]/.test(text) && /- heading "Test shop" \[e\d+\]/.test(text) && /- searchbox "Search" \[e\d+\] value="old text"/.test(text), text);
   check("snapshot marks disabled", /- button "Pay now" \[e\d+\] \(disabled\)/.test(text));
   check("password value is masked", /- textbox "Password" \[e\d+\] value="•••"/.test(text) && !text.includes("hunter2"));
-  check("snapshot refs count", s1.result.refs === (text.match(/\[e\d+\]/g) || []).length && s1.result.truncated === false, s1.result.refs);
+  check("snapshot refs count", resultOf(s1).refs === (text.match(/\[e\d+\]/g) || []).length && resultOf(s1).truncated === false, resultOf(s1).refs);
   const s1small = await req(A, "snapshot", { target: T1, max_nodes: 3 });
-  check("max_nodes cuts and says so", s1small.result.truncated === true && s1small.result.refs === 3, s1small.result.text);
+  check("max_nodes cuts and says so", resultOf(s1small).truncated === true && resultOf(s1small).refs === 3, resultOf(s1small).text);
   console.log(text);
 
   // ---- click (the 5 s trap is gone: focus emulation)
@@ -81,23 +85,25 @@ try {
   check("click lands", c1.ok && c1.result.changed.includes('+ text "bought 1"') || c1.result?.changed.includes("bought 1"), c1.result || c1.error);
   check("click answers in < 5 s (settle included)", c1.ms < 5000, `${c1.ms} ms`);
   check("click summary", c1.result?.summary === `clicked "Add to cart" · 127.0.0.1:${new URL(pages.base).port}`, c1.result?.summary);
-  const ref = /- button "Add to cart" \[(e\d+)\]/.exec(text)[1];
+  const refMatch = /- button "Add to cart" \[(e\d+)\]/.exec(text);
+  if (!refMatch) throw new Error("the snapshot has no Add to cart ref");
+  const ref = refMatch[1];
   const c2 = await act(A, T1, "click", { ref });
   check("click by ref", c2.ok && c2.result.changed.includes("bought 2"), c2.result?.changed || c2.error);
   const timing = [];
   for (let i = 0; i < 3; i++) { const r = await act(A, T1, "click", { ref }); timing.push(r.ms); }
   check("three more clicks answer in < 5 s", timing.every((ms) => ms < 5000), timing);
   // The 5 s trap is in the mouse events themselves: measured inside the worker.
-  const inputs = (await ext.ev("bise.log")).filter((x) => x.input === "click").map((x) => x.ms);
+  const inputs = (await ext.ev<{ input?: string; ms: number }[]>("bise.log")).filter((x) => x.input === "click").map((x) => x.ms);
   check("no 5 s trap: every click's mouse events take < 1 s", inputs.length >= 5 && inputs.every((ms) => ms < 1000), inputs);
 
   // ---- locator errors
   const amb = await act(A, T1, "click", { locator: { role: "button", name: "More" }, timeout_ms: 300 });
-  check("ambiguous lists candidates", !amb.ok && amb.error.code === "ambiguous" && amb.error.candidates.length === 2, amb.error);
+  check("ambiguous lists candidates", !amb.ok && amb.error.code === "ambiguous" && amb.error.candidates?.length === 2, amb.error);
   const nth = await act(A, T1, "click", { locator: { role: "button", name: "More", nth: 1 } });
   check("nth picks one", nth.ok, nth.error);
   const nf = await act(A, T1, "click", { locator: { role: "button", name: "Checkout" }, timeout_ms: 300 });
-  check("not_found lists candidates", !nf.ok && nf.error.code === "not_found" && nf.error.candidates.length > 0 && nf.error.summary === `couldn't find "Checkout" · ${HOST}`, nf.error);
+  check("not_found lists candidates", !nf.ok && nf.error.code === "not_found" && (nf.error.candidates?.length ?? 0) > 0 && nf.error.summary === `couldn't find "Checkout" · ${HOST}`, nf.error);
   const dis = await act(A, T1, "click", { locator: { role: "button", name: "Pay now" }, timeout_ms: 400 });
   check("disabled → timeout", !dis.ok && dis.error.code === "timeout" && /disabled/.test(dis.error.message) && dis.error.summary === `couldn't click "Pay now": it's disabled · ${HOST}`, dis.error);
   const re = await act(A, T1, "read", { locator: { text_re: "price: \\d+/i" } });
@@ -142,8 +148,8 @@ try {
 
   // ---- scroll
   const sc = await req(A, "open", { url: pages.base + "scroll.html" });
-  const T4 = sc.result.target;
-  const yOf = async (tabId) => ext.ev(`chrome.scripting.executeScript({target:{tabId:${tabId}}, func: () => [scrollY, document.getElementById('box').scrollTop]}).then(r => r[0].result)`);
+  const T4 = resultOf(sc).target;
+  const yOf = async (tabId: number) => ext.ev<[number, number]>(`chrome.scripting.executeScript({target:{tabId:${tabId}}, func: () => [scrollY, document.getElementById('box').scrollTop]}).then(r => r[0].result)`);
   const id4 = Number(T4.slice(4));
   const sd = await act(A, T4, "scroll", {});
   const y1 = await yOf(id4);
@@ -176,10 +182,10 @@ try {
   check("chrome:// refused", !chromeUrl.ok && chromeUrl.error.code === "refused", chromeUrl.error);
   const store = await req(A, "open", { url: "https://chromewebstore.google.com/" });
   check("the Web Store refused", !store.ok && store.error.code === "refused", store.error);
-  const have = (await req(A, "tabs", {})).result.length;
-  let fifth;
+  const have = resultOf(await tabsOf(A)).length;
+  let fifth: Reply | undefined;
   for (let i = have; i < 5; i++) fifth = await req(A, "open", { url: pages.base + "next.html" });
-  check("up to 5 tabs per agent", fifth.ok && (await req(A, "tabs", {})).result.length === 5, fifth.error);
+  check("up to 5 tabs per agent", fifth?.ok && resultOf(await tabsOf(A)).length === 5, fifth?.error);
   const sixth = await req(A, "open", { url: pages.base + "next.html" });
   check("a 6th tab is refused", !sixth.ok && sixth.error.code === "refused" && /5 tabs/.test(sixth.error.message), sixth.error);
   const bad = await act(A, T1, "fly", {});
@@ -206,7 +212,7 @@ try {
   check("the agent tab is in front of him", (await ext.ev(`chrome.tabs.get(${id3}).then(t => t.active)`)) === true);
   // and he clicks in it (a real, trusted click, like his mouse)
   await sleep(700);
-  const user = await pageSession(b, (t) => t.targetId && t.url.includes("form.html") && true);
+  const user = await pageSession(b, (t) => !!t.targetId && t.url.includes("form.html") && true);
   await user.call("Input.dispatchMouseEvent", { type: "mousePressed", x: 5, y: 5, button: "left", clickCount: 1 });
   await user.call("Input.dispatchMouseEvent", { type: "mouseReleased", x: 5, y: 5, button: "left", clickCount: 1 });
   await user.detach();
@@ -222,12 +228,13 @@ try {
   check("the agent screenshots it", fs.ok && fs.result.data?.length > 1000, fs.error);
   if (fs.ok) writeFileSync(path.join(process.env.TMPDIR || "/tmp", "cu-cursor.jpg"), Buffer.from(fs.result.data, "base64"));
   check("the tab is still in front of him, still in the agent's group", (await ext.ev(`chrome.tabs.get(${id3}).then(t => t.active && t.groupId !== -1)`)) === true);
-  const tb = await req(B, "tabs", {});
-  check("tabs shows user_touched (drop leaves it to him)", tb.result.find((t) => t.target === T3)?.user_touched === true, tb.result);
+  const tb = await tabsOf(B);
+  check("tabs shows user_touched (drop leaves it to him)", resultOf(tb).find((t) => t.target === T3)?.user_touched === true, tb.result);
   const cursorDrawn = await ext.ev(`chrome.scripting.executeScript({target:{tabId:${id3}}, func: () => !!document.querySelector('bise-cursor')}).then(r => r[0].result)`);
   check("cursor overlay is in the page", cursorDrawn === true);
 
   // ---- his tabs stay his: the one he opened, and one he drags into the agent's group
+  if (!before) throw new Error("no user tab at the start");
   const mine = `tab:${before.id}`;
   const his = await Promise.all([act(B, mine, "read", {}), act(B, mine, "click", { locator: { role: "link", name: "Next page" } }), req(B, "screenshot", { target: mine }), req(B, "snapshot", { target: mine })]);
   check("a tab he opened is off-limits (read, click, screenshot, snapshot)", his.every((r) => !r.ok && r.error.code === "not_found"), his.map((r) => r.error));
@@ -238,7 +245,7 @@ try {
   check("a tab he dragged into the agent's group is still his", !dr.ok && dr.error.code === "not_found", dr.error);
   // a worker restart (MV3 stops it): fresh maps, recover() from session storage
   await ext.ev("(() => { bise.tabs.clear(); bise.agents.clear(); return bise.recover().then(() => 1); })()");
-  const ownersNow = await ext.ev("[...bise.tabs.entries()].map(([id, t]) => [id, t.agent])");
+  const ownersNow = await ext.ev<[number, string][]>("[...bise.tabs.entries()].map(([id, t]) => [id, t.agent])");
   check("after a worker restart: the agent's tabs are recovered, his dragged-in tab is not", ownersNow.some(([id, a]) => id === id3 && a === B) && !ownersNow.some(([id]) => id === dragged), ownersNow);
   const ra = await act(B, T3, "click", { locator: { role: "button", name: "Add to cart" } });
   const rd = await act(B, `tab:${dragged}`, "read", {});
@@ -262,7 +269,7 @@ try {
   broker.send({ release: A });
   await sleep(300);
   const attached = await ext.ev(`[...bise.tabs.values()].filter(t => t.agent === "${A}" && t.attached).length`);
-  const kept = (await req(A, "tabs", {})).result.length;
+  const kept = resultOf(await tabsOf(A)).length;
   check("release detaches (tabs stay)", attached === 0 && kept === 5, { attached, kept });
   const groupA = await ext.ev(`chrome.tabGroups.query({title: "bise · ${A}"}).then(g => g[0].id)`);
   await ext.ev(`chrome.tabs.query({groupId: ${groupA}}).then(ts => chrome.tabs.remove(ts.map(t => t.id))).then(() => 1)`);
@@ -275,14 +282,15 @@ try {
   check("resume → open works again", again.ok, again.error);
   broker.send({ stop: A });
   await sleep(100);
-  const st2 = await act(A, again.result.target, "read", {});
+  const againTarget = resultOf(again).target;
+  const st2 = await act(A, againTarget, "read", {});
   check("stop from bise → stopped, no event", !st2.ok && st2.error.code === "stopped" && broker.events.filter((e) => e.event === "stopped" && e.agent === A).length === 1, st2.error);
-  const userTouchedTabs = (await req(B, "tabs", {})).result.length;
+  const userTouchedTabs = resultOf(await tabsOf(B)).length;
   broker.send({ drop: B });
   broker.send({ drop: A });
   await sleep(500);
   const left = (await win()).flatMap((w) => w.tabs);
-  check("drop closes untouched tabs, ungroups touched ones", left.some((t) => t.id === id3 && t.groupId === -1) && !left.some((t) => t.id === Number(again.result.target.slice(4))) && userTouchedTabs === 1, left);
+  check("drop closes untouched tabs, ungroups touched ones", left.some((t) => t.id === id3 && t.groupId === -1) && !left.some((t) => t.id === Number(againTarget.slice(4))) && userTouchedTabs === 1, left);
   check("no stopped event for bise's own drop", !broker.events.some((e) => e.event === "stopped" && e.agent === B));
 
   // ---- the port comes back after the host dies (a broker restart)
@@ -293,7 +301,7 @@ try {
   check("requests work after the reconnect", after.ok && Array.isArray(after.result), after.error);
   console.log("sw log:", JSON.stringify(await ext.ev("bise.log")));
 } catch (e) {
-  check("no crash", false, String(e.stack || e));
+  check("no crash", false, String((e instanceof Error && e.stack) || e));
 } finally {
   writeFileSync(path.join(process.env.TMPDIR || "/tmp", `cu-e2e-${browser}.json`), JSON.stringify(results, null, 1));
   await b.quit();

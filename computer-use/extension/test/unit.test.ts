@@ -9,10 +9,23 @@ import { jpegSize } from "../lib/jpeg.js";
 // A small CDP AX tree: root → heading, button (with its own text), a
 // password textbox, a generic wrapper, a paragraph of text, an ignored node.
 let id = 0;
-const N = (role, name, extra = {}, kids = []) => ({ nodeId: String(++id), role: { value: role }, name: name === undefined ? undefined : { value: name }, backendDOMNodeId: 100 + id, childIds: kids.map((k) => k.nodeId), _kids: kids, ...extra });
-function flat(root) {
-  const out = [];
-  const go = (n, parent) => { const { _kids, ...node } = n; if (parent) node.parentId = parent.nodeId; out.push(node); _kids.forEach((k) => go(k, n)); };
+/** A CDP AX node as Accessibility.getFullAXTree gives it (the fields walk reads). */
+type AXNode = {
+  nodeId: string;
+  parentId?: string;
+  role: { value: string };
+  name?: { value: string };
+  value?: { value: string };
+  properties?: { name: string; value: { value: unknown } }[];
+  ignored?: boolean;
+  backendDOMNodeId: number;
+  childIds: string[];
+};
+type Tree = AXNode & { _kids: Tree[] };
+const N = (role: string, name?: string, extra: Partial<AXNode> = {}, kids: Tree[] = []): Tree => ({ nodeId: String(++id), role: { value: role }, name: name === undefined ? undefined : { value: name }, backendDOMNodeId: 100 + id, childIds: kids.map((k) => k.nodeId), _kids: kids, ...extra });
+function flat(root: Tree) {
+  const out: AXNode[] = [];
+  const go = (n: Tree, parent: Tree | null) => { const { _kids, ...node } = n; if (parent) node.parentId = parent.nodeId; out.push(node); _kids.forEach((k) => go(k, n)); };
   go(root, null);
   return out;
 }
@@ -33,15 +46,22 @@ const tree = () => {
   ]));
 };
 
-const entriesOf = (nodes, passwords = new Set()) => {
+const entriesOf = (nodes: AXNode[], passwords = new Set<number>()) => {
   let n = 0;
-  const refs = new Map();
-  return walk(nodes, { refFor: (b) => refs.get(b) || (refs.set(b, ++n), n), passwords });
+  const refs = new Map<number, number>();
+  return walk(nodes, { refFor: (b: number) => refs.get(b) || (refs.set(b, ++n), n), passwords });
 };
+/** A thrown error with code bad_args (the lib's refusals). */
+const badArgs = (e: unknown) => e instanceof Error && "code" in e && e.code === "bad_args";
+/** One dispatchKeyEvent's params, the fields these tests read. */
+type KeyEvent = { type: string; key: string; modifiers: number; text?: string; commands?: string[] };
+const events = (chord: ReturnType<typeof parseKeys>[number]): KeyEvent[] => chordEvents(chord);
 
 test("walk + render: the C2 text", () => {
   const nodes = tree();
-  const pw = nodes.find((n) => n.name?.value === "Password").backendDOMNodeId;
+  const pwNode = nodes.find((n) => n.name?.value === "Password");
+  assert.ok(pwNode, "the tree has a Password box");
+  const pw = pwNode.backendDOMNodeId;
   const r = render(entriesOf(nodes, new Set([pw])), { title: "Shop", host: "shop.test" });
   assert.equal(r.text, [
     "# Shop · shop.test",
@@ -118,7 +138,7 @@ test("text locators keep the innermost match", () => {
 test("parseRe: flags after the last slash; bad source is bad_args", () => {
   assert.ok(parseRe("Anker.*2 m/i").test("anker usb 2 M"));
   assert.ok(parseRe("a/b").test("a/b"));
-  assert.throws(() => parseRe("(/"), (e) => e.code === "bad_args");
+  assert.throws(() => parseRe("(/"), badArgs);
 });
 
 test("diff: + added, - removed, at most 20 lines", () => {
@@ -132,16 +152,16 @@ test("diff: + added, - removed, at most 20 lines", () => {
 
 test("keys: Playwright names, chords, macOS edit commands", () => {
   const [enter] = parseKeys("Enter");
-  assert.deepEqual(chordEvents(enter).map((e) => [e.type, e.key, e.text]), [["keyDown", "\r", "\r"], ["keyUp", "\r", undefined]]);
+  assert.deepEqual(events(enter).map((e) => [e.type, e.key, e.text]), [["keyDown", "\r", "\r"], ["keyUp", "\r", undefined]]);
   const chords = parseKeys("Meta+A Backspace");
   assert.equal(chords.length, 2);
-  const ev = chordEvents(chords[0]);
+  const ev = events(chords[0]);
   assert.equal(ev[0].key, "Meta");
   assert.deepEqual(ev[1].commands, ["selectAll"]);
   assert.equal(ev[1].modifiers, 4);
-  assert.equal(chordEvents(parseKeys("Shift+a")[0])[1].text, "A");
-  assert.throws(() => parseKeys("Hyper+Q"), (e) => e.code === "bad_args");
-  assert.throws(() => parseKeys("Florp"), (e) => e.code === "bad_args");
+  assert.equal(events(parseKeys("Shift+a")[0])[1].text, "A");
+  assert.throws(() => parseKeys("Hyper+Q"), badArgs);
+  assert.throws(() => parseKeys("Florp"), badArgs);
   assert.equal(keyLabel("Escape Meta+A Enter"), "esc cmd+a enter");
 });
 

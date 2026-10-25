@@ -3,11 +3,11 @@
 // agent's tab, only while its debugger is attached (it never attaches to
 // look), quietly (no touch mark, not queued as an action), never for
 // another agent's tab.
-// Headless, throwaway profile: node computer-use/extension/test/peek.mjs
-import { fakeBroker, launch, loadExtension, servePages, sleep } from "./harness.mjs";
+// Headless, throwaway profile: node --experimental-strip-types computer-use/extension/test/peek.ts
+import { fakeBroker, launch, loadExtension, servePages, sleep } from "./harness.ts";
 
-const checks = [];
-const check = (name, ok, info) => { checks.push(!!ok); console.log(`${ok ? "ok  " : "FAIL"} ${name}${info !== undefined ? "  " + JSON.stringify(info) : ""}`); };
+const checks: boolean[] = [];
+const check = (name: string, ok: unknown, info?: unknown) => { checks.push(!!ok); console.log(`${ok ? "ok  " : "FAIL"} ${name}${info !== undefined ? "  " + JSON.stringify(info) : ""}`); };
 
 const A = "00000000000000aa.perf";
 const B = "00000000000000bb.docs";
@@ -17,8 +17,9 @@ const b = await launch({ brokerPort: broker.port, startUrl: "about:blank" });
 try {
   const ext = await loadExtension(b);
   check("the extension connects", await broker.until(() => broker.hellos.length > 0, 15_000));
-  const req = (agent, op, args) => broker.request(agent, op, args, 30_000, { name: agent.split(".").pop() });
-  const tab = (id) => ext.ev(`(() => { const t = bise.tabs.get(${id}); return t && { attached: t.attached, touched: t.userTouched, acting: t.acting, paused: t.paused }; })()`);
+  const req = (agent: string, op: string, args: object) => broker.request(agent, op, args, 30_000, { name: agent.split(".").pop() });
+  type TabState = { attached: boolean; touched: boolean; acting: boolean; paused: boolean };
+  const tab = (id: number) => ext.ev<TabState>(`(() => { const t = bise.tabs.get(${id}); return t && { attached: t.attached, touched: t.userTouched, acting: t.acting, paused: t.paused }; })()`);
 
   const o = await req(A, "open", { url: pages.base + "a.html" });
   const target = o.result?.target;

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // The computer-use bench (docs/computer-use-briefs.md, cu-sdk item 6; run
-// in wave 2). 10 tasks on local test pages (pages.mjs) and 3 on public
-// read-only sites (tasks.mjs).
+// in wave 2). 10 tasks on local test pages (pages.ts) and 3 on public
+// read-only sites (tasks.ts).
 //
-//   node --max-old-space-size=1024 computer-use/bench/bench.mjs [options] [task ids...]
+//   node --experimental-strip-types --max-old-space-size=1024 computer-use/bench/bench.ts [options] [task ids...]
 //
 // Scripted run (the default): each task's reference program runs the way
 // bise runs run_typescript: bend-jsrt (with the `computer` SDK in its
@@ -28,19 +28,23 @@
 //
 // The agent name the broker sees: $SB_AGENT, else "cu-bench".
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 import { createServer } from "node:http";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { PAGES } from "./pages.mjs";
-import { TASKS } from "./tasks.mjs";
+import { portOf } from "../extension/test/harness.ts";
+import { PAGES } from "./pages.ts";
+import { TASKS } from "./tasks.ts";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const root = path.resolve(here, "../..");
 
-function parseArgs(argv) {
-  const o = { ids: [], kind: null, bise: "bise", mcp: null, jsrt: null, out: null, mode: "run" };
+type Opts = { ids: string[]; kind: string | null; bise: string; mcp: string | null; jsrt: string | null; out: string | null; mode: string };
+
+function parseArgs(argv: string[]) {
+  const o: Opts = { ids: [], kind: null, bise: "bise", mcp: null, jsrt: null, out: null, mode: "run" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--local") o.kind = "local";
@@ -60,32 +64,40 @@ function parseArgs(argv) {
 
 async function servePages() {
   const server = createServer((req, res) => {
-    const name = path.basename(new URL(req.url, "http://x").pathname) || "search.html";
+    const name = path.basename(new URL(req.url ?? "/", "http://x").pathname) || "search.html";
     const body = PAGES[name];
     if (!body) { res.writeHead(404); res.end("not found"); return; }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     res.end(body);
   });
-  await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  return { base: `http://127.0.0.1:${server.address().port}/`, close: () => server.close() };
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  return { base: `http://127.0.0.1:${portOf(server)}/`, close: () => server.close() };
 }
+
+/** One JSON-RPC answer of the MCP server. */
+type RpcReply = { id?: number; result?: { content?: { text?: string }[]; isError?: boolean; tools?: { name: string }[] }; error?: { message: string } };
 
 // ---- the MCP server, over stdio (JSON-RPC lines) ----
 class Mcp {
-  constructor(cmd, env) {
+  p: ChildProcessByStdio<Writable, Readable, null>;
+  buf: string;
+  id: number;
+  wait: Map<number | undefined, (m: RpcReply) => void>;
+  dead: Promise<number | null>;
+  constructor(cmd: string[], env: NodeJS.ProcessEnv) {
     const [bin, ...args] = cmd;
     this.p = spawn(bin, args, { env, stdio: ["pipe", "pipe", "inherit"] });
     this.buf = "";
     this.id = 0;
     this.wait = new Map();
-    this.p.stdout.on("data", (d) => {
+    this.p.stdout.on("data", (d: Buffer) => {
       this.buf += d.toString();
       let i;
       while ((i = this.buf.indexOf("\n")) >= 0) {
         const line = this.buf.slice(0, i).trim();
         this.buf = this.buf.slice(i + 1);
         if (!line) continue;
-        let m;
+        let m: RpcReply;
         try { m = JSON.parse(line); } catch { continue; }
         const w = this.wait.get(m.id);
         if (w) { this.wait.delete(m.id); w(m); }
@@ -93,13 +105,13 @@ class Mcp {
     });
     this.dead = new Promise((r) => this.p.on("exit", (code) => r(code)));
   }
-  request(method, params) {
+  request(method: string, params: object): Promise<RpcReply> {
     const id = ++this.id;
-    const reply = new Promise((r) => this.wait.set(id, r));
+    const reply = new Promise<RpcReply>((r) => this.wait.set(id, r));
     this.p.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
     return Promise.race([reply, this.dead.then((c) => ({ error: { message: `the MCP server exited (${c})` } }))]);
   }
-  notify(method, params) {
+  notify(method: string, params: object) {
     this.p.stdin.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n");
   }
   async init() {
@@ -111,7 +123,7 @@ class Mcp {
   }
   // one tool call -> { ok, text } (isError = a transport failure: the
   // runtime ends the program on it, so does the bench)
-  async call(name, args) {
+  async call(name: string, args: object) {
     const r = await this.request("tools/call", { name, arguments: args });
     if (r.error) return { ok: false, text: r.error.message };
     const text = (r.result?.content || []).map((c) => c.text || "").join("\n");
@@ -121,7 +133,7 @@ class Mcp {
 }
 
 // ---- one program, the replay loop of bend/runtime/main.bend ----
-function jsrtRound(jsrt, dir, program, results, env) {
+function jsrtRound(jsrt: string, dir: string, program: string, results: string[], env: NodeJS.ProcessEnv) {
   const prog = path.join(dir, "prog.ts");
   const res = path.join(dir, "res.json");
   writeFileSync(prog, program);
@@ -130,9 +142,19 @@ function jsrtRound(jsrt, dir, program, results, env) {
   return { code: r.status, out: (r.stdout || "").trim(), err: (r.stderr || "").trim() };
 }
 
-async function runProgram({ jsrt, dir, env, mcp }, program) {
-  const results = [];
-  const calls = [];
+/** The code of a tool's {"error": {...}} answer. */
+const errorCode = (text: string): string => {
+  const r: { error: { code: string } } = JSON.parse(text);
+  return r.error.code;
+};
+
+/** One tool call of a program, as the report's trace keeps it. */
+type Call = { tool: string; args: unknown; ms: number; bytes: number; error?: string };
+type Run = { done: boolean; out: string; calls: Call[]; rounds: number; ms: number; bytes: number };
+
+async function runProgram({ jsrt, dir, env, mcp }: { jsrt: string; dir: string; env: NodeJS.ProcessEnv; mcp: Mcp }, program: string): Promise<Run> {
+  const results: string[] = [];
+  const calls: Call[] = [];
   let bytes = 0;
   const t0 = Date.now();
   for (let round = 1; round <= 200; round++) {
@@ -140,16 +162,17 @@ async function runProgram({ jsrt, dir, env, mcp }, program) {
     if (r.code === 0) return { done: true, out: r.out, calls, rounds: round, ms: Date.now() - t0, bytes };
     if (r.code === 43) {
       let msg = r.out;
-      try { msg = JSON.parse(r.out).error; } catch {}
+      try { const ended: { error: string } = JSON.parse(r.out); msg = ended.error; } catch {}
       return { done: false, out: msg, calls, rounds: round, ms: Date.now() - t0, bytes };
     }
     if (r.code !== 42) return { done: false, out: `bend-jsrt exit ${r.code}: ${r.err || r.out}`, calls, rounds: round, ms: Date.now() - t0, bytes };
-    const req = JSON.parse(r.out);
+    // exit 42: the tool call the program asks for
+    const req: { tool?: unknown; args?: object } = JSON.parse(r.out);
     const tool = String(req.tool).replace(/^tools\./, "");
     if (!tool.startsWith("computer.")) return { done: false, out: `the program called ${tool}`, calls, rounds: round, ms: Date.now() - t0, bytes };
     const c0 = Date.now();
     const res = await mcp.call(tool.slice("computer.".length), req.args || {});
-    calls.push({ tool, args: req.args, ms: Date.now() - c0, bytes: res.text.length, error: /^\{"error"/.test(res.text) ? JSON.parse(res.text).error.code : undefined });
+    calls.push({ tool, args: req.args, ms: Date.now() - c0, bytes: res.text.length, error: /^\{"error"/.test(res.text) ? errorCode(res.text) : undefined });
     bytes += res.text.length;
     if (!res.ok) return { done: false, out: `program call failed: ${res.text}`, calls, rounds: round, ms: Date.now() - t0, bytes };
     results.push(res.text);
@@ -157,7 +180,7 @@ async function runProgram({ jsrt, dir, env, mcp }, program) {
   return { done: false, out: "more than 200 rounds", calls, rounds: 200, ms: Date.now() - t0, bytes };
 }
 
-function findJsrt(o) {
+function findJsrt(o: Opts) {
   const c = [o.jsrt, process.env.BEND_JSRT_BIN, path.join(root, "rust/jsrt/target/debug/bend-jsrt"), path.join(root, "rust/jsrt/target/release/bend-jsrt")];
   const f = c.find((p) => p && existsSync(p));
   if (!f) throw new Error("no bend-jsrt: pass --jsrt, set BEND_JSRT_BIN, or build rust/jsrt");
@@ -172,7 +195,7 @@ async function main() {
     return 0;
   }
   const pages = await servePages();
-  const fill = (s) => s.replaceAll("__BASE__", pages.base);
+  const fill = (s: string) => s.replaceAll("__BASE__", pages.base);
   if (o.mode === "serve") {
     console.log(`serving the bench pages on ${pages.base} (ctrl-c to stop)`);
     await new Promise(() => {});
@@ -195,7 +218,11 @@ async function main() {
     SB_AGENT: process.env.SB_AGENT || "cu-bench", TMPDIR: work };
   const cmd = o.mcp ? o.mcp.split(/\s+/).filter(Boolean) : [o.bise, "computer-use", "mcp"];
   const mcp = new Mcp(cmd, env);
-  const report = { started: new Date().toISOString(), base: pages.base, jsrt, mcp: cmd.join(" "), tasks: [] };
+  type TaskRow = { id: string; kind: string; pass: boolean; calls: number; rounds: number; ms: number; bytes: number; out: string; trace: Call[] };
+  const report: {
+    started: string; base: string; jsrt: string; mcp: string; tasks: TaskRow[];
+    status?: string; summary?: { passed: number; total: number; calls: number; ms: number; bytes: number };
+  } = { started: new Date().toISOString(), base: pages.base, jsrt, mcp: cmd.join(" "), tasks: [] };
   let rc = 0;
   try {
     const tools = await mcp.init();
@@ -213,7 +240,7 @@ async function main() {
       console.log(`${pass ? "ok  " : "FAIL"} ${t.id.padEnd(14)} ${String(r.calls.length).padStart(3)} calls ${String(r.ms).padStart(6)} ms ${String(r.bytes).padStart(7)} B  ${pass ? "" : r.out.split("\n")[0].slice(0, 160)}`);
     }
   } catch (e) {
-    console.error(`bench: ${e.message}`);
+    console.error(`bench: ${e instanceof Error ? e.message : String(e)}`);
     rc = 2;
   } finally {
     mcp.close();

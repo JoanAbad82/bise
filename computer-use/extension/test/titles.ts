@@ -3,11 +3,11 @@
 // group shows C4 `name`, and its project (C4 `project`) only while another
 // live group shows the same name; the extension maps groups to keys in
 // session storage, never by title.
-// Headless, throwaway profile: node computer-use/extension/test/titles.mjs
-import { fakeBroker, launch, loadExtension, servePages, sleep } from "./harness.mjs";
+// Headless, throwaway profile: node --experimental-strip-types computer-use/extension/test/titles.ts
+import { fakeBroker, launch, loadExtension, servePages, sleep } from "./harness.ts";
 
-const checks = [];
-const check = (name, ok, info) => { checks.push(!!ok); console.log(`${ok ? "ok  " : "FAIL"} ${name}${info !== undefined ? "  " + JSON.stringify(info) : ""}`); };
+const checks: boolean[] = [];
+const check = (name: string, ok: unknown, info?: unknown) => { checks.push(!!ok); console.log(`${ok ? "ok  " : "FAIL"} ${name}${info !== undefined ? "  " + JSON.stringify(info) : ""}`); };
 
 const pages = await servePages();
 const broker = await fakeBroker();
@@ -15,9 +15,9 @@ const b = await launch({ brokerPort: broker.port, startUrl: "about:blank" });
 try {
   const ext = await loadExtension(b);
   check("the extension connects", await broker.until(() => broker.hellos.length > 0, 15_000));
-  const titles = () => ext.ev(`chrome.tabGroups.query({}).then(gs => gs.map(g => g.title).sort())`);
+  const titles = () => ext.ev<string[]>(`chrome.tabGroups.query({}).then(gs => gs.map(g => g.title).sort())`);
   // C4 with name and project, as the broker sends it
-  const open = (agent, name, project) => broker.request(agent, "open", { url: pages.base + "a.html" }, 30_000, { name, project });
+  const open = (agent: string, name: string, project: string) => broker.request(agent, "open", { url: pages.base + "a.html" }, 30_000, { name, project });
   await open("00000000000000aa.perf", "perf", "harness");
   await sleep(300);
   check("one perf: its name only", JSON.stringify(await titles()) === JSON.stringify(["bise · perf"]), await titles());
@@ -31,7 +31,7 @@ try {
   // step 4: {"pause": key} takes one agent's tabs over, not the other's
   broker.send({ pause: "00000000000000aa.perf" });
   await sleep(300);
-  const paused = await ext.ev(`[...bise.tabs.values()].map(t => [t.agent, t.paused, t.attached]).sort()`);
+  const paused = await ext.ev<[string, boolean, boolean][]>(`[...bise.tabs.values()].map(t => [t.agent, t.paused, t.attached]).sort()`);
   check("pause: that key's tabs paused and detached, the other's not", JSON.stringify(paused) === JSON.stringify([["00000000000000aa.perf", true, false], ["00000000000000bb.perf", false, paused[1]?.[2]]]), paused);
   // site's group goes: harness's perf is alone again
   await ext.ev(`chrome.tabGroups.query({}).then(gs => gs.find(g => g.title.endsWith("site"))).then(g => chrome.tabs.query({ groupId: g.id })).then(ts => chrome.tabs.remove(ts.map(t => t.id))).then(() => 1)`);

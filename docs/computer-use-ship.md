@@ -80,7 +80,7 @@ the app bundle. The only cost is release size (below).
 ## 5. Paths not tested yet
 
 Status 24849b3 (cu-untested): the musts below are tested on the real
-stack by `computer-use/bench/paths.mjs` (cancel 9, refused 8, group 2,
+stack by `computer-use/bench/paths.ts` (cancel 9, refused 8, group 2,
 worker 4, quit 9, helper 7 checks, all green, ~1.5 min). Four checks need
 a headed browser or the user's Mac and stay manual:
 `docs/computer-use-manual-checks.md` (the real Cancel bar, Mac sleep, the
