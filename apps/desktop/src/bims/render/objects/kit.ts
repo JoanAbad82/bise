@@ -18,6 +18,8 @@ export interface ObjOpts {
   readonly night: number;
   /** its parts: books on a shelf, lights on a rack, cups in a cabinet */
   readonly n: number;
+  /** which of its looks, where it has several (the shelf's book colours); 0 the first */
+  readonly seed?: number;
 }
 
 /** what an object takes on the floor, centred on its origin, and how tall it is (office units) */

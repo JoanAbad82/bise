@@ -105,6 +105,10 @@ const BY_NAME: readonly (readonly [RegExp, ObjId, number?])[] = [
   [/^bise stats$/, 'trophies'],
   [/^github( app)?$/, 'packing'],
   [/^sentry/, 'extinguisher'],
+  // the board of issues; Jira's and Confluence's charts; Datadog's dials (designer m_40880)
+  [/^linear$/, 'blackboard'],
+  [/^(atlassian|jira|confluence)/, 'charts'],
+  [/^datadog/, 'dashboard'],
   [/^(metabase|bigquery|wandb)$/, 'charts'],
 ];
 

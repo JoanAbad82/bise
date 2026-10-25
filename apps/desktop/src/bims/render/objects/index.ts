@@ -76,6 +76,8 @@ export interface MakeOpts {
   readonly n?: number;
   /** a small office: its compact one (default false) */
   readonly compact?: boolean;
+  /** which of its looks, where it has several (the shelf's book colours; default 0) */
+  readonly seed?: number;
 }
 
 export interface Made {
@@ -93,7 +95,7 @@ export function makeObject(id: ObjId, opts: MakeOpts = {}): Made {
   if (!m) throw new Error(`no object ${id}`);
   const group = new Group();
   group.name = swap ?? id;
-  const o = { off: opts.off ?? false, night: opts.night ?? 0, n: opts.n ?? 5 };
+  const o = { off: opts.off ?? false, night: opts.night ?? 0, n: opts.n ?? 5, seed: opts.seed ?? 0 };
   const s = m.maker(partOf(group, o), o);
   const k = compact && !swap ? COMPACT_SCALE : 1;
   const cx = s.x ?? 0;

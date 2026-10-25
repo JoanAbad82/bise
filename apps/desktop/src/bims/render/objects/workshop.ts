@@ -31,7 +31,9 @@ const printer: Maker = (g, o) => {
   g.box(0.62, 0.22, 0.02, darker(WOOD, 0.85), 0, 0.42, 0.3, 0.02); g.box(0.14, 0.025, 0.02, STEEL, 0, 0.45, 0.314, 0.008);
   g.box(0.3, 0.1, 0.22, CREAM, -0.12, 0.13, 0.12, 0.01); g.box(0.31, 0.03, 0.23, SKY, -0.12, 0.13, 0.12, 0.005);
   // the printer: body, lid, the paper tray at the back with paper standing
-  g.box(0.64, 0.3, 0.5, PAPER, 0, 0.75, 0, 0.07);
+  // its body takes its pages' colour (docs sky, sheets green, slides amber), so the three tell apart at icon size (designer m_40880)
+  const tint = o.n === 1 ? SKY : o.n === 2 ? GREEN : o.n === 3 ? AMBER : null;
+  g.box(0.64, 0.3, 0.5, tint === null ? PAPER : lighter(tint, 0.35), 0, 0.75, 0, 0.07);
   g.box(0.66, 0.06, 0.52, lighter(STEEL, 0.4), 0, 0.92, -0.01, 0.03);
   g.box(0.5, 0.05, 0.03, SLATE, 0, 0.66, 0.255, 0.01);
   const tray = g.box(0.44, 0.3, 0.03, SLATE_L, 0, 1.05, -0.24, 0.015); tray.rotation.x = -0.3;

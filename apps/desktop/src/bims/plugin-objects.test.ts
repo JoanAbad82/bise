@@ -43,6 +43,9 @@ describe('defaultObject', () => {
       [mainRow('blender'), 'easel'],
       [row('mistral:image_generation', 'mistral'), 'easel'],
       [row('mistral:figma', 'mistral'), 'easel'],
+      [row('mistral:linear', 'mistral'), 'blackboard'],
+      [row('mistral:atlassian', 'mistral'), 'charts'],
+      [row('mistral:datadog_eu', 'mistral'), 'dashboard'],
       [mainRow('computer'), 'macdesk'],
       [mainRow('docs'), 'printer', 1],
       [mainRow('sheets'), 'printer', 2],
@@ -68,12 +71,12 @@ describe('defaultObject', () => {
 
   it('gives an MCP server with no entry a rack, a light per server on', () => {
     const parts = [{ kind: 'mcp', on: true }, { kind: 'mcp', on: true }, { kind: 'mcp', on: false }, { kind: 'skill', on: true }];
-    expect(defaultObject(row('linear', 'mcp', 'loaded', { parts }))).toEqual({ obj: 'rack', n: 2 });
+    expect(defaultObject(row('postgres', 'mcp', 'loaded', { parts }))).toEqual({ obj: 'rack', n: 2 });
   });
 
   it('gives anything else a plant whose pot is its kind', () => {
     expect(defaultObject(mainRow('weather'))).toEqual({ obj: 'plant', n: 0 });
-    expect(defaultObject(row('mistral:linear', 'mistral'))).toEqual({ obj: 'plant', n: 1 });
+    expect(defaultObject(row('mistral:hubspot', 'mistral'))).toEqual({ obj: 'plant', n: 1 });
     expect(defaultObject(mainRow('x'))).toEqual({ obj: 'plant', n: 0 });
   });
 

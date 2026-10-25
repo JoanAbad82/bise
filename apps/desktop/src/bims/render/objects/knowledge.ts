@@ -46,8 +46,10 @@ const shelf: Maker = (g, o) => {
   const w = 1.0, d = 0.42, h = 0.95;
   g.contact(w, d);
   carcass(g, w, h, d, [0.1, 0.52]);
-  const k = row(g, -w / 2 + 0.08, w / 2 - 0.08, 0.125, 0.03, 0, o.n);
-  row(g, -w / 2 + 0.08, w / 2 - 0.08, 0.545, 0.03, k, o.n - k);
+  // the seed turns its books' colours, so two skills folders side by side differ (designer m_40885)
+  const s = o.seed ?? 0;
+  const k = row(g, -w / 2 + 0.08, w / 2 - 0.08, 0.125, 0.03, s, o.n);
+  row(g, -w / 2 + 0.08, w / 2 - 0.08, 0.545, 0.03, s + k, o.n - k);
   // on top: a little cactus in a pot and a stack of two lying books
   g.cyl(0.08, 0.12, ORANGE, 0.28, h + 0.06, 0.02); g.box(0.07, 0.16, 0.07, GREEN, 0.28, h + 0.2, 0.02, 0.03);
   g.box(0.3, 0.05, 0.22, SKY, -0.22, h + 0.025, 0.02, 0.015); g.box(0.26, 0.045, 0.2, YELLOW, -0.2, h + 0.07, 0.0, 0.015);

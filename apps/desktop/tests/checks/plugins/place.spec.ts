@@ -45,6 +45,9 @@ test('the plugins place: the sidebar row, the band, the list, a page, add', asyn
     await row.click();
     await expect(s.page.getByTestId('plugins.place')).toBeVisible();
     await expect(s.page.getByTestId('plugins.counts')).toHaveText(`${settings.plugins_place_counts({ on: 16, off: 2 })} · ${settings.plugins_place_waits({ n: 3 })}`);
+    // the room draws his plugins' objects, and each row's icon is its object (p7)
+    await expect(s.page.getByTestId('plugins.room.canvas')).toBeVisible();
+    await expect(s.page.locator('[data-testid="plugins.row.blender.icon"][data-obj="easel"] img')).toBeVisible();
     await shot(s, '1-place-top');
     await scrollTo(s, 'plugins.band');
     await expect(s.page.getByTestId('plugins.band.count')).toHaveText(settings.plugins_band_count({ connected: 3, total: 10 }));
@@ -81,6 +84,14 @@ test('the plugins place: the sidebar row, the band, the list, a page, add', asyn
     await shot(s, '8-add-preview');
     await s.page.getByTestId('plugins.preview.cancel').click();
     await expect.poll(() => core.cmds().some((c) => c['cmd'] === 'plugin_add_cancel')).toBe(true);
+    // dark: the room under the night light, the rows' objects and badges
+    await core.send({ ev: 'prefs', prefs: { theme: 'dark' } } as never);
+    await expect(s.page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await s.page.getByTestId('plugins.place').evaluate((el) => { el.scrollTo(0, 0); });
+    await s.page.waitForTimeout(300);
+    await shot(s, '9-place-top-dark');
+    await scrollTo(s, 'plugins.group.mistral');
+    await shot(s, '10-list-connectors-mcp-dark');
   } finally {
     await s.close();
   }

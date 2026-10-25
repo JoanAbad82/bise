@@ -1,6 +1,6 @@
 // The plugins place (page plugins v48, plugins-ui's screens; Gabriel's pick on q-go: the room,
 // without drag and drop). Top to bottom: the head (its counts from the core's summary), the room
-// (bims' diorama of his plugins as office objects: a plain stand-in until bims' renders land),
+// (bims' diorama of his plugins as office objects, Room.tsx; their icons on a floor without WebGL),
 // 'connect your tools' (Mistral's connectors not connected yet, most useful first, the MCP servers
 // found in other apps, a repo's own skills), then installed | browse with the kind chips, and the
 // list: one row per plugin, its object as its icon, its tags, what it gives and its one control
@@ -30,6 +30,7 @@ import {
   type KindFilter,
 } from './model';
 import { PluginIcon } from './PluginIcon';
+import { Room } from './Room';
 import { AddMenu, type AddItem } from './Add';
 import './plugins.css';
 
@@ -94,7 +95,7 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
           )}
         </div>
         <div className="plg-room" data-testid="plugins.room">
-          {room ?? <PlainRoom rows={all} project={project} />}
+          {room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} />}
         </div>
         <div className="plg-room-sub">{settings.plugins_room_sub}</div>
       </header>
@@ -169,7 +170,7 @@ function TabWords({ words, n }: { words: string; n: number }) {
   );
 }
 
-/** The room until bims' diorama lands: his on plugins' plain icons on a floor, the off ones in glass. */
+/** The room without WebGL: his on plugins' icons on a floor, the off ones in glass. */
 function PlainRoom({ rows, project }: { rows: readonly Plugin[]; project: string | undefined }) {
   const shown = rows.filter((p) => p.state === 'loaded' || p.state === 'disabled').slice(0, 24);
   return (
