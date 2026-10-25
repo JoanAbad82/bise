@@ -15,7 +15,7 @@ import { forwardLine, forwardOf, utcMs } from './forward';
 
 const P = 'acme-1a2b3c4d';
 const ctx: RowCtx = { tkey: threadKey(P, 't1'), project: P, agent: 't1', bise: false, onLink: () => undefined, onArtifact: () => undefined };
-const FWD: Part = { kind: 'forwarded', id: 3, from: 'user', to: 'main', at: '2026-10-25 12:26 UTC', by: 'main' };
+const FWD: Extract<Part, { kind: 'forwarded' }> = { kind: 'forwarded', id: 3, from: 'user', to: 'main', at: '2026-10-25 12:26 UTC', by: 'main' };
 const PARTS: Part[] = [
   { kind: 'text', text: 'please look\n\n' },
   FWD,
@@ -56,7 +56,7 @@ describe('a forwarded message', () => {
     expect(v.getByTestId('thread.from.8.fwd.words').textContent).toContain(`look at this ▣ ${thread.image_n({ n: 1 })} and ▯ notes.csv ▤ 1`);
     expect(v.getByTestId('thread.fwd.8.image.1')).toBeTruthy();
     expect(v.getByTestId('thread.fwd.8.paste.1')).toBeTruthy();
-    const all = v.container.textContent ?? '';
+    const all = v.container.textContent;
     for (const raw of ['[forwarded m_3', 'sb show', '<selection', '<pasted', '<image', '<file']) expect(all).not.toContain(raw);
   });
 
@@ -73,7 +73,7 @@ describe('a forwarded message', () => {
   });
 
   it('says no time it cannot read, and only a forwarded part makes one', () => {
-    expect(forwardLine({ ...(FWD as Extract<Part, { kind: 'forwarded' }>), at: '' }, () => 'never')).toBe(thread.forwarded_from_untimed({ from: thread.forwarded_you, to: 'main' }));
+    expect(forwardLine({ ...FWD, at: '' }, () => 'never')).toBe(thread.forwarded_from_untimed({ from: thread.forwarded_you, to: 'main' }));
     expect(forwardOf(PARTS.filter((p) => p.kind !== 'forwarded'))).toBeNull();
     expect(utcMs('2026-10-25 12:26 UTC')).toBe(Date.UTC(2026, 9, 25, 12, 26));
   });

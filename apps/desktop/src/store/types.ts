@@ -340,6 +340,9 @@ export function sentParts(parts: readonly Part[]): string {
         // a part of an artifact: which one, which version, where (the hub may add its rev)
         case 'anchor':
           return `\u0000anchor:${p.artifact}:${String(p.version)}:${JSON.stringify(p.anchor)}\u0000`;
+        // a forward's header (the hub's only, never in a send of his): the message it names
+        case 'forwarded':
+          return `\u0000forwarded:${String(p.id)}\u0000`;
         default:
           return `\u0000${p.kind}:${p.text}\u0000`;
       }
