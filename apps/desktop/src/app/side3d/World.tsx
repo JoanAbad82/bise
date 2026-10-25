@@ -17,7 +17,8 @@ import { parts as bimsParts } from '@/bims/feed';
 import { mapOf, mapPrefKey, type MapId } from '@/bims/maps/ids';
 import { layoutOf } from '@/bims/maps';
 import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
-import { beatDelay, EASE_MS, happenedOf, HOLD_MS, leadZoom, pickBeat, seenOf, shotOf, stillRecent, type Happened, type LastBeat, type Seen, type Shot } from './camera';
+import { beatDelay, EASE_MS, happenedOf, HOLD_MS, leadZoom, pickBeat, seenOf, shotOf, stillRecent, TALK_HOLD_MS, type Happened, type LastBeat, type Seen, type Shot } from './camera';
+import { useTalkingTo } from '@/composer/talking';
 import { speechOf, speechWord } from './model';
 import type { Agent, Card } from '@/proto';
 import { getPref, type Prefs } from '@/settings/prefs';
@@ -70,14 +71,32 @@ interface CamState {
   readonly frozen: boolean;
 }
 
+/** `on`, and still true `ms` after it went off. */
+function useHeld(on: boolean, ms: number): boolean {
+  const [held, setHeld] = useState(on);
+  if (on && !held) setHeld(true);
+  useEffect(() => {
+    if (on) return;
+    const t = setTimeout(() => {
+      setHeld(false);
+    }, ms);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [on, ms]);
+  return on || held;
+}
+
 /**
  * The world's camera (camera.ts, designer m_42974): the lead framing at rest, a beat now and then
  * on what just happened, the whole office while hovered. A card open freezes it where it is; the
- * window away or hidden plays no beat; reduced motion: the lead only. The clock restarts when the
- * hover or the card ends.
+ * window away or hidden plays no beat; reduced motion: the lead only; while he talks to this
+ * project's main (composer/talking.ts) and TALK_HOLD_MS after, the lead holds. The clock restarts
+ * when the hover, the card or the talk ends.
  */
-function useWorldCamera(agents: readonly Agent[], lead: string | null, zoom: number, { hover, frozen }: CamState): Shot {
+function useWorldCamera(agents: readonly Agent[], project: string, lead: string | null, zoom: number, { hover, frozen }: CamState): Shot {
   const reduced = noGrow();
+  const talking = useHeld(useTalkingTo() === project, TALK_HOLD_MS);
   const seen = useRef<ReadonlyMap<string, Seen> | null>(null);
   const happened = useRef<Happened[]>([]);
   useEffect(() => {
@@ -88,10 +107,7 @@ function useWorldCamera(agents: readonly Agent[], lead: string | null, zoom: num
   }, [agents]);
   const [beat, setBeat] = useState<string | null>(null);
   const last = useRef<LastBeat | null>(null);
-  // TODO(nm-composer useTalkingTo, native-lead m_43216): while he talks to this project's main
-  // (composer focused on it or voice on) and 10 s after, no beat: the lead framing holds. Add that
-  // flag to `stopped` once composer/talking.ts lands.
-  const stopped = hover || frozen || reduced;
+  const stopped = hover || frozen || reduced || talking;
   useEffect(() => {
     if (stopped) return;
     let t: ReturnType<typeof setTimeout> | undefined;
@@ -122,7 +138,7 @@ function useWorldCamera(agents: readonly Agent[], lead: string | null, zoom: num
       if (t !== undefined) clearTimeout(t);
     };
   }, [stopped]);
-  const shot = shotOf({ lead, zoom, beat, hover, reduced });
+  const shot = shotOf({ lead, zoom, beat, hover, reduced, talking });
   // a card open: the camera stays where it is
   const [kept, setKept] = useState(shot);
   if (!frozen && (kept.follow !== shot.follow || kept.zoom !== shot.zoom)) setKept(shot);
@@ -192,7 +208,7 @@ export function World({ project, name, says, agents, cards, onOpen, frozen = fal
   // its camera: the lead framing, a beat now and then (camera.ts)
   const zoom = useLeadZoom(agents, useMap(project));
   const lead = agents.find((a) => a.main)?.name ?? null;
-  const shot = useWorldCamera(agents, lead, zoom, { hover: big, frozen });
+  const shot = useWorldCamera(agents, project, lead, zoom, { hover: big, frozen });
   const beat = shot.follow !== null && shot.follow !== lead ? agents.find((a) => a.name === shot.follow) : undefined;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stop = () => {

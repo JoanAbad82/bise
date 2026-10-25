@@ -22,6 +22,8 @@ export const GAP_MS = 20_000;
 /** a beat: its ease in, then its hold (the ease back is the follow camera's own, to the lead) */
 export const EASE_MS = 600;
 export const HOLD_MS = 6_000;
+/** he talks to the project's main (composer/talking.ts): the lead holds, and this long after */
+export const TALK_HOLD_MS = 10_000;
 
 /** What made a beat, by priority (first wins). */
 export type Why = 'asks' | 'state';
@@ -103,11 +105,12 @@ export interface Shot {
 }
 
 /**
- * The shot now: the whole office while hovered; the lead at its framing under reduced motion or
- * with no beat; a beat's agent at the follow zoom. `lead` null (no main): the whole office. Pure.
+ * The shot now: the whole office while hovered; the lead at its framing under reduced motion,
+ * while he talks to it (`talking`: TALK_HOLD_MS past his last word too) or with no beat; a beat's
+ * agent at the follow zoom. `lead` null (no main): the whole office. Pure.
  */
-export function shotOf(o: { readonly lead: string | null; readonly zoom: number; readonly beat: string | null; readonly hover: boolean; readonly reduced: boolean }): Shot {
+export function shotOf(o: { readonly lead: string | null; readonly zoom: number; readonly beat: string | null; readonly hover: boolean; readonly reduced: boolean; readonly talking?: boolean }): Shot {
   if (o.hover || o.lead === null) return { follow: null, zoom: o.zoom };
-  if (o.beat !== null && !o.reduced) return { follow: o.beat, zoom: FOLLOW_ZOOM };
+  if (o.beat !== null && !o.reduced && o.talking !== true) return { follow: o.beat, zoom: FOLLOW_ZOOM };
   return { follow: o.lead, zoom: o.zoom };
 }

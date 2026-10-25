@@ -68,6 +68,10 @@ describe('the shot', () => {
   it('reduced motion: the lead only, never a beat', () => {
     expect(shotOf({ ...o, beat: 'perf', reduced: true })).toEqual({ follow: 'main', zoom: 2.2 });
   });
+  it('while he talks to the main: the lead holds, a beat waits', () => {
+    expect(shotOf({ ...o, beat: 'perf', talking: true })).toEqual({ follow: 'main', zoom: 2.2 });
+    expect(shotOf({ ...o, beat: 'perf', talking: true, hover: true }).follow).toBeNull();
+  });
   it('the lead framing: 6 tiles across, never past the fit', () => {
     // a 12 × 6 office: (12 + 6) / √2 ≈ 12.7 tiles across the fit
     expect(leadZoom(12, 6)).toBeCloseTo(18 / Math.SQRT2 / 6, 5);
