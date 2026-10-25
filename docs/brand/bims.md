@@ -57,6 +57,26 @@ What goes on a head or in a hand (bim.ts, palette.ts HATS, the maps' wears, the 
 - **headphones.** A dark band following the head's curve over the hair, ear to ear, a cup in the hat colour on each ear over a dark cushion, a small mic arm toward the mouth. Telling feature: the two cups.
 - **hair, bun, afro.** Hair in the bim's HAIR colour: a fringe of soft tufts (hair), a round bun on the back of the head (bun), a round afro never wider than the shoulders (afro). Telling feature: its shape from behind.
 - **sunglasses.** A dark bar over the eyes, worn only by a pose that asks for it (the terrace); the one thing allowed over the eyes.
+
+## women among the bims: the intent sheet (render/bim.ts hair, palette.ts CUTS; Gabriel m_42689: « ce serait cool qu'il y en ait, mais pas sexualisées »)
+About half the bims are women, seeded from the name like the rest (palette.ts outfitOf `cut`, from a hash of its own so the outfit, skin and colours of today's bims stay theirs). What tells them apart is the hair, and a tie or a clip in it where the cut has one (long and curls have none: their outline is enough). Nothing else changes: the same clay body and bean, the same head, face, eyes, smile and cheeks, the same six outfits in the same colours, the same trousers and sneakers, the same poses. Never: a body shape of their own, lashes, lips, make-up or a pinker cheek, a skirt or dress as the women's outfit, a pose of their own. main keeps its own look.
+
+For every cut:
+- **in the HAIR colours** (palette.ts HAIR), a tie or a clip in the bim's hat colour or second colour; no accent pink, no error red.
+- **it wraps the head:** a cap of hair over the skull, so no skin shows through the hair at any angle; nothing hangs into the face below the brows or over the eyes.
+- **it never goes through the head, the collar, the hood, a strap or the headset,** at any head turn of any pose (the hair law: render/hair-clip.test.ts, every cut × every outfit × every headwear it may wear × every head angle of the outfits' poses, names the cut, outfit, pose and frame). Behind, it ends above the collar and the hood: the hood stays the hoodie's telling feature from the back. Under it, a band of hair hugs the skull all the way down under the back of the head (inside the collar at rest), so the back of her head never shows skin when she nods. The law reads hair within 12 mm of the skull (its shells, that band) as the skull, which sits into the collar by design (the bims have no neck); what stands off it (a curtain, a braid, a tail, a bun, a curl) never goes in.
+- **three read sizes:** near (the follow zoom) from the front, the back and 3/4; the home's islands (~200 css px), where the cut reads by its **telling feature** from its outline; the fit, where a woman reads by her outline (a tail, two buns, hair to the shoulders).
+- **cost:** baked into the head's one mesh (no new draw call); a cut's triangles stay within the existing hats' (the afro's, the headset's).
+
+The cuts (one from the name):
+- **long.** Parted in the middle (two soft swoops from the parting to the temples): the cap, and a soft curtain on each side of the face, in front of the ears, falling past the jaw toward the shoulders (never round to the back, where the hood is when she turns her head); behind, a fall to the nape. Telling feature: the parting and the curtains at the sides of the face.
+- **ponytail.** The hair pulled back smooth over the cap (a high, bare forehead), a tie (hat colour) high at the back, and a tail of three soft lobes curving back and down, away from the neck. The tail turns about its tie: it hangs down when she nods, never up over her head, and it is tucked under her head when she lies back (a bed, a bean bag, a deck chair). Telling feature: the tail, in profile and 3/4.
+- **braids.** Parted in the middle, two braids (four lobes each, getting smaller) from in front of the ears down in front of the shoulders, splaying a little, a tie (hat colour) at each end. Telling feature: the two braids from the front.
+- **bob.** A round helmet of hair down to the jaw on the sides, the nape behind, a straight fringe above the brows, a small clip (hat colour, like the ties) on one side. Telling feature: the round helmet and its fringe.
+- **buns.** The hair pulled back smooth (a high, bare forehead), two round buns high on each side of the crown, each with a tie (hat colour) round its foot. Telling feature: the two buns, from any side.
+- **curls.** A round cloud of curls (soft lobes) to the jaw, never wider than the shoulders (the afro's rule). Telling feature: the bumpy outline.
+
+What a woman wears on her head: half go bare-headed. The others wear a hat from the list above only where the cut lets it sit right: the cap or the cap backwards over long, ponytail (the tail out of the cap's back), braids or bob; the beanie over long, braids or bob, its rim over the hair; the headphones over the ponytail only (never over hair at the ears: a braid starts where the cups sit). Never a hat sunk into the hair, or hair through the headset's band or cups.
 - **in the hand:** a mug, a fruit, a sheet, a marker or pencil, a magnifier, a book in both hands, a crate held in front: each held in the hand's real point, never inside the body or the sleeve.
 
 ## light (direction A; sky.ts, render/sky-light.ts, render/index.ts lightUp, loop.ts)

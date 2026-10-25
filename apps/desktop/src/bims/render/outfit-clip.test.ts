@@ -22,6 +22,7 @@ describe('outfit clipping', () => {
       }
       c.dispose();
       expect(bad).toEqual([]);
-    });
+      // a torso voxelised and every pose's frames measured: seconds alone, more on a loaded machine (release-56 m_43466)
+    }, 60_000);
   }
 });

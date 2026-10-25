@@ -26,6 +26,7 @@ import { rigOf } from './pose';
 import { restAt, surfaceAt, type NapRest } from './nap';
 import { meshBoxes } from './cozy';
 import { HEAD_Y } from './laptop';
+import { headBoxOf } from './heads.testkit';
 import { BACK, type Fit, fitSite, siteOf, toScreen, wideSiteOf } from './camera';
 import { STYLE } from './style';
 
@@ -79,7 +80,8 @@ function napper(name: string, spot: Spot, bedAt: (p: { x: number; z: number }) =
     all.push({ m, low: lowest(m) });
   });
   const top = body.children.find((c) => c instanceof Group && Math.abs(c.position.y - HEAD_Y) < 1e-6);
-  const head = top ? new Box3().setFromObject(top, true) : new Box3();
+  // the head as the view laws see it: its shown meshes, without its headwear (heads.testkit.ts)
+  const head = top ? headBoxOf(top, { wear: false }) : new Box3();
   const out = { back: lowest(hoodie), heels: feet.map(lowest), all, head };
   bim.dispose();
   return out;

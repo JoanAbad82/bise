@@ -104,6 +104,22 @@ export const SKIN = ['#f3d5b5', '#e0ac7e', '#c68b59', '#8d5524', '#ffdbac', '#a0
 export const HAIR = ['#2b2118', '#4a3222', '#7a4a2a', '#d9a066', '#1b1b1b', '#9b8fe0'];
 export const HATS = ['cap', 'beanie', 'afro', 'bun', 'hair', 'headphones', 'capback', 'hair', 'beanie', 'cap'] as const;
 export type Hat = (typeof HATS)[number];
+/**
+ * A woman's hair (docs/brand/bims.md "women among the bims", Gabriel m_42689): about half the bims,
+ * told apart by their hair and a tie or a clip in it, never by their body, face or clothes.
+ */
+export const CUTS = ['long', 'ponytail', 'braids', 'bob', 'buns', 'curls'] as const;
+export type Cut = (typeof CUTS)[number];
+/** what a woman wears on her head: bare, or a hat that sits right on her cut (never sunk into it, never over hair on the ears under a headset) */
+export type HeadWear = 'bare' | 'cap' | 'capback' | 'beanie' | 'headphones';
+export const CUT_HATS: Readonly<Record<Cut, readonly Exclude<HeadWear, 'bare'>[]>> = {
+  long: ['cap', 'capback', 'beanie'],
+  ponytail: ['cap', 'headphones', 'capback'],
+  braids: ['beanie', 'cap', 'capback'],
+  bob: ['beanie', 'cap', 'capback'],
+  buns: [],
+  curls: [],
+};
 /** main: the ink hoodie, its gold chain and its :* (in the neon's yellow, never the accent pink) */
 export const MAIN_HOODIE = '#1d1a17';
 export const EYE = '#1d1a17';
@@ -151,7 +167,9 @@ export interface Outfit {
   readonly skin: string;
   readonly hair: string;
   readonly hatColor: string;
-  readonly hat: Hat | 'main';
+  readonly hat: Hat | HeadWear | 'main';
+  /** a woman's hair (about half the bims, from a hash of its own); null: the hat says its hair, as before */
+  readonly cut: Cut | null;
   /** what it wears over its torso (`hoodie` the main colour); main's is always the hoodie */
   readonly kind: Kind;
   /** the outfit's second colour (a sweater's bands, a tee's print, a puffer's sleeves): never the hoodie's */
@@ -165,6 +183,7 @@ export function outfitOf(name: string, main: boolean): Outfit {
   const pick = <T>(xs: readonly T[], shift: number): T => xs[(h >>> shift) % xs.length] as T;
   const hoodie = main ? MAIN_HOODIE : pick(HOODIE, 0);
   const second = pick(HOODIE, 23);
+  const her = main ? null : herHair(name);
   return {
     hoodie,
     kind: main ? 'hoodie' : pick(KINDS, 19),
@@ -173,9 +192,23 @@ export function outfitOf(name: string, main: boolean): Outfit {
     skin: pick(SKIN, 2),
     hair: main ? '#2b2118' : pick(HAIR, 13),
     hatColor: pick(HOODIE, 11),
-    hat: main ? 'main' : pick(HATS, 7),
+    hat: main ? 'main' : her ? her.hat : pick(HATS, 7),
+    cut: her ? her.cut : null,
     phase: (h % 1000) / 160,
   };
+}
+
+/**
+ * Whether a bim is a woman and her hair, from a hash of its own (so its outfit, skin and colours stay
+ * what they were): about half are; half of those go bare-headed, the rest wear a hat her cut takes. Pure.
+ */
+export function herHair(name: string): { readonly cut: Cut; readonly hat: HeadWear } | null {
+  const s = hash(`hair:${name}`);
+  if ((s & 1) === 0) return null;
+  const cut = CUTS[(s >>> 1) % CUTS.length] as Cut;
+  const hats = CUT_HATS[cut];
+  const hatted = ((s >>> 9) & 1) === 1 && hats.length > 0;
+  return { cut, hat: hatted ? (hats[(s >>> 11) % hats.length] as HeadWear) : 'bare' };
 }
 
 /** every colour the world can draw (the test reads it) */

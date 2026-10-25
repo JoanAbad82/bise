@@ -4,7 +4,7 @@
 // bim's arm and hand vertices sit inside what it wears on its torso, below the shoulder cap. The
 // law (outfit-clip.test.ts) and the turnaround sheets (the character designer's studio) read it.
 // Tests and studios only, never the app. Owner: bims-clay-2.
-import { DoubleSide, type Material, Matrix4, Mesh, MeshBasicMaterial, type Object3D, Raycaster, Vector3 } from 'three';
+import { DoubleSide, Matrix4, Mesh, MeshBasicMaterial, type Object3D, Raycaster, Vector3 } from 'three';
 import type { Activity, ActivityKind, Pose, Spot } from '../model';
 import { ISLANDS } from '../sprites/gags';
 import { type Bim, makeBim } from './bim';
@@ -99,32 +99,31 @@ function wornOf(part: Object3D, parts: ReadonlySet<Object3D>): Mesh[] {
   return out;
 }
 
-/** one bim's clip measure: its torso's worn volume (voxels in the body's space, it never bends) and its arms */
-export interface Clipper {
-  readonly bim: Bim;
-  /** arm and hand vertices deep inside the torso's worn volume below the elbow, plus worn torso details' vertices through a sleeve or a hand, at this rig */
-  clipsAt(rig: Rig): number;
-  dispose(): void;
+/** a closed volume as voxels in a space (`toSpace` from world), eroded DEPTH cells: what counts as deep inside it */
+export interface Volume {
+  readonly deep: Uint8Array;
+  readonly lo: Vector3;
+  readonly nx: number;
+  readonly ny: number;
+  readonly nz: number;
 }
 
-export function clipperOf(name: string, main: boolean): Clipper {
-  const bim = makeBim(name, main, STYLE, undefined, undefined, false);
-  const g = bim.group;
-  const find = (n: string): Object3D => {
-    const o = g.getObjectByName(n);
-    if (!o) throw new Error(`no ${n}`);
-    return o;
-  };
-  const body = find('body');
-  const arms = [find('armL'), find('armR')];
-  const parts = new Set<Object3D>(['head', 'body', 'armL', 'armR', 'legL', 'legR'].map(find));
-  g.updateMatrixWorld(true);
-  const toBody = new Matrix4().copy(body.matrixWorld).invert();
-  // the torso's worn meshes, in the body's space, two-sided so a ray counts every crossing
+/** whether a point (in the volume's space) is deep inside it */
+export function deepIn(vol: Volume, v: Vector3): boolean {
+  const ix = Math.round((v.x - vol.lo.x) / CELL);
+  const iy = Math.round((v.y - vol.lo.y) / CELL);
+  const iz = Math.round((v.z - vol.lo.z) / CELL);
+  if (ix < 0 || iy < 0 || iz < 0 || ix >= vol.nx || iy >= vol.ny || iz >= vol.nz) return false;
+  return vol.deep[(ix * vol.ny + iy) * vol.nz + iz] === 1;
+}
+
+/** the voxels of closed meshes in a space: one ray along z per column, inside between each mesh's crossings' pairs, eroded DEPTH times */
+export function volumeOf(meshes: readonly Mesh[], toSpace: Matrix4): Volume {
+  // two-sided so a ray counts every crossing
   const two = new MeshBasicMaterial({ side: DoubleSide });
-  const torso = wornOf(body, parts).map((m) => {
+  const torso = meshes.map((m) => {
     const c = new Mesh(m.geometry, two);
-    c.applyMatrix4(new Matrix4().multiplyMatrices(toBody, m.matrixWorld));
+    c.applyMatrix4(new Matrix4().multiplyMatrices(toSpace, m.matrixWorld));
     c.updateMatrixWorld(true);
     c.geometry.computeBoundingBox();
     return c;
@@ -168,6 +167,32 @@ export function clipperOf(name: string, main: boolean): Clipper {
     }
     deep = next;
   }
+  two.dispose();
+  return { deep, lo, nx, ny, nz };
+}
+
+/** one bim's clip measure: its torso's worn volume (voxels in the body's space, it never bends) and its arms */
+export interface Clipper {
+  readonly bim: Bim;
+  /** arm and hand vertices deep inside the torso's worn volume below the elbow, plus worn torso details' vertices through a sleeve or a hand, at this rig */
+  clipsAt(rig: Rig): number;
+  dispose(): void;
+}
+
+export function clipperOf(name: string, main: boolean): Clipper {
+  const bim = makeBim(name, main, STYLE, undefined, undefined, false);
+  const g = bim.group;
+  const find = (n: string): Object3D => {
+    const o = g.getObjectByName(n);
+    if (!o) throw new Error(`no ${n}`);
+    return o;
+  };
+  const body = find('body');
+  const arms = [find('armL'), find('armR')];
+  const parts = new Set<Object3D>(['head', 'body', 'armL', 'armR', 'legL', 'legR'].map(find));
+  g.updateMatrixWorld(true);
+  const toBody = new Matrix4().copy(body.matrixWorld).invert();
+  const { deep, lo, nx, ny, nz } = volumeOf(wornOf(body, parts), toBody);
   const armMeshes = arms.map((a) => ({ arm: a, meshes: wornOf(a, parts) }));
   const details = wornOf(body, parts).filter((m) => m.userData.bean !== true);
   const v = new Vector3();
@@ -218,7 +243,6 @@ export function clipperOf(name: string, main: boolean): Clipper {
     },
     dispose() {
       bim.dispose();
-      (two as Material).dispose();
     },
   };
 }

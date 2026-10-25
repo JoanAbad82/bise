@@ -25,9 +25,15 @@ export const HEAD_R = 0.245;
 /** the hats and the maps' wears were drawn for a 0.22 head: bim.ts scales them by this about its centre */
 export const HAT_K = HEAD_R / 0.22;
 
-/** the head's parts as balls in the head's frame: the skull, an afro, a bun, a beanie's pompom, a cap's brim (bim.ts, the hats at HAT_K) */
+/**
+ * the head's parts as balls in the head's frame: the skull, a bob's helmet (the widest of the women's
+ * cuts round the face), her two buns, an afro, a bun, a beanie's pompom, a cap's brim (bim.ts, the hats at HAT_K)
+ */
 const HEAD_PARTS: readonly { readonly x: number; readonly y: number; readonly z: number; readonly r: number }[] = [
   { x: 0, y: 0, z: 0, r: HEAD_R },
+  { x: 0, y: 0.06, z: 0, r: 0.262 },
+  // her buns: bim.ts BUN along (0.165, 0.215, -0.05)
+  ...[-1, 1].map((sx) => ({ x: sx * 0.186, y: 0.243, z: -0.057, r: 0.085 })),
   ...[
     { x: 0, y: 0.1, z: -0.05, r: 0.27 },
     { x: 0, y: 0.24, z: -0.08, r: 0.09 },

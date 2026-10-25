@@ -10,7 +10,7 @@
 // far, and detail() swaps them by how big the bim is on screen (nearAt). Its materials are its own,
 // so it fades (reduced motion) and goes grey (stopped); the clay light is claylight.ts's.
 import { type BufferGeometry, Color, CylinderGeometry, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, MeshStandardMaterial, type Object3D, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three';
-import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Kind, type Outfit } from './palette';
+import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Cut, type Kind, type Outfit } from './palette';
 import { HAT_K, HEAD_R, HEAD_Y } from './laptop';
 import { bakePart } from './merge';
 import { GREY_MIX, clayLit, partsMaterial, warmth } from './claylight';
@@ -52,6 +52,8 @@ export const NEAR_PX = 22;
 export const nearAt = (scale: number): boolean => scale > 0 && 1 / scale >= NEAR_PX;
 /** an afro's half-width: inside the shoulders' (0.24 + a sleeve's 0.078), as the old afro sat inside the old shoulders */
 const AFRO_W = 0.29;
+/** her buns' centres from the head's (laptop.ts HEAD_PARTS reads the same) */
+export const BUN = 0.31;
 /**
  * The torso an arm keeps out of (apply's arm solver, the outfits' clipping law outfit-clip.test.ts):
  * the bean's capsule in the body's space (its axis from y0 to y1, its radius, squashed in x and z),
@@ -117,6 +119,12 @@ export function clearArm(q: Quaternion, at: Vector3, girth: { readonly side: num
     q.premultiply(step);
   }
 }
+
+/** her ponytail's turn about its tie for a head turned by `head`: it hangs down when she nods (never up over her head). Pure. */
+export const hangPitch = (head: Rot): number => -Math.max(0, head[0]) * 0.9;
+
+/** a body leaning back past this lies back on something (the flat nap's -1.45, a bean bag's -0.9, a deck chair's -1.0): her ponytail is under her head */
+const LYING = -0.85;
 
 /** the rigid parts, each baked into one mesh (two with a far level of detail) */
 export const PARTS = ['head', 'body', 'armL', 'armR', 'legL', 'legR'] as const;
@@ -344,17 +352,189 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       t.rotation.set(-0.35, 0, rot);
     }
   };
+  // a woman's hair (docs/brand/bims.md "women among the bims"): her cut in the head's space, under
+  // her hat's crown when she wears one (the cap's or the beanie's: then no dome, its bands start under
+  // the rim), under the headset's band when she wears one. Behind, it ends above the collar and the hood
+  // at every head turn (the hair law: hair-clip.test.ts)
+  /** a ponytail's tie and tail: baked apart from the head, hidden while she lies flat (on it) */
+  let hang: Group | null = null;
+  const herHair = (cut: Cut, crowned: boolean, headset: boolean): void => {
+    const hm = mat(o.hair);
+    const tie = mat(o.hatColor);
+    const hair = (m: Mesh): Mesh => {
+      m.userData.hair = true;
+      return m;
+    };
+    /** a shell of hair: the sphere's band from t0 to t1 (polar angles from the top), round the head from phi0 over span (three's φ: the front is π/2) */
+    const arc = (r: number, t0: number, t1: number, phi0: number, span: number, y = 0, z = 0, tilt = 0): Mesh => {
+      const rows = Math.max(3, Math.round((t1 - t0) / (Math.PI / 14)));
+      const cols = Math.max(6, Math.round((span / (Math.PI * 2)) * 24));
+      const m = hair(add(new SphereGeometry(r, cols, rows, phi0, span, t0, t1 - t0), hm, head, 0, y, z));
+      // tilted back (its top toward the nape): its front edge rises off the brows
+      m.rotation.x = -tilt;
+      m.userData.shell = { r, t0, t1, phi0, span, y, z, tilt };
+      return m;
+    };
+    /** a shell round the head but for the face's gap (radians, centred on the front) */
+    const shell = (r: number, t0: number, t1: number, gap: number, y = 0, z = 0, tilt = 0): Mesh => arc(r, t0, t1, Math.PI / 2 + gap / 2, Math.PI * 2 - gap, y, z, tilt);
+    /** a soft lobe of hair (a tail's, a braid's, a bun, a curl), or a tie in its colour */
+    const lobe = (r: number, x: number, y: number, z: number, m: Mat = hm, s: readonly [number, number, number] = [1, 1, 1], on: Object3D = head): Mesh => {
+      const l = hair(add(new SphereGeometry(r, 12, 8), m, on, x, y, z));
+      l.scale.set(...s);
+      return l;
+    };
+    /** the hair's top: a smooth dome over the skull (none under a crown: the hat is the top; lower under a headset's band) */
+    const dome = (tilt = 0): void => {
+      // under a headset's band: centred, up to just under the band (no gap over the hair)
+      if (!crowned) shell(R + 0.012, 0, Math.PI * 0.4, 0, headset ? 0.014 : 0.02, headset ? 0 : -0.02, tilt);
+    };
+    /** parted in the middle: two soft swoops from the parting down to the temples frame the face */
+    const parting = (): void => {
+      if (crowned) return;
+      for (const sx of [-1, 1]) {
+        const sw = lobe(0.075, sx * 0.1, 0.15, 0.18, hm, [1.45, 0.45, 0.5]);
+        sw.rotation.set(-0.55, sx * 0.4, sx * 0.42);
+      }
+    };
+    /** where a band starts: under the dome's edge, or under the crown's rim */
+    const top = crowned ? 1.42 : 1.0;
+    /** how low hair goes behind: above the collar and the hood at every head turn (the nape's band hugs the skull lower) */
+    const NAPE = 2.0;
+    /** the sphere's bottom: the nape band goes all the way down under the back of the skull (inside the collar at rest, out when she nods) */
+    const NAPE_LOW = 2.95;
+    /** the nape: a band hugging the skull under the back's, down to the collar's height, so the back of her head never shows skin when she nods */
+    const nape = (gap: number, t0 = NAPE - 0.03, t1 = NAPE_LOW): void => {
+      shell(R + 0.004, t0, t1, gap);
+      // its rounded foot: no edge shows when she nods
+    };
+    switch (cut) {
+      case 'long': {
+        // parted in the middle, the back to the nape, and a curtain each side of the face falling past the jaw toward the shoulders, in front of the ears (never round to the hood)
+        dome();
+        parting();
+        const GAP = 1.9;
+        // thin at the back (she lies on it on a pillow, her head at the bed's end)
+        const r = R + 0.008;
+        shell(r, top, 2.08, GAP);
+        nape(GAP);
+        // the curtains: long and flat, from the temples past the jaw toward the shoulder's top, flaring a little
+        for (const sx of [-1, 1]) lobe(0.1, sx * 0.235, -0.115, 0.13, hm, [0.36, 1.4, 0.8]).rotation.z = sx * 0.14;
+        break;
+      }
+      case 'ponytail':
+      case 'braids':
+      case 'buns': {
+        // pulled back smooth: the dome set back (a high, bare forehead; braids parted in the middle) and a band down the back of the head to the nape, behind the ears
+        if (cut === 'braids') {
+          dome();
+          parting();
+        } else {
+          dome(0.3);
+          // the tilted dome's edge at the temples: a band hugging the skull under it, so no sliver of skin shows beside the face (a headset's cups cover them)
+          if (!crowned && !headset) shell(R + 0.004, 1.0, 1.4, 2.0);
+        }
+        const GAP = headset ? Math.PI + 0.9 : 2.9;
+        shell(R + 0.01, top, NAPE, GAP);
+        nape(GAP);
+        if (cut === 'ponytail') {
+          // a tie high at the back (under the rim with a hat), a tail of three lobes curving back and
+          // down: their own part (hang) about the tie, hanging down when she nods (apply: hangPitch),
+          // tucked under her head when she lies on her back
+          const ty = crowned ? -0.02 : 0.1;
+          const tz = -Math.sqrt(R * R - ty * ty) - 0.01;
+          const h = new Group();
+          h.name = 'hang';
+          h.position.set(0, ty, tz);
+          head.add(h);
+          hang = h;
+          hair(add(new TorusGeometry(0.038, 0.017, 6, 14), tie, h, 0, 0, -0.012));
+          lobe(0.062, 0, -0.005, -0.075, hm, [1, 1.1, 1], h);
+          lobe(0.058, 0, -0.09, -0.13, hm, [1, 1.2, 1], h);
+          lobe(0.046, 0, -0.165, -0.15, hm, [1, 1.15, 1], h);
+        } else if (cut === 'braids') {
+          // two braids from in front of the ears down in front of the shoulders, splaying a little, a tie at each end
+          for (const sx of [-1, 1]) {
+            const B: readonly (readonly [number, number, number, number])[] = [
+              [0.225, -0.03, 0.085, 0.05],
+              [0.245, -0.095, 0.1, 0.05],
+              [0.258, -0.16, 0.11, 0.047],
+              [0.265, -0.22, 0.115, 0.044],
+            ];
+            for (const [x, y, z, r] of B) lobe(r, sx * x, y, z, hm, [1, 1.15, 1]);
+            lobe(0.032, sx * 0.268, -0.262, 0.115, tie);
+          }
+        } else {
+          // two round buns high on each side of the crown, standing off it on a tie round the foot of each
+          for (const sx of [-1, 1]) {
+            const n = new Vector3(sx * 0.165, 0.215, -0.05).normalize();
+            lobe(0.085, n.x * BUN, n.y * BUN, n.z * BUN);
+            // the ring wider than the bun where it sits (its foot, just off the crown): it shows all round
+            const ring = hair(add(new TorusGeometry(0.078, 0.022, 8, 20), tie, head, n.x * (BUN - 0.045), n.y * (BUN - 0.045), n.z * (BUN - 0.045)));
+            ring.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), n);
+          }
+        }
+        break;
+      }
+      case 'bob': {
+        // a round helmet to the jaw all round, its straight fringe above the brows, a clip on one side (under the rim with a hat)
+        // centred a little forward: full round the face, thin at the back where she lies on a pillow
+        // one round sphere to the jaw all round (no step, no seam), the nape's band under it
+        const r = crowned ? R + 0.014 : R + 0.018;
+        const fz = 0.008;
+        if (!crowned) shell(r, 0, 1.3, 0, 0, fz);
+        shell(r, crowned ? top : 1.3, 1.87, 1.6, 0, fz);
+        // the nape's band starts under the helmet's edge: no skin line between them
+        nape(1.6, 1.78);
+        // the clip on the hair over the left temple (her hat's colour, like the ties)
+        const cy = crowned ? -0.03 : 0.07;
+        const cz = 0.13;
+        const cx = -Math.sqrt(Math.max(0, r * r - cy * cy - (cz - fz) * (cz - fz)));
+        lobe(0.03, cx - 0.004, cy, cz, tie, [0.6, 0.75, 1.7]).rotation.y = -0.6;
+        break;
+      }
+      case 'curls': {
+        // a round cloud of curls to the jaw, never wider than the shoulders (the afro's rule): rings of lobes,
+        // open on the face, the low ones on the sides only (the hood and the collar stay clear behind)
+        dome();
+        // under the lobes, hair round the back of the head: no skin between the curls when she nods
+        shell(R + 0.008, 1.0, 1.75, 2.0);
+        nape(2.4, 1.7);
+        const RING: readonly (readonly [number, number, number, number])[] = [
+          // polar angle, lobes, the arc's start and span (three's φ)
+          [0.35, 5, 0, Math.PI * 2],
+          [0.95, 7, Math.PI / 2 + 0.8, Math.PI * 2 - 1.6],
+          [1.5, 7, Math.PI / 2 + 1.0, Math.PI * 2 - 2.0],
+          [1.9, 2, Math.PI / 2 + 1.0, 0.9],
+          [1.9, 2, Math.PI / 2 - 1.9, 0.9],
+        ];
+        for (const [t, n, phi0, span] of RING) {
+          for (let i = 0; i < n; i++) {
+            const phi = phi0 + (span * (i + (span < Math.PI * 2 ? 0.5 : 0))) / n;
+            const d = 0.215;
+            lobe(0.078, -d * Math.cos(phi) * Math.sin(t), 0.01 + d * Math.cos(t), -0.02 + d * Math.sin(phi) * Math.sin(t));
+          }
+        }
+        break;
+      }
+    }
+  };
+  if (o.cut) herHair(o.cut, o.hat === 'cap' || o.hat === 'capback' || o.hat === 'beanie', o.hat === 'headphones');
   // hair and hats
+  /** what is worn on the head, not the head or its hair (a cap, a beanie, a headset): the view laws measure a head without it (heads.testkit.ts) */
+  const worn = (m: Mesh): Mesh => {
+    m.userData.wear = true;
+    return m;
+  };
   const capOn = (back: boolean): void => {
-    add(style.cap(0.225, 0.48), mat(o.hatColor), hat, 0, 0.03, 0);
-    add(style.box(0.22, 0.03, 0.2), mat(o.hatColor), hat, 0, 0.07, back ? -0.22 : 0.21);
+    worn(add(style.cap(0.225, 0.48), mat(o.hatColor), hat, 0, 0.03, 0));
+    worn(add(style.box(0.22, 0.03, 0.2), mat(o.hatColor), hat, 0, 0.07, back ? -0.22 : 0.21));
   };
   switch (o.hat) {
     case 'cap': capOn(false); break;
     case 'capback': capOn(true); break;
     case 'beanie':
-      add(style.cap(0.232, 0.5), mat(o.hatColor), hat, 0, 0.04, 0);
-      add(style.ball(0.06), mat(WORLD.paper), hat, 0, 0.28, 0);
+      worn(add(style.cap(0.232, 0.5), mat(o.hatColor), hat, 0, 0.04, 0));
+      worn(add(style.ball(0.06), mat(WORLD.paper), hat, 0, 0.28, 0));
       break;
     case 'afro':
       // never wider than the shoulders (designer m_41390 1): AFRO_W half-width at the clay head's size
@@ -367,11 +547,13 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     case 'hair':
       hairOn();
       break;
+    case 'bare':
+      break;
     case 'headphones': {
       // a headset (Gabriel: « cette barre orange est sensé etre un casque audio? »): a band that
       // follows the head's curve over its hair from ear to ear, a cup in its hat colour on each
-      // ear over a dark cushion, and a small mic arm from the left cup to the mouth
-      add(style.cap(0.226, 0.4), mat(o.hair), hat, 0, 0.02, -0.02);
+      // ear over a dark cushion, and a small mic arm from the left cup to the mouth (over her own hair when she has a cut)
+      if (!o.cut) add(style.cap(0.226, 0.4), mat(o.hair), hat, 0, 0.02, -0.02);
       const ink = mat(WORLD.dark);
       const BR = 0.262;
       const SEGS = 7;
@@ -379,20 +561,20 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       const step = (2 * SPAN) / SEGS;
       for (let i = 0; i < SEGS; i++) {
         const a = -SPAN + step * (i + 0.5);
-        add(style.box(BR * step * 1.15, 0.034, 0.06, 0.012), ink, hat, BR * Math.sin(a), BR * Math.cos(a), -0.01).rotation.z = -a;
+        worn(add(style.box(BR * step * 1.15, 0.034, 0.06, 0.012), ink, hat, BR * Math.sin(a), BR * Math.cos(a), -0.01)).rotation.z = -a;
       }
       for (const sx of [-1, 1]) {
-        add(style.box(0.03, 0.07, 0.035, 0.01), ink, hat, sx * 0.258, 0.07, -0.01);
-        add(style.cylinder(0.078, 0.03), ink, hat, sx * 0.222, -0.01, -0.01).rotation.z = Math.PI / 2;
-        add(style.cylinder(0.086, 0.055), mat(o.hatColor), hat, sx * 0.258, -0.01, -0.01).rotation.z = Math.PI / 2;
-        add(style.cylinder(0.05, 0.012), ink, hat, sx * 0.288, -0.01, -0.01).rotation.z = Math.PI / 2;
+        worn(add(style.box(0.03, 0.07, 0.035, 0.01), ink, hat, sx * 0.258, 0.07, -0.01));
+        worn(add(style.cylinder(0.078, 0.03), ink, hat, sx * 0.222, -0.01, -0.01)).rotation.z = Math.PI / 2;
+        worn(add(style.cylinder(0.086, 0.055), mat(o.hatColor), hat, sx * 0.258, -0.01, -0.01)).rotation.z = Math.PI / 2;
+        worn(add(style.cylinder(0.05, 0.012), ink, hat, sx * 0.288, -0.01, -0.01)).rotation.z = Math.PI / 2;
       }
       const from = new Vector3(-0.27, -0.05, 0.03);
       const to = new Vector3(-0.12, -0.1, 0.19);
       const dir = to.clone().sub(from);
-      const arm = add(style.box(0.018, 0.018, dir.length(), 0.006), ink, hat, (from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
+      const arm = worn(add(style.box(0.018, 0.018, dir.length(), 0.006), ink, hat, (from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2));
       arm.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir.normalize());
-      add(style.ball(0.026), ink, hat, to.x, to.y, to.z);
+      worn(add(style.ball(0.026), ink, hat, to.x, to.y, to.z));
       break;
     }
     case 'main': {
@@ -450,7 +632,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   wear?.({ style, name, head: hat, body, arms, legs, mat, add });
 
   // every rigid part baked into one mesh (two: near and far), the face's toggling pieces apart
-  const parts: readonly Group[] = [head, body, armL, armR, legL, legR];
+  const parts: readonly Group[] = [head, body, armL, armR, legL, legR, ...(hang ? [hang] : [])];
   const pm = partsMaterial(style);
   const nearMeshes: Mesh[] = [];
   const farMeshes: Mesh[] = [];
@@ -620,6 +802,11 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       body.position.set(0, rig.y, 0);
       setRot(body, rig.body);
       setRot(head, rig.head);
+      // lying back (a bed, a bean bag, a deck chair), her ponytail is under her head, never through the pillow or the cushion
+      if (hang) {
+        hang.visible = rig.body[0] > LYING;
+        hang.rotation.x = hangPitch(rig.head);
+      }
       setRot(armL, rig.armL);
       setRot(armR, rig.armR);
       // its sleeves never go into what it wears (the outfits' intent sheet): each arm moved the least out of the torso

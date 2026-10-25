@@ -18,7 +18,7 @@ export interface NapRest {
 }
 
 /** the napper's hips ahead of its spot (pose.ts: its pivot, the spot is its bed's NAP_BED.back), by shape */
-export const NAP_DZ: Readonly<Record<NapShape, number>> = { flat: 0.2, sink: 0.15, sling: 0.15 };
+export const NAP_DZ: Readonly<Record<NapShape, number>> = { flat: 0.23, sink: 0.15, sling: 0.15 };
 
 /**
  * The flat lie (pose.ts lying): on its back, its head a little up on a pillow and tilted to the
@@ -35,7 +35,7 @@ export const FLAT = {
   back: -0.39,
   heels: -0.035,
   /** the head's middle from the spot (z ahead), and how far over the bed its lowest point is: the pillow's place and height */
-  headZ: -0.72,
+  headZ: -0.69,
   headUp: 0.06,
 } as const;
 

@@ -31,6 +31,7 @@ import { lookOf } from './maps';
 import { makeBim } from './bim';
 import { rigOf } from './pose';
 import { HEAD_Y } from './laptop';
+import { headBoxOf } from './heads.testkit';
 import { BACK, type Fit, fitSite, siteOf, toScreen, wideSiteOf } from './camera';
 import { STYLE } from './style';
 
@@ -53,9 +54,13 @@ function shown(m: Object3D): boolean {
   return true;
 }
 
-/** each mesh's box of the bim `name` posed with `act` at `spot`, world units, shrunk by SLACK; `head`: its head's box alone */
+/**
+ * each mesh's box of the bim `name` posed with `act` at `spot`, world units, shrunk by SLACK, headwear
+ * and all (nothing may poke through a bed); `head`: its head's box alone as the view laws see it,
+ * without its headwear (heads.testkit.ts headBoxOf)
+ */
 function bimBoxes(name: string, spot: Spot, act: Activity, head = false, bedAt?: (p: Pt) => NapRest | undefined): Box3[] {
-  const bim = makeBim(name, false, STYLE);
+  const bim = makeBim(name, false, STYLE, undefined, undefined, !head);
   const pose: Pose = {
     x: spot.x, z: spot.z, dir: spot.face, moving: false, since: 30,
     seg: { t: 0, act, sig: act.k, spot, path: { pts: [spot], seg: [], len: 0 }, speed: 2.4, from: null },
@@ -65,7 +70,8 @@ function bimBoxes(name: string, spot: Spot, act: Activity, head = false, bedAt?:
   const out: Box3[] = [];
   let top: Object3D | undefined;
   bim.group.traverse((o) => { if (!top && o.children.length > 0 && Math.abs(o.position.y - HEAD_Y) < 1e-6) top = o; });
-  (head && top ? top : bim.group).traverse((m) => { if (m instanceof Mesh && shown(m)) out.push(new Box3().setFromObject(m, true).expandByScalar(-SLACK)); });
+  if (head && top) out.push(headBoxOf(top, { wear: false }).expandByScalar(-SLACK));
+  else bim.group.traverse((m) => { if (m instanceof Mesh && shown(m)) out.push(new Box3().setFromObject(m, true).expandByScalar(-SLACK)); });
   bim.dispose();
   return out;
 }

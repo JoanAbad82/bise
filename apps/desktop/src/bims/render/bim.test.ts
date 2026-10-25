@@ -118,7 +118,8 @@ describe('the bim merged by part', () => {
         plain.dispose();
       }
     }
-  });
+    // every outfit near and far, twice built: ~5 s alone, more on a loaded machine (release-56 m_43466)
+  }, 60_000);
 
   it('keeps one mesh per part (two with a far level), the face apart', () => {
     for (const name of NAMES) {
