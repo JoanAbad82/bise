@@ -650,11 +650,11 @@ def tip_box(d, x_right, y, lines, w=None):
             + "".join(d.t(x + 11, y + 20 + 19 * i, l, 11.5, "dim") for i, l in enumerate(lines)))
 
 def artchip(d, x, y, label, kind):
-    """an artifact's or a PR's chip in the thread (thread.css .th-art): '↗ <title>  <kind>', a 1 px line, r 9, no fill,
-    the words text-2, the kind text-3. never the accent."""
-    c = d.c; cw = tw(label, 12.5) * 1.06 + tw(kind, 11.5) + 30
-    return (f'<rect x="{x}" y="{y - 16}" width="{cw:.0f}" height="24" rx="9" fill="none" stroke="{c["line"]}"/>'
-            + d.t(x + 9, y, f'{E(label)}  <tspan fill="{c["faint"]}" font-size="11.5">{E(kind)}</tspan>', 12.5, "dim"))
+    """an artifact's or a PR's chip (ds/css/prim.css .b-artchip, taste rule 13): the accent on a 10 % accent tint, no border,
+    r-1 (6 px), 24 px tall, 0 8 px padding; '↗ title' in accent, the kind in the same accent at 70 %, 12 px."""
+    c = d.c; cw = tw(label, 13) * 1.06 + tw(kind, 12) + 26
+    return (f'<rect x="{x}" y="{y - 16}" width="{cw:.0f}" height="24" rx="6" fill="{c["accsoft"]}"/>'
+            + d.t(x + 8, y, f'{E(label)}  <tspan fill-opacity=".7" font-size="12">{E(kind)}</tspan>', 13, "acc"))
 
 def d_prs(m):
     """10 · pull requests: perf opens #409; '↑' on its row and the PR's chip in its thread; checks run, then pass; the tip names it."""
@@ -1028,23 +1028,24 @@ def d_plugins(m):
     o.append(at(0, page, pb, dur=.25))
     o.append(ring(d, 140, 236, 1.4, page + .1, r=12))
     # its page: head (icon, name, what, what it gives, 'on for every project' and its switch), try it, its parts
-    pg = [f'<rect width="680" height="{d.H}" fill="{c["bg"]}"/>', t(28, 30, "‹ plugins", 12.5, "dim"), tile(d, 28, 50, "PN", 52),
-          t(96, 72, "patch-notes", 22, "text", 600), t(96, 94, "writes the game's patch notes from the merged PRs", 13, "dim"),
-          t(96, 114, "1 skill", 12, "faint"), t(616, 72, "on for every project", 12, "faint", anchor="end") + toggle(d, 624, 72, True)]
+    # the page starts at its head: no '‹ plugins' (the titlebar's crumb goes back; plug-desktop dropped the link)
+    pg = [f'<rect width="680" height="{d.H}" fill="{c["bg"]}"/>', tile(d, 28, 30, "PN", 52),
+          t(96, 52, "patch-notes", 22, "text", 600), t(96, 74, "writes the game's patch notes from the merged PRs", 13, "dim"),
+          t(96, 94, "1 skill", 12, "faint"), t(616, 52, "on for every project", 12, "faint", anchor="end") + toggle(d, 624, 52, True)]
     tries = ["write the patch notes for 1.4", "what changed since the last patch notes?", "draft the notes for the next release"]
-    pg.append(f'<rect x="28" y="140" width="624" height="{24 + 30 * len(tries)}" rx="10" fill="{c["raised"]}"/>')
+    pg.append(f'<rect x="28" y="120" width="624" height="{24 + 30 * len(tries)}" rx="10" fill="{c["raised"]}"/>')
     for i, l in enumerate(tries):
-        yy = 166 + 30 * i
+        yy = 146 + 30 * i
         pg.append(t(44, yy, E(l), 13) + t(636, yy, "→", 13, "faint", anchor="end"))
-    pg.append(t(28, 284, f'skills <tspan fill="{c["faint"]}">1</tspan>', 12, "text", 600) + f'<path d="M28 296 H652" stroke="{c["line"]}"/>'
-              + t(36, 320, f'<tspan fill="{c["faint"]}">$</tspan>  <tspan font-weight="600">patch-notes</tspan>  <tspan fill="{c["dim"]}">from the merged PRs to player-facing notes</tspan>', 13)
-              + toggle(d, 616, 320, True))
-    pg.append(t(28, 360, "about", 12, "text", 600) + f'<path d="M28 372 H652" stroke="{c["line"]}"/>'
-              + t(36, 396, f'from <tspan style="font-family:{MONO}">~/.agents/plugins/patch-notes</tspan> · your agents get a change at their next turn', 12, "dim"))
+    pg.append(t(28, 264, f'skills <tspan fill="{c["faint"]}">1</tspan>', 12, "text", 600) + f'<path d="M28 276 H652" stroke="{c["line"]}"/>'
+              + t(36, 300, f'<tspan fill="{c["faint"]}">$</tspan>  <tspan font-weight="600">patch-notes</tspan>  <tspan fill="{c["dim"]}">from the merged PRs to player-facing notes</tspan>', 13)
+              + toggle(d, 616, 300, True))
+    pg.append(t(28, 340, "about", 12, "text", 600) + f'<path d="M28 352 H652" stroke="{c["line"]}"/>'
+              + t(36, 376, f'from <tspan style="font-family:{MONO}">~/.agents/plugins/patch-notes</tspan> · your agents get a change at their next turn', 12, "dim"))
     o.append(at(page, swap, "".join(pg), dur=.2))
-    o.append(ring(d, 60, 162, 4.1, swap + .1, r=12))
+    o.append(ring(d, 60, 142, 4.1, swap + .1, r=12))
     # its tip, over the head's blank right side (not over the other lines to try)
-    o.append(at(4.3, swap, tip_box(d, 652, 104, ["puts it in main's composer; you send it or change it"]), dur=.1))
+    o.append(at(4.3, swap, tip_box(d, 652, 84, ["puts it in bise's composer; you send it or change it"]), dur=.1))
     # bise's thread: the line in its composer, sent; bise uses his skill
     TX = 448; X, R = 22, TX - 22
     th = [f'<rect width="680" height="{d.H}" fill="{c["bg"]}"/>',
@@ -1054,7 +1055,8 @@ def d_plugins(m):
     th.append(t(rx, 25, '<tspan font-weight="600">mapforge</tspan>', 13) + lab(64, "AGENTS · 0"))
     # the page bise writes joins ARTIFACTS (8.6 s); SCHEDULED moves down under it
     th.append(at(0, 8.6, lab(102, "ARTIFACTS · 0") + lab(130, "SCHEDULED &amp; WATCHING · 0"), dur=.1))
-    th.append(at(8.6, None, lab(102, "ARTIFACTS · 1") + t(rx, 128, "↗", 13, "dim") + t(rx + 18, 128, f'<tspan font-weight="500">patch notes 1.4</tspan>  <tspan fill="{c["dim"]}" font-size="12">page</tspan>', 13)
+    # the right bar's artifact row: its name in the accent, like every artifact name (taste rule 13)
+    th.append(at(8.6, None, lab(102, "ARTIFACTS · 1") + t(rx, 128, "↗", 13, "acc") + t(rx + 18, 128, f'<tspan font-weight="500">patch notes 1.4</tspan>  <tspan fill-opacity=".7" font-size="12">page</tspan>', 13, "acc")
                   + lab(160, "SCHEDULED &amp; WATCHING · 0"), dur=.1))
     th.append(t(18, 25, f'<tspan fill="{c["acc"]}" style="font-family:{MONO}" font-weight="700">:*</tspan> <tspan font-weight="600">bise</tspan> <tspan fill="{c["dim"]}">· mapforge</tspan>', 13))
     q = tries[0]; send = 6.0
