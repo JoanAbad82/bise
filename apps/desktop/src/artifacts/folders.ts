@@ -207,8 +207,8 @@ export function crumbOf(lib: Library, at: At): { name: string; at: At }[] {
 }
 
 /** The title bar's path: 'artifacts / desktop app / agent view'. Pure. */
-export function titlePath(lib: Library, at: At, searching: boolean): string {
-  const parts = searching ? ['search'] : crumbOf(lib, at).map((c) => c.name);
+export function titlePath(lib: Library, at: At, searched: string): string {
+  const parts = searched !== '' ? [library.crumb_search({ q: searched })] : crumbOf(lib, at).map((c) => c.name);
   return [library.crumb_root, ...parts].join(' / ');
 }
 

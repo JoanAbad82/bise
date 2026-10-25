@@ -72,11 +72,34 @@ function artifacts(project: string, now: number, items: Art[]) {
   };
 }
 
-const png = (id: string, title: string, agent: string, folder: string | undefined, ago: number, extra: Partial<Art> = {}): Art =>
-  ({ id, kind: 'file', title, agent, ago, path: `/nowhere/shots/${id}.png`, ...(folder === undefined ? {} : { folder }), ...extra });
+/**
+ * Where the artifacts' files and pages are. Real (the spec's `files/` folder and its page server):
+ * each card shows its picture, made by the app as for him (designer m_40850: the previews are the
+ * look). Without it, paths that don't exist: every card keeps its kind's icon.
+ */
+export interface Real {
+  /** the absolute path of tests/checks/artifacts/files */
+  readonly dir: string;
+  /** the page server's base, 'http://127.0.0.1:<port>' (it serves files/pages/<id>.html) */
+  readonly pages: string;
+}
+// the files that exist in files/ (a glb, an mp4, a pptx, a dmg have no Quick Look picture: none)
+const REAL_FILES = new Set(['delta-review.md', 'week4.md', 'week3.md', 'dpe.md', 'bourso.md', 'limits.md', 'projection.xlsx', 'offre.pdf']);
+interface Where {
+  file: (name: string) => string;
+  page: (id: string) => string;
+  png: (id: string, title: string, agent: string, folder: string | undefined, ago: number, extra?: Partial<Art>) => Art;
+}
+function whereOf(real: Real | undefined): Where {
+  const file = (name: string) => (real !== undefined && REAL_FILES.has(name) ? `${real.dir}/${name}` : `/nowhere/${name}`);
+  const page = (id: string) => (real === undefined ? `http://127.0.0.1:1/p/${id}` : `${real.pages}/${id}.html`);
+  const png = (id: string, title: string, agent: string, folder: string | undefined, ago: number, extra: Partial<Art> = {}): Art =>
+    ({ id, kind: 'file', title, agent, ago, path: real === undefined ? `/nowhere/shots/${id}.png` : `${real.dir}/${id}.png`, ...(folder === undefined ? {} : { folder }), ...extra });
+  return { file, page, png };
+}
 
 /** The harness project's: the desktop app's tasks, a stack of 8 shots in one turn, bims, unfiled. */
-function harness(now: number): Art[] {
+function harness(now: number, { file, page, png }: Where): Art[] {
   const turn = now - 4 * 60 * MIN;
   const stack = ['dark · 1400 · perf', 'dark · 1400 · search', 'dark · 800 · perf', 'dark · 800 · search', 'light · 1400 · perf', 'light · 1400 · search', 'light · 800 · perf', 'light · 800 · search']
     .map((t, i) => png(`step2-${String(i)}`, `agent view step 2 · ${t}`, 'amb-home', 'f-agentview', 4 * 60 * MIN - i * 1000, { turn, new: true }));
@@ -84,50 +107,55 @@ function harness(now: number): Art[] {
     ...stack,
     png('fixes', 'agent view fixes', 'amb-home', 'f-agentview', 6 * 60 * MIN),
     png('head-sheet', 'agent view head sheet', 'amb-home', 'f-agentview', 8 * 60 * MIN),
-    { id: 'target', kind: 'page', title: 'agent-target shots', agent: 'agent-target', folder: 'f-agentview', ago: 9 * 60 * MIN, url: 'http://127.0.0.1:1/p/agent-target' },
+    { id: 'target', kind: 'page', title: 'agent-target shots', agent: 'agent-target', folder: 'f-agentview', ago: 9 * 60 * MIN, url: page('agent-target') },
     png('folds-dark', 'open folds, dark', 'amb-win', 'f-agentview', 11 * DAY),
     png('folds-light', 'open folds, light', 'amb-win', 'f-agentview', 11 * DAY + MIN),
-    { id: 'delta', kind: 'file', title: 'ambient-app delta review', agent: 'architect', folder: 'f-agentview', ago: 11 * DAY + 2 * MIN, path: '/nowhere/delta-review.md' },
-    { id: 'hero-shots', kind: 'page', title: 'ds-hero part 2: page hero shots', agent: 'ds-hero', folder: 'f-heroes000', ago: 80 * MIN, url: 'http://127.0.0.1:1/p/hero-shots', new: true },
+    { id: 'delta', kind: 'file', title: 'ambient-app delta review', agent: 'architect', folder: 'f-agentview', ago: 11 * DAY + 2 * MIN, path: file('delta-review.md') },
+    { id: 'hero-shots', kind: 'page', title: 'ds-hero part 2: page hero shots', agent: 'ds-hero', folder: 'f-heroes000', ago: 80 * MIN, url: page('hero-shots'), new: true },
     png('hero-a', 'page hero, artifacts', 'ds-hero', 'f-heroes000', 3 * 60 * MIN),
     png('inbox-a', 'inbox step 1', 'amb-inbox', 'f-inbox0000', 2 * DAY),
     png('inbox-b', 'inbox, narrow', 'amb-inbox', 'f-inbox0000', 2 * DAY + MIN),
-    { id: 'office-3d', kind: 'file', title: 'the office objects in 3D', agent: 'bims-objects', folder: 'f-plugins00', ago: 3 * 60 * MIN, path: '/nowhere/office.glb' },
+    { id: 'office-3d', kind: 'file', title: 'the office objects in 3D', agent: 'bims-objects', folder: 'f-plugins00', ago: 3 * 60 * MIN, path: file('office.glb') },
     png('side-a', 'sidebar rows', 'amb-side', 'f-sidebar00', 3 * DAY),
     png('welcome-fix', 'welcome-fix shots', 'amb-wel', 'f-welcome00', 7 * 60 * MIN),
-    { id: 'poof', kind: 'file', title: 'bim poof variants', agent: 'bims', folder: 'f-poof00000', ago: 70 * MIN, path: '/nowhere/poof.mp4', new: true },
-    { id: 'town', kind: 'page', title: 'town light: noon and dark', agent: 'hero-town', folder: 'f-bims00000', ago: 4 * DAY, url: 'http://127.0.0.1:1/p/town' },
-    { id: 'pop', kind: 'file', title: 'bim pop, dark', agent: 'bim-pop', folder: 'f-bims00000', ago: 5 * DAY, path: '/nowhere/pop.mp4' },
-    { id: 'post', kind: 'page', title: 'launch post', agent: 'marketing', folder: 'f-launch000', ago: 3 * DAY, url: 'http://127.0.0.1:1/p/launch-post' },
-    { id: 'pitch', kind: 'file', title: 'bise pitch investisseurs', agent: 'marketing', folder: 'f-launch000', ago: 5 * DAY, path: '/nowhere/pitch.pptx' },
-    { id: 'week4', kind: 'file', title: 'semaine 4: ce que main a fait seul', agent: 'team-lead', folder: 'f-reports00', ago: 2 * 60 * MIN, path: '/nowhere/week4.md' },
-    { id: 'week3', kind: 'file', title: 'semaine 3: trois choses à changer', agent: 'team-lead', folder: 'f-reports00', ago: 7 * DAY, path: '/nowhere/week3.md' },
+    { id: 'poof', kind: 'file', title: 'bim poof variants', agent: 'bims', folder: 'f-poof00000', ago: 70 * MIN, path: file('poof.mp4'), new: true },
+    { id: 'town', kind: 'page', title: 'town light: noon and dark', agent: 'hero-town', folder: 'f-bims00000', ago: 4 * DAY, url: page('town') },
+    { id: 'pop', kind: 'file', title: 'bim pop, dark', agent: 'bim-pop', folder: 'f-bims00000', ago: 5 * DAY, path: file('pop.mp4') },
+    { id: 'post', kind: 'page', title: 'launch post', agent: 'marketing', folder: 'f-launch000', ago: 3 * DAY, url: page('launch-post') },
+    { id: 'pitch', kind: 'file', title: 'bise pitch investisseurs', agent: 'marketing', folder: 'f-launch000', ago: 5 * DAY, path: file('pitch.pptx') },
+    { id: 'week4', kind: 'file', title: 'semaine 4: ce que main a fait seul', agent: 'team-lead', folder: 'f-reports00', ago: 2 * 60 * MIN, path: file('week4.md') },
+    { id: 'week3', kind: 'file', title: 'semaine 3: trois choses à changer', agent: 'team-lead', folder: 'f-reports00', ago: 7 * DAY, path: file('week3.md') },
     // unfiled: his own adds, and from before folders
-    { id: 'dmg', kind: 'file', title: 'bise desktop DMG 2026.10.2-35', agent: 'dmg-benjamin', ago: 8 * DAY, path: '/nowhere/bise.dmg' },
+    { id: 'dmg', kind: 'file', title: 'bise desktop DMG 2026.10.2-35', agent: 'dmg-benjamin', ago: 8 * DAY, path: file('bise.dmg') },
     png('cart', 'cart before / after', 'you', undefined, 7 * DAY, { by: 'you' }),
   ];
 }
 
 /** The world: dark or light, every project, its agents and artifacts (empty: a first run). */
-export function libraryWorld(theme: 'light' | 'dark', now: number, empty = false) {
-  const project = (id: string, name: string, order: number, home = false) => ({ project: id, name, path: `/nowhere/${name}`, git: !home, home, order, agents: 1, working: 0, waits: 0, running: true });
+export function libraryWorld(theme: 'light' | 'dark', now: number, empty = false, real?: Real) {
+  const where = whereOf(real);
+  const { file, page } = where;
+  // with real files, the harness project's folder is files/: main reads a card's file only in his
+  // home (the run's throwaway one) or a project's folder (reveal.ts realLookable)
+  const folderOf = (name: string) => (real !== undefined && name === 'harness' ? real.dir : `/nowhere/${name}`);
+  const project = (id: string, name: string, order: number, home = false) => ({ project: id, name, path: folderOf(name), git: !home, home, order, agents: 1, working: 0, waits: 0, running: true });
   const agent = (name: string) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: `${name}'s job`, since_ms: now - 14 * MIN, waits: 0, watching: [] });
   const projects = [project(HOME, 'bise', 0, true), project(P.harness, 'harness', 1), project(P.ai, 'ai-docs', 2), project(P.paint, 'paint-canvas', 3), project(P.ts, 'ts-pattern', 4), project(P.form, 'app-form', 5)];
   const all = empty ? [] : [
-    artifacts(P.harness, now, harness(now)),
+    artifacts(P.harness, now, harness(now, where)),
     artifacts(P.ai, now, [
-      { id: 'dpe', kind: 'file', title: 'DPE 36 rue de Montreuil', agent: 'appart-web', folder: 'f-rue000000', ago: 2 * DAY, path: '/nowhere/dpe.md' },
-      { id: 'bourso', kind: 'file', title: 'Message BoursoBank : corrections', agent: 'appart-web', folder: 'f-rue000000', ago: 2 * DAY + MIN, path: '/nowhere/bourso.md' },
-      { id: 'projection', kind: 'file', title: 'projection achat ou location', agent: 'epargne-offre', folder: 'f-epargne00', ago: 2 * DAY + 2 * MIN, path: '/nowhere/projection.xlsx', new: true },
-      { id: 'budget', kind: 'page', title: 'budget famille (app)', agent: 'epargne-offre', folder: 'f-epargne00', ago: 4 * DAY, url: 'http://127.0.0.1:1/p/budget' },
+      { id: 'dpe', kind: 'file', title: 'DPE 36 rue de Montreuil', agent: 'appart-web', folder: 'f-rue000000', ago: 2 * DAY, path: file('dpe.md') },
+      { id: 'bourso', kind: 'file', title: 'Message BoursoBank : corrections', agent: 'appart-web', folder: 'f-rue000000', ago: 2 * DAY + MIN, path: file('bourso.md') },
+      { id: 'projection', kind: 'file', title: 'projection achat ou location', agent: 'epargne-offre', folder: 'f-epargne00', ago: 2 * DAY + 2 * MIN, path: file('projection.xlsx'), new: true },
+      { id: 'budget', kind: 'page', title: 'budget famille (app)', agent: 'epargne-offre', folder: 'f-epargne00', ago: 4 * DAY, url: page('budget') },
       { id: 'drive', kind: 'link', title: 'Dossier Drive 36 rue de Montreuil/Offre', agent: 'epargne-offre', ago: 6 * DAY, url: 'https://drive.google.com/drive/folders/1' },
     ]),
     artifacts(P.paint, now, [
-      { id: 'appart-3d', kind: 'file', title: 'modèle 3D (glb)', agent: 'appart-3d', folder: 'f-rue000000', ago: 4 * DAY, path: '/nowhere/appart.glb' },
-      { id: 'offre', kind: 'file', title: "Offre d'achat signée", agent: 'you', by: 'you', ago: 2 * DAY + 3 * MIN, path: '/nowhere/offre.pdf' },
+      { id: 'appart-3d', kind: 'file', title: 'modèle 3D (glb)', agent: 'appart-3d', folder: 'f-rue000000', ago: 4 * DAY, path: file('appart.glb') },
+      { id: 'offre', kind: 'file', title: "Offre d'achat signée", agent: 'you', by: 'you', ago: 2 * DAY + 3 * MIN, path: file('offre.pdf') },
     ]),
     artifacts(P.ts, now, [{ id: 'pr-384', kind: 'pr', title: 'Pattern<…> in type errors', agent: 'ts-fix', folder: 'f-launch000', ago: 2 * DAY, url: 'https://github.com/gvergnaud/ts-pattern/pull/384' }]),
-    artifacts(HOME, now, [{ id: 'limits', kind: 'file', title: 'limits harness 10-22', agent: 'main', folder: 'f-reports00', ago: 2 * DAY, path: '/nowhere/limits.md' }]),
+    artifacts(HOME, now, [{ id: 'limits', kind: 'file', title: 'limits harness 10-22', agent: 'main', folder: 'f-reports00', ago: 2 * DAY, path: file('limits.md') }]),
     artifacts(P.form, now, []),
   ];
   return [

@@ -50,7 +50,25 @@ export function BigTile(p: TileProps) {
         <span className="t" {...tipAttrs(p.folder.name)}>{p.folder.name}</span>
         {fresh > 0 && <span className="dot" {...tipAttrs(library.tip_new_dot({ n: fresh }))} />}
       </span>
-      <span className="ln" data-flash={p.flash || undefined}>{`${countWords(p.count)} · ${p.when}`}</span>
+      <span className="ln" data-flash={p.flash || undefined}>{`${(p.count?.total ?? 0) === 0 ? library.tile_empty : countWords(p.count)} · ${p.when}`}</span>
+    </Press>
+  );
+}
+
+/**
+ * A folder in the ☰ list: a row at the list's height, on top of the artifacts' rows: its glyph, its
+ * name (the dot when something in it is new), its count, its newest time (designer m_40850).
+ */
+export function FolderListRow(p: TileProps) {
+  const fresh = p.count?.fresh ?? 0;
+  return (
+    <Press look="art-frow" onClick={p.onOpen} onContextMenu={(e) => { e.preventDefault(); p.onMenu(e); }}
+      data-over={p.drop?.over === p.folder.id || undefined} data-testid={p.testId} {...dropProps(p.drop, p.folder.id)}>
+      <FolderIcon />
+      <span className="t" {...tipAttrs(p.folder.name)}>{p.folder.name}</span>
+      {fresh > 0 ? <span className="dot" {...tipAttrs(library.tip_new_dot({ n: fresh }))} /> : <span />}
+      <span className="ct" data-flash={p.flash || undefined}>{(p.count?.total ?? 0) === 0 ? library.tile_empty : countWords(p.count)}</span>
+      <span className="when">{p.when}</span>
     </Press>
   );
 }

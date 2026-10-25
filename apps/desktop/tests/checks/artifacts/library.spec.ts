@@ -8,10 +8,30 @@
 // nothing, the scope menu, one project ('14 of 74'), and the empty pages each show. It sends
 // nothing to a hub but what his gestures send. Shots: lib-<tab>-<w>-<theme>.png. art-grid adds its
 // card tabs. Owner: art-folders.
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { library } from '../../../src/proto/words_library.gen';
-import { libraryWorld, P } from './library-world';
+import { libraryWorld, P, type Real } from './library-world';
+
+// the fixture's real files (shots, md, a pdf, a sheet) and its pages, served on 127.0.0.1: each
+// card shows the picture the app makes of it, as for him
+const FILES = join(__dirname, 'files');
+async function realFiles(): Promise<Real & { close: () => void }> {
+  const server = createServer((req, res) => {
+    const name = basename(req.url ?? '');
+    readFile(join(FILES, 'pages', name)).then(
+      (body) => { res.writeHead(200, { 'content-type': name.endsWith('.css') ? 'text/css' : 'text/html; charset=utf-8' }).end(body); },
+      () => { res.writeHead(404).end(); },
+    );
+  });
+  await new Promise<void>((ok) => { server.listen(0, '127.0.0.1', ok); });
+  const at = server.address();
+  const port = typeof at === 'object' && at !== null ? at.port : 0;
+  return { dir: FILES, pages: `http://127.0.0.1:${String(port)}`, close: () => { server.close(); } };
+}
 
 const NOW = Date.now();
 const SIZES = ['1400x900', '1100x820', '800x820'] as const;
@@ -24,8 +44,10 @@ for (const theme of THEMES) {
   for (const size of SIZES) {
     const w = size.split('x')[0] ?? '';
     test(`artifacts/library: every tab of the folders page (${w}, ${theme})`, async () => {
-      const core = new FakeCore(libraryWorld(theme, NOW) as never);
-      const s = await launchDesktop({ core, route: 'artifacts', size });
+      const real = await realFiles();
+      const core = new FakeCore(libraryWorld(theme, NOW, false, real) as never);
+      // the cards' pictures: made by main in a cache of this run's (the fake core's thumbs_dir)
+      const s = await launchDesktop({ core, route: 'artifacts', size, env: { BISE_HARNESS_THUMBS_DIR: test.info().outputPath('thumbs') } });
       const page = s.page;
       // the window's size: the harness's own is fixed, the viewport is the page's
       await page.setViewportSize({ width: Number(w), height: Number(size.split('x')[1]) });
@@ -80,8 +102,11 @@ for (const theme of THEMES) {
         await expect(id(page, 'artifacts.sheet')).toBeVisible();
         await page.locator('[data-testid^="artifacts.sheet.chip."]').nth(1).click();
         await shot('stack-open');
-        await page.keyboard.press('Escape');
-        await page.keyboard.press('Escape');
+        // esc closes the chip, then the stack; one esc more would go up a folder: back to the task to be sure
+        for (let i = 0; i < 3 && await id(page, 'artifacts.sheet').isVisible(); i++) await page.keyboard.press('Escape');
+        await expect(id(page, 'artifacts.sheet')).toBeHidden();
+        await go('artifacts.col.f.f-agentview');
+        await expect(id(page, 'artifacts.head')).toContainText('agent view');
         await id(page, 'artifacts.view.list').click();
         await shot('list');
         await id(page, 'artifacts.view.grid').click();
@@ -147,6 +172,7 @@ for (const theme of THEMES) {
         await shot('nothing-found');
       } finally {
         await s.close();
+        real.close();
       }
     });
   }

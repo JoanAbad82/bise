@@ -3,8 +3,8 @@
 // first, esc clears', the kind chips with their counts, then the results grouped by folder, four a
 // group, the rest behind 'all 6 ›'. Nothing found: where it looked, and the nearest match to open.
 // The cards are the grid's (art-grid's ArtifactGrid, through `cards`). A pure render. Owner: art-folders.
-import type { ReactNode } from 'react';
-import { Button, Press } from '@/ds';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Button, Dropdown, Press } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { chipWord, GROUP_SHOWN, type ChipKind, type Group } from './folders';
 import type { Item } from './model';
@@ -28,19 +28,64 @@ export interface SearchViewProps {
 export const groupKey = (g: Group): string => g.id ?? 'unfiled';
 
 /** The kind chips' row: 'all 17', 'shots 12', ...; the picked one pressed. */
+// One row, never wrapped (designer m_40850): the chips that fit, the rest folded into '+2 ⌄'.
 export function KindChips({ total, chips, chip, onChip, testId }: { total: number; chips: readonly { kind: ChipKind; n: number }[]; chip: ChipKind | null; onChip: (k: ChipKind | null) => void; testId: string }) {
+  const row = useRef<HTMLDivElement>(null);
+  const ruler = useRef<HTMLSpanElement>(null);
+  const [fit, setFit] = useState(chips.length);
+  useLayoutEffect(() => {
+    const box = row.current;
+    const r = ruler.current;
+    if (box === null || r === null) return undefined;
+    const measure = () => { setFit(chipsThatFit(box.clientWidth, [...r.children].map((c) => (c as HTMLElement).offsetWidth), gapOf(r))); };
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(box);
+    return () => { seen.disconnect(); };
+  }, [chips, total]);
+  const shown = chips.slice(0, fit);
+  const folded = chips.slice(fit);
   return (
-    <span className="art-chips" data-testid={testId}>
+    <div ref={row} className="art-chips" data-testid={testId}>
       <Press look="art-chip" aria-pressed={chip === null} onClick={() => { onChip(null); }} data-testid={`${testId}.all`}>
         {library.all_kinds} <span className="n">{total}</span>
       </Press>
-      {chips.map((c) => (
+      {shown.map((c) => (
         <Press key={c.kind} look="art-chip" aria-pressed={chip === c.kind} onClick={() => { onChip(chip === c.kind ? null : c.kind); }} data-testid={`${testId}.${c.kind}`}>
           {chipWord(c.kind)} <span className="n">{c.n}</span>
         </Press>
       ))}
-    </span>
+      {folded.length > 0 && (
+        <Dropdown look="chip" label={`+${String(folded.length)}`} testId={`${testId}.more`}
+          groups={[{ id: 'kinds', rows: folded.map((c) => ({ id: c.kind, name: chipWord(c.kind), trailing: String(c.n), current: chip === c.kind, testId: `${testId}.${c.kind}` })) }]}
+          onPick={(k) => { onChip(chip === k ? null : (k as ChipKind)); }} />
+      )}
+      {/* the ruler: every chip's width, unseen, so the row knows how many fit */}
+      <span ref={ruler} className="art-chips-ruler" aria-hidden="true">
+        <span className="b-press art-chip">{library.all_kinds} <span className="n">{total}</span></span>
+        {chips.map((c) => <span key={c.kind} className="b-press art-chip">{chipWord(c.kind)} <span className="n">{c.n}</span></span>)}
+        <span className="b-press art-chip fold">+{chips.length}</span>
+      </span>
+    </div>
   );
+}
+
+const gapOf = (el: HTMLElement): number => parseFloat(getComputedStyle(el).columnGap) || 0;
+
+/**
+ * How many kind chips fit in a row `width` wide: `widths` are the 'all' chip's, each chip's, then
+ * the '+n ⌄' fold's; the fold takes its room only when some don't fit. Nothing measured (no layout):
+ * all. Pure.
+ */
+export function chipsThatFit(width: number, widths: readonly number[], gap: number): number {
+  const n = widths.length - 2;
+  if (n <= 0 || width <= 0 || widths.every((w) => w === 0)) return Math.max(n, 0);
+  const used = (k: number) => widths.slice(0, k + 1).reduce((s, w) => s + w + gap, 0) - gap;
+  if (used(n) <= width) return n;
+  const fold = (widths[n + 1] ?? 0) + gap;
+  let k = n;
+  while (k > 0 && used(k) + fold > width) k -= 1;
+  return k;
 }
 
 export function SearchResults(p: SearchViewProps) {

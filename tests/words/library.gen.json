@@ -92,6 +92,13 @@
     "one": null,
     "text": "artifacts"
   },
+  "library.crumb_search": {
+    "args": [
+      "q"
+    ],
+    "one": null,
+    "text": "search · {q}"
+  },
   "library.delete_folder": {
     "args": [],
     "one": null,
@@ -546,6 +553,11 @@
     "args": [],
     "one": null,
     "text": "filed by main when each task started"
+  },
+  "library.tile_empty": {
+    "args": [],
+    "one": null,
+    "text": "empty"
   },
   "library.tip_added": {
     "args": [

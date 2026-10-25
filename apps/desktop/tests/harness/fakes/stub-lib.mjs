@@ -53,7 +53,14 @@ function rpcSide(write, hubEvs) {
     refuse: (r) => refusals.push(r),
     // a stdin message -> the command it carries (null: none), after answering it
     take(m) {
-      if (m.method === 'initialize') { write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { proto: 1, methods: [], notifications: [] } })); return null; }
+      // BISE_HARNESS_THUMBS_DIR (test-only, the harness's; not in bise_home::env::VARS like every
+      // BISE_HARNESS_*): the cache main makes the artifact cards' pictures in (a core's
+      // thumbs_dir); unset, none is made and every card keeps its kind's icon
+      if (m.method === 'initialize') {
+        const thumbs = process.env.BISE_HARNESS_THUMBS_DIR;
+        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { proto: 1, methods: [], notifications: [], ...(thumbs ? { thumbs_dir: thumbs } : {}) } }));
+        return null;
+      }
       if (m.method === 'initialized') { ready = true; for (const l of held.splice(0)) note(l); return null; }
       if (typeof m.method !== 'string' || m.id === undefined) return null;
       const cmd = { cmd: m.method.slice(m.method.indexOf('/') + 1), ...(m.params ?? {}) };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Artifact } from '@/proto';
+import { library } from '@/proto/words_library.gen';
 import {
   atOfPath, atPath, chipsOf, countsOf, countWords, coverOf, crumbOf, folderLine, groupByFolder, itemsAt, libraryFacts, libraryOf,
   moveRows, nearestOf, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type Folder,
@@ -9,6 +10,7 @@ import { moveKeys, walkOf } from './MovePicker';
 import { dragKeys, dragPayload, draggedKeys } from './drag';
 import { folderCmd, moveCmd } from './ops';
 import { scopeRows } from './Scope';
+import { chipsThatFit } from './Search';
 import type { Item } from './model';
 
 const NOW = Date.UTC(2026, 9, 24, 18, 0);
@@ -74,9 +76,10 @@ describe('the library', () => {
   it('names paths, crumbs and the title bar', () => {
     expect(pathOf(lib, 'f-view')).toBe('desktop app / agent view');
     expect(crumbOf(lib, { at: 'folder', id: 'f-view' }).map((c) => c.name)).toEqual(['desktop app', 'agent view']);
-    expect(titlePath(lib, { at: 'folder', id: 'f-view' }, false)).toBe('artifacts / desktop app / agent view');
-    expect(titlePath(lib, { at: 'unfiled' }, false)).toBe('artifacts / unfiled');
-    expect(titlePath(lib, { at: 'all' }, true)).toBe('artifacts / search');
+    expect(titlePath(lib, { at: 'folder', id: 'f-view' }, '')).toBe('artifacts / desktop app / agent view');
+    expect(titlePath(lib, { at: 'unfiled' }, '')).toBe('artifacts / unfiled');
+    // searching: the search, whatever place was open
+    expect(titlePath(lib, { at: 'folder', id: 'f-view' }, 'dark')).toBe(`artifacts / ${library.crumb_search({ q: 'dark' })}`);
   });
 
   it('says a folder\'s line: a theme its tasks, a task its agent and the others', () => {
@@ -205,5 +208,19 @@ describe('the scope, the menus, the drag, the commands', () => {
     expect(moveCmd(two, null, lib.folderOf)).toEqual({ cmd: 'folders_move', items: [{ project: 'harness', id: 'step2', from: 'f-view' }, { project: 'harness', id: 'loose' }] });
     expect(folderCmd({ make: { name: 'offre', parent: 'f-rue' } })).toEqual({ cmd: 'folders', op: { make: { name: 'offre', parent: 'f-rue' } } });
     expect(folderCmd('undo')).toEqual({ cmd: 'folders', op: 'undo' });
+  });
+});
+
+describe('the kind chips: one row, the rest in +n', () => {
+  // widths: 'all', four chips, then the fold's; gap 4
+  const widths = [50, 60, 60, 60, 60, 40];
+  it('keeps them all when they fit, folds the last ones with room for the fold, all when nothing is measured', () => {
+    expect(chipsThatFit(500, widths, 4)).toBe(4);
+    expect(chipsThatFit(306, widths, 4)).toBe(4);
+    // 'all' + 2 chips + the fold: 50+4+60+4+60+4+40 = 222
+    expect(chipsThatFit(250, widths, 4)).toBe(2);
+    expect(chipsThatFit(60, widths, 4)).toBe(0);
+    expect(chipsThatFit(0, widths, 4)).toBe(4);
+    expect(chipsThatFit(300, [0, 0, 0, 0], 4)).toBe(2);
   });
 });

@@ -33,11 +33,12 @@ import {
 } from './folders';
 import { FolderColumn, type Editing } from './Column';
 import { FoldCrumb, useNarrow } from './Fold';
+import { sayCrumbSearch } from './crumb';
 import { MovePicker } from './MovePicker';
 import { atOf, CardMenu, FolderMenu, MergePicker, type CardAct, type FolderAct, type MenuAt } from './Menus';
 import { ProjectScope } from './Scope';
 import { KindChips, NothingFound, SearchResults } from './Search';
-import { BigTile, SmallTile } from './Tiles';
+import { BigTile, FolderListRow, SmallTile } from './Tiles';
 import { cardDrag, FLASH_MS, TOAST_MS, useBrief, useDrop } from './drag';
 import { folderCmd, moveCmd, type FolderOp } from './ops';
 import heroLight from './hero/artifacts-hero-light.png';
@@ -128,6 +129,10 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const scoped = eff === '' ? base : base.filter((it) => it.project === eff);
   const counts = countsOf(lib, base, scoped);
   const searching = parsed.words.length > 0;
+  // the title bar's path says the search while there is one ('artifacts › search · dark')
+  const searchWords = parsed.words.join(' ');
+  useEffect(() => { sayCrumbSearch(searchWords); }, [searchWords]);
+  useEffect(() => () => { sayCrumbSearch(''); }, []);
   // a folder gone (deleted, merged): back to all artifacts
   const atNow: At = at.at === 'folder' && !lib.byId.has(at.id) ? { at: 'all' } : at;
   const found = searching ? searchItems(lib, scoped, parsed.words) : [];
@@ -340,11 +345,13 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   // under 900 px the column folds into the crumb: the place's title opens it (page v7 'à 800 px')
   const fold = <FoldCrumb label={crumb.length === 0 ? library.all_artifacts : crumb.map((c) => c.name).join(' / ')} testId="artifacts.fold">{column}</FoldCrumb>;
   const current = atNow.at === 'folder' ? lib.byId.get(atNow.id) : undefined;
-  const filterRow = (
-    <div className="art-filters">
-      {chips.length > 1 && !searching && <KindChips total={here.length} chips={chips} chip={chip} onChip={setChip} testId="artifacts.kinds" />}
-      {searching && <KindChips total={found.length} chips={chips} chip={chip} onChip={setChip} testId="artifacts.kinds" />}
-      <span className="art-filters-end">
+  // the kind chips: their own row under the head (designer m_40850)
+  const chipsRow = searching
+    ? <KindChips total={found.length} chips={chips} chip={chip} onChip={setChip} testId="artifacts.kinds" />
+    : chips.length > 1 ? <KindChips total={here.length} chips={chips} chip={chip} onChip={setChip} testId="artifacts.kinds" /> : null;
+  // the scope, the search, ▦ ☰ and + add: on the head's line, at its right
+  const ends = (
+    <span className="art-filters-end">
         <ProjectScope all={base} project={eff} projectName={projectName} onPick={(p) => { setScope(p); if (typedProject !== null) setQ(parsed.words.join(' ')); }} testId="artifacts.projects" />
         <span className="art-search">
           <Field slash placeholder="search" value={q} onChange={(e) => { setQ(e.currentTarget.value); setWhole(new Set()); }} onKeyDown={searchKey} testId="artifacts.search" />
@@ -355,7 +362,6 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
         </span>
         <AddButton place={place_} testId="artifacts.add" />
       </span>
-    </div>
   );
 
   const body = (() => {
@@ -385,14 +391,24 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
           {themes.length > 0 && (
             <>
               <div className="art-sect"><span>{library.folders}</span><span className="sort">{library.recent_first}</span></div>
-              <div className="art-tiles big" data-testid="artifacts.tiles">
-                {themes.map((t) => (
-                  <BigTile key={t.id} folder={t} count={counts.get(t.id)} when={whenOf(lib.latest.get(t.id) ?? now, now)}
-                    cover={coverOf(lib, scoped, t.id)} thumb={(it) => <Thumb item={it} visible />} drop={drop} flash={flash === t.id}
-                    onOpen={() => { setAt({ at: 'folder', id: t.id }); }} onMenu={(e) => { setOver({ k: 'folder', id: t.id, at: { x: e.clientX, y: e.clientY } }); }}
-                    testId={`artifacts.tile.${t.id}`} />
-                ))}
-              </div>
+              {view === 'list' ? (
+                <div className="art-frows" data-testid="artifacts.tiles">
+                  {themes.map((t) => (
+                    <FolderListRow key={t.id} folder={t} count={counts.get(t.id)} when={whenOf(lib.latest.get(t.id) ?? now, now)} drop={drop} flash={flash === t.id}
+                      onOpen={() => { setAt({ at: 'folder', id: t.id }); }} onMenu={(e) => { setOver({ k: 'folder', id: t.id, at: { x: e.clientX, y: e.clientY } }); }}
+                      testId={`artifacts.tile.${t.id}`} />
+                  ))}
+                </div>
+              ) : (
+                <div className="art-tiles big" data-testid="artifacts.tiles">
+                  {themes.map((t) => (
+                    <BigTile key={t.id} folder={t} count={counts.get(t.id)} when={whenOf(lib.latest.get(t.id) ?? now, now)}
+                      cover={coverOf(lib, scoped, t.id)} thumb={(it) => <Thumb item={it} visible />} drop={drop} flash={flash === t.id}
+                      onOpen={() => { setAt({ at: 'folder', id: t.id }); }} onMenu={(e) => { setOver({ k: 'folder', id: t.id, at: { x: e.clientX, y: e.clientY } }); }}
+                      testId={`artifacts.tile.${t.id}`} />
+                  ))}
+                </div>
+              )}
             </>
           )}
           <div className="art-sect"><span>{eff === '' ? library.recent : library.recent_in({ project: projectName })}</span></div>
@@ -418,12 +434,18 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     return (
       <>
         {tasks.length > 0 && (
-          <div className="art-tiles small" data-testid="artifacts.tasks">
-            {tasks.filter((f) => eff === '' || (counts.get(f.id)?.n ?? 0) > 0).map((f) => (
-              <SmallTile key={f.id} folder={f} count={counts.get(f.id)} when="" drop={drop} flash={flash === f.id}
-                onOpen={() => { setAt({ at: 'folder', id: f.id }); }} onMenu={(e) => { setOver({ k: 'folder', id: f.id, at: { x: e.clientX, y: e.clientY } }); }}
-                testId={`artifacts.task.${f.id}`} />
-            ))}
+          // in the ☰ list the task folders are rows on top; in the grid, small tiles
+          <div className={view === 'list' ? 'art-frows' : 'art-tiles small'} data-testid="artifacts.tasks">
+            {tasks.filter((f) => eff === '' || (counts.get(f.id)?.n ?? 0) > 0).map((f) => {
+              const tp = {
+                folder: f, count: counts.get(f.id), drop, flash: flash === f.id,
+                onOpen: () => { setAt({ at: 'folder', id: f.id }); }, onMenu: (e: MouseEvent) => { setOver({ k: 'folder', id: f.id, at: { x: e.clientX, y: e.clientY } }); },
+                testId: `artifacts.task.${f.id}`,
+              };
+              return view === 'list'
+                ? <FolderListRow key={f.id} {...tp} when={whenOf(lib.latest.get(f.id) ?? now, now)} />
+                : <SmallTile key={f.id} {...tp} when="" />;
+            })}
           </div>
         )}
         {grid(cards, place, atNow.at !== 'recent', 'artifacts.grid')}
@@ -433,13 +455,16 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
 
   const head = searching || atNow.at === 'all' || stack !== null ? null : (
     <header className="art-head" data-testid="artifacts.head">
-      <div className="art-head-t">
-        {narrow ? fold : <span className="t">{atNow.at === 'folder' ? crumb.map((c) => c.name).join(' / ') : crumb[0]?.name}</span>}
-        {current !== undefined && (
-          <span {...tipAttrs(library.tip_folder_more)}>
-            <IconButton label={library.tip_folder_more} size="row" onClick={(e) => { setOver({ k: 'folder', id: current.id, at: atOf(e.currentTarget) }); }} testId="artifacts.head.more">···</IconButton>
-          </span>
-        )}
+      <div className="art-headline">
+        <div className="art-head-t">
+          {narrow ? fold : <span className="t">{atNow.at === 'folder' ? crumb.map((c) => c.name).join(' / ') : crumb[0]?.name}</span>}
+          {current !== undefined && (
+            <span {...tipAttrs(library.tip_folder_more)}>
+              <IconButton label={library.tip_folder_more} size="row" onClick={(e) => { setOver({ k: 'folder', id: current.id, at: atOf(e.currentTarget) }); }} testId="artifacts.head.more">···</IconButton>
+            </span>
+          )}
+        </div>
+        {ends}
       </div>
       <p className="art-head-s">
         {atNow.at === 'folder' ? folderLine(lib, atNow.id, here) : atNow.at === 'unfiled' ? library.unfiled_say : ''}
@@ -449,24 +474,34 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       </p>
     </header>
   );
+  // a stack open: its path alone, 'desktop app / agent view / agent view step 2' (the sheet has its
+  // own line and chips: no scope, search or kind chips over it); under 900 the path opens the column
+  const stackPath = stack === null ? '' : [...crumb.map((c) => c.name), stack.title].join(' / ');
   const stackHead = stack === null ? null : (
     <header className="art-head" data-testid="artifacts.head">
-      <div className="art-head-t">{narrow && fold}<span className="t">{narrow ? stack.title : [...crumb.map((c) => c.name), stack.title].join(' / ')}</span></div>
+      <div className="art-head-t">
+        {narrow ? <FoldCrumb label={stackPath} testId="artifacts.fold">{column}</FoldCrumb> : <span className="t">{stackPath}</span>}
+      </div>
     </header>
+  );
+  // all artifacts and a search have no head: the line keeps the crumb (under 900) and the ends
+  const bareHead = (
+    <div className="art-head">
+      <div className="art-headline">{narrow && <div className="art-head-t">{fold}</div>}{ends}</div>
+    </div>
   );
 
   return (
     <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} data-narrow={narrow || undefined}
-      data-title-path={titlePath(lib, atNow, searching)} onKeyDown={onKeyDown}>
+      data-title-path={titlePath(lib, atNow, searchWords)} onKeyDown={onKeyDown}>
       <div className="art-scroll" data-testid="artifacts.scroll">
         <PageHero name={archivedOn ? 'artifacts · archived' : 'artifacts'} sentence={library.say} facts={libraryFacts(lib, scoped, projectName)}
           vignette={<><img className="art-hero-still light" src={heroLight} alt="" /><img className="art-hero-still dark" src={heroDark} alt="" /></>} testId="artifacts.hero" />
         <div className="art-lib">
           {!narrow && column}
           <div className="art-main">
-            {narrow && (stackHead ?? head) === null && fold}
-            {stackHead ?? head}
-            {filterRow}
+            {stackHead ?? head ?? bareHead}
+            {stack === null && chipsRow}
             <AddDrop place={place_} testId="artifacts.drop">{body}</AddDrop>
           </div>
         </div>

@@ -32,6 +32,8 @@ export const library = {
   folder_name: "folder name",
   /** the page's crumb root and the title-bar path's first part */
   crumb_root: "artifacts",
+  /** the title bar's path while he searches, `search · dark` */
+  crumb_search: (a: { q: string | number }): string => "search · " + String(a.q),
   /** the scope's word when no project is picked */
   all_projects: "all projects",
   /** the scope menu's foot: the typed way */
@@ -64,6 +66,8 @@ export const library = {
   empty_folder_title: "empty for now",
   /** a new folder: what fills it */
   empty_folder_say: (a: { name: string | number }): string => "drag artifacts here from any folder, or press m on one. an agent you tell \"file it in " + String(a.name) + "\" puts its work here.",
+  /** an empty folder's tile, before its time: `empty · 02:25` */
+  tile_empty: "empty",
   /** nothing unfiled: the title */
   no_unfiled_title: "everything is in a folder",
   /** nothing unfiled: what fills it */
