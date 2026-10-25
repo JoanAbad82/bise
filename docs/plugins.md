@@ -429,6 +429,18 @@ tests use temp dirs.
 - `bend-harness plugins on|off <id>`: a plugin or a part (any
   `PluginId`), through `state::set`; applies at the agents' next idle
   (below).
+- The place's 'connect your tools' band draws `catalog::summary`'s
+  suggestions; each one carries a why (`PluginSuggest.whys`, the same
+  order as its titles). A Mistral connector says what bise saw in his
+  projects first (`signals`: git remote hosts, tracked file names, the
+  KEY names of `.env.example`-like files; never a value, never `.env`,
+  nothing leaves the Mac; read by the desktop core off the send path, at
+  most hourly), else its generic why (`settings.plugins_why_<tool>`, 60
+  characters at most), else its description's first sentence cut at 60
+  on a word. Connectors seen in more projects come first, then `USEFUL`.
+  Imports, waits and a project's own plugins say their own reasons
+  (`seen`). The card's tip keeps the description and where it was seen.
+  Thread word counts (the history index) are not read: architect m_41049.
 
 ### Add (the add menu, `bise plugins add`, `bise plugins marketplace`)
 

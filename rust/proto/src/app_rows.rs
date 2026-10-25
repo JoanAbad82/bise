@@ -425,7 +425,9 @@ pub struct PluginsSummary {
 
 /// One suggestion of a [`PluginsSummary`]. `n` is the full count; `ids`
 /// (PluginId strings) and `titles` (what he reads, same order) are capped
-/// at [`SUGGEST_CAP`], so `n >= ids.len() == titles.len()`.
+/// at [`SUGGEST_CAP`], so `n >= ids.len() == titles.len()`. `whys` says
+/// why bise proposes each one: empty (an older core) or `titles`' length,
+/// in the same order.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PluginSuggest {
@@ -435,10 +437,49 @@ pub struct PluginSuggest {
     pub ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub titles: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub whys: Vec<Why>,
+    /// a marketplace item's source ('openai/plugins'), the line names it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// At most this many `ids` and `titles` per [`PluginSuggest`].
 pub const SUGGEST_CAP: usize = 5;
+
+/// At most this many places in a [`Why`]'s `where`.
+pub const WHERE_CAP: usize = 3;
+
+/// Why bise proposes one suggestion, in his words (built by
+/// `bend_plugins::catalog::summary`; the window draws it, decides nothing).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Why {
+    /// the line under the title ('a SENTRY_DSN in 2 of your projects')
+    pub text: String,
+    pub source: WhySource,
+    /// where it was seen (project names), at most [`WHERE_CAP`]; only
+    /// for `seen`
+    #[serde(default, rename = "where", skip_serializing_if = "Vec::is_empty")]
+    pub places: Vec<String>,
+}
+
+/// Where a [`Why`] comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum WhySource {
+    /// something bise saw on this Mac (a project's remote, file or env
+    /// name; an app's config; a login or a server that waits)
+    Seen,
+    /// a short generic why for that tool (the words catalog)
+    Generic,
+    /// the start of its own description
+    Description,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
 
 /// What a [`PluginSuggest`] proposes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

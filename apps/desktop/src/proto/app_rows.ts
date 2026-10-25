@@ -366,9 +366,35 @@ suggest?: Array<PluginSuggest>, };
 /**
  * One suggestion of a [`PluginsSummary`]. `n` is the full count; `ids`
  * (PluginId strings) and `titles` (what he reads, same order) are capped
- * at [`SUGGEST_CAP`], so `n >= ids.len() == titles.len()`.
+ * at [`SUGGEST_CAP`], so `n >= ids.len() == titles.len()`. `whys` says
+ * why bise proposes each one: empty (an older core) or `titles`' length,
+ * in the same order.
  */
-export type PluginSuggest = { kind: SuggestKind, n: number, ids?: Array<string>, titles?: Array<string>, };
+export type PluginSuggest = { kind: SuggestKind, n: number, ids?: Array<string>, titles?: Array<string>, whys?: Array<Why>, 
+/**
+ * a marketplace item's source ('openai/plugins'), the line names it
+ */
+source?: string | null, };
+
+/**
+ * Why bise proposes one suggestion, in his words (built by
+ * `bend_plugins::catalog::summary`; the window draws it, decides nothing).
+ */
+export type Why = { 
+/**
+ * the line under the title ('a SENTRY_DSN in 2 of your projects')
+ */
+text: string, source: WhySource, 
+/**
+ * where it was seen (project names), at most [`WHERE_CAP`]; only
+ * for `seen`
+ */
+where?: Array<string>, };
+
+/**
+ * Where a [`Why`] comes from.
+ */
+export type WhySource = "seen" | "generic" | "description" | "unknown";
 
 /**
  * What a [`PluginSuggest`] proposes.

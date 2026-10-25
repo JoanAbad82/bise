@@ -14,6 +14,7 @@ import type { AppCmd, Plugin, PluginsSummary, ConnectorsProblem } from '@/proto'
 import { settings } from '@/proto/words.gen';
 import {
   bandShows,
+  cardWhy,
   controlOf,
   foundWords,
   gives,
@@ -24,6 +25,7 @@ import {
   kindWords,
   KINDS,
   lineOf,
+  marketWords,
   tagsOf,
   titleOf,
   type Hit,
@@ -282,12 +284,13 @@ export function Band({ summary, browse, projectName, onConnect, onImport, onWork
           {(mistral.ids ?? []).map((id, i) => {
             const row = byId.get(id);
             const title = (mistral.titles ?? [])[i] ?? id;
+            const why = cardWhy(mistral, i, row);
             return (
               <div key={id} className="plg-card" data-testid={`plugins.band.${id}`}>
                 {row !== undefined ? <PluginIcon row={row} /> : <span className="plg-icon row"><span className="plg-tile">{title.slice(0, 2)}</span></span>}
-                <span className="plg-card-words">
+                <span className="plg-card-words" {...(why.tip !== '' ? tipAttrs(why.tip) : {})} data-testid={`plugins.band.${id}.why`}>
                   <span className="plg-title">{title}</span>
-                  <span className="plg-dim">{row?.what ?? settings.plugins_band_popular}</span>
+                  <span className="plg-dim">{why.line}</span>
                 </span>
                 <Button size="sm" onClick={() => { onConnect(id); }} testId={`plugins.band.${id}.connect`}>{settings.plugins_connect}</Button>
               </div>
@@ -309,7 +312,7 @@ export function Band({ summary, browse, projectName, onConnect, onImport, onWork
       )}
       {market.map((m, i) => (
         <div key={i} className="plg-band-line" data-testid="plugins.band.market">
-          <span>{settings.plugins_band_market({ n: m.n })}</span>
+          <span>{marketWords(market, m)}</span>
           <Button size="sm" onClick={onBrowse} testId="plugins.band.market.browse">{settings.plugins_band_browse}</Button>
         </div>
       ))}

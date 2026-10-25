@@ -5,12 +5,22 @@
 //! its setup thread) and the marketplaces it has read. The window adds
 //! nothing up: every number it shows is here.
 //!
+//! Each suggestion says why ([`why`]): what bise saw on this Mac first
+//! (`signals::Evidence` of his projects, gathered off the send path by
+//! the caller; an app's config; a login or a server that waits), else a
+//! generic why, else its description's start. Mistral's connectors with
+//! evidence come first (seen in more projects first), then [`USEFUL`].
+//!
 //! What waits on him comes from typed fields only: a row's or a part's
 //! `login: needs`, a part's `error`; never from a status word. An off row
 //! waits on nothing (its servers don't start).
 
 use crate::add::{default_import_name, import_title, Found};
-use bise_proto::app_rows::{LoginState, Plugin, PluginKind, PluginState, PluginSuggest, PluginsSummary, SuggestKind, SUGGEST_CAP};
+use crate::signals::Evidence;
+use bise_proto::app_rows::{LoginState, Plugin, PluginKind, PluginState, PluginSuggest, PluginsSummary, SuggestKind, Why, SUGGEST_CAP};
+use bise_proto::words::settings;
+
+pub mod why;
 
 /// A marketplace he added, as its last `browse` listed it.
 pub struct Market<'a> {
@@ -27,8 +37,9 @@ pub const USEFUL: &[&str] = &[
 
 /// The list in numbers. `rows`: every row of [`super::rows`], the ones to
 /// connect (`available`) too; `found`: the other apps' MCP configs;
+/// `evidence`: what his projects name (`signals::reasons`, most first);
 /// `project`: the list is a project's (only then the 'workspace' item).
-pub fn summary(rows: &[Plugin], found: &[Found], markets: &[Market], project: bool) -> PluginsSummary {
+pub fn summary(rows: &[Plugin], found: &[Found], markets: &[Market], evidence: &[Evidence], project: bool) -> PluginsSummary {
     let listed = |p: &&Plugin| matches!(p.state, PluginState::Loaded | PluginState::Disabled);
     let on: Vec<&Plugin> = rows.iter().filter(listed).filter(|p| p.on && p.state == PluginState::Loaded).collect();
     let off = rows.iter().filter(listed).filter(|p| !(p.on && p.state == PluginState::Loaded)).count();
@@ -38,12 +49,12 @@ pub fn summary(rows: &[Plugin], found: &[Found], markets: &[Market], project: bo
     let mistral: Vec<&Plugin> = rows.iter().filter(|p| p.kind == PluginKind::Mistral).collect();
     let connected = mistral.iter().filter(|p| p.login == Some(LoginState::In) || (p.login.is_none() && p.state != PluginState::Available)).count();
     let mut to_connect: Vec<&Plugin> = mistral.iter().copied().filter(|p| p.state == PluginState::Available).collect();
-    to_connect.sort_by_key(|p| rank(p));
+    to_connect.sort_by_key(|p| (seen_rank(p, evidence), rank(p)));
 
     let mut suggest = Vec::new();
-    suggest.extend(item(SuggestKind::Login, login.len(), &login));
-    suggest.extend(item(SuggestKind::Error, error.len(), &error));
-    suggest.extend(item(SuggestKind::Mistral, to_connect.len(), &to_connect));
+    suggest.extend(item(SuggestKind::Login, login.len(), &login, |_| why::seen(settings::plugins_part_needs_login.to_string())));
+    suggest.extend(item(SuggestKind::Error, error.len(), &error, |p| why::seen(first_error(p))));
+    suggest.extend(item(SuggestKind::Mistral, to_connect.len(), &to_connect, |p| why::connector(p, evidence)));
     let to_import: Vec<&Found> = found.iter().filter(|f| f.added.is_none() && !f.servers.is_empty()).collect();
     if !to_import.is_empty() {
         let first = to_import.iter().take(SUGGEST_CAP);
@@ -51,19 +62,24 @@ pub fn summary(rows: &[Plugin], found: &[Found], markets: &[Market], project: bo
             kind: SuggestKind::Import,
             n: count(to_import.iter().map(|f| f.servers.len()).sum()),
             ids: first.clone().map(|f| default_import_name(f.from).to_string()).collect(),
-            titles: first.map(|f| import_title(f.from).to_string()).collect(),
+            titles: first.clone().map(|f| import_title(f.from).to_string()).collect(),
+            whys: first.map(|f| why::seen(settings::plugins_why_import(f.servers.len(), import_title(f.from)))).collect(),
+            source: None,
         });
     }
     if project {
         let mine: Vec<&Plugin> = rows.iter().filter(listed).filter(|p| p.scope == bise_proto::app_rows::PluginScope::Workspace).collect();
         // a skills folder brings its skills, a plugin itself
         let n: usize = mine.iter().map(|p| if p.kind == PluginKind::Skills { p.parts.len() } else { 1 }).sum();
-        suggest.extend(item(SuggestKind::Workspace, n, &mine));
+        suggest.extend(item(SuggestKind::Workspace, n, &mine, |p| {
+            why::seen(if p.kind == PluginKind::Skills { settings::plugins_why_skills(p.parts.len()) } else { settings::plugins_why_workspace.to_string() })
+        }));
     }
     let installed: Vec<&str> = rows.iter().filter(listed).map(|p| p.id.as_str()).collect();
     for m in markets {
         let new: Vec<&Plugin> = m.items.iter().filter(|p| !installed.contains(&p.id.as_str()) && !installed.contains(&p.name.as_str())).collect();
-        suggest.extend(item(SuggestKind::Marketplace, new.len(), &new));
+        let one = item(SuggestKind::Marketplace, new.len(), &new, |p| why::described(p).unwrap_or_else(|| why::seen(settings::plugins_why_market(m.source))));
+        suggest.extend(one.map(|x| PluginSuggest { source: Some(m.source.to_string()), ..x }));
     }
     PluginsSummary {
         on: count(on.len()),
@@ -85,14 +101,27 @@ fn failed(p: &Plugin) -> bool {
     p.parts.iter().any(|x| x.on && x.error.is_some())
 }
 
+/// Its server's error line, the first that failed.
+fn first_error(p: &Plugin) -> String {
+    let e = p.parts.iter().find_map(|x| if x.on { x.error.as_deref() } else { None }).unwrap_or_default();
+    e.lines().next().unwrap_or_default().to_string()
+}
+
+/// A connector's place in the evidence (seen in more projects first);
+/// none: after them all.
+fn seen_rank(p: &Plugin, evidence: &[Evidence]) -> usize {
+    let name = p.id.strip_prefix("mistral:").unwrap_or(&p.id);
+    why::evidence_of(name, evidence).and_then(|e| evidence.iter().position(|x| x.family == e.family)).unwrap_or(usize::MAX)
+}
+
 /// A connector's place in [`USEFUL`] (the others after, in order).
 fn rank(p: &Plugin) -> usize {
     let name = p.id.strip_prefix("mistral:").unwrap_or(&p.id);
     USEFUL.iter().position(|u| *u == name).unwrap_or(USEFUL.len())
 }
 
-/// One item, its ids and titles capped; none when there is nothing.
-fn item(kind: SuggestKind, n: usize, rows: &[&Plugin]) -> Option<PluginSuggest> {
+/// One item, its ids, titles and whys capped; none when there is nothing.
+fn item(kind: SuggestKind, n: usize, rows: &[&Plugin], why_of: impl Fn(&Plugin) -> Why) -> Option<PluginSuggest> {
     if n == 0 {
         return None;
     }
@@ -101,7 +130,9 @@ fn item(kind: SuggestKind, n: usize, rows: &[&Plugin]) -> Option<PluginSuggest> 
         kind,
         n: count(n),
         ids: first.clone().map(|p| p.id.clone()).collect(),
-        titles: first.map(|p| if p.title.is_empty() { p.name.clone() } else { p.title.clone() }).collect(),
+        titles: first.clone().map(|p| if p.title.is_empty() { p.name.clone() } else { p.title.clone() }).collect(),
+        whys: first.map(|p| why_of(p)).collect(),
+        source: None,
     })
 }
 

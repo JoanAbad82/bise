@@ -261,6 +261,21 @@ export function bandShows(s: PluginsSummary | null): boolean {
   return newKey(s) !== '';
 }
 
+/**
+ * A band card's why (the core's `whys[i]`, the same order as its titles): the line under the title,
+ * and its tip: the connector's full description, then where it was seen ('seen in harness, docs').
+ */
+export function cardWhy(x: PluginSuggest, i: number, row: Plugin | undefined): { readonly line: string; readonly tip: string } {
+  const why = (x.whys ?? []).at(i);
+  const where = why?.source === 'seen' && (why.where ?? []).length > 0 ? settings.plugins_why_where({ list: (why.where ?? []).join(', ') }) : '';
+  return { line: why?.text ?? '', tip: [row?.what ?? '', where].filter((s) => s !== '').join('\n') };
+}
+
+/** A marketplace line: named when it is his one marketplace ('6 new plugins in openai/plugins'). */
+export function marketWords(items: readonly PluginSuggest[], x: PluginSuggest): string {
+  return items.length === 1 && x.source != null ? settings.plugins_band_market_in({ n: x.n, source: x.source }) : settings.plugins_band_market({ n: x.n });
+}
+
 /** The band's import line: '4 MCP servers found on this Mac: Claude Code, Cursor' (the core's one import item). */
 export function foundWords(x: PluginSuggest | undefined): string | null {
   if (x === undefined) return null;

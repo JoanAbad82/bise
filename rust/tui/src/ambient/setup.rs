@@ -52,6 +52,8 @@ pub enum Done {
     /// a plugin to add built in the staging folder (a git clone may have
     /// run), its preview next (Err: why not)
     Staged { res: Result<StagedPlugin, String> },
+    /// his projects read for what they name (the band's whys)
+    Signals { inputs: Vec<bend_plugins::signals::Inputs> },
     /// a marketplace added and read: its plugins as Browse rows
     Market { source: String, res: Result<Vec<Plugin>, String> },
     /// a Mistral connector's connect said a step (`said`) or ended
@@ -115,6 +117,10 @@ pub type PluginStageFn = Box<dyn Fn(bend_plugins::add::Request, Sender<Done>)>;
 /// Adds a marketplace to his list and reads it on its own thread (a git
 /// clone), `Done::Market` at its end
 pub type MarketFn = Box<dyn Fn(String, Sender<Done>)>;
+/// (each project's folder and name, the channel): what they name
+/// (bend_plugins::signals::gather, names only) on its own thread,
+/// `Done::Signals` at its end
+pub type SignalsFn = Box<dyn Fn(Vec<(PathBuf, String)>, Sender<Done>)>;
 /// (the plugin he just added, where adds read and write, the channel):
 /// its MCP servers tried once on their own thread
 /// (bend_plugins::add::try_servers), `Done::Tried` at its end
@@ -190,6 +196,8 @@ pub struct SetupPorts {
     /// the core until his click (`plugin_preview`)
     pub plugin_stage: PluginStageFn,
     pub plugin_market: MarketFn,
+    /// what his projects name, for the band's whys (never on a send path)
+    pub signals: SignalsFn,
     /// where an add reads and writes (`add::Ctx::standard`, a temp one in
     /// tests): what a confirmed preview installs into
     pub add_ctx: Box<dyn Fn() -> bend_plugins::add::Ctx>,
@@ -644,6 +652,12 @@ pub fn live(flow: FlowFn) -> SetupPorts {
                     .map(|m| marketplace::rows(&m))
                     .map_err(|e| e.to_string());
                 let _ = tx.send(Done::Market { source: url, res });
+            });
+        }),
+        signals: Box::new(|projects, tx| {
+            std::thread::spawn(move || {
+                let inputs = projects.iter().map(|(path, name)| bend_plugins::signals::gather(path, name)).collect();
+                let _ = tx.send(Done::Signals { inputs });
             });
         }),
         add_ctx: Box::new(bend_plugins::add::Ctx::standard),

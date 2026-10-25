@@ -79,23 +79,26 @@ pub fn logged_in(t: &Target, secrets: &Path) -> bool {
 }
 
 /// The popup's words: `mcp.linear.app · needs a login`, `… · logged in
-/// · 23 tools`, `… · not logged in`.
+/// · 23 tools`, `… · not logged in` (the words: the catalog's
+/// `settings.plugins_*`).
 pub fn state(t: &Target, secrets: &Path, status_dir: &Path) -> String {
+    use bise_proto::words::settings;
     let last = status::read(status_dir, &t.plugin, &t.server.id);
     let host = t.server.host();
-    if last.as_ref().is_some_and(|s| s.login) {
-        return format!("{} · needs a login", host);
-    }
-    if logged_in(t, secrets) {
-        return match last.map(|s| s.tools) {
-            Some(Ok(n)) => format!("{} · logged in · {} tool{}", host, n, if n == 1 { "" } else { "s" }),
-            _ => format!("{} · logged in", host),
-        };
-    }
-    match last.map(|s| s.tools) {
-        Some(Ok(n)) => format!("{} · connected · {} tool{}", host, n, if n == 1 { "" } else { "s" }),
-        _ => format!("{} · not logged in", host),
-    }
+    let said = if last.as_ref().is_some_and(|s| s.login) {
+        settings::plugins_part_needs_login.to_string()
+    } else if logged_in(t, secrets) {
+        match last.map(|s| s.tools) {
+            Some(Ok(n)) => settings::plugins_logged_in_tools(n),
+            _ => settings::plugins_logged_in.to_string(),
+        }
+    } else {
+        match last.map(|s| s.tools) {
+            Some(Ok(n)) => settings::plugins_connected(n),
+            _ => settings::plugins_not_logged_in.to_string(),
+        }
+    };
+    format!("{host} · {said}")
 }
 
 /// Log in to `t` through the browser, then connect and count its tools

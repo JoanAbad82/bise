@@ -346,8 +346,6 @@ crate::words! { settings:
     plugins_band_sub = "each one you connect, your agents reach in every project. a write still asks you first";
     /// band: a connector's button
     plugins_connect = "connect";
-    /// band: a connector with nothing more to say
-    plugins_band_popular = "popular at Mistral";
     /// band: the MCP servers found in other apps (`list`: "Claude Code 2, Cursor 1")
     plugins_band_found(n, list) = one "{n} MCP server found on this Mac: {list}" | "{n} MCP servers found on this Mac: {list}";
     /// band: the import button
@@ -356,8 +354,65 @@ crate::words! { settings:
     plugins_band_workspace(project, n) = "{project} brings {n} of its own";
     /// band: see the project's own ones
     plugins_band_see = "see them";
-    /// band: a marketplace's plugins not added yet
+    /// band: the plugins not added yet of several marketplaces
     plugins_band_market(n) = one "{n} new plugin in your marketplaces" | "{n} new plugins in your marketplaces";
+    /// band: the plugins not added yet of his one marketplace (source: 'openai/plugins')
+    plugins_band_market_in(n, source) = one "{n} new plugin in {source}" | "{n} new plugins in {source}";
+    /// band: why a connector, seen in his projects (thing: 'SENTRY_DSN',
+    /// 'a github.com remote', '.sentryclirc'; n: the projects it is in)
+    plugins_why_seen(thing, n) = "{thing} in {n} of your projects";
+    /// band: why a connector, seen in one of his projects
+    plugins_why_seen_one(thing) = "{thing} in one of your projects";
+    /// band: the thing of a seen why, a git remote (host: 'github.com')
+    plugins_why_remote(host) = "a {host} remote";
+    /// band: a seen why's tip, where it was seen (list: 'harness, ai-docs')
+    plugins_why_where(list) = "seen in {list}";
+    /// band: why import an app's servers
+    plugins_why_import(n, app) = one "you set up {n} server in {app}" | "you set up {n} servers in {app}";
+    /// band: why this project's skills folder
+    plugins_why_skills(n) = one "this project has {n} skill" | "this project has {n} skills";
+    /// band: why this project's own plugin
+    plugins_why_workspace = "set up in this project";
+    /// band: why a connector that has nothing more to say
+    plugins_why_mistral = "a Mistral connector";
+    /// band: why a marketplace's plugin, when it says nothing of itself
+    plugins_why_market(source) = "new in {source}";
+    /// band: why Linear (generic: 60 characters at most, a verb first)
+    plugins_why_linear = "track and update your issues and projects";
+    /// band: why GitHub
+    plugins_why_github = "read issues, pull requests and code";
+    /// band: why GitLab
+    plugins_why_gitlab = "read issues, merge requests and pipelines";
+    /// band: why Atlassian
+    plugins_why_atlassian = "search and update Jira issues and Confluence pages";
+    /// band: why Jira
+    plugins_why_jira = "track, search and update your Jira issues";
+    /// band: why Confluence
+    plugins_why_confluence = "search and read your Confluence pages";
+    /// band: why Notion
+    plugins_why_notion = "search, read and write your Notion pages";
+    /// band: why Slack
+    plugins_why_slack = "read, search and post in your channels";
+    /// band: why Gmail
+    plugins_why_gmail = "read, search and draft your mail";
+    /// band: why Outlook
+    plugins_why_outlook = "read, search and draft your Outlook mail";
+    /// band: why Google Drive
+    plugins_why_drive = "find and read your docs, sheets and files";
+    /// band: why a calendar (Google, Outlook)
+    plugins_why_calendar = "see your events and find a free slot";
+    /// band: why Figma
+    plugins_why_figma = "read your designs and their comments";
+    /// band: why Sentry
+    plugins_why_sentry = "look into your production errors";
+    /// band: why Datadog
+    plugins_why_datadog = "query your logs, metrics and monitors";
+    /// band: why Airtable
+    plugins_why_airtable = "read and update your bases";
+    /// band: why HubSpot
+    plugins_why_hubspot = "look up contacts, companies and deals";
+    /// band: why Stripe
+    plugins_why_stripe = "look up customers, payments and subscriptions";
     /// band: browse them
     plugins_band_browse = "browse";
     /// place: the tabs
@@ -416,8 +471,9 @@ crate::words! { settings:
     plugins_tools_fold(n) = one "▸ {n} tool" | "▸ {n} tools";
     /// plugin page: an MCP part's tools, open
     plugins_tools_unfold(n) = one "▾ {n} tool" | "▾ {n} tools";
-    /// plugin page: a prompt to try, its tip
-    plugins_try_tip = "puts it in main's composer; you send it or change it";
+    /// plugin page: a prompt to try, its tip (the window's: main is 'bise'
+    /// there, designer m_41122)
+    plugins_try_tip = "puts it in bise's composer; you send it or change it";
     /// plugin page: remove it
     plugins_remove = "remove";
     /// remove: the question

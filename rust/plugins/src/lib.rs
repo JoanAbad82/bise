@@ -28,6 +28,9 @@
 //! - `remove`: a plugin he added removed, with its secrets, logins,
 //!   statuses and on/off ids;
 //! - `marketplace`: his plugin marketplaces and what they offer;
+//! - `signals`: what his projects name (remotes, file names, env example
+//!   keys; names only), the evidence the 'connect your tools' band ranks
+//!   and says why by;
 //! - `secrets`: the values of an MCP server's `${VAR}` he typed in.
 
 // the tests run on a temp HOME, never the user's (bise_home::test_home)
@@ -50,6 +53,7 @@ pub mod remove;
 pub mod report;
 pub mod resolve;
 pub mod secrets;
+pub mod signals;
 pub mod skills;
 pub mod state;
 pub mod status;

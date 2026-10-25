@@ -47,6 +47,10 @@ struct World {
     /// marketplaces read, and where a confirmed add installs (a temp dir)
     staging: Option<std::sync::mpsc::Sender<Done>>,
     markets: Vec<String>,
+    /// the projects each signals read asked for (the test ends it with
+    /// its own `Done::Signals`)
+    signals: Vec<Vec<(PathBuf, String)>>,
+    signaling: Option<std::sync::mpsc::Sender<Done>>,
     /// a connect's channel, and the pending names each rows call saw
     connecting: Option<std::sync::mpsc::Sender<Done>>,
     pending_seen: Vec<Vec<String>>,
@@ -74,6 +78,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (x, y, z) = (w.clone(), w.clone(), w.clone());
     let mf = w.clone();
+    let sg = w.clone();
     let (ad, am, ac, pc) = (w.clone(), w.clone(), w.clone(), w.clone());
     let (kn, ks, pt) = (w.clone(), w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
@@ -212,6 +217,11 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             let mut w = am.borrow_mut();
             w.markets.push(url);
             w.staging = Some(tx);
+        }),
+        signals: Box::new(move |projects, tx| {
+            let mut w = sg.borrow_mut();
+            w.signals.push(projects);
+            w.signaling = Some(tx);
         }),
         add_ctx: Box::new(move || add_ctx(&ac.borrow().add_root)),
         // no server runs here: the test ends the try itself (Done::Tried)
@@ -532,6 +542,35 @@ fn the_window_lists_toggles_and_logs_in_to_plugins() {
     let out = t.take();
     assert!(evs(&out, "error")[0]["text"].as_str().is_some_and(|e| e.contains("linear: the browser closed")));
     assert_eq!(evs(&out, "plugins")[0]["items"][0]["parts"][0]["login"], "needs", "no longer pending");
+}
+
+/// The band's whys (architect m_41049): his projects (never home) are read
+/// off the loop, once until [`SIGNALS_EVERY`]; their end ranks and says
+/// the summary again, a connector seen in a project first with where.
+#[test]
+fn the_projects_signals_are_read_once_off_the_loop_then_say_why() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"plugins"}"#);
+    let out = t.take();
+    let mistral = |out: &[Value]| -> Value {
+        let s = &evs(out, "plugins_summary")[0]["summary"]["suggest"];
+        s.as_array().unwrap().iter().find(|x| x["kind"] == "mistral").cloned().unwrap()
+    };
+    assert_eq!(mistral(&out)["whys"][0]["source"], "generic");
+    app(&mut t, r#"{"cmd":"plugins"}"#);
+    t.take();
+    let asked = w.borrow().signals.clone();
+    assert_eq!(asked, vec![vec![(PathBuf::from("/p/shop"), "shop".to_string()), (PathBuf::from("/p/docs"), "docs".to_string())]], "once, home left out");
+    let tx = w.borrow_mut().signaling.take().unwrap();
+    let shop = bend_plugins::signals::Inputs { project: "shop".into(), env_keys: vec!["NOTION_TOKEN".into()], ..Default::default() };
+    tx.send(Done::Signals { inputs: vec![shop] }).unwrap();
+    t.until(|o| !evs(o, "plugins_summary").is_empty());
+    let out = t.take();
+    let s = &mistral(&out);
+    assert_eq!(s["ids"][0], "mistral:notion");
+    assert_eq!(s["whys"][0]["text"], bise_proto::words::settings::plugins_why_seen_one("NOTION_TOKEN"));
+    assert_eq!(s["whys"][0]["where"][0], "shop");
 }
 
 /// The add menu (plug-add's add::Held in the core): an item staged off

@@ -46,10 +46,22 @@ describe('the plugins place', () => {
     const { sent } = place();
     expect(screen.getByTestId('plugins.counts').textContent).toBe('16 on · 2 off · 3 need you');
     expect(screen.getByTestId('plugins.band.count').textContent).toBe('3 of 10 connected');
-    expect(screen.getByTestId('plugins.band.mistral:linear').textContent).toContain('issues, projects and cycles');
     expect(screen.getByTestId('plugins.band.import').textContent).toContain('3 MCP servers found on this Mac: Claude Code, Cursor');
     fireEvent.click(screen.getByTestId('plugins.band.mistral:linear.connect'));
     expect(sent).toEqual([{ cmd: 'plugin_connect', id: 'mistral:linear' }]);
+  });
+
+  it("says why each card: the core's why under the title, the description and where it was seen in its tip", () => {
+    place();
+    const sentry = screen.getByTestId('plugins.band.mistral:sentry.why');
+    expect(sentry.textContent).toBe('SentrySENTRY_DSN in 3 of your projects');
+    expect(sentry.getAttribute('data-tip')).toBe('seen in harness, ai-docs, bend-lab');
+    const linear = screen.getByTestId('plugins.band.mistral:linear.why');
+    expect(linear.textContent).toBe('Lineartrack and update your issues and projects');
+    // the description left the card for its tip; a generic why says no 'seen in'
+    expect(linear.getAttribute('data-tip')).toBe('issues, projects and cycles');
+    // his one marketplace is named
+    expect(screen.getByTestId('plugins.band.market').textContent).toContain('2 new plugins in openai/plugins');
   });
 
   it("gives each row its one control: always on, set up, connect, log in, details + switch", () => {

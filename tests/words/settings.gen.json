@@ -2293,10 +2293,13 @@
     "one": "{n} new plugin in your marketplaces",
     "text": "{n} new plugins in your marketplaces"
   },
-  "settings.plugins_band_popular": {
-    "args": [],
-    "one": null,
-    "text": "popular at Mistral"
+  "settings.plugins_band_market_in": {
+    "args": [
+      "n",
+      "source"
+    ],
+    "one": "{n} new plugin in {source}",
+    "text": "{n} new plugins in {source}"
   },
   "settings.plugins_band_see": {
     "args": [],
@@ -3328,7 +3331,7 @@
   "settings.plugins_try_tip": {
     "args": [],
     "one": null,
-    "text": "puts it in main's composer; you send it or change it"
+    "text": "puts it in bise's composer; you send it or change it"
   },
   "settings.plugins_unchanged": {
     "args": [],
@@ -3373,6 +3376,157 @@
     "args": [],
     "one": null,
     "text": "your agents"
+  },
+  "settings.plugins_why_airtable": {
+    "args": [],
+    "one": null,
+    "text": "read and update your bases"
+  },
+  "settings.plugins_why_atlassian": {
+    "args": [],
+    "one": null,
+    "text": "search and update Jira issues and Confluence pages"
+  },
+  "settings.plugins_why_calendar": {
+    "args": [],
+    "one": null,
+    "text": "see your events and find a free slot"
+  },
+  "settings.plugins_why_confluence": {
+    "args": [],
+    "one": null,
+    "text": "search and read your Confluence pages"
+  },
+  "settings.plugins_why_datadog": {
+    "args": [],
+    "one": null,
+    "text": "query your logs, metrics and monitors"
+  },
+  "settings.plugins_why_drive": {
+    "args": [],
+    "one": null,
+    "text": "find and read your docs, sheets and files"
+  },
+  "settings.plugins_why_figma": {
+    "args": [],
+    "one": null,
+    "text": "read your designs and their comments"
+  },
+  "settings.plugins_why_github": {
+    "args": [],
+    "one": null,
+    "text": "read issues, pull requests and code"
+  },
+  "settings.plugins_why_gitlab": {
+    "args": [],
+    "one": null,
+    "text": "read issues, merge requests and pipelines"
+  },
+  "settings.plugins_why_gmail": {
+    "args": [],
+    "one": null,
+    "text": "read, search and draft your mail"
+  },
+  "settings.plugins_why_hubspot": {
+    "args": [],
+    "one": null,
+    "text": "look up contacts, companies and deals"
+  },
+  "settings.plugins_why_import": {
+    "args": [
+      "n",
+      "app"
+    ],
+    "one": "you set up {n} server in {app}",
+    "text": "you set up {n} servers in {app}"
+  },
+  "settings.plugins_why_jira": {
+    "args": [],
+    "one": null,
+    "text": "track, search and update your Jira issues"
+  },
+  "settings.plugins_why_linear": {
+    "args": [],
+    "one": null,
+    "text": "track and update your issues and projects"
+  },
+  "settings.plugins_why_market": {
+    "args": [
+      "source"
+    ],
+    "one": null,
+    "text": "new in {source}"
+  },
+  "settings.plugins_why_mistral": {
+    "args": [],
+    "one": null,
+    "text": "a Mistral connector"
+  },
+  "settings.plugins_why_notion": {
+    "args": [],
+    "one": null,
+    "text": "search, read and write your Notion pages"
+  },
+  "settings.plugins_why_outlook": {
+    "args": [],
+    "one": null,
+    "text": "read, search and draft your Outlook mail"
+  },
+  "settings.plugins_why_remote": {
+    "args": [
+      "host"
+    ],
+    "one": null,
+    "text": "a {host} remote"
+  },
+  "settings.plugins_why_seen": {
+    "args": [
+      "thing",
+      "n"
+    ],
+    "one": null,
+    "text": "{thing} in {n} of your projects"
+  },
+  "settings.plugins_why_seen_one": {
+    "args": [
+      "thing"
+    ],
+    "one": null,
+    "text": "{thing} in one of your projects"
+  },
+  "settings.plugins_why_sentry": {
+    "args": [],
+    "one": null,
+    "text": "look into your production errors"
+  },
+  "settings.plugins_why_skills": {
+    "args": [
+      "n"
+    ],
+    "one": "this project has {n} skill",
+    "text": "this project has {n} skills"
+  },
+  "settings.plugins_why_slack": {
+    "args": [],
+    "one": null,
+    "text": "read, search and post in your channels"
+  },
+  "settings.plugins_why_stripe": {
+    "args": [],
+    "one": null,
+    "text": "look up customers, payments and subscriptions"
+  },
+  "settings.plugins_why_where": {
+    "args": [
+      "list"
+    ],
+    "one": null,
+    "text": "seen in {list}"
+  },
+  "settings.plugins_why_workspace": {
+    "args": [],
+    "one": null,
+    "text": "set up in this project"
   },
   "settings.privacy_add": {
     "args": [],

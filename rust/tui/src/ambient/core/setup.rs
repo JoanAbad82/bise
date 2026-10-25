@@ -26,6 +26,10 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Instant;
 
+/// How often his projects are read again for what they name (the band's
+/// whys; architect m_41049).
+pub(crate) const SIGNALS_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
+
 /// A check's end: what it found, and how long the call took (ms).
 pub(crate) type CheckEnd<'a> = (Result<&'a crate::firstkey::Works, &'a crate::firstkey::Failed>, u64);
 
@@ -103,6 +107,18 @@ struct CuLive {
 }
 
 /// The poll has run long enough without a `check`.
+/// His projects read for what they name (the band's whys): the first
+/// time, then at most every [`SIGNALS_EVERY`]; on the port's thread, the
+/// summary meanwhile from the last evidence.
+fn ask_signals(s: &mut Setup, now: Instant) {
+    if s.signals_at.is_some_and(|t| now.saturating_duration_since(t) < SIGNALS_EVERY) {
+        return;
+    }
+    s.signals_at = Some(now);
+    let projects = (s.ports.rows)().into_iter().filter(|r| !r.home).map(|r| (r.path, r.name)).collect();
+    (s.ports.signals)(projects, s.tx.clone());
+}
+
 pub(crate) fn cu_idle(last_check: Instant, now: Instant) -> bool {
     now.saturating_duration_since(last_check) >= CU_IDLE
 }
@@ -122,6 +138,11 @@ pub(crate) struct Setup {
     /// the other apps' MCP configs (`add::found`): read once with the rows,
     /// again after a refresh or an add, never at each send
     found: Option<Vec<bend_plugins::add::Found>>,
+    /// what his projects name (`signals::reasons`, the band's whys) and
+    /// when they were last asked for: read again at most every
+    /// [`SIGNALS_EVERY`], on the port's thread, never at a send
+    evidence: Vec<bend_plugins::signals::Evidence>,
+    signals_at: Option<Instant>,
     /// the marketplaces read so far, by source (their last `browse`)
     markets: Vec<(String, Vec<bise_proto::app_rows::Plugin>)>,
     /// the last `plugins_summary` sent, per project (only a change goes out)
@@ -170,7 +191,7 @@ impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), staged: Default::default(), found: None, markets: Vec::new(), summaries: Default::default(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), staged: Default::default(), found: None, evidence: Vec::new(), signals_at: None, markets: Vec::new(), summaries: Default::default(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
     }
 
     /// R8: his `/model <model>` in `agent`'s view, before it goes to the
@@ -651,9 +672,10 @@ impl Core {
         if s.found.is_none() {
             s.found = Some(bend_plugins::add::found(&(s.ports.add_ctx)()));
         }
+        ask_signals(s, Instant::now());
         let markets: Vec<bend_plugins::catalog::Market> =
             s.markets.iter().map(|(source, items)| bend_plugins::catalog::Market { source, items }).collect();
-        let summary = bend_plugins::catalog::summary(rows, s.found.as_deref().unwrap_or_default(), &markets, project.is_some());
+        let summary = bend_plugins::catalog::summary(rows, s.found.as_deref().unwrap_or_default(), &markets, &s.evidence, project.is_some());
         if s.summaries.get(&project) == Some(&summary) {
             return;
         }
@@ -771,6 +793,19 @@ impl Core {
                         self.setup_error("plugins_refresh", &e);
                     }
                     let _ = self.emit_plugins(project);
+                }
+                Done::Signals { inputs } => {
+                    let projects: Vec<Option<String>> = match self.setup.as_mut() {
+                        Some(s) => {
+                            s.evidence = bend_plugins::signals::reasons(&inputs);
+                            s.summaries.keys().cloned().collect()
+                        }
+                        None => Vec::new(),
+                    };
+                    // each summary sent so far, ranked and said again
+                    for p in projects {
+                        self.emit_summary_of(p);
+                    }
                 }
                 Done::Market { source, res } => match res {
                     Ok(items) => {
