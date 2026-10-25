@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
 import { FOLLOW_ZOOM } from '@/bims/focus';
-import { BEAT_EVERY_MS, BEAT_JITTER_MS, beatDelay, GAP_MS, happenedOf, leadZoom, pickBeat, RECENT_MS, seenOf, shotOf, stillRecent, type Happened } from './camera';
+import { BEAT_EVERY_MS, BEAT_JITTER_MS, BEAT_SOON_MS, beatDelay, GAP_MS, happenedOf, leadZoom, pickBeat, RECENT_MS, seenOf, shotOf, stillRecent, tickSoon, type Happened } from './camera';
 
 const agent = (name: string, o: Partial<Agent> = {}): Agent => ({ name, main: false, status: 'working', archived: false, waits: 0, ...o }) as unknown as Agent;
 
@@ -47,6 +47,15 @@ describe('the beat picker', () => {
     expect(pickBeat([h('a', 'asks', last.at - 1)], now, last)).toBeNull();
     expect(pickBeat([h('a', 'asks', now - 1000)], now, last)?.agent).toBe('a');
     expect(pickBeat([h('a', 'state', now - 100), h('b', 'state', now - 1000)], now, last)?.agent).toBe('b');
+  });
+  it('something just happened: the next tick comes within 2 s, or 20 s after the last beat, never later than planned', () => {
+    expect(tickSoon(100_000, 130_000, null)).toBe(100_000 + BEAT_SOON_MS);
+    expect(tickSoon(100_000, 130_000, { agent: 'a', at: 95_000 })).toBe(95_000 + GAP_MS);
+    expect(tickSoon(100_000, 101_000, null)).toBe(101_000);
+    // an ask right after a beat still gets its own within the 20 s it stays recent
+    const at = tickSoon(100_000, 140_000, { agent: 'a', at: 100_000 });
+    expect(at - 100_000).toBeLessThanOrEqual(RECENT_MS);
+    expect(pickBeat([h('b', 'asks', 100_000)], at, { agent: 'a', at: 100_000 })?.agent).toBe('b');
   });
   it('every 30 s ± 8', () => {
     expect(beatDelay(0)).toBe(BEAT_EVERY_MS - BEAT_JITTER_MS);

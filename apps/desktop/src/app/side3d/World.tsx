@@ -17,7 +17,7 @@ import { parts as bimsParts } from '@/bims/feed';
 import { mapOf, mapPrefKey, type MapId } from '@/bims/maps/ids';
 import { layoutOf } from '@/bims/maps';
 import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
-import { beatDelay, EASE_MS, happenedOf, HOLD_MS, leadZoom, pickBeat, seenOf, shotOf, stillRecent, TALK_HOLD_MS, type Happened, type LastBeat, type Seen, type Shot } from './camera';
+import { beatDelay, EASE_MS, happenedOf, HOLD_MS, leadZoom, pickBeat, seenOf, shotOf, stillRecent, TALK_HOLD_MS, tickSoon, type Happened, type LastBeat, type Seen, type Shot } from './camera';
 import { useTalkingTo } from '@/composer/talking';
 import { speechOf, speechWord } from './model';
 import type { Agent, Card } from '@/proto';
@@ -99,11 +99,15 @@ function useWorldCamera(agents: readonly Agent[], project: string, lead: string 
   const talking = useHeld(useTalkingTo() === project, TALK_HOLD_MS);
   const seen = useRef<ReadonlyMap<string, Seen> | null>(null);
   const happened = useRef<Happened[]>([]);
+  // the clock's 'something just happened': its next tick pulled in (camera.ts tickSoon)
+  const soon = useRef<() => void>(() => undefined);
   useEffect(() => {
     const next = seenOf(agents);
     const now = Date.now();
-    if (seen.current !== null) happened.current = [...stillRecent(happened.current, now), ...happenedOf(seen.current, next, now)];
+    const fresh = seen.current === null ? [] : happenedOf(seen.current, next, now);
+    happened.current = [...stillRecent(happened.current, now), ...fresh];
     seen.current = next;
+    if (fresh.length > 0) soon.current();
   }, [agents]);
   const [beat, setBeat] = useState<string | null>(null);
   const last = useRef<LastBeat | null>(null);
@@ -111,8 +115,15 @@ function useWorldCamera(agents: readonly Agent[], project: string, lead: string 
   useEffect(() => {
     if (stopped) return;
     let t: ReturnType<typeof setTimeout> | undefined;
+    // when the next tick comes; null while a beat plays (its end arms the clock again)
+    let tickAt: number | null = null;
+    const armAt = (at: number) => {
+      if (t !== undefined) clearTimeout(t);
+      tickAt = at;
+      t = setTimeout(fire, Math.max(0, at - Date.now()));
+    };
     const arm = () => {
-      t = setTimeout(fire, beatDelay(Math.random()));
+      armAt(Date.now() + beatDelay(Math.random()));
     };
     const fire = () => {
       const now = Date.now();
@@ -122,12 +133,18 @@ function useWorldCamera(agents: readonly Agent[], project: string, lead: string 
         return;
       }
       last.current = { agent: b.agent, at: now };
+      tickAt = null;
       setBeat(b.agent);
       // its ease in and its hold, then back to the lead (the follow camera's own ease)
       t = setTimeout(() => {
         setBeat(null);
         arm();
       }, EASE_MS + HOLD_MS);
+    };
+    soon.current = () => {
+      if (tickAt === null) return;
+      const at = tickSoon(Date.now(), tickAt, last.current);
+      if (at < tickAt) armAt(at);
     };
     // back from a hover or a card: a beat cut short goes back to the lead now, the clock starts again
     t = setTimeout(() => {

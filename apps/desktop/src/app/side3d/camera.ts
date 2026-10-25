@@ -84,6 +84,18 @@ export function stillRecent(happened: readonly Happened[], now: number): Happene
   return happened.filter((h) => now - h.at <= RECENT_MS);
 }
 
+/** something just happened: its beat comes this soon at the soonest (ui-review m_43571: a tick 30 s ± 8 away missed the 20 s an ask stays recent) */
+export const BEAT_SOON_MS = 2_000;
+
+/**
+ * The next tick when something just happened at `now`: pulled in to BEAT_SOON_MS, or to GAP_MS
+ * after the last beat if that is later (still within RECENT_MS of it), never pushed back. Pure.
+ */
+export function tickSoon(now: number, tickAt: number, last: LastBeat | null): number {
+  const soon = Math.max(now + BEAT_SOON_MS, last === null ? 0 : last.at + GAP_MS);
+  return Math.min(tickAt, soon);
+}
+
 /** The wait before the next beat, from a draw r in [0, 1): 30 s ± 8. Pure. */
 export function beatDelay(r: number): number {
   return Math.round(BEAT_EVERY_MS + (2 * r - 1) * BEAT_JITTER_MS);
