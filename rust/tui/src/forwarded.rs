@@ -63,6 +63,8 @@ pub(crate) fn rows(
     let bar = Span::styled("│ ", fa);
     let mut body = crate::render::hung_rows(&bar, &bar, original_lines(f.original, d, room), room);
     match open {
+        // nothing folds when it fits its closed rows: no lone `▾` (designer m_41711)
+        true if body.len() <= CLOSED_ROWS => {}
         true => body.push(Line::from(vec![bar.clone(), Span::styled(glyph(G_OPEN), d)])),
         false if body.len() > CLOSED_ROWS => {
             body.truncate(CLOSED_ROWS);

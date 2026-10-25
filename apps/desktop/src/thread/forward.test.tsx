@@ -52,7 +52,8 @@ describe('a forwarded message', () => {
     expect(v.getByTestId('thread.from.8.text').textContent).toContain('please look');
     const orig = v.getByTestId('thread.from.8.fwd.original');
     expect(orig.textContent).toContain('❝ the quoted line');
-    expect(orig.textContent).toContain('look at this');
+    // each chip keeps its place in the words, one space apart (designer m_41661)
+    expect(v.getByTestId('thread.from.8.fwd.words').textContent).toContain(`look at this ▣ ${thread.image_n({ n: 1 })} and ▯ notes.csv ▤ 1`);
     expect(v.getByTestId('thread.fwd.8.image.1')).toBeTruthy();
     expect(v.getByTestId('thread.fwd.8.paste.1')).toBeTruthy();
     const all = v.container.textContent ?? '';

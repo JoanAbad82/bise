@@ -16,6 +16,8 @@ import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
 import { YouBubble } from './rows-messages';
 import { PartChips, partImageWords } from './YouBody';
+import { labelN } from '@/composer/partsback';
+import type { Part } from '@/proto';
 import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
 import { drawnParts, pageAnswer, pageOf, youView } from './parts';
@@ -370,7 +372,7 @@ export function AgentNote({ pos, from, to, text: said, parts, ctx, testId, tag, 
     setOpen((o) => !o);
   };
   return (
-    <div className="th-note" data-open={open || undefined} data-testid={testId} data-pos={pos}>
+    <div className="th-note" data-open={open || undefined} data-fwd={fwd !== null || undefined} data-testid={testId} data-pos={pos}>
       {(chip || tag !== undefined) && (
         <div className="th-note-head">
           {chip && (
@@ -423,8 +425,10 @@ export function AgentNote({ pos, from, to, text: said, parts, ctx, testId, tag, 
  */
 function ForwardBody({ f, to, open, onToggle, ctx, pos, testId }: { f: Forward; to: string; open: boolean; onToggle: () => void; ctx: RowCtx; pos: number; testId: string }) {
   const view = youView(f.original);
-  const lines = view.words.split('\n').filter((l) => l.trim() !== '');
-  const more = lines.length > NOTE_LINES || view.words.length > NOTE_CHARS;
+  const words = foldedWords(f.original);
+  const lines = words.split('\n').filter((l) => l.trim() !== '');
+  const more = lines.length > NOTE_LINES || words.length > NOTE_CHARS;
+  const id = `thread.fwd.${String(pos)}`;
   return (
     <div className="th-fwd" data-testid={`${testId}.fwd`}>
       <div className="th-fwd-line" title={forwardTip(f.fwd, to)} data-testid={`${testId}.fwd.line`}>
@@ -437,10 +441,12 @@ function ForwardBody({ f, to, open, onToggle, ctx, pos, testId }: { f: Forward; 
             <span className="th-note-faint">{`\u00a0· ${shownName(q.from)}`}</span>
           </div>
         ))}
-        {view.words !== '' &&
+        {/* its words with each chip's token in place ('▣ image 1'), open or folded alike (designer
+            m_41711): never the composer's inline chip, whose thumb is his own bubble's */}
+        {words !== '' &&
           (open ? (
             <div className="th-fwd-words" data-testid={`${testId}.fwd.words`}>
-              <Markdown text={view.words} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
+              <Markdown text={words} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
             </div>
           ) : (
             <div className="th-fwd-words folded" data-testid={`${testId}.fwd.words`}>
@@ -452,10 +458,43 @@ function ForwardBody({ f, to, open, onToggle, ctx, pos, testId }: { f: Forward; 
               )}
             </div>
           ))}
-        <PartChips view={view} ctx={ctx} id={`thread.fwd.${String(pos)}`} named />
+        <PartChips view={view} ctx={ctx} id={id} named />
       </div>
     </div>
   );
+}
+
+/**
+ * A forward's original folded, on its lines: its words with each chip's token where it stood ('▣
+ * image 1', '▯ notes.csv', '▤ 1', a numbered quote's '❝ 2'), one space apart, as his bubble places
+ * them (designer m_41661). Pure.
+ */
+export function foldedWords(parts: readonly Part[]): string {
+  let images = 0;
+  const token = (p: Part): string => {
+    switch (p.kind) {
+      case 'text':
+        return p.text;
+      case 'image':
+        images += 1;
+        return ` ▣ ${partImageWords(p.name, labelN(p.name) ?? images)} `;
+      case 'paste':
+        return ` ▤ ${String(p.n)} `;
+      case 'file':
+        return (p.name ?? '') === '' ? '' : ` ▯ ${p.path.split('/').at(-1) ?? p.path} `;
+      case 'quote':
+        return p.n == null ? '' : ` ❝ ${String(p.n)} `;
+      default:
+        return '';
+    }
+  };
+  return parts
+    .map(token)
+    .join('')
+    .replace(/[ \t]{2,}/gu, ' ')
+    .replace(/[ \t]+\n/gu, '\n')
+    .replace(/\n[ \t]+/gu, '\n')
+    .trim();
 }
 
 /** A card entry right after the ask it answers (same words): the ask carries the question. Pure. */

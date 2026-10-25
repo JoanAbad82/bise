@@ -37,9 +37,10 @@ pub(crate) fn spans(line: &str, st: Style) -> Vec<Span<'static>> {
     }
 }
 
-/// A chip's first span: its image or file glyph.
+/// A chip's first span: its image, file or paste glyph (a forward's
+/// original draws its pastes' chips, designer m_41661).
 fn is_chip(s: &Span) -> bool {
-    [crate::theme::G_IMAGE, crate::theme::glyph(crate::theme::G_FILE), crate::theme::G_FILE].iter().any(|g| s.content.starts_with(g))
+    [crate::theme::G_IMAGE, crate::theme::glyph(crate::theme::G_FILE), crate::theme::G_FILE, crate::theme::G_PASTE].iter().any(|g| s.content.starts_with(g))
 }
 
 /// One space before a chip glued to what comes before it: `sb send

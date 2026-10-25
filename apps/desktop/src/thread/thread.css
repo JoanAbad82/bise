@@ -2011,6 +2011,14 @@
 .th-fwd-words {
   overflow-wrap: anywhere;
 }
+/* open, its words stay text-2, the original's */
+.th-fwd-orig .th-md {
+  color: var(--c-text-2);
+}
+/* a forward's note is the sender's own words: ink, folded or open (designer m_41711) */
+.th-note[data-fwd] .th-note-text {
+  color: var(--c-text);
+}
 .th-fwd-words.folded {
   display: flex;
   align-items: flex-end;
