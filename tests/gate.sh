@@ -254,6 +254,10 @@ cu_check() {
   echo "node --test computer-use/extension/test/unit.test.ts"
   NODE_OPTIONS="$TS_NODE_OPTIONS" node --test "$root/computer-use/extension/test/unit.test.ts" || return 1
   if [ -x "$tsc" ]; then echo "tsc -p computer-use/tsconfig.node.json"; "$tsc" -p "$root/computer-use/tsconfig.node.json" || return 1
+    # the extension's own code: its types, and the committed .js is what its .ts emits
+    echo "tsc -p computer-use/extension/tsconfig.json"; "$tsc" -p "$root/computer-use/extension/tsconfig.json" || return 1
+    echo "ts_emit computer-use/extension/tsconfig.json --check"
+    NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/computer-use/extension/tsconfig.json" --check || return 1
   else echo "skipped computer-use types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
 }
 # the as-he-does helpers' unit test, then the types of the driver and pagedrive (Playwright's

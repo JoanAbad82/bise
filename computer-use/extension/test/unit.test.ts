@@ -83,14 +83,14 @@ test("a paragraph split in one span per character is one text line (launch #3)",
   const chars = [..."This is"].map((c) => N("generic", "", {}, [N("StaticText", c, {}, [N("InlineTextBox", c)])]));
   const nodes = flat(N("RootWebArea", "Example", {}, [N("paragraph", "", {}, chars), N("link", "Learn more")]));
   const lines = entriesOf(nodes).map((e) => e.line);
-  assert.deepEqual(lines.map((l) => l.replace(/ \[e\d+\]/, "")), ['- paragraph', '- text "This is"', '- link "Learn more"']);
+  assert.deepEqual(lines.map((l) => l!.replace(/ \[e\d+\]/, "")), ['- paragraph', '- text "This is"', '- link "Learn more"']);
 });
 
 test("render cuts at max_nodes and says so", () => {
   const r = render(entriesOf(tree()), { title: "Shop", host: "x", maxNodes: 2 });
   assert.equal(r.truncated, true);
   assert.equal(r.refs, 2);
-  assert.match(r.text.split("\n").at(-1), /^# … 5 more nodes/);
+  assert.match(r.text.split("\n").at(-1)!, /^# … 5 more nodes/);
 });
 
 test("nesting indents 2 spaces per depth; long values cut at 80", () => {
@@ -110,18 +110,18 @@ test("ariaRole maps Chrome's internal roles", () => {
 
 test("locators: role, name (substring, exact, regex), text, label, nth", () => {
   const e = entriesOf(tree());
-  assert.equal(pick(e, { role: "button", name: "add to" }).entry.name, "Add to cart");
+  assert.equal(pick(e, { role: "button", name: "add to" }).entry!.name, "Add to cart");
   assert.equal(pick(e, { role: "button", name: "Add", exact: true }).code, "not_found");
-  assert.equal(pick(e, { name_re: "^pay$/i" }).entry.name, "Pay");
-  assert.equal(pick(e, { text: "12,50" }).entry.role, "text");
-  assert.equal(pick(e, { text_re: "Price: \\d+" }).entry.name, "Price: 12,50 €");
-  assert.equal(pick(e, { label: "Password" }).entry.role, "textbox");
+  assert.equal(pick(e, { name_re: "^pay$/i" }).entry!.name, "Pay");
+  assert.equal(pick(e, { text: "12,50" }).entry!.role, "text");
+  assert.equal(pick(e, { text_re: "Price: \\d+" }).entry!.name, "Price: 12,50 €");
+  assert.equal(pick(e, { label: "Password" }).entry!.role, "textbox");
   assert.equal(pick(e, { text: "Password" }).code, "not_found", "text never matches a form field");
   const amb = pick(e, { role: "button" });
   assert.equal(amb.code, "ambiguous");
-  assert.equal(amb.candidates.length, 2);
-  assert.equal(pick(e, { role: "button", nth: 1 }).entry.name, "Pay");
-  assert.equal(pick(e, { role: "button", nth: -1 }).entry.name, "Pay");
+  assert.equal(amb.candidates!.length, 2);
+  assert.equal(pick(e, { role: "button", nth: 1 }).entry!.name, "Pay");
+  assert.equal(pick(e, { role: "button", nth: -1 }).entry!.name, "Pay");
   assert.equal(pick(e, { role: "button", nth: 5 }).code, "not_found");
   const nf = pick(e, { role: "button", name: "Checkout" });
   assert.deepEqual(nf.candidates, ['- button "Add to cart" [e2]', '- button "Pay" [e3] (disabled)']);

@@ -6,7 +6,8 @@
 # The store package is computer-use/extension minus what a store refuses
 # or doesn't need: the dev "key" (the Store assigns its own ID and rejects
 # a manifest with "key"; the host's allowed_origins lists both IDs) and
-# test/. Prints the zip's path. Checks: icons present (128 px required by
+# test/, and the TypeScript sources (*.ts, tsconfig.json: Chrome runs the
+# committed .js emitted from them). Prints the zip's path. Checks: icons present (128 px required by
 # the Store), no unused permission the review would question.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -18,7 +19,7 @@ version=$(jq -r .version "$EXT/manifest.json")
 stage="$OUT/stage"
 rm -rf "$stage"
 mkdir -p "$stage"
-(cd "$EXT" && find . -type f ! -path './test/*' ! -name '.*' -print0 | xargs -0 -I{} rsync -R {} "$stage/")
+(cd "$EXT" && find . -type f ! -path './test/*' ! -name '.*' ! -name '*.ts' ! -name 'tsconfig.json' -print0 | xargs -0 -I{} rsync -R {} "$stage/")
 jq 'del(.key)' "$EXT/manifest.json" > "$stage/manifest.json"
 
 warn=0
