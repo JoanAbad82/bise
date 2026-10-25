@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, ptyBin } from './lines';
+import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, ptyBin, shellKey } from './lines';
 
 describe('pty lines', () => {
   it('decodes known events, drops the rest', () => {
@@ -85,5 +85,25 @@ describe('ptyBin', () => {
   });
   it('a normal run never reads it: the app\'s own bise runs the shells', () => {
     expect(ptyBin({ BISE_DESKTOP_PTY: '/elsewhere/bise' }, false, '/app/bin/bise')).toBe('/app/bin/bise');
+  });
+});
+
+describe('shellKey (several shells per project: the panel\'s terminal tabs)', () => {
+  it("a project's first shell is the project's id, as before (the bottom panel's, the capsule's)", () => {
+    expect(shellKey('shop-1a2b', 0)).toBe('shop-1a2b');
+    expect(shellKey('shop-1a2b', undefined)).toBe('shop-1a2b');
+    expect(shellKey('shop-1a2b', null)).toBe('shop-1a2b');
+  });
+  it("the next ones '<project>#<n>'", () => {
+    expect(shellKey('shop-1a2b', 1)).toBe('shop-1a2b#1');
+    expect(shellKey('shop-1a2b', 7)).toBe('shop-1a2b#7');
+  });
+  it('refuses a bad project or number', () => {
+    expect(shellKey('', 1)).toBeNull();
+    expect(shellKey(3, 1)).toBeNull();
+    expect(shellKey('shop', -1)).toBeNull();
+    expect(shellKey('shop', 1.5)).toBeNull();
+    expect(shellKey('shop', '1')).toBeNull();
+    expect(shellKey('shop', 100)).toBeNull();
   });
 });

@@ -38,13 +38,13 @@ import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar, useWaitingTotal } from './Sidebar';
 import { useZen, useZenWatch } from './zen';
-import { RAIL_PX, SideRail } from './SideRail';
 import { Over, Titlebar, useFrame } from './Frame';
 import { PanelHost } from './panel/Host';
 import { SideHost } from './side3d/Host';
 import { FloatHost } from '@/composer/float/Host';
-import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
-import { RightBar } from './RightBar';
+import { ArtifactRoute, artOf } from './ArtifactView';
+import { panelState } from './panel/state';
+import { doPanelKey } from './panel/keys';
 import { TipLayer } from './TipLayer';
 import { noteJump, numbersOf } from '@/agents/model';
 import { HubMoments } from './HubMoments';
@@ -237,36 +237,11 @@ function Shell() {
   // zen while he types (zen.ts, the TUI's zen.rs): a change of what waits on him leaves it
   useZenWatch(useWaitingTotal());
   const zen = useZen();
-  // an artifact open (designer's artifact-open page): it takes the right column, widened to its share
-  // of the window; under 1200 px the left bar folds; under 1000 px it takes the centre (ArtifactCentre)
-  const winW = useInnerWidth();
-  const [artShare, setArtShare] = useArtPct();
-  const art = artOf(route);
-  const artDocked = art !== undefined && frame.width !== 'narrow';
-  // under 1200 px the left bar folds to its 56 px icon rail; the title bar's sidebar button slides
-  // the whole bar back over it (designer m_20435 (f))
-  const rail = frame.side && artDocked && winW < ART_FOLD_PX;
-  const side = frame.side && !rail;
-  const at = formatRoute(route);
-  const [railAt, setRailAt] = useState<string | null>(null);
-  const railOver = rail && railAt === at;
-  const shown = rail
-    ? {
-        ...frame,
-        side: false,
-        over: railOver ? ('side' as const) : frame.over,
-        toggle: (what: 'sidebar' | 'panel') => {
-          if (what === 'sidebar') setRailAt(railOver ? null : at);
-          else frame.toggle(what);
-        },
-      }
-    : frame;
-  const leftW = rail ? RAIL_PX : side ? frame.sideW : 0;
-  const artW = artDocked ? artWidth(winW, leftW, artShare) : 0;
+  const side = frame.side;
   return (
     <div
-      className={`app-shell b-ui w-${frame.width}${side ? '' : rail ? ' rail' : ' no-side'}`}
-      style={{ '--side-w': `${String(rail ? RAIL_PX : frame.sideW)}px`, '--side-full': `${String(frame.sideW)}px`, '--panel-w': `${String(artDocked ? artW : frame.panelW)}px` } as CSSProperties}
+      className={`app-shell b-ui w-${frame.width}${side ? '' : ' no-side'}`}
+      style={{ '--side-w': `${String(frame.sideW)}px`, '--side-full': `${String(frame.sideW)}px` } as CSSProperties}
       data-testid="app.root"
       data-zen={zen || undefined}
     >
@@ -278,22 +253,10 @@ function Shell() {
         </div>
       ) : (
         <>
-          <Win
-            side={side ? <Sidebar onSearch={openPalette} /> : rail ? <SideRail /> : null}
-            main={<Current top={<Titlebar frame={shown} />} />}
-            aside={
-              artDocked ? (
-                <ArtifactColumn project={art.project} id={art.id} />
-              ) : frame.panel?.docked === true ? (
-                <RightBar project={frame.panel.project} name={frame.panel.name} column={frame.panelW} />
-              ) : (
-                <PanelHost />
-              )
-            }
-          />
+          <Win side={side ? <Sidebar onSearch={openPalette} /> : null} main={<Current top={<Titlebar frame={frame} />} />} aside={<PanelHost />} />
           {/* his try a43609b2: both side columns resize by their border (designer m_19374); a folded
               sidebar opens again by a drag from the window's left edge */}
-          {frame.width !== 'narrow' && !rail && (
+          {frame.width !== 'narrow' && (
             <Splitter
               edge="side"
               width={side ? frame.sideW : 0}
@@ -307,53 +270,10 @@ function Shell() {
               testId="app.split.side"
             />
           )}
-          {artDocked && (
-            <Splitter
-              edge="panel"
-              width={artW}
-              onWidth={(w) => {
-                setArtShare(w / winW);
-              }}
-              onReset={() => {
-                setArtShare(0.55);
-              }}
-              label="artifact width"
-              testId="app.split.art"
-            />
-          )}
-          {!artDocked && frame.panel?.docked === true && (
-            <Splitter
-              edge="panel"
-              width={frame.panelW}
-              onWidth={(w) => {
-                frame.resize('panel', w);
-              }}
-              onReset={() => {
-                frame.reset('panel');
-              }}
-              label="panel width"
-              testId="app.split.panel"
-            />
-          )}
-          {/* under 1000 px (or hidden by ⌘\) the sidebar slides over; the panel too under 1000 px */}
-          {railOver && (
-            <Over
-              side="left"
-              onClose={() => {
-                setRailAt(null);
-              }}
-            >
-              <Sidebar onSearch={openPalette} />
-            </Over>
-          )}
+          {/* under 1000 px (or hidden by ⌘\) the sidebar slides over */}
           {frame.over === 'side' && (
             <Over side="left" onClose={frame.close}>
               <Sidebar onSearch={openPalette} />
-            </Over>
-          )}
-          {frame.over === 'panel' && frame.panel !== undefined && (
-            <Over side="right" onClose={frame.close}>
-              <RightBar project={frame.panel.project} name={frame.panel.name} over />
             </Over>
           )}
         </>
@@ -454,10 +374,10 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <EnvironmentsScreen project={route.project} />}</Known>;
     case 'artifacts':
       // every project's (project ''), one project's, or one artifact open (amb-kit's src/artifacts)
-      // a project's artifact by id: the maker's thread in the centre, the artifact in the right column
-      // (App's shell), or the artifact alone under 1000 px (ArtifactView.tsx)
+      // a project's artifact by id: the maker's thread in the centre, the artifact in a panel tab
+      // (ArtifactView.tsx ArtifactRoute)
       if (route.id === undefined) return <ArtifactsScreen project={route.project} at={route.at} />;
-      return route.project === '' ? <ArtifactOpen project={route.project} id={route.id} /> : <ArtifactCentre project={route.project} id={route.id} />;
+      return route.project === '' ? <ArtifactOpen project={route.project} id={route.id} /> : <ArtifactRoute project={route.project} id={route.id} />;
     case 'scheduled':
       // every project's live scheduled tasks (amb-kit's src/scheduled)
       return <ScheduledScreen />;
@@ -588,6 +508,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
         projects: store.projects(),
         agents: (p) => store.agents(p),
         typing: typingIn(document.activeElement),
+        panelOpen: panelState.get().open,
         // ⌥N reads the numbers he sees (held), then they hold still a moment (agent-rank)
         numbers: (p) => {
           const n = numbersOf(p, store.agents(p), true);
@@ -603,6 +524,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
       else if ('help' in act) openHelp();
       else if ('frame' in act) frameRef.current(act.frame);
       else if ('addProject' in act) addProject(router);
+      else if ('panel' in act) doPanelKey(act.panel, { route: router.get(), home: store.projects().find((p) => p.home)?.project, openFolder: (p) => { const path = store.projects().find((x) => x.project === p)?.path; if (path) void window.bise.openPath(path); } });
       else emitAction(act.screen);
     };
     window.addEventListener('keydown', onKey, true);

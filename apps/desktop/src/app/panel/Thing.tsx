@@ -1,0 +1,84 @@
+// src/app/panel · a thing in a tab (page native-mac §4 #2: « toute entité s'y ouvre »): an artifact
+// in the browser (Browser.tsx), an agent's thread (the side thread), its changes, a commit, a PR
+// (its project's pull requests), a process's output, a plugin's page, a scheduled task (the
+// scheduled list), a project's lead thread, a project's office. Each draws the screen it has in the
+// centre, in the panel's width. Owner: nm-panel.
+import type { Entity } from '@/shared/entity';
+import { ThreadScreen } from '@/thread/ThreadScreen';
+import { ReviewScreen } from '@/review/ReviewScreen';
+import { PrsScreen } from '@/review/PrsScreen';
+import { PluginsScreen } from '@/plugins';
+import { ScheduledScreen } from '@/scheduled';
+import { Output } from '@/running/Output';
+import { isRunning, quietWords, stateOf, useAllProcesses } from '@/running';
+import { useState } from 'react';
+import { useProjects } from '@/store';
+import { MAIN } from '@/app/route';
+import { Browser } from './Browser';
+import { OfficeTab } from './Office';
+
+/** The body of a thing's tab. */
+export function ThingTab({ e, tabId }: { e: Exclude<Entity, { kind: 'tab' }>; tabId: string }) {
+  const projects = useProjects();
+  const row = 'project' in e ? projects.find((p) => p.project === e.project) : undefined;
+  switch (e.kind) {
+    case 'artifact':
+      return <Browser project={e.project} id={e.id} tabId={tabId} />;
+    case 'agent':
+    case 'project': {
+      const agent = e.kind === 'agent' ? e.agent : MAIN;
+      return (
+        <div className="pn-screen" data-testid="app.panel.thread">
+          <ThreadScreen project={e.project} agent={agent} bise={row?.home === true && agent === MAIN} {...(row === undefined ? {} : { projectName: row.name })} />
+        </div>
+      );
+    }
+    case 'diff':
+      return (
+        <div className="pn-screen" data-testid="app.panel.diff">
+          <ReviewScreen project={e.project} agent={e.agent} />
+        </div>
+      );
+    case 'commit':
+      return (
+        <div className="pn-screen" data-testid="app.panel.commit">
+          <ReviewScreen project={e.project} agent={MAIN} commit={e.sha} />
+        </div>
+      );
+    case 'pr':
+      return (
+        <div className="pn-screen" data-testid="app.panel.pr">
+          <PrsScreen project={e.project} />
+        </div>
+      );
+    case 'process':
+      return <ProcTab project={e.project} agent={e.agent} id={e.id} />;
+    case 'plugin':
+      return (
+        <div className="pn-screen" data-testid="app.panel.plugin">
+          <PluginsScreen id={e.id} />
+        </div>
+      );
+    case 'scheduled':
+      return (
+        <div className="pn-screen" data-testid="app.panel.scheduled">
+          <ScheduledScreen />
+        </div>
+      );
+    case 'office':
+      return <OfficeTab project={e.project} />;
+  }
+}
+
+/** A process's output, live while it runs (running/'s Output, as the processes page draws it). */
+function ProcTab({ project, agent, id }: { project: string; agent: string; id: string }) {
+  const x = useAllProcesses(project).find((y) => y.p.agent === agent && y.p.id === id);
+  const [now] = useState(() => Date.now());
+  return (
+    <div className="pn-screen pn-proc" data-testid="app.panel.process">
+      {x !== undefined && (
+        <Output project={project} agent={agent} id={id} none={x.p.out === 'none' || x.p.out === 'unknown'} live={isRunning(x.p)} quiet={quietWords(x.p, stateOf(x.p), now)} />
+      )}
+    </div>
+  );
+}

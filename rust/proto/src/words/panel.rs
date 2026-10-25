@@ -132,14 +132,14 @@ crate::words! { panel:
     wt_said_on(said, g) = "{said} · {g} worktree on ";
 
     // ---- the desktop's right bar
-    /// AGENTS' head
-    bar_agents = "AGENTS";
-    /// ARCHIVED's head
-    bar_archived = "ARCHIVED";
-    /// ARTIFACTS' head
-    bar_artifacts = "ARTIFACTS";
-    /// SCHEDULED & WATCHING's head
-    bar_scheduled = "SCHEDULED & WATCHING";
+    /// the Overview tab's agents label (sentence case, bise fait mac §6)
+    bar_agents = "Agents";
+    /// the Overview tab's archived agents label
+    bar_archived = "Archived";
+    /// the Overview tab's artifacts label
+    bar_artifacts = "Artifacts";
+    /// the Overview tab's scheduled tasks and watches label
+    bar_scheduled = "Scheduled";
     /// a head's link to the full list
     all = "all ›";
     /// a long section's next page, more than a page left
@@ -312,4 +312,72 @@ crate::words! { panel:
     tray_on_branch(branch) = "on {branch}";
     /// the projects left out of the menu, and where they are (a click opens bise)
     tray_more(n) = "{n} more in bise";
+
+    // ---- the desktop's tabbed panel (bise fait mac, page native-mac §4 #2, mockups 1-4)
+    /// the panel's first tab: what the right bar was (agents, archived, artifacts, scheduled, processes)
+    tab_overview = "Overview";
+    /// a tab of the launcher ('+', ⌘T), and its VoiceOver name
+    tab_new = "New tab";
+    /// a shell's tab: the project it runs in
+    tab_terminal(project) = "Terminal · {project}";
+    /// a project's next shell's tab
+    tab_terminal_n(n, project) = "Terminal {n} · {project}";
+    /// a pull request's tab
+    tab_pr(number) = "PR #{number}";
+    /// an agent's changes' tab
+    tab_changes(agent) = "Changes · {agent}";
+    /// a scheduled task's tab
+    tab_scheduled = "Scheduled task";
+    /// a project's office's tab
+    tab_office(project) = "Office · {project}";
+    /// a tab's × button: its VoiceOver name and tip, with its key
+    tab_close(key) = "close tab · {key}";
+    /// the '+' after the tabs: its tip, with its key
+    tab_add(key) = "new tab · {key}";
+    /// the overflow menu's button past six tabs
+    tabs_more(n) = one "{n} more tab" | "{n} more tabs";
+    /// the tab strip's VoiceOver name
+    tabs_label = "panel tabs";
+    /// the bar's panel button: its tip and VoiceOver name, with its key
+    panel_toggle(key) = "panel · {key}";
+    /// the panel's VoiceOver name
+    panel_label = "panel";
+    /// the panel's border: its VoiceOver name (drag to resize, double click resets)
+    panel_width = "panel width";
+
+    // ---- New tab, the launcher (mockup 3)
+    /// the search field's placeholder and VoiceOver name
+    launch_search = "Search artifacts, or enter a URL";
+    /// the launcher's first group
+    launch_open = "Open";
+    /// the launcher's second group: what he opened last
+    launch_recent = "Recent";
+    /// an Open row: the project's folder in Finder
+    launch_files = "Files";
+    /// an Open row: a new shell in a tab
+    launch_terminal = "Terminal";
+    /// an Open row: the lead's thread beside the one in view
+    launch_side = "Side thread";
+    /// an Open row: the agent's changes in a tab
+    launch_changes = "Changes";
+    /// an Open row: the search field takes a URL
+    launch_browser = "Browser";
+    /// Recent with nothing opened yet
+    launch_none = "nothing opened yet";
+    /// what the search found: nothing
+    launch_no_match = "no artifact by that name";
+    /// a recent artifact's line: its kind and who made it
+    launch_kind_by(kind, who) = "{kind} · {who}";
+
+    // ---- an artifact's tab, the browser (mockup 4)
+    /// the address bar's back button
+    addr_back = "back";
+    /// the address bar's forward button
+    addr_forward = "forward";
+    /// the address bar's reload button
+    addr_reload = "reload";
+    /// the address bar's ↗: the page in his browser
+    addr_out = "open in your browser";
+    /// the bar's button over an artifact's tab: the artifact in a window of its own
+    addr_window = "open in a window";
 }
