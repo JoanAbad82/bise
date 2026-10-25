@@ -18,7 +18,9 @@
 //! ([`hunk_undone`]; a hunk the lander rewrote has neither; `git apply
 //! --check` was too strict: a bless that wrote its own line where C's
 //! was matched neither way). Any: refused in one line
-//! ([`refusal`]), nothing moved.
+//! ([`refusal`]), nothing moved. The guard judges the land's own diff,
+//! base -> tip: a C already undone at base (by anyone, a land from
+//! before the guard: native-lead m_42665) is not this land's doing.
 //!
 //! The pure part (the log's parse, the exemptions, the hunks, the words)
 //! is unit-tested here; [`guard`] is the git shell beside it.
@@ -202,7 +204,7 @@ pub fn guard(dir: &Path, target: &str, base: &str, tip: &str, since_ms: u64, lan
         if both.is_empty() {
             continue;
         }
-        let files = undone_files(dir, &c, tip, &both)?;
+        let files = undone_files(dir, &c, base, tip, &both)?;
         if !files.is_empty() {
             undone.push(Undone { sha: c.sha, subject: c.subject, by, files });
         }
@@ -218,19 +220,26 @@ fn set_of(v: &[String]) -> BTreeSet<&str> {
 }
 
 /// Of `both` (C's files the land changes too), the ones whose C change
-/// tip undoes: equal to C^1's (fast path), else a hunk of C's back.
-fn undone_files(dir: &Path, c: &Recent, tip: &str, both: &[&str]) -> Result<Vec<String>, String> {
+/// the land undoes, base -> tip: tip's equal to C^1's and base's not
+/// (fast path), else a hunk of C's back at tip and not at base. A file
+/// already C^1's at base is not this land's doing.
+fn undone_files(dir: &Path, c: &Recent, base: &str, tip: &str, both: &[&str]) -> Result<Vec<String>, String> {
     let parent = c.parent.as_deref().unwrap_or(EMPTY_TREE);
-    let mut args = vec!["--literal-pathspecs", "diff", "--no-renames", "--name-only", "-z", parent, tip, "--"];
-    args.extend(both);
-    let differ: BTreeSet<String> = git(dir, &args)?.split('\0').filter(|f| !f.is_empty()).map(str::to_string).collect();
-    let mut out: Vec<String> = both.iter().filter(|f| !differ.contains(**f)).map(|f| f.to_string()).collect();
-    let rest: Vec<&str> = both.iter().copied().filter(|f| differ.contains(*f)).collect();
+    let differ = |rev: &str| -> Result<BTreeSet<String>, String> {
+        let mut args = vec!["--literal-pathspecs", "diff", "--no-renames", "--name-only", "-z", parent, rev, "--"];
+        args.extend(both);
+        Ok(git(dir, &args)?.split('\0').filter(|f| !f.is_empty()).map(str::to_string).collect())
+    };
+    let (at_tip, at_base) = (differ(tip)?, differ(base)?);
+    // already C^1's at base: undone before this land, whoever did it
+    let live: Vec<&str> = both.iter().copied().filter(|f| at_base.contains(*f)).collect();
+    let mut out: Vec<String> = live.iter().filter(|f| !at_tip.contains(**f)).map(|f| f.to_string()).collect();
+    let rest: Vec<&str> = live.into_iter().filter(|f| at_tip.contains(*f)).collect();
     if rest.is_empty() {
         return Ok(out);
     }
     // the mixed case: tip's file is neither C^1's nor C's: C's hunks
-    // against tip's lines
+    // against tip's lines, and base's
     let show = |rev: &str, f: &str| git(dir, &["show", &format!("{}:{}", rev, f)]).unwrap_or_default();
     for f in rest {
         // a file C made that tip still has: changed since, not undone
@@ -239,11 +248,11 @@ fn undone_files(dir: &Path, c: &Recent, tip: &str, both: &[&str]) -> Result<Vec<
             continue;
         }
         let patch = git(dir, &["--literal-pathspecs", "diff", "--no-renames", "--no-color", "--no-ext-diff", "-U0", parent, &c.sha, "--", f])?;
-        let (b, a, t) = (show(parent, f), show(&c.sha, f), show(tip, f));
+        let (b, a, t, s) = (show(parent, f), show(&c.sha, f), show(tip, f), show(base, f));
         let lines = |s: &str| s.lines().map(|l| l.to_string()).collect::<Vec<_>>();
-        let (b, a, t) = (lines(&b), lines(&a), lines(&t));
-        let (before, after, at) = (set_of(&b), set_of(&a), set_of(&t));
-        if hunks(&patch).iter().any(|(minus, plus)| hunk_undone(minus, plus, &before, &after, &at)) {
+        let (b, a, t, s) = (lines(&b), lines(&a), lines(&t), lines(&s));
+        let (before, after, at, was) = (set_of(&b), set_of(&a), set_of(&t), set_of(&s));
+        if hunks(&patch).iter().any(|(minus, plus)| hunk_undone(minus, plus, &before, &after, &at) && !hunk_undone(minus, plus, &before, &after, &was)) {
             out.push(f.to_string());
         }
     }

@@ -299,3 +299,24 @@ fn a_dirty_worktree_that_drops_anothers_fresh_files_is_refused() {
     assert_eq!(git(&ws, &["rev-parse", "feat"]).unwrap(), tip, "feat did not move");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
+
+/// native-lead m_42665 (nm-side's L3 e805ff52f): y's change to f was
+/// already undone on the feature before x started (a land from before
+/// the guard, no record: nm-side's own 1d9aff6bb put back ff62d5826's
+/// old side words). x's land only edits another line of f: it undoes
+/// nothing, the base already had y's old line. It lands.
+#[test]
+fn a_change_already_undone_on_the_target_is_not_the_landers() {
+    let ws = repo("revert-before");
+    sh(&ws, "seq 1 30 > f && git add f && git commit -qm f && git branch feat main");
+    let (wx, jx) = on_feat(&ws, "x");
+    let (wy, jy) = on_feat(&ws, "y");
+    sh(&wy, "sed -i.bak 's/^3$/three/' f && rm f.bak && git commit -qam 'y: three'");
+    land(&jy).unwrap();
+    // a land from before the guard puts 3 back: no record, no check
+    sh(&wy, "sed -i.bak 's/^three$/3/' f && rm f.bak && git commit -qam 'z: 3 back' && git branch -f feat HEAD");
+    sh(&wx, "git rebase -q feat && sed -i.bak 's/^25$/twenty-five/' f && rm f.bak && git commit -qam 'x: 25'");
+    land(&jx).unwrap();
+    assert_eq!(git(&ws, &["show", "feat:f"]).unwrap().lines().filter(|l| l.contains('t')).collect::<Vec<_>>(), ["twenty-five"]);
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}
