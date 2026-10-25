@@ -336,7 +336,7 @@
    narrower. The rows, the day lines, the strip, the docked card, the voice pane and the
    composer share its width and its left edge. A row's time sits on its name line (ds). */
 .th-screen {
-  --th-col: min(720px, calc(100% - 48px));
+  --th-col: min(var(--w-col), calc(100% - 48px));
   /* more air (his try a43609b2, designer m_19359): prose reads at 1.65, the dim rows (tool lines,
      folds, the live line) at 1.5, and 20 px between the thread's last row and what sits under it
      (the inbox box, the docked card or the composer's label), carried by the list itself; the

@@ -224,7 +224,7 @@ pub fn rows(m: &Market) -> Vec<Plugin> {
             let id = PluginId::plugin(i.name.clone()).to_string();
             let mut row: Plugin = serde_json::from_value(json!({
                 "id": id, "name": i.name, "kind": "plugin", "scope": "user", "state": "available", "on": false,
-                "title": i.title.clone().unwrap_or_else(|| i.name.clone()),
+                "title": i.title.clone().unwrap_or_else(|| crate::title::display_name(&i.name)),
             }))
             .expect("a Browse row");
             row.what = i.description.clone();

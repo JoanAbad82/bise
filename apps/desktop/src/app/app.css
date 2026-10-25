@@ -1174,11 +1174,11 @@ body:has(.app-shell) {
   padding: var(--s-2) var(--pad-panel) var(--s-6);
 }
 .app-report-text {
-  max-width: var(--th-col, 720px);
+  max-width: var(--th-col, var(--w-col));
   margin: 0 auto;
 }
 .app-report-body > .app-dim {
-  max-width: var(--th-col, 720px);
+  max-width: var(--th-col, var(--w-col));
   margin: var(--s-6) auto 0;
   color: var(--c-text-3);
 }

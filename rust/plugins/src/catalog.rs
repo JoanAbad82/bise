@@ -14,13 +14,16 @@
 //! A row's `on` and each part's come from `plugins.json`
 //! ([`StateV2::is_on`]); an MCP server's status, tool count, tools and
 //! error from its last status file ([`crate::status`]); a remote one's
-//! login from its tokens. No secret reaches a row: a server shows its
+//! login from its tokens. A connector with no display name gets its
+//! name as people read it ([`crate::title::display_name`]), once here,
+//! so every reader shows the same title. No secret reaches a row: a server shows its
 //! command's name and package or its URL's host, never an argument, a
 //! header, an env value or a URL path.
 
 use crate::id::{PartKind as IdPart, PluginId, SkillsScope};
 use crate::model::{ConnectorAuth, ConnectorEntry, SkillEntry, StateV2};
 use crate::resolve::{self, HttpServer, StdioServer};
+use crate::title::display_name;
 use crate::{connectors, status};
 use bise_proto::app_rows::{ConnectorsProblem, LoginState, PartKind, Plugin, PluginAction, PluginKind, PluginPart, PluginScope, PluginState};
 use bise_proto::words::settings;
@@ -325,7 +328,7 @@ fn connector_base(c: &ConnectorEntry, id: PluginId) -> Plugin {
         name: id.to_string(),
         kind: PluginKind::Mistral,
         scope: connector_scope(c),
-        title: if c.display_name.trim().is_empty() { c.name.clone() } else { c.display_name.clone() },
+        title: if c.display_name.trim().is_empty() { display_name(&c.name) } else { c.display_name.clone() },
         what: None,
         icon: None,
         version: None,

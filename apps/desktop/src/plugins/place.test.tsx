@@ -64,6 +64,16 @@ describe('the plugins place', () => {
     expect(screen.getByTestId('plugins.band.market').textContent).toContain('2 new plugins in openai/plugins');
   });
 
+  it('draws a connector with no row in the same tile, its capital initial; the core names it; the grid ends on browse N more (ui-review #4, #5, #9)', () => {
+    place();
+    const icon = screen.getByTestId('plugins.band.mistral:google_calendar.icon');
+    expect(icon.className).toBe('plg-icon row');
+    expect(icon.textContent).toBe('G');
+    expect(screen.getByTestId('plugins.band.mistral:google_calendar.title').textContent).toBe('Google Calendar');
+    // the core's n is 6 for 5 ids: 5 cards and the 6th cell
+    expect(screen.getByTestId('plugins.band.more').textContent).toBe('browse 1 more');
+  });
+
   it("gives each row its one control: always on, set up, connect, log in, details + switch", () => {
     const { sent, ports } = place();
     expect(screen.getByTestId('plugins.row.skills:bise').textContent).toContain('always on');

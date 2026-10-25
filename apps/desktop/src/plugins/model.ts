@@ -261,14 +261,38 @@ export function bandShows(s: PluginsSummary | null): boolean {
   return newKey(s) !== '';
 }
 
+/** A band card's words: the line under its title, and its tip. */
+export interface CardWords { readonly line: string; readonly tip: string }
+
 /**
- * A band card's why (the core's `whys[i]`, the same order as its titles): the line under the title,
- * and its tip: the connector's full description, then where it was seen ('seen in harness, docs').
+ * The band's words (the core's `whys[i]`, the same order as its ids): a why every card would say
+ * goes up to the band's sub, once (ui-review #6); each card then says what its tool does (its
+ * row's `what`). The tip: the connector's full description, then where it was seen.
  */
-export function cardWhy(x: PluginSuggest, i: number, row: Plugin | undefined): { readonly line: string; readonly tip: string } {
-  const why = (x.whys ?? []).at(i);
-  const where = why?.source === 'seen' && (why.where ?? []).length > 0 ? settings.plugins_why_where({ list: (why.where ?? []).join(', ') }) : '';
-  return { line: why?.text ?? '', tip: [row?.what ?? '', where].filter((s) => s !== '').join('\n') };
+export function bandWords(x: PluginSuggest, rows: ReadonlyMap<string, Plugin>): { readonly sub: string; readonly cards: readonly CardWords[] } {
+  const ids = x.ids ?? [];
+  const whys = x.whys ?? [];
+  const first = whys[0]?.text ?? '';
+  const shared = ids.length >= 2 && first !== '' && whys.length === ids.length && whys.every((w) => w.text === first) ? first : '';
+  const cards = ids.map((id, i) => {
+    const why = whys.at(i);
+    const what = rows.get(id)?.what ?? '';
+    const where = why?.source === 'seen' && (why.where ?? []).length > 0 ? settings.plugins_why_where({ list: (why.where ?? []).join(', ') }) : '';
+    return { line: shared !== '' ? what : why?.text ?? '', tip: [what, where].filter((s) => s !== '').join('\n') };
+  });
+  return { sub: shared !== '' ? settings.plugins_band_sub_why({ why: shared }) : settings.plugins_band_sub, cards };
+}
+
+/**
+ * How many of the band's `k` cards to show so the grid has no hole (ui-review #9: 2 across, 1 when
+ * narrow): 2, 4 or 6 cells, the last one 'browse N more' when more wait than it shows (`total`,
+ * the core's n). One cell: itself.
+ */
+export function bandCells(k: number, total: number): { readonly shown: number; readonly more: number } {
+  const slots = Math.min(6, k + (total > k ? 1 : 0));
+  const cells = slots <= 1 ? slots : slots - (slots % 2);
+  const shown = Math.min(k, total > cells ? cells - 1 : cells);
+  return { shown, more: Math.max(0, total - shown) };
 }
 
 /** A marketplace line: named when it is his one marketplace ('6 new plugins in openai/plugins'). */

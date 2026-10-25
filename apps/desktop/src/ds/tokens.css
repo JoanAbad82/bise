@@ -41,6 +41,7 @@
   --lh-ui: 1.35; --lh-read: 1.55;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
   --sidebar: 240px; --board: 260px;
+  --w-col: 720px; /* the shell's one column: the thread, the inbox and composer, every shell page (designer m_41512) */
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
@@ -135,6 +136,7 @@
   --lh-ui: 1.35; --lh-read: 1.55;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
   --sidebar: 240px; --board: 260px;
+  --w-col: 720px; /* the shell's one column: the thread, the inbox and composer, every shell page (designer m_41512) */
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);

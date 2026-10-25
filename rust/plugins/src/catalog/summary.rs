@@ -130,7 +130,7 @@ fn item(kind: SuggestKind, n: usize, rows: &[&Plugin], why_of: impl Fn(&Plugin) 
         kind,
         n: count(n),
         ids: first.clone().map(|p| p.id.clone()).collect(),
-        titles: first.clone().map(|p| if p.title.is_empty() { p.name.clone() } else { p.title.clone() }).collect(),
+        titles: first.clone().map(|p| p.title.clone()).collect(),
         whys: first.map(|p| why_of(p)).collect(),
         source: None,
     })

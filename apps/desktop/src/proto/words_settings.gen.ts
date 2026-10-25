@@ -1564,6 +1564,10 @@ export const settings = {
   plugins_band_count: (a: { connected: string | number; total: string | number }): string => String(a.connected) + " of " + String(a.total) + " connected",
   /** band: its sub */
   plugins_band_sub: "each one you connect, your agents reach in every project. a write still asks you first",
+  /** band: its sub when every card has the same why (why: 'a Mistral connector'), said once here instead of on each card */
+  plugins_band_sub_why: (a: { why: string | number }): string => String(a.why) + ". each one you connect, your agents reach in every project. a write still asks you first",
+  /** band: the grid's last cell when more connectors wait than it shows */
+  plugins_band_more: (a: { n: string | number }): string => "browse " + String(a.n) + " more",
   /** band: a connector's button */
   plugins_connect: "connect",
   /** band: the MCP servers found in other apps (`list`: "Claude Code 2, Cursor 1") */

@@ -1,8 +1,10 @@
-// A plugin's icon in the plugins place: its office object (bims-link's objectOf(row, picks), drawn
-// small by render.ts through bims-objects' makeObject), in glass when off, with its '?' / '✗' badge,
-// each explaining itself on hover. Until the object is drawn, and for good without WebGL or for a
-// row that brings none, a plain tile: the row's initials. Takes the row as is (bims-link m_40142:
-// its pick, its count and its badges come from the row's typed fields). Owner: plug-desktop.
+// A plugin's icon in the plugins place: one tile for every icon (ui-review #4: the same frame and
+// mass), its office object inside (bims-link's objectOf(row, picks), drawn small by render.ts
+// through bims-objects' makeObject), dimmed when off, with its '?' / '✗' badge, each explaining
+// itself on hover. Until the object is drawn, and for good without WebGL or for a row that brings
+// none, the same tile holds the title's capital initial (MonoTile, also the band's for a connector
+// with no row). Takes the row as is (bims-link m_40142: its pick, its count and its badges come
+// from the row's typed fields). Owner: plug-desktop.
 import { tipAttrs } from '@/ds';
 import type { Plugin } from '@/proto';
 import { settings } from '@/proto/words.gen';
@@ -10,15 +12,22 @@ import { useIconUrl, usePicks } from './icons';
 import { badgeOf, titleOf } from './model';
 import { iconObject } from './spots';
 
-/** the icon's css size: a row's, the plugin page's head */
-const PX = { row: 40, head: 56 } as const;
+/** the object's css size inside its tile: a row's (tile 40), the plugin page's head (tile 56) */
+const PX = { row: 32, head: 48 } as const;
 
-/** 'Linear' -> 'Li', 'image generation' -> 'ig', 'bise-stats' -> 'bs'. Pure. */
-export function initialsOf(title: string): string {
-  const words = title.split(/[\s\-_:.]+/).filter((w) => w !== '');
-  if (words.length >= 2) return `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`;
-  const w = words[0] ?? '?';
-  return w.length > 1 ? `${w[0] ?? ''}${w[1] ?? ''}` : w;
+/** 'Linear' -> 'L', 'image generation' -> 'I', 'élan' -> 'É', '' -> '?'. Pure. */
+export function initialOf(title: string): string {
+  const c = /[\p{L}\p{N}]/u.exec(title)?.[0];
+  return c === undefined ? '?' : c.toUpperCase();
+}
+
+/** The tile with a title's initial: a row with no object, a band card with no row. */
+export function MonoTile({ title, size = 'row', testId }: { title: string; size?: 'row' | 'head'; testId?: string }) {
+  return (
+    <span className={`plg-icon ${size}`} aria-hidden="true" data-testid={testId}>
+      <span className="plg-mono-letter">{initialOf(title)}</span>
+    </span>
+  );
 }
 
 /** `lit`: drawn as on though the row is off (computer, a built-in not set up yet: on, says Gabriel). */
@@ -26,11 +35,13 @@ export function PluginIcon({ row, project, size = 'row', lit = false, testId }: 
   const badge = badgeOf(row);
   const picks = usePicks(project);
   const o = iconObject(row, picks, lit);
-  const url = useIconUrl(o, PX[size]);
+  // off: drawn solid and dimmed by the tile (.glass, half), never in glass, which all but vanished
+  // in dark (ui-review #15); the room keeps its glass
+  const url = useIconUrl(o === null ? null : { ...o, glass: false }, PX[size]);
   return (
     <span className={`plg-icon ${size}${row.on || lit || row.state === 'available' ? '' : ' glass'}`} data-kind={row.kind} data-obj={url === null ? undefined : o?.obj}
       aria-hidden={badge === null || undefined} data-testid={testId}>
-      {url !== null ? <img className="plg-obj" src={url} alt="" draggable={false} /> : <span className="plg-tile">{initialsOf(titleOf(row))}</span>}
+      {url !== null ? <img className="plg-obj" src={url} alt="" draggable={false} /> : <span className="plg-mono-letter">{initialOf(titleOf(row))}</span>}
       {badge !== null && (
         <span className={`plg-badge${badge === '✗' ? ' err' : ''}`} {...tipAttrs(badge === '✗' ? settings.plugins_badge_failed : settings.plugins_badge_waits)}>
           {badge}

@@ -1,61 +1,80 @@
 /* src/plugins (plug-desktop): the plugins place (page plugins v48, plugins-ui's screens). ds tokens
    only, the 4 px grid; colour only for what waits on him (accent) and what failed (err). */
-.plg-place { height: 100%; overflow-y: auto; box-sizing: border-box; padding: var(--s-5) var(--pad-column) var(--s-8); display: flex; flex-direction: column; gap: var(--gap-block); }
-.plg-place > * { max-width: 880px; width: 100%; margin-inline: auto; box-sizing: border-box; }
+/* the rhythm (ui-review #1): the sections (the hero, connect your tools, the list) --gap-page apart;
+   inside a section its blocks --gap-block apart. One column for every shell page: --w-col (#13,
+   designer m_41512). Two left edges: the column's, and a box's content at --pad-card-x (#12). */
+.plg-place { height: 100%; overflow-y: auto; box-sizing: border-box; padding: var(--s-5) var(--pad-column) var(--s-8); display: flex; flex-direction: column; gap: var(--gap-page); }
+.plg-place > * { max-width: var(--w-col); width: 100%; margin-inline: auto; box-sizing: border-box; }
+.plg-sec { display: flex; flex-direction: column; gap: var(--gap-block); }
 
-/* the head: the words, then the room */
-.plg-head { display: grid; grid-template-columns: 1fr; gap: var(--s-2); padding: var(--pad-card); border-radius: var(--r-4, 12px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
-.plg-h1 { margin: 0; display: flex; align-items: center; gap: var(--s-2); font: 600 22px/1.2 var(--font-ui); color: var(--c-text); }
-.plg-h2 { font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
-.plg-counts { font: var(--t-12) var(--font-ui); color: var(--c-text-2); font-variant-numeric: tabular-nums; }
+/* the head: the ds page hero's measures (#11: pad 20/24, name t-22, sentence t-15, facts t-13),
+   add at its top right (#2), then the room, capped so the band shows without a scroll */
+.plg-head { display: flex; flex-direction: column; gap: var(--gap-block); padding: var(--s-5) var(--s-6); border-radius: var(--r-3); background: var(--c-raised); }
+.plg-head-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); }
+.plg-head-words { min-width: 0; display: flex; flex-direction: column; gap: var(--gap-tight); }
+.plg-h1 { margin: 0; display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-22)/1.25 var(--font-ui); color: var(--c-text); }
+.plg-h2 { max-width: 56ch; font: var(--t-15)/1.5 var(--font-ui); color: var(--c-text-2); }
+.plg-counts { margin-top: var(--gap-tight); font: var(--t-13)/var(--lh-ui) var(--font-ui); color: var(--c-text-3); font-variant-numeric: tabular-nums; }
 .plg-acc { color: var(--c-accent); }
 .plg-dim { color: var(--c-text-3); }
 .plg-n { margin-left: var(--s-1); color: var(--c-text-3); font-variant-numeric: tabular-nums; }
-.plg-mono { font-family: var(--font-mono); font-size: 12px; }
+.plg-mono { font-family: var(--font-mono); font-size: var(--t-12); }
+.plg-add-words { display: inline-flex; align-items: center; gap: var(--gap-inline); }
 
-/* the room: bims' diorama of his plugins' objects (Room.tsx), a 2.2:1 banner; without WebGL their icons on a floor */
-.plg-room { min-height: 160px; display: flex; align-items: center; justify-content: center; }
+/* the room: bims' diorama of his plugins' objects (Room.tsx), a 2.2:1 banner at most 240 px high
+   (centred, its sides on the hero's ground); without WebGL their icons on a floor */
+.plg-room { --plg-room-h: calc(var(--s-12) * 5); /* 240, ui-review #11 */ width: 100%; max-width: calc(var(--plg-room-h) * 2.2); min-height: 160px; margin-inline: auto; position: relative; display: flex; align-items: center; justify-content: center; }
 .plg-room-canvas { display: block; width: 100%; aspect-ratio: 2.2 / 1; }
-.plg-floor { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: var(--s-3); max-width: 560px; padding: var(--s-6) var(--s-8); border-radius: var(--r-3, 10px); background: var(--c-sunken); }
+.plg-room-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--c-raised); }
+.plg-floor { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: var(--s-3); max-width: 560px; padding: var(--s-6) var(--s-8); border-radius: var(--r-2); background: var(--c-sunken); }
 .plg-room-sub { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 
-/* the bar: the search, add */
-.plg-bar { display: flex; justify-content: flex-end; align-items: center; gap: var(--gap-inline); }
-.plg-search { width: 260px; }
-.plg-add-words { display: inline-flex; align-items: center; gap: var(--s-2); }
+/* the list's head: installed | browse, the search at their right, both 28 high (#2, #10, #14) */
+.plg-tabs { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--gap-block); border-bottom: 1px solid var(--c-line); }
+.plg-tabs > .b-seg { border-bottom: 0; }
+.plg-search { flex: 0 1 260px; min-width: 0; padding-bottom: var(--s-1); }
+.plg-search .b-field { height: var(--h-control-sm); }
 
-/* connect your tools */
-.plg-band { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--pad-card); border-radius: var(--r-4, 12px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
-.plg-band-head { display: flex; align-items: baseline; gap: var(--s-2); font: var(--t-13) var(--font-ui); }
-.plg-band-h { font-weight: 600; color: var(--c-text); }
-.plg-band-count { margin-left: auto; color: var(--c-text-2); font-variant-numeric: tabular-nums; }
-.plg-band-sub { font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
-.plg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-2); }
-.plg-card { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: var(--s-1) var(--s-2); padding: var(--s-2) var(--s-3); border-radius: var(--r-2); background: var(--c-surface); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); }
-.plg-card > .b-btn { grid-column: 2; justify-self: start; }
-.plg-card-words { display: flex; flex-direction: column; min-width: 0; }
+/* connect your tools: head t-15/600 and its count on one baseline, the sub 4 under, the cards 12
+   under (#8); one-line cards (#3); the import and other lines its foot, on a rule (#7) */
+.plg-band { container-type: inline-size; display: flex; flex-direction: column; gap: var(--gap-block); padding: var(--pad-card); border-radius: var(--r-4); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.plg-band-top { display: flex; flex-direction: column; gap: var(--gap-tight); }
+.plg-band-head { display: flex; align-items: baseline; gap: var(--gap-inline); font: var(--t-13) var(--font-ui); }
+.plg-band-h { font: 600 var(--t-15) var(--font-ui); color: var(--c-text); }
+.plg-band-count { margin-left: auto; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+.plg-band-sub { font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+/* 2 across in the column (3 left a card's words ~60 px beside its button), 1 when it narrows (#9);
+   bandCells keeps 2, 4 or 6 cells, so no hole either way */
+.plg-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-block); }
+@container (max-width: 480px) { .plg-cards { grid-template-columns: minmax(0, 1fr); } }
+.plg-card { display: flex; align-items: center; gap: var(--gap-block); padding: var(--pad-card); border: 0; border-radius: var(--r-2); background: var(--c-surface); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); text-align: left; min-width: 0; }
+.plg-card > .b-btn { flex: none; }
+.plg-card.more { justify-content: center; background: none; }
+.plg-card-words { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 .plg-card-words > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.plg-card-words .plg-dim { font-size: 12px; }
-.plg-band-line { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); min-height: var(--h-row); padding: 0 var(--s-3); border-radius: var(--r-2); background: var(--c-surface); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); }
-.plg-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.plg-card-words .plg-dim { font-size: var(--t-12); }
+.plg-band-line { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); padding-top: var(--gap-block); border-top: 1px solid var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.plg-band-line + .plg-band-line { padding-top: 0; border-top: 0; }
+.plg-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
 
-/* installed | browse, the kinds */
-.plg-tabs { border-bottom: 1px solid var(--c-line); }
-.plg-kinds { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+/* the kinds: the chosen one on the raised surface, its words full (#10) */
+.plg-kinds { display: flex; flex-wrap: wrap; gap: var(--gap-tight); }
+.plg-kinds .b-chip[aria-expanded="true"] { background: var(--c-raised); color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
 
-/* the list */
-.plg-group { display: flex; flex-direction: column; gap: var(--s-1); }
-.plg-group-head { display: flex; align-items: baseline; gap: var(--s-1); padding: var(--s-2) var(--s-1) 0; font: 600 11.5px/1.2 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-3); }
-.plg-list { border-radius: var(--r-3, 10px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); overflow: hidden; }
-.plg-row { display: flex; align-items: center; gap: var(--s-3); min-height: var(--s-12); padding: var(--s-2) var(--s-3); box-sizing: border-box; border-top: 1px solid var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); outline: none; }
+/* the list: group heads at the column's edge, a row's content at --pad-card-x (#12) */
+.plg-group { display: flex; flex-direction: column; gap: var(--gap-tight); }
+.plg-group-head { display: flex; align-items: baseline; gap: var(--s-1); padding: var(--s-2) 0 0; font: 600 var(--t-11)/1.2 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-3); }
+.plg-list { border-radius: var(--r-3); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); overflow: hidden; }
+.plg-row { display: flex; align-items: center; gap: var(--gap-block); min-height: var(--s-12); padding: var(--s-2) var(--pad-card-x); box-sizing: border-box; border-top: 1px solid var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); outline: none; }
 .plg-row:first-child { border-top: 0; }
 .plg-row:hover, .plg-row:focus-visible { background: var(--c-hover); }
 .plg-row.part { min-height: var(--s-10); }
-.plg-row.off .plg-row-words { opacity: 0.55; }
-.plg-row-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--s-1) / 2); }
+/* off: its words in text-3, readable (#15), never faded by opacity */
+.plg-row.off .plg-title, .plg-row.off .plg-row-what { color: var(--c-text-3); }
+.plg-row-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0; }
 .plg-row-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
 .plg-title { font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.plg-tag { flex: none; padding: 0 var(--s-2); border-radius: 999px; box-shadow: inset 0 0 0 1px var(--c-line-strong); font: 400 11px/16px var(--font-ui); color: var(--c-text-2); }
+.plg-tag { flex: none; padding: 0 var(--s-2); border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--c-line-strong); font: 400 var(--t-11)/var(--s-4) var(--font-ui); color: var(--c-text-2); }
 .plg-row-what { font: var(--t-12) var(--font-ui); color: var(--c-text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .plg-row-what.err { color: var(--c-err); }
 .plg-row-end { flex: none; display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
@@ -63,14 +82,18 @@
 .plg-empty { padding: var(--s-6) var(--s-1); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
 
 /* an icon: the plain stand-in for the plugin's object (bims' render goes in its place) */
-.plg-icon { position: relative; flex: none; display: inline-flex; }
+/* one tile for every icon (#4): 40 on --c-sunken at --r-2, the object drawn at 32 inside (PluginIcon
+   PX) or the title's capital at t-15/600; the head's 56 at --r-3, its object 48. Off: the object or
+   letter at half, the tile kept, so it stays readable in dark (#15) */
+.plg-icon { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-2); background: var(--c-sunken); box-shadow: inset 0 0 0 1px var(--c-line); }
 .plg-icon.row { width: var(--s-10); height: var(--s-10); }
-.plg-icon.head { width: calc(var(--s-12) + var(--s-2)); height: calc(var(--s-12) + var(--s-2)); }
-.plg-tile { width: 100%; height: 100%; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-2); background: var(--c-sunken); box-shadow: inset 0 0 0 1px var(--c-line); font: 600 11px/1 var(--font-ui); color: var(--c-text-2); text-transform: none; }
-.plg-icon.head .plg-tile { border-radius: var(--r-3, 10px); font-size: 18px; }
-.plg-icon.glass .plg-tile { opacity: 0.4; background: transparent; }
-.plg-obj { width: 100%; height: 100%; object-fit: contain; user-select: none; }
-.plg-badge { position: absolute; bottom: calc(var(--s-1) / -2); right: calc(var(--s-1) / -2); width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--c-accent); color: var(--c-on-ink, #fff); font: 700 9px/1 var(--font-ui); }
+.plg-icon.head { width: calc(var(--s-12) + var(--s-2)); height: calc(var(--s-12) + var(--s-2)); border-radius: var(--r-3); }
+.plg-mono-letter { font: 600 var(--t-15)/1 var(--font-ui); color: var(--c-text-2); }
+.plg-icon.head .plg-mono-letter { font-size: var(--t-22); }
+.plg-obj { width: var(--s-8); height: var(--s-8); object-fit: contain; user-select: none; }
+.plg-icon.head .plg-obj { width: var(--s-12); height: var(--s-12); }
+.plg-icon.glass > .plg-obj, .plg-icon.glass > .plg-mono-letter { opacity: 0.5; }
+.plg-badge { position: absolute; bottom: calc(-1 * var(--s-1)); right: calc(-1 * var(--s-1)); width: var(--s-4); height: var(--s-4); display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--c-accent); color: var(--c-on-ink, #fff); font: 700 var(--t-11)/1 var(--font-ui); }
 .plg-badge.err { background: var(--c-err); }
 
 /* a plugin's page */
@@ -102,7 +125,6 @@
 
 @media (max-width: 1000px) {
   .plg-place { padding: var(--s-4) var(--s-4) var(--s-6); }
-  .plg-search { width: auto; flex: 1 1 auto; }
 }
 /* a switch inside a tip's span: the span is a flex box, so the switch keeps its size */
 .plg-tg { display: inline-flex; align-items: center; }

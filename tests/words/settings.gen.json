@@ -2301,6 +2301,13 @@
     "one": "{n} new plugin in {source}",
     "text": "{n} new plugins in {source}"
   },
+  "settings.plugins_band_more": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "browse {n} more"
+  },
   "settings.plugins_band_see": {
     "args": [],
     "one": null,
@@ -2310,6 +2317,13 @@
     "args": [],
     "one": null,
     "text": "each one you connect, your agents reach in every project. a write still asks you first"
+  },
+  "settings.plugins_band_sub_why": {
+    "args": [
+      "why"
+    ],
+    "one": null,
+    "text": "{why}. each one you connect, your agents reach in every project. a write still asks you first"
   },
   "settings.plugins_band_through": {
     "args": [],

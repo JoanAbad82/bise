@@ -263,7 +263,12 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
     },
     resize(w) {
       const px = Math.max(1, Math.round(w));
-      if (px === width) return;
+      // the same width: the canvas may have lost its frame (a window resize, the room scrolled
+      // away and back), so draw it again; one frame, no loop
+      if (px === width) {
+        frame();
+        return;
+      }
       width = px;
       const P = 0.75;
       const site: Site = { x0: -ROOM.w / 2 - P, x1: ROOM.w / 2 + P, z0: -ROOM.d / 2 - P, z1: ROOM.d / 2 + P, yLow: -0.6, yHigh: 2.2 };

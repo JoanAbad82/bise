@@ -13,8 +13,9 @@ import { Button, Chip, Field, Seg, Toggle, tipAttrs } from '@/ds';
 import type { AppCmd, Plugin, PluginsSummary, ConnectorsProblem } from '@/proto';
 import { settings } from '@/proto/words.gen';
 import {
+  bandCells,
   bandShows,
-  cardWhy,
+  bandWords,
   controlOf,
   foundWords,
   gives,
@@ -31,7 +32,7 @@ import {
   type Hit,
   type KindFilter,
 } from './model';
-import { PluginIcon } from './PluginIcon';
+import { MonoTile, PluginIcon } from './PluginIcon';
 import { Room } from './Room';
 import { AddMenu, type AddItem } from './Add';
 import './plugins.css';
@@ -78,88 +79,100 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
   const groups = useMemo(() => groupsOf(all, kind, q), [all, kind, q]);
   const counts = useMemo(() => kindCounts(all), [all]);
   const toBrowse = browse.reduce((n, b) => n + b.items.length, 0);
+  const search = (
+    <span className="plg-search">
+      <Field slash placeholder={settings.plugins_search} value={q} onChange={(e) => { setQ(e.currentTarget.value); }}
+        onKeyDown={(e) => { if (e.key === 'Escape') setQ(''); }} testId="plugins.search" />
+    </span>
+  );
+  // three sections at --gap-page (the hero, connect your tools, the list); inside the list, its
+  // head (the tabs, the search at their right: it filters the list), the chips and the groups at
+  // --gap-block (ui-review #1, #2, #10)
   return (
     <section className="plg-place" data-testid="plugins.place">
       <header className="plg-head" data-testid="plugins.head">
-        <div className="plg-head-words">
-          <h1 className="plg-h1">{settings.plugins_screen}</h1>
-          <div className="plg-h2">{settings.plugins_place_sub}</div>
-          {summary !== null && (
-            <div className="plg-counts" data-testid="plugins.counts">
-              {settings.plugins_place_counts({ on: summary.on, off: summary.off })}
-              {summary.waiting > 0 && (
-                <>
-                  {' · '}
-                  <span className="plg-acc">{settings.plugins_place_waits({ n: summary.waiting })}</span>
-                </>
-              )}
-            </div>
-          )}
+        <div className="plg-head-top">
+          <div className="plg-head-words">
+            <h1 className="plg-h1">{settings.plugins_screen}</h1>
+            <div className="plg-h2">{settings.plugins_place_sub}</div>
+            {summary !== null && (
+              <div className="plg-counts" data-testid="plugins.counts">
+                {settings.plugins_place_counts({ on: summary.on, off: summary.off })}
+                {summary.waiting > 0 && (
+                  <>
+                    {' · '}
+                    <span className="plg-acc">{settings.plugins_place_waits({ n: summary.waiting })}</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <AddMenu summary={summary} onPick={(item) => { if (item === 'browse') setTab('browse'); else ports.add(item); }} />
         </div>
         <div className="plg-room" data-testid="plugins.room">
           {room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} />}
         </div>
         <div className="plg-room-sub">{settings.plugins_room_sub}</div>
       </header>
-      <div className="plg-bar">
-        <span className="plg-search">
-          <Field slash placeholder={settings.plugins_search} value={q} onChange={(e) => { setQ(e.currentTarget.value); }}
-            onKeyDown={(e) => { if (e.key === 'Escape') setQ(''); }} testId="plugins.search" />
-        </span>
-        <AddMenu summary={summary} onPick={(item) => { if (item === 'browse') setTab('browse'); else ports.add(item); }} />
-      </div>
-      {bandShows(summary) && summary !== null && (
-        <Band summary={summary} browse={browse.find((b) => b.source === 'mistral')?.items ?? []} projectName={projectName}
-          onConnect={(id) => { ports.send({ cmd: 'plugin_connect', ...at, id }); }}
-          onImport={() => { ports.add('import'); }}
-          onWorkspace={() => { setTab('installed'); setKind('all'); setQ(''); }}
-          onBrowse={() => { setTab('browse'); }} />
-      )}
-      {problem != null && <Problem problem={problem} onRefresh={() => { ports.send({ cmd: 'plugins_refresh', ...at }); }} />}
-      <div className="plg-tabs">
-        <Seg items={[<TabWords key="i" words={settings.plugins_tab_installed} n={counts.all} />, <TabWords key="b" words={settings.plugins_tab_browse} n={toBrowse} />]}
-          on={tab === 'installed' ? 0 : 1} onPick={(i) => { setTab(i === 0 ? 'installed' : 'browse'); }} testId="plugins.tabs" />
-      </div>
-      {tab === 'installed' ? (
-        <>
-          <div className="plg-kinds" role="group" data-testid="plugins.kinds">
-            {KINDS.map((k) => (
-              <Chip key={k} {...(k === kind ? { state: 'hover' as const } : {})} onClick={() => { setKind(k); }} testId={`plugins.kind.${k}`} expanded={k === kind}>
-                {kindWords(k)}
-                {k !== 'all' && <span className="plg-n">{counts[k]}</span>}
-              </Chip>
-            ))}
-          </div>
-          {rows === null ? (
-            <div className="plg-empty" data-testid="plugins.loading">{settings.plugins_place_loading}</div>
-          ) : groups.length === 0 ? (
-            <div className="plg-empty" data-testid="plugins.none">{settings.plugins_none_match}</div>
-          ) : (
-            groups.map((g) => (
-              <div key={g.kind} className="plg-group" data-testid={`plugins.group.${g.kind}`}>
-                <div className="plg-group-head">
-                  <span>{groupWords(g.kind)}</span>
-                  <span className="plg-n">{g.hits.length}</span>
-                </div>
-                <div className="plg-list">
-                  {g.hits.map((h) => (
-                    <PlaceRow key={h.p.id === '' ? h.p.name : h.p.id} h={h} project={project}
-                      onOpen={() => { ports.open(h.p.id === '' ? h.p.name : h.p.id); }}
-                      onSet={(on) => { ports.send({ cmd: 'plugin_set', ...at, name: h.p.id === '' ? h.p.name : h.p.id, on }); }}
-                      onConnect={(id) => { ports.send({ cmd: 'plugin_connect', ...at, id }); }}
-                      onLogin={(name) => { ports.send({ cmd: 'plugin_login', ...at, name }); }}
-                      onSetUp={ports.setUpComputer} />
-                  ))}
-                </div>
-              </div>
-            ))
+      {(bandShows(summary) && summary !== null) || problem != null ? (
+        <div className="plg-sec">
+          {bandShows(summary) && summary !== null && (
+            <Band summary={summary} browse={browse.find((b) => b.source === 'mistral')?.items ?? []} projectName={projectName}
+              onConnect={(id) => { ports.send({ cmd: 'plugin_connect', ...at, id }); }}
+              onImport={() => { ports.add('import'); }}
+              onWorkspace={() => { setTab('installed'); setKind('all'); setQ(''); }}
+              onBrowse={() => { setTab('browse'); }} />
           )}
-        </>
-      ) : (
-        <BrowseList browse={browse} q={q} project={project}
-          onConnect={(id) => { ports.send({ cmd: 'plugin_connect', ...at, id }); }}
-          onOpen={ports.open} />
-      )}
+          {problem != null && <Problem problem={problem} onRefresh={() => { ports.send({ cmd: 'plugins_refresh', ...at }); }} />}
+        </div>
+      ) : null}
+      <div className="plg-sec" data-testid="plugins.list">
+        <div className="plg-tabs">
+          <Seg items={[<TabWords key="i" words={settings.plugins_tab_installed} n={counts.all} />, <TabWords key="b" words={settings.plugins_tab_browse} n={toBrowse} />]}
+            on={tab === 'installed' ? 0 : 1} onPick={(i) => { setTab(i === 0 ? 'installed' : 'browse'); }} testId="plugins.tabs" />
+          {search}
+        </div>
+        {tab === 'installed' ? (
+          <>
+            <div className="plg-kinds" role="group" data-testid="plugins.kinds">
+              {KINDS.map((k) => (
+                <Chip key={k} onClick={() => { setKind(k); }} testId={`plugins.kind.${k}`} expanded={k === kind}>
+                  {kindWords(k)}
+                  {k !== 'all' && <span className="plg-n">{counts[k]}</span>}
+                </Chip>
+              ))}
+            </div>
+            {rows === null ? (
+              <div className="plg-empty" data-testid="plugins.loading">{settings.plugins_place_loading}</div>
+            ) : groups.length === 0 ? (
+              <div className="plg-empty" data-testid="plugins.none">{settings.plugins_none_match}</div>
+            ) : (
+              groups.map((g) => (
+                <div key={g.kind} className="plg-group" data-testid={`plugins.group.${g.kind}`}>
+                  <div className="plg-group-head">
+                    <span>{groupWords(g.kind)}</span>
+                    <span className="plg-n">{g.hits.length}</span>
+                  </div>
+                  <div className="plg-list">
+                    {g.hits.map((h) => (
+                      <PlaceRow key={h.p.id === '' ? h.p.name : h.p.id} h={h} project={project}
+                        onOpen={() => { ports.open(h.p.id === '' ? h.p.name : h.p.id); }}
+                        onSet={(on) => { ports.send({ cmd: 'plugin_set', ...at, name: h.p.id === '' ? h.p.name : h.p.id, on }); }}
+                        onConnect={(id) => { ports.send({ cmd: 'plugin_connect', ...at, id }); }}
+                        onLogin={(name) => { ports.send({ cmd: 'plugin_login', ...at, name }); }}
+                        onSetUp={ports.setUpComputer} />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </>
+        ) : (
+          <BrowseList browse={browse} q={q} project={project}
+            onConnect={(id) => { ports.send({ cmd: 'plugin_connect', ...at, id }); }}
+            onOpen={ports.open} />
+        )}
+      </div>
     </section>
   );
 }
@@ -271,49 +284,59 @@ export function Band({ summary, browse, projectName, onConnect, onImport, onWork
   const ws = itemsOf(summary, 'workspace')[0];
   const market = itemsOf(summary, 'marketplace');
   const byId = new Map(browse.map((p) => [p.id, p]));
+  const words = mistral === undefined ? null : bandWords(mistral, byId);
+  const ids = mistral?.ids ?? [];
+  const cells = bandCells(ids.length, mistral?.n ?? 0);
   return (
     <div className="plg-band" data-testid="plugins.band">
-      <div className="plg-band-head">
-        <span className="plg-band-h">{settings.plugins_band_head}</span>
-        <span className="plg-dim">{settings.plugins_band_through}</span>
-        <span className="plg-band-count" data-testid="plugins.band.count">{settings.plugins_band_count({ connected: summary.connected, total: summary.connectors })}</span>
+      <div className="plg-band-top">
+        <div className="plg-band-head">
+          <span className="plg-band-h">{settings.plugins_band_head}</span>
+          <span className="plg-dim">{settings.plugins_band_through}</span>
+          <span className="plg-band-count" data-testid="plugins.band.count">{settings.plugins_band_count({ connected: summary.connected, total: summary.connectors })}</span>
+        </div>
+        <div className="plg-band-sub" data-testid="plugins.band.sub">{words?.sub ?? settings.plugins_band_sub}</div>
       </div>
-      <div className="plg-band-sub">{settings.plugins_band_sub}</div>
-      {mistral !== undefined && (
+      {mistral !== undefined && words !== null && (
         <div className="plg-cards">
-          {(mistral.ids ?? []).map((id, i) => {
+          {ids.slice(0, cells.shown).map((id, i) => {
             const row = byId.get(id);
             const title = (mistral.titles ?? [])[i] ?? id;
-            const why = cardWhy(mistral, i, row);
+            const card = words.cards[i] ?? { line: '', tip: '' };
             return (
               <div key={id} className="plg-card" data-testid={`plugins.band.${id}`}>
-                {row !== undefined ? <PluginIcon row={row} /> : <span className="plg-icon row"><span className="plg-tile">{title.slice(0, 2)}</span></span>}
-                <span className="plg-card-words" {...(why.tip !== '' ? tipAttrs(why.tip) : {})} data-testid={`plugins.band.${id}.why`}>
-                  <span className="plg-title">{title}</span>
-                  <span className="plg-dim">{why.line}</span>
+                {row !== undefined ? <PluginIcon row={row} testId={`plugins.band.${id}.icon`} /> : <MonoTile title={title} testId={`plugins.band.${id}.icon`} />}
+                <span className="plg-card-words" {...(card.tip !== '' ? tipAttrs(card.tip) : {})} data-testid={`plugins.band.${id}.why`}>
+                  <span className="plg-title" data-testid={`plugins.band.${id}.title`}>{title}</span>
+                  {card.line !== '' && <span className="plg-dim">{card.line}</span>}
                 </span>
                 <Button size="sm" onClick={() => { onConnect(id); }} testId={`plugins.band.${id}.connect`}>{settings.plugins_connect}</Button>
               </div>
             );
           })}
+          {cells.more > 0 && (
+            <div className="plg-card more">
+              <Button kind="ghost" onClick={onBrowse} testId="plugins.band.more">{settings.plugins_band_more({ n: cells.more })}</Button>
+            </div>
+          )}
         </div>
       )}
       {found !== null && imp !== undefined && (
         <div className="plg-band-line" data-testid="plugins.band.import">
           <span>{found}</span>
-          <Button size="sm" onClick={onImport} testId="plugins.band.import.go">{settings.plugins_band_import({ n: imp.n })}</Button>
+          <Button size="sm" kind="ghost" onClick={onImport} testId="plugins.band.import.go">{settings.plugins_band_import({ n: imp.n })}</Button>
         </div>
       )}
       {ws !== undefined && (
         <div className="plg-band-line" data-testid="plugins.band.workspace">
           <span>{settings.plugins_band_workspace({ project: projectName ?? '', n: ws.n })}</span>
-          <Button size="sm" onClick={onWorkspace} testId="plugins.band.workspace.see">{settings.plugins_band_see}</Button>
+          <Button size="sm" kind="ghost" onClick={onWorkspace} testId="plugins.band.workspace.see">{settings.plugins_band_see}</Button>
         </div>
       )}
       {market.map((m, i) => (
         <div key={i} className="plg-band-line" data-testid="plugins.band.market">
           <span>{marketWords(market, m)}</span>
-          <Button size="sm" onClick={onBrowse} testId="plugins.band.market.browse">{settings.plugins_band_browse}</Button>
+          <Button size="sm" kind="ghost" onClick={onBrowse} testId="plugins.band.market.browse">{settings.plugins_band_browse}</Button>
         </div>
       ))}
     </div>

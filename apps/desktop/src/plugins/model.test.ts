@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Plugin, PluginPart, PluginsSummary } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
-import { badgeOf, controlOf, gives, groupsOf, hitOf, kindCounts, lineOf, newKey, removable, sideOf, waitsWords } from './model';
+import { settings } from '@/proto/words.gen';
+import { badgeOf, bandCells, bandWords, controlOf, gives, groupsOf, hitOf, kindCounts, lineOf, newKey, removable, sideOf, waitsWords } from './model';
 import { isNew, markSeen, seenKey, type SeenStore } from './seen';
 
 const row = (id: string, more: Partial<Plugin> = {}): Plugin => ({ id, name: id, kind: 'plugin', scope: 'user', title: id, state: 'loaded', on: true, ...more });
@@ -112,5 +113,29 @@ describe('the summary', () => {
     // a new connector to suggest: the dot again
     const more = { ...s, suggest: (s.suggest ?? []).map((x) => (x.kind === 'mistral' ? { ...x, ids: ['mistral:hex', ...(x.ids ?? []).slice(0, 4)] } : x)) };
     expect(isNew(more, seenKey(st))).toBe(true);
+  });
+
+  it("the band: a why every card says goes up to the sub once, each card then says what its tool does (ui-review #6)", () => {
+    const m = (full().suggest ?? []).find((x) => x.kind === 'mistral');
+    if (m === undefined) throw new Error('fixture');
+    const rows = new Map<string, Plugin>([['mistral:linear', { id: 'mistral:linear', name: 'mistral:linear', kind: 'mistral', scope: 'mistral', title: 'Linear', state: 'available', on: false, what: 'issues, projects and cycles' }]]);
+    const mixed = bandWords(m, rows);
+    expect(mixed.sub).toBe(settings.plugins_band_sub);
+    expect(mixed.cards[1]).toEqual({ line: 'track and update your issues and projects', tip: 'issues, projects and cycles' });
+    const same = bandWords({ ...m, whys: (m.whys ?? []).map(() => ({ text: settings.plugins_why_mistral, source: 'generic' as const })) }, rows);
+    expect(same.sub).toBe(settings.plugins_band_sub_why({ why: settings.plugins_why_mistral }));
+    expect(same.cards.map((c) => c.line)).toEqual(['', 'issues, projects and cycles', '', '', '']);
+  });
+
+  it('the band grid: 2, 4 or 6 cells, the last one browse N more when more wait (ui-review #9)', () => {
+    expect(bandCells(5, 6)).toEqual({ shown: 5, more: 1 });
+    expect(bandCells(5, 122)).toEqual({ shown: 5, more: 117 });
+    expect(bandCells(5, 5)).toEqual({ shown: 3, more: 2 });
+    expect(bandCells(4, 4)).toEqual({ shown: 4, more: 0 });
+    expect(bandCells(3, 3)).toEqual({ shown: 1, more: 2 });
+    expect(bandCells(2, 9)).toEqual({ shown: 1, more: 8 });
+    expect(bandCells(2, 2)).toEqual({ shown: 2, more: 0 });
+    expect(bandCells(1, 1)).toEqual({ shown: 1, more: 0 });
+    expect(bandCells(0, 0)).toEqual({ shown: 0, more: 0 });
   });
 });

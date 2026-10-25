@@ -59,4 +59,5 @@ pub mod skills;
 pub mod state;
 pub mod status;
 pub mod stdio;
+pub mod title;
 pub mod tools_cache;
