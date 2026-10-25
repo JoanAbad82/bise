@@ -37,11 +37,14 @@ export function agentCounts(agents: readonly Agent[]): Pick<Counts, 'working' | 
   return { working: working.length, asks: asking.length, busy: busy.length };
 }
 
-/** A bubble's count pill: its number (none at 0) and whether it is the accent (an agent asks). Pure. */
+/**
+ * A bubble's count pill (designer m_42866): the number waiting on him, in the accent, when there is
+ * one (the agents that ask); otherwise its total, text-2 on --c-raised; none at 0. Pure.
+ */
 export function bubbleCount(b: BubbleId, c: Counts): { readonly n: number; readonly accent: boolean } {
   switch (b) {
     case 'agents':
-      return { n: c.busy, accent: c.asks > 0 };
+      return c.asks > 0 ? { n: c.asks, accent: true } : { n: c.busy, accent: false };
     case 'artifacts':
       return { n: c.newArtifacts, accent: false };
     case 'scheduled':

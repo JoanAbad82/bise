@@ -181,14 +181,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--c-ink);
-  color: var(--c-on-ink);
-  box-shadow: 0 0 0 2px var(--c-solid);
+  /* a total: text-2 on --c-raised; what waits on him (an agent asks): the accent (designer m_42866) */
+  background: var(--c-raised);
+  color: var(--c-text-2);
+  box-shadow: 0 0 0 2px var(--c-solid), inset 0 0 0 1px var(--c-line);
   font: 600 var(--f-kbd);
   font-variant-numeric: tabular-nums;
 }
 .s3-count[data-accent] {
   background: var(--c-accent);
+  color: var(--c-on-ink);
+  box-shadow: 0 0 0 2px var(--c-solid);
 }
 
 /* a card: 360 with its padding, 12 left of the bubbles (12 + 44 + 12), r 16, glass, --e-3; it stops

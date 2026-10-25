@@ -25,8 +25,9 @@ describe('the counts', () => {
     expect(c).toEqual({ working: 2, asks: 1, busy: 2 });
   });
   it('a bubble shows its count, the agents in the accent only when one asks', () => {
-    expect(bubbleCount('agents', COUNTS)).toEqual({ n: 3, accent: true });
-    expect(bubbleCount('agents', { ...COUNTS, asks: 0 }).accent).toBe(false);
+    // what waits on him in the accent (1 asks), else the total plain (designer m_42866)
+    expect(bubbleCount('agents', COUNTS)).toEqual({ n: 1, accent: true });
+    expect(bubbleCount('agents', { ...COUNTS, asks: 0 })).toEqual({ n: 3, accent: false });
     expect(bubbleCount('artifacts', COUNTS)).toEqual({ n: 2, accent: false });
     expect(bubbleCount('scheduled', COUNTS).n).toBe(2);
     expect(bubbleCount('processes', COUNTS).n).toBe(2);

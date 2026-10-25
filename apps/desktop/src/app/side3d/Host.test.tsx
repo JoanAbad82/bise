@@ -80,7 +80,8 @@ describe('the right side, folded', () => {
     const { v } = side3d();
     expect(v.getByTestId('app.world')).toBeTruthy();
     for (const b of ['agents', 'artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.bubble.${b}`).getAttribute('data-tip')).toBeTruthy();
-    expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('2');
+    // 2 working, 1 of them asks: the badge is what waits on him
+    expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('1');
     expect(v.getByTestId('app.bubble.agents.count').hasAttribute('data-accent')).toBe(true);
     expect(v.getByTestId('app.bubble.artifacts.count').textContent).toBe('1');
     expect(v.getByTestId('app.bubble.artifacts.count').hasAttribute('data-accent')).toBe(false);
