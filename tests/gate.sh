@@ -205,8 +205,9 @@ map_paths() {  # <changed path>...
       # the skills teach the SDK through bise office run (architect m_23951)
       plugins/sheets/*|plugins/slides/*|plugins/docs/*|rust/jsrt/*) office_skills=1 ;;
     esac
-    # the kit's node checks (kit/*.check.ts, no deps, ~0.1 s)
-    case "$f" in kit/*) kit=1 ;; esac
+    # the kit's node checks (kit/*.check.ts, no deps, ~0.1 s), and the page scripts' types
+    # and emit, bise.dev's (site/) with them
+    case "$f" in kit/*|site/*) kit=1 ;; esac
     # the extension's unit tests and the computer-use scripts' types (~2 s)
     case "$f" in computer-use/extension/*|computer-use/bench/*|computer-use/tsconfig.node.json) cu=1 ;; esac
     # the as-he-does driver and pagedrive: fx's unit test and their types (~3 s)
@@ -244,8 +245,10 @@ kit_check() {
     echo "tsc -p kit/tsconfig.json"; "$tsc" -p "$root/kit/tsconfig.json" || return 1
     # the artifact viewer's modules (kit/office): theirs, on office/dist's types
     echo "tsc -p kit/office/tsconfig.json"; "$tsc" -p "$root/kit/office/tsconfig.json" || return 1
-    echo "ts_emit kit/tsconfig.json kit/office/tsconfig.json --check"
-    NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/kit/tsconfig.json" "$root/kit/office/tsconfig.json" --check || return 1
+    # bise.dev's own scripts (Vercel serves the committed .js)
+    echo "tsc -p site/tsconfig.json"; "$tsc" -p "$root/site/tsconfig.json" || return 1
+    echo "ts_emit kit/tsconfig.json kit/office/tsconfig.json site/tsconfig.json --check"
+    NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/kit/tsconfig.json" "$root/kit/office/tsconfig.json" "$root/site/tsconfig.json" --check || return 1
   else echo "skipped kit types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
 }
 # the extension's unit tests (no browser), then the types of its tests and the bench

@@ -5,3 +5,6 @@ README.md
 .env*
 .vercel
 *.tmpl
+# the TypeScript sources of the scripts (the committed .js next to them is what runs)
+*.ts
+tsconfig.json
