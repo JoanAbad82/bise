@@ -155,9 +155,9 @@ agents message each other directly: questions, hand-offs, who edits which file. 
 
 #### every MCP server, always enabled
 
-connect as many MCP servers as you want (GitHub, Linear, Sentry, Slack, your database) and keep them all on. agents call tools from code, so a hundred servers don't fill the context.
+connect as many MCP servers as you want (GitHub, Linear, Sentry, Slack, your database) and keep them all on. agents call tools from code, so a hundred servers don't fill the context. the plugins place in the app, or `/plugins` in the terminal, lists them with their state.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/tools-dark.svg"><img src="docs/brand/readme/feat/tools-light.svg" width="680" alt="42 MCP servers are on. you ask why checkout errors jumped; main writes a few lines of code that call Sentry, GitHub and Slack, and answers in two lines."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/tools-desktop-dark.svg"><img src="docs/brand/readme/feat/tools-desktop-light.svg" width="680" alt="bise desktop: the plugins place lists 42 MCP servers, all on (GitHub, Sentry, Slack, Linear, postgres…); you ask main why checkout errors jumped; it checks Sentry, GitHub and Slack in one script and answers in two lines."></picture>
 
 #### computer use
 
@@ -167,9 +167,9 @@ your agents can use your browser: they open pages in their own tab group, in the
 
 #### Agent Plugins
 
-skills, MCP servers and hooks in the [Agent Plugins](https://agent-plugins.org) format load as they are, from `~/.agents/plugins` or your repo. Vibe plugins too.
+skills, MCP servers and hooks in the [Agent Plugins](https://agent-plugins.org) format load as they are, from `~/.agents/plugins` or your repo. Vibe plugins too. in the app, each plugin has its page in the plugins place, with a few lines to try.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/plugins-dark.svg"><img src="docs/brand/readme/feat/plugins-light.svg" width="680" alt="on its first run, bise finds your skills, plugins and MCP servers; you ask for the game&#x27;s patch notes and the agent uses your own skill."></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme/feat/plugins-desktop-dark.svg"><img src="docs/brand/readme/feat/plugins-desktop-light.svg" width="680" alt="bise desktop: the plugins place lists your plugin patch-notes next to bise's own skills and your skill folders; its page shows its skill and three lines to try; one click puts 'write the patch notes for 1.4' in the composer; you send it, and main uses your skill and writes the page."></picture>
 
 ### control
 
