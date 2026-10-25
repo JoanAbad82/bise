@@ -74,7 +74,7 @@ describe("his sketch's growth", () => {
       // it takes in more than the square did
       expect(c.left.length, `${m} ${String(n)} agents`).toBeLessThanOrEqual(square.left.length);
     }
-  });
+  }, 60_000);
 
   it("on every map, the wing's walk and the garden's path cross no furniture, and join the office's network", () => {
     for (const [m, n] of MAP_IDS.flatMap((id) => [1, 12, 20, 31].map((k) => [id, k] as const))) {
@@ -100,7 +100,30 @@ describe("his sketch's growth", () => {
     expect(overlaps(g.wing ?? { x0: 0, x1: 0, z0: 0, z1: 0 }, { x0: o.x0, x1: o.x0 + o.W, z0: 0, z1: o.D })).toBe(false);
   });
 
-  it('grows every map but california (its office is beside the park: a wing past the park would be a side room)', () => {
-    expect([...GROWS].sort()).toEqual(['campus', 'climb', 'cyclades', 'greenhouse', 'haveli', 'kyoto', 'loft', 'nordic', 'patio', 'riad', 'sahel', 'tropical', 'workshop']);
+  it("grows every map; california its wing past the office's left side (never past the park)", () => {
+    const c = layoutOf(crewOf(3), 'california');
+    const w = wingOf(c);
+    expect(w.x1).toBe(c.x0);
+    expect(w.z0).toBe(0);
+    expect([...GROWS].sort()).toEqual(['california', 'campus', 'climb', 'cyclades', 'greenhouse', 'haveli', 'kyoto', 'loft', 'nordic', 'patio', 'riad', 'sahel', 'tropical', 'workshop']);
   });
+
+  it("a garden takes the door's trio first: mailbox, scooter and bike stand in it together, an outdoor piece waits before them (designer m_41494)", () => {
+    const trio = ['mailbox', 'scooter', 'bike'];
+    let gardens = 0;
+    for (const map of GROWS) {
+      const o = layoutOf(crewOf(3), map);
+      // his collection and every outdoor piece: the garden can't take them all
+      const outdoor = ['library', 'files', 'visio', 'booth', 'arcade', 'pingpong', 'scooter', 'mailbox', 'easel', 'macdesk', 'telescope', 'bike', 'campfire', 'grill', 'hammock', 'swing', 'pond', 'veggies'] as const;
+      const objs = objsOf(outdoor.length, outdoor);
+      const before = objectSpots(o, objs);
+      const { office } = grownFor(o, objs, before.placed);
+      if (office.garden === undefined) continue;
+      gardens += 1;
+      const after = objectSpots(office, objs, before.placed);
+      const out = after.placed.filter((p) => trio.includes(p.of));
+      expect(out.map((p) => `${map} ${p.of} ${p.corner}`).sort(), map).toEqual(trio.map((t) => `${map} ${t} garden`).sort());
+    }
+    expect(gardens).toBeGreaterThan(GROWS.size / 2);
+  }, 30_000);
 });

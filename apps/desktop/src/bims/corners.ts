@@ -218,12 +218,12 @@ function keepOf(o: Office): Keep {
   for (const f of [...dec.plants, dec.doorMat, dec.ramp]) boxes.push({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd });
   for (const f of [dec.parasol, dec.palm]) boxes.push({ x0: f.x - CANOPY, x1: f.x + CANOPY, z0: f.z - CANOPY, z1: f.z + CANOPY });
   // his sketch's wing: its lamp and the floor under its window (wing.ts)
-  if (o.wing !== undefined) boxes.push(wingLamp(o.wing), wingWindow(o.wing));
+  if (o.wing !== undefined) boxes.push(wingLamp(o.wing, o.wing.x1 <= o.x0 + 1e-9), wingWindow(o.wing));
   // his sketch's garden: its tree (render/extensions.ts), its crown's reach
   if (o.garden !== undefined) boxes.push({ x0: o.garden.x0 + 0.7 - CANOPY, x1: o.garden.x0 + 0.7 + CANOPY, z0: o.garden.z1 - 1.1 - CANOPY, z1: o.garden.z1 - 1.1 + CANOPY });
   const spots: Pt[] = [o.door, o.mainDesk, ...o.desks.values(), ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, ...o.terrace, ...(o.nooks ?? []), ...(c?.coffeeSpots ?? [])];
   const t = terraceSlab(o);
-  const gx = Math.min(o.x0, t.x0, o.garden?.x0 ?? t.x0) - CELL;
+  const gx = Math.min(o.x0, t.x0, o.garden?.x0 ?? t.x0, o.wing?.x0 ?? t.x0) - CELL;
   const gz = Math.min(0, t.z0) - CELL;
   const nx = Math.ceil((Math.max(o.x0 + o.W, t.x1, o.wing?.x1 ?? t.x1, o.garden?.x1 ?? t.x1) + CELL - gx) / CELL);
   const nz = Math.ceil((Math.max(o.D, t.z1, o.garden?.z1 ?? t.z1) + CELL - gz) / CELL);
@@ -296,7 +296,7 @@ function areaOf(o: Office, corner: Corner): Box {
     const g = o.garden ?? { x0: 0, x1: 0, z0: 0, z1: 0 };
     return { x0: g.x0 + EDGE, x1: g.x1 - EDGE, z0: g.z0 + EDGE, z1: g.z1 - HEDGE_D };
   }
-  return { x0: o.x0 + EDGE, x1: (o.wing?.x1 ?? o.x0 + o.W) - EDGE, z0: EDGE, z1: o.D - EDGE };
+  return { x0: Math.min(o.x0, o.wing?.x0 ?? o.x0) + EDGE, x1: Math.max(o.x0 + o.W, o.wing?.x1 ?? o.x0) - EDGE, z0: EDGE, z1: o.D - EDGE };
 }
 
 /** the floors a grown office stands things on: the room and its wing, the terrace and its garden */
@@ -530,7 +530,7 @@ export const PLAY_ZONE = 1.5;
 function inZone(area: Box, b: Box, corner: Corner, seeds: readonly Box[], play: readonly Box[] = [], wing?: Box): boolean {
   if (OUT.has(corner)) return true;
   // his sketch's wing (extensions.ts) is the office going on: any indoor corner may gather there too (not the door's, not a hung thing)
-  if (wing !== undefined && corner !== 'door' && corner !== 'hang' && b.x0 >= wing.x0 - 1e-9) return true;
+  if (wing !== undefined && corner !== 'door' && corner !== 'hang' && b.x0 >= wing.x0 - 1e-9 && b.x1 <= wing.x1 + 1e-9) return true;
   if (corner === 'read') return b.x0 <= area.x0 + ZONE && !play.some((s) => overlaps(b, s, ZONE));
   if (corner === 'hang') return b.z0 <= area.z0 + TOUCH || b.x0 <= area.x0 + TOUCH;
   // the games stay right by the nap place, never halfway to main's desk (designer m_41180)
@@ -538,9 +538,13 @@ function inZone(area: Box, b: Box, corner: Corner, seeds: readonly Box[], play: 
   return seeds.some((s) => overlaps(b, s, reach));
 }
 
-/** the order objects take their spots: hung and wall things first (they need a wall), then the biggest; the key breaks ties */
-function orderOf(objs: readonly PluginObject[]): PluginObject[] {
-  const rank = (p: PluginObject): number => (CORNER[p.obj] === 'hang' ? 0 : AGAINST.has(p.obj) ? 1 : 2);
+/**
+ * the order objects take their spots: with a garden, the door's trio first (it goes out together:
+ * an outdoor piece waits, never the mailbox, designer m_41494); then hung and wall things (they need
+ * a wall), then the biggest; the key breaks ties
+ */
+function orderOf(objs: readonly PluginObject[], garden: boolean): PluginObject[] {
+  const rank = (p: PluginObject): number => (garden && TRAVEL.has(p.obj) ? -1 : CORNER[p.obj] === 'hang' ? 0 : AGAINST.has(p.obj) ? 1 : 2);
   const area = (p: PluginObject): number => FEET[p.obj].w * FEET[p.obj].d;
   return [...objs].sort((a, b) => rank(a) - rank(b) || area(b) - area(a) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
@@ -558,9 +562,13 @@ export function objectSpots(o: Office, objs: readonly PluginObject[], prev: read
   const left: PluginObject[] = [];
   const todo: PluginObject[] = [];
   // the ones still free where they were, first
-  for (const p of orderOf(objs)) {
+  const garden = o.garden !== undefined;
+  const order = orderOf(objs, garden);
+  for (const p of order) {
     const b = was.get(p.key);
-    const at = b === undefined ? null : kept(c, p, b, placed);
+    // a garden come: the door's trio goes out to it, from wherever it stood
+    const out = garden && TRAVEL.has(p.obj) && b !== undefined && b.corner !== 'garden';
+    const at = b === undefined || out ? null : kept(c, p, b, placed);
     if (at === null) todo.push(p);
     else placed.push(at);
   }

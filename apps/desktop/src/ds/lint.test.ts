@@ -142,7 +142,8 @@ describe('the pointer law (his words: « chaque chose sur laquelle tu peux cliqu
 
   it('no stylesheet puts the arrow back on a control (only a disabled state, or a thing that takes no click)', () => {
     // labels that look like rows but take no click
-    const may = new Set(['app/app.css .app-rb-none', 'app/app.css .app-rb-none:hover']);
+    // an object's '?' pill that takes no click (only a broken plugin's '✗' opens it: objpills.ts)
+    const may = new Set(['app/app.css .app-rb-none', 'app/app.css .app-rb-none:hover', "bims/office.css .bims-pill.bims-objpill:not([role='button'])"]);
     const found = files
       .filter((f) => f.endsWith('.css'))
       .flatMap((p) => cursorFaults(readFileSync(p, 'utf8')).map((s) => `${rel(p)} ${s}`))

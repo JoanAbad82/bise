@@ -38,9 +38,10 @@ export const SHADOW_BLUR = 0.55;
 export function siteOf(o: Office): Site {
   // his sketch's extensions (extensions.ts) are the building's too: the wing past its right side, the garden past the terrace
   const s = squareSiteOf(o);
+  const x0 = Math.min(s.x0, (o.wing?.x0 ?? Infinity) - EXT_PAD);
   const x1 = Math.max(s.x1, (o.wing?.x1 ?? -Infinity) + EXT_PAD, (o.garden?.x1 ?? -Infinity) + EXT_PAD);
   const z1 = Math.max(s.z1, (o.garden?.z1 ?? -Infinity) + EXT_PAD);
-  return { ...s, x1, z1 };
+  return { ...s, x0, x1, z1 };
 }
 
 /** the square's site alone: its building, the terrace in front */
@@ -67,6 +68,8 @@ export function extSlabsOf(o: Office, g: { readonly stage: number; readonly gard
   const G = groundOf(o, g);
   const out: ExtSlab[] = [];
   if (o.wing !== undefined && o.wing.x1 + EXT_PAD > G.x1) out.push({ kind: 'wing', x0: G.x1, x1: o.wing.x1 + EXT_PAD, z0: G.z0, z1: Math.max(G.z0 + 1, o.wing.z1 + EXT_PAD) });
+  // a wing past the left side (california's): its slab off the ground's left
+  if (o.wing !== undefined && o.wing.x0 - EXT_PAD < G.x0) out.push({ kind: 'wing', x0: o.wing.x0 - EXT_PAD, x1: G.x0, z0: G.z0, z1: Math.max(G.z0 + 1, o.wing.z1 + EXT_PAD) });
   if (o.garden !== undefined && o.garden.z1 + EXT_PAD > G.z1) out.push({ kind: 'garden', x0: G.x0, x1: Math.max(G.x0 + 1, o.garden.x1 + EXT_PAD), z0: G.z1, z1: o.garden.z1 + EXT_PAD });
   return out;
 }

@@ -11,11 +11,20 @@ import { FEET } from './render/objects/feet';
 export { wingLamp, wingWindow } from './wing';
 import type { Box, Leg, Office, Pt } from './model';
 import type { MapId } from './maps/ids';
+import type { Cozy } from './cozy';
 import type { PluginObject } from './plugin-objects';
 import { decorOf, terraceSlab } from './render/decor';
 
 /** the maps that grow like his sketch so far (each map's look of them comes in its own step); the others wait, their objects in `left` */
-export const GROWS: ReadonlySet<MapId> = new Set<MapId>(['loft', 'campus', 'workshop', 'kyoto', 'riad', 'nordic', 'patio', 'haveli', 'tropical', 'cyclades', 'sahel', 'greenhouse', 'climb']);
+export const GROWS: ReadonlySet<MapId> = new Set<MapId>(['loft', 'campus', 'workshop', 'kyoto', 'riad', 'nordic', 'patio', 'haveli', 'tropical', 'cyclades', 'sahel', 'greenhouse', 'climb', 'california']);
+/** the maps whose wing goes on past the office's LEFT side (california: its office is beside the park; never past the park, designer m_41482) */
+export const WING_LEFT: ReadonlySet<MapId> = new Set<MapId>(['california']);
+
+/** the office's own room's width: the square's, short of a park beside it */
+const roomW = (o: Office): number => (o.park !== undefined && o.park.area.x0 > o.x0 ? o.park.area.x0 - o.x0 : o.W);
+
+/** a wing past the office's left side (WING_LEFT) */
+export const wingIsLeft = (o: Office, w: Box): boolean => w.x1 <= o.x0 + 1e-9;
 
 /** which of his sketch's extensions an office needs */
 export interface Need {
@@ -56,7 +65,7 @@ export function needOf(o: Office, left: readonly PluginObject[]): Need {
     else area += (FEET[p.obj].w + AROUND) * (FEET[p.obj].d + AROUND);
   }
   if (area === 0) return { wing: 0, garden };
-  const width = size(o.W);
+  const width = size(roomW(o));
   const wing = Math.min(Math.min(o.D, size(o.D)), Math.max(WING_MIN_D, Math.ceil(area / width + WALK_BAND)));
   return { wing, garden };
 }
@@ -68,8 +77,11 @@ const size = (n: number): number => Math.max(EXT_MIN, Math.round(n * EXT_SHARE))
 
 /** The wing's floor: past the square's right side, from its back wall, this deep (its sketch step at most). Pure. */
 export function wingOf(o: Office, depth = size(o.D)): Box {
+  const z1 = Math.min(o.D, size(o.D), depth);
+  const w = size(roomW(o));
+  if (WING_LEFT.has(o.map)) return { x0: o.x0 - w, x1: o.x0, z0: 0, z1 };
   const x0 = o.x0 + o.W;
-  return { x0, x1: x0 + size(o.W), z0: 0, z1: Math.min(o.D, size(o.D), depth) };
+  return { x0, x1: x0 + w, z0: 0, z1 };
 }
 
 /** The garden: in front of the terrace, from the square's left edge, as far as the door's line and past it. Pure. */
@@ -102,22 +114,63 @@ function clearLeg(l: Leg, solids: readonly Box[]): boolean {
  * straight way across is clear (main's desk when none is), into the wing, then along its open front
  * (its back wall's floor stays for things).
  */
-function wingLegs(o: Office, w: Box): Leg[] {
-  const solids = solidsOf(o);
-  const x = w.x0 + WING_IN;
+function wingLegs(o: Office, w: Box, solids: readonly Box[] = solidsOf(o)): Leg[] | null {
+  const left = wingIsLeft(o, w);
+  const x = left ? w.x1 - WING_IN : w.x0 + WING_IN;
   const z = w.z1 - WING_IN;
-  const tail = (from: Pt): Leg[] => {
-    const a: Pt = { x, z: from.z };
+  // from a walk's point: a step along its aisle to a clear line (zIn), across into the wing, to its front, along it
+  const tail = (from: Pt, zIn = from.z): Leg[] => {
+    const s: Pt = { x: from.x, z: zIn };
+    const a: Pt = { x, z: zIn };
     const b: Pt = { x, z };
-    return [[from, a], [a, b], [b, { x: w.x1 - WING_END, z }]];
+    const legs: Leg[] = zIn === from.z ? [] : [[from, s]];
+    return [...legs, [s, a], [a, b], [b, { x: left ? w.x0 + WING_END : w.x1 - WING_END, z }]];
   };
-  const ends = o.walks.flatMap(([a, b]) => [a, b]).filter((p) => p.x < w.x0 && p.z >= 0.5 && p.z <= z);
-  ends.sort((p, q) => w.x0 - p.x - (w.x0 - q.x) || p.z - q.z);
+  // the walk's points on the wing's side, nearest it first
+  const gap = (p: Pt): number => (left ? p.x - w.x1 : w.x0 - p.x);
+  const ends = o.walks.flatMap(([a, b]) => [a, b]).filter((p) => gap(p) > 0 && p.z >= 0.5 && p.z <= z);
+  ends.sort((p, q) => gap(p) - gap(q) || p.z - q.z);
   for (const p of ends) {
-    const legs = tail(p);
-    if (legs.every((l) => l[0].x === l[1].x && l[0].z === l[1].z ? true : clearLeg(l, solids))) return legs;
+    for (const dz of [0, 0.5, -0.5, 1, -1]) {
+      const zIn = p.z + dz;
+      if (zIn < 0.5 || zIn > z) continue;
+      const legs = tail(p, zIn);
+      if (legs.every((l) => (l[0].x === l[1].x && l[0].z === l[1].z) || clearLeg(l, solids))) return legs;
+    }
   }
-  return tail({ x: o.mainDesk.x, z: o.mainDesk.z });
+  return null;
+}
+
+/** the wing as deep as asked, or deeper until a clear walk reaches it (desks along the back: california's), and its walk */
+function wingWithLegs(o: Office, depth: number): { wing: Box; legs: Leg[]; cozy?: Cozy } {
+  const deeper = (solids?: readonly Box[]): { wing: Box; legs: Leg[] } | null => {
+    for (let d = depth; d <= o.D; d += 0.5) {
+      const wing = wingOf(o, d);
+      const legs = wingLegs(o, wing, solids);
+      if (legs !== null) return { wing, legs };
+      if (wing.z1 < d) break;
+    }
+    return null;
+  };
+  const clear = deeper();
+  if (clear !== null) return clear;
+  // a cozy lamp or plant in the way (california's lamp by the wall the wing opens): the walk takes its place, the wing's own lamp replaces it
+  const c = o.cozy;
+  if (c) {
+    const keep = solidsOf(o).filter((b) => !c.lamps.some((i) => i.box === b) && !c.plants.some((i) => i.box === b));
+    const through = deeper(keep);
+    if (through !== null) {
+      const off = (i: { box: Box }): boolean => through.legs.every((l) => clearLeg(l, [i.box]));
+      return { ...through, cozy: { ...c, lamps: c.lamps.filter(off), plants: c.plants.filter(off) } };
+    }
+  }
+  // none clear (never on today's plans): main desk's line, as before
+  const wing = wingOf(o, depth);
+  const z = wing.z1 - WING_IN;
+  const left = wingIsLeft(o, wing);
+  const x = left ? wing.x1 - WING_IN : wing.x0 + WING_IN;
+  const from: Pt = { x: o.mainDesk.x, z: o.mainDesk.z };
+  return { wing, legs: [[from, { x, z: from.z }], [{ x, z: from.z }, { x, z }], [{ x, z }, { x: left ? wing.x0 + WING_END : wing.x1 - WING_END, z }]] };
 }
 
 /**
@@ -148,10 +201,11 @@ function gardenLegs(o: Office, g: Box): Leg[] {
 /** The office grown by what it needs: its wing and garden, and their walks on the network. The same office and need give the same one. Pure. */
 export function withExtensions(o: Office, need: Need): Office {
   if (need.wing <= 0 && !need.garden) return o;
-  const wing = need.wing > 0 ? wingOf(o, need.wing) : undefined;
+  const ww = need.wing > 0 ? wingWithLegs(o, need.wing) : undefined;
+  const wing = ww?.wing;
   const garden = need.garden ? gardenOf(o) : undefined;
-  const walks = [...o.walks, ...(wing ? wingLegs(o, wing) : []), ...(garden ? gardenLegs(o, garden) : [])];
-  return { ...o, walks, ...(wing ? { wing } : {}), ...(garden ? { garden } : {}) };
+  const walks = [...o.walks, ...(ww ? ww.legs : []), ...(garden ? gardenLegs(o, garden) : [])];
+  return { ...o, walks, ...(ww?.cozy ? { cozy: ww.cozy } : {}), ...(wing ? { wing } : {}), ...(garden ? { garden } : {}) };
 }
 
 /**

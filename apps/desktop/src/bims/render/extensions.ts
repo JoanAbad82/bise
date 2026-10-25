@@ -49,7 +49,7 @@ export function buildExtensions(b: Build, into: (of: 'wing' | 'garden') => Objec
       k.add(style.box(0.04, 0.8, 0.07), k.mat(pal.desk), root, cx, 1.0, 0.045);
     }
     // a floor lamp in its far back corner (wing.ts), lit at night like the cozy ones
-    const lamp = wingLamp(w);
+    const lamp = wingLamp(w, w.x1 <= o.x0 + 1e-9);
     const lx = (lamp.x0 + lamp.x1) / 2;
     const lz = (lamp.z0 + lamp.z1) / 2;
     k.add(style.cylinder(0.16, 0.04), k.mat(WORLD.dark), root, lx, 0.02, lz);

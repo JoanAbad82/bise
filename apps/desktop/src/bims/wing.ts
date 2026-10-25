@@ -4,8 +4,8 @@
 import type { Box } from './model';
 
 /** the wing's floor lamp, in its far back corner (render/extensions.ts draws it, corners.ts keeps off it) */
-export function wingLamp(w: Box): Box {
-  return { x0: w.x1 - 0.75, x1: w.x1 - 0.25, z0: 0.2, z1: 0.7 };
+export function wingLamp(w: Box, left = false): Box {
+  return left ? { x0: w.x0 + 0.25, x1: w.x0 + 0.75, z0: 0.2, z1: 0.7 } : { x0: w.x1 - 0.75, x1: w.x1 - 0.25, z0: 0.2, z1: 0.7 };
 }
 
 /** the wing's window on its back wall and the floor under it, kept so it shows (designer m_41450) */
