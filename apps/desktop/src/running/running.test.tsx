@@ -83,7 +83,8 @@ describe('the running screen', () => {
     expect(screen.getByTestId('running.sub').textContent).toBe('3 running in 2 projects · 1 listening');
     expect(rowIds()).toEqual(['shop/checkout/bg1', 'shop/perf/bg3', 'tele/p99/p9.1']);
     // its address on the second line; the chosen row's 'open' opens it (its tip says where)
-    expect(screen.getByTestId('running.row.shop/perf/bg3.url').textContent).toBe(' · :5173 ↗');
+    expect(screen.getByTestId('running.row.shop/perf/bg3.url').textContent).toBe(' · :5173');
+    expect(screen.getByTestId('running.row.shop/perf/bg3.url').querySelector('.b-app-icon')).not.toBeNull();
     fireEvent.click(screen.getByTestId('running.row.shop/perf/bg3.open'));
     expect(screen.getByTestId('running.row.shop/perf/bg3.go').getAttribute('data-tip')).toBe('open localhost:5173');
     // every row has its '…' (its menu: stop, open in a tab: nm-menus); no glyph as a mark

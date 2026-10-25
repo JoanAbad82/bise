@@ -62,8 +62,8 @@ export const running = {
   mark_exit: (a: { rc: string | number }): string => "ended, exit " + String(a.rc),
   /** a row's mark tip: it ended, its code not known */
   mark_ended: "ended",
-  /** a row's address, short and quiet: `:5173 ↗` */
-  url_row: (a: { port: string | number }): string => ":" + String(a.port) + " ↗",
+  /** a row's address, short and quiet: `:5173` (the desktop draws its line icon after it) */
+  url_row: (a: { port: string | number }): string => ":" + String(a.port),
   /** its tip: `open localhost:5173` */
   url_tip: (a: { port: string | number }): string => "open localhost:" + String(a.port),
   /** the output's head: stop asks once more before it stops */

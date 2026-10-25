@@ -379,7 +379,7 @@ function ProcRow({ x, k, on, s, now, home, onClick, onOpen }: {
         title={<span className="run-cmd" data-testid={`running.row.${k}.cmd`}><span className="run-prog">{c.prog}</span>{c.args !== '' && <span className="run-args">{` ${c.args}`}</span>}</span>}
         sub={<>
           {x.p.agent}
-          {u !== null && <span data-testid={`running.row.${k}.url`}>{` · ${u.row}`}</span>}
+          {u !== null && <span className="run-url" data-testid={`running.row.${k}.url`}>{` · ${u.row}`}<AppIcon name="open" size={14} /></span>}
           {' · '}<span data-testid={`running.row.${k}.end`}>{endWords(x.p, s, now)}</span>
         </>}
         end={<>

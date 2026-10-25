@@ -74,8 +74,8 @@ crate::words! { running:
     mark_exit(rc) = "ended, exit {rc}";
     /// a row's mark tip: it ended, its code not known
     mark_ended = "ended";
-    /// a row's address, short and quiet: `:5173 ↗`
-    url_row(port) = ":{port} ↗";
+    /// a row's address, short and quiet: `:5173` (the desktop draws its line icon after it)
+    url_row(port) = ":{port}";
     /// its tip: `open localhost:5173`
     url_tip(port) = "open localhost:{port}";
     /// the output's head: stop asks once more before it stops

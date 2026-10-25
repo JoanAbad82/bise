@@ -324,7 +324,7 @@
       "port"
     ],
     "one": null,
-    "text": ":{port} ↗"
+    "text": ":{port}"
   },
   "running.url_tip": {
     "args": [

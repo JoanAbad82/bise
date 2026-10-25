@@ -22,6 +22,8 @@
 .run-prog { color: var(--c-text); }
 .run-args { color: var(--c-text-2); }
 .run-row[data-state='stopping'] .l2 { color: var(--c-text-3); }
+/* its address on the second line, the 'open' line icon after it (no '↗' glyph) */
+.run-url > .b-app-icon { margin-left: var(--s-1); vertical-align: -2px; }
 
 /* the selected one's output: beside the list, half the screen; its sides the list's (16, designer m_41694 #13) */
 .run-pane { container: run-pane / inline-size; flex: 0 0 52%; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid var(--c-line); padding: var(--s-5) var(--s-4) 0; gap: var(--s-3); }

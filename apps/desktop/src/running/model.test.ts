@@ -28,7 +28,7 @@ describe('a row', () => {
     const s = stateOf(p);
     expect(markOf(s)).toEqual({ glyph: '∿', tone: 'dim' });
     expect(endWords(p, s, NOW)).toBe('14 min');
-    expect(urlWords(p, s)).toEqual({ label: 'localhost:5173 ↗', url: 'http://127.0.0.1:5173', row: ':5173 ↗', tip: 'open localhost:5173' });
+    expect(urlWords(p, s)).toEqual({ label: 'localhost:5173 ↗', url: 'http://127.0.0.1:5173', row: ':5173', tip: 'open localhost:5173' });
     expect(portWords(p, s)).toBe('');
     // the hub's url is the port that answered HTTP, not the first one
     const late = proc({ id: 'bg3', agent: 'perf', ports: [5173, 24678], url: 'http://127.0.0.1:24678' });
