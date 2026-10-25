@@ -8,6 +8,7 @@
 import type { Agent } from '@/proto';
 import type { Box, Leg, Office, Spot } from '../model';
 import { type Plan, boxAt, deskNames } from './plan';
+import { ROOM } from './room';
 import { BACK_D, CROSS_BACK, backZone, frontZone, keepSlots, slotsUsed, walksOf } from './yard';
 
 export interface HaveliOffice extends Office {
@@ -114,4 +115,4 @@ const jhoola = (o: Office): Box[] => {
   return [left ? { x0: o.x0, x1: o.x0 + 0.75, z0: sz - 1.45, z1: sz + 1.45 } : { x0: o.x0 + o.W - 0.75, x1: o.x0 + o.W, z0: sz - 1.45, z1: sz + 1.45 }];
 };
 
-export const haveli: Plan<HaveliOffice> = { id: 'haveli', ready: true, layout: haveliLayout, cozy: { keepOut: jhoola } };
+export const haveli: Plan<HaveliOffice> = { id: 'haveli', ready: true, layout: haveliLayout, cozy: { keepOut: jhoola }, room: ROOM };

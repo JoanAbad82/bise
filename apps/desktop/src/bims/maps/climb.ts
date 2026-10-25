@@ -19,6 +19,7 @@ import type { Box, Gym, Leg, Office, Pt, Spot, WallPt } from '../model';
 import { QUEUE_GAP } from '../model';
 import type { CozyHints } from '../cozy';
 import { NAP_ROW, NAP_Z0, type Plan, type Things, boxAt, deskNames, napBedAt, wayIn } from './plan';
+import { ROOM } from './room';
 
 /** the climbing gym's office: the numbers its look reads past the common ones */
 export interface ClimbOffice extends Office {
@@ -305,7 +306,7 @@ const THINGS: Things = {
   8: bims.stage_climb_8, 9: bims.stage_climb_9, 10: bims.stage_climb_10, 11: bims.stage_climb_11, 12: bims.stage_climb_12, 13: bims.stage_climb_13, 14: bims.stage_climb_14,
 };
 
-export const climb: Plan<ClimbOffice> = { id: 'climb', ready: true, layout: climbLayout, things: THINGS, cozy: climbCozy };
+export const climb: Plan<ClimbOffice> = { id: 'climb', ready: true, layout: climbLayout, things: THINGS, cozy: climbCozy, room: ROOM };
 
 /**
  * The walk graph: the back corridor from the hall's rest spot lane to the right lane, the aisle down

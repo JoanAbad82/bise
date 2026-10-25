@@ -7,6 +7,7 @@
 import type { Agent } from '@/proto';
 import type { Box, Leg, Office, Spot } from '../model';
 import { type Plan, boxAt, deskNames } from './plan';
+import { ROOM } from './room';
 import { CROSS_BACK, backZone, frontZone, keepSlots, slotsUsed, walksOf } from './yard';
 
 /** a colour wall: its middle, its width, its colour's index; its desks stand in front of it */
@@ -105,4 +106,4 @@ export function patioLayout(agents: readonly Agent[], prev?: PatioOffice): Patio
   return { ...base, walks: walksOf(base, trunk), queueMore: back.queueMore, rows, slabs, trough, aisles: AISLES };
 }
 
-export const patio: Plan<PatioOffice> = { id: 'patio', ready: true, layout: patioLayout, cozy: { islandTop: 0.56 } };
+export const patio: Plan<PatioOffice> = { id: 'patio', ready: true, layout: patioLayout, cozy: { islandTop: 0.56 }, room: ROOM };

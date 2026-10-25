@@ -15,6 +15,7 @@ import type { Agent } from '@/proto';
 import { type Bar, type Box, type Leg, type Office, type Park, type Pt, QUEUE_GAP, type Spot } from '../model';
 import { backBusy, type CozyHints } from '../cozy';
 import { NAP_ROW, NAP_Z0, type Plan, boxAt, deskNames, napBedAt, wayIn } from './plan';
+import { ROOM } from './room';
 
 /** California's office: the numbers its look reads past the common ones. */
 export interface CaliforniaOffice extends Office {
@@ -137,7 +138,7 @@ const californiaCozy: CozyHints = {
   keepOut: (o) => [{ x0: o.x0, x1: o.x0 + 0.5, z0: o.D - 4.35, z1: o.D - 2.45 }],
 };
 
-export const california: Plan<CaliforniaOffice> = { id: 'california', ready: true, layout: californiaLayout, cozy: californiaCozy };
+export const california: Plan<CaliforniaOffice> = { id: 'california', ready: true, layout: californiaLayout, cozy: californiaCozy, room: ROOM };
 
 /**
  * The park on its slab (x px0..px1, z pz0..pz1), v10's drawing: the mini ramp across the back left

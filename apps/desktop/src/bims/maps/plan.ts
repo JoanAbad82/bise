@@ -8,6 +8,7 @@ import type { Agent } from '@/proto';
 import type { Box, Leg, MapId, Office, Pt, Spot } from '../model';
 import type { Stage, Things } from '../growth';
 import type { CozyHints } from '../cozy';
+import type { Room } from './room';
 
 export type { Stage, Things };
 
@@ -28,6 +29,8 @@ export interface Plan<O extends Office = Office> {
   readonly things?: Things;
   /** where its cozy pieces may stand and what they keep off (cozy.ts placeCozy); absent: the loft's walls */
   readonly cozy?: CozyHints;
+  /** the room its office makes for his plugins' objects past what its layout lays (maps/room.ts withRoom); absent: none (the loft has its bands in its layout) */
+  readonly room?: Room;
 }
 
 

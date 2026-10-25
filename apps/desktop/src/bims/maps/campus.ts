@@ -8,6 +8,7 @@ import type { Agent } from '@/proto';
 import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { type BOffice, LOFT_LIKE, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, boxAt } from './plan';
+import { ROOM } from './room';
 
 export interface CampusOffice extends BOffice {
   /** every pod's middle, by pod (slot / 4) */
@@ -100,4 +101,4 @@ const campusPieces = (o: Office): Pt[] => {
   return [{ x: (xs.length ? Math.max(...xs) + 0.4 : o.x0 + 4) + 0.3, z: 0.3 }, { x: (o.lounge[0]?.x ?? o.x0) + 1.0, z: 1.5 }];
 };
 
-export const campus: Plan<CampusOffice> = { id: 'campus', ready: true, layout: campusLayout, things: LOFT_LIKE, cozy: { pieces: campusPieces } };
+export const campus: Plan<CampusOffice> = { id: 'campus', ready: true, layout: campusLayout, things: LOFT_LIKE, cozy: { pieces: campusPieces }, room: ROOM };

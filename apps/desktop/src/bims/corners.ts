@@ -326,6 +326,7 @@ interface Ctx {
   readonly keep: Keep;
   readonly spans: { back: [number, number][]; left: [number, number][] };
   readonly grids: Map<Corner, readonly Pt[]>;
+  readonly zoned: Map<Corner, readonly Pt[]>;
   readonly seeds: Map<Corner, readonly Box[]>;
 }
 
@@ -339,6 +340,24 @@ function gridOf(c: Ctx, corner: Corner): readonly Pt[] {
   ps.sort((p, q) => p.r - q.r || p.p.x - q.p.x || p.p.z - q.p.z);
   const out = ps.map((p) => p.p);
   c.grids.set(corner, out);
+  return out;
+}
+
+/** the biggest half size a thing takes on the floor (the ping-pong table turned), for the zone's prefilter */
+const HALF_MAX = 1.6;
+
+/** a corner's floor points that may hold a thing in its place (inZone for the biggest one): the others are never tried (laid once) */
+function zoneGridOf(c: Ctx, corner: Corner): readonly Pt[] {
+  const had = c.zoned.get(corner);
+  if (had !== undefined) return had;
+  const area = areaOf(c.o, corner);
+  const seeds = seedOfCorner(c, corner);
+  const out = gridOf(c, corner).filter((p) => {
+    if (corner === 'read') return p.x <= area.x0 + ZONE + HALF_MAX;
+    const b = { x0: p.x - HALF_MAX, x1: p.x + HALF_MAX, z0: p.z - HALF_MAX, z1: p.z + HALF_MAX };
+    return inZone(area, b, corner, seeds);
+  });
+  c.zoned.set(corner, out);
   return out;
 }
 
@@ -484,7 +503,7 @@ function orderOf(objs: readonly PluginObject[]): PluginObject[] {
  */
 export function objectSpots(o: Office, objs: readonly PluginObject[], prev: readonly Placed[] = []): Corners {
   if (objs.length === 0) return NO_CORNERS;
-  const c: Ctx = { o, keep: keepOf(o), spans: wallSpans(o), grids: new Map(), seeds: new Map() };
+  const c: Ctx = { o, keep: keepOf(o), spans: wallSpans(o), grids: new Map(), zoned: new Map(), seeds: new Map() };
   const was = new Map(prev.map((p) => [p.key, p]));
   const placed: Placed[] = [];
   const left: PluginObject[] = [];
@@ -545,7 +564,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
       const sn = Math.abs(Math.sin(turn));
       const hw = (foot.w * cs + foot.d * sn) / 2;
       const hd = (foot.w * sn + foot.d * cs) / 2;
-      for (const q of gridOf(c, corner)) {
+      for (const q of zoneGridOf(c, corner)) {
         const b = { x0: q.x - hw, x1: q.x + hw, z0: q.z - hd, z1: q.z + hd };
         if (!inZone(area, b, corner, seeds, play)) continue;
         if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1 || keptIn(c.keep, b) > 0) continue;

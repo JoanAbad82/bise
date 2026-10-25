@@ -7,6 +7,7 @@
 import type { Agent } from '@/proto';
 import type { Leg, Office, Pt, Spot } from '../model';
 import { type Plan, boxAt, deskNames } from './plan';
+import { ROOM } from './room';
 import { CROSS_BACK, backZone, frontZone, keepSlots, slotsUsed, walksOf } from './yard';
 
 export interface TropicalOffice extends Office {
@@ -89,4 +90,4 @@ export function tropicalLayout(agents: readonly Agent[], prev?: TropicalOffice):
   return { ...base, walks: walksOf(base, trunk), queueMore: back.queueMore, curves, paths, aisles: AISLES };
 }
 
-export const tropical: Plan<TropicalOffice> = { id: 'tropical', ready: true, layout: tropicalLayout };
+export const tropical: Plan<TropicalOffice> = { id: 'tropical', ready: true, layout: tropicalLayout, room: ROOM };

@@ -8,6 +8,7 @@ import type { Plan } from './plan';
 import { withCozy } from '../cozy';
 import { withSeats } from '../sit';
 import { withInbox } from '../inbox';
+import { roomKeepOut, withRoom } from './room';
 import { loft } from './loft';
 import { greenhouse } from './greenhouse';
 import { campus } from './campus';
@@ -44,5 +45,12 @@ export const readyMaps = (): MapId[] => MAP_IDS.filter((id) => PLANS[id].ready);
  */
 export function layoutOf(agents: readonly Agent[], map: MapId = DEFAULT_MAP, prev?: Office): Office {
   const p = planOf(map);
-  return withInbox(withCozy(withSeats(p.layout(agents, prev?.map === p.id ? prev : undefined)), p.cozy ?? {}));
+  const laid = p.layout(agents, prev?.map === p.id ? prev : undefined);
+  const room = p.room;
+  if (room === undefined) return withInbox(withCozy(withSeats(laid), p.cozy ?? {}));
+  // the room for his plugins' objects (maps/room.ts): its walls out, the play corner's band kept from the cozy pieces
+  const o = withRoom(laid, room);
+  const hints = p.cozy ?? {};
+  const keepOut = (x: Office) => [...(hints.keepOut?.(x) ?? []), ...roomKeepOut(x, room)];
+  return withInbox(withCozy(withSeats(o), { ...hints, keepOut }));
 }

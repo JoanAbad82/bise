@@ -10,6 +10,7 @@ import { bims } from '@/proto/words_bims.gen';
 import type { Box, Leg, Office, Spot } from '../model';
 import { type BOffice, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { NAP_BED, NAP_Z0, type Plan, type Things, boxAt, napBedAt } from './plan';
+import { ROOM } from './room';
 
 export interface KyotoOffice extends BOffice {
   /** the inner garden's floor box (gravel, moss, the lantern, the maple), right of the engawa */
@@ -116,4 +117,4 @@ const THINGS: Things = {
 /** the inner garden holds its stages' pieces (the lantern, the maple, the go board, the shishi-odoshi): nothing cozy in it */
 const kyotoKeep = (o: Office): Box[] => [(o as KyotoOffice).garden];
 
-export const kyoto: Plan<KyotoOffice> = { id: 'kyoto', ready: true, layout: kyotoLayout, things: THINGS, cozy: { keepOut: kyotoKeep } };
+export const kyoto: Plan<KyotoOffice> = { id: 'kyoto', ready: true, layout: kyotoLayout, things: THINGS, cozy: { keepOut: kyotoKeep }, room: ROOM };
