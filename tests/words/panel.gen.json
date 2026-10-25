@@ -8,27 +8,27 @@
   "panel.addr_back": {
     "args": [],
     "one": null,
-    "text": "back"
+    "text": "Back"
   },
   "panel.addr_forward": {
     "args": [],
     "one": null,
-    "text": "forward"
+    "text": "Forward"
   },
   "panel.addr_out": {
     "args": [],
     "one": null,
-    "text": "open in your browser"
+    "text": "Open in your browser"
   },
   "panel.addr_reload": {
     "args": [],
     "one": null,
-    "text": "reload"
+    "text": "Reload"
   },
   "panel.addr_window": {
     "args": [],
     "one": null,
-    "text": "open in a window"
+    "text": "Open in a window"
   },
   "panel.agents": {
     "args": [],
@@ -406,22 +406,29 @@
     "one": null,
     "text": "Show all"
   },
-  "panel.panel_label": {
-    "args": [],
-    "one": null,
-    "text": "panel"
-  },
-  "panel.panel_toggle": {
+  "panel.panel_hide": {
     "args": [
       "key"
     ],
     "one": null,
-    "text": "panel · {key}"
+    "text": "Hide panel · {key}"
+  },
+  "panel.panel_label": {
+    "args": [],
+    "one": null,
+    "text": "Panel"
+  },
+  "panel.panel_show": {
+    "args": [
+      "key"
+    ],
+    "one": null,
+    "text": "Show panel · {key}"
   },
   "panel.panel_width": {
     "args": [],
     "one": null,
-    "text": "panel width"
+    "text": "Panel width"
   },
   "panel.paused": {
     "args": [],
@@ -634,7 +641,7 @@
       "key"
     ],
     "one": null,
-    "text": "new tab · {key}"
+    "text": "New tab · {key}"
   },
   "panel.tab_changes": {
     "args": [
@@ -648,7 +655,7 @@
       "key"
     ],
     "one": null,
-    "text": "close tab · {key}"
+    "text": "Close tab · {key}"
   },
   "panel.tab_new": {
     "args": [],
@@ -697,7 +704,7 @@
   "panel.tabs_label": {
     "args": [],
     "one": null,
-    "text": "panel tabs"
+    "text": "Panel tabs"
   },
   "panel.tabs_more": {
     "args": [

@@ -299,19 +299,21 @@ export const panel = {
   /** a project's office's tab */
   tab_office: (a: { project: string | number }): string => "Office · " + String(a.project),
   /** a tab's × button: its VoiceOver name and tip, with its key */
-  tab_close: (a: { key: string | number }): string => "close tab · " + String(a.key),
+  tab_close: (a: { key: string | number }): string => "Close tab · " + String(a.key),
   /** the '+' after the tabs: its tip, with its key */
-  tab_add: (a: { key: string | number }): string => "new tab · " + String(a.key),
+  tab_add: (a: { key: string | number }): string => "New tab · " + String(a.key),
   /** the overflow menu's button past six tabs */
   tabs_more: (a: { n: number }): string => a.n === 1 ? String(a.n) + " more tab" : String(a.n) + " more tabs",
   /** the tab strip's VoiceOver name */
-  tabs_label: "panel tabs",
-  /** the bar's panel button: its tip and VoiceOver name, with its key */
-  panel_toggle: (a: { key: string | number }): string => "panel · " + String(a.key),
+  tabs_label: "Panel tabs",
+  /** the bar's panel button while it is folded: its tip and VoiceOver name, with its key */
+  panel_show: (a: { key: string | number }): string => "Show panel · " + String(a.key),
+  /** the panel button while it is open (the bar's, a sheet's own): its tip and VoiceOver name, with its key */
+  panel_hide: (a: { key: string | number }): string => "Hide panel · " + String(a.key),
   /** the panel's VoiceOver name */
-  panel_label: "panel",
+  panel_label: "Panel",
   /** the panel's border: its VoiceOver name (drag to resize, double click resets) */
-  panel_width: "panel width",
+  panel_width: "Panel width",
   /** the search field's placeholder and VoiceOver name */
   launch_search: "Search artifacts, or enter a URL",
   /** the launcher's first group */
@@ -335,15 +337,15 @@ export const panel = {
   /** a recent artifact's line: its kind and who made it */
   launch_kind_by: (a: { kind: string | number; who: string | number }): string => String(a.kind) + " · " + String(a.who),
   /** the address bar's back button */
-  addr_back: "back",
+  addr_back: "Back",
   /** the address bar's forward button */
-  addr_forward: "forward",
+  addr_forward: "Forward",
   /** the address bar's reload button */
-  addr_reload: "reload",
+  addr_reload: "Reload",
   /** the address bar's ↗: the page in his browser */
-  addr_out: "open in your browser",
+  addr_out: "Open in your browser",
   /** the bar's button over an artifact's tab: the artifact in a window of its own */
-  addr_window: "open in a window",
+  addr_window: "Open in a window",
   /** a section's '…': its full list (the 'all ›' it replaces) */
   ov_show_all: "Show all",
   /** the artifacts section's '…' and '+': a file of his into the project's artifacts */

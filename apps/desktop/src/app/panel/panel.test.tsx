@@ -104,7 +104,7 @@ describe('the tabbed panel', () => {
   it('every tab has a VoiceOver name, a tip only when its title is cut; the strip has its name', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
-    expect(v.getByRole('tablist').getAttribute('aria-label')).toBe('panel tabs');
+    expect(v.getByRole('tablist').getAttribute('aria-label')).toBe('Panel tabs');
     const t = v.getByTestId('app.panel.tab.overview');
     expect(t.getAttribute('aria-label')).toBe('Overview');
     // its whole title shows: no tip repeating it (ui-review m_42619 #5)

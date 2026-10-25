@@ -32,8 +32,13 @@
   position: absolute;
   top: 0;
   right: 0;
+  border-left: 1px solid var(--c-line);
   background: var(--c-solid);
-  box-shadow: var(--e-3);
+  /* its shadow falls on the thread to its left: it sits above it (designer m_43050 #4); no scrim */
+  box-shadow: var(--e-3), calc(var(--s-4) * -1) 0 var(--s-12) var(--c-shadow);
+}
+.pn[data-over] .pn-in {
+  border-left: 0;
 }
 .pn[data-over] > .pn-border {
   left: auto;
@@ -99,6 +104,17 @@
   align-items: center;
   margin-left: auto;
 }
+/* every tab at its title, unseen: their widths for model.ts fitTabs */
+.pn-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
 .pn-tabs {
   flex: 1;
   display: flex;
@@ -108,13 +124,15 @@
 }
 .pn-tab {
   box-sizing: border-box;
-  flex: 0 1 auto;
-  min-width: calc(var(--s-8) * 3 + var(--s-6));
+  /* sized to its title, 64 to 180, cut with '…' past it (designer m_43050 #5); model.ts fitTabs
+     sends to ⌄ N only what really doesn't fit */
+  flex: none;
+  min-width: var(--s-16);
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
   height: var(--h-control-sm);
-  max-width: calc(var(--s-8) * 5);
+  max-width: calc(var(--s-16) * 2 + var(--s-12) + var(--s-1));
   padding: 0 var(--s-3);
   border-radius: var(--r-2);
   color: var(--c-text-2);
@@ -813,22 +831,10 @@
 .app-rb-orphan .app-rb-name {
   color: var(--c-text-3);
 }
-/* a worktree's group: a 1 px --c-line rule along it, in the body's 8 px margin (the rows keep the
-   sign column) */
+/* a worktree's group: no rule of its own along it, the panel's left line is the one divider at
+   that edge (designer m_43050 #2); the rows keep the sign column */
 .app-rb-arow[data-group] {
   position: relative;
-}
-.app-rb-arow[data-group]::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--s-1) * -1);
-  width: 1px;
-  background: var(--c-line);
-}
-.app-rb-ghead[data-group]::before {
-  top: var(--s-1);
 }
 /* an artifact's title in its pink chip (§5): the room is the box, the chip hugs the words */
 .app-rb-chipbox {

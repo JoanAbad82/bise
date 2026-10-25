@@ -137,19 +137,29 @@ export function stepIn(t: Tabs, dir: 1 | -1): Tabs {
 }
 
 /**
- * The least a tab shrinks to before the next one goes to the overflow menu: its icon, eight
- * letters and its × (ui-review m_42619 #4: never 'New …' or 'Perf n…'); panel.css .pn-tab's min-width.
+ * A tab is sized to its title (designer m_43050 #5): 64 at least, 180 at most, its title cut with
+ * '…' past it; panel.css .pn-tab's min-width and max-width. TAB_GAP: the row's gap between two.
  */
-export const TAB_MIN_W = 120;
-/** What the tab row keeps for its '+', the overflow button and their gaps. */
-export const ROW_KEEP_W = 104;
+export const TAB_MIN_W = 64;
+export const TAB_MAX_W = 180;
+export const TAB_GAP = 4;
 
 /**
- * How many whole tabs fit a row `width` wide, six at most, one at least: past it they go to the
- * overflow menu, never one cut (ui-review m_42482 #3). Pure.
+ * How many whole tabs fit `room` px, each at its own width (`widths`, in the tabs' order, as
+ * measured at their titles), the one in front (`active`) always shown in the last place past the
+ * rest (shownOf): only what really doesn't fit goes to the overflow menu, six at most, one at
+ * least. Pure.
  */
-export function fitCount(width: number, max = MAX_SHOWN): number {
-  return Math.max(1, Math.min(max, Math.floor((width - ROW_KEEP_W) / TAB_MIN_W)));
+export function fitTabs(widths: readonly number[], active: number, room: number, max = MAX_SHOWN): number {
+  const w = (i: number) => Math.min(TAB_MAX_W, Math.max(TAB_MIN_W, widths[i] ?? TAB_MIN_W));
+  const total = (n: number) => {
+    let t = (n - 1) * TAB_GAP + w(active >= n - 1 ? active : n - 1);
+    for (let i = 0; i < n - 1; i++) t += w(i);
+    return t;
+  };
+  let n = Math.min(widths.length, max);
+  while (n > 1 && total(n) > room) n--;
+  return Math.max(1, n);
 }
 
 /**
@@ -190,7 +200,7 @@ export function dropGone(t: Tabs, known: (project: string) => ReadonlySet<string
 /** The width each kind of tab asks, kept apart: the rows, a shell (mockup 2), a page (mockup 4). */
 export type WidthOf = 'rows' | 'shell' | 'page';
 
-/** The widths he starts with (page native-mac §6: 384; mockup 2: 480; mockup 4: 640). */
+/** The widths each kind asks (page native-mac §6: 384; mockup 2: 480; mockup 4: 640): 384 is where the panel starts, 640 what a page widens it to (widenFor). */
 export const WIDTHS: Readonly<Record<WidthOf, number>> = { rows: 384, shell: 480, page: 640 };
 /** The panel's border drags it from 320 to 640 (native-mac-qa §7). */
 export const MIN_W = 320;
@@ -230,16 +240,28 @@ export function clampW(w: number): number {
   return Number.isFinite(w) ? Math.round(Math.min(MAX_W, Math.max(MIN_W, w))) : WIDTHS.rows;
 }
 
-/** The panel's whole kept state: open or folded, its tabs, each kind's width, what he opened last. */
+/** The panel's whole kept state: open or folded, its tabs, its one width, what he opened last. */
 export interface PanelKept {
   readonly open: boolean;
   readonly tabs: Tabs;
-  readonly widths: Readonly<Record<WidthOf, number>>;
+  /** ONE width per window, whatever tab is in front (designer m_43050 #7a): his last drag, else 384 */
+  readonly width: number;
+  /** he dragged it: an artifact opening no longer widens it */
+  readonly dragged: boolean;
   /** the things he opened in a tab, newest first (the launcher's Recent) */
   readonly recent: readonly Entity[];
 }
 
-export const FOLDED: PanelKept = { open: false, tabs: FIRST, widths: WIDTHS, recent: [] };
+export const FOLDED: PanelKept = { open: false, tabs: FIRST, width: WIDTHS.rows, dragged: false, recent: [] };
+
+/**
+ * The width after `what` opens in a new tab: a page (an artifact, an office, a thread) widens it
+ * once to the page's 640 (fitW caps it so the thread keeps 560), unless his drag set it; then it
+ * stays for every tab. Pure.
+ */
+export function widenFor(k: PanelKept, what: TabWhat): number {
+  return !k.dragged && widthOf(what) === 'page' ? Math.max(k.width, WIDTHS.page) : k.width;
+}
 
 /** How many things Recent keeps. */
 export const RECENT_MAX = 8;
@@ -319,8 +341,7 @@ export function parseKept(raw: unknown): PanelKept {
   if (!seen.has(OVERVIEW.id)) list.unshift(OVERVIEW);
   const want = isObj(raw['tabs']) ? raw['tabs']['active'] : undefined;
   const tabs: Tabs = { list, active: list.some((x) => x.id === want) ? (want as string) : (list[0] as Tab).id };
-  const w = isObj(raw['widths']) ? raw['widths'] : {};
-  const width = (k: WidthOf) => (typeof w[k] === 'number' ? clampW(w[k]) : WIDTHS[k]);
+  const width = typeof raw['width'] === 'number' ? clampW(raw['width']) : WIDTHS.rows;
   const recent = (Array.isArray(raw['recent']) ? (raw['recent'] as unknown[]) : []).map(entityOf).filter((e): e is Entity => e !== undefined).slice(0, RECENT_MAX);
-  return { open: raw['open'] === true, tabs, widths: { rows: width('rows'), shell: width('shell'), page: width('page') }, recent };
+  return { open: raw['open'] === true, tabs, width, dragged: raw['dragged'] === true, recent };
 }

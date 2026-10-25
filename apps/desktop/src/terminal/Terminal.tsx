@@ -100,6 +100,8 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
   const host = useRef<HTMLDivElement>(null);
   const live = useRef<{ term: Xterm; fit: () => void; restart: () => void } | null>(null);
   const [life, setLife] = useState<Life>({ s: 'opening' });
+  // its prompt came (a byte or a screen to redraw): before, a dim line says it starts, never a black void (designer m_43050 #7b)
+  const [seen, setSeen] = useState(false);
 
   useEffect(() => {
     const api = (window as Partial<Window>).bise?.term;
@@ -136,6 +138,7 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
     const mine = shellIdOf(project, n);
     const offData = api.onData((from, bytes) => {
       if (from !== mine) return;
+      setSeen(true);
       if (id === undefined) early.push(bytes);
       else term.write(bytes);
     });
@@ -156,6 +159,7 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
       id = r.id;
       // a shell already running: redraw its screen as it is now
       if (r.screen !== null) {
+        if (r.screen.length > 0) setSeen(true);
         term.write('\x1bc');
         term.write(r.screen);
       }
@@ -211,6 +215,11 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
   return (
     <div className="term-body">
       <div ref={host} className="term-host" data-testid="terminal.screen" data-state={life.s} />
+      {!seen && (life.s === 'opening' || life.s === 'live') && (
+        <p className="term-line term-wait" data-testid="terminal.starting">
+          starting a shell…
+        </p>
+      )}
       {life.s === 'failed' && (
         <p className="term-line" data-testid="terminal.failed">
           the terminal could not start: {life.why}

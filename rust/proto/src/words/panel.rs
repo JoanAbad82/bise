@@ -321,19 +321,21 @@ crate::words! { panel:
     /// a project's office's tab
     tab_office(project) = "Office · {project}";
     /// a tab's × button: its VoiceOver name and tip, with its key
-    tab_close(key) = "close tab · {key}";
+    tab_close(key) = "Close tab · {key}";
     /// the '+' after the tabs: its tip, with its key
-    tab_add(key) = "new tab · {key}";
+    tab_add(key) = "New tab · {key}";
     /// the overflow menu's button past six tabs
     tabs_more(n) = one "{n} more tab" | "{n} more tabs";
     /// the tab strip's VoiceOver name
-    tabs_label = "panel tabs";
-    /// the bar's panel button: its tip and VoiceOver name, with its key
-    panel_toggle(key) = "panel · {key}";
+    tabs_label = "Panel tabs";
+    /// the bar's panel button while it is folded: its tip and VoiceOver name, with its key
+    panel_show(key) = "Show panel · {key}";
+    /// the panel button while it is open (the bar's, a sheet's own): its tip and VoiceOver name, with its key
+    panel_hide(key) = "Hide panel · {key}";
     /// the panel's VoiceOver name
-    panel_label = "panel";
+    panel_label = "Panel";
     /// the panel's border: its VoiceOver name (drag to resize, double click resets)
-    panel_width = "panel width";
+    panel_width = "Panel width";
 
     // ---- New tab, the launcher (mockup 3)
     /// the search field's placeholder and VoiceOver name
@@ -361,15 +363,15 @@ crate::words! { panel:
 
     // ---- an artifact's tab, the browser (mockup 4)
     /// the address bar's back button
-    addr_back = "back";
+    addr_back = "Back";
     /// the address bar's forward button
-    addr_forward = "forward";
+    addr_forward = "Forward";
     /// the address bar's reload button
-    addr_reload = "reload";
+    addr_reload = "Reload";
     /// the address bar's ↗: the page in his browser
-    addr_out = "open in your browser";
+    addr_out = "Open in your browser";
     /// the bar's button over an artifact's tab: the artifact in a window of its own
-    addr_window = "open in a window";
+    addr_window = "Open in a window";
 
     // ---- the Overview tab's sections (bise fait mac, mockup 1): the head's '…' menu
     /// a section's '…': its full list (the 'all ›' it replaces)

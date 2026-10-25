@@ -8,7 +8,7 @@ import {
   closeOthers,
   dropGone,
   FIRST,
-  fitCount,
+  fitTabs,
   FOLDED,
   MAX_W,
   MIN_W,
@@ -21,6 +21,7 @@ import {
   RECENT_MAX,
   shownOf,
   stepIn,
+  widenFor,
   widthOf,
   WIDTHS,
   type TabWhat,
@@ -125,14 +126,19 @@ describe('the tab model: six at most in the bar (HIG), the rest in the overflow 
   it('six or fewer: nothing overflows', () => {
     expect(shownOf(FIRST).over).toEqual([]);
   });
-  it('the row holds as many whole tabs as fit, six at most, one at least: none cut', () => {
-    expect(fitCount(384)).toBe(2);
-    expect(fitCount(640)).toBe(4);
-    expect(fitCount(900)).toBe(6);
-    expect(fitCount(2000)).toBe(6);
-    expect(fitCount(100)).toBe(1);
+  it('tabs at their own widths: only what really does not fit goes to ⌄ N, six at most, one at least (designer m_43050 #5)', () => {
+    // Overview 92, Perf notes 120, New tab 96 in the 320 a 384 panel leaves them: all three
+    expect(fitTabs([92, 120, 96], 2, 320)).toBe(3);
+    expect(fitTabs([92, 120, 96], 2, 250)).toBe(2);
+    // 64 and 180 bound a tab's width
+    expect(fitTabs([10, 10, 10], 0, 200)).toBe(3);
+    expect(fitTabs([500, 500], 0, 370)).toBe(2);
+    expect(fitTabs(Array.from({ length: 9 }, () => 64), 0, 2000)).toBe(6);
+    expect(fitTabs([180, 180], 1, 100)).toBe(1);
+    // the one in front takes the last place: its own width counts there
+    expect(fitTabs([64, 64, 64, 180], 3, 64 * 2 + 180 + 8)).toBe(3);
     const t = activate(many, 'overview');
-    expect(shownOf(t, fitCount(384)).shown.map((x) => x.id)).toEqual(['overview', 'artifact:acme/a']);
+    expect(shownOf(t, fitTabs([92, 120, 120], 0, 250)).shown.map((x) => x.id)).toEqual(['overview', 'artifact:acme/a']);
   });
 });
 
@@ -154,6 +160,14 @@ describe('the panel width (page native-mac §6: 384; mockup 2: 480; mockup 4: 64
     expect(widthOf({ kind: 'terminal', project: 'acme', n: 0 })).toBe('shell');
     expect(widthOf(art('a'))).toBe('page');
     expect(WIDTHS).toEqual({ rows: 384, shell: 480, page: 640 });
+  });
+  it('one width per window: a page newly opened widens it once to 640, never after his drag (designer m_43050 #7a)', () => {
+    expect(FOLDED.width).toBe(384);
+    expect(widenFor(FOLDED, art('a'))).toBe(640);
+    expect(widenFor(FOLDED, { kind: 'terminal', project: 'acme', n: 0 })).toBe(384);
+    expect(widenFor(FOLDED, { kind: 'launcher', n: 1 })).toBe(384);
+    expect(widenFor({ ...FOLDED, width: 500, dragged: true }, art('a'))).toBe(500);
+    expect(parseKept({ widths: { rows: 500 } }).width).toBe(384);
   });
   it('the thread keeps 560 beside the left: a wide tab caps (ui-review m_42509)', () => {
     expect(fitW(640, 1440, 296)).toEqual({ width: 584, over: false });
@@ -202,13 +216,15 @@ describe('the kept record (kept per window, read back after a reload)', () => {
         active: 'artifact:acme/a',
         list: [{ what: { kind: 'overview' } }, { what: { kind: 'thing', e: { kind: 'artifact', project: 'acme', id: 'a' } } }, { what: { kind: 'thing', e: { kind: 'artifact', project: '', id: 'b' } } }, { what: { kind: 'bogus' } }, { what: { kind: 'overview' } }],
       },
-      widths: { rows: 9999, shell: 500 },
+      width: 9999,
+      dragged: true,
       recent: [{ kind: 'pr', project: 'acme', number: 6 }, { kind: 'pr' }],
     });
     expect(k.open).toBe(true);
     expect(ids(k.tabs)).toEqual(['overview', 'artifact:acme/a']);
     expect(k.tabs.active).toBe('artifact:acme/a');
-    expect(k.widths).toEqual({ rows: 640, shell: 500, page: 640 });
+    expect(k.width).toBe(640);
+    expect(k.dragged).toBe(true);
     expect(k.recent).toEqual([{ kind: 'pr', project: 'acme', number: 6 }]);
   });
   it('a tab in front that is gone falls back to the first', () => {

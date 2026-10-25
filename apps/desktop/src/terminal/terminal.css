@@ -27,6 +27,7 @@
 }
 
 .term-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -45,6 +46,15 @@
   color: var(--c-text-2);
   font-family: var(--font-mono);
   font-size: 12px;
+}
+
+/* before the shell's first byte: one dim line over the empty screen */
+.term-wait {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-3);
+  color: var(--c-text-3);
+  pointer-events: none;
 }
 
 .term-again {

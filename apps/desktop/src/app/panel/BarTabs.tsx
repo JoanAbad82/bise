@@ -12,7 +12,7 @@ import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, 
 import { AppIcon, IconButton, Press, tipAttrs } from '@/ds';
 import { panel } from '@/proto/words_panel.gen';
 import { useEntityMenu } from '@/app/menus/use';
-import { closable, fitCount, shownOf, type Tab } from './model';
+import { closable, fitTabs, shownOf, TAB_GAP, type Tab } from './model';
 import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanelState } from './state';
 import { useTabLooks, type TabLook } from './look';
 import { PANEL_KEYS } from './keys';
@@ -20,7 +20,7 @@ import { PANEL_KEYS } from './keys';
 /** The ▯ at a sheet's tab row start: the sheet covers the bar's own (ui-review m_42642). */
 export function SheetToggle() {
   return (
-    <IconButton label={panel.panel_toggle({ key: PANEL_KEYS.toggle })} size="bar" pressed onClick={panelToggle} testId="app.panel.sheet.toggle">
+    <IconButton label={panel.panel_hide({ key: PANEL_KEYS.toggle })} size="bar" pressed onClick={panelToggle} testId="app.panel.sheet.toggle">
       <AppIcon name="panel" size={16} />
     </IconButton>
   );
@@ -31,7 +31,7 @@ export function BarTabs() {
   const s = usePanelState();
   return (
     <div className="pn-bar" data-testid="app.panel.bar" data-open={s.open || undefined}>
-      <IconButton label={panel.panel_toggle({ key: PANEL_KEYS.toggle })} size="bar" pressed={s.open} onClick={panelToggle} testId="app.panel.toggle">
+      <IconButton label={s.open ? panel.panel_hide({ key: PANEL_KEYS.toggle }) : panel.panel_show({ key: PANEL_KEYS.toggle })} size="bar" pressed={s.open} onClick={panelToggle} testId="app.panel.toggle">
         <AppIcon name="panel" size={16} />
       </IconButton>
     </div>
@@ -57,18 +57,51 @@ function useWidthOf(): readonly [RefObject<HTMLDivElement | null>, number] {
   return [ref, w];
 }
 
+/** What the tab strip keeps past its tabs: '+' (28) and the overflow button (⌄ N), each with its gap. */
+const ADD_W = 28 + TAB_GAP;
+const OVER_W = 48 + TAB_GAP;
+
 /** The tabs in the panel's top row, '+', at its start `start` (a sheet's ▯) and at its end what the tab in front adds (`end`). */
 export function PanelTabs({ start, end }: { start?: ReactNode; end?: ReactNode }) {
   const s = usePanelState();
   const look = useTabLooks();
-  const [row, width] = useWidthOf();
+  const [strip, room] = useWidthOf();
+  // each tab's width at its title (designer m_43050 #5), measured in a hidden row of them all
+  const measure = useRef<HTMLDivElement>(null);
+  const [widths, setWidths] = useState<readonly number[]>([]);
+  const titles = s.tabs.list.map((t) => `${t.id}\u0000${look(t).title}`).join('\u0001');
+  useLayoutEffect(() => {
+    const el = measure.current;
+    if (el === null) return;
+    setWidths(Array.from(el.children, (c) => (c as HTMLElement).offsetWidth));
+  }, [titles]);
+  const active = s.tabs.list.findIndex((t) => t.id === s.tabs.active);
   // before the first measure (a test's DOM has no layout): six, the HIG's most
-  const { shown, over } = shownOf(s.tabs, width === 0 ? undefined : fitCount(width));
+  const measured = room > 0 && widths.length === s.tabs.list.length && widths.every((w) => w > 0);
+  const all = measured ? fitTabs(widths, active, room - ADD_W) : undefined;
+  const fit = all === undefined || all >= s.tabs.list.length ? all : fitTabs(widths, active, room - ADD_W - OVER_W);
+  const { shown, over } = shownOf(s.tabs, fit);
   const [drag, setDrag] = useState<string | null>(null);
   return (
-    <div className="pn-top" ref={row} data-testid="app.panel.top">
+    <div className="pn-top" data-testid="app.panel.top">
         {start}
-        <div className="pn-tabs" role="tablist" aria-label={panel.tabs_label} data-testid="app.panel.tabs">
+        <div className="pn-measure" ref={measure} aria-hidden>
+          {s.tabs.list.map((t) => {
+            const l = look(t);
+            return (
+              <span key={t.id} className="pn-tab">
+                {l.icon}
+                <span className="pn-tab-t">{l.title}</span>
+                {closable(t.id) && (
+                  <span className="pn-tab-x">
+                    <AppIcon name="close" size={14} />
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+        <div className="pn-tabs" ref={strip} role="tablist" aria-label={panel.tabs_label} data-testid="app.panel.tabs">
           {shown.map((t) => (
             <BarTab
               key={t.id}

@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { useLeftWidth } from '@/app/frame-state';
-import { activate, closable, closeIn, closeOthers, moveIn, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widthOf, clampW, fitW, dropGone, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, closable, closeIn, closeOthers, moveIn, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 
 const KEY = 'panel';
 
@@ -81,7 +81,10 @@ export function panelToggle(): void {
 /** Opens `what` in a tab (an open one comes to the front), unfolding the panel; `instead`: the launcher it replaces. */
 export function openWhat(what: TabWhat, instead?: string): void {
   const recent = what.kind === 'thing' ? pushRecent(state.recent, what.e) : state.recent;
-  set({ ...state, open: true, tabs: openIn(state.tabs, what, instead), recent });
+  const tabs = openIn(state.tabs, what, instead);
+  // a page newly opened may widen the panel once (widenFor); an open one coming to the front doesn't
+  const isNew = !state.tabs.list.some((t) => t.id === tabs.active);
+  set({ ...state, open: true, tabs, recent, width: isNew ? widenFor(state, what) : state.width });
 }
 
 /** '+' and ⌘T: a New tab (the launcher). */
@@ -132,25 +135,20 @@ export function closeActive(): void {
   else set({ ...state, open: false });
 }
 
-/** The panel's width now: the width the tab in front asks (kept per kind). */
+/** The panel's width now: its one width, whatever tab is in front (designer m_43050 #7a). */
 export function widthNow(s: PanelKept): number {
-  const tab = s.tabs.list.find((x) => x.id === s.tabs.active);
-  return s.widths[tab === undefined ? 'rows' : widthOf(tab.what)];
+  return s.width;
 }
 
-/** His drag on the panel's border: the width of what is in front, kept. */
+/** His drag on the panel's border: the window's panel width, kept; no artifact widens it after. */
 export function setWidth(w: number): void {
-  const tab = state.tabs.list.find((x) => x.id === state.tabs.active);
-  const k = tab === undefined ? 'rows' : widthOf(tab.what);
   const v = clampW(w);
-  if (state.widths[k] !== v) set({ ...state, widths: { ...state.widths, [k]: v } });
+  if (state.width !== v || !state.dragged) set({ ...state, width: v, dragged: true });
 }
 
-/** A double click on the border: back to the width he started with. */
+/** A double click on the border: back to the width it starts with, an artifact may widen it again. */
 export function resetWidth(): void {
-  const tab = state.tabs.list.find((x) => x.id === state.tabs.active);
-  const k = tab === undefined ? 'rows' : widthOf(tab.what);
-  set({ ...state, widths: { ...state.widths, [k]: parseKept(undefined).widths[k] } });
+  set({ ...state, width: FOLDED.width, dragged: false });
 }
 
 /** An Overview section a card asked for (nm-side's ▯ 'pin as a tab'): the Overview scrolls to it once. */
