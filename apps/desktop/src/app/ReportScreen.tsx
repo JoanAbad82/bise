@@ -7,7 +7,8 @@
 // (window.bise.app.restartLog()), as plain lines. Owner: amb-win.
 import { useEffect, useState } from 'react';
 import type { BiseApi, CrashReport } from '@/shared/api';
-import { Button, Head } from '@/ds';
+import { Act, Empty, PageHero } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { Markdown } from '@/thread/Markdown';
 import { panel } from '@/proto/words_panel.gen';
 
@@ -49,41 +50,46 @@ export function ReportScreen({ log }: { log?: 'restart' | undefined } = {}) {
   const home = bise()?.home;
   return (
     <section className="app-report" data-testid="app.report">
-      <Head
-        title={restart ? panel.crumb_update_log : panel.crumb_crash}
-        sub={r != null ? reportWhere(r.path, home) : undefined}
-        end={
-          r != null ? (
-            <>
-              <Button
-                testId="app.report.copy"
-                onClick={() => {
-                  void bise()
-                    ?.copy(r.text)
-                    .then(() => {
-                      setCopied(true);
-                    });
-                }}
-              >
-                {copied ? 'copied' : 'copy'}
-              </Button>
-              <Button
-                testId="app.report.finder"
-                onClick={() => {
-                  void bise()?.showInFinder(r.path);
-                }}
-              >
-                show in Finder
-              </Button>
-            </>
-          ) : undefined
-        }
-      />
       <div className="app-report-body">
+        {/* the page hero (ui-review-app #2): the file and its acts on the facts line */}
+        <PageHero
+          name={restart ? panel.crumb_update_log : panel.crumb_crash}
+          sentence={restart ? hero.update_log_say : hero.crash_say}
+          {...(r != null
+            ? {
+                facts: (
+                  <>
+                    {reportWhere(r.path, home)}
+                    {' · '}
+                    <Act
+                      testId="app.report.copy"
+                      onClick={() => {
+                        void bise()
+                          ?.copy(r.text)
+                          .then(() => {
+                            setCopied(true);
+                          });
+                      }}
+                    >
+                      {copied ? 'copied' : 'copy'}
+                    </Act>
+                    {' · '}
+                    <Act
+                      testId="app.report.finder"
+                      onClick={() => {
+                        void bise()?.showInFinder(r.path);
+                      }}
+                    >
+                      show in Finder
+                    </Act>
+                  </>
+                ),
+              }
+            : {})}
+          testId="app.report.hero"
+        />
         {r === undefined ? null : r === null ? (
-          <p className="app-dim" data-testid="app.report.none">
-            {restart ? 'no update log: this app never updated itself.' : "no crash report: bise hasn't crashed."}
-          </p>
+          <Empty testId="app.report.none" title={restart ? 'no update log: this app never updated itself.' : "no crash report: bise hasn't crashed."} />
         ) : restart ? (
           <pre className="app-report-text app-report-log" data-testid="app.report.text">
             {r.text}

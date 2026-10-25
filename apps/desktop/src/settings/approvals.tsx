@@ -8,7 +8,7 @@
 // Owner: amb-mac (amb-kit's before).
 import { useState } from 'react';
 import { useListKeys } from '@/app/listkeys';
-import { Act, Group, Help, Seg, type GroupItem } from '@/ds';
+import { Act, Empty, Group, Help, Seg, type GroupItem } from '@/ds';
 import type { ApprovalRule, HubCmd, HubEv } from '@/proto';
 import { settings } from '@/proto/words.gen';
 
@@ -97,7 +97,7 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
       return false;
     },
   });
-  if (a === null) return <Help testId="settings.approvals.none">{settings.approvals_none}</Help>;
+  if (a === null) return <Empty testId="settings.approvals.none" title={settings.approvals_none} />;
   const modes = ['auto', 'yolo'] as const;
   const repo = a.repo === '' ? settings.approvals_this_repo : tilde(a.repo, home);
   const head: GroupItem[] = [
@@ -163,7 +163,7 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
           items={rules.map((it) => ({ ...it, sel: it.id === sel, onPick: () => { setSel(it.id); } }))}
         />
       ) : (
-        <Help testId="settings.approvals.empty">{settings.approvals_empty}</Help>
+        <Empty testId="settings.approvals.empty" title={settings.approvals_empty} />
       )}
       {error != null && error !== '' && (
         <Help err testId="settings.approvals.error">

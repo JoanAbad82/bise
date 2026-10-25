@@ -18,6 +18,16 @@ crate::words! { hero:
     agents_say = "who works on this project now: main, your lead, and the agents it started, one per job.";
     /// the archived agents screen's hero sentence
     archived_say = "agents whose work is done. their threads stay here to read; restore one to talk to it again.";
+    /// a project's changes screen's hero sentence (ui-review-app #2)
+    changes_say = "what your agents changed in this project: their branches, the features they try, what reached main today.";
+    /// a project's pull requests screen's hero sentence
+    prs_say = "the pull requests open on GitHub for this project. in PR flow, an agent opens one when its work is done.";
+    /// a project's environments screen's hero sentence
+    environments_say = "where this project runs: each worktree, the agents working in it and the servers they started.";
+    /// the crash report screen's hero sentence
+    crash_say = "what bise wrote when it last crashed. it stays on this Mac; nothing is sent anywhere.";
+    /// the update log screen's hero sentence
+    update_log_say = "what happened the last time this app updated itself and restarted.";
 
     // ---- the facts lines (parts joined by ' · ')
     /// inbox: how many wait on him (the accent)

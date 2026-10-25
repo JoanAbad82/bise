@@ -3,7 +3,8 @@
 // failing and which ones, review); a click opens it in his browser. Empty,
 // the hub's own words ('no open PR. in PR flow…'). Owner: amb-win.
 import { useEffect } from 'react';
-import { Dot, Head, Empty, Press, Skel } from '@/ds';
+import { Dot, Empty, PageHero, Press, Skel } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { usePrs, useStore } from '@/store';
 import type { Pr } from '@/proto';
 import { agentsOf, toneOf, wordsOf, type PrTone } from './prs';
@@ -24,8 +25,8 @@ export function PrsScreen({ project }: { project: string }) {
 
   return (
     <section className="rv-screen" data-testid="prs.screen" data-project={project}>
-      <Head title="pull requests" sub={list === null ? 'asking GitHub…' : list.head === '' ? 'none open' : list.head} />
       <div className="rv-body">
+        <PageHero name="pull requests" sentence={hero.prs_say} facts={list === null ? 'asking GitHub…' : list.head === '' ? 'none open' : list.head} testId="prs.hero" />
         {list === null && <Skel />}
         {list !== null && list.items.length === 0 && (
           <Empty title="no open PR">

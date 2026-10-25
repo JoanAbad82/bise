@@ -24,6 +24,21 @@
     "one": "{n} artifact",
     "text": "{n} artifacts"
   },
+  "hero.changes_say": {
+    "args": [],
+    "one": null,
+    "text": "what your agents changed in this project: their branches, the features they try, what reached main today."
+  },
+  "hero.crash_say": {
+    "args": [],
+    "one": null,
+    "text": "what bise wrote when it last crashed. it stays on this Mac; nothing is sent anywhere."
+  },
+  "hero.environments_say": {
+    "args": [],
+    "one": null,
+    "text": "where this project runs: each worktree, the agents working in it and the servers they started."
+  },
   "hero.inbox_say": {
     "args": [],
     "one": null,
@@ -72,6 +87,11 @@
     "one": null,
     "text": "what your agents left running on this Mac: dev servers, watchers, long tests. open one to read its output, or stop it."
   },
+  "hero.prs_say": {
+    "args": [],
+    "one": null,
+    "text": "the pull requests open on GitHub for this project. in PR flow, an agent opens one when its work is done."
+  },
   "hero.running": {
     "args": [
       "n"
@@ -83,6 +103,11 @@
     "args": [],
     "one": null,
     "text": "what runs on its own: a check every few minutes, a morning summary, a wait for a build to end. an agent sets it up; you can stop any of it."
+  },
+  "hero.update_log_say": {
+    "args": [],
+    "one": null,
+    "text": "what happened the last time this app updated itself and restarted."
   },
   "hero.wait_for_you": {
     "args": [

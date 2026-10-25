@@ -2,7 +2,8 @@
 // his others) and what reached main today. Owner: amb-win. Each agent's
 // branch opens its review; a merged commit opens read-only.
 import { useEffect } from 'react';
-import { Act, Empty, Head, Row, SectionHead } from '@/ds';
+import { Act, Empty, PageHero, Row, SectionHead } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { useFeatures, useMerged, usePrs, useStore, useWorktrees } from '@/store';
 import { distance, stateWords } from './feature';
 import { useRouter } from '@/app/router';
@@ -33,8 +34,9 @@ export function ChangesScreen({ project }: { project: string }) {
   const branches = branchesOf(worktrees);
   return (
     <section className="rv-screen" data-testid="changes.screen" data-project={project}>
-      <Head title="changes" sub={`${branches.length} branches · ${merged.length} merged today`} />
       <div className="rv-body">
+        {/* the page hero, every full page's first block (ui-review-app #2): it scrolls with the list */}
+        <PageHero name="changes" sentence={hero.changes_say} facts={`${branches.length} branches · ${merged.length} merged today`} testId="changes.hero" />
         <Row
           // its open PRs (bar A.7, the TUI's /prs): the count, the list one click away
           name="pull requests"

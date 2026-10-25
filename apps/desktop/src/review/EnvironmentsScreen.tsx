@@ -5,7 +5,8 @@
 // agents left running under it (the hub's processes rows, running ones).
 // Owner: amb-win.
 import { useEffect } from 'react';
-import { Empty, Head, Row, SectionHead } from '@/ds';
+import { Empty, PageHero, Row, SectionHead } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import type { Agent, Worktree } from '@/proto';
 import { useAgents, useProcesses, useStore, useWorktrees } from '@/store';
 import { isRunning, stateOf, urlWords, type Proc } from '@/running/model';
@@ -64,8 +65,8 @@ export function EnvironmentsScreen({ project }: { project: string }) {
   const listening = procs.filter((p) => isRunning(p) && (p.ports?.length ?? 0) > 0).length;
   return (
     <section className="rv-screen" data-testid="environments.screen" data-project={project}>
-      <Head title="environments" sub={`${String(places.length)} places · ${String(listening)} servers up`} />
       <div className="rv-body">
+        <PageHero name="environments" sentence={hero.environments_say} facts={`${String(places.length)} places · ${String(listening)} servers up`} testId="environments.hero" />
         {places.length === 0 && <Empty title="no agents at work here" />}
         {places.map((p, i) => (
           <div key={p.path} data-testid={`environments.place.${String(i)}`}>

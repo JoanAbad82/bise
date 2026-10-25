@@ -21,7 +21,6 @@
 .sch-next { color: var(--c-text-2); text-align: right; }
 .sch-keys { flex: none; display: flex; gap: 3ch; padding: var(--s-2) 0 var(--s-3); border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 .sch-keys b { font-weight: 500; color: var(--c-text-2); }
-.sch-empty { padding: var(--s-8) var(--pad-row-x); font: var(--t-14) var(--font-read); color: var(--c-text-2); }
 
 /* one task: a 400 px pane at the right */
 .sch-pane { flex: none; width: 400px; box-sizing: border-box; overflow-y: auto; padding: var(--pad-panel); border-left: 1px solid var(--c-line); display: flex; flex-direction: column; gap: var(--s-2); }

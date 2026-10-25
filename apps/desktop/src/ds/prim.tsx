@@ -268,12 +268,15 @@ export function Skel() {
   return <span className="b-skel" aria-hidden="true" />;
 }
 
-/** an empty state: what is empty and what to do */
-export function Empty({ title, children }: { title: ReactNode; children?: ReactNode }) {
+/** an empty state, the one for every page and panel (ui-review-app #3): what is empty, one sentence
+ *  (t-15 text-2), an optional detail line, then at most one action; on the content's left edge,
+ *  --gap-page under a hero. Never centered, never a 12 px line of its own */
+export function Empty({ title, children, action, testId }: { title: ReactNode; children?: ReactNode; action?: ReactNode; testId?: string }) {
   return (
-    <div className="b-empty">
-      <b>{title}</b>
-      {children != null && <span>{children}</span>}
+    <div className="b-empty" data-testid={testId}>
+      <p className="say">{title}</p>
+      {children != null && <p className="more">{children}</p>}
+      {action != null && <div className="act">{action}</div>}
     </div>
   );
 }

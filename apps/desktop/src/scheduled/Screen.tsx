@@ -4,7 +4,7 @@
 // '‹ scheduled'). x stops one after asking in place. The keys are the shared list keys
 // (app/listkeys.ts) plus the TUI's r, x, / and esc (tui-parity m_22176). Owner: amb-mac (amb-kit's before).
 import { useState, type KeyboardEvent } from 'react';
-import { Button, Field, PageHero } from '@/ds';
+import { Button, Empty, Field, PageHero } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
 import { useStore } from '@/store';
@@ -116,9 +116,9 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
           </span>
         )}
         {list.length === 0 ? (
-          <div className="sch-empty" data-testid="scheduled.empty">{scheduled.empty_desktop}</div>
+          <Empty testId="scheduled.empty" title={scheduled.empty_desktop} />
         ) : shown.length === 0 ? (
-          <div className="sch-empty" data-testid="scheduled.none">{scheduled.none_match_desktop}</div>
+          <Empty testId="scheduled.none" title={scheduled.none_match_desktop} />
         ) : (
           <div className="sch-list" role="listbox" data-testid="scheduled.list">
             <div className="sch-row sch-cols" aria-hidden="true">

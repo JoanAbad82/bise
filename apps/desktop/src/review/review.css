@@ -20,6 +20,15 @@
   outline: none;
 }
 
+/* the page hero (changes, pull requests, environments: ui-review-app #2) on the rows' text edge,
+   20 below the bar like every hero page; its rows' tint hangs out --pad-row-x as before */
+.rv-body > .b-hero {
+  margin-inline: var(--pad-row-x);
+}
+.rv-body > .b-hero:first-child {
+  margin-top: var(--s-3);
+}
+
 /* a row's right-hand facts are words, sans 13 text-3 like the right bar's; only the machine's own
    text (a sha, a branch, a url) is mono (designer m_21379 (4)) */
 .rv-body .b-row .end {
