@@ -41,8 +41,8 @@ pub(crate) fn of(parts: &[Part]) -> Option<Fwd<'_>> {
 pub(crate) fn line(f: &Fwd, clock: impl Fn(u64) -> String) -> String {
     let who = |n: &str| if n == "user" { thread::forwarded_you.to_string() } else { n.to_string() };
     match bise_proto::thread::when::utc_ms(f.at) {
-        Some(ms) => thread::forwarded_from(&who(f.from), &who(f.to), &clock(ms)),
-        None => thread::forwarded_from_untimed(&who(f.from), &who(f.to)),
+        Some(ms) => thread::forwarded_from(who(f.from), who(f.to), clock(ms)),
+        None => thread::forwarded_from_untimed(who(f.from), who(f.to)),
     }
 }
 

@@ -30,7 +30,7 @@ fn a_forward_draws_its_note_its_line_and_the_original_quoted() {
     let rows = shown(true, parts());
     let all = rows.join("\n");
     assert!(rows[1].contains("please look"), "the note under the chip: {rows:#?}");
-    let line = thread::forwarded_from(thread::forwarded_you, "main", &crate::running::clock(bise_proto::thread::when::utc_ms("2026-10-25 12:26 UTC").unwrap()));
+    let line = thread::forwarded_from(thread::forwarded_you, "main", crate::running::clock(bise_proto::thread::when::utc_ms("2026-10-25 12:26 UTC").unwrap()));
     assert_eq!(rows[2].trim(), line, "{rows:#?}");
     assert!(rows[3..].iter().all(|r| r.starts_with("  │ ")), "the original quoted: {rows:#?}");
     assert!(all.contains("❝ the quoted line") && all.contains("shot.png") && all.contains("notes.csv"), "{all}");

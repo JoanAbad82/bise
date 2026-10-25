@@ -257,6 +257,19 @@ fn tag_of(text: &str) -> Option<String> {
     (!tag.is_empty() && tag.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')).then(|| tag.to_string())
 }
 
+/// The user's own words in the block the hub wraps them in
+/// (`<user_message id="m_1">…</user_message>`, msg-forward): the inner
+/// text, his 'you' row, whatever tag it starts with (a quote, a paste).
+/// None for any other text.
+fn user_words(text: &str) -> Option<&str> {
+    if tag_of(text).as_deref() != Some("user_message") {
+        return None;
+    }
+    let t = text.trim();
+    let inner = &t[t.find('>')? + 1..];
+    Some(inner.strip_suffix("</user_message>").unwrap_or(inner).trim())
+}
+
 /// A user message bise wrote, not the user: a block of its own
 /// (`<task_status>`, `<bise_notes>`) or its `[bise]` / `[switchboard]`
 /// notes.
@@ -602,9 +615,13 @@ impl Source<'_> {
             Payload::UserMessage(m) => {
                 let text = parts_text(&m.content, self.blobs);
                 let steer = if matches!(m.delivery, Delivery::Steer) { " (steer)" } else { "" };
-                match injected_head(&text) {
-                    Some(h) => push(Role::Injected, format!("{h}{steer}"), Body::Md(text)),
-                    None => push(Role::You, format!("{}{steer}", first_line(&text, 90)), Body::Md(text)),
+                if let Some(w) = user_words(&text) {
+                    push(Role::You, format!("{}{steer}", first_line(w, 90)), Body::Md(w.to_string()))
+                } else {
+                    match injected_head(&text) {
+                        Some(h) => push(Role::Injected, format!("{h}{steer}"), Body::Md(text)),
+                        None => push(Role::You, format!("{}{steer}", first_line(&text, 90)), Body::Md(text)),
+                    }
                 }
             }
             Payload::ContextInjected(m) => {
@@ -850,3 +867,6 @@ pub fn iso_ms(at: &str) -> Option<u64> {
     let t = ((days * 24 + h) * 60 + mi) * 60 + s;
     u64::try_from(t * 1000 + ms).ok()
 }
+
+#[cfg(test)]
+mod tests;
