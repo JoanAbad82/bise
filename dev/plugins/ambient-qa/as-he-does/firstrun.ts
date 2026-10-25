@@ -5,50 +5,52 @@
 // Anthropic -> a bad key fails under its field and is never saved; a good one is checked live,
 // "it works" with the model's own answer, the key in auth.json, main's model in config.toml,
 // continue enabled. Never the projects step (it scans a home).
-//   AS_HE_DOES_FIRST_HOME=<bise home> node firstrun.mjs <cdp port> <out dir>
+//   AS_HE_DOES_FIRST_HOME=<bise home> node --experimental-strip-types firstrun.ts <cdp port> <out dir>
 // Writes <out>/firstrun.json ({steps, shots}) and <out>/firstrun-N-*.png.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Browser, Page } from '@playwright/test';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DESKTOP = process.env.PW_FROM ?? path.join(HERE, '..', '..', '..', '..', 'apps', 'desktop');
-const { chromium } = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
-const [port, out] = process.argv.slice(2);
+const { chromium }: typeof import('@playwright/test') = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
+const [port, out = '.'] = process.argv.slice(2);
 const BH = process.env.AS_HE_DOES_FIRST_HOME;
 
-const res = { mode: 'firstrun', steps: [], shots: [] };
+const res: { mode: string; steps: { name: string; ok: unknown; info: unknown }[]; shots: string[] } = { mode: 'firstrun', steps: [], shots: [] };
 const save = () => fs.writeFileSync(path.join(out, 'firstrun.json'), JSON.stringify(res, null, 1));
-const step = (name, ok, info) => { res.steps.push({ name, ok, info: info ?? null }); save(); };
+const step = (name: string, ok: unknown, info: unknown) => { res.steps.push({ name, ok, info: info ?? null }); save(); };
 setTimeout(() => { step('driver watchdog', false, '240 s'); process.exit(2); }, 240000).unref();
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const read = (f) => { try { return fs.readFileSync(path.join(BH, f), 'utf8'); } catch { return ''; } };
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const read = (f: string) => { try { return fs.readFileSync(path.join(BH ?? '', f), 'utf8'); } catch { return ''; } };
 
 if (!BH) { step('the fresh home (AS_HE_DOES_FIRST_HOME)', false, 'not set'); process.exit(1); }
-let browser;
+let browser: Browser | null = null;
 for (const t0 = Date.now(); !browser;) {
-  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 10000 }).catch((e) => {
+  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 10000 }).catch((e: unknown) => {
     if (Date.now() - t0 > 90000) { step('connect to the app (CDP)', false, String(e).slice(0, 300)); process.exit(1); }
     return null;
   });
   if (!browser) await wait(1000);
 }
-let page;
-for (let i = 0; i < 150 && !page; i++) {
+let found: Page | undefined;
+for (let i = 0; i < 150 && !found; i++) {
   for (const c of browser.contexts()) for (const p of c.pages()) {
-    if (await p.locator('[data-testid="app.root"], [data-testid="setup.root"]').count().catch(() => 0)) page = p;
+    if (await p.locator('[data-testid="app.root"], [data-testid="setup.root"]').count().catch(() => 0)) found = p;
   }
-  if (!page) await wait(200);
+  if (!found) await wait(200);
 }
-if (!page) { step('the window page', false, null); process.exit(1); }
+if (!found) { step('the window page', false, null); process.exit(1); }
+const page: Page = found;
 let n = 0;
-const shot = async (name) => {
+const shot = async (name: string) => {
   const f = path.join(out, `firstrun-${++n}-${name}.png`);
   try { await page.screenshot({ path: f, timeout: 15000 }); res.shots.push(f); save(); } catch { /* the steps say enough */ }
 };
-const seen = (id, ms = 20000) => page.getByTestId(id).first().waitFor({ timeout: ms }).then(() => true, () => false);
-const txt = (id) => page.getByTestId(id).first().innerText({ timeout: 2000 }).then((t) => t.replace(/\s+/g, ' ').trim(), () => null);
+const seen = (id: string, ms = 20000) => page.getByTestId(id).first().waitFor({ timeout: ms }).then(() => true, () => false);
+const txt = (id: string) => page.getByTestId(id).first().innerText({ timeout: 2000 }).then((t) => t.replace(/\s+/g, ' ').trim(), () => null);
 
 try {
   const hello = await seen('setup.step.hello', 40000);
@@ -60,7 +62,7 @@ try {
   await page.getByTestId('setup.next').click({ timeout: 5000 });
   const model = await seen('setup.step.model', 10000) && await seen('setup.pay', 20000);
   const nextOff = await page.getByTestId('setup.next').isDisabled().catch(() => null);
-  const rows = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="setup.pay."]')].map((e) => e.getAttribute('data-testid'))).catch(() => []);
+  const rows = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="setup.pay."]')].map((e) => e.getAttribute('data-testid'))).catch((): (string | null)[] => []);
   await shot('pay');
   step('the model step lists how to connect (ChatGPT, OpenRouter, an API key, a coding plan); no continue while nothing works', model && nextOff === true
     && ['setup.pay.api', 'setup.pay.chatgpt', 'setup.pay.coding'].every((r) => rows.includes(r)), { nextOff, rows });

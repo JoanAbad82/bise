@@ -1,9 +1,9 @@
-// pagedrive.mjs: drive a page in a throwaway headless Chrome over CDP, never the user's
+// pagedrive.ts: drive a page in a throwaway headless Chrome over CDP, never the user's
 // browser (ambient-pm's ~/.bise/qpm/cdp.mjs, folded into ambient-qa as `qa.py page drive`).
 // Its own --user-data-dir (no logins, deleted at the end), local URLs only (the throwaway
 // hub's page server), 2x by default, light or dark through prefers-color-scheme.
 //
-//   node pagedrive.mjs '<json args>'
+//   node --experimental-strip-types pagedrive.ts '<json args>'
 //   args: {url, out (file prefix), steps: [...], scheme: "light"|"dark", width, height, scale}
 //   a step: {eval: "js", label?}, {key, code?, vk?, mod?, text?}, {mouse: [x, y], click?},
 //           {type: "text"}, {wait: ms}, {shot: "name"} (any mix in one step, in that order)
@@ -13,11 +13,19 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync, readdirSync } from "nod
 import { join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 
-const args = JSON.parse(process.argv[2] || "{}");
+/** One step (any mix, run in this order): eval, key, mouse, type, wait, shot. */
+type Step = {
+  eval?: string; label?: string;
+  key?: string; code?: string; vk?: number; mod?: number; text?: string;
+  mouse?: [number, number]; click?: boolean;
+  type?: string; wait?: number; shot?: string;
+};
+type Args = { url?: string; out?: string; steps?: Step[]; scheme?: string; width?: number; height?: number; scale?: number; settle_ms?: number };
+const args: Args = JSON.parse(process.argv[2] || "{}");
 const { url, out } = args;
-const steps = args.steps && args.steps.length ? args.steps : [{ shot: "page" }];
+const steps: Step[] = args.steps && args.steps.length ? args.steps : [{ shot: "page" }];
 const W = args.width || 1400, H = args.height || 900, SCALE = args.scale || 2;
-const fail = (msg) => { console.log(JSON.stringify({ error: msg })); process.exit(1); };
+function fail(msg: string): never { console.log(JSON.stringify({ error: msg })); process.exit(1); }
 if (!url || !out) fail("url and out are needed");
 const u = new URL(url);
 if (!(u.protocol === "file:" || ["127.0.0.1", "localhost", "[::1]"].includes(u.hostname))) {
@@ -51,7 +59,7 @@ function headlessShell() {
 }
 
 /** Why an executable is refused (one line), or "": anything in /Applications, ~/Applications or an app bundle. */
-export function appBinary(exe) {
+export function appBinary(exe: string) {
   if (!exe) return "";
   const p = resolve(exe);
   for (const root of ["/Applications", join(homedir(), "Applications"), "/System/Applications"]) {
@@ -68,36 +76,45 @@ const chrome = spawn(CHROME, [
   "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-sync",
   `--window-size=${W},${H}`, "about:blank",
 ], { stdio: "ignore" });
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const results = [], logs = [];
-let ws;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const results: ({ shot: string } | { eval: string; value: unknown })[] = [], logs: string[] = [];
+let ws: WebSocket | undefined;
+/** One CDP message: an answer (id) or an event (method, params). */
+type Cdp = {
+  id?: number; method?: string;
+  result?: { data?: string; result?: { value?: unknown }; exceptionDetails?: { text?: string } };
+  params?: { type?: string; args?: { value?: unknown; description?: string }[]; exceptionDetails?: { text?: string; exception?: { description?: string } } };
+};
 try {
-  let targets;
+  let targets: { type: string; webSocketDebuggerUrl: string }[] | undefined;
   for (let i = 0; i < 75 && !targets; i++) {
     try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); } catch { await sleep(200); }
   }
   if (!targets) throw new Error("headless Chrome didn't answer on its debugging port");
   const page = targets.find((t) => t.type === "page");
-  ws = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
-  let id = 0; const pending = new Map();
-  ws.onmessage = (m) => {
-    const d = JSON.parse(m.data);
-    if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
-    if (d.method === "Runtime.consoleAPICalled") logs.push(d.params.type + ": " + d.params.args.map((a) => a.value ?? a.description).join(" "));
-    if (d.method === "Runtime.exceptionThrown") logs.push("exception: " + d.params.exceptionDetails.text + " " + (d.params.exceptionDetails.exception?.description || ""));
+  if (!page) throw new Error("headless Chrome has no page");
+  const sock = new WebSocket(page.webSocketDebuggerUrl);
+  ws = sock;
+  await new Promise((r, j) => { sock.onopen = r; sock.onerror = j; });
+  let id = 0; const pending = new Map<number, (d: Cdp) => void>();
+  sock.onmessage = (m) => {
+    const d: Cdp = JSON.parse(m.data);
+    const p = d.id ? pending.get(d.id) : undefined;
+    if (d.id && p) { p(d); pending.delete(d.id); }
+    if (d.method === "Runtime.consoleAPICalled") logs.push(d.params?.type + ": " + (d.params?.args ?? []).map((a) => a.value ?? a.description).join(" "));
+    if (d.method === "Runtime.exceptionThrown") logs.push("exception: " + d.params?.exceptionDetails?.text + " " + (d.params?.exceptionDetails?.exception?.description || ""));
   };
-  const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+  const send = (method: string, params: object = {}) => new Promise<Cdp>((r) => { const i = ++id; pending.set(i, r); sock.send(JSON.stringify({ id: i, method, params })); });
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: SCALE, mobile: false });
   if (args.scheme) await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: args.scheme }] });
   await send("Page.navigate", { url });
   await sleep(args.settle_ms || 2000);
-  const shot = async (name) => {
+  const shot = async (name: string) => {
     const r = await send("Page.captureScreenshot", { format: "png" });
     const f = `${out}.${name}.png`;
-    writeFileSync(f, Buffer.from(r.result.data, "base64"));
+    writeFileSync(f, Buffer.from(r.result?.data ?? "", "base64"));
     results.push({ shot: f });
   };
   for (const s of steps) {

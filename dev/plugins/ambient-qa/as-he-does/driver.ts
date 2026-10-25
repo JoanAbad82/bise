@@ -1,7 +1,7 @@
 // The as-he-does run's window reader (ambient-lead m_18718, m_18946): the promoted app on the
 // real-shaped world, read over CDP on 127.0.0.1 only, page events only. Never a native panel:
 // settings.add.choose (the folder picker) is never touched.
-//   node driver.mjs <cdp port> <out dir> <first|second|draft-type|draft-check> [<draft text>]
+//   node --experimental-strip-types driver.ts <cdp port> <out dir> <first|second|draft-type|draft-check> [<draft text>]
 // first: the open frame, the banner, settings › projects, the add sheet's scan and one add, a
 // message to a project's main and its answer. second: the open frame and the banner.
 // draft-type: harness' composer gets <draft text>, never sent (ambient-lead m_19525); draft-check,
@@ -11,13 +11,14 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fxDir, named } from './fx.mjs';
+import type { Browser, ConsoleMessage, Locator, Page, Request, Response } from '@playwright/test';
+import { fxDir, named } from './fx.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DESKTOP = process.env.PW_FROM ?? path.join(HERE, '..', '..', '..', '..', 'apps', 'desktop');
-const { chromium } = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
-const [port, out, mode, draft] = process.argv.slice(2);
-// the files its words carry: never under a path that names a world project (fx.mjs)
+const { chromium }: typeof import('@playwright/test') = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
+const [port, out = '.', mode = '', draft] = process.argv.slice(2);
+// the files its words carry: never under a path that names a world project (fx.ts)
 const FX = fxDir(out, process.env);
 fs.mkdirSync(FX, { recursive: true });
 const tag = process.env.AS_HE_DOES_TAG ? `-${process.env.AS_HE_DOES_TAG}` : '';
@@ -31,22 +32,25 @@ const WATCHDOG_MS = Number(process.env.AS_HE_DOES_WATCHDOG_MS ?? 600000);
 const ONLY = [...(process.env.AS_HE_DOES_QUICK_ROWS ?? '').split(','),
   ...(process.env.AS_HE_DOES_ROWS_FILE ? fs.readFileSync(process.env.AS_HE_DOES_ROWS_FILE, 'utf8').split('\n') : [])]
   .map((w) => w.trim()).filter(Boolean);
-const asN = (s) => s.replace(/\d+/g, 'N');
-const wanted = (name) => ONLY.length === 0 || ONLY.some((w) => name.includes(w) || asN(name).includes(asN(w)));
+const asN = (s: string) => s.replace(/\d+/g, 'N');
+const wanted = (name: string) => ONLY.length === 0 || ONLY.some((w) => name.includes(w) || asN(name).includes(asN(w)));
 const GROUPS = (process.env.AS_HE_DOES_GROUPS ?? '').split(',').map((w) => w.trim()).filter(Boolean);
-let GROUP = null;
+let GROUP: string | null = null;
 // the time a step spent polling (`until`) since the step before (fast-loop): each step's `wait_s`
 // says how much of its at_s gap was a wait for the app or the hub, not the step's own work
 let WAITED_MS = 0;
 const ANSWER_MS = Number(process.env.AS_HE_DOES_ANSWER_MS ?? 240000);
 const MESSAGE = 'hello from the as-he-does proof';
 
-const res = { mode, steps: [], shots: [] };
+/** One row of the pass: its name, green or not, what it saw. */
+type Step = { name: string; ok: unknown; info: unknown; at_s: number; wait_s: number; group?: string };
+// the pass's JSON: its rows, its shots, and what a mode adds (pages, ...)
+const res: { mode: string; steps: Step[]; shots: string[]; [k: string]: unknown } = { mode, steps: [], shots: [] };
 const save = () => fs.writeFileSync(path.join(out, `${mode}${tag}.json`), JSON.stringify(res, null, 1));
 // at_s: seconds from the driver's start, so a pass shows where its time went
 const T0 = Date.now();
-let lastStep = { name: null, at: T0 };
-const step = (name, ok, info) => {
+let lastStep: { name: string | null; at: number } = { name: null, at: T0 };
+const step = (name: string, ok: unknown, info?: unknown) => {
   res.steps.push({ name, ok, info: info ?? null, at_s: Math.round((Date.now() - T0) / 1000), wait_s: Math.round(WAITED_MS / 1000), ...(GROUP ? { group: GROUP } : {}) });
   WAITED_MS = 0;
   lastStep = { name, at: Date.now() };
@@ -59,11 +63,11 @@ const step = (name, ok, info) => {
 // watchdog'), and the rows past it never ran.
 const STALL_MS = Number(process.env.AS_HE_DOES_STALL_MS ?? 600000);
 // pids a row holds with SIGSTOP (rowsF2A7): always SIGCONT'd, also when the pass ends early
-const HELD = new Set();
+const HELD = new Set<number>();
 const unhold = () => { for (const p of HELD) { try { process.kill(p, 'SIGCONT'); } catch { /* gone */ } } HELD.clear(); };
-const watchdog = (why) => { unhold(); step('driver watchdog', false, why); process.exit(2); };
-let passTimer = null;
-const passLimit = (ms) => {
+const watchdog = (why: unknown) => { unhold(); step('driver watchdog', false, why); process.exit(2); };
+let passTimer: NodeJS.Timeout | null = null;
+const passLimit = (ms: number) => {
   if (passTimer) clearTimeout(passTimer);
   passTimer = setTimeout(() => watchdog({ limit_s: ms / 1000, last: lastStep.name }), ms);
   passTimer.unref();
@@ -76,23 +80,25 @@ setInterval(() => {
 
 // the app's CDP port answers some seconds after the open (c28260a9's first run: 3 drives refused at
 // once, ECONNREFUSED): retried for up to 90 s, then a failed step, never an uncaught error
-let browser;
-for (const t0 = Date.now(); !browser;) {
-  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 10000 }).catch((e) => {
+let connected: Browser | null = null;
+for (const t0 = Date.now(); !connected;) {
+  connected = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 10000 }).catch((e: unknown) => {
     if (Date.now() - t0 > 90000) { step('connect to the app (CDP)', false, String(e).slice(0, 300)); process.exit(1); }
     return null;
   });
-  if (!browser) await new Promise((r) => setTimeout(r, 1000));
+  if (!connected) await new Promise((r) => setTimeout(r, 1000));
 }
-let page;
-for (let i = 0; i < 100 && !page; i++) {
+const browser: Browser = connected;
+let found: Page | undefined;
+for (let i = 0; i < 100 && !found; i++) {
   for (const c of browser.contexts()) for (const p of c.pages()) {
-    if (await p.locator('[data-testid="app.root"]').count().catch(() => 0)) page = p;
+    if (await p.locator('[data-testid="app.root"]').count().catch(() => 0)) found = p;
   }
-  if (!page) await new Promise((r) => setTimeout(r, 200));
+  if (!found) await new Promise((r) => setTimeout(r, 200));
 }
 res.pages = browser.contexts().flatMap((c) => c.pages().map((p) => p.url()));
-if (!page) { step('the window page', false, res.pages); process.exit(1); }
+if (!found) { step('the window page', false, res.pages); process.exit(1); }
+const page: Page = found;
 
 page.on('close', () => closed());
 // a renderer gone is said apart from a window closed (try-gate-f2a7's first run: 'the page closed'
@@ -100,7 +106,7 @@ page.on('close', () => closed());
 page.on('crash', () => step('the window renderer did not crash', false, { at: new Date().toISOString() }));
 browser.on('disconnected', () => { if (!ending) step('the app kept its CDP connection', false, { at: new Date().toISOString() }); });
 let n = 0;
-const shot = async (name) => {
+const shot = async (name: string) => {
   const f = path.join(out, `${mode}${tag}-${++n}-${name}.png`);
   try { await page.screenshot({ path: f, timeout: 15000 }); }
   catch {
@@ -112,11 +118,11 @@ const shot = async (name) => {
   }
   res.shots.push(f); save();
 };
-const text = (sel) => page.locator(sel).first().innerText({ timeout: 3000 }).catch(() => null);
+const text = (sel: string) => page.locator(sel).first().innerText({ timeout: 3000 }).catch(() => null);
 // the right bar's pager (fa548fa11, designer m_27020): 'show N more' under 50, 'show 50 more · N
 // left' past it; '+ N more' is the inbox strip's only (stripRows.ts)
 const BAR_MORE = /^show \d+ more\b/;
-const click = async (name, loc) => {
+const click = async (name: string, loc: Locator) => {
   try { await loc.click({ timeout: 8000 }); return true; }
   catch (e) { step(name, false, String(e).slice(0, 240)); return false; }
 };
@@ -129,7 +135,7 @@ const closed = () => {
   step('the window stayed open through the pass', false, { what: 'the page closed', at: new Date().toISOString() });
   process.exit(3);
 };
-const until = async (fn, ms, every = 1000) => {
+const until = async <T,>(fn: () => Promise<T>, ms: number, every = 1000): Promise<T | null> => {
   const t0 = Date.now();
   try {
     for (;;) {
@@ -145,7 +151,7 @@ const until = async (fn, ms, every = 1000) => {
 };
 // the alarm rows of the right bar's SCHEDULED & WATCHING whose words hold `words` (agent-waiting-states
 // A: app.right.watching.<agent>.<id>, never its .detail/.stop/.open parts): {id, text, title, g, sub, end}
-const alarmRows = (words) => page.evaluate((w) => [...document.querySelectorAll('[data-testid^="app.right.watching."]')]
+const alarmRows = (words: string) => page.evaluate((w) => [...document.querySelectorAll('[data-testid^="app.right.watching."]')]
   .filter((e) => /\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w))
   // its hover words: the ds tip layer's data-tip since hover-tips (984699494), no native title
   .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), title: e.getAttribute('data-tip') ?? e.getAttribute('title'),
@@ -156,10 +162,10 @@ await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 200
 // the status pill (e41cd3c2): 'starting bise…' and the core's words sit IN the title bar, no row
 // under it, nothing below moves when it shows or goes. 5 s of samples from the window's first draw.
 {
-  const seen = { samples: 0, pill: 0, outside: 0, words: [], mainTops: [] };
+  const seen: { samples: number; pill: number; outside: number; words: string[]; mainTops: number[] } = { samples: 0, pill: 0, outside: 0, words: [], mainTops: [] };
   for (let i = 0; i < 20; i++) {
     const s = await page.evaluate(() => {
-      const r = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null;
+      const r = (sel: string) => document.querySelector(sel)?.getBoundingClientRect() ?? null;
       const p = r('[data-testid="app.core"]');
       const bar = r('[data-testid="app.title.panel"]') ?? r('[data-testid="app.title.sidebar"]');
       const m = r('[data-testid="app.main"]');
@@ -193,9 +199,10 @@ step('sidebar', !!side, side);
 // lands on his screen. The bounds come from the page (outer size) and the kept file.
 const FRAMES = process.env.AS_HE_DOES_USERDATA ? path.join(process.env.AS_HE_DOES_USERDATA, 'window-frame.json') : null;
 const winBox = () => page.evaluate(() => ({ x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, iw: window.innerWidth, ih: window.innerHeight, aw: window.screen.availWidth, ah: window.screen.availHeight })).catch(() => null);
-const keptFrames = () => { try { return JSON.parse(fs.readFileSync(FRAMES, 'utf8')); } catch { return null; } };
+// userData/window-frame.json as the app keeps it (JSON): read by the frame rows
+const keptFrames = (): unknown => { try { return JSON.parse(fs.readFileSync(FRAMES ?? '', 'utf8')); } catch { return null; } };
 // resize from CDP: the browser's Browser.setWindowBounds when Electron answers it, else window.resizeTo
-const resizeWin = async (width, height) => {
+const resizeWin = async (width: number, height: number) => {
   const how = await (async () => {
     const b = await browser.newBrowserCDPSession().catch(() => null);
     if (!b) return null;
@@ -346,7 +353,7 @@ const closeArtifact = async () => {
 
 if (mode === 'cut') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
-  const say = async (words) => {
+  const say = async (words: string) => {
     if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
     // b51422c0: a '/diff' left in the composer took the next message ('/diff[[bash: …'): start empty
     await page.keyboard.press('Meta+a');
@@ -421,7 +428,8 @@ if (mode === 'cut') {
   step('the seed ran (runs, agents, artifact)', !!done, { kinds });
   step('the runs fold (tools rows, not one row per call)', kinds.filter((k) => k === 'tools').length >= 1 && kinds.filter((k) => k === 'tools').length < 6, kinds);
   // /agents and /archived
-  for (const [cmd, want, not] of [['/agents', 'keeper', 'gone'], ['/archived', 'gone', null]]) {
+  const lists: [string, string, string | null][] = [['/agents', 'keeper', 'gone'], ['/archived', 'gone', null]];
+  for (const [cmd, want, not] of lists) {
     await click('back to harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
     await say(cmd);
     const t = await until(async () => { const s = await text('[data-testid="app.main"]'); return s && s.includes(want) ? s : null; }, 20000, 1000);
@@ -432,12 +440,12 @@ if (mode === 'cut') {
   }
   // the local .html artifact's pixels, and what its frame loads (ambient-lead m_20609: for amb-web +
   // task-panel when it is blank): every request, response, failure and console line from here
-  const net = [];
-  const onReq = (r) => net.push({ ev: 'request', url: r.url().slice(0, 300), type: r.resourceType(), frame: r.frame()?.url().slice(0, 200) });
-  const onRes = (r) => net.push({ ev: 'response', url: r.url().slice(0, 300), status: r.status(), type: r.headers()['content-type'] ?? '' });
-  const onFail = (r) => net.push({ ev: 'failed', url: r.url().slice(0, 300), error: r.failure()?.errorText ?? '' });
-  const onCon = (m) => net.push({ ev: 'console', type: m.type(), text: m.text().slice(0, 300), url: m.location()?.url?.slice(0, 200) });
-  const onPerr = (e) => net.push({ ev: 'pageerror', text: String(e).slice(0, 300) });
+  const net: Record<string, unknown>[] = [];
+  const onReq = (r: Request) => net.push({ ev: 'request', url: r.url().slice(0, 300), type: r.resourceType(), frame: r.frame()?.url().slice(0, 200) });
+  const onRes = (r: Response) => net.push({ ev: 'response', url: r.url().slice(0, 300), status: r.status(), type: r.headers()['content-type'] ?? '' });
+  const onFail = (r: Request) => net.push({ ev: 'failed', url: r.url().slice(0, 300), error: r.failure()?.errorText ?? '' });
+  const onCon = (m: ConsoleMessage) => net.push({ ev: 'console', type: m.type(), text: m.text().slice(0, 300), url: m.location()?.url?.slice(0, 200) });
+  const onPerr = (e: Error) => net.push({ ev: 'pageerror', text: String(e).slice(0, 300) });
   page.on('request', onReq); page.on('response', onRes); page.on('requestfailed', onFail); page.on('console', onCon); page.on('pageerror', onPerr);
   await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
   const item = page.locator('[data-testid="artifacts.list"]').getByText('proof-html').first();
@@ -452,7 +460,7 @@ if (mode === 'cut') {
     green = png ? await page.evaluate(async (b64) => {
       const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
       const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const g = c.getContext('2d'); if (!g) return 0; g.drawImage(img, 0, 0);
       const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
       for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 46) < 12 && Math.abs(d[i + 1] - 139) < 12 && Math.abs(d[i + 2] - 87) < 12) n++;
       return n / (d.length / 4);
@@ -505,7 +513,7 @@ if (mode === 'cut') {
 // forward, the working row, the inbox block with another project's item, a short thought's words
 if (mode === 'rows2') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
-  const say = async (words) => {
+  const say = async (words: string) => {
     if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
     // b51422c0: a '/diff' left in the composer took the next message ('/diff[[bash: …'): start empty
     await page.keyboard.press('Meta+a');
@@ -542,7 +550,7 @@ if (mode === 'rows2') {
   const panel = page.locator('[data-testid="app.panel"]').first();
   const shown = await panel.waitFor({ timeout: 10000 }).then(() => true, () => false);
   const order = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right."]')]
-    .map((e) => e.getAttribute('data-testid')).filter((t) => /^app\.right\.(agents|archived|artifacts|scheduled)$/.test(t)));
+    .map((e) => e.getAttribute('data-testid')).filter((t) => /^app\.right\.(agents|archived|artifacts|scheduled)$/.test(t ?? '')));
   await shot('right-bar');
   step('the right bar: agents, archived, artifacts, scheduled', shown && order.join(',') === 'app.right.agents,app.right.archived,app.right.artifacts,app.right.scheduled', order);
   const agentsText = (await text('[data-testid="app.right.agents"]')) ?? '';
@@ -576,14 +584,14 @@ if (mode === 'rows2') {
     green = png ? await page.evaluate(async (b64) => {
       const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
       const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const g = c.getContext('2d'); if (!g) return 0; g.drawImage(img, 0, 0);
       const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
       for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 46) < 12 && Math.abs(d[i + 1] - 139) < 12 && Math.abs(d[i + 2] - 87) < 12) n++;
       return n / (d.length / 4);
     }, png) : 0;
   }
   const cols = await page.evaluate(() => {
-    const vis = (sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const vis = (sel: string) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
     // the left bar: shown, and left of the thread (1c5659b8 run: the dragged sidebar is ~240 px, a
     // fixed 160 px rail check read it as missing)
     const side = document.querySelector('[data-testid="app.sidebar"]')?.getBoundingClientRect();
@@ -611,7 +619,7 @@ if (mode === 'rows2') {
   const lbl = () => page.locator('.b-composer .lbl:visible').first().innerText({ timeout: 1000 })
     .then((s) => s.replace(/[∿≈~∼∽·]+/g, ' ').replace(/\s+/g, ' ').trim(), () => null);
   const fieldText = async () => ((await field.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
-  const typeIn = async (words) => {
+  const typeIn = async (words: string) => {
     if (!(await click('the composer', field))) return false;
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
@@ -623,7 +631,7 @@ if (mode === 'rows2') {
   const mainLabel = await lbl();
   await click('proof-html for the esc row', row);
   const reopened = await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false);
-  let escRow = { main_typed: mainTyped, reopened };
+  let escRow: Record<string, unknown> = { main_typed: mainTyped, reopened };
   if (mainTyped && reopened && await typeIn(ART_WORDS)) {
     const artLabel = await lbl();
     await page.keyboard.press('Escape');
@@ -689,20 +697,25 @@ if (mode === 'rows2') {
   await say('take a moment [[slow: 12]]');
   const mark = page.locator('[data-testid="thread.mark"][data-state="working"]').first();
   const marked = await mark.waitFor({ timeout: 10000 }).then(() => true, () => false);
-  const wk = { mark: marked };
+  type Geo = { list: string | null; mark: string | null; composer: string | null; scroll: string | null; breath: string | null } | null;
+  const wk: {
+    mark: boolean; label?: string | null; breath_frames?: number; scrolls?: (string | null)[];
+    still?: Record<string, boolean>; scroll_jumps?: number; first?: Geo; old_rows?: number;
+    is_working_text?: boolean; on_label_line?: boolean; tip?: string | null;
+  } = { mark: marked };
   if (marked) {
     wk.label = await lbl();
     const geo = () => page.evaluate(() => {
-      const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map(Math.round).join(','); };
+      const r = (s: string) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map(Math.round).join(','); };
       const sc = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller]') ?? document.querySelector('[data-testid="thread.list"]');
       return { list: r('[data-testid="thread.list"]'), mark: r('[data-testid="thread.mark"]'), composer: r('[data-testid="composer"]'), scroll: sc ? `${Math.round(sc.scrollTop)},${sc.scrollHeight}` : null, breath: document.querySelector('[data-testid="thread.mark.breath"]')?.textContent ?? null };
     }).catch(() => null);
     // 96db3e08 run: one 18 px scrollTop move right after the send (the send's bottom settle, not
     // the gust?). Let the send settle 500 ms before sampling, so a move left is the gust's (ambient-lead m_22035)
     await page.waitForTimeout(500);
-    const g = [];
+    const g: Geo[] = [];
     for (let i = 0; i < 16; i++) { g.push(await geo()); await page.waitForTimeout(110); }
-    const same = (k) => new Set(g.map((x) => x?.[k] ?? null)).size === 1;
+    const same = (k: 'list' | 'mark' | 'composer') => new Set(g.map((x) => x?.[k] ?? null)).size === 1;
     wk.breath_frames = new Set(g.map((x) => x?.breath ?? null)).size;
     // the scroller may grow when a row lands (new content, kept at the bottom): that is not the gust
     // moving it. Red only when scrollTop moves while scrollHeight stays (the thread jumps by itself).
@@ -725,7 +738,7 @@ if (mode === 'rows2') {
   }
   // the home thread names its main 'bise' (ambient-lead m_22076): the label reads 'to bise'
   step("the working mark: a breath after 'to bise' while main works, no 'is working' row, the thread still under its frames",
-    marked && /^to (bise|main)\b/.test((wk.label ?? '').trim()) && wk.on_label_line && wk.old_rows === 0 && !wk.is_working_text && wk.breath_frames >= 2 && Object.values(wk.still).every(Boolean), wk);
+    marked && /^to (bise|main)\b/.test((wk.label ?? '').trim()) && wk.on_label_line && wk.old_rows === 0 && !wk.is_working_text && (wk.breath_frames ?? 0) >= 2 && Object.values(wk.still ?? {}).every(Boolean), wk);
   await until(async () => (/ack: take a moment/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   await say('one quick thought [[think: weighing the proof rows]]');
   // the TUI folds a thought too (ambient-lead m_20609): the row is there, then opens to its words
@@ -740,12 +753,12 @@ if (mode === 'rows2') {
   await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   // a long reply in bise's own thread, so it scrolls for the block's height row (1c5659b8 run: the
   // thread was empty, nothing scrolled)
-  // regress-25e5: a path naming a project routes these words there (fx.mjs), and the rows below
+  // regress-25e5: a path naming a project routes these words there (fx.ts), and the rows below
   // read a reply that never comes to bise's thread
   // the project rows only (app.sidebar.project.<id>, not their parts), their first line: the name
   const projects = (await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .filter((r) => /^app\.sidebar\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''))
-    .map((r) => (r.innerText ?? '').split(String.fromCharCode(10))[0].trim())).catch(() => [])).filter(Boolean);
+    .map((r) => ((r instanceof HTMLElement ? r.innerText : '') ?? '').split(String.fromCharCode(10))[0]?.trim() ?? '')).catch((): string[] => [])).filter(Boolean);
   const hits = named(FX, projects);
   step("the files the words carry name no world project (else bise's thread routes them there)", projects.length > 0 && hits.length === 0, { fx: FX, projects, named: hits });
   const longMd = path.join(FX, 'long-reply.md');
@@ -762,7 +775,7 @@ if (mode === 'rows2') {
   const blockH = () => page.locator('[data-testid="inbox.block"]').first().boundingBox({ timeout: 2000 }).then((b) => (b ? Math.round(b.height) : null), () => null);
   const listTop = () => page.evaluate(() => {
     const list = document.querySelector('[data-testid="thread.list"]');
-    const scrolls = (x) => x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(x).overflowY);
+    const scrolls = (x: Element) => x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(x).overflowY);
     let e = list && [list, ...list.querySelectorAll('*')].find(scrolls);
     if (!e) { e = list; while (e && !scrolls(e)) e = e.parentElement; }
     return e ? Math.round(e.scrollTop) : null;
@@ -777,7 +790,7 @@ if (mode === 'rows2') {
     // 8b00ed2b (ambient-lead m_21810 (c), as thread/steady-bottom.spec): the composer, its keys line
     // and the inbox block keep their boxes while the thread scrolls, moving and stopped
     const bottom = () => page.evaluate(() => {
-      const at = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round).join(','); };
+      const at = (sel: string) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round).join(','); };
       return { composer: at('.th-screen .b-composer') ?? at('[data-testid="composer"]'), keys: at('[data-testid="composer.keys"]'), block: at('[data-testid="inbox.block"]') };
     }).catch(() => null);
     const rest = await bottom();
@@ -795,7 +808,7 @@ if (mode === 'rows2') {
     await shot('inbox-block-scrolled');
     const moved = tops.some((t) => t !== null && t !== top0);
     step('the inbox block keeps its height on scroll', h0 !== null && moved && hs.every((x) => x !== null && Math.abs(x - h0) <= 1), { height: h0, during: hs, scroll_top: [top0, ...tops], thread_scrolled: moved });
-    const key = (b) => JSON.stringify(b);
+    const key = (b: unknown) => JSON.stringify(b);
     const off = [...moving, ...stopped].map((b, i) => (key(b) === key(rest) ? null : { at: i < moving.length ? `moving ${i}` : `stopped ${i - moving.length}`, box: b })).filter(Boolean);
     step('steady bottom: wheel up and down on a long thread, the composer, keys line and inbox block boxes unchanged',
       !!rest && !!rest.composer && !!rest.keys && !!rest.block && moved && off.length === 0, { rest, thread_scrolled: moved, changed: off.slice(0, 6) });
@@ -804,8 +817,8 @@ if (mode === 'rows2') {
   // the keys where they act: bise's '0', each project's digit in place of its count, ⌘[ under ‹ (a
   // place behind), ⌘] under › (one ahead), ⌘I on the inbox head; released, all gone. A quick ⌘: none.
   const hintsNow = () => page.evaluate(() => {
-    const t = (s) => document.querySelector(s)?.textContent?.trim() ?? null;
-    const rows = [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')].filter((r) => /^app\.sidebar\.project\.[^.]+$/.test(r.getAttribute('data-testid')));
+    const t = (s: string) => document.querySelector(s)?.textContent?.trim() ?? null;
+    const rows = [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')].filter((r) => /^app\.sidebar\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''));
     return {
       n: document.querySelectorAll('.app-keyhint').length,
       bise: t('[data-testid="app.sidebar.bise.hint"]'),
@@ -813,7 +826,7 @@ if (mode === 'rows2') {
       back: t('[data-testid="app.title.back.hint"]'), forward: t('[data-testid="app.title.forward.hint"]'), inbox: t('[data-testid="inbox.block.hint"]'),
     };
   }).catch(() => null);
-  const holdCmd = async (name) => {
+  const holdCmd = async (name: string) => {
     await page.keyboard.down('Meta');
     await page.waitForTimeout(700);
     const held = await hintsNow();
@@ -870,7 +883,7 @@ if (mode === 'rows2') {
   // Seeded as amb-core's answer-drafts-real check does: harness' main publishes a page of two drafted
   // mails, so its hub opens one batch card. Never '1. review' (it opens the page in a browser).
   const DRAFTS = 'release replies proof';
-  const em = (i, to) => `<section data-kit="email" data-id="${i}" data-verb="draft"><p data-field="to">${to}</p><p data-field="subject">v5.9.1</p><p>x</p></section>`;
+  const em = (i: number | string, to: string) => `<section data-kit="email" data-id="${i}" data-verb="draft"><p data-field="to">${to}</p><p data-field="subject">v5.9.1</p><p>x</p></section>`;
   const draftsHtml = '<section data-kit="checklist" data-id="plan" data-plan><ol>'
     + '<li data-id="b1" data-who="bise" data-did="drafted" data-draft="mail-lucas">reply to Lucas</li>'
     + '<li data-id="b2" data-who="bise" data-did="drafted" data-draft="mail-marc">reply to Marc</li></ol></section>'
@@ -912,7 +925,7 @@ if (mode === 'rows2') {
   // the two-finger swipe (swipe.ts reads the renderer's wheel events): a horizontal wheel stream
   // through CDP, fingers right (deltaX < 0) walks back, fingers left forward. Events 20 ms apart
   // stay one gesture (GAP_MS 220); 8 x 30 px passes THRESHOLD_PX 140.
-  const swipe = async (dx) => {
+  const swipe = async (dx: number) => {
     const m = await page.locator('[data-testid="app.main"]').first().boundingBox().catch(() => null);
     if (m) await page.mouse.move(m.x + m.width / 2, m.y + m.height / 3);
     for (let i = 0; i < 8; i++) { await page.mouse.wheel(dx, 0); await new Promise((r) => setTimeout(r, 20)); }
@@ -937,15 +950,15 @@ if (mode === 'rows2') {
   await harness();
   await page.keyboard.press('Meta+k');
   const pal = await page.locator('[data-testid="app.palette"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
-  let kRow = { palette: pal };
+  let kRow: { palette: boolean; groups?: string[] | null; row?: unknown; settings?: boolean } = { palette: pal };
   if (pal) {
     await page.keyboard.type('set', { delay: 40 });
     const groups = await until(async () => {
-      const g = await page.locator('[data-testid^="app.palette.group."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid').slice('app.palette.group.'.length)));
+      const g = await page.locator('[data-testid^="app.palette.group."]').evaluateAll((els) => els.map((e) => (e.getAttribute('data-testid') ?? '').slice('app.palette.group.'.length)));
       return g.includes('pages') ? g : null;
     }, 5000, 300);
     const at = await page.evaluate(() => {
-      const num = (e) => (e ? Number(e.getAttribute('data-testid').split('.').pop()) : null);
+      const num = (e: Element | null) => (e ? Number((e.getAttribute('data-testid') ?? '').split('.').pop()) : null);
       const first = document.querySelector('[data-testid="app.palette.group.pages"] [data-testid^="app.palette.item."]');
       return { want: num(first), cur: num(document.querySelector('[data-testid^="app.palette.item."][aria-selected="true"]')), name: first?.textContent?.slice(0, 80) ?? null };
     });
@@ -966,7 +979,8 @@ if (mode === 'rows2') {
   await new Promise((r) => setTimeout(r, 600));
   const vw = await page.evaluate(() => window.innerWidth);
   const overflow = async () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
-  const at1100 = {};
+  // each screen at 1100 wide: does the page overflow, is the screen there (and what it adds)
+  const at1100: Record<string, { overflow: boolean; there?: boolean; [k: string]: unknown }> = {};
   await harness();
   await page.waitForTimeout(800);
   await shot('w1100-thread');
@@ -988,7 +1002,7 @@ if (mode === 'rows2') {
   await shot('w1100-agents');
   at1100.agents = { overflow: await overflow(), screen: agents };
   // b4a25acb's spacing batch: artifacts, scheduled, /log, /diff (changes), ⌘K, settings and a menu
-  const screen1100 = async (name, open, sel) => {
+  const screen1100 = async (name: string, open: () => Promise<unknown>, sel: string | null) => {
     await open();
     const there = sel ? await page.locator(sel).first().waitFor({ timeout: 10000 }).then(() => true, () => false) : true;
     await page.waitForTimeout(600);
@@ -1042,14 +1056,15 @@ if (mode === 'rows2') {
   const tint = await page.evaluate(() => {
     const list = document.querySelector('[data-testid="thread.list"]');
     const w = document.createTreeWalker(list ?? document.body, NodeFilter.SHOW_TEXT);
-    let n = null;
-    while (w.nextNode()) if (w.currentNode.textContent.includes('quote me if you like')) n = w.currentNode;
-    if (!n) return null;
-    const i = n.textContent.indexOf('quote me');
+    let n: Node | null = null;
+    while (w.nextNode()) if ((w.currentNode.textContent ?? '').includes('quote me if you like')) n = w.currentNode;
+    if (!n || !n.parentElement) return null;
+    const i = (n.textContent ?? '').indexOf('quote me');
     const r = document.createRange();
     r.setStart(n, i);
     r.setEnd(n, i + 'quote me if you like'.length);
     const s = window.getSelection();
+    if (!s) return null;
     s.removeAllRanges();
     s.addRange(r);
     n.parentElement.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
@@ -1087,7 +1102,7 @@ if (mode === 'rows2') {
   const fromEnd = () => page.evaluate(() => {
     // the scroller is inside thread.list (ThreadList's scrollerRef, b4a25acb), on older builds around it
     const list = document.querySelector('[data-testid="thread.list"]');
-    const scrolls = (x) => x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(x).overflowY);
+    const scrolls = (x: Element) => x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(x).overflowY);
     let e = list && [list, ...list.querySelectorAll('*')].find(scrolls);
     if (!e) { e = list; while (e && !scrolls(e)) e = e.parentElement; }
     return e ? { fromEnd: Math.round(e.scrollHeight - e.scrollTop - e.clientHeight), height: e.scrollHeight } : null;
@@ -1112,12 +1127,13 @@ if (mode === 'rows2') {
   const moreBtn = page.locator('[data-testid="app.right.artifacts.more"]').first();
   const capped = await moreBtn.waitFor({ timeout: 60000 }).then(() => true, () => false);
   // (e) 8027d979: every head that folds is a row: pointer; hovered, the rows' tint and its '▾'
-  const look = (id) => page.locator(`[data-testid="app.right.${id}.head"]`).first().evaluate((el) => {
+  const look = (id: string) => page.locator(`[data-testid="app.right.${id}.head"]`).first().evaluate((el) => {
     const label = el.querySelector('.app-rb-label');
     const row = el.parentElement;
     return { cursor: getComputedStyle(el).cursor, tint: row ? getComputedStyle(row).backgroundColor : '', chevron: label ? getComputedStyle(label, '::after').content : '', shown: label ? getComputedStyle(label, '::after').visibility : '' };
   }).catch(() => null);
-  const heads = {};
+  type Look = Awaited<ReturnType<typeof look>>;
+  const heads: Record<string, { rest: Look; hover: Look }> = {};
   for (const id of ['agents', 'archived', 'artifacts', 'scheduled']) {
     await page.mouse.move(1, 400);
     await page.waitForTimeout(150);
@@ -1128,11 +1144,14 @@ if (mode === 'rows2') {
     if (id === 'artifacts') await shot('right-head-hover');
   }
   await page.mouse.move(1, 400);
-  const folding = ['archived', 'artifacts', 'scheduled'].filter((id) => heads[id].rest);
+  const folding = ['archived', 'artifacts', 'scheduled'].filter((id) => heads[id]?.rest);
   step('right bar: the section heads that fold show a pointer and tint on hover',
-    folding.length > 0 && folding.every((id) => heads[id].rest.cursor === 'pointer' && heads[id].hover?.tint !== heads[id].rest.tint), heads);
-  const artRows = () => page.locator('[data-testid="app.right.artifacts"] [data-testid^="app.right.artifact."]').evaluateAll((es) => es.filter((e) => !/\.leaves$/.test(e.getAttribute('data-testid'))).length).catch(() => null);
-  let ml = { capped };
+    folding.length > 0 && folding.every((id) => heads[id]?.rest?.cursor === 'pointer' && heads[id]?.hover?.tint !== heads[id]?.rest?.tint), heads);
+  const artRows = () => page.locator('[data-testid="app.right.artifacts"] [data-testid^="app.right.artifact."]').evaluateAll((es) => es.filter((e) => !/\.leaves$/.test(e.getAttribute('data-testid') ?? '')).length).catch(() => null);
+  const ml: {
+    capped: boolean; more_text?: string; rows_capped?: number | null; less_text?: string | null; rows_open?: number | null;
+    more_gone?: boolean; rows_back?: number | null; more_back?: string; head_in_view?: boolean;
+  } = { capped };
   if (capped) {
     ml.more_text = (await moreBtn.innerText().catch(() => '')).trim();
     ml.rows_capped = await artRows();
@@ -1148,17 +1167,17 @@ if (mode === 'rows2') {
     ml.more_back = (await moreBtn.innerText({ timeout: 3000 }).catch(() => '')).trim();
     ml.head_in_view = await page.locator('[data-testid="app.right.artifacts.head"]').first().isVisible().catch(() => false);
   }
-  step("right bar: '+ N more' -> every row and 'show less' -> back at the cap", capped && BAR_MORE.test(ml.more_text) && ml.less_text === 'show less' && ml.more_gone && ml.rows_open > ml.rows_capped && ml.rows_back === ml.rows_capped && ml.more_back === ml.more_text, ml);
+  step("right bar: '+ N more' -> every row and 'show less' -> back at the cap", capped && BAR_MORE.test(ml.more_text ?? '') && ml.less_text === 'show less' && ml.more_gone && (ml.rows_open ?? 0) > (ml.rows_capped ?? 0) && ml.rows_back === ml.rows_capped && ml.more_back === ml.more_text, ml);
   // (f) 1a79de8a: a PR artifact's click calls window.bise.openExternal and opens no panel. Seen
   // from a logpoint on the preload's openExternal (CDP Debugger, a condition that logs and never
   // pauses); the url is refused in main, so nothing reaches his browser (gate A watches anyway)
   const prRow = page.locator('[data-testid^="app.right.artifact."][data-testid$=".pr-proof"]').first();
   const prThere = await prRow.waitFor({ timeout: 20000 }).then(() => true, () => false);
   const dbg = await page.context().newCDPSession(page).catch(() => null);
-  const ext = [];
-  let bp = null;
+  const ext: string[] = [];
+  let bp: { id: string; url: string; param: string | undefined } | { id?: undefined; error: string } | null = null;
   if (dbg && prThere) {
-    const scripts = [];
+    const scripts: { scriptId: string; url: string; startLine: number; startColumn: number }[] = [];
     dbg.on('Debugger.scriptParsed', (e) => scripts.push(e));
     dbg.on('Runtime.consoleAPICalled', (e) => { const v = e.args?.[0]?.value; if (typeof v === 'string' && v.startsWith('AHD-EXT ')) ext.push(v.slice(8)); });
     await dbg.send('Runtime.enable').catch(() => {});
@@ -1179,7 +1198,10 @@ if (mode === 'rows2') {
       }).then((r) => ({ id: r.breakpointId, url: s.url, param: m[1] }), (e) => ({ error: String(e).slice(0, 200) }));
     }
   }
-  let pr = { row: prThere, logpoint: bp };
+  let pr: {
+    row: boolean; logpoint: typeof bp; leaves?: string | null; external_calls?: string[]; panel?: number;
+    thread_before?: string | null; thread_after?: string | null;
+  } = { row: prThere, logpoint: bp };
   if (prThere) {
     pr.leaves = await page.locator('[data-testid^="app.right.artifact."][data-testid$=".pr-proof.leaves"]').first().innerText({ timeout: 2000 }).catch(() => null);
     const screenBefore = await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent').catch(() => null);
@@ -1212,7 +1234,11 @@ if (mode === 'rows2') {
   const dropAsked = await dropCard.waitFor({ timeout: 20000 }).then(() => true, () => false);
   if (dropAsked) await click(`answer ${MAKER}'s drop card 'yes'`, dropCard);
   const archived = await until(async () => (/release-ts/.test((await text('[data-testid="app.right.archived"]')) ?? '') && !/release-ts/.test((await text('[data-testid="app.right.agents"]')) ?? '') ? true : null), 60000, 1000);
-  let gh = { made, drop_card: dropAsked, archived: !!archived };
+  type Box = { x: number; right: number; w: number; h: number } | null;
+  let gh: {
+    made: boolean; drop_card: boolean; archived: boolean; open?: boolean; agent?: string | null; head?: Box; column_right?: number | null;
+    art?: Box; restore?: Box; restore_text?: string | null; restore_cut?: boolean | null; width?: number;
+  } = { made, drop_card: dropAsked, archived: !!archived };
   if (made && archived) {
     await expand();
     await click(`${MAKER}'s artifact from the right bar`, makerArt);
@@ -1222,7 +1248,7 @@ if (mode === 'rows2') {
     await page.waitForTimeout(800);
     await page.mouse.move(1, 400);
     gh = { ...gh, open, ...(await page.evaluate(() => {
-      const b = (s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x), right: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; };
+      const b = (s: string) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x), right: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; };
       const head = document.querySelector('[data-testid="thread.head"]');
       const restore = document.querySelector('[data-testid="thread.head.restore"]');
       return {
@@ -1237,8 +1263,9 @@ if (mode === 'rows2') {
     await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
     await closeArtifact();
   }
-  const fits = !!gh.head && !!gh.restore && gh.column_right !== null && gh.head.right <= gh.column_right + 1
-    && (!gh.art || gh.art.x <= gh.head.x || gh.head.right <= gh.art.x + 1) && gh.restore.right <= gh.head.right + 1 && gh.restore_cut === false && gh.head.h === 44;
+  const { head: ghHead, restore: ghRestore, column_right: ghCol, art: ghArt } = gh;
+  const fits = !!ghHead && !!ghRestore && ghCol != null && ghHead.right <= ghCol + 1
+    && (!ghArt || ghArt.x <= ghHead.x || ghHead.right <= ghArt.x + 1) && ghRestore.right <= ghHead.right + 1 && gh.restore_cut === false && ghHead.h === 44;
   step("an archived maker's head beside its artifact at 1100: restore inside its column", gh.agent === MAKER && gh.width === 1100 && fits, gh);
   await harness();
   await fileChips(harness);
@@ -1247,7 +1274,7 @@ if (mode === 'rows2') {
 // quick: the quick rows alone, a follow-up pass on a candidate (cand.sh AS_HE_DOES_ONLY=quick)
 if (mode === 'quick') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
-  const say = async (words) => {
+  const say = async (words: string) => {
     if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
@@ -1289,33 +1316,33 @@ if (mode === 'quick') {
 // '2' calls window.bise.openExternal: a breakpoint in the preload reads its URL and swaps it for
 // 'qa-noop:held' (main refuses that scheme), so his browser never opens; a swap that doesn't take
 // stops the renderer's call (Runtime.terminateExecution) and the run (BREACH).
-async function rowsE812(harness, say) {
-  const row = async (name, fn) => {
+async function rowsE812(harness: () => Promise<unknown>, say: (words: string) => Promise<unknown>) {
+  const row = async (name: string, fn: () => Promise<unknown>) => {
     if (!wanted(name)) return;
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
-  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
   const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   const HP = process.env.AS_HE_DOES_HARNESS ?? null;
   const GHW = process.env.AS_HE_DOES_GH_WORLD ?? null;
-  const git = async (args) => {
+  const git = async (args: string[]) => {
     const { execFileSync } = await import('node:child_process');
-    try { return execFileSync('git', ['-C', HP, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; }
+    try { return execFileSync('git', ['-C', HP ?? '.', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; }
   };
   // the projects of the sidebar but bise and harness: {id, name}
   const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
     .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
-  const openProject = async (id) => {
+  const openProject = async (id: string) => {
     await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(800);
   };
   // a card's words anywhere a card shows (the inbox block, a strip, the dock), never his asides
   // a read that fails (a reload under it) counts as seen: a red to look at, never a silent pass
-  const cardShown = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
+  const cardShown = (token: string) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
     .some((e) => (e.textContent ?? '').includes(t)), token).catch(() => 'unread');
   // the block's row or card holding `token`, opened (a click on its row, '+ N more' first)
-  const dock = async (token, ms) => {
+  const dock = async (token: string, ms: number) => {
     const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: token }).first();
     const open = page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: token }).first();
     const listed = await until(async () => {
@@ -1330,10 +1357,10 @@ async function rowsE812(harness, say) {
     }
     return { listed: !!listed, open: (await open.isVisible().catch(() => false)) ? open : null };
   };
-  const answeredAsides = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="thread.aside."], [data-testid^="thread.approval."]')]
+  const answeredAsides = (token: string) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="thread.aside."], [data-testid^="thread.approval."]')]
     .filter((e) => /^thread\.(aside|approval)\.\d+$/.test(e.getAttribute('data-testid') ?? '') && /you answered/.test(e.textContent ?? '') && (e.textContent ?? '').includes(t))
     .map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)), token).catch(() => ['unread']);
-  const fakeLines = (token) => {
+  const fakeLines = (token: string) => {
     const LOG = process.env.AS_HE_DOES_FAKE_LOG;
     return LOG && fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes(token)).length : null;
   };
@@ -1376,8 +1403,8 @@ async function rowsE812(harness, say) {
     await page.mouse.move(1, 300);
     await shot('card-answered-other-project');
     // from here on, sampled every 250 ms: the card must never show again
-    const seen = [];
-    const watch = async (where, ms) => {
+    const seen: { where: string; at_ms: number }[] = [];
+    const watch = async (where: string, ms: number) => {
       const t0 = Date.now();
       while (Date.now() - t0 < ms) { if (await cardShown(T)) seen.push({ where, at_ms: Date.now() - t0 }); await page.waitForTimeout(250); }
     };
@@ -1410,12 +1437,12 @@ async function rowsE812(harness, say) {
 // SIGSTOP while main withdraws it); a pause under a minute counts its seconds on the line, the head
 // and the AGENTS row, then minutes. Every SIGSTOP is the world's or the candidate's own pid, always
 // SIGCONT'd. Each row is its own try.
-async function rowsF2A7(harness, say) {
-  const row = async (name, fn) => {
+async function rowsF2A7(harness: () => Promise<unknown>, say: (words: string) => Promise<unknown>) {
+  const row = async (name: string, fn: () => Promise<unknown>) => {
     if (!wanted(name)) return;
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
-  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
   const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   const field = page.locator('[data-testid="composer.field"]:visible').first();
   const clear = async () => {
@@ -1426,17 +1453,17 @@ async function rowsF2A7(harness, say) {
   const APP = process.env.AS_HE_DOES_APP ?? null;
   const { execFileSync, spawn } = await import('node:child_process');
   const psLines = () => { try { return execFileSync('/bin/ps', ['-axww', '-o', 'pid=,command='], { encoding: 'utf8' }).split(String.fromCharCode(10)); } catch { return []; } };
-  const pidOf = (l) => Number(l.trim().split(/\s+/)[0]);
+  const pidOf = (l: string) => Number(l.trim().split(/\s+/)[0]);
   // the candidate's own ambient-core (under its bundle)
   const coreLines = () => (APP ? psLines().filter((l) => l.includes(`${APP}/Contents/`) && / ambient-core( |$)/.test(l)) : []);
-  const signal = (pids, s) => pids.forEach((p) => {
+  const signal = (pids: number[], s: NodeJS.Signals) => pids.forEach((p) => {
     if (s === 'SIGSTOP') HELD.add(p); else HELD.delete(p);
     try { process.kill(p, s); } catch { /* gone */ }
   });
   const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
     .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
-  const openProject = async (id) => {
+  const openProject = async (id: string) => {
     await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(800);
   };
@@ -1446,11 +1473,11 @@ async function rowsF2A7(harness, say) {
     await page.waitForTimeout(1000);
   };
   // a card's words anywhere a card shows (a failed read counts as shown: a red to look at)
-  const cardShown = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
+  const cardShown = (token: string) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
     .some((e) => (e.textContent ?? '').includes(t)), token).catch(() => 'unread');
   // the card holding `token` anywhere in the block: its words, else a walk through '+ N more' (each
   // opens the next item; a folded card's words aren't in the block, try-gate-f2a7's second run)
-  const present = async (token) => {
+  const present = async (token: string) => {
     const seen = await cardShown(token);
     if (seen !== false) return true;
     const n = Number(/(\d+) waiting/.exec(flat(await text('[data-testid="inbox.block"]')))?.[1] ?? 0);
@@ -1464,7 +1491,7 @@ async function rowsF2A7(harness, say) {
     return false;
   };
   // the block's card holding `token`, open in place: {listed, open, id}
-  const dock = async (token, ms) => {
+  const dock = async (token: string, ms: number) => {
     const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: token }).first();
     const open = page.locator('[data-testid^="inbox.block.open."]').filter({ hasText: token }).first();
     const listed = await until(async () => {
@@ -1486,20 +1513,23 @@ async function rowsF2A7(harness, say) {
     return { listed: !!listed, open: isOpen ? open : null, id };
   };
   // the rows of the thread on screen holding `words`: his asides and the hub's approval rows, each once
-  const rowsWith = (words) => page.evaluate((w) => [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread."]')]
+  const rowsWith = (words: string) => page.evaluate((w) => [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread."]')]
     .filter((e) => /^thread\.(aside|approval)\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w))
-    .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) })), words).catch(() => [{ id: 'unread', text: '' }]);
-  const bodyHas = async (re) => { const b = flat(await page.locator('body').innerText({ timeout: 3000 }).catch(() => '')); const m = re.exec(b); return m ? m[0] : null; };
+    .map((e) => ({ id: e.getAttribute('data-testid') ?? '', text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) })), words).catch(() => [{ id: 'unread', text: '' }]);
+  const bodyHas = async (re: RegExp) => { const b = flat(await page.locator('body').innerText({ timeout: 3000 }).catch(() => '')); const m = re.exec(b); return m ? m[0] : null; };
   // the resolution the world's hub journaled for card `id` whose words hold `token` (the journal
   // whose card_opened has both): 'answered', 'withdrawn by main: …', …; null if none
-  const closeOf = (token, id) => {
+  // a journal line (JSON): the fields closeOf reads
+  type JournalEv = { type?: string; id?: string; resolution?: unknown; card?: { id?: string; text?: string } };
+  const closeOf = (token: string, id: string) => {
     const hubs = process.env.AS_HE_DOES_BISE_HOME ? path.join(process.env.AS_HE_DOES_BISE_HOME, 'hubs') : null;
-    let dirs = [];
+    if (!hubs) return null;
+    let dirs: string[] = [];
     try { dirs = fs.readdirSync(hubs); } catch { return null; }
     for (const d of dirs) {
-      let lines;
+      let lines: string[];
       try { lines = fs.readFileSync(path.join(hubs, d, 'journal.jsonl'), 'utf8').split(String.fromCharCode(10)); } catch { continue; }
-      const evs = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      const evs = lines.map((l): JournalEv | null => { try { return JSON.parse(l); } catch { return null; } }).filter((e) => e !== null);
       if (!evs.some((e) => e.type === 'card_opened' && e.card?.id === id && (e.card?.text ?? '').includes(token))) continue;
       const c = evs.find((e) => e.type === 'card_closed' && e.id === id);
       return c ? String(c.resolution) : null;
@@ -1514,7 +1544,7 @@ async function rowsF2A7(harness, say) {
 
   // main's cards in harness, each '<question>' then its options on their own lines (Shift+Enter, as
   // rows37: sb notify is main's alone, 'reserved for main' from an agent, try-gate-f2a7's first run)
-  const cards = async (list, tail) => {
+  const cards = async (list: { q: string; opts: string[] }[], tail: string) => {
     await field.click({ timeout: 3000 }).catch(() => {});
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
@@ -1522,7 +1552,7 @@ async function rowsF2A7(harness, say) {
     // and '5. 1. zqclick-one' on the third card of a message: no option 1 to click, try-gate-f2a7's
     // second run)
     const NL = String.fromCharCode(92) + 'n';
-    const one = (c) => `sb notify "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
+    const one = (c: { q: string; opts: string[] }) => `sb notify "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
     await page.keyboard.type(`[[bash: ${list.map(one).join(' && ')}]] ${tail}`, { delay: 5 });
     await page.keyboard.press('Enter');
   };
@@ -1535,7 +1565,7 @@ async function rowsF2A7(harness, say) {
   const seeded = await until(async () => ((((await text('[data-testid="thread.list"]')) ?? '').match(/(card|notification) #\d+ opened for the user/g) ?? []).length >= 3 ? true : null), 120000, 1000);
   step("rowsF2A7 seed: main's three cards (digit, words, click) in the inbox", !!seeded, { other: other ?? null, block: flat(await text('[data-testid="inbox.block"]')).slice(0, 300) });
 
-  const took = {};
+  const took: Record<string, unknown> = {};
   // answer-in-thread A (787e6ee82): an answer to another project's card takes the window to that
   // project's thread at his answer, the hub's row there ('answered from <where>' under his bubble);
   // no window aside in the thread he answered from (store/answered.ts)
@@ -1544,8 +1574,8 @@ async function rowsF2A7(harness, say) {
     .find((p) => p.id && !p.id.includes('.') && /^\W*harness\b/.test(p.t))?.id ?? null).catch(() => null);
   const HID = await harnessPid();
   const inHarness = () => page.locator('[data-testid="thread.screen"]').first().getAttribute('data-project', { timeout: 1000 }).then((x) => x === HID, () => false);
-  const hubRows = async (w) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.approval.'));
-  const asideRows = async (w) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.aside.'));
+  const hubRows = async (w: string) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.approval.'));
+  const asideRows = async (w: string) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.aside.'));
   // inbox-scope (e76af4925): a project's block lists that project's items only; another project's
   // card is answered from bise's view (every project's), here by its digit
   await row('answer by a digit from bise', async () => {
@@ -1594,37 +1624,44 @@ async function rowsF2A7(harness, say) {
 // fence (ipc.ts lookable) refuses a preview or a reveal and nothing reaches his screen. The calls
 // are seen from logpoints on the preload's quickLook / showInFinder (this build has no test mode,
 // so no 'bise-desktop: quicklook' line).
-async function fileChips(harness) {
+/** A part of a hub message (Part::Text / Part::File), as the journal keeps it. */
+type JournalPart = { kind?: string; name?: string; path?: string; missing?: boolean; text?: string };
+/** A journal row that carries a word: its hub, its message's ends, parts and text. */
+type JournalRow = { hub: string; type: string | null; from: string | null; to: string | null; parts: JournalPart[] | null; text: string };
+async function fileChips(harness: () => Promise<unknown>) {
   const FD = path.join(FX, 'file-chips');
   fs.rmSync(FD, { recursive: true, force: true });
   fs.mkdirSync(FD, { recursive: true });
   const DOCS = ['q3.pdf', 'data.csv', 'plan.xlsx', 'brief.docx', 'deck.pptx'];
   const NL = String.fromCharCode(10);
   for (const d of DOCS) fs.writeFileSync(path.join(FD, d), `fake ${d}${NL}`);
-  const at = (d) => path.join(FD, d);
-  const appHome = await page.evaluate(() => window.bise?.home ?? null).catch(() => null);
+  const at = (d: string) => path.join(FD, d);
+  // the preload's window.bise (the app's home only, here)
+  const appHome = await page.evaluate(() => { const w: Window & { bise?: { home?: string } } = window; return w.bise?.home ?? null; }).catch(() => null);
   const fenced = !!appHome && !FD.startsWith(`${appHome}/`);
-  const drop = async (sel, files) => {
+  const drop = async (sel: string, files: string[]) => {
     const box = await page.locator(sel).first().boundingBox().catch(() => null);
     if (!box) return false;
     const x = box.x + box.width / 2, y = box.y + box.height / 2;
     const s = await page.context().newCDPSession(page);
     const data = { items: [], files, dragOperationsMask: 1 };
-    for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x, y, data });
+    for (const type of ['dragEnter', 'dragOver', 'drop'] as const) await s.send('Input.dispatchDragEvent', { type, x, y, data });
     await s.detach().catch(() => {});
     return true;
   };
   // the home hubs' journals (the world's, under the app's home): the msg rows that carry word
-  const journal = (word) => {
-    const rows = [];
+  const journal = (word: string) => {
+    const rows: JournalRow[] = [];
     const hubs = appHome ? path.join(appHome, '.bise', 'hubs') : null;
     for (const h of hubs && fs.existsSync(hubs) ? fs.readdirSync(hubs) : []) {
-      const f = path.join(hubs, h, 'journal.jsonl');
+      const f = path.join(hubs ?? '', h, 'journal.jsonl');
       if (!fs.existsSync(f)) continue;
       for (const l of fs.readFileSync(f, 'utf8').split(NL)) {
         if (!l.includes(word)) continue;
         try {
-          const j = JSON.parse(l);
+          // a journal line (JSON): a msg row, or the message itself
+          type Msg = { type?: string; from?: string; to?: string; parts?: string | JournalPart[]; text?: unknown };
+          const j: Msg & { msg?: Msg } = JSON.parse(l);
           const m = j.msg ?? j;
           const parts = typeof m.parts === 'string' ? JSON.parse(m.parts) : m.parts;
           rows.push({ hub: h, type: j.type ?? null, from: m.from ?? null, to: m.to ?? null, parts: Array.isArray(parts) ? parts : null, text: String(m.text ?? '').slice(0, 300) });
@@ -1635,7 +1672,7 @@ async function fileChips(harness) {
   };
   const field = page.locator('[data-testid="composer.field"]:visible').first();
   const fileChip = page.locator('[data-testid^="composer.chip."][data-kind="file"]');
-  const fresh = async (words) => {
+  const fresh = async (words: string) => {
     await field.click({ timeout: 5000 }).catch(() => {});
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
@@ -1675,14 +1712,14 @@ async function fileChips(harness) {
   await page.mouse.move(1, 300);
   await shot('file-chips-bubble');
   step("(f1) his bubble draws a chip per file, '· missing' on the one gone at send time",
-    drawn && bub.names.length === DOCS.length && /· missing/.test(bub.gone_text) && /deck\.pptx is gone from /.test(bub.gone_title ?? '') && /preview · right-click: show in Finder/.test(bub.q3_title ?? ''), bub);
+    !!bub && bub.names.length === DOCS.length && /· missing/.test(bub.gone_text) && /deck\.pptx is gone from /.test(bub.gone_title ?? '') && /preview · right-click: show in Finder/.test(bub.q3_title ?? ''), bub);
 
   // a click -> quickLook(path), a right-click -> showInFinder(path), the gone one calls nothing
-  const calls = [];
+  const calls: string[] = [];
   const dbg = await page.context().newCDPSession(page).catch(() => null);
-  const bps = [];
+  const bps: { fn: string; id: string | null; error: string | null }[] = [];
   if (dbg && fenced) {
-    const scripts = [];
+    const scripts: { scriptId: string; url: string; startLine: number; startColumn: number }[] = [];
     dbg.on('Debugger.scriptParsed', (e) => scripts.push(e));
     dbg.on('Runtime.consoleAPICalled', (e) => { const v = e.args?.[0]?.value; if (typeof v === 'string' && v.startsWith('AHD-F ')) calls.push(v.slice(6)); });
     await dbg.send('Runtime.enable').catch(() => {});
@@ -1700,12 +1737,12 @@ async function fileChips(harness) {
         const r = await dbg.send('Debugger.setBreakpoint', {
           location: { scriptId: s.scriptId, lineNumber: line + (s.startLine ?? 0), columnNumber: col + (line === 0 ? (s.startColumn ?? 0) : 0) },
           condition: `console.log('AHD-F ${fn} ' + String(${m[1]})), false`,
-        }).catch((e) => ({ error: String(e).slice(0, 200) }));
-        bps.push({ fn, id: r.breakpointId ?? null, error: r.error ?? null });
+        }).then((ok) => ({ id: ok.breakpointId, error: null }), (e: unknown) => ({ id: null, error: String(e).slice(0, 200) }));
+        bps.push({ fn, id: r.id, error: r.error });
       }
     }
   }
-  const ck = { fenced, logpoints: bps };
+  const ck: { fenced: boolean; logpoints: typeof bps; calls?: string[]; gone_calls?: number } = { fenced, logpoints: bps };
   if (drawn && fenced && bps.filter((b) => b.id).length === 2) {
     await bchips.filter({ hasText: 'q3.pdf' }).first().click({ timeout: 5000 }).catch(() => {});
     await until(async () => (calls.some((c) => c.startsWith('quickLook ')) ? true : null), 5000, 200);
@@ -1718,7 +1755,7 @@ async function fileChips(harness) {
     ck.calls = [...calls];
     ck.gone_calls = calls.length - n0;
   }
-  for (const b of bps) if (b.id) await dbg.send('Debugger.removeBreakpoint', { breakpointId: b.id }).catch(() => {});
+  for (const b of bps) if (b.id && dbg) await dbg.send('Debugger.removeBreakpoint', { breakpointId: b.id }).catch(() => {});
   if (dbg) { await dbg.send('Debugger.disable').catch(() => {}); await dbg.detach().catch(() => {}); }
   step('(f1) a click on a file chip calls quickLook(its path), a right-click showInFinder(its path), the gone one calls nothing (seen in the preload; main fences them out)',
     (ck.calls ?? []).includes(`quickLook ${at('q3.pdf')}`) && (ck.calls ?? []).includes(`showInFinder ${at('data.csv')}`) && ck.gone_calls === 0, ck);
@@ -1747,7 +1784,7 @@ async function fileChips(harness) {
   }
   const docked = await card.isVisible().catch(() => false);
   const answering = docked && /answering/.test(((await page.locator('[data-testid="composer"]').first().innerText({ timeout: 1000 }).catch(() => '')) ?? ''));
-  let ans = { listed: !!listed, docked, answering };
+  let ans: { listed: boolean; docked: boolean; answering: boolean; chip?: boolean; entry?: unknown; ok?: boolean } = { listed: !!listed, docked, answering };
   if (answering) {
     await fresh('cold, see ');
     await drop('[data-testid="composer.field"]:visible', [csv]);
@@ -1756,12 +1793,12 @@ async function fileChips(harness) {
     await page.keyboard.press('Enter');
     // an answer reaches main as the hub's own words ('the user answered card #N (…): "…"'), the file
     // in them as its <file … path=…> tag where he dropped it (cand-2760), or as a file part
-    const asPart = (r) => r.parts?.some((p) => p.kind === 'file' && p.path === csv);
+    const asPart = (r: JournalRow) => r.parts?.some((p) => p.kind === 'file' && p.path === csv);
     // the hub says 'notification #N' since cards became notifications in its words
-    const asTag = (r) => /answered (card|notification)/.test(r.text) && r.text.includes(`cold, see <file name="[File #1]" path="${csv}"`);
+    const asTag = (r: JournalRow) => /answered (card|notification)/.test(r.text) && r.text.includes(`cold, see <file name="[File #1]" path="${csv}"`);
     const got = await until(async () => journal('bench-zq.csv').find((r) => asPart(r) || asTag(r)) ?? null, 30000, 1000);
     ans = { ...ans, chip: !!chip, entry: got ? { ...got, parts: got.parts?.map((p) => ({ kind: p.kind, name: p.name, path: p.path ? path.basename(p.path) : undefined, text: p.text })) ?? null } : journal('bench-zq.csv').slice(0, 2) };
-    ans.ok = !!chip && !!got && (asTag(got) || (got.parts[0]?.kind === 'text' && /cold, see/.test(got.parts[0]?.text ?? '')));
+    ans.ok = !!chip && !!got && (asTag(got) || (got.parts?.[0]?.kind === 'text' && /cold, see/.test(got.parts?.[0]?.text ?? '')));
   }
   step("(f1) a csv dropped while answering a card: a file chip, sent as a file part where it was", !!ans.ok, ans);
   await harness();

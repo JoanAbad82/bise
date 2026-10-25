@@ -1,7 +1,7 @@
-// node --test dev/plugins/ambient-qa/as-he-does/fx.test.mjs
+// node --experimental-strip-types --test dev/plugins/ambient-qa/as-he-does/fx.test.ts
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fxDir, named, namesIn } from './fx.mjs';
+import { fxDir, named, namesIn } from './fx.ts';
 
 const WORLD = ['harness', 'ai-docs', 'folder-15'];
 // try-gate-25e5's out dir: the two runs whose long reply went to harness

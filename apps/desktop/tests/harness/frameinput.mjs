@@ -7,7 +7,7 @@
 // step itself: before each pointer event, the parent's elementFromPoint at those page coordinates
 // must be the iframe, else it throws with what is on top (an overlay over the frame still fails,
 // as it would for him). Same-origin frames route fine under offscreen rendering: refused here.
-// Plain .mjs so the as-he-does driver (dev/plugins/ambient-qa/as-he-does/driver.mjs) and the
+// Plain .mjs so the as-he-does driver (dev/plugins/ambient-qa/as-he-does/driver.ts) and the
 // checks (inputs.ts re-exports it) read one copy. Coordinates are the page's, as page.mouse's.
 
 const KEYS = {

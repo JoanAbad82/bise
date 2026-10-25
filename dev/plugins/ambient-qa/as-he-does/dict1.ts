@@ -1,45 +1,47 @@
 // One real ctrl+r take in the packed app's composer (ambient-lead m_22430): the candidate opened
 // with BISE_AMBIENT_FAKE_VOICE=<words file> on the real-shaped world, read over CDP on 127.0.0.1.
-//   AS_HE_DOES_VOICE=<words file> node dict1.mjs <cdp port> <out dir>
+//   AS_HE_DOES_VOICE=<words file> node --experimental-strip-types dict1.ts <cdp port> <out dir>
 // harness' composer, the words written to the file, ctrl+r tapped, 1.2 s, ctrl+r tapped again:
 // the words must reach the field. Writes <out>/dict1.json ({steps, shots}) and <out>/dict1-N-*.png.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Browser, Page } from '@playwright/test';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DESKTOP = process.env.PW_FROM ?? path.join(HERE, '..', '..', '..', '..', 'apps', 'desktop');
-const { chromium } = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
-const [port, out] = process.argv.slice(2);
+const { chromium }: typeof import('@playwright/test') = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
+const [port, out = '.'] = process.argv.slice(2);
 const VOICE = process.env.AS_HE_DOES_VOICE;
 const WORDS = 'take one alpha bravo charlie';
 
-const res = { mode: 'dict1', steps: [], shots: [] };
+const res: { mode: string; steps: { name: string; ok: unknown; info: unknown }[]; shots: string[] } = { mode: 'dict1', steps: [], shots: [] };
 const save = () => fs.writeFileSync(path.join(out, 'dict1.json'), JSON.stringify(res, null, 1));
-const step = (name, ok, info) => { res.steps.push({ name, ok, info: info ?? null }); save(); };
+const step = (name: string, ok: unknown, info: unknown) => { res.steps.push({ name, ok, info: info ?? null }); save(); };
 setTimeout(() => { step('driver watchdog', false, '120 s'); process.exit(2); }, 120000).unref();
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 if (!VOICE) { step('the fake voice words file (AS_HE_DOES_VOICE)', false, 'not set'); process.exit(1); }
-let browser;
+let browser: Browser | null = null;
 for (const t0 = Date.now(); !browser;) {
-  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 10000 }).catch((e) => {
+  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 10000 }).catch((e: unknown) => {
     if (Date.now() - t0 > 90000) { step('connect to the app (CDP)', false, String(e).slice(0, 300)); process.exit(1); }
     return null;
   });
   if (!browser) await wait(1000);
 }
-let page;
-for (let i = 0; i < 100 && !page; i++) {
+let found: Page | undefined;
+for (let i = 0; i < 100 && !found; i++) {
   for (const c of browser.contexts()) for (const p of c.pages()) {
-    if (await p.locator('[data-testid="app.root"]').count().catch(() => 0)) page = p;
+    if (await p.locator('[data-testid="app.root"]').count().catch(() => 0)) found = p;
   }
-  if (!page) await wait(200);
+  if (!found) await wait(200);
 }
-if (!page) { step('the window page', false, null); process.exit(1); }
+if (!found) { step('the window page', false, null); process.exit(1); }
+const page: Page = found;
 let n = 0;
-const shot = async (name) => {
+const shot = async (name: string) => {
   const f = path.join(out, `dict1-${++n}-${name}.png`);
   try { await page.screenshot({ path: f, timeout: 15000 }); res.shots.push(f); save(); } catch { /* the steps say enough */ }
 };
@@ -52,7 +54,7 @@ const tap = async () => {
 };
 const read = () => page.evaluate(() => ({
   field: document.querySelector('[data-testid="composer.field"]')?.textContent ?? null,
-  value: document.querySelector('[data-testid="composer.field"]')?.value ?? null,
+  value: document.querySelector<HTMLTextAreaElement>('[data-testid="composer.field"]')?.value ?? null,
   mic: document.querySelector('[data-testid="composer.mic"]')?.getAttribute('data-state') ?? null,
   note: document.querySelector('[data-testid="composer.note"]')?.textContent ?? null,
   why: document.querySelector('[data-testid="composer.dictation.why"]')?.textContent ?? null,
@@ -62,8 +64,9 @@ const read = () => page.evaluate(() => ({
   sign: (() => { const s = document.querySelector('[data-testid="composer.dictation"] .chip .sign'); return s ? getComputedStyle(s, '::before').content : null; })(),
 })).catch(() => null);
 // every meter sample of the take: {ms, phase, bars, sign}
-const meter = [];
-const sample = (r, ms) => { if (r?.bars != null && (meter.at(-1)?.bars !== r.bars || meter.at(-1)?.phase !== r.phase)) meter.push({ ms, phase: r.phase, bars: r.bars, sign: r.sign }); };
+type Sample = { ms: number; phase: string | null; bars: string; sign: string | null };
+const meter: Sample[] = [];
+const sample = (r: Awaited<ReturnType<typeof read>>, ms: number) => { if (r?.bars != null && (meter.at(-1)?.bars !== r.bars || meter.at(-1)?.phase !== r.phase)) meter.push({ ms, phase: r.phase, bars: r.bars, sign: r.sign }); };
 
 await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
 await page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first().click({ timeout: 8000 }).catch(() => {});
@@ -74,12 +77,15 @@ if (!there) { await shot('no-composer'); process.exit(1); }
 await field.click({ timeout: 5000 }).catch(() => {});
 await field.fill('').catch(() => {});
 fs.writeFileSync(VOICE, WORDS);
-const mic = [];
+const mic: { ms: number; s: string | null }[] = [];
 // the fake voice's final comes some ms after the stop (cand-37fa: recording -> off, the 100 ms poll
 // never saw 'transcribing'): an observer in the page keeps every meter change as it happens
+// the observer's log, kept on the page's window
+type MeterWindow = Window & { __ahdMeter?: { ms: number; phase: string | null; bars: string | null; sign: string | null }[] };
 await page.evaluate(() => {
-  const log = [];
-  window.__ahdMeter = log;
+  const log: NonNullable<MeterWindow['__ahdMeter']> = [];
+  const w: MeterWindow = window;
+  w.__ahdMeter = log;
   const t0 = performance.now();
   const rec = () => {
     const m = document.querySelector('[data-testid="composer.dictation.meter"]');
@@ -114,13 +120,13 @@ step('one ctrl+r take: the fake voice words reach the field', landed, { words: W
 // transcribing the rolling wave ▂▃▅▆▅▃ (1,2,4,5,4,2 rolled) and the sign ∿. The fake voice sends
 // levels (cand-37fa: 0 → 3-4 within 130 ms): the take opens flat (silence before his first level),
 // then the bars follow the levels.
-const seenIn = await page.evaluate(() => window.__ahdMeter ?? null).catch(() => null);
-const all = seenIn?.length ? seenIn : meter;
+const seenIn = await page.evaluate(() => { const w: MeterWindow = window; return w.__ahdMeter ?? null; }).catch(() => null);
+const all: { ms: number; phase: string | null; bars: string | null; sign: string | null }[] = seenIn?.length ? seenIn : meter;
 const listen = all.filter((m) => m.phase === 'listening');
 const trans = all.filter((m) => m.phase === 'transcribing');
 const WAVE = [1, 2, 4, 5, 4, 2];
-const isWave = (b) => { const a = b.split(',').map(Number); return WAVE.some((_, k) => [...WAVE.slice(k), ...WAVE.slice(0, k)].join() === a.join()); };
-step('the meter opens flat: 6 bars at the lowest step (silence before his voice)', listen.length > 0 && listen[0].bars === '0,0,0,0,0,0' && listen.every((m) => m.bars.split(',').length === 6), { first: listen[0] ?? null, from: seenIn?.length ? 'observer' : 'poll' });
+const isWave = (b: string | null) => { const a = (b ?? '').split(',').map(Number); return WAVE.some((_, k) => [...WAVE.slice(k), ...WAVE.slice(0, k)].join() === a.join()); };
+step('the meter opens flat: 6 bars at the lowest step (silence before his voice)', listen.length > 0 && listen[0].bars === '0,0,0,0,0,0' && listen.every((m) => (m.bars ?? '').split(',').length === 6), { first: listen[0] ?? null, from: seenIn?.length ? 'observer' : 'poll' });
 step('the bars move with his voice (the fake voice levels)', new Set(listen.map((m) => m.bars)).size > 2, { distinct: [...new Set(listen.map((m) => m.bars))].slice(0, 12) });
 step('while transcribing: the ∿ sign and the rolling wave', trans.length > 0 && trans.every((m) => isWave(m.bars)) && trans.some((m) => /∿/.test(m.sign ?? '')), { transcribing: trans.slice(0, 8), frames: new Set(trans.map((m) => m.bars)).size, from: seenIn?.length ? 'observer' : 'poll' });
 await field.fill('').catch(() => {});

@@ -84,7 +84,7 @@ def page_meta(id, tries=6):
 
 
 def page_drive(id=None, url=None, steps=None, schemes=("light",), name=None, out=None, width=1400, height=900, scale=2):
-    """A page in a throwaway headless Chrome (pagedrive.mjs: its own profile,
+    """A page in a throwaway headless Chrome (pagedrive.ts: its own profile,
     no logins, local URLs only), never the user's browser: the page `id` on
     the throwaway hub (or a local `url`), `steps` run in order (eval, key,
     mouse, type, wait, shot), once per color scheme. Returns each run's
@@ -104,7 +104,9 @@ def page_drive(id=None, url=None, steps=None, schemes=("light",), name=None, out
     for sc in schemes:
         args = {"url": url, "out": os.path.join(out, "%s.%s" % (name, sc)), "steps": steps or [], "scheme": sc,
                 "width": width, "height": height, "scale": scale}
-        r = subprocess.run(["node", os.path.join(HERE, "pagedrive.mjs"), json.dumps(args)], capture_output=True, text=True, timeout=600)
+        # pagedrive.ts runs by node's type stripping: flagged before node 22.18 (js-to-ts, architect m_40557)
+        r = subprocess.run(["node", os.path.join(HERE, "pagedrive.ts"), json.dumps(args)], capture_output=True, text=True, timeout=600,
+                           env=dict(os.environ, NODE_OPTIONS="--experimental-strip-types --disable-warning=ExperimentalWarning"))
         try:
             res = json.loads(r.stdout.strip().splitlines()[-1])
         except (ValueError, IndexError):
