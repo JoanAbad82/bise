@@ -13,15 +13,17 @@
 //! and that its commits do not name (`git revert`'s "This reverts commit
 //! <sha>": an undo on purpose), whose files the land also changes. The
 //! land undoes C on F when tip's F is C^1's F (the fast path: absent
-//! from `git diff C^1 tip`), or else when one of C's hunks on F applies
-//! forward on tip and not backward (tip has C's old lines back; a hunk
-//! the lander rewrote applies neither way). Any: refused in one line
+//! from `git diff C^1 tip`), or else when one of C's hunks on F has its
+//! own new lines gone from tip and its own removed lines back
+//! ([`hunk_undone`]; a hunk the lander rewrote has neither; `git apply
+//! --check` was too strict: a bless that wrote its own line where C's
+//! was matched neither way). Any: refused in one line
 //! ([`refusal`]), nothing moved.
 //!
 //! The pure part (the log's parse, the exemptions, the hunks, the words)
 //! is unit-tested here; [`guard`] is the git shell beside it.
 
-use crate::land::{git, git_in, short};
+use crate::land::{git, short};
 use crate::land_record::{landed_by, LandRecord};
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -92,27 +94,37 @@ pub fn named(messages: &str, sha: &str) -> bool {
         .any(|w| w.len() >= 7 && sha.starts_with(&w.to_ascii_lowercase()))
 }
 
-/// A file's patch (`git diff` of one file) as one patch per hunk: its
-/// header, then that hunk.
-pub fn hunks(patch: &str) -> Vec<String> {
-    let mut head = String::new();
-    let mut out: Vec<String> = Vec::new();
-    for line in patch.split_inclusive('\n') {
+/// A file's `git diff -U0` patch as its hunks: (C's removed lines, C's
+/// added lines).
+pub fn hunks(patch: &str) -> Vec<(Vec<String>, Vec<String>)> {
+    let mut out: Vec<(Vec<String>, Vec<String>)> = Vec::new();
+    for line in patch.lines() {
         if line.starts_with("@@") {
-            out.push(format!("{}{}", head, line));
-        } else if let Some(last) = out.last_mut() {
-            last.push_str(line);
-        } else {
-            head.push_str(line);
+            out.push((Vec::new(), Vec::new()));
+        } else if let Some((minus, plus)) = out.last_mut() {
+            if let Some(l) = line.strip_prefix('-') {
+                minus.push(l.to_string());
+            } else if let Some(l) = line.strip_prefix('+') {
+                plus.push(l.to_string());
+            }
         }
     }
     out
 }
 
-/// A hunk of C is undone at tip when it applies forward (C's old lines
-/// are there) and not backward (C's new lines are not).
-pub fn hunk_undone(forward: bool, backward: bool) -> bool {
-    forward && !backward
+/// A hunk of C is undone at tip when C's own new lines are gone from it
+/// and C's own removed lines are back. "Own": a line C added that was
+/// nowhere in the file before it (`before`), a line it removed that is
+/// nowhere in it after (`after`): a `}` or a blank line proves nothing.
+/// A hunk with no own line is never undone; a hunk the lander rewrote
+/// (C's lines gone, the old ones too) is not.
+pub fn hunk_undone(minus: &[String], plus: &[String], before: &BTreeSet<&str>, after: &BTreeSet<&str>, tip: &BTreeSet<&str>) -> bool {
+    let added: Vec<&str> = plus.iter().map(String::as_str).filter(|l| !l.trim().is_empty() && !before.contains(l)).collect();
+    let removed: Vec<&str> = minus.iter().map(String::as_str).filter(|l| !l.trim().is_empty() && !after.contains(l)).collect();
+    if added.is_empty() && removed.is_empty() {
+        return false;
+    }
+    added.iter().all(|l| !tip.contains(l)) && removed.iter().all(|l| tip.contains(l))
 }
 
 /// What a land undoes of one commit: who landed it (None: no agent's land
@@ -201,6 +213,10 @@ pub fn guard(dir: &Path, target: &str, base: &str, tip: &str, since_ms: u64, lan
     }
 }
 
+fn set_of(v: &[String]) -> BTreeSet<&str> {
+    v.iter().map(String::as_str).collect()
+}
+
 /// Of `both` (C's files the land changes too), the ones whose C change
 /// tip undoes: equal to C^1's (fast path), else a hunk of C's back.
 fn undone_files(dir: &Path, c: &Recent, tip: &str, both: &[&str]) -> Result<Vec<String>, String> {
@@ -213,33 +229,25 @@ fn undone_files(dir: &Path, c: &Recent, tip: &str, both: &[&str]) -> Result<Vec<
     if rest.is_empty() {
         return Ok(out);
     }
-    // the mixed case: tip's file is neither C^1's nor C's; C's hunks are
-    // checked against tip in a private index
-    let idx = crate::land::tmp_index("revert");
-    let patch_file = idx.with_extension("patch");
-    let res = (|| {
-        git_in(dir, &["read-tree", tip], Some(&idx))?;
-        for f in rest {
-            let patch = git(
-                dir,
-                &["--literal-pathspecs", "diff", "--no-renames", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/", parent, &c.sha, "--", f],
-            )?;
-            for h in hunks(&format!("{}\n", patch)) {
-                std::fs::write(&patch_file, &h).map_err(|e| e.to_string())?;
-                let p = patch_file.to_string_lossy();
-                let forward = git_in(dir, &["apply", "--check", "--cached", &p], Some(&idx)).is_ok();
-                let backward = forward && git_in(dir, &["apply", "--check", "--cached", "-R", &p], Some(&idx)).is_ok();
-                if hunk_undone(forward, backward) {
-                    out.push(f.to_string());
-                    break;
-                }
-            }
+    // the mixed case: tip's file is neither C^1's nor C's: C's hunks
+    // against tip's lines
+    let show = |rev: &str, f: &str| git(dir, &["show", &format!("{}:{}", rev, f)]).unwrap_or_default();
+    for f in rest {
+        // a file C made that tip still has: changed since, not undone
+        // (deleting it is, the fast path's)
+        if c.parent.is_none() || git(dir, &["cat-file", "-e", &format!("{}:{}", parent, f)]).is_err() {
+            continue;
         }
-        Ok(())
-    })();
-    let _ = std::fs::remove_file(&idx);
-    let _ = std::fs::remove_file(&patch_file);
-    res.map(|_| out)
+        let patch = git(dir, &["--literal-pathspecs", "diff", "--no-renames", "--no-color", "--no-ext-diff", "-U0", parent, &c.sha, "--", f])?;
+        let (b, a, t) = (show(parent, f), show(&c.sha, f), show(tip, f));
+        let lines = |s: &str| s.lines().map(|l| l.to_string()).collect::<Vec<_>>();
+        let (b, a, t) = (lines(&b), lines(&a), lines(&t));
+        let (before, after, at) = (set_of(&b), set_of(&a), set_of(&t));
+        if hunks(&patch).iter().any(|(minus, plus)| hunk_undone(minus, plus, &before, &after, &at)) {
+            out.push(f.to_string());
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -276,22 +284,33 @@ mod tests {
     }
 
     #[test]
-    fn a_patch_splits_into_one_patch_per_hunk_with_its_header() {
-        let p = "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -1 +1 @@\n-a\n+A\n@@ -9 +9 @@\n-z\n+Z\n";
-        let head = "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n";
-        assert_eq!(hunks(p), vec![format!("{}@@ -1 +1 @@\n-a\n+A\n", head), format!("{}@@ -9 +9 @@\n-z\n+Z\n", head)]);
+    fn a_patch_reads_as_its_hunks_removed_and_added_lines() {
+        let p = "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -1 +1 @@\n-a\n+A\n@@ -9,0 +10 @@\n+z\n";
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(hunks(p), vec![(v(&["a"]), v(&["A"])), (v(&[]), v(&["z"]))]);
         assert!(hunks("Binary files a/x and b/x differ\n").is_empty(), "no hunk: never undone by lines");
     }
 
-    /// architect m_42458's mixed case: C's old lines back (forward only)
-    /// is undone; C's lines kept (backward applies) or rewritten by the
-    /// lander (neither way) is not.
+    /// architect m_42458's mixed case and native-lead's (m_42531): C's
+    /// old lines back, its new ones gone, whatever the lander wrote
+    /// around them, is undone; C's lines kept, or rewritten by the
+    /// lander, is not.
     #[test]
-    fn a_hunk_is_undone_only_when_its_old_lines_are_back() {
-        assert!(hunk_undone(true, false), "old lines back");
-        assert!(!hunk_undone(false, true), "C's lines kept");
-        assert!(!hunk_undone(false, false), "the lander rewrote them");
-        assert!(!hunk_undone(true, true), "context only either way");
+    fn a_hunk_is_undone_only_when_its_own_lines_are_gone_and_the_old_ones_back() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let set = |xs: &[&'static str]| xs.iter().copied().collect::<BTreeSet<&str>>();
+        let (before, after) = (set(&["1", "3", "}", "25"]), set(&["1", "three", "}", "25"]));
+        // y: 3 -> three
+        let (m, p) = (v(&["3"]), v(&["three"]));
+        assert!(hunk_undone(&m, &p, &before, &after, &set(&["1", "3", "}", "twenty-five"])), "old line back, x's own edit elsewhere");
+        assert!(!hunk_undone(&m, &p, &before, &after, &set(&["1", "three", "}", "twenty-five"])), "y's line kept");
+        assert!(!hunk_undone(&m, &p, &before, &after, &set(&["1", "THREE", "}"])), "x rewrote it");
+        // y appends `menus`; x's bless wrote `side` there instead
+        let (m, p) = (v(&[]), v(&["menus", "}"]));
+        assert!(hunk_undone(&m, &p, &before, &after, &set(&["1", "3", "}", "side"])), "y's line gone");
+        assert!(!hunk_undone(&m, &p, &before, &after, &set(&["1", "menus", "}", "side"])), "both kept");
+        // a hunk of common lines only proves nothing
+        assert!(!hunk_undone(&v(&[]), &v(&["}", ""]), &before, &after, &set(&["1"])));
     }
 
     #[test]

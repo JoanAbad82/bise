@@ -278,3 +278,24 @@ fn a_file_both_edited_is_refused_only_when_the_others_lines_are_back() {
     assert_eq!(git(&ws, &["show", "feat:f"]).unwrap().lines().filter(|l| l.contains('t')).collect::<Vec<_>>(), ["three", "twenty-five"]);
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
+
+/// native-lead's second case (5e44e9d26): a killed bless kept writing in
+/// x's worktree after its rebase: it deleted y's fresh generated file
+/// and rewrote the shared one without y's line; x's plain land (every
+/// change of a worktree it has alone) took it. Refused, naming both.
+#[test]
+fn a_dirty_worktree_that_drops_anothers_fresh_files_is_refused() {
+    let ws = repo("revert-dirty");
+    sh(&ws, "seq 1 20 > words.gen && git add words.gen && git commit -qm words && git branch feat main");
+    let (wx, jx) = on_feat(&ws, "x");
+    let (wy, jy) = on_feat(&ws, "y");
+    sh(&wy, "echo menus >> words.gen && echo m > menus.gen && git add . && git commit -qm 'y: menus words'");
+    land(&jy).unwrap();
+    let tip = git(&ws, &["rev-parse", "feat"]).unwrap();
+    // x rebased on y's land, then the old bless wrote its own view
+    sh(&wx, "git rebase -q feat && seq 1 20 > words.gen && echo side >> words.gen && rm menus.gen && echo h > host.tsx");
+    let e = land(&jx).unwrap_err();
+    assert!(e.starts_with("your land puts back old copies of menus.gen, words.gen, undoing @y's "), "{}", e);
+    assert_eq!(git(&ws, &["rev-parse", "feat"]).unwrap(), tip, "feat did not move");
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}
