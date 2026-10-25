@@ -1,5 +1,7 @@
 // The application menu's actions for this window (⌘, ⌘I ⌘F: amb-mac's
-// src/main/menu.ts sends them through window.bise.onMenu). Owner: amb-win.
+// src/main/menu.ts sends them through window.bise.onMenu), and its Agent menu kept on the agent in
+// view (app/menus/use.ts useAgentMenuBar; its ⌘. Stop asks the thread with emitAction('stop')).
+// Owner: nm-menus.
 //
 // One subscription to the preload for the whole window (useMenuRouting,
 // in the shell); 'settings' is a route, 'inbox' opens the block in place, anything else goes to
@@ -11,6 +13,7 @@ import { inboxAtOf, parseRoute } from './route';
 import { askInbox } from './inboxAsk';
 import type { ScreenAction } from './keys';
 import { panel } from '@/terminal/panel';
+import { useAgentMenuBar } from './menus/use';
 
 /** What a screen may be asked: a menu item's ('find') or a window key's ('fold-all', 'stop'...). */
 export type AppAction = MenuAction | ScreenAction;
@@ -30,6 +33,8 @@ export function routeOfMenu(action: MenuAction): 'settings' | undefined {
 
 /** In the shell: the menu's routes go to the router, the rest to the screens. */
 export function useMenuRouting(router: Router) {
+  // the menu bar's Agent menu follows the agent in view (bise fait mac, d4)
+  useAgentMenuBar();
   useEffect(() => {
     // the page outside Electron (a component test) has no preload
     const bise = (window as Partial<Window>).bise;

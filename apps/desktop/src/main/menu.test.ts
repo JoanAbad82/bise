@@ -4,6 +4,9 @@ import type { MenuAction } from '../shared/api';
 import type { ClipOp } from './clipfence';
 import { externalUrl } from './external';
 import { menuTarget, menuTemplate } from './menu';
+import { nativeItems, popupPoint } from './menu-popup';
+import { KEYS, menuOf } from '../app/menus/registry';
+import { menus } from '../proto/words_menus.gen';
 
 function flat(items: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
   return items.flatMap((i) => [i, ...(Array.isArray(i.submenu) ? flat(i.submenu) : [])]);
@@ -136,5 +139,47 @@ describe("Help › 'send a test notification' (a0, lead m_14515)", () => {
     item?.click?.();
     expect(clicked).toBe(1);
     expect(menuTemplate(base).some((m) => m.role === 'help')).toBe(false);
+  });
+});
+
+describe("the Agent menu (bise fait mac, d4): the agent in view's '…' in the menu bar", () => {
+  const perf = { name: 'perf', main: false, status: 'working', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, dir: '/h/perf', path: '/w/perf', changes: { files: 1, add: 1, del: 0 }, watching: [] as never[] } as const;
+  const items = menuOf({ e: { kind: 'agent', project: 'acme', agent: 'perf' }, row: perf, pinned: false, reply: false });
+  const base = { platform: 'darwin' as const, appName: 'bise', dev: true, send: () => undefined };
+
+  it('hidden with no agent in view; with one, its items, keys live, a pick says its id', () => {
+    expect(menuTemplate(base).some((m) => m.label === menus.agent_menu)).toBe(false);
+    const picked: string[] = [];
+    const t = menuTemplate({ ...base, agent: nativeItems(items, (id) => picked.push(id), () => undefined, true) });
+    const agent = t.find((m) => m.label === menus.agent_menu);
+    const sub = flat((agent?.submenu ?? []) as MenuItemConstructorOptions[]);
+    const stop = sub.find((i) => i.id === 'stop');
+    expect(stop?.accelerator).toBe(KEYS.stop);
+    expect(stop?.registerAccelerator).toBe(true);
+    (stop?.click as (() => void) | undefined)?.();
+    expect(picked).toEqual(['stop']);
+    // nothing dimmed: an item it can't do is not there
+    expect(sub.some((i) => i.enabled === false)).toBe(false);
+    // its place: after View, before Window (macOS's order)
+    const labels = t.map((m) => m.label ?? m.role);
+    expect(labels.indexOf(menus.agent_menu)).toBe(labels.indexOf('View') + 1);
+  });
+
+  it('no accelerator twice across the whole bar; ⌥⌘0-4 left to the panel and the bubbles', () => {
+    const all = flat(menuTemplate({ ...base, agent: nativeItems(items, () => undefined, () => undefined, true) }));
+    const acc = all.flatMap((i) => (typeof i.accelerator === 'string' ? [i.accelerator] : []));
+    expect(acc).toContain('CmdOrCtrl+.');
+    expect(new Set(acc).size).toBe(acc.length);
+    for (const n of [0, 1, 2, 3, 4]) expect(acc).not.toContain(`Alt+CmdOrCtrl+${String(n)}`);
+  });
+
+  it("a popup's keys are shown, never registered (the menu bar's are the live ones)", () => {
+    const pop = flat(nativeItems(items, () => undefined, () => undefined, false));
+    expect(pop.filter((i) => i.accelerator !== undefined).every((i) => i.registerAccelerator === false)).toBe(true);
+  });
+
+  it("the '…' opens its menu under the button, at its left edge; a right click at the pointer", () => {
+    expect(popupPoint({ x: 100.4, y: 40, width: 28, height: 28 })).toEqual({ x: 100, y: 68 });
+    expect(popupPoint(undefined)).toBeUndefined();
   });
 });

@@ -1,6 +1,8 @@
 /* ⌘K, one search (designer's signed block s-k, desktop-screens v7): a 640 px panel --s-12 under
-   the titlebar, centred, r 14, e-3, over a 45 % scrim of the window's ground. On the spacing grid
-   (designer's p/desktop-spacing): every text of the panel starts 16 px in. Owner: amb-web. */
+   the bar, centred, over a 45 % scrim of the window's ground. Bise fait mac (ui-review z, page
+   native-mac §6): drawn to the menus' rules, as a floating thing: glass (--c-overlay + --glass),
+   r 10, e-2; rows 28 at r 6 with a 16 icon 8 before the words; keys and meta text-3 on the right;
+   the arrow on its controls. Same behaviour. Owner: nm-menus. */
 .app-palette {
   position: fixed;
   inset: 0;
@@ -19,13 +21,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 14px;
-  /* opaque: the thread under it never shows through the rows */
-  background: linear-gradient(var(--c-raised), var(--c-raised)), var(--c-solid);
-  box-shadow: var(--e-3);
+  border-radius: var(--r-menu);
+  background: var(--c-overlay);
+  backdrop-filter: var(--glass);
+  box-shadow: var(--e-2);
   color: var(--c-text);
-  font-family: var(--font-ui);
-  font-size: 13px;
+  font: var(--f-ui);
 }
 
 .app-k-field {
@@ -33,10 +34,11 @@
   align-items: center;
   gap: var(--gap-inline);
   padding: var(--s-3) var(--s-4);
-  font-size: 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--c-text) 8%, transparent);
+  font: var(--f-lead);
+  border-bottom: 1px solid var(--c-line);
 }
-.app-k-field > span {
+.app-k-field > svg {
+  flex: none;
   color: var(--c-text-3);
 }
 .app-k-field input {
@@ -66,9 +68,7 @@
   border-radius: var(--r-pill);
   background: none;
   color: var(--c-text-2);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+  font: var(--f-meta);
 }
 .app-k-scopes .app-k-scope:hover {
   background: var(--c-hover);
@@ -82,15 +82,15 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--s-1) var(--pad-list) var(--s-2);
+  padding: var(--s-1);
 }
 
 .app-k-head {
   display: flex;
   align-items: center;
-  padding: var(--s-3) var(--pad-row-x) var(--gap-tight);
-  font-size: 11.5px;
-  font-weight: 600;
+  padding: var(--s-2) var(--pad-row-x) var(--gap-tight);
+  font: var(--f-meta);
+  font-weight: 500;
   color: var(--c-text-3);
 }
 .app-k-head .sp {
@@ -102,15 +102,15 @@
 
 .app-k-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: var(--w-state) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--gap-inline);
-  height: var(--h-row);
+  height: var(--h-row-tight);
   padding: 0 var(--pad-row-x);
-  border-radius: 8px;
+  border-radius: var(--r-1);
 }
 .app-k-row.on {
-  background: color-mix(in srgb, var(--c-text) 9%, transparent);
+  background: var(--c-active);
 }
 .app-k-row .g {
   display: flex;
@@ -166,7 +166,7 @@
   align-items: center;
   gap: var(--s-3);
   white-space: nowrap;
-  font-size: 12px;
+  font: var(--f-meta);
   color: var(--c-text-3);
 }
 .app-k-row .rt .hint {
@@ -186,15 +186,13 @@
   text-align: center;
   color: var(--c-text-2);
 }
+.app-k-empty > svg {
+  color: var(--c-text-3);
+}
 .app-k-empty p {
   max-width: 440px;
   margin: 0;
   line-height: 1.5;
-}
-.app-k-empty .big {
-  font-family: var(--font-mono);
-  font-size: 22px;
-  color: var(--c-text-3);
 }
 .app-k-ask {
   display: inline-flex;
@@ -207,7 +205,6 @@
   background: var(--c-surface);
   color: var(--c-text);
   font: inherit;
-  cursor: pointer;
 }
 .app-k-ask:hover {
   background: var(--c-hover);
@@ -228,8 +225,8 @@
 
 .app-k-keys {
   padding: var(--s-2) var(--s-4);
-  border-top: 1px solid color-mix(in srgb, var(--c-text) 8%, transparent);
-  font-size: 11.5px;
+  border-top: 1px solid var(--c-line);
+  font: var(--f-meta);
   color: var(--c-text-3);
   white-space: pre;
   overflow: hidden;

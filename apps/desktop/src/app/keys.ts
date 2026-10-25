@@ -5,7 +5,7 @@
 // ⌘0 bise · ⌘1-9 a project in his order · ⌥0 the project's main · ⌥1-9
 // its agents in the panel's order · ⌘K the agent palette · ⌘D the agent's
 // changes · ⌘⇧A the artifacts · ⌘E fold/unfold everything · ⌘/ the key
-// list · ⌘. stop the turn · end back to the bottom · ctrl+y copy a code
+// list · end back to the bottom · ctrl+y copy a code
 // block · ⌥↑/⌥↓ the previous / next agent (empty composer).
 // Keys are read by `code` (⌥1 types '¡' on a Mac keyboard) and taken in the
 // capture phase, so the composer never gets the character.
@@ -113,7 +113,6 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   // the key list over the window (amb-web 1e60fbd6, src/help): ⌘/ only; '?' is his to type, a
   // message may start with it (main m_22096)
   if ((only('meta') || only('meta', true)) && e.code === 'Slash') return { help: true }; // ⌘/, ⌘? (designer m_22100)
-  if (only('meta') && e.code === 'Period') return { screen: 'stop' };
   if (only('ctrl') && e.code === 'KeyY') return { screen: 'copy-code' };
   if (only('none') && e.key === 'End' && !c.typing) return { screen: 'to-end' };
   if (only('alt') && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !c.typing) {

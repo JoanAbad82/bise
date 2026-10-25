@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, session } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme, session } from 'electron';
 import { BADGE_LINE, CORE_IPC, IPC, TEST_DIST_UPDATE_ENV, TEST_ENV, TEST_MOVE_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { capsuleFramesDir } from './capsuleframe';
@@ -29,7 +29,8 @@ import { Shots } from './helper/shot';
 import { installIpc, panelShown, sendClip, sendMenu, setProjectRoots } from './ipc';
 import { installKeepIpc } from './keep';
 import { projectRoots } from './reveal';
-import { hasTestNotify, menuTemplate } from './menu';
+import { hasTestNotify } from './menu';
+import { installAppMenu } from './agentmenu';
 import { startTerms, type TermHost } from './term/host';
 import { BiseTray } from './tray';
 import { testHomeProblem } from './testhome';
@@ -176,27 +177,24 @@ void app.whenReady().then(() => {
   });
   // the notifier comes after the windows; Help's test item reaches it once it exists
   let notifierRef: Notifier | null = null;
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate(
-      menuTemplate({
-        platform: process.platform,
-        appName: app.name,
-        dev: !app.isPackaged,
-        send: (action) => {
-          sendMenu(action, main);
-        },
-        ...(testMode ? { clip: sendClip } : {}),
-        // a0: try and check builds (their own name) and tests, never his release app
-        ...(hasTestNotify(app.name, testMode)
-          ? {
-              testNotify: () => {
-                notifierRef?.testNotify(join(app.getPath('userData'), 'notify-test.log'));
-              },
-            }
-          : {}),
-      }),
-    ),
-  );
+  // the menu bar, with the Agent menu of the focused window's agent (agentmenu.ts)
+  installAppMenu({
+    platform: process.platform,
+    appName: app.name,
+    dev: !app.isPackaged,
+    send: (action) => {
+      sendMenu(action, main);
+    },
+    ...(testMode ? { clip: sendClip } : {}),
+    // a0: try and check builds (their own name) and tests, never his release app
+    ...(hasTestNotify(app.name, testMode)
+      ? {
+          testNotify: () => {
+            notifierRef?.testNotify(join(app.getPath('userData'), 'notify-test.log'));
+          },
+        }
+      : {}),
+  });
   // its frame kept in userData (windows.ts FRAMES_FILE): a test's or a stand-in's, never his under a test
   const main = new MainWindow(testMode, offscreen, app.getPath('userData'));
   // off-screen: where the capsule would sit, in userData/capsule-frames.jsonl (capsuleframe.ts)

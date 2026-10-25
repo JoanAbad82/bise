@@ -29,6 +29,7 @@ interface Pushed {
   [IPC.termExit]: { id: string; code: number | null };
   [IPC.updateState]: UpdateState;
   [IPC.a11y]: A11y;
+  [IPC.agentMenu]: string;
 }
 
 // window.bise.saveCopy's answer as main gives it: {to}, {error}, or null
@@ -197,6 +198,10 @@ const api: BiseApi = {
     const id: unknown = await ipcRenderer.invoke(IPC.popupMenu, items, at);
     return typeof id === 'string' ? id : null;
   },
+  agentMenu: (items) => {
+    ipcRenderer.send(IPC.agentMenu, items);
+  },
+  onAgentMenu: (listener) => listen(IPC.agentMenu, listener),
   a11y: async () => (await ipcRenderer.invoke(IPC.a11y)) as A11y,
   onA11y: (listener) => listen(IPC.a11y, listener),
   onRoute: (listener) => listen(IPC.route, listener),

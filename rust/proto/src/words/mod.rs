@@ -40,6 +40,7 @@ pub mod ds;
 pub mod hero;
 pub mod inbox;
 pub mod library;
+pub mod menus;
 pub mod panel;
 pub mod running;
 pub mod scheduled;
@@ -72,6 +73,7 @@ pub const ALL: &[(&str, &[Word])] = &[
     ("hero", hero::WORDS),
     ("inbox", inbox::WORDS),
     ("library", library::WORDS),
+    ("menus", menus::WORDS),
     ("panel", panel::WORDS),
     ("running", running::WORDS),
     ("scheduled", scheduled::WORDS),

@@ -192,6 +192,13 @@ export interface BiseApi {
    */
   readonly popupMenu: (items: readonly PopupItem[], at?: PopupAt) => Promise<string | null>;
   /**
+   * The menu bar's Agent menu for this window: the items of the agent in view (app/menus, the same
+   * registry as its '…'), null when no agent is (the menu hides). main/menu.ts shows the focused
+   * window's; onAgentMenu hears the picked item's id (nm-menus').
+   */
+  readonly agentMenu: (items: readonly PopupItem[] | null) => void;
+  readonly onAgentMenu: (listener: (id: string) => void) => () => void;
+  /**
    * macOS's accessibility settings now (main/a11y.ts, nm-frame's: systemPreferences), and on every
    * change; the shell sets them on <html> as data-reduce-transparency, data-reduce-motion and
    * data-increase-contrast (ds/tokens.css's fallbacks).
@@ -410,8 +417,10 @@ export type PopupItem =
       readonly checked?: boolean;
       /** an erase with no way back: drawn as macOS's destructive item */
       readonly destructive?: boolean;
+      /** its icon, an SF Symbol's name (nativeImage.createMenuSymbol): macOS draws it at 16 */
+      readonly icon?: string;
     }
-  | { readonly type: 'submenu'; readonly label: string; readonly items: readonly PopupItem[] }
+  | { readonly type: 'submenu'; readonly label: string; readonly icon?: string; readonly items: readonly PopupItem[] }
   | { readonly type: 'separator' };
 
 /** Where a native menu opens: a box in the window's CSS px (the menu under it), else the pointer. */
@@ -506,6 +515,8 @@ export const IPC = {
   fullScreen: 'bise:full-screen',
   openWindow: 'bise:open-window',
   popupMenu: 'bise:popup-menu',
+  /** a window -> main: its Agent menu's items (null: none); main -> the window: the picked id */
+  agentMenu: 'bise:agent-menu',
   a11y: 'bise:a11y',
   route: 'bise:route',
   /** main -> a window: a link in its artifact's frame names another artifact (guard.ts, framelink.ts) */

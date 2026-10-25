@@ -30,7 +30,7 @@ describe("the window's keys", () => {
     expect(keyAction(k('Digit0', { altKey: true }), ctx({ route: { screen: 'bise' } }))).toEqual({ go: { screen: 'thread', project: 'h', agent: 'main' } });
   });
 
-  it('⌘K palette, ⌘D changes / review, ⌘⇧A artifacts, ⌘E ⌘. ctrl+y to the screen, ⌘/ the key list', () => {
+  it('⌘K palette, ⌘D changes / review, ⌘⇧A artifacts, ⌘E ctrl+y to the screen, ⌘/ the key list (⌘. is the Agent menu’s Stop)', () => {
     expect(keyAction(k('KeyK', { metaKey: true }), ctx())).toEqual({ palette: true });
     expect(keyAction(k('KeyD', { metaKey: true }), ctx())).toEqual({ go: { screen: 'changes', project: 'a' } });
     expect(keyAction(k('KeyD', { metaKey: true }), ctx({ route: { screen: 'thread', project: 'a', agent: 'perf' } }))).toEqual({ go: { screen: 'review', project: 'a', agent: 'perf' } });
@@ -39,7 +39,8 @@ describe("the window's keys", () => {
     // the TUI's ctrl+o, typing or not (his cb1f2b44 bug: nothing opened the folds)
     expect(keyAction(k('KeyO', { ctrlKey: true }), ctx())).toEqual({ screen: 'fold-all' });
     expect(keyAction(k('KeyO', { ctrlKey: true }), ctx({ typing: true }))).toEqual({ screen: 'fold-all' });
-    expect(keyAction(k('Period', { metaKey: true }), ctx())).toEqual({ screen: 'stop' });
+    // the menu bar's Agent menu has ⌘. (app/menus/registry.ts KEYS): the window's keys leave it
+    expect(keyAction(k('Period', { metaKey: true }), ctx())).toBeUndefined();
     expect(keyAction(k('KeyY', { ctrlKey: true }), ctx())).toEqual({ screen: 'copy-code' });
     expect(keyAction(k('Slash', { metaKey: true }), ctx())).toEqual({ help: true });
     // editing keys are not the window's

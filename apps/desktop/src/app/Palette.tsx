@@ -5,8 +5,9 @@
 // artifacts · scheduled), ↑↓ ctrl+n/p move, ⏎ opens (a waiting agent: answers in its thread),
 // ⌘⏎ restores an archived agent then opens it; one or two words that name nothing, or a sentence:
 // ⏎ asks bise (a sentence: 'ask bise' is the first row, what it names one row down, main m_12973,
-// the spotlight's rule from src/search's asksBise); esc closes. Its own field: the composer keeps its draft. Owner: amb-web (lead m_11864), in
-// amb-win's shell.
+// the spotlight's rule from src/search's asksBise); esc closes. Its own field: the composer keeps its draft.
+// Bise fait mac (ui-review z): drawn to the native menus' rules (palette.css), its glyphs nm-ds's
+// line icons; the same behaviour. Owner: nm-menus.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
 import { caretAtEnd, keep, useKeptText } from '@/app/keep';
@@ -22,7 +23,7 @@ import { appPages } from './pages';
 import { MAIN, parseRoute } from './route';
 import { useRoute, useRouter } from './router';
 import './palette.css';
-import { Input, Press } from '@/ds';
+import { AppIcon, Input, Press } from '@/ds';
 
 /** The kept view bit: ⌘K open (lead m_11997, keep.ts: an open panel, no age). */
 const OPEN_KEY = 'palette.open';
@@ -216,7 +217,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     >
       <div className="app-k" onKeyDown={onKey} role="dialog" aria-label="search">
         <label className="app-k-field">
-          <span aria-hidden>⌕</span>
+          <AppIcon name="search" size={16} />
           <Input
             ref={field}
             value={q}
@@ -259,9 +260,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
           )}
           {list.mode === 'none' && (
             <div className="app-k-empty" data-testid="app.palette.none">
-              <span className="big" aria-hidden>
-                ⌕
-              </span>
+              <AppIcon name="search" size={18} />
               <p>{PW.none(q.trim())}</p>
               <Press look="app-k-ask" onClick={ask} data-testid="app.palette.ask">
                 {PW.ask(q.trim())} <kbd>⏎</kbd>

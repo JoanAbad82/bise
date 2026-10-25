@@ -4,8 +4,11 @@
 // copy, paste, select all in the focused field; hide, quit, close, minimize)
 // and shows in the menu bar with its key. bise's own items (settings ⌘,,
 // inbox ⌘I, find ⌘F, terminal ⌃`, File › save a copy ⌘S) only send a MenuAction to the focused window's
-// renderer, which decides what it means (src/shared/api.ts onMenu).
+// renderer, which decides what it means (src/shared/api.ts onMenu). The Agent menu (bise fait mac,
+// d4) is the agent in view's '…' with its keys live, hidden when no agent is (main/agentmenu.ts).
+// Owner: nm-menus.
 import type { MenuItemConstructorOptions } from 'electron';
+import { menus } from '../proto/words_menus.gen';
 import type { MenuAction } from '../shared/api';
 import type { ClipOp } from './clipfence';
 
@@ -26,6 +29,12 @@ export interface MenuOptions {
    * posts one notification like a real card and records what comes back (a0, lead m_14515).
    */
   readonly testNotify?: () => void;
+  /**
+   * The Agent menu (bise fait mac, d4): the focused window's agent in view, its items as its '…'
+   * gives them (app/menus/registry.ts, converted by menu-popup.ts nativeItems with their keys
+   * live); none: no agent in view, the menu is hidden (main/agentmenu.ts).
+   */
+  readonly agent?: readonly MenuItemConstructorOptions[];
 }
 
 export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
@@ -120,6 +129,8 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
     },
   ];
 
+  const agent: MenuItemConstructorOptions[] = o.agent === undefined || o.agent.length === 0 ? [] : [{ label: menus.agent_menu, submenu: [...o.agent] }];
+
   const window: MenuItemConstructorOptions = mac
     ? { role: 'windowMenu' }
     : { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'close' }] };
@@ -129,7 +140,7 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       ? []
       : [{ role: 'help', submenu: [{ label: 'send a test notification', click: o.testNotify }] }];
 
-  return [...appMenu, file, edit, go, ...view, window, ...help];
+  return [...appMenu, file, edit, go, ...view, ...agent, window, ...help];
 }
 
 /** Whether Help › 'send a test notification' shows: a try or check build (its own name) or a test run, never 'bise'. */
