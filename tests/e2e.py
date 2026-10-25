@@ -668,7 +668,9 @@ def t_direct_message_and_note(E, c):
     c.say("@t1 route explicite")
     c.wait_feed("main", "route", 90, who="t1", said="route explicite")
     # from main's view the task reads it tagged (RFC 0003 §5.1)
-    c.wait_line("t1", 'ack: <user_message via="main"> route explicite')
+    # (its frame carries the message id too since msg-forward: `<user_message id="m_6" via="main">`)
+    c.wait(lambda: any(re.search(r'ack: <user_message id="m_\d+" via="main"> route explicite', l) for l in c.lines("t1")), 90,
+           "t1 acks the routed frame")
     c.wait_idle("t1")
     check(len([r for r in E.fake_requests() if r["agent"] == "main"]) == before, "an explicit route costs no main turn")
 
