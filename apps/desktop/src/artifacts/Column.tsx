@@ -1,14 +1,17 @@
-// The folder column (page artifacts-gallery v7 'la page', 200 px, rows of --h-row-tight): all
-// artifacts, recent, unfiled, then the folders (the same for every project). A theme opens under
-// itself onto its task folders (4, then 'N more'). At rest a row is its name and, in pink, a dot
-// when something new is inside; its count shows on hover or focus only, in the dot's place, and
-// for 2 s after a drop on it (density rule 2). '+ new folder' puts a field in the column at its
-// place; F2 or a double-click renames one in place; a right-click opens the folder's menu. A row
-// takes a drop (drag.ts: holding 600 ms on a closed theme opens it). Under 900 px the same rows sit
-// in the crumb's popover (Fold.tsx). A pure render of its props: Screen.tsx holds the state.
-// Owner: art-folders.
+// The artifacts library (bise fait mac mockup 7, decision d2; page artifacts-gallery v7): the
+// 'library' label, all artifacts, recent, unfiled (each with its line icon), then the 'folders'
+// label with its + and the folders (the same for every project). Rows 28, margin 0 8, r 6, the
+// chosen one --c-active; labels 12/500 text-3, 28 high, 12 above (nm-frame's sidebar rows). It
+// draws in the window's sidebar on the artifacts route (ArtLibrary, library.tsx, `side`), else in
+// the page's own column. A theme opens under itself onto its task folders (4, then 'N more'). At
+// rest a row is its name and, in pink, a dot when something new is inside; its count shows on hover
+// or focus only, in the dot's place, and for 2 s after a drop on it (density rule 2). The folders'
+// + puts a field in the list at its place; F2 or a double-click renames one in place; a right-click
+// opens the folder's menu. A row takes a drop (drag.ts: holding 600 ms on a closed theme opens it).
+// Under 900 px the same rows sit in the crumb's popover (Fold.tsx). A pure render of its props:
+// Screen.tsx holds the state. Owner: nm-pages-a (art-folders' before).
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
-import { Input, Press, tipAttrs } from '@/ds';
+import { AppIcon, Input, Press, tipAttrs, type AppIconName } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { countWords, type At, type Count, type Folder, type Library } from './folders';
 
@@ -47,6 +50,8 @@ export interface ColumnProps {
   /** the field's ⏎ (its words) or esc (null) */
   readonly onEdited: (name: string | null) => void;
   readonly onMenu: (id: string, e: MouseEvent) => void;
+  /** drawn in the window's sidebar (ArtLibrary, library.tsx): the sidebar's rows, not sticky */
+  readonly side?: boolean;
   readonly testId: string;
 }
 
@@ -70,13 +75,20 @@ export function FolderColumn(p: ColumnProps) {
     );
   };
   return (
-    <nav className="art-col" aria-label={library.folders} data-testid={testId}>
-      <PlaceRow name={library.all_artifacts} on={at.at === 'all'} onGo={() => { p.onGo({ at: 'all' }); }} testId={`${testId}.all`} />
-      <PlaceRow name={library.recent} on={at.at === 'recent'} onGo={() => { p.onGo({ at: 'recent' }); }} testId={`${testId}.recent`} />
-      <PlaceRow name={library.unfiled} on={at.at === 'unfiled'} count={counts.get('unfiled')} countAtRest
+    <nav className={`art-col${p.side === true ? ' side' : ''}`} aria-label={library.library_head} data-testid={testId}>
+      <div className="art-col-head">{library.library_head}</div>
+      <PlaceRow icon="artifacts" name={library.all_artifacts} on={at.at === 'all'} onGo={() => { p.onGo({ at: 'all' }); }} testId={`${testId}.all`} />
+      <PlaceRow icon="scheduled" name={library.recent} on={at.at === 'recent'} onGo={() => { p.onGo({ at: 'recent' }); }} testId={`${testId}.recent`} />
+      <PlaceRow icon="inbox" name={library.unfiled} on={at.at === 'unfiled'} count={counts.get('unfiled')} countAtRest
         over={p.drop?.over === 'unfiled'} drop={p.drop} dropId="unfiled" flash={p.flash === 'unfiled'}
         onGo={() => { p.onGo({ at: 'unfiled' }); }} testId={`${testId}.unfiled`} />
-      <div className="art-col-head">{library.folders}</div>
+      {/* the folders' label, its + at its end (mockup 7): a field for a new folder's name */}
+      <div className="art-col-head">
+        <span className="nm">{library.folders}</span>
+        <Press look="art-col-add" onClick={p.onNew} aria-label={library.new_folder_tip} data-testid={`${testId}.new`} {...tipAttrs(library.new_folder_tip)}>
+          <AppIcon name="plus" size={14} />
+        </Press>
+      </div>
       {lib.themes.map((t) => {
         const tasks = lib.tasks.get(t.id) ?? [];
         const shown = p.full.has(t.id) ? tasks : tasks.slice(0, TASKS_SHOWN);
@@ -97,19 +109,7 @@ export function FolderColumn(p: ColumnProps) {
         ];
       })}
       {field(null)}
-      <Press look="art-col-row art-col-new" onClick={p.onNew} data-testid={`${testId}.new`}>
-        <span className="nm">{library.new_folder}</span>
-      </Press>
     </nav>
-  );
-}
-
-/** The folder's line icon (the mock's), 16 px, text-3. */
-export function FolderIcon() {
-  return (
-    <svg className="art-folder-icon" viewBox="0 0 16 13" width="16" height="13" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round">
-      <path d="M1 2.5a1 1 0 0 1 1-1h4l1.5 1.5h6.5a1 1 0 0 1 1 1v7.5a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1z" />
-    </svg>
   );
 }
 
@@ -133,10 +133,11 @@ function dropAttrs(drop: DropTarget | undefined, id: string) {
   };
 }
 
-function PlaceRow(p: { name: string; on: boolean; count?: Count | undefined; countAtRest?: boolean; over?: boolean; flash?: boolean; drop?: DropTarget | undefined; dropId?: string; onGo: () => void; testId: string }) {
+function PlaceRow(p: { icon: AppIconName; name: string; on: boolean; count?: Count | undefined; countAtRest?: boolean; over?: boolean; flash?: boolean; drop?: DropTarget | undefined; dropId?: string; onGo: () => void; testId: string }) {
   return (
     <Press look="art-col-row" aria-current={p.on || undefined} data-over={p.over || undefined} onClick={p.onGo} data-testid={p.testId}
       {...(p.dropId === undefined ? {} : dropAttrs(p.drop, p.dropId))}>
+      <AppIcon name={p.icon} size={16} />
       <span className="nm">{p.name}</span>
       {p.count !== undefined && p.count.total > 0 && <End count={p.count} atRest={p.countAtRest} flash={p.flash} />}
     </Press>
@@ -179,7 +180,7 @@ function FolderRow(p: FolderRowProps) {
       onDoubleClick={(e) => { e.preventDefault(); p.onRename(); }}
       onContextMenu={(e) => { e.preventDefault(); p.onMenu(e); }}
       onKeyDown={key} data-testid={p.testId} {...dropAttrs(p.drop, p.id)}>
-      {p.theme && <FolderIcon />}
+      {p.theme && <AppIcon name="folder" size={16} />}
       <span className="nm" {...tipAttrs(p.name)}>{p.name}</span>
       <End count={p.count} flash={p.flash} />
     </Press>

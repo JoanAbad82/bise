@@ -10,7 +10,6 @@ import { moveKeys, walkOf } from './MovePicker';
 import { dragKeys, dragPayload, draggedKeys } from './drag';
 import { folderCmd, moveCmd } from './ops';
 import { scopeRows } from './Scope';
-import { chipsThatFit } from './Search';
 import type { Item } from './model';
 
 const NOW = Date.UTC(2026, 9, 24, 18, 0);
@@ -211,16 +210,3 @@ describe('the scope, the menus, the drag, the commands', () => {
   });
 });
 
-describe('the kind chips: one row, the rest in +n', () => {
-  // widths: 'all', four chips, then the fold's; gap 4
-  const widths = [50, 60, 60, 60, 60, 40];
-  it('keeps them all when they fit, folds the last ones with room for the fold, all when nothing is measured', () => {
-    expect(chipsThatFit(500, widths, 4)).toBe(4);
-    expect(chipsThatFit(306, widths, 4)).toBe(4);
-    // 'all' + 2 chips + the fold: 50+4+60+4+60+4+40 = 222
-    expect(chipsThatFit(250, widths, 4)).toBe(2);
-    expect(chipsThatFit(60, widths, 4)).toBe(0);
-    expect(chipsThatFit(0, widths, 4)).toBe(4);
-    expect(chipsThatFit(300, [0, 0, 0, 0], 4)).toBe(2);
-  });
-});

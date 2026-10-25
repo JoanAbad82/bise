@@ -15,7 +15,7 @@
   "running.bar": {
     "args": [],
     "one": null,
-    "text": "Processes"
+    "text": "PROCESSES"
   },
   "running.by": {
     "args": [
@@ -177,7 +177,7 @@
   "running.open": {
     "args": [],
     "one": null,
-    "text": "open ↗"
+    "text": "open"
   },
   "running.opening": {
     "args": [

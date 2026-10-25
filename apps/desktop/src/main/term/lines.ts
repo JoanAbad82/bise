@@ -1,22 +1,10 @@
 // The terminal panel's pure parts (bar T W25/V13/K26/M16; architect
 // m_10140): `bise pty`'s lines (bise-proto's pty.rs, generated types in
-// src/proto/pty.ts), which folder a project's shell runs in, a shell's key
-// (several per project: the panel's terminal tabs), the clamps, which shell to
-// drop when too many run, and the output batches.
+// src/proto/pty.ts), which folder a project's shell runs in, the clamps,
+// which shell to drop when too many run, and the output batches.
 import type { PtyCmd, PtyEv } from '../../proto';
 
 export const PTY_EV_TAGS: ReadonlySet<PtyEv['ev']> = new Set(['started', 'data', 'screen', 'exit', 'error']);
-
-/**
- * A shell's id: the project's first shell (n 0: the bottom panel's, the capsule's) is the project's
- * id, as before; the next ones '<project>#<n>' (the panel's terminal tabs, bise fait mac). Null for
- * a bad project or number.
- */
-export function shellKey(project: unknown, n: unknown): string | null {
-  if (typeof project !== 'string' || project === '') return null;
-  if (n === undefined || n === null || n === 0) return project;
-  return typeof n === 'number' && Number.isInteger(n) && n > 0 && n < 100 ? `${project}#${String(n)}` : null;
-}
 
 /** One line of `bise pty`'s stdout -> an event, or null (not JSON, an unknown tag: dropped). */
 export function decodePtyEv(line: string): PtyEv | null {

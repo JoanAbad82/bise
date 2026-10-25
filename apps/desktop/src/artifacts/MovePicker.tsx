@@ -5,10 +5,9 @@
 // → open   esc back'. The ds PickerPop from the picked card (the menu law); the field keeps the keys
 // and drives the active row. Owner: art-folders.
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { Input, PickerPop, type PickerGroup } from '@/ds';
+import { AppIcon, Input, PickerPop, type PickerGroup } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { moveRows, nameOf, type Library, type MoveRow } from './folders';
-import { FolderIcon } from './Column';
 import { MenuAnchor, type MenuAt } from './Menus';
 
 export interface MovePickerProps {
@@ -108,7 +107,7 @@ export function MovePicker(p: MovePickerProps) {
   const rowOf = (prefix: string) => (r: MoveRow) => ({
     id: `${prefix}${r.id}`,
     name: r.name,
-    glyph: r.id === 'unfiled' ? undefined : <FolderIcon />,
+    glyph: r.id === 'unfiled' ? undefined : <AppIcon name="folder" size={16} />,
     secondary: r.where === '' ? undefined : r.where,
     trailing: r.digit !== undefined ? String(r.digit) : r.opens === true ? '▸' : undefined,
     testId: `${p.testId}.row.${r.id}`,

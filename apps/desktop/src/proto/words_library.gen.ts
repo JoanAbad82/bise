@@ -4,8 +4,8 @@
 // bise_proto::words::library: rust/proto/src/words/library.rs, never a word typed here.
 
 export const library = {
-  /** the artifacts page's hero sentence, folders on */
-  say: "what your agents made for you to look at, in folders: each task files its work, you move what you like.",
+  /** the artifacts page's lead sentence (one line, ≤ 56 ch: ui-review's lead rule) */
+  say: "what your agents made for you to look at.",
   /** facts: how many, from where, in how many folders: `893 from 6 projects, in 9 folders` */
   count_from: (a: { n: string | number; from: string | number; inside: string | number }): string => String(a.n) + " from " + String(a.from) + ", " + String(a.inside),
   /** facts: the projects part, `6 projects` */
@@ -14,6 +14,8 @@ export const library = {
   in_folders: (a: { n: number }): string => a.n === 1 ? "in " + String(a.n) + " folder" : "in " + String(a.n) + " folders",
   /** facts: how many have no folder, `23 unfiled` */
   unfiled_n: (a: { n: string | number }): string => String(a.n) + " unfiled",
+  /** the library's first label, over all artifacts, recent and unfiled (and its VoiceOver name) */
+  library_head: "library",
   /** the column's first row: every artifact, the folders as tiles */
   all_artifacts: "all artifacts",
   /** the column's row of the newest, whatever their folder */
@@ -22,8 +24,8 @@ export const library = {
   unfiled: "unfiled",
   /** the column's head over the folders */
   folders: "folders",
-  /** the column's last row: makes a folder inline */
-  new_folder: "+ new folder",
+  /** the + on the folders' label: its tip and VoiceOver name (it makes a folder inline) */
+  new_folder_tip: "new folder",
   /** a theme's folded task rows, `11 more` */
   n_more: (a: { n: string | number }): string => String(a.n) + " more",
   /** a folder's count under a project filter, `14 of 74` */
@@ -74,6 +76,12 @@ export const library = {
   no_unfiled_say: "what you add yourself waits here until you give it one.",
   /** the archived ones (a), none */
   none_archived: "nothing archived. esc goes back.",
+  /** the archived ones' toggle under the lead, `3 archived` */
+  archived_n: (a: { n: string | number }): string => String(a.n) + " archived",
+  /** the same toggle's tip, with its key */
+  archived_tip: "show the archived ones · a",
+  /** the + in the bar (its tip when no project takes it) and the empty page's action */
+  add_files: "add files",
   /** a project filter that leaves a folder empty */
   none_from: (a: { project: string | number }): string => "nothing from " + String(a.project) + " in this folder.",
   /** the picker's title for one, `move "agent view fixes" to…` */
@@ -146,8 +154,10 @@ export const library = {
   found_where: "in all folders · ⏎ opens the first, esc clears",
   /** a group's more, `all 6 ›` */
   all_n: (a: { n: string | number }): string => "all " + String(a.n) + " ›",
-  /** the kind chips' first, `all 17` */
+  /** the kind filter's first (in the window's bar), `all 17` */
   all_kinds: "all",
+  /** the kind filter, for VoiceOver */
+  kinds_label: "kinds",
   /** no result: the head */
   nothing_found: (a: { q: string | number }): string => "nothing found for \"" + String(a.q) + "\"",
   /** no result: the title */

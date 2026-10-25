@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { BarSlot } from '@/app/barslot';
 import type { Artifact } from '@/proto';
 import { Store, StoreProvider } from '@/store';
 import { RouterContext, createRouter } from '@/app/router';
@@ -8,13 +9,16 @@ import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, revealPathOf, saveOf, splitArchived, timeOf, versions, whenWords, type Item } from './model';
 import { emitAction } from '@/app/menu';
-import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
+import { aboutWords, ArtLibrary, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
+import { library } from '@/proto/words_library.gen';
 import { putInDraft } from './put';
 import { browserUrl, cutFolder, frameSrc, themedUrl } from './Open';
 import { aboutText } from '@/thread/about';
 import { load } from '@/composer/drafts';
 import { entryOf, entrySegments } from '@/composer/entry';
 
+// the window's bar, where the page's kinds, search and + go (InBar)
+beforeEach(() => { render(<BarSlot />); });
 afterEach(cleanup);
 
 // a fixed noon, local time, so 'today' and 'yesterday' don't depend on when the test runs
@@ -76,12 +80,49 @@ function mount(node: React.ReactNode, start: Route = { screen: 'artifacts', proj
   return router;
 }
 
+describe('the page in bise fait mac (mockup 7, decision d2)', () => {
+  it('the kinds, the search and + in the bar; the lead with its vignette, no hero card', () => {
+    mount(<ArtifactsScreen />);
+    const bar = screen.getByTestId('app.bar.slot');
+    expect(bar.querySelector('[data-testid="artifacts.kinds"]')).not.toBeNull();
+    expect(bar.querySelector('[data-testid="artifacts.search"]')).not.toBeNull();
+    expect(screen.getByTestId('artifacts.kinds.all').getAttribute('aria-selected')).toBe('true');
+    expect(screen.queryByTestId('artifacts.hero')).toBeNull();
+    expect(screen.getByTestId('artifacts.lead').textContent).toContain(library.say);
+    expect(screen.getByTestId('artifacts.screen').querySelector('.art-vignette img')).not.toBeNull();
+    // no glyph as an icon: the toggles are line icons with their tips
+    expect(screen.getByTestId('artifacts.view.grid').textContent).toBe('');
+    expect(screen.getByTestId('artifacts.view.grid').getAttribute('data-tip')).toBe(library.tip_cards);
+  });
+
+  it("the library goes to the window's sidebar once it mounts there (ArtLibrary); the page drops its own column", () => {
+    const router = mount(<><ArtLibrary /><ArtifactsScreen /></>);
+    // one library, the sidebar's: the page draws no column of its own
+    expect(screen.queryByTestId('artifacts.col')).toBeNull();
+    const lib = screen.getByTestId('artifacts.lib');
+    expect(lib.textContent).toContain(library.library_head);
+    expect(screen.getByTestId('artifacts.lib.all').getAttribute('aria-current')).toBe('true');
+    // its rows drive the page: the page's state, one copy
+    fireEvent.click(screen.getByTestId('artifacts.lib.recent'));
+    expect(router.get()).toEqual({ screen: 'artifacts', project: '', at: 'recent' });
+    // the folders' + puts a field in the library
+    fireEvent.click(screen.getByTestId('artifacts.lib.new'));
+    expect(screen.getByTestId('artifacts.lib.field')).toBeTruthy();
+  });
+
+  it('with no library in the sidebar, the page keeps its column', () => {
+    mount(<ArtifactsScreen />);
+    expect(screen.getByTestId('artifacts.col')).toBeTruthy();
+    expect(screen.queryByTestId('artifacts.lib')).toBeNull();
+  });
+});
+
 describe('artifacts screens', () => {
   it('all artifacts: every project\'s newest as cards, the new chip; words search every folder, ⏎ in the search opens the first', () => {
     const router = mount(<ArtifactsScreen />);
     expect(screen.getByTestId('artifacts.grid').querySelectorAll('[data-row]').length).toBe(3);
     expect(screen.getByTestId('artifacts.grid.card.shop-1/notes.new').textContent).toBe('new');
-    const field = screen.getByTestId('artifacts.search').querySelector('input') ?? screen.getByTestId('artifacts.search');
+    const field = screen.getByTestId('artifacts.search.input');
     fireEvent.change(field, { target: { value: 'checkout' } });
     expect(screen.getByTestId('artifacts.results.head').textContent).toContain('1 found for "checkout"');
     fireEvent.keyDown(field, { key: 'Enter' });
@@ -99,7 +140,7 @@ describe('artifacts screens', () => {
     expect(on()).toEqual(['shop-1/notes']);
     // / : the search has the keys; ↓ gives them back
     fireEvent.keyDown(scr, { key: '/' });
-    const field = screen.getByTestId('artifacts.search');
+    const field = screen.getByTestId('artifacts.search.input');
     expect(document.activeElement).toBe(field);
     fireEvent.change(field, { target: { value: 'e' } });
     fireEvent.keyDown(field, { key: 'ArrowDown' });
@@ -397,14 +438,16 @@ describe('archived artifacts (art-archive archived_at, the TUI artifacts screen)
     mountWith(archivedWorld(), <ArtifactsScreen />);
     const ids = () => [...screen.getByTestId('artifacts.screen').querySelectorAll('[data-row]')].map((r) => r.getAttribute('data-row'));
     expect(ids()).not.toContain('shop-1/old-deck');
-    expect(screen.getByTestId('artifacts.archived').textContent).toBe('2 archived');
+    // a toggle in the filters' row (its archive icon, its count), pressed while they show
+    const toggle = () => screen.getByTestId('artifacts.archived');
+    expect(toggle().textContent).toBe('2 archived');
+    expect(toggle().getAttribute('aria-pressed')).toBe('false');
     fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'a' });
-    expect(screen.getByTestId('artifacts.screen').querySelector('.b-hero .name')?.textContent).toBe('artifacts · archived');
+    expect(toggle().getAttribute('aria-pressed')).toBe('true');
     expect(ids()).toEqual(['shop-1/old-deck', 'shop-1/old-doc']);
-    expect(screen.queryByTestId('artifacts.archived')).toBeNull();
     fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'Escape' });
     expect(ids()).not.toContain('shop-1/old-deck');
-    fireEvent.click(screen.getByTestId('artifacts.archived'));
+    fireEvent.click(toggle());
     expect(ids()).toEqual(['shop-1/old-deck', 'shop-1/old-doc']);
   });
 

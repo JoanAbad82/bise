@@ -56,6 +56,9 @@ const PARTS = {
   down: ["m6 9 6 6 6-6"],
   right: ["m9 6 6 6-6 6"],
   check: ["m5 12 4 4 10-10"],
+  // nm-pages-a (native-lead m_42310): the artifacts' cards / list toggle, for ▦ ☰
+  grid: ["M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"],
+  list: ["M4 6h16M4 12h16M4 18h16"],
 } as const satisfies Record<string, readonly Part[]>;
 
 /** Every app icon's name. */

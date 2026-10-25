@@ -5,31 +5,6 @@
     "one": null,
     "text": "add a project"
   },
-  "panel.addr_back": {
-    "args": [],
-    "one": null,
-    "text": "back"
-  },
-  "panel.addr_forward": {
-    "args": [],
-    "one": null,
-    "text": "forward"
-  },
-  "panel.addr_out": {
-    "args": [],
-    "one": null,
-    "text": "open in your browser"
-  },
-  "panel.addr_reload": {
-    "args": [],
-    "one": null,
-    "text": "reload"
-  },
-  "panel.addr_window": {
-    "args": [],
-    "one": null,
-    "text": "open in a window"
-  },
   "panel.agents": {
     "args": [],
     "one": null,
@@ -77,17 +52,17 @@
   "panel.bar_agents": {
     "args": [],
     "one": null,
-    "text": "Agents"
+    "text": "AGENTS"
   },
   "panel.bar_archived": {
     "args": [],
     "one": null,
-    "text": "Archived"
+    "text": "ARCHIVED"
   },
   "panel.bar_artifacts": {
     "args": [],
     "one": null,
-    "text": "Artifacts"
+    "text": "ARTIFACTS"
   },
   "panel.bar_label": {
     "args": [
@@ -99,7 +74,7 @@
   "panel.bar_scheduled": {
     "args": [],
     "one": null,
-    "text": "Scheduled"
+    "text": "SCHEDULED & WATCHING"
   },
   "panel.bise": {
     "args": [],
@@ -238,64 +213,6 @@
     "one": null,
     "text": "lands via PRs"
   },
-  "panel.launch_browser": {
-    "args": [],
-    "one": null,
-    "text": "Browser"
-  },
-  "panel.launch_changes": {
-    "args": [],
-    "one": null,
-    "text": "Changes"
-  },
-  "panel.launch_files": {
-    "args": [],
-    "one": null,
-    "text": "Files"
-  },
-  "panel.launch_kind_by": {
-    "args": [
-      "kind",
-      "who"
-    ],
-    "one": null,
-    "text": "{kind} · {who}"
-  },
-  "panel.launch_no_match": {
-    "args": [],
-    "one": null,
-    "text": "no artifact by that name"
-  },
-  "panel.launch_none": {
-    "args": [],
-    "one": null,
-    "text": "nothing opened yet"
-  },
-  "panel.launch_open": {
-    "args": [],
-    "one": null,
-    "text": "Open"
-  },
-  "panel.launch_recent": {
-    "args": [],
-    "one": null,
-    "text": "Recent"
-  },
-  "panel.launch_search": {
-    "args": [],
-    "one": null,
-    "text": "Search artifacts, or enter a URL"
-  },
-  "panel.launch_side": {
-    "args": [],
-    "one": null,
-    "text": "Side thread"
-  },
-  "panel.launch_terminal": {
-    "args": [],
-    "one": null,
-    "text": "Terminal"
-  },
   "panel.more": {
     "args": [
       "n"
@@ -405,23 +322,6 @@
     "args": [],
     "one": null,
     "text": "↗ opens in your browser"
-  },
-  "panel.panel_label": {
-    "args": [],
-    "one": null,
-    "text": "panel"
-  },
-  "panel.panel_toggle": {
-    "args": [
-      "key"
-    ],
-    "one": null,
-    "text": "panel · {key}"
-  },
-  "panel.panel_width": {
-    "args": [],
-    "one": null,
-    "text": "panel width"
   },
   "panel.paused": {
     "args": [],
@@ -640,83 +540,6 @@
     "args": [],
     "one": null,
     "text": "working"
-  },
-  "panel.tab_add": {
-    "args": [
-      "key"
-    ],
-    "one": null,
-    "text": "new tab · {key}"
-  },
-  "panel.tab_changes": {
-    "args": [
-      "agent"
-    ],
-    "one": null,
-    "text": "Changes · {agent}"
-  },
-  "panel.tab_close": {
-    "args": [
-      "key"
-    ],
-    "one": null,
-    "text": "close tab · {key}"
-  },
-  "panel.tab_new": {
-    "args": [],
-    "one": null,
-    "text": "New tab"
-  },
-  "panel.tab_office": {
-    "args": [
-      "project"
-    ],
-    "one": null,
-    "text": "Office · {project}"
-  },
-  "panel.tab_overview": {
-    "args": [],
-    "one": null,
-    "text": "Overview"
-  },
-  "panel.tab_pr": {
-    "args": [
-      "number"
-    ],
-    "one": null,
-    "text": "PR #{number}"
-  },
-  "panel.tab_scheduled": {
-    "args": [],
-    "one": null,
-    "text": "Scheduled task"
-  },
-  "panel.tab_terminal": {
-    "args": [
-      "project"
-    ],
-    "one": null,
-    "text": "Terminal · {project}"
-  },
-  "panel.tab_terminal_n": {
-    "args": [
-      "n",
-      "project"
-    ],
-    "one": null,
-    "text": "Terminal {n} · {project}"
-  },
-  "panel.tabs_label": {
-    "args": [],
-    "one": null,
-    "text": "panel tabs"
-  },
-  "panel.tabs_more": {
-    "args": [
-      "n"
-    ],
-    "one": "{n} more tab",
-    "text": "{n} more tabs"
   },
   "panel.tip_agents": {
     "args": [

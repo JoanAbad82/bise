@@ -1,10 +1,11 @@
 // The window's frame around the screens (designer's desktop-screens v6/v7,
-// signed): the titlebar over the main column ('storefront › perf'), the
-// width classes (under 1000 px the sidebar is hidden and slides over the
-// window with a 45% scrim, esc or a click outside closes it, and the titlebar
-// shows the sidebar button (⌘\) and 'n waiting' in the accent), and whether
-// the sidebar shows; the tabbed panel's tabs and its ▯ mount in the title bar
-// (<BarTabs/>), its state is app/panel/state.ts (nm-panel's). Owner: nm-frame (bise fait mac; amb-win before).
+// signed): the titlebar over the main column ('storefront › perf', the
+// right panel's button '↗ artifacts · 5 ⌥⌘0'), the width classes (under
+// 1000 px the sidebar is hidden and slides over the window with a 45%
+// scrim, esc or a click outside closes it, and the titlebar shows the
+// sidebar button (⌘\) and 'n waiting' in the accent), and which of the
+// sidebar and the right panel show; the panel's tabs mount in the title bar
+// (<BarTabs/>, nm-panel's). Owner: nm-frame (bise fait mac; amb-win before).
 import {
   useCallback,
   useEffect,
@@ -16,6 +17,7 @@ import {
 import { Chip, IconButton, Kbd, Pearl, PickerPop, Press } from "@/ds";
 import { useModHeld } from "./held";
 import { useProjects } from "@/store";
+import { keep } from "./keep";
 import { formatRoute, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
@@ -23,10 +25,24 @@ import { TitleStatus } from "./TitleStatus";
 import { BarTabs } from "./panel/BarTabs";
 import { BarSlot } from "./barslot";
 import { frameLeft, useLeft } from "./frame-state";
-import { SIDE, sideWidthOf, UNFOLD_PX } from "./resize";
-import { crumbGoOf, crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
+import {
+  keptWidth,
+  PANEL,
+  panelWidthOf,
+  SIDE,
+  sideWidthOf,
+  UNFOLD_PX,
+} from "./resize";
+import {
+  crumbGoOf,
+  crumbOf,
+  NARROW_PX,
+  PANEL_OPEN_PX,
+  panelAt,
+  panelProject,
+} from "./side";
 import { useWaitingTotal } from "./Sidebar";
-import { panelToggle, usePanelBox } from "./panel/state";
+import { usePanelColumn } from "@/bims/view";
 import { usePlaceCrumb } from "@/artifacts/crumb";
 
 export type Width = "narrow" | "mid" | "wide";
@@ -47,71 +63,156 @@ export function useWidth(): Width {
   );
 }
 
+const WIDE_PX: Record<Width, number> = {
+  narrow: NARROW_PX - 1,
+  mid: NARROW_PX,
+  wide: PANEL_OPEN_PX,
+};
+
+/** A kept yes/no of the frame (no age: the sidebar hidden, the panel shown). */
+function useKeptFlag(
+  key: string,
+): readonly [boolean | undefined, (v: boolean) => void] {
+  const [v, set] = useState<boolean | undefined>(() => {
+    const k = keep.view(key);
+    return typeof k === "boolean" ? k : undefined;
+  });
+  return [
+    v,
+    (next: boolean) => {
+      keep.setView(key, next);
+      set(next);
+    },
+  ];
+}
+
 export interface FrameState {
   readonly width: Width;
   /** the sidebar in its column */
   readonly side: boolean;
   /** what slides over the window now (under 1000 px, or the sidebar hidden by ⌘\) */
-  readonly over: "side" | null;
-  /** ⌘\ the sidebar; ⌥⌘0 the tabbed panel (app/panel/state.ts, nm-panel's) */
+  readonly over: "side" | "panel" | null;
+  /** the panel's project and whether it shows docked */
+  readonly panel:
+    | {
+        readonly project: string;
+        readonly name: string;
+        readonly docked: boolean;
+      }
+    | undefined;
   readonly toggle: (what: "sidebar" | "panel") => void;
   readonly close: () => void;
-  /** the sidebar's width (kept), and what a drag on its border does */
+  /** the sidebar's and the panel's widths (kept), and what a drag on their border does */
   readonly sideW: number;
-  readonly resize: (what: "side", want: number) => void;
-  readonly reset: (what: "side") => void;
+  readonly panelW: number;
+  readonly resize: (what: "side" | "panel", want: number) => void;
+  readonly reset: (what: "side" | "panel") => void;
 }
 
-/** Whether the sidebar shows, from the width and his kept choice; the panel is app/panel/state.ts's. */
+/** A kept width of the frame, in its limits. */
+function useKeptWidth(
+  key: string,
+  lo: number,
+  hi: number,
+  def: number,
+): readonly [number, (v: number) => void] {
+  const [v, set] = useState<number>(() =>
+    keptWidth(keep.view(key), lo, hi, def),
+  );
+  return [
+    v,
+    (next: number) => {
+      keep.setView(key, next);
+      set(next);
+    },
+  ];
+}
+
+/** Which of the sidebar and the right panel show, from the width, his kept choices and the route. */
 export function useFrame(): FrameState {
   const width = useWidth();
   const route = useRoute();
+  const rows = useProjects();
+  const home = rows.find((p) => p.home)?.project;
   // the sidebar's kept state: one store, read by the right side too (frame-state.ts)
   const { hidden, width: sideW } = useLeft();
   const setHidden = frameLeft.hide;
   const setSideW = frameLeft.width;
-  // what slid over, for the route and the width class it opened on (overOf, over.ts); only the
-  // sidebar slides over now (the tabbed panel docks or folds: app/panel)
+  const [kept, setKept] = useKeptFlag("frame.panel");
+  // what slid over, for the route and the width class it opened on (overOf, over.ts)
   const at_ = formatRoute(route);
   const [slid, setSlid] = useState<Slid | null>(null);
-  const over = overOf(slid, at_, width) === "side" ? ("side" as const) : null;
-  const setOver = (f: (o: "side" | null) => "side" | null) => {
+  const over = overOf(slid, at_, width);
+  const setOver = (
+    f: (o: "side" | "panel" | null) => "side" | "panel" | null,
+  ) => {
     const next = f(over);
     setSlid(next === null ? null : { what: next, at: at_, width });
   };
   const side = width !== "narrow" && !hidden;
-  const panelW = usePanelBox().width;
+  const project = panelProject(route, home, rows.filter((p) => !p.home).length);
+  const row = rows.find((p) => p.project === project);
+  const at = panelAt(WIDE_PX[width], kept);
+  const [panelW, setPanelW] = useKeptWidth(
+    "frame.panel.w",
+    PANEL.min,
+    4000,
+    PANEL.def,
+  );
+  // the office wide: the column is 640 when the window has room for it (bims/view.ts)
+  const column = usePanelColumn(panelW, side ? sideW : 0, project);
+  const panel =
+    project === undefined
+      ? undefined
+      : {
+          project,
+          name: project === "" ? "all projects" : (row?.name ?? project),
+          docked: at.docked && at.open,
+        };
   return {
     width,
     side,
     over,
+    panel,
     toggle: (what) => {
-      if (what === "panel") {
-        panelToggle();
+      if (what === "sidebar") {
+        if (width === "narrow") setOver((o) => (o === "side" ? null : "side"));
+        else setHidden(side);
         return;
       }
-      if (width === "narrow") setOver((o) => (o === "side" ? null : "side"));
-      else setHidden(side);
+      if (project === undefined) return;
+      if (at.docked) setKept(!at.open);
+      else setOver((o) => (o === "panel" ? null : "panel"));
     },
     close: () => {
       setSlid(null);
     },
     sideW,
-    resize: (_what, want) => {
-      // folded (⌘\ or a drag under 160): a drag out of the fold opens it at 200
-      if (!side) {
-        if (want >= UNFOLD_PX) {
-          setSideW(Math.max(sideW, SIDE.reopen));
-          setHidden(false);
+    panelW: column,
+    resize: (what, want) => {
+      const win = window.innerWidth;
+      const shownPanel =
+        at.docked && at.open && project !== undefined ? column : 0;
+      if (what === "side") {
+        // folded (⌘\ or a drag under 160): a drag out of the fold opens it at 200
+        if (!side) {
+          if (want >= UNFOLD_PX) {
+            setSideW(Math.max(sideW, SIDE.reopen));
+            setHidden(false);
+          }
+          return;
         }
+        const w = sideWidthOf(want, win, shownPanel);
+        if (w === "fold") setHidden(true);
+        else if (w !== sideW) setSideW(w);
         return;
       }
-      const w = sideWidthOf(want, window.innerWidth, panelW);
-      if (w === "fold") setHidden(true);
-      else if (w !== sideW) setSideW(w);
+      const w = panelWidthOf(want, win, side ? sideW : 0);
+      if (w !== panelW) setPanelW(w);
     },
-    reset: () => {
-      setSideW(SIDE.def);
+    reset: (what) => {
+      if (what === "side") setSideW(SIDE.def);
+      else setPanelW(PANEL.def);
     },
   };
 }
@@ -299,12 +400,17 @@ export function Titlebar({ frame }: { frame: FrameState }) {
   const router = useRouter();
   const rows = useProjects();
   const waits = useWaitingTotal();
+  // what waits on him in the right bar's place: one project's, or every project's on bise's thread
+  const placeWaits =
+    frame.panel === undefined ? 0 : frame.panel.project === "" ? waits : (rows.find((r) => r.project === frame.panel?.project)?.waits ?? 0);
   const name = (p: string) => rows.find((r) => r.project === p)?.name ?? p;
   // the artifacts library's place after 'artifacts' (artifacts/crumb.ts)
   const place = usePlaceCrumb();
   const crumb = crumbOf(route, name, place);
   // an earlier crumb's route, by its place (the last: where he is, no route) — crumbGoOf, pure
   const go = crumbGoOf(route, name, place).map((s) => s.go);
+  const panelOn =
+    frame.panel !== undefined && (frame.panel.docked || frame.over === "panel");
   return (
     <div
       className={frame.side ? "app-title" : "app-title away"}
@@ -374,6 +480,31 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       <BarSlot />
       {/* bise fait mac: the panel's tabs in the bar (nm-panel's mount point) */}
       <BarTabs />
+      {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
+          pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
+      {frame.panel !== undefined && (
+        <span className="app-rtg">
+          <IconButton
+            label="right bar"
+            keys="⌥⌘0"
+            size="bar"
+            pressed={panelOn}
+            onClick={() => {
+              frame.toggle("panel");
+            }}
+            testId="app.title.panel"
+          >
+            <span className="app-tg-glyph right" aria-hidden="true">
+              <span />
+            </span>
+          </IconButton>
+          {placeWaits > 0 && (
+            <span className="app-rtg-n" data-testid="app.title.panel.waits">
+              {placeWaits}
+            </span>
+          )}
+        </span>
+      )}
     </div>
   );
 }

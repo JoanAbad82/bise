@@ -1,20 +1,25 @@
-// The artifacts screen, in folders (artifacts-folders brief part 4, page artifacts-gallery v7; route
-// artifacts[/<p>]): one library for every project. The hero (ds PageHero, the bims still in its
-// slot) scrolls away with the page; under it the 200 px folder column (Column.tsx; under 900 px
-// folded into the crumb, Fold.tsx) and the place he is in: all artifacts (the themes as big tiles,
-// then recent), recent, unfiled, a theme (its task folders as small tiles, then its cards), a
-// task's folder (its cards by day). The filter row: the kind chips the place holds, the project
-// scope at the search field (Scope.tsx, or 'in:<project>' typed), ▦ ☰. / searches every folder
-// (Search.tsx). A card moves by a drag onto a folder or a tile (drag.ts), by m (MovePicker.tsx),
+// The artifacts screen, in folders (bise fait mac: page native-mac §6, mockup 7, decision d2;
+// artifacts-folders brief part 4, page artifacts-gallery v7; route artifacts[/<p>]): one library
+// for every project. The window's bar holds the place's name (its crumb), the kinds the place holds
+// (ds Filters), the search and + add (InBar). Under the bar the lead (ds PageLead, the bims still
+// beside it as a vignette, no card) scrolls away with the page; then the filters (the project scope,
+// Scope.tsx, or 'in:<project>' typed; the archived ones; cards or a list), and the place he is in:
+// all artifacts (the themes as big tiles, then recent, ds GroupLabels), recent, unfiled, a theme
+// (its task folders as small tiles, then its cards), a task's folder (its cards by day). The
+// library (Column.tsx) draws in the window's sidebar (ArtLibrary, library.tsx: this page publishes
+// its props there); with no sidebar library, in the page's 200 px column (under 900 px folded into
+// a crumb, Fold.tsx). / searches every folder (Search.tsx). A card moves by a drag onto a folder or a tile (drag.ts), by m (MovePicker.tsx),
 // by its right-click menu (Menus.tsx); ⌘/shift-click picks several, the selection bar comes up.
 // Folders: + new folder in the column, F2 or a double-click renames, the folder menu merges or
 // deletes (a dialog). Every move and folder edit has its undo (⌘Z, and the toast's). The grid, the
 // cards, the stacks and the list view are art-grid's (Grid.tsx, Sheet.tsx). Owner: art-folders.
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { Button, Field, IconButton, PageHero, Press, Sheet, tipAttrs, Toast } from '@/ds';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { AppIcon, BarSearch, Button, Empty, FilterRow, Filters, GroupLabel, MoreButton, PageLead, Press, Sheet, tipAttrs, Toast, type EntityMenu } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { useFolders, useProjects, useStore } from '@/store';
 import { useRouter } from '@/app/router';
+import { InBar } from '@/app/barslot';
+import { publishColumn, useLibraryShown, type ColumnBits } from './library';
 import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
 import { rowKey, useLook } from './List';
@@ -32,12 +37,13 @@ import {
   nameOf, nearestOf, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type At, type ChipKind, type Library,
 } from './folders';
 import { FolderColumn, type Editing } from './Column';
+import { chipWord } from './folders';
 import { FoldCrumb, useNarrow } from './Fold';
 import { sayCrumbSearch } from './crumb';
 import { MovePicker } from './MovePicker';
 import { atOf, CardMenu, FolderMenu, MergePicker, type CardAct, type FolderAct, type MenuAt } from './Menus';
 import { ProjectScope } from './Scope';
-import { KindChips, NothingFound, SearchResults } from './Search';
+import { NothingFound, SearchResults } from './Search';
 import { BigTile, FolderListRow, SmallTile } from './Tiles';
 import { cardDrag, FLASH_MS, TOAST_MS, useBrief, useDrop } from './drag';
 import { folderCmd, moveCmd, type FolderOp } from './ops';
@@ -104,6 +110,9 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   // a move to a folder made from the picker (⌘⏎): sent once the folder is in the list
   const pendingMove = useRef<{ name: string; parent: string | null; keys: readonly string[] } | null>(null);
   const narrow = useNarrow();
+  const searchRef = useRef<HTMLInputElement>(null);
+  // the window's sidebar draws the library (ArtLibrary): the page draws no column of its own
+  const sideLib = useLibraryShown();
 
   const go = (p: string, a: At) => {
     const path = atPath(a);
@@ -219,7 +228,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return false;
     if (e.key === '/') {
-      document.querySelector<HTMLInputElement>('[data-testid="artifacts.search"]')?.focus();
+      searchRef.current?.focus();
       return true;
     }
     if (e.key === 'm') {
@@ -328,12 +337,16 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   // the place's theme is always open in the column (a folder reached by a link, a tile, the fold)
   const curTheme = curId === null ? null : (lib.byId.get(curId)?.parent ?? curId);
   const shownOpen = curTheme === null || open.has(curTheme) ? open : new Set([...open, curTheme]);
-  const column = (
-    <FolderColumn lib={lib} counts={counts} at={atNow} open={shownOpen} full={full} editing={editing} flash={flash} drop={drop}
-      onGo={(a) => { setQ(''); setAt(a); }} onToggle={(t) => { setOpen(toggled(open, t)); }} onMore={(t) => { setFull(new Set([...full, t])); }}
-      onNew={() => { setEditing({ kind: 'new', parent: null }); }} onRename={(id) => { setEditing({ kind: 'rename', id }); }} onEdited={onEdited}
-      onMenu={(id, e: MouseEvent) => { setOver({ k: 'folder', id, at: { x: e.clientX, y: e.clientY } }); }} testId="artifacts.col" />
-  );
+  // the library's props, one copy: the page's column draws them, or the sidebar's (library.tsx)
+  const colBits: ColumnBits = {
+    lib, counts, at: atNow, open: shownOpen, full, editing, flash, drop,
+    onGo: (a) => { setQ(''); setAt(a); }, onToggle: (t) => { setOpen(toggled(open, t)); }, onMore: (t) => { setFull(new Set([...full, t])); },
+    onNew: () => { setEditing({ kind: 'new', parent: null }); }, onRename: (id) => { setEditing({ kind: 'rename', id }); }, onEdited,
+    onMenu: (id, e: MouseEvent) => { setOver({ k: 'folder', id, at: { x: e.clientX, y: e.clientY } }); },
+  };
+  useLayoutEffect(() => { publishColumn(colBits); });
+  useEffect(() => () => { publishColumn(null); }, []);
+  const column = <FolderColumn {...colBits} testId="artifacts.col" />;
   const grid = (items: readonly Card[], placeHere: Place, days: boolean, testId: string) => (
     <ArtifactGrid cards={items} cols={cols} view={view} now={now} place={placeHere} days={days} cursor={sel} picked={picked}
       onPick={onPick} onOpen={(c) => { openCard(c.key); }}
@@ -345,28 +358,50 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   // under 900 px the column folds into the crumb: the place's title opens it (page v7 'à 800 px')
   const fold = <FoldCrumb label={crumb.length === 0 ? library.all_artifacts : crumb.map((c) => c.name).join(' / ')} testId="artifacts.fold">{column}</FoldCrumb>;
   const current = atNow.at === 'folder' ? lib.byId.get(atNow.id) : undefined;
-  // the kind chips: their own row under the head (designer m_40850)
-  const chipsRow = searching
-    ? <KindChips total={found.length} chips={chips} chip={chip} onChip={setChip} testId="artifacts.kinds" />
-    : chips.length > 1 ? <KindChips total={here.length} chips={chips} chip={chip} onChip={setChip} testId="artifacts.kinds" /> : null;
-  // the scope, the search, ▦ ☰ and + add: on the head's line, at its right
-  const ends = (
-    <span className="art-filters-end">
-        <ProjectScope all={base} project={eff} projectName={projectName} onPick={(p) => { setScope(p); if (typedProject !== null) setQ(parsed.words.join(' ')); }} testId="artifacts.projects" />
-        <span className="art-search">
-          <Field slash placeholder="search" value={q} onChange={(e) => { setQ(e.currentTarget.value); setWhole(new Set()); }} onKeyDown={searchKey} testId="artifacts.search" />
-        </span>
-        <span className="art-views">
-          <span {...tipAttrs(library.tip_cards)}><IconButton label={library.tip_cards} size="row" pressed={view === 'grid'} onClick={() => { setView('grid'); }} testId="artifacts.view.grid">▦</IconButton></span>
-          <span {...tipAttrs(library.tip_list)}><IconButton label={library.tip_list} size="row" pressed={view === 'list'} onClick={() => { setView('list'); }} testId="artifacts.view.list">☰</IconButton></span>
-        </span>
-        <AddButton place={place_} testId="artifacts.add" />
-      </span>
+  // the window's bar (mockup 7): the kinds the place holds (ds Filters: all, then each kind with its
+  // count), the search ('/'), + add files
+  const kindsTotal = searching ? found.length : here.length;
+  const inBar = (
+    <InBar>
+      {stack === null && (searching || chips.length > 1) && (
+        <Filters label={library.kinds_label} on={chip ?? 'all'} testId="artifacts.kinds"
+          items={[{ id: 'all', label: <>{library.all_kinds}<span className="art-n">{kindsTotal}</span></> },
+            ...chips.map((c) => ({ id: c.kind, label: <>{chipWord(c.kind)}<span className="art-n">{c.n}</span></> }))]}
+          onPick={(id) => { setChip(id === 'all' ? null : (id as ChipKind)); }} />
+      )}
+      <BarSearch ref={searchRef} value={q} onChange={(e) => { setQ(e.currentTarget.value); setWhole(new Set()); }} onKeyDown={searchKey} testId="artifacts.search" />
+      <AddButton place={place_} testId="artifacts.add" />
+    </InBar>
   );
+  // under the lead (app-polish #4: menus left, the view's toggles right, one height): the project
+  // scope, the archived ones, cards or a list
+  const filters = stack === null && (
+    <FilterRow testId="artifacts.filters">
+      <ProjectScope all={base} project={eff} projectName={projectName} onPick={(p) => { setScope(p); if (typedProject !== null) setQ(parsed.words.join(' ')); }} testId="artifacts.projects" />
+      {archived.length > 0 && (
+        <Press look="art-toggle" aria-pressed={archivedOn} onClick={() => { setArchivedOn(!archivedOn); setPicked(new Set()); }} data-testid="artifacts.archived"
+          {...tipAttrs(library.archived_tip)}>
+          <AppIcon name="archive" size={14} />{library.archived_n({ n: archived.length })}
+        </Press>
+      )}
+      <span className="art-views">
+        <Press look="art-view" aria-pressed={view === 'grid'} aria-label={library.tip_cards} onClick={() => { setView('grid'); }} data-testid="artifacts.view.grid" {...tipAttrs(library.tip_cards)}><AppIcon name="grid" size={16} /></Press>
+        <Press look="art-view" aria-pressed={view === 'list'} aria-label={library.tip_list} onClick={() => { setView('list'); }} data-testid="artifacts.view.list" {...tipAttrs(library.tip_list)}><AppIcon name="list" size={16} /></Press>
+      </span>
+    </FilterRow>
+  );
+  // the place's folder: its '…' (the folder's own menu: rename, a folder inside, merge, delete)
+  const folderMenu: EntityMenu | null = current === undefined ? null : {
+    onContextMenu: (e) => { e.preventDefault(); setOver({ k: 'folder', id: current.id, at: { x: e.clientX, y: e.clientY } }); },
+    open: () => {
+      const el = document.querySelector('[data-testid="artifacts.head.more"]');
+      setOver({ k: 'folder', id: current.id, at: el === null ? { x: 0, y: 0 } : atOf(el) });
+    },
+  };
 
   const body = (() => {
     if (all.length === 0) return <FirstRun place={place_} />;
-    if (archivedOn && base.length === 0) return <div className="art-empty-box" data-testid="artifacts.none"><p className="s">{library.none_archived}</p></div>;
+    if (archivedOn && base.length === 0) return <Empty title={library.none_archived} testId="artifacts.none" />;
     if (stack !== null) {
       return <StackSheet stack={stack} now={now} onOpen={openIt} onLook={look} onPut={putIt} onBack={() => { setStack(null); }} testId="artifacts.sheet" />;
     }
@@ -378,7 +413,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       }
       const groups = groupByFolder(lib, shown);
       return (
-        <SearchResults q={parsed.words.join(' ')} total={found.length} chips={chips} chip={chip} onChip={setChip} groups={groups} whole={whole}
+        <SearchResults q={parsed.words.join(' ')} total={found.length} groups={groups} whole={whole}
           onWhole={(g) => { setWhole(new Set([...whole, g])); }}
           cards={(items, g) => grid(items.map((it) => cards.find((c) => c.key === keyOf(it)) ?? { kind: 'one', key: keyOf(it), it }), { kind: 'search' }, false, `artifacts.results.${g.id ?? 'unfiled'}`)}
           testId="artifacts.results" />
@@ -390,7 +425,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
         <>
           {themes.length > 0 && (
             <>
-              <div className="art-sect"><span>{library.folders}</span><span className="sort">{library.recent_first}</span></div>
+              <GroupLabel tip={library.recent_first} testId="artifacts.sect.folders">{library.folders}</GroupLabel>
               {view === 'list' ? (
                 <div className="art-frows" data-testid="artifacts.tiles">
                   {themes.map((t) => (
@@ -411,24 +446,20 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
               )}
             </>
           )}
-          <div className="art-sect"><span>{eff === '' ? library.recent : library.recent_in({ project: projectName })}</span></div>
+          <GroupLabel testId="artifacts.sect.recent">{eff === '' ? library.recent : library.recent_in({ project: projectName })}</GroupLabel>
           {grid(cards, place, false, 'artifacts.grid')}
         </>
       );
     }
     if (atNow.at === 'unfiled' && here.length === 0) {
-      return <div className="art-empty-box" data-testid="artifacts.none"><div className="t">{library.no_unfiled_title}</div><p className="s">{library.no_unfiled_say}</p></div>;
+      return <Empty title={library.no_unfiled_title} testId="artifacts.none">{library.no_unfiled_say}</Empty>;
     }
     if (atNow.at === 'folder' && here.length === 0) {
       if (eff !== '' && (counts.get(atNow.id)?.total ?? 0) > 0) {
-        return <div className="art-empty-box" data-testid="artifacts.none"><p className="s">{library.none_from({ project: projectName })}</p></div>;
+        return <Empty title={library.none_from({ project: projectName })} testId="artifacts.none" />;
       }
-      return (
-        <div className="art-empty-box" data-testid="artifacts.none">
-          <div className="t">{library.empty_folder_title}</div>
-          <p className="s">{library.empty_folder_say({ name: nameOf(lib, atNow.id) })}</p>
-        </div>
-      );
+      // the empty folder (app-polish #14): the ds Empty, on the column's edge
+      return <Empty title={library.empty_folder_title} testId="artifacts.none">{library.empty_folder_say({ name: nameOf(lib, atNow.id) })}</Empty>;
     }
     const tasks = isTheme ? (lib.tasks.get(curId) ?? []) : [];
     return (
@@ -454,19 +485,12 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   })();
 
   const head = searching || atNow.at === 'all' || stack !== null ? null : (
-    <header className="art-head" data-testid="artifacts.head">
-      <div className="art-headline">
-        <div className="art-head-t">
-          {narrow ? fold : <span className="t">{atNow.at === 'folder' ? crumb.map((c) => c.name).join(' / ') : crumb[0]?.name}</span>}
-          {current !== undefined && (
-            <span {...tipAttrs(library.tip_folder_more)}>
-              <IconButton label={library.tip_folder_more} size="row" onClick={(e) => { setOver({ k: 'folder', id: current.id, at: atOf(e.currentTarget) }); }} testId="artifacts.head.more">···</IconButton>
-            </span>
-          )}
-        </div>
-        {ends}
-      </div>
+    // the place's name is the window's bar's (its crumb: 'artifacts › launch'), never a second time
+    // here (designer's rule on #5); under 900 the fold's crumb opens the library
+    <header className="art-head" data-testid="artifacts.head" onContextMenu={folderMenu?.onContextMenu}>
+      {narrow && <div className="art-head-t">{fold}</div>}
       <p className="art-head-s">
+        {folderMenu !== null && <MoreButton menu={folderMenu} testId="artifacts.head.more" />}
         {atNow.at === 'folder' ? folderLine(lib, atNow.id, here) : atNow.at === 'unfiled' ? library.unfiled_say : ''}
         {atNow.at === 'unfiled' && here.length > 0 && (
           <> <Press look="art-link" onClick={() => { router.go({ screen: 'bise' }); }} data-testid="artifacts.sort">{library.sort_with_main}</Press></>
@@ -484,31 +508,28 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       </div>
     </header>
   );
-  // all artifacts and a search have no head: the line keeps the crumb (under 900) and the ends
-  const bareHead = (
-    <div className="art-head">
-      <div className="art-headline">{narrow && <div className="art-head-t">{fold}</div>}{ends}</div>
-    </div>
-  );
+  // all artifacts and a search have no head: under 900 the line keeps the fold's crumb
+  const bareHead = narrow ? <div className="art-head"><div className="art-head-t">{fold}</div></div> : null;
 
   return (
     <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} data-narrow={narrow || undefined}
       data-title-path={titlePath(lib, atNow, searchWords)} onKeyDown={onKeyDown}>
+      {inBar}
       <div className="art-scroll" data-testid="artifacts.scroll">
-        <PageHero name={archivedOn ? 'artifacts · archived' : 'artifacts'} sentence={library.say} facts={libraryFacts(lib, scoped, projectName)}
-          vignette={<><img className="art-hero-still light" src={heroLight} alt="" /><img className="art-hero-still dark" src={heroDark} alt="" /></>} testId="artifacts.hero" />
-        <div className="art-lib">
-          {!narrow && column}
+        {/* the lead (designer's rule on #5): no card; the bims still stays beside it as a vignette */}
+        <div className="art-lead">
+          <PageLead sentence={library.say} facts={libraryFacts(lib, scoped, projectName)} testId="artifacts.lead" />
+          <span className="art-vignette" aria-hidden="true"><img className="art-hero-still light" src={heroLight} alt="" /><img className="art-hero-still dark" src={heroDark} alt="" /></span>
+        </div>
+        {filters}
+        <div className={`art-lib${narrow || sideLib ? ' bare' : ''}`}>
+          {!narrow && !sideLib && column}
           <div className="art-main">
             {stackHead ?? head ?? bareHead}
-            {stack === null && chipsRow}
             <AddDrop place={place_} testId="artifacts.drop">{body}</AddDrop>
           </div>
         </div>
       </div>
-      {!archivedOn && archived.length > 0 && picked.size === 0 && (
-        <Press look="art-archived" onClick={() => { setArchivedOn(true); }} data-testid="artifacts.archived">{archived.length} archived</Press>
-      )}
       {picked.size > 0 && (
         <div className="art-selbar" data-testid="artifacts.selbar">
           <span className="n">{library.picked({ n: picked.size })}</span>
@@ -598,10 +619,8 @@ function placeOf(lib: Library, at: At, searching: boolean, items: readonly Item[
 /** First run: nothing yet, one sentence, one action. */
 function FirstRun({ place }: { place: ReturnType<typeof useAddPlace> }) {
   return (
-    <div className="art-empty-box first" data-testid="artifacts.empty">
-      <div className="t">{library.first_title}</div>
-      <p className="s">{library.first_say}</p>
-      <div className="acts"><AddButton place={place} testId="artifacts.empty.add" /></div>
-    </div>
+    <Empty title={library.first_title} action={<AddButton place={place} labeled testId="artifacts.empty.add" />} testId="artifacts.empty">
+      {library.first_say}
+    </Empty>
   );
 }

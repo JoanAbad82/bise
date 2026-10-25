@@ -1,7 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { clampHeight, DEFAULT_H, dragHeight, isToggleKey, KEEP_ABOVE, MIN_H, shellProject, shellTakes, shortPath, writesOf } from './model';
 import { panel } from './panel';
-import { panelState } from '@/app/panel/state';
 
 const key = (code: string, mods: Partial<{ metaKey: boolean; altKey: boolean; ctrlKey: boolean; shiftKey: boolean }> = {}, k = '') => ({
   code,
@@ -71,10 +70,7 @@ describe('shell project', () => {
   });
 });
 
-describe('the bottom panel (after "move to bottom")', () => {
-  beforeEach(() => {
-    panel.setPlace('bottom');
-  });
+describe('panel state', () => {
   afterEach(() => {
     panel.reset();
   });
@@ -94,31 +90,6 @@ describe('the bottom panel (after "move to bottom")', () => {
   it('keeps the dragged height', () => {
     panel.setHeight(333);
     expect(panel.get().height).toBe(333);
-  });
-});
-
-describe('the terminal on the right, a tab of the panel (his pref, the default)', () => {
-  afterEach(() => {
-    panel.reset();
-    panelState.reset();
-  });
-  it('lives on the right by default; ctrl+` opens the shell of the project in view in a tab, then folds the panel', () => {
-    expect(panel.get().place).toBe('right');
-    panel.setHere('acme');
-    panel.toggleByKey(1000);
-    expect(panel.get().shown).toBe(false);
-    expect(panelState.get().open).toBe(true);
-    expect(panelState.get().tabs.active).toBe('term:acme#0');
-    panel.toggleByKey(2000);
-    expect(panelState.get().open).toBe(false);
-  });
-  it('View > Terminal from another window reveals it where it lives', () => {
-    panel.setHere('acme');
-    panel.reveal();
-    expect(panelState.get().tabs.active).toBe('term:acme#0');
-    panel.setPlace('bottom');
-    panel.reveal();
-    expect(panel.get().shown).toBe(true);
   });
 });
 

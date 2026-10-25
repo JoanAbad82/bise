@@ -13,7 +13,6 @@ import type { Agent, ProjectRow } from '@/proto';
 import { liveOf, rankedOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { projectsOf } from './Sidebar';
-import { panelKeyOf, type PanelKey } from './panel/keys';
 
 /** A window event that opens the key list (the composer's /help and /shortcuts). */
 export const HELP_EVENT = 'bise:help';
@@ -31,9 +30,7 @@ export type KeyAct =
   | { readonly screen: ScreenAction }
   | { readonly frame: FrameAction }
   /** ⌘N: the add-a-project sheet (settings › projects when none is mounted) */
-  | { readonly addProject: true }
-  /** the tabbed panel's keys (app/panel/keys.ts): ⌘T, ⌘W, ⌘⇧[ ], ⌘P, ⌘L, ⌥⌘S, ⌥⌘D */
-  | { readonly panel: PanelKey };
+  | { readonly addProject: true };
 
 export interface KeyLike {
   readonly key: string;
@@ -52,8 +49,6 @@ export interface KeyCtx {
   readonly typing: boolean;
   /** the project's ⌥ numbers as the sidebar shows them (agents/model numbersOf); none: the hub's rank */
   readonly numbers?: (project: string) => ReadonlyMap<string, number>;
-  /** the tabbed panel is open: ⌘W and ⌘⇧[ ] are its */
-  readonly panelOpen?: boolean;
 }
 
 const digit = (code: string): number | undefined => (/^Digit[0-9]$/.test(code) ? Number(code.slice(5)) : undefined);
@@ -87,8 +82,6 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     return name !== undefined ? { go: { screen: 'thread', project: p, agent: name } } : undefined;
   }
   if (only('meta') && e.code === 'KeyK') return { palette: true };
-  const pk = panelKeyOf(e, c.panelOpen === true);
-  if (pk !== undefined) return { panel: pk };
   // designer's desktop-screens v6: ⌘\ the sidebar, ⌥⌘0 the right panel, ⌘N add a project, ⌘, settings
   if (only('meta') && e.code === 'Backslash') return { frame: 'sidebar' };
   if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'Digit0') return { frame: 'panel' };

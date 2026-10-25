@@ -63,10 +63,10 @@ for (const theme of THEMES) {
         } else await id(page, testId).click();
       };
       try {
-        await expect(id(page, 'artifacts.hero')).toContainText(library.say);
+        await expect(id(page, 'artifacts.lead')).toContainText(library.say);
         await expect(id(page, 'artifacts.tiles')).toBeVisible();
-        // the bims still is in the hero, drawn (from 800 px down the hero is words only: ds pagehero.css)
-        if (Number(w) > 800) expect(await page.locator('[data-testid="artifacts.hero"] img.art-hero-still:visible').evaluate((i) => (i as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        // the bims still beside the lead, drawn (the vignette, no card: designer's lead rule)
+        if (Number(w) > 800) expect(await page.locator('.art-vignette img.art-hero-still:visible').evaluate((i) => (i as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
         await shot('home');
 
         if (narrowOf(size)) {
@@ -81,7 +81,7 @@ for (const theme of THEMES) {
         await expect(id(page, 'artifacts.projects.menu')).toContainText('ai-docs');
         await shot('scope');
         await id(page, `artifacts.projects.${P.ai}`).click();
-        await expect(id(page, 'artifacts.hero')).toContainText('ai-docs');
+        await expect(id(page, 'artifacts.lead')).toContainText('ai-docs');
         await shot('one-project');
         await id(page, 'artifacts.projects.clear').click();
 
@@ -168,10 +168,10 @@ for (const theme of THEMES) {
         await shot('empty-folder');
 
         // search across folders, and nothing found
-        await id(page, 'artifacts.search').fill('dark');
+        await id(page, 'artifacts.search.input').fill('dark');
         await expect(id(page, 'artifacts.results.head')).toContainText('"dark"');
         await shot('search');
-        await id(page, 'artifacts.search').fill('pitch v3');
+        await id(page, 'artifacts.search.input').fill('pitch v3');
         await expect(id(page, 'artifacts.nothing')).toContainText('bise pitch investisseurs');
         await shot('nothing-found');
       } finally {

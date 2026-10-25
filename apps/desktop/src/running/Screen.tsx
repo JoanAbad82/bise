@@ -323,7 +323,7 @@ function Pane({ x, st, now, where, onTerm, onBack, onStop, onOpen, onFind, find 
           {/* ⌘F's find over the output: the key in its tip (no key line at the foot, bise fait mac §6) */}
           <Press look="run-icon" onClick={onFind} aria-label={running.key_find} data-testid="running.pane.find" {...tipAttrs(running.find_tip)}><AppIcon name="search" size={16} /></Press>
           {u !== null && (
-            <Press look="run-act" onClick={onOpen} data-testid="running.pane.open" {...tipAttrs(u.tip)}>{running.open}</Press>
+            <Press look="run-act" onClick={onOpen} data-testid="running.pane.open" {...tipAttrs(u.tip)}>{running.open}<AppIcon name="open" size={14} /></Press>
           )}
           {st.k === 'running' && (
             <Press
@@ -357,7 +357,7 @@ function Mark({ s }: { s: ReturnType<typeof stateOf> }) {
   if (s.k === 'running' || s.k === 'stopping') return <span className="run-dot" />;
   if (m.tone === 'ink') return <AppIcon name="check" size={14} />;
   if (m.tone === 'err') return <span className="run-err"><AppIcon name="close" size={14} /></span>;
-  return <span className="run-dash" />;
+  return <AppIcon name="fold" size={14} />;
 }
 
 /** One process (ds ListRow): its program in mono and its arguments dimmer, then its agent, its
@@ -383,7 +383,7 @@ function ProcRow({ x, k, on, s, now, home, onClick, onOpen }: {
           {' · '}<span data-testid={`running.row.${k}.end`}>{endWords(x.p, s, now)}</span>
         </>}
         end={<>
-          {on && u !== null && <RowAction onClick={() => { onOpen(u.url); }} tip={u.tip} testId={`running.row.${k}.go`}>{running.open}</RowAction>}
+          {on && u !== null && <RowAction onClick={() => { onOpen(u.url); }} tip={u.tip} testId={`running.row.${k}.go`}>{running.open}<AppIcon name="open" size={14} /></RowAction>}
           <MoreButton menu={menu} testId={`running.row.${k}.more`} />
         </>} />
     </div>

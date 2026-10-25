@@ -91,13 +91,12 @@ for (const theme of ['light', 'dark'] as const) {
         // it fades in late (a quick answer never flashes it)
         await page.waitForTimeout(700);
         await page.screenshot({ path: test.info().outputPath(`processes-${theme}-${String(w)}-quiet.png`) });
-        // one line each: the pane's head and its keys (designer m_41800 #1 #2)
-        for (const id of ['running.pane.meta', 'running.keys']) {
-          // every part it shows on one row: the same top
-          const tops = await page.getByTestId(id).evaluate((e) => Array.from(e.children).filter((c) => (c as HTMLElement).offsetWidth > 0).map((c) => (c as HTMLElement).offsetTop));
-          expect(new Set(tops).size, `${id} on one line`).toBe(1);
-        }
-        await expect(page.getByTestId('running.keys')).toContainText(running.key_back);
+        // one line: the pane's head (designer m_41800 #1 #2); no key line at the foot any more (bise
+        // fait mac §6): ⌘F is the find button's tip
+        const tops = await page.getByTestId('running.pane.meta').evaluate((e) => Array.from(e.children).filter((c) => (c as HTMLElement).offsetWidth > 0).map((c) => (c as HTMLElement).offsetTop));
+        expect(new Set(tops).size, 'running.pane.meta on one line').toBe(1);
+        await expect(page.getByTestId('running.keys')).toHaveCount(0);
+        await expect(page.getByTestId('running.pane.find')).toHaveAttribute('data-tip', running.find_tip);
         // its first bytes: the quiet line goes, the box keeps its size
         await core.send({ ev: 'proc_out', project: ACME, agent: 'perf', id: 'bg5', at: 0, data: b64('  VITE v6.0.1  ready in 412 ms\n'), end: 0 } as never);
         await expect(quiet).toHaveCount(0);

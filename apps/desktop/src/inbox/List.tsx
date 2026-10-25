@@ -238,7 +238,7 @@ function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; projec
   return (
     <div className={`ip-row${answered ? '' : ' gone'}`} data-row={p.key}>
       <ListRow on={on} testId={`inbox.row.${p.key}`} tip={inbox.row_tip_past}
-        state={answered ? <AppIcon name="check" size={14} /> : <span className="ip-dash" />}
+        state={answered ? <AppIcon name="check" size={14} /> : <AppIcon name="fold" size={14} />}
         title={<><span className="ip-who">{shownName(r.asker)}</span><span className="ip-q">{r.question}</span></>}
         sub={<><span data-testid={`inbox.row.${p.key}.said`}>{r.line2}</span>{` · ${project}`}{ms > 0 && ` · ${timeOf(ms)}`}<CardId id={r.card} testId={`inbox.row.${p.key}.id`} /></>}
         onClick={onClick} />

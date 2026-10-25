@@ -17,7 +17,6 @@ export const PENDING_HAND: Readonly<Record<string, number>> = {
   "agents/agents.css": 2,
   "app/app.css": 5,
   "app/palette.css": 2,
-  "artifacts/artifacts.css": 4,
   "bims/office.css": 10,
   "capsule/capsule.css": 1,
   "composer/composer.css": 1,
@@ -36,7 +35,6 @@ export const PENDING_HAND: Readonly<Record<string, number>> = {
 export const PENDING_TYPE: Readonly<Record<string, number>> = {
   "app/app.css": 1,
   "app/palette.css": 2,
-  "artifacts/folders.css": 1,
   "artifacts/thumbs/thumbs.css": 1,
   "bims/office.css": 1,
   "capsule/capsule.css": 2,

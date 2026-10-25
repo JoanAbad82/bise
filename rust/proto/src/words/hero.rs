@@ -11,9 +11,9 @@ crate::words! { hero:
     /// the inbox screen's hero sentence
     inbox_say = "what your agents wait on you for, from every project.";
     /// the scheduled screen's hero sentence
-    scheduled_say = "what runs on its own: a check every few minutes, a morning summary, a wait for a build to end. an agent sets it up; you can stop any of it.";
+    scheduled_say = "what runs on its own: timers and watches your agents set.";
     /// the processes screen's hero sentence
-    processes_say = "what your agents left running on this Mac: dev servers, watchers, long tests. open one to read its output, or stop it.";
+    processes_say = "what your agents left running on this Mac.";
     /// the agents screen's hero sentence
     agents_say = "who works on this project now: main, your lead, and the agents it started, one per job.";
     /// the archived agents screen's hero sentence

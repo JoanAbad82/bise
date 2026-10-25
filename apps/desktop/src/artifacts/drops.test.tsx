@@ -75,7 +75,7 @@ describe('giving files (designer m_23868, m_23898)', () => {
     window.addEventListener('drop', onWindow);
     render(<StoreProvider store={store}><Listed project="shop-1" /></StoreProvider>);
     const add = screen.getByTestId('t.add');
-    expect(add.getAttribute('title')).toBe('add a file to storefront');
+    expect(add.getAttribute('data-tip')).toBe('add a file to storefront');
     await act(async () => {
       fireEvent.click(add);
       await Promise.resolve();
@@ -95,7 +95,7 @@ describe('giving files (designer m_23868, m_23898)', () => {
     bridge();
     const { store } = world();
     render(<StoreProvider store={store}><Listed project="" /></StoreProvider>);
-    expect(screen.getByTestId('t.add').getAttribute('title')).toBe('add a file to bise');
+    expect(screen.getByTestId('t.add').getAttribute('data-tip')).toBe('add a file to bise');
   });
 
   it('no picker in the bridge (a plain browser): no + add', () => {

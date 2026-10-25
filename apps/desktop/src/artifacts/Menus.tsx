@@ -5,9 +5,8 @@
 // Each is the ds PickerPop (the menu law), from the point he clicked or the ··· he pressed.
 // Owner: art-folders.
 import { useRef, type RefObject } from 'react';
-import { PickerPop, type PickerRow } from '@/ds';
+import { AppIcon, PickerPop, type PickerRow } from '@/ds';
 import { library } from '@/proto/words_library.gen';
-import { FolderIcon } from './Column';
 import type { Library } from './folders';
 
 /** Where a menu opens: a point on the screen (a right-click), or a box (a ··· pressed, a card: its rect). */
@@ -102,7 +101,7 @@ export function MergePicker({ at, lib, id, n, onMerge, onClose, testId }: { at: 
     return {
       id: x.id,
       name: x.name,
-      glyph: <FolderIcon />,
+      glyph: <AppIcon name="folder" size={16} />,
       ...(p === null ? {} : { secondary: lib.byId.get(p)?.name ?? '' }),
       ...(i < 9 ? { trailing: String(i + 1) } : {}),
       testId: `${testId}.row.${x.id}`,

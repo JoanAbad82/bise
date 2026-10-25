@@ -120,14 +120,14 @@ export const panel = {
   wt_no_branch: (a: { who: string | number }): string => String(a.who) + ", no branch",
   /** a mark's tip: the PR's or the land's words, then its branch */
   wt_said_on: (a: { said: string | number; g: string | number }): string => String(a.said) + " · " + String(a.g) + " worktree on ",
-  /** the Overview tab's agents label (sentence case, bise fait mac §6) */
-  bar_agents: "Agents",
-  /** the Overview tab's archived agents label */
-  bar_archived: "Archived",
-  /** the Overview tab's artifacts label */
-  bar_artifacts: "Artifacts",
-  /** the Overview tab's scheduled tasks and watches label */
-  bar_scheduled: "Scheduled",
+  /** AGENTS' head */
+  bar_agents: "AGENTS",
+  /** ARCHIVED's head */
+  bar_archived: "ARCHIVED",
+  /** ARTIFACTS' head */
+  bar_artifacts: "ARTIFACTS",
+  /** SCHEDULED & WATCHING's head */
+  bar_scheduled: "SCHEDULED & WATCHING",
   /** a head's link to the full list */
   all: "all ›",
   /** a long section's next page, more than a page left */
@@ -292,66 +292,4 @@ export const panel = {
   tray_on_branch: (a: { branch: string | number }): string => "on " + String(a.branch),
   /** the projects left out of the menu, and where they are (a click opens bise) */
   tray_more: (a: { n: string | number }): string => String(a.n) + " more in bise",
-  /** the panel's first tab: what the right bar was (agents, archived, artifacts, scheduled, processes) */
-  tab_overview: "Overview",
-  /** a tab of the launcher ('+', ⌘T), and its VoiceOver name */
-  tab_new: "New tab",
-  /** a shell's tab: the project it runs in */
-  tab_terminal: (a: { project: string | number }): string => "Terminal · " + String(a.project),
-  /** a project's next shell's tab */
-  tab_terminal_n: (a: { n: string | number; project: string | number }): string => "Terminal " + String(a.n) + " · " + String(a.project),
-  /** a pull request's tab */
-  tab_pr: (a: { number: string | number }): string => "PR #" + String(a.number),
-  /** an agent's changes' tab */
-  tab_changes: (a: { agent: string | number }): string => "Changes · " + String(a.agent),
-  /** a scheduled task's tab */
-  tab_scheduled: "Scheduled task",
-  /** a project's office's tab */
-  tab_office: (a: { project: string | number }): string => "Office · " + String(a.project),
-  /** a tab's × button: its VoiceOver name and tip, with its key */
-  tab_close: (a: { key: string | number }): string => "close tab · " + String(a.key),
-  /** the '+' after the tabs: its tip, with its key */
-  tab_add: (a: { key: string | number }): string => "new tab · " + String(a.key),
-  /** the overflow menu's button past six tabs */
-  tabs_more: (a: { n: number }): string => a.n === 1 ? String(a.n) + " more tab" : String(a.n) + " more tabs",
-  /** the tab strip's VoiceOver name */
-  tabs_label: "panel tabs",
-  /** the bar's panel button: its tip and VoiceOver name, with its key */
-  panel_toggle: (a: { key: string | number }): string => "panel · " + String(a.key),
-  /** the panel's VoiceOver name */
-  panel_label: "panel",
-  /** the panel's border: its VoiceOver name (drag to resize, double click resets) */
-  panel_width: "panel width",
-  /** the search field's placeholder and VoiceOver name */
-  launch_search: "Search artifacts, or enter a URL",
-  /** the launcher's first group */
-  launch_open: "Open",
-  /** the launcher's second group: what he opened last */
-  launch_recent: "Recent",
-  /** an Open row: the project's folder in Finder */
-  launch_files: "Files",
-  /** an Open row: a new shell in a tab */
-  launch_terminal: "Terminal",
-  /** an Open row: the lead's thread beside the one in view */
-  launch_side: "Side thread",
-  /** an Open row: the agent's changes in a tab */
-  launch_changes: "Changes",
-  /** an Open row: the search field takes a URL */
-  launch_browser: "Browser",
-  /** Recent with nothing opened yet */
-  launch_none: "nothing opened yet",
-  /** what the search found: nothing */
-  launch_no_match: "no artifact by that name",
-  /** a recent artifact's line: its kind and who made it */
-  launch_kind_by: (a: { kind: string | number; who: string | number }): string => String(a.kind) + " · " + String(a.who),
-  /** the address bar's back button */
-  addr_back: "back",
-  /** the address bar's forward button */
-  addr_forward: "forward",
-  /** the address bar's reload button */
-  addr_reload: "reload",
-  /** the address bar's ↗: the page in his browser */
-  addr_out: "open in your browser",
-  /** the bar's button over an artifact's tab: the artifact in a window of its own */
-  addr_window: "open in a window",
 } as const;

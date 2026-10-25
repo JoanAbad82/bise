@@ -1,9 +1,6 @@
 // The terminal panel's shells (bar T W25/V13/K26/M16; architect m_10140):
-// `bise pty` children, run by main, never inside ambient-core: a project's
-// first shell (its id the project's) and the next ones the panel's terminal
-// tabs open ('<project>#<n>', lines.ts shellKey). Owner: nm-panel (bise fait
-// mac; amb-win before).
-// A shell is made on the first open of its key and kept while the panel
+// one `bise pty` child per project, run by main, never inside ambient-core.
+// A shell is made on the first open of its project and kept while the panel
 // is hidden or the window closed (⌘W); an open of a live one answers a
 // screen snapshot (`attach`), so the panel redraws whatever runs. At most
 // MAX_SHELLS: the least recently used ends to make room. All end at quit
@@ -27,7 +24,7 @@ import { onCoreEvent } from '../core/ipc';
 import { LineSplitter } from '../helper/lines';
 import { childEnv } from '../childenv';
 import { binPath } from '../paths';
-import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, MAX_SHELLS, MAX_WRITE, ptyBin, shellKey } from './lines';
+import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, MAX_SHELLS, MAX_WRITE, ptyBin } from './lines';
 
 interface Shell {
   readonly id: string;
@@ -89,13 +86,12 @@ export class TermHost {
     return this.rows;
   }
 
-  /** The project's live shell `n` (with its screen), else a new one; an error line when it can't. */
-  async open(project: unknown, cols: unknown, rows: unknown, n?: unknown): Promise<TermOpened> {
+  /** The project's live shell (with its screen), else a new one; an error line when it can't. */
+  async open(project: unknown, cols: unknown, rows: unknown): Promise<TermOpened> {
     const folder = folderOf(project, await this.rowsNow());
-    const key = shellKey(project, n);
-    if (folder === null || key === null) return { error: 'no folder for this project' };
+    if (folder === null || typeof project !== 'string') return { error: 'no folder for this project' };
     const size = clampSize(cols, rows) ?? { cols: 80, rows: 24 };
-    const id = key;
+    const id = project;
     this.lastUse.set(id, Date.now());
     const live = this.shells.get(id);
     if (live?.alive === true) {
@@ -211,7 +207,7 @@ export function startTerms(testMode: boolean, ready?: Promise<void>): TermHost {
   onCoreEvent((ev) => {
     if (ev['ev'] === 'projects' && Array.isArray(ev['projects'])) host.setRows(ev['projects'] as unknown[]);
   });
-  ipcMain.handle(IPC.termOpen, (_e, project: unknown, cols: unknown, rows: unknown, n: unknown) => host.open(project, cols, rows, n));
+  ipcMain.handle(IPC.termOpen, (_e, project: unknown, cols: unknown, rows: unknown) => host.open(project, cols, rows));
   ipcMain.on(IPC.termWrite, (_e, id: unknown, data: unknown) => {
     host.write(id, data);
   });

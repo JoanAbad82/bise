@@ -210,7 +210,7 @@ const api: BiseApi = {
   },
   core: coreBridge(ipcRenderer),
   term: {
-    open: async (project, cols, rows, n) => (await ipcRenderer.invoke(IPC.termOpen, project, cols, rows, n ?? 0)) as TermOpened,
+    open: async (project, cols, rows) => (await ipcRenderer.invoke(IPC.termOpen, project, cols, rows)) as TermOpened,
     write: (id, data) => {
       ipcRenderer.send(IPC.termWrite, id, data);
     },

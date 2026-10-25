@@ -1,29 +1,15 @@
 /* src/artifacts (amb-kit): the artifacts screen, panel A's list, one artifact open (desktop-screens v6,
    designer m_11837). ds tokens only; real px as signed. */
-.art-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s-5) var(--pad-column) 0; box-sizing: border-box; }
+.art-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; }
 /* the screen takes the focus for its keys: never a ring around it (designer m_24208) */
 .art-screen:focus { outline: 0; }
-/* the hero, the filters and the list in one scroller (designer m_39330: the hero scrolls away with
-   the page); in it the list and its drop zone take their height, the scroller scrolls */
-.art-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
+/* the lead, the filters and the cards in one scroller (designer m_39330: the lead scrolls away with
+   the page), the page's sides --pad-column (the cards take the width, mockup 7), 24 under the bar,
+   the floating composer's room at its foot (--float-room); in it the list and its drop zone take
+   their height, the scroller scrolls */
+.art-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; padding: var(--s-6) var(--pad-column) var(--float-room); }
 .art-scroll .art-add-drop, .art-scroll .art-list { flex: none; min-height: 0; overflow: visible; }
-.art-filters { flex: none; display: flex; align-items: center; gap: var(--gap-inline); margin: var(--gap-section) 0 var(--s-2); min-width: 0; }
-.art-kinds { display: inline-flex; gap: var(--gap-inline); }
-.art-kind { height: var(--s-6); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: 999px; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); box-shadow: inset 0 0 0 1px var(--c-line); }
-.art-kind:hover { color: var(--c-text); background: var(--c-hover); }
-.art-kind.on { color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-ink); }
-.art-kind:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
-/* the search keeps the right end of the chips' row: 220, 160 in a narrow window, never wrapped */
-.art-search { margin-left: auto; flex: 0 1 220px; min-width: 120px; }
-@media (max-width: 900px) {
-  /* one row at 800: tighter filters, the search 160 when it fits, never past the edge */
-  .art-filters { gap: var(--s-1); }
-  .art-filters .b-btn.ghost { padding: 0 var(--pad-control-x-sm); }
-  .art-kind { padding: 0 var(--pad-control-x-sm); }
-  .art-search { flex-basis: 160px; min-width: 120px; }
-}
-/* border-box: the field's 10 px sides stay inside its slot (content-box ran 20 px past the edge) */
-.art-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }
+.art-scroll > .b-filter-row + .art-lib { margin-top: var(--s-4); }
 
 .art-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
 .art-day-h { padding: var(--s-4) var(--pad-row-x) var(--gap-tight); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
@@ -47,7 +33,7 @@
 .art-keys { flex: none; display: flex; gap: 3ch; padding: var(--s-2) 0 var(--s-3); border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 .art-keys b { font-weight: 500; color: var(--c-text-2); }
 /* the archived ones left behind (the TUI's faint '2 archived' row): a quiet line, a click shows them */
-.art-archived { flex: none; display: block; width: 100%; padding: var(--s-2); border: 0; background: none; text-align: left; font: var(--t-12) var(--font-ui); color: var(--c-text-3); cursor: pointer; }
+.art-archived { flex: none; display: block; width: 100%; padding: var(--s-2); border: 0; background: none; text-align: left; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 .art-archived:hover { color: var(--c-text-2); text-decoration: underline; text-underline-offset: 3px; }
 .art-archived:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; border-radius: 3px; }
 .art-empty { padding: var(--s-8) var(--pad-row-x); font: var(--t-14) var(--font-read); color: var(--c-text-2); }
@@ -56,11 +42,11 @@
 .art-down-title { font: 600 var(--t-15) var(--font-ui); color: var(--c-text); }
 .art-down-line { max-width: 52ch; font: var(--t-14) var(--font-read); color: var(--c-text-2); }
 .art-down-mono { font: var(--t-13) var(--font-mono); color: var(--c-text-2); }
-.art-down-path { padding: 0; border: 0; background: none; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: var(--c-line); text-underline-offset: 3px; }
+.art-down-path { padding: 0; border: 0; background: none; text-align: left; text-decoration: underline; text-decoration-color: var(--c-line); text-underline-offset: 3px; }
 .art-down-path:hover { color: var(--c-text); }
 .art-down-path:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; border-radius: 3px; }
 /* designer m_38170: a ghost button, 1 px line, r 6, 28 high, 16 px under the line */
-.art-down-again { margin-top: var(--s-2); height: var(--h-control-sm); padding: 0 var(--s-3); border: 1px solid var(--c-line); border-radius: var(--r-1); background: none; font: var(--t-13) var(--font-ui); color: var(--c-text-2); cursor: pointer; }
+.art-down-again { margin-top: var(--s-2); height: var(--h-control-sm); padding: 0 var(--s-3); border: 1px solid var(--c-line); border-radius: var(--r-1); background: none; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
 .art-down-again:hover { color: var(--c-text); background: var(--c-hover); }
 .art-down-again:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; }
 
@@ -110,11 +96,10 @@
 /* a zone under 120 px (the right bar's ARTIFACTS, Drops.tsx SHORT_ZONE_PX): what is under it hides
    whole, its head too; only the words show, centred (designer m_24293) */
 .art-add-drop[data-short] > :not(.art-give) { opacity: 0; }
-.art-add { flex: none; display: inline-flex; }
 /* the hub's live words under the head (art-live, designer m_23868): 28 px, text-2; '← v2' 16 px
    after the line, text-2, underlined on hover */
 .art-live { flex: none; display: flex; align-items: center; gap: var(--s-4); height: var(--h-control-sm); padding: 0 var(--s-4); border-bottom: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); white-space: nowrap; overflow: hidden; }
-.art-live-back { border: 0; padding: 0; background: none; font: inherit; color: var(--c-text-2); cursor: pointer; }
+.art-live-back { border: 0; padding: 0; background: none; font: inherit; color: var(--c-text-2); }
 .art-live-back:hover { text-decoration: underline; text-underline-offset: 3px; }
 .art-live-back:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; border-radius: 3px; }
 /* after 'save a copy…' (art-save): a long folder ellipsizes, 'show in Finder' stays */

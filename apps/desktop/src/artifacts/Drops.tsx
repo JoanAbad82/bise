@@ -7,7 +7,8 @@ import { useCallback, useState, type DragEvent, type ReactNode } from 'react';
 
 /** Under this height a list's drop zone hides what is under it whole (designer m_24293). */
 export const SHORT_ZONE_PX = 120;
-import { Button } from '@/ds';
+import { AppIcon, Button, Press, tipAttrs } from '@/ds';
+import { library } from '@/proto/words_library.gen';
 import { useProjects, useStore } from '@/store';
 import { addDropWords, addPlace, addTitle, carriesFiles, droppedPaths, giveWords, useFileDrag, type AddPlace } from './give';
 
@@ -58,7 +59,7 @@ export function useAddPlace(project: string): AddPlace | null {
 }
 
 /** '+ add' in a list's head: the picker, then each picked file to the place. Hidden without the bridge's picker. */
-export function AddButton({ place, testId, className = 'art-add' }: { place: AddPlace | null; testId: string; className?: string }) {
+export function AddButton({ place, testId, labeled = false }: { place: AddPlace | null; testId: string; labeled?: boolean }) {
   const store = useStore();
   const pick = bridge()?.pickFiles;
   const onClick = useCallback(() => {
@@ -68,12 +69,14 @@ export function AddButton({ place, testId, className = 'art-add' }: { place: Add
     });
   }, [place, pick, store]);
   if (pick === undefined) return null;
-  return (
-    <span className={className}>
-      <Button kind="ghost" size="sm" {...(place === null ? {} : { title: addTitle(place) })} disabled={place === null} onClick={onClick} testId={testId}>
-        + add
-      </Button>
-    </span>
+  const tip = place === null ? library.add_files : addTitle(place);
+  // the empty state's action, in words; in the window's bar, the + alone (mockup 7) with its tip
+  return labeled ? (
+    <Button kind="ghost" size="sm" disabled={place === null} onClick={onClick} testId={testId}>{library.add_files}</Button>
+  ) : (
+    <Press look="art-add" disabled={place === null} onClick={onClick} aria-label={tip} data-testid={testId} {...tipAttrs(tip)}>
+      <AppIcon name="plus" size={16} />
+    </Press>
   );
 }
 

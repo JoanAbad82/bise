@@ -233,11 +233,10 @@ export type TermOpened = { readonly id: string; readonly screen: Uint8Array | nu
  * folder (main finds it in the core's projects rows), kept while the panel is
  * hidden or the window closed. Open again: `screen` holds escape sequences
  * that redraw it as it is (reset the terminal, write them), then `onData`
- * goes on from there. Its id is the project's for its first shell, '<project>#<n>' for the next.
+ * goes on from there. Its id is the project's.
  */
 export interface TermApi {
-  /** the project's shell `n` (0, the default: its first, the bottom panel's; a terminal tab's next ones 1, 2...) */
-  readonly open: (project: string, cols: number, rows: number, n?: number) => Promise<TermOpened>;
+  readonly open: (project: string, cols: number, rows: number) => Promise<TermOpened>;
   /** keys, a paste (UTF-8; ≤ 64 kB a call) */
   readonly write: (id: string, data: string) => void;
   /** the panel's size in cells (clamped 2..500 × 1..200) */

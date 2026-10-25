@@ -1,12 +1,9 @@
-// The terminal (bar T W25/V13/K26/M16): a real shell in the project's folder
-// (main runs it: src/main/term, `bise pty`), drawn by xterm, in a tab of the
-// tabbed panel on the right (his pref, the default: TerminalTab, several shells
-// per project), or in the panel under the screen after 'move to bottom'
-// (TerminalPanel, the project's first shell). ⌃` (or View > Terminal) shows and
-// hides it where it lives; hidden, it stays mounted and its shell runs on, so
-// showing it again is the same shell. Drag the bottom panel's top edge to
-// resize. While it has the focus every key is the shell's except ⌘ keys (⌘C /
-// ⌘V copy and paste, ⌘W) and ⌃`. Owner: nm-panel (bise fait mac; amb-win before).
+// The terminal panel under the screen (bar T W25/V13/K26/M16): a real shell
+// in the project's folder (main runs it: src/main/term, `bise pty`), drawn by
+// xterm. ⌃` (or View > Terminal) shows and hides it; hidden, it stays mounted
+// and its shell runs on, so showing it again is the same shell. Drag its top
+// edge to resize. While it has the focus every key is the shell's except ⌘
+// keys (⌘C / ⌘V copy and paste) and ⌃`. Owner: amb-win.
 import { memo, useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { Terminal as Xterm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -17,16 +14,12 @@ import { useProjects } from '@/store';
 import './terminal.css';
 import { Press } from '@/ds';
 
-/** The bottom panel for the project in view; nothing until it was first shown, nor while the terminal lives on the right. */
+/** The panel for the project in view; nothing until it was first shown. */
 export const TerminalPanel = memo(function TerminalPanel({ project }: { project: string | undefined }) {
   const p = usePanel();
   const folder = useProjects().find((x) => x.project === project)?.path ?? '';
   const box = useRef<HTMLDivElement>(null);
-  // ⌃` on the right opens the shell of the project in view
-  useEffect(() => {
-    panel.setHere(project);
-  }, [project]);
-  if (!p.opened || project === undefined || p.place !== 'bottom') return null;
+  if (!p.opened || project === undefined) return null;
   return (
     <section
       ref={box}
@@ -51,24 +44,10 @@ export const TerminalPanel = memo(function TerminalPanel({ project }: { project:
         </Press>
       </div>
       {/* one shell view per project: another project's shell runs on in main */}
-      <ShellView key={project} project={project} n={0} shown={p.shown} />
+      <ShellView key={project} project={project} shown={p.shown} />
     </section>
   );
 });
-
-/** A shell in a tab of the panel: the project's shell `n`, kept running while another tab is in front. */
-export function TerminalTab({ project, n, shown }: { project: string; n: number; shown: boolean }) {
-  return (
-    <section className="term-tab" data-testid="terminal.tab" data-project={project} data-n={n} hidden={!shown}>
-      <ShellView project={project} n={n} shown={shown} />
-    </section>
-  );
-}
-
-/** A shell's id in main (main/term/lines.ts shellKey): the project's for its first, '<project>#<n>' after. Pure. */
-export function shellIdOf(project: string, n: number): string {
-  return n === 0 ? project : `${project}#${String(n)}`;
-}
 
 /** The top edge: drag it up for a taller panel (M16). */
 function Grip({ box }: { box: React.RefObject<HTMLDivElement | null> }) {
@@ -95,8 +74,8 @@ function Grip({ box }: { box: React.RefObject<HTMLDivElement | null> }) {
 
 type Life = { s: 'opening' } | { s: 'live' } | { s: 'failed'; why: string } | { s: 'ended'; code: number | null };
 
-/** One shell drawn by xterm: opened at mount, its screen redrawn from main's snapshot. */
-function ShellView({ project, n, shown }: { project: string; n: number; shown: boolean }) {
+/** One project's shell drawn by xterm: opened at mount, its screen redrawn from main's snapshot. */
+function ShellView({ project, shown }: { project: string; shown: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const live = useRef<{ term: Xterm; fit: () => void; restart: () => void } | null>(null);
   const [life, setLife] = useState<Life>({ s: 'opening' });
@@ -111,7 +90,7 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
     const term = new Xterm({
       fontFamily: cssVar('--font-mono') || 'ui-monospace, Menlo, monospace',
       fontSize: 12,
-      lineHeight: 1.5,
+      lineHeight: 1.2,
       cursorBlink: true,
       scrollback: 5000,
       theme: themeOf(),
@@ -133,21 +112,20 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
         // not laid out yet
       }
     };
-    const mine = shellIdOf(project, n);
     const offData = api.onData((from, bytes) => {
-      if (from !== mine) return;
+      if (from !== project) return;
       if (id === undefined) early.push(bytes);
       else term.write(bytes);
     });
     const offExit = api.onExit((from, code) => {
-      if (from !== mine || gone) return;
+      if (from !== project || gone) return;
       id = undefined;
       setLife({ s: 'ended', code });
     });
     const open = async () => {
       fit();
       setLife({ s: 'opening' });
-      const r = await api.open(project, term.cols, term.rows, n);
+      const r = await api.open(project, term.cols, term.rows);
       if (gone) return;
       if ('error' in r) {
         setLife({ s: 'failed', why: r.error });
@@ -193,7 +171,7 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
       term.dispose();
       live.current = null;
     };
-  }, [project, n]);
+  }, [project]);
 
   // shown: fit to the panel and take the keys; hidden: give them back to the screen
   useEffect(() => {

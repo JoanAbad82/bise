@@ -116,8 +116,8 @@ crate::words! { running:
     ended_no_open = "it has ended: nothing to open.";
 
     // ---- the desktop (apps/desktop/src/running, the right bar)
-    /// the Overview tab's processes label (sentence case, bise fait mac §6)
-    bar = "Processes";
+    /// the right bar's section head (`PROCESSES · 2`)
+    bar = "PROCESSES";
     /// the right bar's scope line on an agent's thread: `by perf`
     by(agent) = "by {agent}";
     /// ⌘K's row for the screen: the words it is found by too
@@ -127,7 +127,7 @@ crate::words! { running:
     /// the search field's placeholder (`/` focuses it)
     search = "search";
     /// the output's head: open its address
-    open = "open ↗";
+    open = "open";
     /// the tip of a thread's `$` row whose command runs in the background (`∿ 14 min`)
     tip_thread_row = "open its output";
     /// the output's head: stop it

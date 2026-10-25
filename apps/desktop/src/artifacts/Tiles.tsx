@@ -4,10 +4,10 @@
 // its menu. The cover's pictures are the grid's thumbnails (art-thumbs' Thumb, through `thumb`).
 // The pink dot when something new is inside. A pure render of its props. Owner: art-folders.
 import type { MouseEvent, ReactNode } from 'react';
-import { Press, tipAttrs } from '@/ds';
+import { AppIcon, Press, tipAttrs } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { countWords, type Count, type Folder } from './folders';
-import { FolderIcon, type DropTarget } from './Column';
+import type { DropTarget } from './Column';
 import type { Item } from './model';
 
 export interface TileProps {
@@ -44,7 +44,7 @@ export function BigTile(p: TileProps) {
         {cover.map((it) => (
           <span key={`${it.project}/${it.a.id}`} className="pic">{p.thumb?.(it)}</span>
         ))}
-        {cover.length === 0 && <span className="pic none"><FolderIcon /></span>}
+        {cover.length === 0 && <span className="pic none"><AppIcon name="folder" size={16} /></span>}
       </span>
       <span className="nm">
         <span className="t" {...tipAttrs(p.folder.name)}>{p.folder.name}</span>
@@ -64,7 +64,7 @@ export function FolderListRow(p: TileProps) {
   return (
     <Press look="art-frow" onClick={p.onOpen} onContextMenu={(e) => { e.preventDefault(); p.onMenu(e); }}
       data-over={p.drop?.over === p.folder.id || undefined} data-testid={p.testId} {...dropProps(p.drop, p.folder.id)}>
-      <FolderIcon />
+      <AppIcon name="folder" size={16} />
       <span className="t" {...tipAttrs(p.folder.name)}>{p.folder.name}</span>
       {fresh > 0 ? <span className="dot" {...tipAttrs(library.tip_new_dot({ n: fresh }))} /> : <span />}
       <span className="ct" data-flash={p.flash || undefined}>{(p.count?.total ?? 0) === 0 ? library.tile_empty : countWords(p.count)}</span>
@@ -79,7 +79,7 @@ export function SmallTile(p: TileProps) {
   return (
     <Press look="art-tile small" onClick={p.onOpen} onContextMenu={(e) => { e.preventDefault(); p.onMenu(e); }}
       data-over={p.drop?.over === p.folder.id || undefined} data-testid={p.testId} {...dropProps(p.drop, p.folder.id)}>
-      <FolderIcon />
+      <AppIcon name="folder" size={16} />
       <span className="t" {...tipAttrs(p.folder.name)}>{p.folder.name}</span>
       <span className="end" data-flash={p.flash || undefined}>
         {fresh > 0 && <span className="dot" {...tipAttrs(library.tip_new_dot({ n: fresh }))} />}

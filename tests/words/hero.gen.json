@@ -85,7 +85,7 @@
   "hero.processes_say": {
     "args": [],
     "one": null,
-    "text": "what your agents left running on this Mac: dev servers, watchers, long tests. open one to read its output, or stop it."
+    "text": "what your agents left running on this Mac."
   },
   "hero.prs_say": {
     "args": [],
@@ -102,7 +102,7 @@
   "hero.scheduled_say": {
     "args": [],
     "one": null,
-    "text": "what runs on its own: a check every few minutes, a morning summary, a wait for a build to end. an agent sets it up; you can stop any of it."
+    "text": "what runs on its own: timers and watches your agents set."
   },
   "hero.update_log_say": {
     "args": [],

@@ -4,13 +4,12 @@
 // head (title, version menu, '↗ browser', ⋯, ✕), then the page from the pages server, 16 px in on
 // a 3% backdrop. A link inside the page goes to his browser (the shell's guard, main's
 // framelink.ts); one that names another artifact opens it here (links.ts). The composer's
-// words come from maker.ts. `bare`: no head, for a panel tab's address bar (bise fait mac,
-// nm-panel's Browser.tsx), which picks the version with ArtifactVersions. Owner: amb-kit (the list, the model); task-panel (the open view).
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+// words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { APP_FRAME_NAME } from './frameNote';
 import { useFrameNote } from './useFrameNote';
 import { Button, IconButton, PickerPop, PickerTrigger, Press } from '@/ds';
-import type { Artifact, ArtifactLive } from '@/proto';
+import type { ArtifactLive } from '@/proto';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useProjects, useStore } from '@/store';
 import { downWords, probed, useReach, type DownWords } from './reach';
@@ -302,36 +301,6 @@ export interface ArtifactOpenProps {
   composer?: boolean;
   /** before the title in its head: under 1000 px the frame's '◧ <maker>' that slides the maker's thread over (amb-win) */
   lead?: ReactNode;
-  /** no head: a panel tab draws its own address bar over the page (bise fait mac, app/panel/Browser.tsx) */
-  bare?: boolean;
-  /** the version shown, when the frame picks it (its own ArtifactVersions); absent: the head's own pick */
-  version?: number;
-}
-
-/**
- * An artifact's versions picker (the head's 'page · v2 ⌄' menu, and a panel tab's address): every
- * version with its words and age, the one shown checked; a pick says which.
- */
-export function ArtifactVersions({ a, shown, now, anchor, onPick, onClose }: {
-  a: Artifact;
-  shown: number;
-  now: number;
-  anchor: RefObject<HTMLElement | null>;
-  onPick: (v: number) => void;
-  onClose: () => void;
-}) {
-  return (
-    <PickerPop anchor={anchor} align="end" onClose={onClose} testId="artifact.versions"
-      groups={[{ id: 'versions', rows: versions(a, now).map((r) => ({
-        id: String(r.v),
-        text: `v${String(r.v)}`,
-        name: <><span className="art-v">{`v${String(r.v)}`}</span><span className="art-v-words">{r.words}</span></>,
-        trailing: r.when,
-        current: r.v === shown,
-        testId: `artifact.versions.v${String(r.v)}`,
-      })) }]}
-      onPick={(id) => { onPick(Number(id)); }} />
-  );
 }
 
 /**
@@ -343,7 +312,7 @@ export function ArtifactVersions({ a, shown, now, anchor, onPick, onClose }: {
  * (maker.ts: the project's main when the maker is archived); the frame draws it under the
  * maker's thread, so here only with `composer`.
  */
-export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare = false, version }: ArtifactOpenProps) {
+export function ArtifactOpen({ project, id, onClose, composer = true, lead }: ArtifactOpenProps) {
   const router = useRouter();
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
   // 'v' on a row of the list opens it with its versions shown
@@ -354,8 +323,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
   const versionsAt = useRef<HTMLButtonElement>(null);
   const moreAt = useRef<HTMLButtonElement>(null);
   const [at] = useState(() => takeAnchor(`${project}/${id}`));
-  const [own, setV] = useState<number | null>(() => takeVersion(`${project}/${id}`));
-  const v = version ?? own;
+  const [v, setV] = useState<number | null>(() => takeVersion(`${project}/${id}`));
   // a link in the page that names another artifact: the panel opens it (links.ts)
   useArtifactLinks(project);
   // the live line he moved away from (another version picked): it goes; a new line shows again
@@ -444,8 +412,8 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
   const finder = bise?.showInFinder;
   const canSave = toSave !== null && bise?.saveCopy !== undefined;
   return (
-    <section className="art-open" data-testid="artifact.open" data-agent={a.agent} data-bare={bare || undefined} onKeyDown={onKeyDown}>
-      {!bare && <div className="art-open-head" data-testid="artifact.head">
+    <section className="art-open" data-testid="artifact.open" data-agent={a.agent} onKeyDown={onKeyDown}>
+      <div className="art-open-head" data-testid="artifact.head">
         {lead}
         <span className="art-open-title" data-testid="artifact.title" title={a.title}>{a.title}</span>
         <span className="art-open-end">
@@ -453,8 +421,16 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
             {`${kindOf(a.kind)} · v${String(shown)}`}
           </PickerTrigger>
           {menu === 'versions' && (
-            <ArtifactVersions a={a} shown={shown} now={now} anchor={versionsAt} onClose={closeMenu}
-              onPick={(n) => { setV(n); setMenu(null); setGoneLine(a.live?.line ?? null); setSaved(null); }} />
+            <PickerPop anchor={versionsAt} align="end" onClose={closeMenu} testId="artifact.versions"
+              groups={[{ id: 'versions', rows: versions(a, now).map((r) => ({
+                id: String(r.v),
+                text: `v${String(r.v)}`,
+                name: <><span className="art-v">{`v${String(r.v)}`}</span><span className="art-v-words">{r.words}</span></>,
+                trailing: r.when,
+                current: r.v === shown,
+                testId: `artifact.versions.v${String(r.v)}`,
+              })) }]}
+              onPick={(id) => { setV(Number(id)); setMenu(null); setGoneLine(a.live?.line ?? null); setSaved(null); }} />
           )}
           {out !== null && (
             <Button kind="ghost" size="sm" onClick={() => { openChecked(out, bise, again); }} testId="artifact.browser" title="open in browser">
@@ -483,7 +459,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
           )}
           {x}
         </span>
-      </div>}
+      </div>
       <LiveStrip live={a.live ?? null} gone={goneLine} onBack={(back, line) => { setV(back); setGoneLine(line); setSaved(null); }} />
       <SavedStrip saved={saved} home={bise?.home} onReveal={finder === undefined ? undefined : (to) => { void finder(to); }} />
       <div className="art-open-body">
