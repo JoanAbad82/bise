@@ -30,6 +30,7 @@ import { ABOUT_HEAD } from '@/artifacts/maker';
 import { otherTip } from '@/app/tipwords';
 import { aboutParts, aboutText } from './about';
 import { composer } from '../proto/words.gen';
+import { useHomeShows } from '@/composer/home/Home';
 
 /**
  * The thread's composer, also mounted under an open artifact (amb-kit's src/artifacts/Open.tsx,
@@ -106,6 +107,8 @@ export const ThreadComposer = memo(function ThreadComposer({
 }) {
   const store = useStore();
   const router = useRouter();
+  // main's empty thread (composer/home): the strip says 'new worktree', the field the home's words
+  const home = useHomeShows(threadKey(project, agent), agent) && !floating && about === undefined && answer === null && !voiceTyping;
   // TP-R6 (amb-web's composer/approvals.ts): ⇧⇥ switches the hub's approvals mode yolo ↔ auto like
   // the TUI; for 3 s after a switch the label line's right says it (the TUI's key bar flash)
   const approvals = useApprovals(project);
@@ -396,7 +399,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     router.go({ screen: 'thread', project: p, agent: MAIN });
   }, [router]);
   const stripProject = useMemo(() => strip ?? { id: project, onPick: goProject }, [strip, project, goProject]);
-  const tabEl = <ComposerTab words={tabWords} bare={bare || atTo !== null} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} project={stripProject} newPlace={placeOnly} testId="composer.ctx" />;
+  const tabEl = <ComposerTab words={tabWords} bare={bare || atTo !== null} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} project={stripProject} newPlace={placeOnly || home} testId="composer.ctx" />;
   // the one notice at the strip's right (noticeOf): it goes at his first key in the frame (esc
   // too), at any send or command, a note also after LINE_MS; never outlives his next message,
   // never moves the composer (designer m_29135)
@@ -418,7 +421,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   useEffect(() => {
     doneRef.current = lineDone;
   });
-  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={floating ? undefined : tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={floating ? undefined : tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={home ? composer.home_placeholder : placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
   return field;
 });
 

@@ -405,7 +405,7 @@ describe("a project's welcome in main's empty thread (page new-project-home, pic
     });
   };
 
-  it("shows while he said nothing: the legend 1, 2, 3, the lead's first message, the ideas; not in another agent's thread", () => {
+  it("shows while he said nothing: the empty home's question and ideas on it, the legend 1, 2, 3, the lead's first message; not in another agent's thread", () => {
     const store = new Store(null);
     act(() => {
       store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('old', { archived: true })] });
@@ -414,7 +414,8 @@ describe("a project's welcome in main's empty thread (page new-project-home, pic
     const v = screen(store);
     expect(v.getByTestId('welcome.legend').textContent).toContain('bise, your team lead');
     expect(v.getByTestId('welcome.hi').textContent).toContain(`hi, i'm the lead for ${P}.`);
-    expect(v.getByTestId('welcome.idea.2').textContent).toBe('show me what you can do');
+    expect(v.getByTestId('composer.home.idea.2').textContent).toBe('show me what you can do');
+    expect(v.getByTestId('welcome').contains(v.getByTestId('composer.home')), 'the home sits on the welcome').toBe(true);
     expect(v.queryByTestId('setup.firstrun')).toBeNull();
     cleanup();
     expect(screen(store, 'old').queryByTestId('welcome')).toBeNull();

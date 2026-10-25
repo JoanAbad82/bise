@@ -337,7 +337,7 @@
 .b-composer .box.ans .cmp-ctx.bare .who {
   font-weight: 600;
 }
-.b-composer .box.ans > .head {
+.b-composer .box.ans:not(.quiet) > .head {
   background: color-mix(in srgb, var(--c-accent) 7%, transparent);
 }
 /* the one-off notice at the strip's right (Composer NoticeLine, notice.ts: a refused command, the

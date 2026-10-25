@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppIcon, PickerPop, PickerTrigger, Press, tipAttrs } from '@/ds';
 import { InboxBlock, type Answering } from '@/inbox';
 import { shownName } from '@/agents/model';
-import { threadKey, useAgents, useProjects, useStore } from '@/store';
+import { threadKey, useAgents, useProjects, useStore, useThreadOrder } from '@/store';
 import { MAIN } from '@/app/route';
 import { useRoute } from '@/app/router';
 import { useSideLayout } from '@/app/side3d/place';
@@ -98,11 +98,40 @@ function Float({ to: def }: { to: FloatTo }) {
       window.removeEventListener('pointerdown', down, true);
     };
   }, [state, go]);
+  // esc while the focus is outside it (an item's card closed by its own esc, a click on the page):
+  // the float folds, never the page behind (esc-up.ts); inside, its own onKeyDown does it, after
+  // the field's lists; an open item takes its own esc first (the inbox block's)
+  useEffect(() => {
+    if (state === 'rest' || answering !== null) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || root.current?.contains(e.target as Node) === true) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      fold('esc');
+    };
+    window.addEventListener('keydown', key, true);
+    return () => {
+      window.removeEventListener('keydown', key, true);
+    };
+  }, [state, answering, fold]);
+  // the mini thread: the addressee's rows; none yet, one line and the float holds only it
+  const tkey = threadKey(project, agent);
+  const order = useThreadOrder(tkey);
+  const empty = order.loaded && order.order.length === 0;
+  // open, it holds the addressee's thread as a thread screen does (the store pages it in)
+  const open = state === 'open';
+  useEffect(() => {
+    if (!open) return;
+    store.subscribeThread(project, agent);
+    return () => {
+      store.unsubscribeThread(project, agent);
+    };
+  }, [open, store, project, agent]);
   // centred on the content's column, not the window (nm-side's one sideLayout, page native-mac §6)
   const col = useSideLayout();
   const listRef = useRef<ThreadListHandle | null>(null);
   return (
-    <div ref={root} className="cmp-float" data-state={state} data-testid="composer.float" data-project={project} data-agent={agent}
+    <div ref={root} className="cmp-float" data-state={state} data-empty={(state === 'open' && empty) || undefined} data-testid="composer.float" data-project={project} data-agent={agent}
       role="region" aria-label={composer.float_name} style={{ left: col.colLeft + col.colW / 2 }}
       onFocus={() => {
         go('focus');
@@ -115,8 +144,6 @@ function Float({ to: def }: { to: FloatTo }) {
         e.stopPropagation();
         fold('esc');
       }}>
-      {/* an item opened here (^1-3, ⌘I): its card and answer buttons, as the dock's (designer m_25639) */}
-      <InboxBlock here={isHome && agent === MAIN ? HERE_BISE : { project, agent }} onAnswer={onAnswer} rest="open-only" />
       {state !== 'rest' && (
         <div className="hd" data-testid="composer.float.head">
           <Press look="cmp-tool" aria-label={composer.float_fold} {...tipAttrs(composer.float_fold, 'esc')} data-testid="composer.float.fold"
@@ -139,11 +166,16 @@ function Float({ to: def }: { to: FloatTo }) {
           </Press>
         </div>
       )}
-      {state === 'open' && (
-        <div className="body" data-testid="composer.float.thread">
-          <Rows tkey={threadKey(project, agent)} project={project} agent={agent} bise={isHome && agent === MAIN} listRef={listRef} />
-        </div>
-      )}
+      {/* an item opened here (^1-3, ⌘I): under the head, flat in the float, its answer buttons as the dock's (designer m_25639) */}
+      <InboxBlock here={isHome && agent === MAIN ? HERE_BISE : { project, agent }} onAnswer={onAnswer} rest="open-only" />
+      {state === 'open' &&
+        (empty ? (
+          <p className="body-empty" data-testid="composer.float.thread.empty">{composer.float_empty({ agent: name })}</p>
+        ) : (
+          <div className="body" data-testid="composer.float.thread">
+            <Rows tkey={tkey} project={project} agent={agent} bise={isHome && agent === MAIN} listRef={listRef} />
+          </div>
+        ))}
       <ThreadComposer
         project={project}
         agent={agent}

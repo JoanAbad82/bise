@@ -398,6 +398,24 @@ export const composer = {
   float_close: "hide the thread",
   /** the floating composer, for VoiceOver */
   float_name: "composer",
+  /** the floating composer's mini thread with nothing in it yet */
+  float_empty: (a: { agent: string | number }): string => "nothing with " + String(a.agent) + " yet",
+  /** the empty home's question on a project's main, its project a picker */
+  home_question: (a: { project: string | number }): string => "what should we build in " + String(a.project) + "?",
+  /** the empty home's question on bise's own main */
+  home_question_bise: "what should we work on?",
+  /** the empty home's line: who works */
+  home_working: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent working" : String(a.n) + " agents working",
+  /** the empty home's line: what waits */
+  home_waits: (a: { n: number }): string => a.n === 1 ? String(a.n) + " waits for you" : String(a.n) + " wait for you",
+  /** the empty home's line: no agent yet */
+  home_quiet: "no agent working yet",
+  /** the empty home's composer */
+  home_placeholder: "ask bise anything, or start an agent",
+  /** the empty home's project picker: its name and tip */
+  home_pick: (a: { project: string | number }): string => String(a.project) + " · pick another project",
+  /** the empty home's suggestions, for VoiceOver */
+  home_ideas: "ideas",
   /** the context ring's tip */
   ring_tip: (a: { pct: string | number; agent: string | number; tokens: string | number }): string => String(a.pct) + "% of " + String(a.agent) + "'s context used · " + String(a.tokens) + " tokens · compacts at 90%",
   /** ctrl+1 with nothing in the inbox */

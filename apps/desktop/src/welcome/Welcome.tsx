@@ -4,11 +4,12 @@
 // stacked (his note n1: no room for 3 columns on a small screen); then the lead's first message,
 // written by the app (no model call), and three ideas that fill the composer (never a send).
 // The office can't draw (WebGL lost, renderer failed): B's three pictures instead. Shown while
-// rule.ts says so; at his first message it docks into the right bar (dock.ts). Owner: project-home.
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { Press } from '@/ds';
+// rule.ts says so; at his first message it docks into the right bar (dock.ts). Since bise fait mac
+// the empty home (composer/home, designer's pick (c)) sits on it: the question and the ideas are
+// the home's, the office the picture under them, with no call to action of its own. Owner:
+// nm-composer (native-lead m_42546).
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { reducedMotion } from '@/ds/hooks';
-import type { ComposerActions } from '@/composer';
 import { thread } from '@/proto/words_thread.gen';
 import { composer as composerWords } from '@/proto/words_composer.gen';
 import { useAgents, useCards, useGrowth, usePending, usePlaces, usePrefs, useProjects, useStore, useThreadOrder } from '@/store';
@@ -36,7 +37,7 @@ const LEGEND = [
   [thread.welcome_inbox_head, thread.welcome_inbox_says],
 ] as const;
 
-/** the ideas, put in the composer as the first run's demo is */
+/** the ideas, put in the composer as the first run's demo is (the empty home's, composer/home) */
 export const IDEAS = [thread.welcome_idea_tests, thread.welcome_idea_repo, composerWords.demo] as const;
 
 /** The office's width over its height while it loads (its first frame sets its own). */
@@ -47,7 +48,8 @@ const OFFICE_MAX_W = 440;
 interface WelcomeProps {
   project: string;
   name: string;
-  onIdea: (text: string) => void;
+  /** over the office: the empty home (composer/home), none: the office first */
+  head?: ReactNode;
   /** the welcome's root and its office's holder, the office's snapshot: the dock reads them */
   rootRef?: RefObject<HTMLDivElement | null>;
   mapRef?: RefObject<HTMLDivElement | null>;
@@ -58,7 +60,7 @@ interface WelcomeProps {
   centred?: boolean;
 }
 
-export function Welcome({ project, name, onIdea, rootRef, mapRef, snapRef, docking = false, centred = true }: WelcomeProps) {
+export function Welcome({ project, name, head, rootRef, mapRef, snapRef, docking = false, centred = true }: WelcomeProps) {
   const agents = useAgents(project);
   const live = agents.filter((a) => !a.archived);
   const cards = useCards(project);
@@ -79,6 +81,7 @@ export function Welcome({ project, name, onIdea, rootRef, mapRef, snapRef, docki
   const width = room === null ? 0 : Math.min(OFFICE_MAX_W, Math.floor(room * ratio));
   return (
     <div className="welcome" ref={root} data-testid="welcome" data-office={drawn ? state : 'lost'} data-room={room === null ? 'none' : undefined}>
+      {head}
       {drawn ? (
         room !== null && (
         <div className="welcome-map" ref={mapBox} data-dock="map" aria-label={thread.welcome_office} style={{ maxWidth: `${String(width)}px`, aspectRatio: state === 'loading' ? String(MAP_RATIO) : undefined }}>
@@ -113,24 +116,6 @@ export function Welcome({ project, name, onIdea, rootRef, mapRef, snapRef, docki
         ))}
       </ol>
       <LeadHi name={name} testId="welcome.hi" />
-      <div className="welcome-ideas">
-        {IDEAS.map((idea, i) => (
-          <Press
-            key={idea}
-            look="welcome-idea"
-            // keep the composer's focus and selection: the click must not blur it first
-            onMouseDown={(e) => {
-              e.preventDefault();
-            }}
-            onClick={() => {
-              onIdea(idea);
-            }}
-            data-testid={`welcome.idea.${String(i)}`}
-          >
-            {idea}
-          </Press>
-        ))}
-      </div>
       </div>
     </div>
   );
@@ -218,7 +203,7 @@ export function IntroRow({ project }: { project: string }) {
  * The welcome in main's thread of a project (not bise's own): while rule.ts says so, and for its
  * dock once his first message leaves (the bar's office turns on, as the cube does).
  */
-export function WelcomeSlot({ tkey, project, composer }: { tkey: string; project: string; composer: RefObject<ComposerActions | null> }) {
+export function WelcomeSlot({ tkey, project, head }: { tkey: string; project: string; head?: ReactNode }) {
   const store = useStore();
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
@@ -252,7 +237,8 @@ export function WelcomeSlot({ tkey, project, composer }: { tkey: string; project
       cancelAnimationFrame(raf);
     };
   }, [leaving]);
-  if (!shows && !leaving) return null;
+  // no welcome (main has agents already): the home alone, in the slot's centre
+  if (!shows && !leaving) return head == null ? null : <div className="th-first th-home" data-testid="thread.first">{head}</div>;
   const centred = view.order.length === 0;
   return (
     <div className={centred ? 'th-first th-welcome' : 'th-first th-welcome after'} data-testid="thread.first">
@@ -264,9 +250,7 @@ export function WelcomeSlot({ tkey, project, composer }: { tkey: string; project
         snapRef={snap}
         docking={leaving}
         centred={centred}
-        onIdea={(text) => {
-          composer.current?.fill(text);
-        }}
+        head={head}
       />
     </div>
   );

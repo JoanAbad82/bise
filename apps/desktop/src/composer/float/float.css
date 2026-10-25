@@ -32,6 +32,16 @@
   height: min(var(--float-h-open), var(--float-max-h));
   box-shadow: var(--e-3);
 }
+/* open with nothing in the thread yet: one line over the field, no blank glass */
+.cmp-float[data-state='open'][data-empty] {
+  height: auto;
+}
+.cmp-float .body-empty {
+  margin: 0;
+  padding: var(--s-4);
+  font: var(--f-ui);
+  color: var(--c-text-3);
+}
 /* the head: ─ 28, 'to bise ⌄' 13/500, the grip at its right; a rule under it */
 .cmp-float .hd {
   flex: none;
@@ -61,6 +71,25 @@
 }
 .cmp-float .hd .cmp-float-ans.acc {
   color: var(--c-accent);
+}
+/* ─ and the grip: 28 square icon buttons, the 6% hover (their tips say what they do) */
+.cmp-float .hd .cmp-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-control-sm);
+  height: var(--h-control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--c-text-2);
+}
+.cmp-float .hd .cmp-tool:hover,
+.cmp-float .hd .cmp-tool[aria-expanded='true'] {
+  background: var(--c-hover);
+  color: var(--c-text);
 }
 .cmp-float .hd .grip {
   margin-left: auto;
@@ -121,7 +150,12 @@
 .cmp-float .b-composer .in .b-field {
   max-height: calc(var(--float-max-h) / 2);
 }
-/* the inbox item opened here (^1-3, ⌘I): over the head, inside the float's frame */
+/* the inbox item opened here (^1-3, ⌘I): under the head, flat in the float (never a frame in a
+   frame), a rule between it and the field */
 .cmp-float .inbox-block {
-  margin: var(--s-2) var(--s-2) 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: inset 0 -1px 0 var(--c-line);
 }

@@ -160,6 +160,8 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   testId: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
+  // the empty home: the project's own branch (where main starts its worktrees from)
+  const projectBranch = useProjects().find((p) => p.project === project?.id)?.branch ?? undefined;
   const [fit, setFit] = useState<StripFit>(ALL);
   // the label cut after a whole word when even alone it doesn't fit (designer m_24325); null: whole
   const [cut, setCut] = useState<string | null>(null);
@@ -236,7 +238,7 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
       </span>
     );
   }
-  const branch = newPlace ? undefined : place?.branch;
+  const branch = newPlace ? projectBranch : place?.branch;
   return (
     <span ref={ref} className="cmp-ctx" data-testid={testId}>
       {project !== undefined && <ProjectItem project={project} shown={fit.project} testId={testId} />}

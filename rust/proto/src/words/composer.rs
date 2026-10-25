@@ -409,7 +409,7 @@ crate::words! { composer:
     tab_worktree_on(branch) = "ψ worktree, on {branch}";
     /// the tab's place tip: his checkout
     tab_own_folder(path) = "your own folder: {path}";
-    // ---- the context strip and the floating composer (bise fait mac, nm-composer)
+    // ---- the context strip, the floating composer and the empty home (bise fait mac, nm-composer)
 
     /// the strip's place: his own checkout
     ctx_local = "local";
@@ -441,6 +441,24 @@ crate::words! { composer:
     float_close = "hide the thread";
     /// the floating composer, for VoiceOver
     float_name = "composer";
+    /// the floating composer's mini thread with nothing in it yet
+    float_empty(agent) = "nothing with {agent} yet";
+    /// the empty home's question on a project's main, its project a picker
+    home_question(project) = "what should we build in {project}?";
+    /// the empty home's question on bise's own main
+    home_question_bise = "what should we work on?";
+    /// the empty home's line: who works
+    home_working(n) = one "{n} agent working" | "{n} agents working";
+    /// the empty home's line: what waits
+    home_waits(n) = one "{n} waits for you" | "{n} wait for you";
+    /// the empty home's line: no agent yet
+    home_quiet = "no agent working yet";
+    /// the empty home's composer
+    home_placeholder = "ask bise anything, or start an agent";
+    /// the empty home's project picker: its name and tip
+    home_pick(project) = "{project} · pick another project";
+    /// the empty home's suggestions, for VoiceOver
+    home_ideas = "ideas";
     /// the context ring's tip
     ring_tip(pct, agent, tokens) = "{pct}% of {agent}'s context used · {tokens} tokens · compacts at 90%";
     /// ctrl+1 with nothing in the inbox

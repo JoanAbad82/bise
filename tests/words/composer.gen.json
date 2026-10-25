@@ -598,6 +598,13 @@
     "one": null,
     "text": "hide the thread"
   },
+  "composer.float_empty": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "nothing with {agent} yet"
+  },
   "composer.float_fold": {
     "args": [],
     "one": null,
@@ -697,6 +704,54 @@
     ],
     "one": null,
     "text": "you're in yolo: agents run commands without asking. {switch_key} changes it."
+  },
+  "composer.home_ideas": {
+    "args": [],
+    "one": null,
+    "text": "ideas"
+  },
+  "composer.home_pick": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "{project} · pick another project"
+  },
+  "composer.home_placeholder": {
+    "args": [],
+    "one": null,
+    "text": "ask bise anything, or start an agent"
+  },
+  "composer.home_question": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "what should we build in {project}?"
+  },
+  "composer.home_question_bise": {
+    "args": [],
+    "one": null,
+    "text": "what should we work on?"
+  },
+  "composer.home_quiet": {
+    "args": [],
+    "one": null,
+    "text": "no agent working yet"
+  },
+  "composer.home_waits": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} waits for you",
+    "text": "{n} wait for you"
+  },
+  "composer.home_working": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} agent working",
+    "text": "{n} agents working"
   },
   "composer.image_not_attached": {
     "args": [

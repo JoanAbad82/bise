@@ -1,0 +1,61 @@
+/* The empty home (Home.tsx; mockup 5, designer's pick (c)): centred over the composer's column,
+   16 between its parts: the bise mark 32, the question 30/36 500 (--f-question: the 7 sizes have no 22) in bise's voice (its project
+   underlined dotted, 2 thick, 6 under, a picker), its line 13 text-3, then the ideas (a click
+   fills the composer). On a project's main the welcome's office is the picture under it. */
+.cmp-home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-4);
+  text-align: center;
+}
+.cmp-home-q {
+  margin: 0;
+  font: 500 var(--f-question);
+  letter-spacing: -0.01em;
+  color: var(--c-text);
+}
+.cmp-home .cmp-home-proj {
+  display: inline;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline dotted var(--c-text-3);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+.cmp-home .cmp-home-proj:hover,
+.cmp-home .cmp-home-proj[aria-expanded='true'] {
+  text-decoration-color: var(--c-text);
+}
+.cmp-home-line {
+  margin: 0;
+  font: var(--f-ui);
+  color: var(--c-text-3);
+}
+.cmp-home-ideas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-2);
+}
+.cmp-home .cmp-home-idea {
+  height: var(--h-control-sm);
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--c-sunken);
+  font: var(--f-ui);
+  color: var(--c-text-2);
+}
+.cmp-home .cmp-home-idea:hover {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+/* over an empty thread with no welcome under it: the slot's own centre, 80 above the composer */
+.th-home {
+  padding-bottom: var(--s-16);
+}

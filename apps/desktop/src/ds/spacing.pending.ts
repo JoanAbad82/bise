@@ -27,7 +27,6 @@ export const PENDING_HAND: Readonly<Record<string, number>> = {
   "setup/setup.css": 1,
   "terminal/terminal.css": 2,
   "thread/thread.css": 19,
-  "welcome/welcome.css": 1,
 };
 
 /** text sizes off the 7 of native-mac §6 (lint.ts offScaleText): 30, 15, 14, 13, 12, 11.5 kbd, 12 mono */

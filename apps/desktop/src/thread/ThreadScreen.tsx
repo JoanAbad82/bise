@@ -49,8 +49,8 @@ import { OpenArtifactContext } from './openArtifact';
 import { ThreadDrop } from '@/artifacts/Drops';
 import { createFolds, FoldsContext } from './folds';
 import { ThreadVoice, TYPING_END, typingLabelOf, useVoiceHere, VoiceTypePearl } from '@/voicemode';
-import { FirstRunSlot, Rows } from './ThreadRows';
-import { WelcomeSlot } from '@/welcome/Welcome';
+import { Rows } from './ThreadRows';
+import { HomeSlot } from '@/composer/home/Home';
 import { useThreadQuote } from './threadQuote';
 import { answerOf, HERE_BISE, ThreadComposer } from './ThreadComposer';
 
@@ -412,8 +412,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             it sat bottom-left at the column's edge) */}
         <div className="th-main">
           <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onReading={setReading} />
-          {/* a project's main: its welcome (page new-project-home, pick A); bise's own thread: the first run */}
-          {agent === MAIN && me?.archived !== true && (bise ? <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} /> : <WelcomeSlot tkey={tkey} project={project} composer={composer} />)}
+          {/* main's empty thread: the empty home (composer/home, bise fait mac), on a project's welcome */}
+          {agent === MAIN && me?.archived !== true && <HomeSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
           {/* files dragged over the window: 'drop to give this file to perf' over the rows, to the
               composer's agent (designer's office-artifacts pick 4); an archived thread takes none */}
           {(me?.archived !== true || artifact !== undefined) && (
