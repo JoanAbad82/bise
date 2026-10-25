@@ -383,7 +383,6 @@
   min-height: 0;
 }
 .pn-office {
-  overflow-y: auto;
   padding: var(--s-2);
 }
 

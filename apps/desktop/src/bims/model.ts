@@ -548,8 +548,12 @@ export interface OfficeRenderer {
   setOffice(office: Office, agents: readonly Agent[]): void;
   /** his plugins' objects at their spots (corners.ts objectSpots, the driver's Step.corners); resolves once they are in the scene, true when their own chunk had to load first (the shell draws a frame then) */
   setObjects(c: Corners): Promise<boolean>;
-  /** css px; the camera fits the office to the width (never cropped), returns the height it takes */
-  setSize(widthPx: number, maxHeightPx: number): number;
+  /**
+   * css px; the camera fits the office to the width (never cropped), returns the height it takes.
+   * `box`: the canvas is the whole width × maxHeightPx, the office whole and centred in it (a tab
+   * that fills its pane: app/panel/Office.tsx)
+   */
+  setSize(widthPx: number, maxHeightPx: number, box?: boolean): number;
   /** his pinch and pan (zoom.ts): the view inside the fit; FIT is the whole office. The next frame shows it */
   setCam(cam: Cam): void;
   /** draw time t; how the loop must run next (Motion). Reduced motion: never 'loop' */

@@ -8,6 +8,13 @@
   margin: var(--gap-tight) calc(-1 * var(--s-2));
   overflow: hidden;
 }
+/* a tab's office (app/panel/Office.tsx): its holder's whole height, the canvas that box (Office fill) */
+.bims-office[data-fill] {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  aspect-ratio: auto;
+}
 /* not loaded yet: the office's last shape (Office.tsx lastRatio), empty, so the fold grows to it */
 .bims-office[data-state='loading'] {
   aspect-ratio: var(--bims-ratio, 1.4);

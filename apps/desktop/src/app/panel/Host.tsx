@@ -9,18 +9,18 @@
 // VoiceOver reaches it (ui-review m_42482 #6). The tab in front draws; a shell's tab stays mounted
 // hidden (its shell runs on, the same one when it comes back), the others mount when in front.
 // The tabs of an agent no longer in the rows go (model.ts dropGone). Owner: nm-panel.
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react';
 import { AppIcon, IconButton } from '@/ds';
 import { formatRoute } from '@/app/route';
 import { panel } from '@/proto/words_panel.gen';
 import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
 import { MAX_W, MIN_W, type Tab } from './model';
-import { dropGoneTabs, resetWidth, setWidth, usePanelFit, usePanelState } from './state';
+import { dropGoneTabs, panelToggle, resetWidth, setWidth, usePanelFit, usePanelState } from './state';
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
-import { PanelTabs } from './BarTabs';
+import { PanelTabs, SheetToggle } from './BarTabs';
 import './panel.css';
 
 /** The tabbed panel on the window's right (--w-panel 384, from --w-panel-min to --w-panel-max). */
@@ -29,10 +29,13 @@ export function PanelHost() {
   const { width, over } = usePanelFit();
   const [dragging, setDragging] = useState(false);
   useDropGone(s.tabs.list);
+  const box = useRef<HTMLElement>(null);
+  useSheetOut(s.open && over, box);
   const front = s.tabs.list.find((t) => t.id === s.tabs.active);
   const art = front?.what.kind === 'thing' && front.what.e.kind === 'artifact' ? front.what.e : undefined;
   return (
     <aside
+      ref={box}
       className="pn"
       data-testid="app.panel"
       data-open={s.open || undefined}
@@ -44,7 +47,7 @@ export function PanelHost() {
     >
       {s.open && <Border width={width} onDrag={setDragging} />}
       <div className="pn-col" style={{ width }}>
-        <PanelTabs end={art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />} />
+        <PanelTabs start={over ? <SheetToggle /> : undefined} end={art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />} />
         <div className="pn-in" role="tabpanel" data-testid={`app.panel.body.${s.tabs.active}`}>
           {s.tabs.list.map((t) => (
             <Body key={t.id} tab={t} shown={s.open && t.id === s.tabs.active} />
@@ -53,6 +56,29 @@ export function PanelHost() {
       </div>
     </aside>
   );
+}
+
+/**
+ * A sheet over the thread folds on esc or a click outside it (ui-review m_42642), besides its ▯:
+ * the click still does what it does there. An esc a thing inside took (defaultPrevented) stays its own.
+ */
+function useSheetOut(on: boolean, box: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    if (!on) return;
+    const down = (e: PointerEvent) => {
+      const el = box.current;
+      if (el !== null && e.target instanceof Node && !el.contains(e.target)) panelToggle();
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) panelToggle();
+    };
+    document.addEventListener('pointerdown', down, true);
+    window.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [on, box]);
 }
 
 /** The tab row's end over an artifact (mockup 4): the artifact in a window of its own. */

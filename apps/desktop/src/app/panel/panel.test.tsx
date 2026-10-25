@@ -112,4 +112,25 @@ describe('the tabbed panel', () => {
     expect(t.getAttribute('data-tip')).toBeNull();
     expect(v.getByTestId('app.panel.toggle').getAttribute('data-tip')).toContain('⌥⌘0');
   });
+  it('a narrow window: a sheet over the thread with its own ▯; esc or a click outside folds it (ui-review m_42642)', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1100, configurable: true });
+    const v = shell();
+    fireEvent.click(v.getByTestId('app.panel.toggle'));
+    expect(v.getByTestId('app.panel').hasAttribute('data-over')).toBe(true);
+    expect(v.getByTestId('app.panel').style.width).toBe('0px');
+    fireEvent.click(v.getByTestId('app.panel.sheet.toggle'));
+    expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
+    fireEvent.click(v.getByTestId('app.panel.toggle'));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
+    fireEvent.click(v.getByTestId('app.panel.toggle'));
+    fireEvent.pointerDown(document.body);
+    expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
+  });
+  it('a wide window: no sheet, no ▯ in the panel', () => {
+    const v = shell();
+    fireEvent.click(v.getByTestId('app.panel.toggle'));
+    expect(v.getByTestId('app.panel').hasAttribute('data-over')).toBe(false);
+    expect(v.queryByTestId('app.panel.sheet.toggle')).toBeNull();
+  });
 });

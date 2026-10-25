@@ -15,7 +15,7 @@
 import { Vector3 } from 'three';
 import type { BimFrame, Look, MakeRenderer, Motion, OfficeRenderer } from '../model';
 import { FIT, type Cam } from '../zoom';
-import { type Fit, fitSite, groundAllOf, siteOf, toScreen, viewFit, wideSiteOf } from './camera';
+import { type Fit, boxSite, fitSite, groundAllOf, siteOf, toScreen, viewFit, wideSiteOf } from './camera';
 import { NO_GROW } from '../growth';
 import { pickAt, type Target } from './pick';
 import type { Rig } from './pose';
@@ -89,7 +89,7 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
   let base: Fit | null = null;
   let fit: Fit | null = null;
   let cam: Cam = FIT;
-  let size = { w: 0, maxH: 0 };
+  let size = { w: 0, maxH: 0, box: false };
   const v = new Vector3();
   /** the sky's blend (sky.ts): from the drawn sky to the slot's, then rest; null: no sky (the theme's light) */
   let blend: Blend | null = null;
@@ -138,7 +138,8 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
     if (!o || size.w <= 0) return;
     // 320: the building; wide: a little ground past it. The garden past that is cropped (Office.tsx's
     // soft fade), so the office never gets smaller as the project grows (bims m_28178)
-    base = fitSite(size.w >= WIDE_FIT_PX ? wideSiteOf(o) : siteOf(o), size.w, size.maxH);
+    const site = size.w >= WIDE_FIT_PX ? wideSiteOf(o) : siteOf(o);
+    base = size.box ? boxSite(site, size.w, size.maxH) : fitSite(site, size.w, size.maxH);
     applyView();
     view.size(base);
   }
@@ -184,8 +185,8 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
     setObjects(c) {
       return office.setObjects(c);
     },
-    setSize(widthPx, maxHeightPx) {
-      size = { w: Math.round(widthPx), maxH: Math.round(maxHeightPx) };
+    setSize(widthPx, maxHeightPx, box = false) {
+      size = { w: Math.round(widthPx), maxH: Math.round(maxHeightPx), box };
       applyFit();
       return base?.heightPx ?? 0;
     },

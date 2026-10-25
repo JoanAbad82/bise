@@ -104,6 +104,31 @@ afterEach(() => {
   bimsView.reset();
 });
 
+describe('a tab that fills its pane (fill)', () => {
+  it("the canvas is the holder's whole box, the office centred in it; off, its natural height for the width", async () => {
+    const w = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(624);
+    const h = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
+    try {
+      const r = fakeRenderer();
+      const { parts } = fakeParts(r);
+      render(<Office project="p1" agents={AGENTS} cards={[]} places={[]} parts={parts} onOpen={vi.fn()} fill />);
+      await flush();
+      expect(screen.getByTestId('app.right.bims').dataset.fill).toBe('true');
+      expect(r.setSize).toHaveBeenCalledWith(624, 800, true);
+      expect(screen.getByTestId('app.right.bims').style.height).toBe('');
+      cleanup();
+      const r2 = fakeRenderer();
+      mount(fakeParts(r2).parts);
+      await flush();
+      expect(r2.setSize).toHaveBeenCalledWith(624, 4000);
+      expect(screen.getByTestId('app.right.bims').style.height).toBe('120px');
+    } finally {
+      w.mockRestore();
+      h.mockRestore();
+    }
+  });
+});
+
 describe('the toggle', () => {
   it("no 'bims' pill in the head (the title bar's icon); 320 | wide only with the office on; kept", () => {
     const { rerender } = render(<BimsSwitch view={bimsView.get()} />);

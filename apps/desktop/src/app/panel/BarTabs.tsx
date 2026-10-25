@@ -17,6 +17,15 @@ import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanel
 import { useTabLooks, type TabLook } from './look';
 import { PANEL_KEYS } from './keys';
 
+/** The ▯ at a sheet's tab row start: the sheet covers the bar's own (ui-review m_42642). */
+export function SheetToggle() {
+  return (
+    <IconButton label={panel.panel_toggle({ key: PANEL_KEYS.toggle })} size="bar" pressed onClick={panelToggle} testId="app.panel.sheet.toggle">
+      <AppIcon name="panel" size={16} />
+    </IconButton>
+  );
+}
+
 /** The panel's ▯ at the title bar's end (⌥⌘0), pressed while it is open. */
 export function BarTabs() {
   const s = usePanelState();
@@ -48,8 +57,8 @@ function useWidthOf(): readonly [RefObject<HTMLDivElement | null>, number] {
   return [ref, w];
 }
 
-/** The tabs in the panel's top row, '+', and at its end what the tab in front adds (`end`). */
-export function PanelTabs({ end }: { end?: ReactNode }) {
+/** The tabs in the panel's top row, '+', at its start `start` (a sheet's ▯) and at its end what the tab in front adds (`end`). */
+export function PanelTabs({ start, end }: { start?: ReactNode; end?: ReactNode }) {
   const s = usePanelState();
   const look = useTabLooks();
   const [row, width] = useWidthOf();
@@ -58,6 +67,7 @@ export function PanelTabs({ end }: { end?: ReactNode }) {
   const [drag, setDrag] = useState<string | null>(null);
   return (
     <div className="pn-top" ref={row} data-testid="app.panel.top">
+        {start}
         <div className="pn-tabs" role="tablist" aria-label={panel.tabs_label} data-testid="app.panel.tabs">
           {shown.map((t) => (
             <BarTab

@@ -2,7 +2,8 @@
 // click opens it (nm-side), the full view of bims/Office. It was the right bar's head of AGENTS; it
 // moved here with the bar's end (bise fait mac: the world floats on the right side, the office opens
 // in a tab, the Overview lists rows only). A bim's click opens its agent's thread; an object's '?'
-// its plugin; the map chip his pick (/bims <map>). Owner: nm-panel.
+// its plugin; the map chip his pick (/bims <map>). It fills the tab's whole height, the office whole
+// and centred, refitted as the pane resizes (designer m_42866 #3). Owner: nm-panel.
 import { useEffect, useMemo } from 'react';
 import { Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
@@ -46,6 +47,7 @@ export function OfficeTab({ project }: { project: string }) {
         map={map}
         parts={bimsParts}
         follow={follow}
+        fill
         onOpen={(agent) => {
           router.go({ screen: 'thread', project, agent });
         }}

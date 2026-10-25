@@ -13,7 +13,7 @@
 // section and per scope (his m_26894, barrows.ts pageRows).
 // Owner: nm-panel (bise fait mac; amb-win before). The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Act, AppIcon, Dot, IconButton, KindIcon, MoreButton, Press, Ring, Slide, iconKindOf, tipAttrs, type AppIconName, type DotState } from '@/ds';
+import { AppIcon, Button, Dot, IconButton, KindIcon, MoreButton, Press, Ring, Slide, iconKindOf, tipAttrs, type AppIconName, type DotState } from '@/ds';
 import { markTip } from './tipwords';
 import { common } from '@/proto/words_common.gen';
 import { panel } from '@/proto/words_panel.gen';
@@ -404,12 +404,13 @@ function WatchDetail({ r, onStop, onAgent }: { r: BarRow; onStop: () => void; on
         ))}
       </div>
       <div className="app-rb-detail-acts">
-        <Act onClick={onAgent} testId={`${r.testId}.open`}>
+        {/* ds buttons, never text links (native-mac §6: the Overview has no underlined words) */}
+        <Button kind="ghost" size="sm" onClick={onAgent} testId={`${r.testId}.open`}>
           {common.open_agent({ agent: r.name })}
-        </Act>
-        <Act onClick={onStop} testId={`${r.testId}.stop`}>
+        </Button>
+        <Button kind="ghost" size="sm" onClick={onStop} testId={`${r.testId}.stop`}>
           {common.stop_watching}
-        </Act>
+        </Button>
       </div>
     </div>
   );

@@ -203,6 +203,7 @@ export function Office({
   map = DEFAULT_MAP,
   parts,
   follow = null,
+  fill = false,
   onOpen,
   onOpenPlugin,
   onPickMap,
@@ -225,6 +226,8 @@ export function Office({
   parts: Parts;
   /** the agent whose thread is open (focus.ts followOf): the office zooms on its bim and follows it */
   follow?: string | null;
+  /** the office fills its holder's height (a panel tab, app/panel/Office.tsx): the canvas is the holder's box, the office whole and centred in it; off, its natural height for the width */
+  fill?: boolean;
   /** a click on a bim: open that agent, as its row's click */
   onOpen: (agent: string) => void;
   /** a click on an object's '?' / '✗' pill: open its plugin (its key); absent: the pill shows, no click */
@@ -450,8 +453,10 @@ export function Office({
       if (r === null) return;
       const w = box.clientWidth;
       if (w <= 0) return;
-      const h = r.setSize(w, 4000);
-      box.style.height = `${String(Math.round(h))}px`;
+      // filling: the box's own height (100% of its holder, office.css), the canvas that whole box
+      const full = fill ? box.clientHeight : 0;
+      const h = full > 0 ? r.setSize(w, full, true) : r.setSize(w, 4000);
+      if (!fill) box.style.height = `${String(Math.round(h))}px`;
       if (h > 0) lastRatio = w / h;
       setBoxW(w);
     };
@@ -683,7 +688,7 @@ export function Office({
       if (snapRef !== undefined) snapRef.current = null;
       r?.dispose();
     };
-  }, [parts, driver, layoutTags, moveCam, snapRef, transparent]);
+  }, [parts, driver, layoutTags, moveCam, snapRef, transparent, fill]);
 
   // hover: the bim under the pointer, its line after the tip's delay; off it, at once
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -752,6 +757,7 @@ export function Office({
       aria-label={bims.view_bims_tip}
       data-testid="app.right.bims"
       data-state={state}
+      data-fill={fill || undefined}
       data-shown={(drawn && grown) || undefined}
       style={state === 'loading' ? ({ '--bims-ratio': String(lastRatio) } as CSSProperties) : undefined}
       data-pointer={pointer || undefined}
