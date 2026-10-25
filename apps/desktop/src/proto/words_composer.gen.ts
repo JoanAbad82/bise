@@ -383,13 +383,11 @@ export const composer = {
   /** the strip's project picker: its name and tip */
   ctx_project_pick: (a: { project: string | number }): string => String(a.project) + " · pick another project",
   /** the project picker's title */
-  ctx_projects: "projects",
+  ctx_projects: "Projects",
   /** the floating composer's addressee ('to bise ⌄') */
   float_to: (a: { agent: string | number }): string => "to " + String(a.agent),
   /** the addressee picker's title */
-  float_to_title: "send to",
-  /** the floating composer's empty field */
-  float_ask: (a: { agent: string | number }): string => "ask " + String(a.agent),
+  float_to_title: "Send to",
   /** the floating composer's ─ button */
   float_fold: "fold it",
   /** the floating composer's grip, folded: its mini thread opens */
@@ -415,7 +413,7 @@ export const composer = {
   /** the empty home's project picker: its name and tip */
   home_pick: (a: { project: string | number }): string => String(a.project) + " · pick another project",
   /** the empty home's suggestions, for VoiceOver */
-  home_ideas: "ideas",
+  home_ideas: "Ideas",
   /** the context ring's tip */
   ring_tip: (a: { pct: string | number; agent: string | number; tokens: string | number }): string => String(a.pct) + "% of " + String(a.agent) + "'s context used · " + String(a.tokens) + " tokens · compacts at 90%",
   /** ctrl+1 with nothing in the inbox */

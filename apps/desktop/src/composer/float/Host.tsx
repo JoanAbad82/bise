@@ -165,7 +165,8 @@ function Float({ to: def }: { to: FloatTo }) {
             onClick={() => {
               go('grip');
             }}>
-            <AppIcon name="grip" />
+            {/* a chevron, never a grip (⠿ says 'drag me', and nothing drags: designer m_43204): up while the thread is hidden, down while shown */}
+            <AppIcon name="down" />
           </Press>
         </div>
       )}
@@ -186,7 +187,7 @@ function Float({ to: def }: { to: FloatTo }) {
         tab={tab}
         tabEnd={answering?.end}
         me={me}
-        placeholder={answering?.placeholder ?? composer.float_ask({ agent: name })}
+        placeholder={answering?.placeholder ?? composer.placeholder_to({ agent: name })}
         answer={answerOf(answering)}
         onStop={stop}
         onEscape={onEscape}

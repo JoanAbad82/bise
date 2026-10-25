@@ -54,6 +54,10 @@
 .b-composer .b-field-host {
   display: contents;
 }
+/* ThreadComposer's focus wrapper (composer/talking.ts): no box of its own */
+.cmp-talk {
+  display: contents;
+}
 .b-composer .b-field.ProseMirror {
   white-space: pre-wrap;
   overflow-wrap: break-word;

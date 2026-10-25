@@ -109,6 +109,10 @@
   margin-left: auto;
   color: var(--c-text-3);
 }
+/* its chevron: up while the thread is hidden (a click shows it), down while shown */
+.cmp-float .hd .grip[aria-expanded='false'] svg {
+  transform: rotate(180deg);
+}
 /* the mini thread: the addressee's own rows, scrolling over the field */
 .cmp-float .body {
   flex: 1 1 auto;

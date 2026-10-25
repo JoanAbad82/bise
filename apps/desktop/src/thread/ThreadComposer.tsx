@@ -31,6 +31,7 @@ import { otherTip } from '@/app/tipwords';
 import { aboutParts, aboutText } from './about';
 import { composer } from '../proto/words.gen';
 import { useHomeShows } from '@/composer/home/Home';
+import { noteComposerFocus, talkFocusHandlers } from '@/composer/talking';
 
 /**
  * The thread's composer, also mounted under an open artifact (amb-kit's src/artifacts/Open.tsx,
@@ -422,7 +423,20 @@ export const ThreadComposer = memo(function ThreadComposer({
     doneRef.current = lineDone;
   });
   const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={floating ? undefined : tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={home ? composer.home_placeholder : placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
-  return field;
+  // its focus says whom he talks to (composer/talking.ts: nm-side's camera); the wrapper has no box
+  const talk = useMemo(() => talkFocusHandlers({ project, agent }), [project, agent]);
+  // gone while focused (a route change): no blur comes, so it lets go here
+  useEffect(
+    () => () => {
+      noteComposerFocus(null, { project, agent });
+    },
+    [project, agent],
+  );
+  return (
+    <div className="cmp-talk" onFocus={talk.onFocus} onBlur={talk.onBlur}>
+      {field}
+    </div>
+  );
 });
 
 /** How long a notice stays when he does nothing (designer m_29135; an error has no timer). */

@@ -141,10 +141,6 @@ export interface ComposerFrameProps {
   tabs?: ReactNode;
   /** shown focused without focus (the gallery); live, :focus-within does it */
   focus?: boolean;
-  /** off the thread, at rest (designer m_41569, ui-review-app #1): unfocused, the box is one line, no
-   *  tab, no head, no tool row; it grows back at its focus. The caller sets it only while nothing
-   *  is typed, answered, quoted or said on its notice line */
-  fold?: boolean;
   /** the whole frame is the input: a press on its padding or empty area (not on the editor, a chip, a
    * button, the dock, the tabs or a quote) calls this to focus the editor, the caret at the end (his round 2) */
   onBoxDown?: () => void;
@@ -164,9 +160,9 @@ export function boxPress(target: EventTarget | null): boolean {
 }
 /** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (its head, the editor,
  *  then its row: tools left, tools and send right) */
-export function ComposerFrame({ children, tab, answering, answerTip, quiet, tools, toolsEnd, sent = 0, send, onSend, disabled, head, quote, dock, tabs, focus, fold, onBoxDown, lead, onKeyDownCapture, testId }: ComposerFrameProps) {
+export function ComposerFrame({ children, tab, answering, answerTip, quiet, tools, toolsEnd, sent = 0, send, onSend, disabled, head, quote, dock, tabs, focus, onBoxDown, lead, onKeyDownCapture, testId }: ComposerFrameProps) {
   return (
-    <div className={cx("b-composer", disabled && "is-disabled", fold && "fold")} data-testid={testId} data-fold={fold || undefined} onKeyDownCapture={onKeyDownCapture}
+    <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId} onKeyDownCapture={onKeyDownCapture}
       onMouseDown={onBoxDown && ((e) => {
         // the editor's own text keeps the click (the caret at the clicked line); elsewhere the frame focuses it
         if (e.button !== 0 || !boxPress(e.target)) return;

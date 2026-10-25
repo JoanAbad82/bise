@@ -49,7 +49,7 @@ describe('FloatHost', () => {
     const v = mount({ screen: 'inbox' });
     expect(state(v)).toBe('rest');
     expect(v.getByTestId('composer.float').dataset['agent']).toBe('main');
-    expect(v.getByTestId('composer.field').getAttribute('placeholder')).toBe('ask bise');
+    expect(v.getByTestId('composer.field').getAttribute('placeholder')).toBe('write to bise, then ⏎');
     expect(v.queryByTestId('composer.float.head'), 'no head at rest').toBeNull();
     cleanup();
     expect(mount({ screen: 'thread', project: 'acme-1a2b3c4d', agent: 'perf' }).queryByTestId('composer.float')).toBeNull();
