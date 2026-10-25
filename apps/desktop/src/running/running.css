@@ -1,6 +1,6 @@
 /* src/running (nm-pages-a, bise fait mac: page native-mac §6 and §8): the processes screen. ds tokens
-   only, 4 px grid, no accent. The lead, the filters, the group labels and the rows are the ds's
-   (PageLead, FilterRow + Filters, GroupLabel, ListRow): here only the column, the rows' words and
+   only, 4 px grid, no accent. The banner, the filters, the group labels and the rows are the ds's
+   (PageBanner, FilterRow + Filters, GroupLabel, ListRow): here only the column, the rows' words and
    marks, and the selected one's output beside the list. */
 .run-screen { display: flex; height: 100%; min-height: 0; outline: none; }
 .run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
@@ -8,8 +8,10 @@
    floating composer's room at its foot (--float-room). Beside the pane (always, over 1000 px) the
    list is its own column: the page's centring would squeeze it, so its sides are the page's least,
    --pad-column (ui-review qa g5) */
-.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--s-6) var(--pad-column) var(--float-room); box-sizing: border-box; }
-@media (max-width: 1000px) { .run-screen:not(.has-pane) .run-scroll { padding-inline: var(--pad-page-x); } }
+.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 0 var(--float-room); box-sizing: border-box; }
+/* the banner (ds PageBanner) takes the list's width, 24 from its edges; the rest its column */
+.run-scroll > :not(.b-banner) { margin-inline: var(--pad-column); }
+@media (max-width: 1000px) { .run-screen:not(.has-pane) .run-scroll > :not(.b-banner) { margin-inline: var(--pad-page-x); } }
 .run-n { margin-left: var(--s-1); color: var(--c-text-3); }
 .run-search { margin-left: auto; }
 .run-list { margin-top: var(--s-2); }

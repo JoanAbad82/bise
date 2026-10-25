@@ -12,7 +12,7 @@ import {
   Field, Fold, Group, Head, Help, HeroWait, IconButton, PageHero, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, PickerTrigger, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
-  APP_ICONS, AppIcon, BarSearch, FilterRow, Filters, GroupLabel, LeadWait, ListRow, MoreButton, PageLead, RowAction, type EntityMenu,
+  APP_ICONS, AppIcon, BannerWait, BarSearch, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageBanner, RowAction, type EntityMenu,
 } from "../index";
 import { BimsToggle } from "@/bims/Cube";
 import { BimsSwitch } from "@/bims/Office";
@@ -544,7 +544,9 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     const q = <span className="g-mac-q">?</span>;
     return (
       <div className="g-mac" data-testid="ds.mac">
-        <PageLead sentence="what your agents wait on you for, from every project." facts={<><LeadWait>3 waiting</LeadWait> · the oldest 21 d ago</>} testId="ds.mac.lead" />
+        {/* the banner (designer m_42762) with no vignette: the page's line icon at 64 */}
+        <PageBanner title="Inbox" sentence="what your agents wait on you for, from every project." facts={<><BannerWait>3 waiting</BannerWait> · the oldest 21 d ago</>}
+          icon="inbox" edge="page" testId="ds.mac.lead" />
         <FilterRow>
           <Filters items={[{ id: "w", label: "waiting" }, { id: "a", label: "answered" }, { id: "x", label: "withdrawn" }]} on="w" onPick={noop} testId="ds.mac.filters" />
           <PickerTrigger look="pop" onClick={noop}>all projects</PickerTrigger>

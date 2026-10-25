@@ -1,0 +1,39 @@
+/* src/ds · PageBanner (banner.tsx; designer m_42762): a card the content area's width, 24 from its
+   left, right and top edges, 24 above the page's content; r 16, no shadow; the day's ground with a
+   1 px line, the night's raised ground. It ends where the right side leaves room (--banner-gutter,
+   the page's useSideLayout gutter). 200 high, its text left (32 in, or on the page's column's text
+   edge: the page's --pad-page-x and the rows' 12, computed from the banner's own width), its visual
+   bottom right in a 360 x 176 box 12 from the edges. Under a 1000 content area (the banner < 952):
+   160 high, the box 264 x 132; under 760 (< 712): no visual, the text takes the width. */
+.b-banner{container:b-banner / inline-size;margin:var(--s-6) max(var(--s-6), var(--banner-gutter, 0px)) var(--s-6) var(--s-6);border-radius:var(--r-4);background:var(--c-solid);box-shadow:inset 0 0 0 1px var(--c-line)}
+[data-theme="dark"] .b-banner{background:var(--c-raised);box-shadow:none}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .b-banner{background:var(--c-raised);box-shadow:none}
+}
+.b-banner > .in{position:relative;box-sizing:border-box;height:var(--h-banner);display:flex;align-items:center;padding:var(--s-8) calc(var(--w-banner-vis) + var(--s-3) + var(--s-6)) var(--s-8) var(--s-8)}
+/* a column page: the title on its column's text edge, as the rows' (--pad-page-x of the page, 12 in) */
+.b-banner[data-edge="column"] > .in{padding-left:max(var(--s-8), calc((100cqw + var(--s-6) + max(var(--s-6), var(--banner-gutter, 0px)) - var(--w-col)) / 2 - var(--s-6) + var(--s-3)))}
+.b-banner .txt{min-width:0;max-width:var(--w-banner-text);display:flex;flex-direction:column}
+.b-banner .title{margin:0;font:600 var(--f-title);color:var(--c-text)}
+.b-banner .say{margin:var(--s-2) 0 0;font:400 var(--f-lead);color:var(--c-text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.b-banner .facts{margin:var(--s-3) 0 0;font:400 var(--f-ui);color:var(--c-text-3)}
+.b-banner .wait{color:var(--c-accent)}
+/* the visual: transparent, no frame; a vignette's light and dark stills, or the line icon at 64 */
+.b-banner .vis{position:absolute;right:var(--s-3);bottom:var(--s-3);width:var(--w-banner-vis);height:var(--h-banner-vis);display:flex;align-items:center;justify-content:center;color:var(--c-text-3);pointer-events:none}
+.b-banner .vis > img{display:block;width:100%;height:100%;object-fit:contain}
+.b-banner .vis > .b-app-icon{width:var(--s-16);height:var(--s-16)}
+.b-banner .vis > .dark{display:none}
+[data-theme="dark"] .b-banner .vis > .light{display:none}
+[data-theme="dark"] .b-banner .vis > .dark{display:block}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .b-banner .vis > .light{display:none}
+  :root:not([data-theme="light"]) .b-banner .vis > .dark{display:block}
+}
+@container b-banner (max-width: 951px){
+  .b-banner > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
+  .b-banner .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
+}
+@container b-banner (max-width: 711px){
+  .b-banner > .in{padding-right:var(--s-6)}
+  .b-banner .vis{display:none}
+}

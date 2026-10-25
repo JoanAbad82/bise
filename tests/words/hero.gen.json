@@ -24,6 +24,11 @@
     "one": "{n} artifact",
     "text": "{n} artifacts"
   },
+  "hero.artifacts_title": {
+    "args": [],
+    "one": null,
+    "text": "Artifacts"
+  },
   "hero.changes_say": {
     "args": [],
     "one": null,
@@ -43,6 +48,11 @@
     "args": [],
     "one": null,
     "text": "what your agents wait on you for, from every project."
+  },
+  "hero.inbox_title": {
+    "args": [],
+    "one": null,
+    "text": "Inbox"
   },
   "hero.new_ones": {
     "args": [
@@ -87,6 +97,11 @@
     "one": null,
     "text": "what your agents left running on this Mac."
   },
+  "hero.processes_title": {
+    "args": [],
+    "one": null,
+    "text": "Processes"
+  },
   "hero.prs_say": {
     "args": [],
     "one": null,
@@ -103,6 +118,11 @@
     "args": [],
     "one": null,
     "text": "what runs on its own: timers and watches your agents set."
+  },
+  "hero.scheduled_title": {
+    "args": [],
+    "one": null,
+    "text": "Scheduled"
   },
   "hero.update_log_say": {
     "args": [],

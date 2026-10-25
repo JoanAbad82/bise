@@ -1,6 +1,6 @@
 // The processes screen (bise fait mac: page native-mac §6 and §8; designer's running-procs; route
 // running): what his agents left running in every project. The page's name and its search
-// (InBar, '/') are in the window's bar; under it the lead (ds PageLead), the filter (ds Filters:
+// (InBar, '/') are in the window's bar; under it the banner (ds PageBanner), the filter (ds Filters:
 // 'running N' / 'ended today N'), a ds GroupLabel per project, one ds ListRow per process (its
 // command in mono 12, then agent · address · age; a --c-ok dot while it runs; the chosen one's
 // 'open'; its '…' and a right click are its menu, useEntityMenu), and the selected one's output
@@ -12,7 +12,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { nextHit, type Hit } from './find';
 import type { Terminal as Xterm } from '@xterm/xterm';
-import { AppIcon, BarSearch, Empty, Field, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageLead, Press, RowAction, tipAttrs } from '@/ds';
+import { AppIcon, BarSearch, Empty, Field, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageBanner, Press, RowAction, tipAttrs } from '@/ds';
+import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { useEntityMenu } from '@/app/menus/use';
 import { Code } from '@/thread/Code';
 import { hero } from '@/proto/words_hero.gen';
@@ -116,6 +117,7 @@ export function RunningView({
   const [filter, setFilter] = useState<Filter>(() => (endedOne(opened) ? 'ended' : 'running'));
   const [q, setQ] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const gutter = useBannerGutter();
   // what he stopped from here, until its hub says it ended
   const [stopping, setStopping] = useState<ReadonlySet<string>>(new Set());
   // the rows seen running while 'running' is shown: one that ends stays in place (designer m_38389)
@@ -202,8 +204,14 @@ export function RunningView({
         {/* one scroller: the lead scrolls away with the list (designer m_39330); its foot keeps the
             floating composer's room (--float-room) */}
         <div className="run-scroll" data-testid="running.scroll">
-        <PageLead
+        <PageBanner
+          title={hero.processes_title}
           sentence={hero.processes_say}
+          visual={<PageVignette page="processes" />}
+          icon="terminal"
+          // its list is a full-width column beside the output (--pad-column): the title 32 in
+          edge="page"
+          gutter={cur ? 0 : gutter}
           // 'in N projects' only on every project's list: a scoped one is one place (designer m_38700)
           facts={<span data-testid="running.sub">{`${scoped ? running.count_running({ n: counts.running }) : running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}</span>}
           testId="running.lead"

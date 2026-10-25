@@ -1,5 +1,5 @@
 /* src/inbox (nm-pages-a, bise fait mac: page native-mac §6, mockup 6): the inbox screen. ds tokens
-   only. The page's name is in the window's bar; the lead (ds PageLead), its filters 24 under it
+   only. The page's name is in the window's bar and its banner (ds PageBanner); its filters 24 under it
    (ds FilterRow), the group labels and the rows (ds GroupLabel, ListRow) are the ds's: here only
    the column, the rows' words, the pane and the floating composer's room. One left edge: the lead,
    the filters and the rows' tint on the column's edge, a row's content 12 in (mockup 6). */
@@ -7,7 +7,9 @@
 /* one scroller: the lead and the filters scroll away with the list (designer m_39330); a size
    container, so the pane stays in view (sticky) at most its height; the floating composer's room
    at its foot (--float-room: the last row never sits under it) */
-.ip-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; container-type: size; padding: var(--s-6) var(--pad-page-x) var(--float-room); }
+.ip-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; container-type: size; padding: 0 0 var(--float-room); }
+/* the banner (ds PageBanner) takes the page's width, 24 from its edges; the rest holds the column */
+.ip-scroll > :not(.b-banner) { margin-inline: var(--pad-page-x); }
 .ip-search { margin-left: auto; }
 
 .ip-list { margin-top: var(--s-2); }
@@ -51,7 +53,7 @@
 
 /* 800: the pane takes the list's place, '← inbox' back */
 @media (max-width: 900px) {
-  .ip-scroll { padding: var(--s-4) var(--s-4) var(--float-room); }
+  .ip-scroll > :not(.b-banner) { margin-inline: var(--s-4); }
   .ip-body.paned > .ip-list { display: none; }
   .ip-pane { flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; border: 0; }
   .ip-p-head .ip-crumb { display: inline-flex; }

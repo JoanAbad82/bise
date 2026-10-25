@@ -60,13 +60,6 @@
 .art-head-s:empty{display:none}
 .art-link{color:var(--c-text);text-decoration:underline;text-underline-offset:2px}
 
-/* the lead and the bims still beside it (designer's lead rule: the vignette stays, no card) */
-/* out of the flow (ui-review qa g1 g2): the lead 24 under the bar and the filters 24 under the lead,
-   as on every page; the still sits at the top right and may bleed past the lead's height */
-.art-lead{position:relative}
-.art-lead > .b-lead{padding-right:calc(var(--s-6) * 5 + var(--s-4))}
-.art-vignette{position:absolute;top:calc(-1 * var(--s-4));right:0;width:calc(var(--s-6) * 5);aspect-ratio:440 / 264;pointer-events:none}
-.art-vignette > img{display:block;width:100%;height:100%;object-fit:contain}
 /* the kinds' counts in the bar's filter, text-3 */
 .art-n{margin-left:var(--s-1);color:var(--c-text-3)}
 /* the filters' row: the scope, the archived ones, cards or a list (the toggles at its end) */
@@ -147,12 +140,3 @@
 .art-move-field{height:var(--h-control-sm);padding:0 var(--s-2);border-radius:var(--r-1);border:1px solid var(--c-line-strong);background:var(--c-surface);color:var(--c-text);font:inherit;font-size:var(--t-13)}
 .art-merge-say{display:block;font-size:var(--t-12);line-height:1.5;color:var(--c-text-3)}
 
-/* the lead's bims still (bims-plugins' renderer, 440x264 at 2x): the light one, the dark one in the
-   dark theme (his pick, else the system's) */
-.art-vignette > .art-hero-still.dark{display:none}
-[data-theme="dark"] .art-vignette > .art-hero-still.light{display:none}
-[data-theme="dark"] .art-vignette > .art-hero-still.dark{display:block}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) .art-vignette > .art-hero-still.light{display:none}
-  :root:not([data-theme="light"]) .art-vignette > .art-hero-still.dark{display:block}
-}

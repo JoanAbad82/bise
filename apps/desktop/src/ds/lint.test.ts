@@ -194,6 +194,12 @@ describe('the 7 text sizes (page native-mac §6: 30, 15, 14, 13, 12, 11.5 kbd, 1
   it('no stylesheet writes more sizes off the scale than when it came in (PENDING_TYPE, a ratchet)', () => {
     expect(ratchet(PENDING_TYPE, (css) => offScaleText(css).length), 'a text size off the 7: font: <weight> var(--f-question|lead|read|ui|meta|kbd|mono) (src/ds/tokens.css)').toEqual([]);
   });
+
+  it("the banner's title size (--f-title, 22/28) is PageBanner's alone (designer m_42762, native-lead m_42982)", () => {
+    const users = files.filter((p) => /\.(css|tsx?)$/.test(p) && !p.endsWith('.test.ts') && !p.endsWith('.test.tsx'))
+      .filter((p) => readFileSync(p, 'utf8').includes('var(--f-title)')).map(rel);
+    expect(users).toEqual(['ds/css/banner.css']);
+  });
 });
 
 describe("macOS's overlay scrollbars (page native-mac §11)", () => {

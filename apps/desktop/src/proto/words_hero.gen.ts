@@ -4,6 +4,14 @@
 // bise_proto::words::hero: rust/proto/src/words/hero.rs, never a word typed here.
 
 export const hero = {
+  /** the inbox page's banner title */
+  inbox_title: "Inbox",
+  /** the artifacts page's banner title */
+  artifacts_title: "Artifacts",
+  /** the scheduled page's banner title */
+  scheduled_title: "Scheduled",
+  /** the processes page's banner title */
+  processes_title: "Processes",
   /** the inbox screen's hero sentence */
   inbox_say: "what your agents wait on you for, from every project.",
   /** the scheduled screen's hero sentence */

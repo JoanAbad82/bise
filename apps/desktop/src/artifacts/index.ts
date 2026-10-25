@@ -12,4 +12,5 @@ export * from './gallery';
 export { useAllArtifacts, useNewArtifacts } from './hooks';
 export { usePlaceCrumb } from './crumb';
 export { ArtLibrary } from './library';
+export { PageVignette, useBannerGutter, type VignettePage } from './hero/vignettes';
 export * from './model';

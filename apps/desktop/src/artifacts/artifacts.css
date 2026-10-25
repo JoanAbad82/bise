@@ -7,7 +7,9 @@
    the page), the page's sides --pad-column (the cards take the width, mockup 7), 24 under the bar,
    the floating composer's room at its foot (--float-room); in it the list and its drop zone take
    their height, the scroller scrolls */
-.art-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; padding: var(--s-6) var(--pad-column) var(--float-room); }
+.art-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; padding: 0 0 var(--float-room); }
+/* the banner (ds PageBanner) 24 from the page's edges; the rest on the page's sides */
+.art-scroll > :not(.b-banner) { margin-inline: var(--pad-column); }
 .art-scroll .art-add-drop, .art-scroll .art-list { flex: none; min-height: 0; overflow: visible; }
 .art-scroll > .b-filter-row + .art-lib { margin-top: var(--s-4); }
 

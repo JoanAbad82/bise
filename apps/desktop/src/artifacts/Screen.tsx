@@ -1,8 +1,8 @@
 // The artifacts screen, in folders (bise fait mac: page native-mac §6, mockup 7, decision d2;
 // artifacts-folders brief part 4, page artifacts-gallery v7; route artifacts[/<p>]): one library
 // for every project. The window's bar holds the place's name (its crumb), the kinds the place holds
-// (ds Filters), the search and + add (InBar). Under the bar the lead (ds PageLead, the bims still
-// beside it as a vignette, no card) scrolls away with the page; then the filters (the project scope,
+// (ds Filters), the search and + add (InBar). Under the bar the banner (ds PageBanner, the bims
+// filing desk as its vignette) scrolls away with the page; then the filters (the project scope,
 // Scope.tsx, or 'in:<project>' typed; the archived ones; cards or a list), and the place he is in:
 // all artifacts (the themes as big tiles, then recent, ds GroupLabels), recent, unfiled, a theme
 // (its task folders as small tiles, then its cards), a task's folder (its cards by day). The
@@ -14,7 +14,8 @@
 // deletes (a dialog). Every move and folder edit has its undo (⌘Z, and the toast's). The grid, the
 // cards, the stacks and the list view are art-grid's (Grid.tsx, Sheet.tsx). Owner: art-folders.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { AppIcon, BarSearch, Button, Empty, FilterRow, Filters, GroupLabel, MoreButton, PageLead, Press, Sheet, tipAttrs, Toast, type EntityMenu } from '@/ds';
+import { AppIcon, BarSearch, Button, Empty, FilterRow, Filters, GroupLabel, MoreButton, PageBanner, Press, Sheet, tipAttrs, Toast, type EntityMenu } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
 import { library } from '@/proto/words_library.gen';
 import { useFolders, useProjects, useStore } from '@/store';
 import { useRouter } from '@/app/router';
@@ -47,8 +48,7 @@ import { NothingFound, SearchResults } from './Search';
 import { BigTile, FolderListRow, SmallTile } from './Tiles';
 import { cardDrag, FLASH_MS, TOAST_MS, useBrief, useDrop } from './drag';
 import { folderCmd, moveCmd, type FolderOp } from './ops';
-import heroLight from './hero/artifacts-hero-light.png';
-import heroDark from './hero/artifacts-hero-dark.png';
+import { PageVignette, useBannerGutter } from './hero/vignettes';
 import './artifacts.css';
 import './folders.css';
 
@@ -115,6 +115,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const [keyed, setKeyed] = useState(false);
   // the window's sidebar draws the library (ArtLibrary): the page draws no column of its own
   const sideLib = useLibraryShown();
+  const gutter = useBannerGutter();
 
   const go = (p: string, a: At) => {
     const path = atPath(a);
@@ -536,10 +537,9 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       {inBar}
       <div className="art-scroll" data-testid="artifacts.scroll">
         {/* the lead (designer's rule on #5): no card; the bims still stays beside it as a vignette */}
-        <div className="art-lead">
-          <PageLead sentence={library.say} facts={libraryFacts(lib, scoped, projectName)} testId="artifacts.lead" />
-          <span className="art-vignette" aria-hidden="true"><img className="art-hero-still light" src={heroLight} alt="" /><img className="art-hero-still dark" src={heroDark} alt="" /></span>
-        </div>
+        {/* the banner (designer m_42762): a full-width page, its title 32 in, the filing desk right */}
+        <PageBanner title={hero.artifacts_title} sentence={library.say} facts={libraryFacts(lib, scoped, projectName)}
+          visual={<PageVignette page="artifacts" />} icon="artifacts" edge="page" gutter={gutter} testId="artifacts.lead" />
         {filters}
         <div className={`art-lib${narrow || sideLib ? ' bare' : ''}`}>
           {!narrow && !sideLib && column}

@@ -1,6 +1,6 @@
 // The inbox screen's view (bise fait mac: page native-mac §6, mockup 6; designer's inbox-history
 // pick A, m_24212 (2)-(6); route inbox/all, the rail's inbox): the page's name is in the window's
-// bar, its search there too (InBar, '/'); under the bar the lead (ds PageLead: its sentence, '3
+// bar, its search there too (InBar, '/'); under the bar the banner (ds PageBanner: 'Inbox', its sentence, '3
 // waiting · the oldest 2 h ago', the accent on what waits), the filters 24 under it (ds Filters:
 // all / waiting / answered / withdrawn; the projects and agents menus), 'waiting for you N' first
 // (ds GroupLabel; ⏎ or the chosen row's 'answer' opens the item above the composer, as ⌘I: the
@@ -17,7 +17,8 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
 import { InBar } from '@/app/barslot';
-import { AppIcon, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, LeadWait, ListRow, PageLead, Press, RowAction } from '@/ds';
+import { AppIcon, BannerWait, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, ListRow, PageBanner, Press, RowAction } from '@/ds';
+import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
@@ -66,6 +67,7 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
   // the pane is open: it shows the selected row while that is a past one (it follows ↑↓)
   const [paned, setPaned] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const gutter = useBannerGutter();
   const lists = listsOf(cards, records, names, f, now);
   const pastBy = new Map(lists.days.flatMap((d) => d.rows.map((r) => [r.key, r] as const)));
   const waitBy = new Map(lists.waiting.map((w) => [w.key, w] as const));
@@ -154,7 +156,8 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
           const el = e.currentTarget;
           if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) onEnd();
         }}>
-      <PageLead sentence={hero.inbox_say} facts={<>{facts.wait !== undefined && <><LeadWait>{facts.wait}</LeadWait>{' · '}</>}{facts.rest}</>} testId="inbox.lead" />
+      <PageBanner title={hero.inbox_title} sentence={hero.inbox_say} facts={<>{facts.wait !== undefined && <><BannerWait>{facts.wait}</BannerWait>{' · '}</>}{facts.rest}</>}
+        visual={<PageVignette page="inbox" />} icon="inbox" gutter={gutter} testId="inbox.lead" />
       <FilterRow testId="inbox.filters">
         <Filters items={STATES.map((s) => ({ id: s, label: STATE_WORDS[s] }))} on={f.state} label={inbox.filter_label}
           onPick={(id) => { set({ state: id as StateFilter }); }} testId="inbox.state" />

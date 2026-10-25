@@ -10,6 +10,7 @@ import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, revealPathOf, saveOf, splitArchived, timeOf, versions, whenWords, type Item } from './model';
 import { emitAction } from '@/app/menu';
 import { aboutWords, ArtLibrary, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
+import { hero } from '@/proto/words_hero.gen';
 import { library } from '@/proto/words_library.gen';
 import { putInDraft } from './put';
 import { browserUrl, cutFolder, frameSrc, themedUrl } from './Open';
@@ -89,7 +90,9 @@ describe('the page in bise fait mac (mockup 7, decision d2)', () => {
     expect(screen.getByTestId('artifacts.kinds.all').getAttribute('aria-selected')).toBe('true');
     expect(screen.queryByTestId('artifacts.hero')).toBeNull();
     expect(screen.getByTestId('artifacts.lead').textContent).toContain(library.say);
-    expect(screen.getByTestId('artifacts.screen').querySelector('.art-vignette img')).not.toBeNull();
+    // the banner: its title, and the filing desk as its vignette (light and dark), no icon fallback
+    expect(screen.getByTestId('artifacts.lead').querySelector('h1')?.textContent).toBe(hero.artifacts_title);
+    expect(screen.getByTestId('artifacts.lead.visual').querySelectorAll('img[data-vignette="artifacts"]')).toHaveLength(2);
     // no glyph as an icon: the toggles are line icons with their tips
     expect(screen.getByTestId('artifacts.view.grid').textContent).toBe('');
     expect(screen.getByTestId('artifacts.view.grid').getAttribute('data-tip')).toBe(library.tip_cards);

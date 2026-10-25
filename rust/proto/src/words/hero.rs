@@ -7,6 +7,16 @@
 //! `settings.page_*_sub`. Ages (`2 h`) and clock times stay TS fns.
 
 crate::words! { hero:
+    // ---- the titles: a page banner's (ds PageBanner, designer m_42762), what the page is
+    /// the inbox page's banner title
+    inbox_title = "Inbox";
+    /// the artifacts page's banner title
+    artifacts_title = "Artifacts";
+    /// the scheduled page's banner title
+    scheduled_title = "Scheduled";
+    /// the processes page's banner title
+    processes_title = "Processes";
+
     // ---- the sentences
     /// the inbox screen's hero sentence
     inbox_say = "what your agents wait on you for, from every project.";

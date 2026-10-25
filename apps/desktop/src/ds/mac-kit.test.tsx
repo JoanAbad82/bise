@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ds } from "@/proto/words_ds.gen";
 import { entityKey } from "@/shared/entity";
-import { APP_ICONS, AppIcon, BarSearch, Filters, GroupLabel, LeadWait, ListRow, MoreButton, PageLead, RowAction, type EntityMenu } from "./index";
+import { APP_ICONS, AppIcon, BannerWait, BarSearch, Filters, GroupLabel, ListRow, MoreButton, PageBanner, RowAction, type EntityMenu } from "./index";
 import { clippers, noClip } from "./noclip";
 
 afterEach(cleanup);
@@ -16,19 +16,41 @@ const menu = (): EntityMenu & { opened: number; right: number } => {
   return m;
 };
 
-describe("PageLead", () => {
-  it("the sentence, then the facts with the accent only on what waits; no name of its own", () => {
-    const { getByTestId } = render(<PageLead sentence="what your agents wait on you for." facts={<><LeadWait>3 waiting</LeadWait> · the oldest 21 d ago</>} testId="lead" />);
-    const lead = getByTestId("lead");
-    expect(lead.querySelector(".say")?.textContent).toBe("what your agents wait on you for.");
-    expect(lead.querySelector(".facts")?.textContent).toBe("3 waiting · the oldest 21 d ago");
-    expect([...lead.querySelectorAll(".wait")].map((n) => n.textContent)).toEqual(["3 waiting"]);
-    expect(lead.querySelector(".name")).toBeNull();
+describe("PageBanner", () => {
+  it("the title, the sentence, then the facts with the accent only on what waits; no button in it", () => {
+    const { getByTestId } = render(<PageBanner title="Inbox" sentence="what your agents wait on you for." facts={<><BannerWait>3 waiting</BannerWait> · the oldest 21 d ago</>} icon="inbox" testId="b" />);
+    const b = getByTestId("b");
+    expect(b.querySelector("h1.title")?.textContent).toBe("Inbox");
+    expect(b.querySelector(".say")?.textContent).toBe("what your agents wait on you for.");
+    expect(b.querySelector(".facts")?.textContent).toBe("3 waiting · the oldest 21 d ago");
+    expect([...b.querySelectorAll(".wait")].map((n) => n.textContent)).toEqual(["3 waiting"]);
+    expect(b.querySelector("button")).toBeNull();
   });
 
   it("no facts line when the place has no live number", () => {
-    const { getByTestId } = render(<PageLead sentence="s" testId="lead" />);
-    expect(getByTestId("lead").querySelector(".facts")).toBeNull();
+    const { getByTestId } = render(<PageBanner title="t" sentence="s" icon="inbox" testId="b" />);
+    expect(getByTestId("b").querySelector(".facts")).toBeNull();
+  });
+
+  it("never an empty box: the page's line icon with no vignette, the vignette when it has one", () => {
+    const { getByTestId, unmount } = render(<PageBanner title="t" sentence="s" icon="scheduled" testId="b" />);
+    expect(getByTestId("b.visual").getAttribute("data-fallback")).toBe("true");
+    expect(getByTestId("b.visual").querySelector('[data-icon="scheduled"]')).not.toBeNull();
+    unmount();
+    const r = render(<PageBanner title="t" sentence="s" icon="scheduled" visual={<img className="light" alt="" />} testId="b" />);
+    expect(r.getByTestId("b.visual").hasAttribute("data-fallback")).toBe(false);
+    expect(r.getByTestId("b.visual").querySelector("img.light")).not.toBeNull();
+    expect(r.getByTestId("b.visual").getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("its edge (a column page's or 32 in) and the right side's gutter as --banner-gutter", () => {
+    const { getByTestId, unmount } = render(<PageBanner title="t" sentence="s" icon="inbox" gutter={172} testId="b" />);
+    expect(getByTestId("b").getAttribute("data-edge")).toBe("column");
+    expect(getByTestId("b").style.getPropertyValue("--banner-gutter")).toBe("172px");
+    unmount();
+    const r = render(<PageBanner title="t" sentence="s" icon="inbox" edge="page" testId="b" />);
+    expect(r.getByTestId("b").getAttribute("data-edge")).toBe("page");
+    expect(r.getByTestId("b").style.getPropertyValue("--banner-gutter")).toBe("");
   });
 });
 

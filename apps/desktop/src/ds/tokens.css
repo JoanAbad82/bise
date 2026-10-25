@@ -113,6 +113,11 @@
   --w-panel: 384px; --w-panel-min: 320px; --w-panel-max: 640px; /* the tabbed panel on the right */
   --w-flyout: 360px;       /* a bubble's card on the right side */
   --w-search: 200px;       /* the search field in a page's bar */
+  /* a page's banner (ds PageBanner, designer m_42762): 200 high, its visual 360 x 176; under a
+     1000 content area 160 high and 264 x 132; its text 560 wide at most */
+  --h-banner: 200px; --h-banner-sm: 160px;
+  --w-banner-vis: 360px; --h-banner-vis: 176px; --w-banner-vis-sm: 264px; --h-banner-vis-sm: 132px;
+  --w-banner-text: 560px;
   --w-state: 16px;         /* a list row's state column ('?', a check) */
   --bubble: 44px;          /* a bubble on the right side (A: its object comes out of its top) */
   --bubble-obj: 68px;      /* the 3D object in a bubble: 28 out of its top */
@@ -129,6 +134,7 @@
   --float-room: calc(var(--float-bottom) + var(--float-h) + var(--s-4));
   /* the 7 text sizes (native-mac §6), nothing else: font: <weight> var(--f-*). lint.ts typeScale counts the rest */
   --f-question: var(--t-30)/36px var(--font-ui); /* the empty home's question, 500, -0.01em */
+  --f-title: var(--t-22)/28px var(--font-ui);    /* a page banner's title, 600: ds/css/banner.css only (lint.test) */
   --f-lead: var(--t-15)/22px var(--font-ui);     /* the sentence at a page's top, text-2 */
   --f-read: var(--t-14)/22px var(--font-read);   /* the thread, the bubbles, the composer's field */
   --f-ui: var(--t-13)/18px var(--font-ui);       /* the sidebar, the bar, tabs, rows, menus, buttons */
