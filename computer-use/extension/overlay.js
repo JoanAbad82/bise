@@ -1,23 +1,15 @@
-// Injected (chrome.scripting) into an agent's tabs only. Two jobs:
-// 1. Draw the agent's cursor (designer, design §5.1): a dark arrow with a
-//    light edge and a pink glow, the agent's name in a pill; it glides to
-//    the target (~150 ms), then a pink ring grows and fades (300 ms).
-//    Purely visual, in a closed shadow root, pointer-events: none.
-// 2. Tell the service worker when someone clicks or types in this tab; the
-//    worker keeps the user's input only (the tab counts as touched; the
-//    agent keeps driving it: taking over is bise's window only).
+// generated from overlay.ts by scripts/ts_emit.ts: never hand-edited (edit the .ts, then run it)
 (() => {
-  if (window.__biseOverlay) return;
-  window.__biseOverlay = true;
-
-  let host = null, cursorEl = null, nameEl = null, shown = false;
-
-  function build() {
-    host = document.createElement("bise-cursor");
-    host.setAttribute("aria-hidden", "true");
-    host.style.cssText = "all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483647;";
-    const root = host.attachShadow({ mode: "closed" });
-    root.innerHTML = `
+    if (window.__biseOverlay)
+        return;
+    window.__biseOverlay = true;
+    let host = null, cursorEl = null, nameEl = null, shown = false;
+    function build() {
+        host = document.createElement("bise-cursor");
+        host.setAttribute("aria-hidden", "true");
+        host.style.cssText = "all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483647;";
+        const root = host.attachShadow({ mode: "closed" });
+        root.innerHTML = `
       <style>
         .c { position: fixed; left: 0; top: 0; transform: translate(-100px, -100px); transition: transform 150ms ease-out; will-change: transform; }
         .arrow { display: block; filter: drop-shadow(0 0 4px rgba(244, 166, 176, 0.9)) drop-shadow(0 0 10px rgba(244, 166, 176, 0.5)); }
@@ -33,58 +25,62 @@
         </svg>
         <div class="pill"></div>
       </div>`;
-    cursorEl = root.querySelector(".c");
-    nameEl = root.querySelector(".pill");
-    host.__root = root;
-    (document.body || document.documentElement).appendChild(host);
-  }
-
-  function ring(x, y) {
-    const r = document.createElement("div");
-    r.className = "ring";
-    r.style.left = x + "px";
-    r.style.top = y + "px";
-    host.__root.appendChild(r);
-    setTimeout(() => r.remove(), 350);
-  }
-
-  chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
-    if (msg?.bise !== "cursor") return;
-    if (msg.hide) {
-      if (host) host.style.display = "none";
-      shown = false;
-      reply(true);
-      return;
+        cursorEl = root.querySelector(".c");
+        nameEl = root.querySelector(".pill");
+        host.__root = root;
+        (document.body || document.documentElement).appendChild(host);
     }
-    if (!host || !host.isConnected) build();
-    host.style.display = "";
-    nameEl.textContent = msg.agent;
-    if (!shown) {
-      // First appearance: start a little up-left of the target, then glide.
-      cursorEl.style.transition = "none";
-      cursorEl.style.transform = `translate(${msg.x - 40}px, ${msg.y - 30}px)`;
-      cursorEl.getBoundingClientRect();
-      cursorEl.style.transition = "";
-      shown = true;
+    // (host and the cursor's elements: build() made them before any of this runs)
+    function ring(x, y) {
+        const r = document.createElement("div");
+        r.className = "ring";
+        r.style.left = x + "px";
+        r.style.top = y + "px";
+        host.__root.appendChild(r);
+        setTimeout(() => r.remove(), 350);
     }
-    cursorEl.style.transform = `translate(${msg.x}px, ${msg.y}px)`;
-    setTimeout(() => {
-      if (msg.ring) ring(msg.x, msg.y);
-      reply(true);
-    }, 150);
-    return true;
-  });
-
-  // A real click or key from the user, in a tab they can see: touched.
-  const user = (e) => {
-    // The worker keeps only what comes from the tab in view, outside its own actions.
-    if (!e.isTrusted) return;
-    try {
-      chrome.runtime.sendMessage({ bise: "input", kind: e.type });
-    } catch {
-      // the extension was reloaded
-    }
-  };
-  addEventListener("pointerdown", user, true);
-  addEventListener("keydown", user, true);
+    chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+        if (msg?.bise !== "cursor")
+            return;
+        if (msg.hide) {
+            if (host)
+                host.style.display = "none";
+            shown = false;
+            reply(true);
+            return;
+        }
+        if (!host || !host.isConnected)
+            build();
+        host.style.display = "";
+        nameEl.textContent = msg.agent;
+        if (!shown) {
+            // First appearance: start a little up-left of the target, then glide.
+            cursorEl.style.transition = "none";
+            cursorEl.style.transform = `translate(${msg.x - 40}px, ${msg.y - 30}px)`;
+            cursorEl.getBoundingClientRect();
+            cursorEl.style.transition = "";
+            shown = true;
+        }
+        cursorEl.style.transform = `translate(${msg.x}px, ${msg.y}px)`;
+        setTimeout(() => {
+            if (msg.ring)
+                ring(msg.x, msg.y);
+            reply(true);
+        }, 150);
+        return true;
+    });
+    // A real click or key from the user, in a tab they can see: touched.
+    const user = (e) => {
+        // The worker keeps only what comes from the tab in view, outside its own actions.
+        if (!e.isTrusted)
+            return;
+        try {
+            chrome.runtime.sendMessage({ bise: "input", kind: e.type });
+        }
+        catch {
+            // the extension was reloaded
+        }
+    };
+    addEventListener("pointerdown", user, true);
+    addEventListener("keydown", user, true);
 })();

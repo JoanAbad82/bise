@@ -15,6 +15,12 @@ for every version, what TCC keys a grant on).
 The hardened runtime's library validation: a signed piece loads only libraries signed by Apple or
 its own team. The agent runtime dlopens Homebrew's libssl.3 for TLS, so it carries
 runtime.plist (disable-library-validation); packaging/test-install.sh's TLS turn is the check.
+Ad hoc ('-', a dry run or a local candidate) has no team at all, so under the hardened runtime
+library validation refuses every library of the bundle itself, Electron Framework first: dyld
+aborts the app at launch (SIGABRT, "mapping process and mapped file (non-platform) have different
+Team IDs"; /Applications/bise.app and the release candidates, 10-20 to 10-24). So an ad hoc
+signing gives every executable and app disable-library-validation on top of its own
+entitlements (ad_hoc_entitlements); a real identity never gets it from here.
 
 Why a bundle: macOS keys a plain executable's grant (Files and Folders, App Management) on its
 path and signature, a bundle's on its id and signature (docs/issues/15-tcc-one-grant.md). Every
@@ -33,6 +39,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 REPO = os.path.dirname(HERE)
@@ -175,6 +182,19 @@ def entitlements_for(rel, kind, default=None, bid=None, cli_bundles=()):
     return None
 
 
+LIBRARY_VALIDATION_OFF = "com.apple.security.cs.disable-library-validation"
+
+
+def ad_hoc_entitlements(rel, kind, base):
+    """An ad hoc signing's entitlements for one piece, a dict, or None to keep `base` as is: an
+    executable or an app gets base's keys plus library validation off (an ad hoc piece has no
+    team, so the hardened runtime would refuse every library it loads); a library or a framework
+    keeps base (None). Pure."""
+    if not (kind == "exec" or (kind == "bundle" and is_app(rel))):
+        return None
+    return dict(base or {}, **{LIBRARY_VALIDATION_OFF: True})
+
+
 def codesign_argv(path, kind, identity, entitlements=None, keychain=None, rel=None):
     """codesign's argv for one step, entitlements as decided by entitlements_for. Pure."""
     argv = ["codesign", "--force", "--sign", identity, "--options", "runtime",
@@ -195,15 +215,27 @@ def sign_tree(top, identity, keychain=None, default=None, outer=True, say=None):
     bids = {rel: bundle_id(os.path.normpath(os.path.join(top, rel))) for rel, k in steps if k == "bundle"}
     cli = [rel for rel, b in bids.items() if b in (CLI_ID, DEV_ID)]
     done = []
-    for rel, kind in steps:
-        path = os.path.normpath(os.path.join(top, rel))
-        ent = entitlements_for(rel, kind, default, bids.get(rel), cli)
-        if ent and not os.path.isfile(ent):
-            raise SignError("no entitlements file at %s" % ent)
-        r = subprocess.run(codesign_argv(path, kind, identity, ent, keychain, rel), capture_output=True, text=True)
-        if r.returncode != 0:
-            raise SignError("codesign %s: %s" % (rel, (r.stderr or r.stdout).strip()))
-        done.append((rel, kind, ent))
+    with tempfile.TemporaryDirectory(prefix="mac-sign-") as tmp:
+        for i, (rel, kind) in enumerate(steps):
+            path = os.path.normpath(os.path.join(top, rel))
+            ent = entitlements_for(rel, kind, default, bids.get(rel), cli)
+            if ent and not os.path.isfile(ent):
+                raise SignError("no entitlements file at %s" % ent)
+            use = ent
+            if identity == "-":
+                base = None
+                if ent:
+                    with open(ent, "rb") as f:
+                        base = plistlib.load(f)
+                merged = ad_hoc_entitlements(rel, kind, base)
+                if merged is not None:
+                    use = os.path.join(tmp, "%d.plist" % i)
+                    with open(use, "wb") as f:
+                        plistlib.dump(merged, f)
+            r = subprocess.run(codesign_argv(path, kind, identity, use, keychain, rel), capture_output=True, text=True)
+            if r.returncode != 0:
+                raise SignError("codesign %s: %s" % (rel, (r.stderr or r.stdout).strip()))
+            done.append((rel, kind, ent))
     if say:
         say("signed %d pieces of code in %s, inside out" % (len(done), os.path.basename(os.path.abspath(top))))
     return done

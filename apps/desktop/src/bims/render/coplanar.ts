@@ -15,6 +15,8 @@ export interface Clash {
   readonly b: string;
   /** the overlap's area, in square units */
   readonly area: number;
+  /** the shared plane's normal's y, from a's face: -1 a face only seen from under the floor */
+  readonly ny: number;
 }
 
 function trisOf(geo: BufferGeometry, mesh: Mesh, out: Tri[]): void {
@@ -76,10 +78,12 @@ function overlap(a: P2[], b: P2[]): number {
 }
 
 /**
- * Every pair of meshes under root with two faces in one plane (facing either way, their planes
+ * Every pair of meshes under root with two faces in one plane (facing either way, or the same way
+ * with `facing: 'same'`: a piece's underside on a top is culled, only two faces turned the same way
+ * draw in turns; their planes
  * apart by less than eps) that overlap by more than minArea: what z-fights. One clash per pair.
  */
-export function coplanarClashes(root: Object3D, eps = 0.005, minArea = 1e-6): Clash[] {
+export function coplanarClashes(root: Object3D, eps = 0.005, minArea = 1e-6, facing: 'either' | 'same' = 'either'): Clash[] {
   root.updateMatrixWorld(true);
   const meshes: Mesh[] = [];
   root.traverse((o) => { if (o instanceof Mesh) meshes.push(o as Mesh); });
@@ -95,23 +99,24 @@ export function coplanarClashes(root: Object3D, eps = 0.005, minArea = 1e-6): Cl
     for (let j = i + 1; j < meshes.length; j++) {
       // two meshes whose bounds don't touch share no face
       if (!(boxes[i] as Box3).intersectsBox(boxes[j] as Box3)) continue;
-      const area = clashOf(tris[i] ?? [], tris[j] ?? [], eps, minArea);
-      if (area > 0) found.push({ a: name(i), b: name(j), area });
+      const c = clashOf(tris[i] ?? [], tris[j] ?? [], eps, minArea, facing === 'same');
+      if (c) found.push({ a: name(i), b: name(j), ...c });
     }
   }
   return found;
 }
 
-/** the overlap of the first two faces of a and b in one plane, or 0 */
-function clashOf(as: readonly Tri[], bs: readonly Tri[], eps: number, minArea: number): number {
+/** the overlap of the first two faces of a and b in one plane and a's normal's y, or undefined */
+function clashOf(as: readonly Tri[], bs: readonly Tri[], eps: number, minArea: number, same: boolean): { area: number; ny: number } | undefined {
   for (const a of as) {
     for (const b of bs) {
-      if (Math.abs(a.n.dot(b.n)) < 0.9995) continue;
+      const dot = a.n.dot(b.n);
+      if ((same ? dot : Math.abs(dot)) < 0.9995) continue;
       if (b.p.some((v) => Math.abs(a.n.dot(v) - a.d) > eps)) continue;
       const ax = Math.abs(a.n.x) >= Math.abs(a.n.y) && Math.abs(a.n.x) >= Math.abs(a.n.z) ? 0 : Math.abs(a.n.y) >= Math.abs(a.n.z) ? 1 : 2;
       const area = overlap(flat(a, ax), flat(b, ax));
-      if (area > minArea) return area;
+      if (area > minArea) return { area, ny: a.n.y };
     }
   }
-  return 0;
+  return undefined;
 }

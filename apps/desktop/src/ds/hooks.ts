@@ -1,6 +1,6 @@
 // src/ds · the only state and effects a ds component may hold: measuring its own box and following
 // its own row's hover (architect m_26213). What they never do: reach the store, the IPC or the app;
-// they read the DOM of the component that calls them, nothing else. purity.mjs checks that every
+// they read the DOM of the component that calls them, nothing else. purity.mts checks that every
 // useState/useEffect/useLayoutEffect/ResizeObserver of src/ds is here. Owner: amb-kit.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DependencyList, type FocusEvent, type Ref, type RefObject } from "react";
 import { pickerPlace, type PickerPlace } from "./place";

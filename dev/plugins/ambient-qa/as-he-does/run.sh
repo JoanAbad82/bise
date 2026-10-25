@@ -6,19 +6,22 @@
 # Gates first, each a kill at its first breach: A the front app (realshape.py front), B his Library
 # (realshape.py libsnap, before/after every step), C no bise-mac-helper process and no TCC request
 # from any of the run's pids (tccd's log, read live). Then two launches (first: the window passes,
-# driver.mjs; second: clean start), --real --stop after each, realshape core with no env.
+# driver.ts; second: clean start), --real --stop after each, realshape core with no env.
 #   run.sh <out dir>
 set -u
 O=${1:?out dir}; mkdir -p "$O"
 P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
+# the driver is .ts, run by node's type stripping: flagged before node 22.18 (js-to-ts, architect
+# m_40557), on each node line only. Goes with engines >=22.18.
+TS_NODE="--experimental-strip-types --disable-warning=ExperimentalWarning"
 RS="$P -B $HERE/../realshape.py"
 . "$HERE/ports.sh" || { echo "no $HERE/ports.sh"; exit 2; }
 G=$HOME/.bise/gate/real-shape; H=$G/w/h
 SRC=${AS_HE_DOES_SRC:-$HOME/.bise/dev/try-src}
 A="$SRC/apps/desktop/dist/mac-arm64/bise try.app"
 export PW_FROM=$T/apps/desktop
-# the files the driver's words carry, under the world, never under a path naming a project (fx.mjs)
+# the files the driver's words carry, under the world, never under a path naming a project (fx.ts)
 export AS_HE_DOES_FX=$G/fx
 say() { echo "$(date +%T) $*"; }
 stopall() { (cd "$SRC" && BISE_TRY_REAL=$H/.bise scripts/desktop-try.sh --real --stop); sleep 2; say "left naming the world: $(ps -axo pid,command | grep -F "$G/w" | grep -v grep | wc -l)"; }
@@ -34,7 +37,7 @@ libgate() { $RS libsnap --out $O/after-$1.json --diff $O/before.json || { echo "
 draftcase() {
   local tag=$1 pause=$2 text="draft kept across a restart ($1)" d=$O/restart-$1 lbl=amb-tools.restart-proof
   mkdir -p $d; rm -f $d/rc
-  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs $CDP_GATE $O draft-type "$text" 2>&1 | tail -3
+  AS_HE_DOES_TAG=$tag NODE_OPTIONS="$TS_NODE" node $HERE/driver.ts $CDP_GATE $O draft-type "$text" 2>&1 | tail -3
   breach
   [ "$pause" -gt 0 ] && sleep "$pause"
   local t0; t0=$(date '+%Y-%m-%d %H:%M:%S')
@@ -44,7 +47,7 @@ draftcase() {
   for i in $(seq 900); do [ -e $d/rc ] && break; [ -e $O/BREACH ] && break; sleep 0.5; done
   say "restart $tag: rc $(cat $d/rc 2>/dev/null || echo none): $(tail -2 $d/log 2>/dev/null | tr '\n' ' ' | cut -c1-300)"
   breach; libgate restart-$tag
-  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs $CDP_GATE $O draft-check "$text" 2>&1 | tail -3
+  AS_HE_DOES_TAG=$tag NODE_OPTIONS="$TS_NODE" node $HERE/driver.ts $CDP_GATE $O draft-check "$text" 2>&1 | tail -3
   breach
   $P - "$O/tcc-debug.ndjson" "$t0" > $d/tcc-appleevents.txt <<'PY'
 import json, sys
@@ -103,7 +106,7 @@ for n in first second; do
   say "launch $n"
   (cd "$SRC" && BISE_TRY_REAL=$H/.bise BISE_DESKTOP_OFFSCREEN=1 BISE_TRY_OPEN=$HERE/open-cdp.sh BISE_PROOF_CDP_PORT=$CDP_GATE scripts/desktop-try.sh --real) 2>&1
   breach; libgate $n-open
-  node $HERE/driver.mjs $CDP_GATE $O $n 2>&1 | tail -5
+  NODE_OPTIONS="$TS_NODE" node $HERE/driver.ts $CDP_GATE $O $n 2>&1 | tail -5
   breach
   if [ $n = first ]; then draftcase pause 5; draftcase atonce 0; fi
   # the app's core.log is in its actual userData, wherever the stand-in put it (amb-core's caveat,

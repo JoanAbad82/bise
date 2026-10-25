@@ -21,6 +21,9 @@ O=${1:?out dir}; A=${2:?candidate app}; mkdir -p "$O"
 A=$(cd "$A" && pwd -P) || { echo "no $2"; exit 2; }
 P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
+# the drivers are .ts, run by node's type stripping: flagged before node 22.18 (js-to-ts, architect
+# m_40557), on each node line only, so the candidate app never inherits it. Goes with engines >=22.18.
+TS_NODE="--experimental-strip-types --disable-warning=ExperimentalWarning"
 RS="$P -B $HERE/../realshape.py"
 # a world per heavy slot (fast-loop, his pick q-slow on loop-4min; review-gates m_36599): world 1 is
 # ~/.bise/gate/real-shape (CDP 9341), world n ~/.bise/gate/real-shape-n (CDP 9341 + 10 (n - 1));
@@ -95,7 +98,7 @@ for l in "$G/locks/world" "$CAND_LOCK"; do echo "pid $$ since $(date '+%F %T'), 
 # stand-in run, holding the locks that long and nothing else (tests/cand_lock_test.py)
 [ -n "${CAND_LOCK_HOLD:-}" ] && { sleep "$CAND_LOCK_HOLD"; exit "${CAND_LOCK_HOLD_RC:-0}"; }
 # AS_HE_DOES_FAKE_VOICE=1: the candidate's core hears the words written to $VOICE (fake.rs: its
-# BISE_HOME is under ~/.bise/gate, never his), for dict1.mjs' ctrl+r take
+# BISE_HOME is under ~/.bise/gate, never his), for dict1.ts' ctrl+r take
 VOICE=$G/voice-cand.txt; FV=()
 [ "${AS_HE_DOES_FAKE_VOICE:-}" = 1 ] && { : > "$VOICE"; FV=(--env "BISE_AMBIENT_FAKE_VOICE=$VOICE"); export AS_HE_DOES_VOICE=$VOICE; }
 # the driver's f2a7 rows find the candidate's own ambient-core by this path (a SIGSTOP of its pid only)
@@ -247,7 +250,7 @@ candprefs() {
   grep 'cand prefs:' $O/run.out 2>/dev/null >> $O/cand-prefs.txt
 }
 # the candidate's userData in the world (userdata.ts standInPaths: HOME is the world's): window-frame.json
-drive() { AS_HE_DOES_BISE_HOME=$H/.bise AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; echo $? > $O/driver-$1${TAG:+-$TAG}.rc; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
+drive() { AS_HE_DOES_BISE_HOME=$H/.bise AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} NODE_OPTIONS="$TS_NODE" node $HERE/driver.ts $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; echo $? > $O/driver-$1${TAG:+-$TAG}.rc; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
 
 # the end of a quick or smoke run: the gates' watchers stop, the fake provider and the world's last
 # processes (by pid), the candidate's prefs domain, gate B's final diff, his app's pids again
@@ -272,7 +275,7 @@ else
 fi
 # every model request in a line (the quote row reads it), in the world, never /tmp's default
 export FAKE_LOG=$G/fake/requests.jsonl AS_HE_DOES_FAKE_LOG=$G/fake/requests.jsonl
-# the files the driver's words carry, under the world (fx.mjs, regress-25e5): an out dir in an
+# the files the driver's words carry, under the world (fx.ts, regress-25e5): an out dir in an
 # agent's tmp (~/.bise/hubs/harness-<id>/...) names 'harness', and bise's thread routed them there
 export AS_HE_DOES_FX=$G/fx
 mkdir -p $G/fake; : > $FAKE_LOG; ($P -u $T/tests/fake_provider.py 0 > $G/fake/fake.out 2> $G/fake/fake.err & echo $! > $G/fake/fake.pid)
@@ -358,7 +361,7 @@ if [ "${AS_HE_DOES_ONLY:-}" = quick ]; then
   # fake voice (AS_HE_DOES_FAKE_VOICE=1), then the usual stop and gates
   drive quick
   if [ -n "${FV:-}" ]; then
-    AS_HE_DOES_VOICE=$VOICE node $HERE/dict1.mjs $PORT_CDP $O > $O/driver-dict1.log 2>&1; tail -4 $O/driver-dict1.log; breach
+    AS_HE_DOES_VOICE=$VOICE NODE_OPTIONS="$TS_NODE" node $HERE/dict1.ts $PORT_CDP $O > $O/driver-dict1.log 2>&1; tail -4 $O/driver-dict1.log; breach
   fi
   L=$(find "$H" -name core.log -newer $O/before.json -not -path "*/.bise/hubs/*" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
   [ -n "$L" ] && cp "$L" $O/core-first.log
@@ -367,12 +370,12 @@ if [ "${AS_HE_DOES_ONLY:-}" = quick ]; then
     # the first run's live key check (desk-cut-10, onboard-keys-2): the candidate again on a FRESH
     # home under the world (stopcand stops what names $G/w), no key, no prefs, every provider's
     # base_url on the world's fake provider, the keychain probe off, no browser or link opener;
-    # the gates still run. firstrun.mjs never goes past the model step.
+    # the gates still run. firstrun.ts never goes past the model step.
     WH=$H; H=$G/w/first-$(date +%H%M%S)/h; mkdir -p $H/.bise
     for p in anthropic openai mistral chatgpt openrouter; do printf '[providers.%s]\nbase_url = "http://127.0.0.1:%s/v1"\n\n' $p $PORT; done > $H/.bise/config.toml
     FV=(--env BISE_DETECT_KEYCHAIN=0 --env BISE_OPEN=true --env BISE_BROWSER=true)
     say "first run: fresh home $H"; opencand; breach; libgate firstrun-open
-    AS_HE_DOES_FIRST_HOME=$H/.bise node $HERE/firstrun.mjs $PORT_CDP $O > $O/driver-firstrun.log 2>&1; tail -4 $O/driver-firstrun.log; breach
+    AS_HE_DOES_FIRST_HOME=$H/.bise NODE_OPTIONS="$TS_NODE" node $HERE/firstrun.ts $PORT_CDP $O > $O/driver-firstrun.log 2>&1; tail -4 $O/driver-firstrun.log; breach
     stopcand; breach; libgate firstrun-stop
     H=$WH
   fi

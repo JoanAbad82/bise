@@ -11,7 +11,7 @@
 //     anchor when the picker had it. Keys typed in it never reach the screen under it.
 //   - Dropdown: a PickerTrigger and its PickerPop, the open state its own; a pick closes it.
 // Their state (open, place) and effects (the outside press, esc, a resize, the focus back) are
-// hooks.ts's useOpen and usePop (purity.mjs): the floating is the ds's, written once. The lint
+// hooks.ts's useOpen and usePop (purity.mts): the floating is the ds's, written once. The lint
 // (ds/lint.ts menuDrawn) refuses a menu built anywhere else. css/dropdown.css.
 import { useRef, type KeyboardEvent, type MouseEventHandler, type ReactNode, type Ref, type RefObject } from "react";
 import { createPortal } from "react-dom";

@@ -51,6 +51,11 @@ describe("the agent head's name", () => {
     expect(v.getByTestId('thread.head.role').textContent).toBe(agent.purpose);
   });
 
+  it("its tip says its role: on a short row the role goes whole (designer m_39925)", () => {
+    const v = head();
+    expect(v.getByTestId('thread.head.name').title).toBe(`${agent.name} · ${agent.purpose}`);
+  });
+
   it("an archived maker's name still gets the width useArchivedFit keeps", () => {
     const v = head(() => undefined);
     // (happy-dom measures nothing: the kept width is 0 here, but it is set)

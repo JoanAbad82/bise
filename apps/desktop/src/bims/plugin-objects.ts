@@ -1,0 +1,196 @@
+// Which object each of his plugins brings to the office (plan bims-plugins p3, page bims-plugins
+// v16): the default one by the plugin's name and kind (bims-plugins m_40041; anything else: a
+// plant whose pot is its kind's), or his own pick, kept per project in the prefs
+// `bims.objects.<project>` = { <PluginId string>: { obj } } (architect m_40029: the prefs' one
+// writer, next to bims.map and bims.grow; an object so p4's spot joins it without a shape change).
+// Its look comes from the plugins event's typed fields only, never a status text: loaded = the
+// object, disabled = glass, invalid or a failed server = glass with the '✗' pill, a login he
+// owes = the '?' pill; a shadowed row brings nothing (the plugin that wins it does).
+// Pure, no React, no three: the office driver and settings › plugins read it. Owner: bims-link.
+import type { JsonValue, Plugin } from '@/proto';
+import { isObjId, type ObjId } from './render/objects/ids';
+
+/**
+ * The fields of a plugins row this module reads. Main's rows have no `id`, `kind`, `login` or
+ * `parts` yet (the plugins branch adds them): each is optional, so both rows fit.
+ */
+export type PluginRow = Pick<Plugin, 'name' | 'state'> & {
+  readonly id?: string | null;
+  readonly kind?: string | null;
+  readonly login?: string | null;
+  readonly logins?: readonly { readonly state: string }[] | null;
+  readonly parts?: readonly { readonly kind: string; readonly on: boolean; readonly login?: string | null; readonly error?: string | null }[] | null;
+};
+
+/** What a plugin is, for its default object and its plant's pot; never its scope. */
+export type PluginKind = 'plugin' | 'connector' | 'mcp' | 'skills' | 'bise';
+
+/** One plugin's object in the office. */
+export interface PluginObject {
+  /** the plugin's id string (pluginKey): the prefs' key and the placement's seed */
+  readonly key: string;
+  readonly obj: ObjId;
+  /** the object's count (makeObject's n): books on a shelf, lights on a rack, the plant's pot */
+  readonly n?: number;
+  /** true: drawn in glass (off, or broken) */
+  readonly glass: boolean;
+  /** '✗' it is broken, '?' it waits on his login; null: none */
+  readonly pill: '✗' | '?' | null;
+  /** true: his pick, not the default */
+  readonly picked: boolean;
+}
+
+/** His picks for one project: plugin key → object. */
+export type Picks = ReadonlyMap<string, ObjId>;
+
+/** The prefs key of a project's picks. */
+export const objectsPrefKey = (project: string): string => `bims.objects.${project}`;
+
+/** A row's PluginId string: its `id` when the row has one, else its name (a real plugin's id is its bare name). */
+export function pluginKey(row: Pick<PluginRow, 'id' | 'name'>): string {
+  return row.id ?? row.name;
+}
+
+/** What the row is: its `kind` when the row says, else read from its id's prefix. */
+export function kindOf(row: Pick<PluginRow, 'id' | 'name' | 'kind'>): PluginKind {
+  const key = pluginKey(row);
+  if (key === 'bise') return 'bise';
+  switch (row.kind) {
+    case 'mistral':
+      return 'connector';
+    case 'mcp':
+      return 'mcp';
+    case 'skills':
+      return 'skills';
+    case 'plugin':
+      return 'plugin';
+    default:
+      return key.startsWith('mistral:') ? 'connector' : key.startsWith('skills:') ? 'skills' : 'plugin';
+  }
+}
+
+/** The plant's pot by kind (makeObject's n for a plant, signed with designer): 1 amber, 2 sky, 3 violet, else teal. */
+const POT: Readonly<Record<PluginKind, number>> = { plugin: 0, connector: 1, mcp: 2, skills: 3, bise: 0 };
+
+/** The name the table matches: a connector's own name, lowercased, '_' and '-' as spaces. */
+function nameOf(key: string): string {
+  const bare = key.startsWith('mistral:') ? key.slice('mistral:'.length) : key;
+  let name = bare;
+  try {
+    name = decodeURIComponent(bare);
+  } catch {
+    // a lone '%': the name as written
+  }
+  return name.toLowerCase().replace(/[_-]+/g, ' ').trim();
+}
+
+/** The default object by name (bims-plugins m_40041); null: none by name. */
+const BY_NAME: readonly (readonly [RegExp, ObjId, number?])[] = [
+  [/^notion$/, 'library'],
+  [/^(google )?drive( mcp)?$/, 'files'],
+  [/^granola$/, 'visio'],
+  [/^slack$/, 'booth'],
+  [/^(hn|hacker news)$/, 'arcade'],
+  [/^reddit$/, 'pingpong'],
+  [/^kit$/, 'scooter'],
+  [/^gmail$/, 'mailbox'],
+  // figma: where you draw (designer m_40518)
+  [/^(blender|image generation|figma)$/, 'easel'],
+  [/^(computer|computer use)$/, 'macdesk'],
+  [/^docs$/, 'printer', 1],
+  [/^sheets$/, 'printer', 2],
+  [/^slides$/, 'printer', 3],
+  [/calendar/, 'calendar'],
+  [/^(web search|tavily)$/, 'telescope'],
+  [/^bise stats$/, 'trophies'],
+  [/^github( app)?$/, 'packing'],
+  [/^sentry/, 'extinguisher'],
+  [/^(metabase|bigquery|wandb)$/, 'charts'],
+];
+
+/** The plugin's own object when he never picked one, with its count. */
+export function defaultObject(row: PluginRow): { readonly obj: ObjId; readonly n?: number } {
+  const kind = kindOf(row);
+  if (kind === 'bise') return { obj: 'cat' };
+  if (kind === 'skills') return { obj: 'shelf', n: count(row, 'skill', false) };
+  const name = nameOf(pluginKey(row));
+  for (const [re, obj, n] of BY_NAME) if (re.test(name)) return n === undefined ? { obj } : { obj, n };
+  if (kind === 'mcp') return { obj: 'rack', n: count(row, 'mcp', true) };
+  return { obj: 'plant', n: POT[kind] };
+}
+
+/** How many parts of that kind the row has (only the ones on), at least 1; absent parts: 1. */
+function count(row: PluginRow, kind: string, onOnly: boolean): number {
+  const n = (row.parts ?? []).filter((p) => p.kind === kind && (!onOnly || p.on)).length;
+  return Math.max(1, n);
+}
+
+/** A login he owes: the row's own (a connector), a server's (main's `logins`), or a part's. */
+function owesLogin(row: PluginRow): boolean {
+  return row.login === 'needs' || (row.logins ?? []).some((l) => l.state === 'needs') || (row.parts ?? []).some((p) => p.on && p.login === 'needs');
+}
+
+/** A server of it that failed (a part with an error: its presence marks it, never its text). */
+function failed(row: PluginRow): boolean {
+  return (row.parts ?? []).some((p) => p.on && p.error != null);
+}
+
+/** His picks from the prefs value at `bims.objects.<project>`: a value that is no object or no known ObjId is skipped. */
+export function picksOf(v: JsonValue | undefined): Picks {
+  const out = new Map<string, ObjId>();
+  if (v === null || v === undefined || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const [key, e] of Object.entries(v)) {
+    if (e === null || typeof e !== 'object' || Array.isArray(e)) continue;
+    const obj = e.obj;
+    if (typeof obj === 'string' && isObjId(obj)) out.set(key, obj);
+  }
+  return out;
+}
+
+/**
+ * The prefs value with `key`'s pick set (obj null: back to its default). Every other entry stays
+ * as it was, a stale key (a plugin gone for now) and an entry's other fields (p4's spot) too.
+ */
+export function withPick(v: JsonValue | undefined, key: string, obj: ObjId | null): JsonValue {
+  const was = v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const old = was[key];
+  const rest = old !== null && old !== undefined && typeof old === 'object' && !Array.isArray(old) ? old : {};
+  const keep = Object.fromEntries(Object.entries(rest).filter(([k]) => k !== 'obj'));
+  const others = Object.fromEntries(Object.entries(was).filter(([k]) => k !== key));
+  if (obj !== null) return { ...others, [key]: { ...keep, obj } };
+  return Object.keys(keep).length > 0 ? { ...others, [key]: keep } : others;
+}
+
+/** One plugin's object, its look and its pill; null: it brings none (shadowed, or a state this app does not know). */
+export function objectOf(row: PluginRow, picks: Picks): PluginObject | null {
+  const broken = row.state === 'invalid' || failed(row);
+  const on = row.state === 'loaded';
+  // shadowed (another row wins its name), available (a connector he never added), unknown: nothing
+  if (!on && !broken && row.state !== 'disabled') return null;
+  const key = pluginKey(row);
+  const pick = picks.get(key);
+  const dflt = defaultObject(row);
+  // his pick keeps the default's count only when it is the same object (the plant's pot, the shelf's books)
+  const n = pick === undefined || pick === dflt.obj ? dflt.n : undefined;
+  return {
+    key,
+    obj: pick ?? dflt.obj,
+    ...(n === undefined ? {} : { n }),
+    glass: broken || !on,
+    pill: broken ? '✗' : owesLogin(row) ? '?' : null,
+    picked: pick !== undefined,
+  };
+}
+
+/** Every plugin's object, in a stable order (by key), one per key (the first row wins). */
+export function officeObjects(rows: readonly PluginRow[] | null, picks: Picks): readonly PluginObject[] {
+  const seen = new Set<string>();
+  const out: PluginObject[] = [];
+  for (const row of rows ?? []) {
+    const o = objectOf(row, picks);
+    if (o === null || seen.has(o.key)) continue;
+    seen.add(o.key);
+    out.push(o);
+  }
+  return out.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+}

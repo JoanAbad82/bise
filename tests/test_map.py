@@ -231,7 +231,7 @@ def gen_files(root=ROOT):
 
 # ---- desktop-pick: which harness checks (apps/desktop/tests/checks) a change can break (fast-try
 # p2; architect m_29198 m_29411, review-gates m_29412). The map is the nightly's coverage
-# (apps/desktop/tests/harness/coverage/covmap.mjs writes <gate dir>/desktop-cov.json, never
+# (apps/desktop/tests/harness/coverage/covmap.mts writes <gate dir>/desktop-cov.json, never
 # committed): per check, the source files V8 saw run in it and the files its spec imports. This is
 # its one reader. Anything it can't vouch for is ALL.
 COV_FILE = "desktop-cov.json"

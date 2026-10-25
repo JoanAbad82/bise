@@ -20,6 +20,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.join(HERE, "..", "dev", "plugins", "ambient-qa")
+# its .ts scripts run by node's type stripping: flagged before node 22.18 (js-to-ts, architect m_40557)
+TS_NODE = "--experimental-strip-types --disable-warning=ExperimentalWarning"
 sys.path.insert(0, PLUGIN)
 import qa  # noqa: E402
 import qa_flows  # noqa: E402  (a test patches a name where it is read)
@@ -313,8 +315,8 @@ def page_drive_local_only():
     # never one of his apps (ambient-lead m_12343: his /Applications Chrome set off App Management)
     for exe in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", os.path.expanduser("~/Applications/X.app/Contents/MacOS/X"),
                 "/opt/x/Thing.app/Contents/MacOS/t"):
-        p = subprocess.run(["node", os.path.join(PLUGIN, "pagedrive.mjs"), json.dumps({"url": "http://127.0.0.1:1/x", "out": "/tmp/x"})],
-                           capture_output=True, text=True, timeout=30, env=dict(os.environ, QA_CHROME=exe))
+        p = subprocess.run(["node", os.path.join(PLUGIN, "pagedrive.ts"), json.dumps({"url": "http://127.0.0.1:1/x", "out": "/tmp/x"})],
+                           capture_output=True, text=True, timeout=30, env=dict(os.environ, QA_CHROME=exe, NODE_OPTIONS=TS_NODE))
         check(p.returncode == 1 and json.loads(p.stdout)["error"].startswith("refused: "), (exe, p.stdout))
 
 
@@ -927,9 +929,10 @@ def as_he_does_scripts():
         r = subprocess.run(["bash", "-n", os.path.join(d, f)], capture_output=True, text=True)
         check(r.returncode == 0 and os.access(os.path.join(d, f), os.X_OK), (f, r.stderr))
     if shutil.which("node"):
-        r = subprocess.run(["node", "--check", os.path.join(d, "driver.mjs")], capture_output=True, text=True)
+        r = subprocess.run(["node", "--check", os.path.join(d, "driver.ts")], capture_output=True, text=True,
+                           env=dict(os.environ, NODE_OPTIONS=TS_NODE))
         check(r.returncode == 0, r.stderr)
-    drv = open(os.path.join(d, "driver.mjs")).read()
+    drv = open(os.path.join(d, "driver.ts")).read()
     code = "\n".join(l for l in drv.splitlines() if not l.lstrip().startswith("//"))
     check("settings.add.choose" not in code and "settings.project.add" in code and "127.0.0.1" in code, "driver: no picker, its own add, localhost CDP")
     run = open(os.path.join(d, "run.sh")).read()

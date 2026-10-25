@@ -3,7 +3,7 @@
 // formulas without results; plan risks). Arithmetic, comparison, `&`,
 // cell and range references (same sheet or `Sheet!A1`, `'My sheet'!A1:B2`),
 // and the functions in FUNCS, each pinned by rows of the table test
-// (test/sheets-formula.test.mjs). A wrong cached value is worse than none
+// (test/sheets-formula.test.ts). A wrong cached value is worse than none
 // (architect m_23850): a function we cannot pin to Excel's rules stays out.
 // Anything else is `Unsupported`: the caller keeps the cell's old result,
 // check() names it, Excel recomputes on open (fullCalcOnLoad).

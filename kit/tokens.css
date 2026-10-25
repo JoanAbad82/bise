@@ -112,7 +112,7 @@
    with round 8's dark-column role colors */
 /* the system's choice unless the page was told one: the window opens a page with ?theme=light|dark
    (his theme pref), kit.js puts it on <html data-theme>, and the block under this one (the same
-   values, kit/check.mjs keeps them equal) applies it whatever the system says */
+   values, kit/check.ts keeps them equal) applies it whatever the system says */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --surface-made: #171513;

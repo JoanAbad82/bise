@@ -116,7 +116,8 @@ export function AgentHead({ project, a, more, note, starting = false, restore, n
           // only an archived maker's name cuts (to its first 12 chars, useArchivedFit); a live one
           // keeps its whole width and the role cuts with '…' after it: a min-width of 0 here let it
           // shrink under its own text, drawn over the role (Gabriel, art-gallery's head)
-          <b className="ah-name" data-testid="thread.head.name" title={a.name} style={restore === undefined ? undefined : { minWidth: arch.nameMin }}>
+          // its tip says the role too: on a short row the role goes whole (designer m_39925)
+          <b className="ah-name" data-testid="thread.head.name" title={roleOf(a) === '' ? a.name : `${a.name} · ${roleOf(a)}`} style={restore === undefined ? undefined : { minWidth: arch.nameMin }}>
             {a.name}
           </b>
         )}

@@ -259,14 +259,23 @@ export function stepTime(ms: number): string {
   return r === 0 ? `${String(m)} m` : `${String(m)} m ${String(r)} s`;
 }
 
-/** A scheduled task's line without its number ('main scheduled #1 for dashboards · …' reads 'main scheduled dashboards · …'; designer N2). Pure. */
+/**
+ * A scheduled task's line without its number ('main scheduled #1 for dashboards · …' reads 'bise
+ * scheduled dashboards · …'; designer N2), its agents named as the window names them (`shown`: main
+ * is 'bise', designer m_40683; the TUI keeps 'main'). Pure.
+ */
 export function schedHead(head: string, agent: string | null = null): string {
   // never the internal number (designer m_14246): 'scheduled #48 ended' reads 'scheduled perf ended' in
   // that agent's thread, else 'a scheduled task ended'
   // its rhythm in the app's one form, as the right bar's: 'every 2m' reads 'every 2 min' (designer m_22403)
-  return rhythmWords(head)
-    .replace(/\bscheduled #\d+ for /, 'scheduled ')
-    .replace(/\bscheduled #\d+ (?=ended|stopped|failed)/, agent === null ? 'a scheduled task ' : `scheduled ${agent} `);
+  return (
+    rhythmWords(head)
+      .replace(/\bscheduled #\d+ for /, 'scheduled ')
+      .replace(/\bscheduled #\d+ (?=ended|stopped|failed)/, agent === null ? 'a scheduled task ' : `scheduled ${agent} `)
+      // the hub's set_own '{agent} scheduled {title}' and set_for '… {title} for {agent}' (bise_proto::words::scheduled)
+      .replace(/^(\S+)(?= scheduled )/, (a: string) => shown(a))
+      .replace(/(?<= for )(\S+)(?= ·|$)/, (a: string) => shown(a))
+  );
 }
 
 /** The argument a tool is about, in the order the args usually name it. */

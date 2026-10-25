@@ -219,7 +219,9 @@ if [ "${1:-}" = --in-slot ]; then
   # turns the night red (MISS lines, <gate dir>/desktop-pick-misses.tsv; the selection goes back
   # to shadow mode), and a missing map only makes the selection ALL
   day="$(date +%F)" gate_dir="${BISE_HOME:-$HOME/.bise}/gate"
-  covmap=apps/desktop/tests/harness/coverage/covmap.mjs
+  covmap=apps/desktop/tests/harness/coverage/covmap.mts
+  # node runs the .ts itself (until engines >= 22.18 makes type stripping the default)
+  ts_node="--experimental-strip-types --disable-warning=ExperimentalWarning"
   # a tip run skips the desktop checks, their map and audit, and core-record (review-gates
   # m_37134: the 04:31 tip run sat 5 h in desktop-checks, a slot and a 10 GB reserve held while
   # 5 agents waited for disk room): a tip gate is the gate per sha; the nightly runs these
@@ -232,7 +234,7 @@ if [ "${1:-}" = --in-slot ]; then
   if [ -f scripts/tree_bise.sh ] && [ -z "${QA_BISE:-}" ] && qb="$(bash scripts/tree_bise.sh)"; then
     export QA_BISE="$qb" AMBIENT_QA_APP_ROOT="$PWD"
   fi
-  night_step desktop-checks "$covmap" node "$covmap" checks --gate-dir "$gate_dir" ${NIGHTLY_END:+--until "$NIGHTLY_END"}
+  night_step desktop-checks "$covmap" env NODE_OPTIONS="$ts_node" node "$covmap" checks --gate-dir "$gate_dir" ${NIGHTLY_END:+--until "$NIGHTLY_END"}
   cr=$?
   if [ -f "$covmap" ]; then
     ncut=0
@@ -259,7 +261,7 @@ if [ "${1:-}" = --in-slot ]; then
   if [ $cr = 3 ]; then
     [ -f "$gate_dir/desktop-cov-run/report.json" ] && mapped=--past-end
   else mapped=now; fi
-  if [ -n "$mapped" ] && night_step --own try-select ${mapped#now} desktop-map "$covmap" node "$covmap" map --gate-dir "$gate_dir" --day "$day"; then
+  if [ -n "$mapped" ] && night_step --own try-select ${mapped#now} desktop-map "$covmap" env NODE_OPTIONS="$ts_node" node "$covmap" map --gate-dir "$gate_dir" --day "$day"; then
     night_step --own try-select desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --gate-dir "$gate_dir" --day "$day"
   fi
   fi

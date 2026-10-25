@@ -1,3 +1,4 @@
+// stays JS: the release config, read by electron-builder's own loader (no TS there).
 // Packaging bise desktop (electron-builder; `pnpm dist`). Owner: amb-mac.
 // The app carries what it runs, so nothing is looked up on PATH:
 //   Contents/Resources/bin/bise          the bise it runs (src/main/paths.ts binPath); in a
@@ -15,6 +16,8 @@
 //                                        BISE_PACK_VERSION when given: the updater says it to
 //                                        the core (src/main/update); none = a dev build, never
 //                                        offered an update
+//   Contents/Info.plist                  CFBundleShortVersionString and CFBundleVersion from that
+//                                        VERSION too (bundleVersions), never package.json's 0.0.0
 // Its icon is resources/icon.png (1024 px, the Swift app's), made an .icns here.
 // A try build (amb-tools' 'bise-ambient --try') gets its own identity so it
 // never shares his app's userData, single-instance lock or permissions:
@@ -57,6 +60,27 @@ try {
 }
 // optional: the release's VERSION file (make-release writes id= and built=)
 const version = process.env['BISE_PACK_VERSION'] ? need('BISE_PACK_VERSION') : null;
+
+// Info.plist's versions from that VERSION (`key=value` lines), else package.json's 0.0.0 stays
+// in CFBundleShortVersionString and CFBundleVersion: Finder's Get Info, the crash reports, and the
+// About panel's build when main sets none. The short one is the build's name (`version=`, else
+// `id=`) as he reads it in About and the settings: src/shared/version.ts shortVersion's rule
+// ('desktop-2026.10.2' and 'desktop-v2026.10.2' → '2026.10.2'; this file runs in plain node, so it
+// can't import the .ts: change both together, version.test.ts and desktop_release_test.py check
+// each). The build one is its commit (12 chars), else that name again. A VERSION without an id
+// leaves both alone. Pure.
+export function bundleVersions(text) {
+  const kv = new Map();
+  for (const line of text.split('\u000a')) {
+    const i = line.indexOf('=');
+    if (i > 0) kv.set(line.slice(0, i).trim(), line.slice(i + 1).trim());
+  }
+  const raw = kv.get('version') || kv.get('id') || '';
+  if (raw === '') return {};
+  const name = raw.replace(/^desktop-v?(?=\d)/, '').replace(/^v(?=\d)/, '');
+  const commit = kv.get('commit') || '';
+  return { bundleShortVersion: name, bundleVersion: commit === '' ? name : commit.slice(0, 12) };
+}
 
 // BISE_PACK_SIGN_DIR: bise's stable self-signed identity ('bise ambient dev'
 // in <dir>/sign.keychain-db, made once by scripts/sign-identity.sh when
@@ -157,6 +181,7 @@ export default {
     // notarytool (scripts/desktop_release.py notarize)
     notarize: false,
     extraFiles: [{ from: helper, to: 'MacOS/bise-mac-helper' }],
+    ...(version === null ? {} : bundleVersions(readFileSync(version, 'utf8'))),
     extendInfo: {
       NSMicrophoneUsageDescription: 'bise listens while you hold fn, to hear what you ask.',
       NSAppleEventsUsageDescription: 'bise reads the address of the tab in front when you hold fn.',

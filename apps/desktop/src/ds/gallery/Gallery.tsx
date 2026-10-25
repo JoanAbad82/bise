@@ -1,5 +1,5 @@
 // src/ds · the gallery: every component in each of its states, dark and light side by side, on fake
-// data. It is the design system's dev route and the source of its visual check (check.mjs takes one
+// data. It is the design system's dev route and the source of its visual check (check.mts takes one
 // shot per section and theme). Sections are `data-testid="ds.gallery.<name>"`; `?only=a,b` keeps
 // those sections. Pure: no store, no core.
 import { useEffect, useRef, type ReactNode } from "react";
@@ -386,7 +386,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     </div>
   ),
   // never by color alone (bar N2): each group draws the same words in each of its color states;
-  // shoot.mjs checks that, with increase contrast, every state of a group reads differently without
+  // shoot.mts checks that, with increase contrast, every state of a group reads differently without
   // its color (a glyph, a word or a shape), items `ds.contrast.<group>.<state>`
   contrast: () => (
     <div className="g-col">

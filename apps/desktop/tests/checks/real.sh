@@ -13,7 +13,7 @@ desktop=$(cd "$here/../.." && pwd)
 qa="$desktop/../../dev/plugins/ambient-qa/qa.py"
 up=(world up --projects 2)
 [ -n "${QA_BISE:-}" ] && up+=(--bise "$QA_BISE")
-# the run's rules (first, fresh, keys), one copy with the nightly's desktop-checks step (covmap.mjs)
+# the run's rules (first, fresh, keys), one copy with the nightly's desktop-checks step (covmap.mts)
 rule() { python3 -c 'import json, sys; v = json.load(open(sys.argv[1]))[sys.argv[2]]; print(" ".join("tests/" + s for s in v) if isinstance(v, list) else v)' "$here/real.json" "$1"; }
 
 # No real key reaches the run: world up builds its hubs' env from an allowlist since amb-tools'

@@ -14,13 +14,13 @@
 // of the same problem) are checked once. Also: the lines last 8-12 s, a rest at least as long; two
 // climbers at most, never main, nobody under reduced motion; a line draws at LOOP_FPS, a rest nothing.
 import { describe, expect, it } from 'vitest';
-import { BufferGeometry, CapsuleGeometry, Group, Matrix4, Mesh, type Object3D, SphereGeometry, Vector3 } from 'three';
+import { BufferGeometry, CapsuleGeometry, Group, Mesh, type Object3D, SphereGeometry, Vector3 } from 'three';
 import { agent, mainAgent } from '../fixtures';
 import { climbLayout } from '../maps/climb';
 import type { Activity, ClimbPastime, FunIn, Gym } from '../model';
 import { growOf, STAGE_AT } from '../growth';
 import {
-  type Facet, type Hold, MAT_H, MOVES, type V3, bellAt, closestOnTri, decorHolds, dot, facets, goldenHold, insideVolume, len, routeHolds, routes, sub,
+  type Facet, type Hold, MAT_H, MOVES, type Route, type V3, bellAt, closestOnTri, decorHolds, dot, facets, goldenHold, insideVolume, len, routeHolds, routes, sub,
   volumes,
 } from '../climbwall';
 import { type Line, LINE_MAX, LINE_MIN, SESSION_S, climbers, compose, lineOf } from '../climb';
@@ -32,6 +32,8 @@ import { STYLE } from './style';
 
 /** every frame at 30 fps on main's full gate and the nightly (FUZZ_RUNS); a commit's quick run samples 6 fps (testing skill, rule 2) */
 const FPS = typeof process !== 'undefined' && process.env.FUZZ_RUNS !== undefined ? 30 : 6;
+/** a problem's case: 10 s at most at 30 fps on a Mac at load ~40 (climb-law, from 138 s for the whole law in one case); 3x for a busier one */
+const CASE_MS = 30_000;
 /** a limb this near the wall touches it: on a hold */
 const TOUCH = 0.02;
 /** float noise: a vertex this far inside is on the surface */
@@ -99,24 +101,81 @@ function shown(m: Object3D): boolean {
   return true;
 }
 
-/** a mesh's vertices, world units */
-function verts(m: Mesh, mw: Matrix4): V3[] {
-  const pos = m.geometry.getAttribute('position');
-  const v = new Vector3();
-  const out: V3[] = [];
+/** a geometry's distinct vertices, local units (a sphere's seams and poles repeat theirs: one is enough for a distance) */
+const LOCAL = new WeakMap<BufferGeometry, Float32Array>();
+function localOf(g: BufferGeometry): Float32Array {
+  const hit = LOCAL.get(g);
+  if (hit) return hit;
+  const pos = g.getAttribute('position');
+  const seen = new Set<string>();
+  const out: number[] = [];
   for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i).applyMatrix4(mw);
-    out.push({ x: v.x, y: v.y, z: v.z });
+    const k = `${String(pos.getX(i))},${String(pos.getY(i))},${String(pos.getZ(i))}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(pos.getX(i), pos.getY(i), pos.getZ(i));
   }
+  const arr = new Float32Array(out);
+  LOCAL.set(g, arr);
+  return arr;
+}
+
+const WORLD = new WeakMap<Mesh, { x: number; y: number; z: number }[]>();
+
+/** a mesh's distinct vertices, world units (Vector3.applyMatrix4's sums); one array per mesh, rewritten at each call */
+function verts(m: Mesh): readonly V3[] {
+  const loc = localOf(m.geometry);
+  const e = m.matrixWorld.elements;
+  let out = WORLD.get(m);
+  if (!out) {
+    out = Array.from({ length: loc.length / 3 }, () => ({ x: 0, y: 0, z: 0 }));
+    WORLD.set(m, out);
+  }
+  out.forEach((p, i) => {
+    const x = loc[i * 3] ?? 0;
+    const y = loc[i * 3 + 1] ?? 0;
+    const z = loc[i * 3 + 2] ?? 0;
+    const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+    p.x = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
+    p.y = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
+    p.z = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
+  });
   return out;
 }
 
-/** a point's signed distance to the wall's facets near it (Infinity: none near) */
-function wallDist(p: V3, fs: readonly Facet[]): { d: number; at: V3 } {
+/** a facet and its bounding sphere (its centroid, the farthest corner from it), for wallDist's skip */
+interface Near {
+  readonly f: Facet;
+  readonly c: V3;
+  readonly r: number;
+}
+
+const nearOf = (f: Facet): Near => {
+  const c: V3 = { x: (f.a.x + f.b.x + f.c.x) / 3, y: (f.a.y + f.b.y + f.c.y) / 3, z: (f.a.z + f.b.z + f.c.z) / 3 };
+  return { f, c, r: Math.max(len(sub(f.a, c)), len(sub(f.b, c)), len(sub(f.c, c))) };
+};
+
+/** a lower bound of a point's distance to a facet: its sphere's, its plane's */
+function boundTo(p: V3, { f, c, r }: Near): number {
+  const dx = p.x - c.x;
+  const dy = p.y - c.y;
+  const dz = p.z - c.z;
+  const plane = Math.abs((p.x - f.a.x) * f.n.x + (p.y - f.a.y) * f.n.y + (p.z - f.a.z) * f.n.z);
+  return Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz) - r, plane);
+}
+
+/**
+ * a point's signed distance to the wall's facets near it (Infinity: none near). A facet whose lower
+ * bound (its sphere's, its plane's) is past the best so far + 1e-6 is skipped: it would be neither a
+ * new best nor a tie (d >= its bound), so the result is the full walk's, without most closestOnTri
+ */
+function wallDist(p: V3, ns: readonly Near[]): { d: number; at: V3 } {
   let best = Infinity;
   let sign = 0;
   let at: V3 = p;
-  for (const f of fs) {
+  for (const x of ns) {
+    if (boundTo(p, x) > best + 1e-6) continue;
+    const { f } = x;
     const q = closestOnTri(p, f.a, f.b, f.c);
     const d = len(sub(p, q));
     const s = dot(sub(p, q), f.n);
@@ -127,13 +186,11 @@ function wallDist(p: V3, fs: readonly Facet[]): { d: number; at: V3 } {
 }
 
 /** every line a climber may play on a problem: topped out with and without the bell, fallen off each move */
-function linesOf(): { name: string; line: Line }[] {
+function linesOf(r: Route): { name: string; line: Line }[] {
   const out: { name: string; line: Line }[] = [];
-  for (const r of routes(gym)) {
-    out.push({ name: `r${String(r.id)} top`, line: compose(r, r.slot, gym, false, MOVES, false) });
-    out.push({ name: `r${String(r.id)} top, the bell`, line: compose(r, r.slot, gym, false, MOVES, true) });
-    for (let j = 1; j < MOVES; j++) out.push({ name: `r${String(r.id)} fall ${String(j)}`, line: compose(r, r.slot, gym, true, j, false) });
-  }
+  out.push({ name: `r${String(r.id)} top`, line: compose(r, r.slot, gym, false, MOVES, false) });
+  out.push({ name: `r${String(r.id)} top, the bell`, line: compose(r, r.slot, gym, false, MOVES, true) });
+  for (let j = 1; j < MOVES; j++) out.push({ name: `r${String(r.id)} fall ${String(j)}`, line: compose(r, r.slot, gym, true, j, false) });
   return out;
 }
 
@@ -152,8 +209,10 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
     for (const pts of vols) expect(vs.some((x) => [x.a, x.b, x.c, x.apex].every((c) => pts.some((p) => near3(p, c))))).toBe(true);
   });
 
-  {
-    it(`every frame of every line at ${String(FPS)} fps, with and without the bell`, async () => {
+  const ns = fs.map(nearOf);
+  // one case per problem, each its own budget (a frame's key starts with its problem: nothing seen is shared across them)
+  for (const route of routes(gym)) {
+    it(`every frame of every line of problem ${String(route.id)} at ${String(FPS)} fps, with and without the bell`, { timeout: CASE_MS }, async () => {
       const holds: Hold[] = [...routes(gym).flatMap((r) => routeHolds(r)), ...decorHolds(gym)];
       const gold = goldenHold(gym);
       if (gold) holds.push(gold);
@@ -165,7 +224,7 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
       expect(parts.feet.length).toBe(2);
       const out = new Set<string>();
       const seen = new Set<string>();
-      for (const { name, line } of linesOf()) {
+      for (const { name, line } of linesOf(route)) {
         // a macrotask between two lines (src/test-busy.ts: no test holds the loop over 10 s of CPU)
         await new Promise((ok) => setTimeout(ok, 0));
         for (const beat of line.beats) {
@@ -179,7 +238,9 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
             bim.group.updateMatrixWorld(true);
             const here = (msg: string): void => void out.add(`${name}, ${beat.k} at ${into.toFixed(2)} s: ${msg}`);
             const g0 = body.f.g;
-            const nearFs = fs.filter((x) => Math.min(...[x.a, x.b, x.c].map((p) => Math.hypot(p.x - g0.x, p.z - g0.z))) < 2.0);
+            const nearFs = ns.filter(({ f: x }) => Math.min(...[x.a, x.b, x.c].map((p) => Math.hypot(p.x - g0.x, p.z - g0.z))) < 2.0);
+            // a hand's or a foot's nearest vertex to the wall, from its check: the stance reads it again
+            const minOf = new Map<Mesh, number>();
             const nearVs = vs.filter((x) => Math.hypot(x.apex.x - g0.x, x.apex.z - g0.z) < 2.5);
             const holding = beat.k === 'move' ? into >= Math.min(beat.dur, 0.4) : beat.k === 'bell' || beat.k === 'cheer' || beat.k === 'slip';
             const check = (m: Mesh, kind: 'hand' | 'foot' | 'body' | 'limb'): void => {
@@ -191,21 +252,26 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
               const c3 = (bs?.center.clone() ?? new Vector3()).applyMatrix4(m.matrixWorld);
               const c: V3 = { x: c3.x, y: c3.y, z: c3.z };
               const R = (bs?.radius ?? 1) * m.matrixWorld.getMaxScaleOnAxis() + 0.005;
-              const wallNear = nearFs.length > 0 && wallDist(c, nearFs).d < R + TOUCH;
+              const wc = nearFs.length > 0 ? wallDist(c, nearFs).d : Infinity;
+              const wallNear = wc < R + TOUCH;
               const matNear = c.y - R < MAT_H && gym.mats.some((mt) => c.x > mt.x0 - R && c.x < mt.x1 + R && c.z > mt.z0 - R && c.z < mt.z1 + R);
               const volsNear = nearVs.filter((x) => insideVolume(x, c) > -R);
               if (!wallNear && !matNear && volsNear.length === 0) return;
-              const ps = verts(m, m.matrixWorld);
+              // the facets a vertex may be nearest to: a vertex is within R of c, so its nearest facet is within |wc| + R of
+              // it, and a facet whose bound from c is past |wc| + 2R (+ 1e-6) is past that from every vertex (wallDist's skip)
+              const mine = wallNear ? nearFs.filter((x) => boundTo(c, x) <= Math.abs(wc) + 2 * R + 1e-6) : [];
+              const ps = verts(m);
               let min = { d: Infinity, at: ps[0] as V3 };
               for (const p of ps) {
                 // a mat: nobody stands in one
                 if (matNear) for (const mt of gym.mats) if (p.x > mt.x0 + 0.01 && p.x < mt.x1 - 0.01 && p.z > mt.z0 + 0.01 && p.z < mt.z1 - 0.01 && p.y < MAT_H - EPS) here(`${kind} in a mat at ${fmt(p)}`);
                 for (const x of volsNear) if (insideVolume(x, p) > EPS) here(`${kind} in a volume at ${fmt(p)}`);
                 if (!wallNear) continue;
-                const w = wallDist(p, nearFs);
+                const w = wallDist(p, mine);
                 if (w.d < min.d) min = w;
               }
               if (min.d === Infinity) return;
+              if (wallNear) minOf.set(m, min.d);
               if (kind === 'body' && min.d <= 0) here(`its body touches the wall at ${fmt(min.at)} (${min.d.toFixed(3)})`);
               if (min.d < -EPS) here(`its ${kind} in the wall at ${fmt(min.at)} (${min.d.toFixed(3)})`);
               if ((kind === 'hand' || kind === 'foot') && min.d < TOUCH) {
@@ -219,7 +285,7 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
             parts.limbs.forEach((m) => { check(m, 'limb'); });
             if (holding) {
               // the stance's limbs on: every foot, and every hand but the one that rings, cheers or slips
-              const on = (ms: Mesh[]): number[] => ms.map((m) => Math.min(...verts(m, m.matrixWorld).map((p) => wallDist(p, nearFs).d)));
+              const on = (ms: Mesh[]): number[] => ms.map((m) => minOf.get(m) ?? Math.min(...verts(m).map((p) => wallDist(p, nearFs).d)));
               const free = beat.k === 'move' ? -1 : beat.k === 'slip' ? 1 : 0;
               on(parts.hands).forEach((d, i) => { if (i !== free && d >= TOUCH) here(`hand ${String(i)} off the wall in a stance (${d.toFixed(3)})`); });
               on(parts.feet).forEach((d, i) => { if (d >= TOUCH) here(`foot ${String(i)} off the wall in a stance (${d.toFixed(3)})`); });
@@ -229,7 +295,7 @@ describe('the climbing law: no hand, foot or body in the wall or a volume, nobod
       }
       bim.dispose();
       expect([...out].slice(0, 30)).toEqual([]);
-    }, 120_000);
+    });
   }
 });
 

@@ -1,8 +1,8 @@
-// The test side of the scripted stubs (stub-lib.mjs): send events as the helper or the core, read
+// The test side of the scripted stubs (stub-lib.mts): send events as the helper or the core, read
 // the commands the app sent them. Events and commands are bise-proto's typed lines (src/proto;
 // fixtures in '@/proto/fixtures.gen'), never hand-written shapes.
-//   const helper = new FakeHelper();                 // bise-mac-helper (helper-stub.mjs)
-//   const core = new FakeCore();                     // bise ambient-core (core-stub.mjs), fixture world
+//   const helper = new FakeHelper();                 // bise-mac-helper (helper-stub.mts)
+//   const core = new FakeCore();                     // bise ambient-core (core-stub.mts), fixture world
 //   const s = await launchDesktop({ helper, core, route: 'settings' });
 //   await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });          // a fn press
 //   await core.waitCmd((c) => c.cmd === 'send');                           // the app really sent it
@@ -12,19 +12,26 @@ import path from 'node:path';
 import type { AppCmd, CoreEv, HelperCmd, HelperEv, HubCmd, HubEv } from '../../../src/proto';
 
 const NL = String.fromCharCode(10);
+/** node runs the .ts stubs itself (until engines >= 22.18 makes it the default) */
+const STRIP_TYPES = '--experimental-strip-types --disable-warning=ExperimentalWarning';
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 class Stub<Ev, Cmd> {
   readonly dir: string;
   readonly sock: string;
   readonly log: string;
+  /** what the app runs: a sh wrapper that execs node on the stub's .ts with type stripping on */
+  protected readonly stub: string;
 
-  constructor(protected readonly stub: string) {
+  constructor(source: string) {
     // a short path: a unix socket path must stay under 104 bytes
     this.dir = mkdtempSync(path.join('/tmp', 'bh-'));
     this.sock = path.join(this.dir, 's');
     this.log = path.join(this.dir, 'cmds.jsonl');
-    chmodSync(stub, 0o755);
+    // named like the stub (crash.spec finds the core by `pgrep -f core-stub`); exec keeps the pid
+    this.stub = path.join(this.dir, path.basename(source, '.mts'));
+    writeFileSync(this.stub, `#!/bin/sh${NL}NODE_OPTIONS="${STRIP_TYPES}" exec node '${source}' "$@"${NL}`);
+    chmodSync(this.stub, 0o755);
   }
 
   /** Sends events as the stubbed process (each becomes one line on its stdout). */
@@ -71,7 +78,7 @@ class Stub<Ev, Cmd> {
 /** The scripted bise-mac-helper: hello at start; without it a test run has no helper. */
 export class FakeHelper extends Stub<HelperEv, HelperCmd> {
   constructor() {
-    super(path.join(__dirname, 'helper-stub.mjs'));
+    super(path.join(__dirname, 'helper-stub.mts'));
   }
 
   env(): Record<string, string> {
@@ -87,7 +94,7 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
   private readonly world: string | undefined;
 
   constructor(start: 'fixtures' | 'none' | readonly (CoreEv | HubEv)[] = 'fixtures') {
-    super(path.join(__dirname, 'core-stub.mjs'));
+    super(path.join(__dirname, 'core-stub.mts'));
     if (start === 'none') this.world = 'none';
     else if (start !== 'fixtures') {
       this.world = path.join(this.dir, 'world.jsonl');
@@ -120,6 +127,16 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
    */
   async result(cmd: string, card: number | undefined, result: unknown, before: readonly unknown[] = []): Promise<void> {
     await this.raw([JSON.stringify({ harness: 'result', cmd, ...(card === undefined ? {} : { card }), result, before })]);
+  }
+
+  /** The answers to `cmd` wait (a busy hub: thread-loading's subscribe) until `release()`. */
+  async hold(cmd: string): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'hold', cmd })]);
+  }
+
+  /** The held answers go, in order; `cmd` is answered at once again. */
+  async release(): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'release' })]);
   }
 
   env(): Record<string, string> {

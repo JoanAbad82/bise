@@ -2,7 +2,7 @@
 # bins.sh — the Bend native binaries (repl-live, repl-scripted, sb-core,
 # harness-demo), the V8 engine of a version (bend-jsrt, RELEASE build,
 # BISE-133), and the viewer's xlsx grid (office-sheet: Univer, ~7 MB of
-# JS built by office/sdk/build.mjs into office/dist/office-sheet.js,
+# JS built by office/sdk/build.ts into office/dist/office-sheet.js,
 # never committed, architect m_37322). They are NOT in git (BISE-114): each one is built from
 # its sources into a cache keyed by the CONTENT of those sources, shared
 # by every worktree and by versions.sh, then copied where it is run.
@@ -102,8 +102,8 @@ recipe() {
     sb-core) echo "${b}hub/main.bend ${b}hub ${b}vendor" ;;
     # a cargo build (release): the crate and its path dependencies
     bend-jsrt) echo "cargo rust/jsrt rust/images rust/home" ;;
-    # a node build (office/sdk/build.mjs --only): its entry, the build and the lockfile
-    office-sheet) echo "node office/sdk/src/view/sheet.ts office/sdk/build.mjs office/sdk/package.json office/sdk/pnpm-lock.yaml" ;;
+    # a node build (office/sdk/build.ts --only): its entry, the build, its node options and the lockfile
+    office-sheet) echo "node office/sdk/src/view/sheet.ts office/sdk/build.ts office/sdk/.npmrc office/sdk/package.json office/sdk/pnpm-lock.yaml" ;;
     *) say "unknown binary: $1 (repl-live repl-scripted sb-core harness-demo bend-jsrt office-sheet)"; exit 2 ;;
   esac
 }
@@ -164,7 +164,7 @@ compile() {  # <src> <name> <out>
     # its own node_modules from the lockfile, every time: a fresh worktree has
     # none, a kept one's can predate a new dependency (a no-op when current)
     (cd "$src/office/sdk" && pnpm -s install --frozen-lockfile --prefer-offline \
-      && node build.mjs --only "$name.js" --out "$out" >/dev/null && chmod +x "$out"); return
+      && pnpm -s build --only "$name.js" --out "$out" >/dev/null && chmod +x "$out"); return
   fi
   if [ "${r%% *}" != cargo ]; then
     (cd "$src" && bend "${r%% *}" -o "$out" >/dev/null); return

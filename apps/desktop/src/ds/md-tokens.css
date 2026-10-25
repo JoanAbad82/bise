@@ -2,7 +2,7 @@
    user's try round 2). The source is the terminal app: rust/tui/src/markdown.rs + codeblock.rs say
    which role each element takes, rust/tui/src/theme.rs DARK / LIGHT give the values. The ds palette
    (tokens.css, desktop-ds v5) already holds the TUI's text, dim, faint, rule, accent and ok, so the
-   roles read it; the code's syntax colors are the only new values (theme.rs syntax_*). check.mjs
+   roles read it; the code's syntax colors are the only new values (theme.rs syntax_*). check.ts
    mirrors theme.rs: a change there turns its law red. Owner: amb-kit. */
 :root, [data-theme="dark"] {
   --p-syn-keyword: #d7a6f0; --p-syn-string: #b9d99a; --p-syn-comment: #99928a;

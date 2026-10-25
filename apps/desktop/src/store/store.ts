@@ -113,6 +113,8 @@ export class Store extends StoreVoice {
     if (state === "up") this.sayAgain();
     if (state !== "down") return;
     this.commandsAsked = false;
+    // no page comes from a core that is down (the screen says the core is down); asked again when it is up
+    for (const [key, t] of this.threads) this.setSyncing(key, t, false);
     for (const a of this.asked.values()) a.resolve(null);
     this.asked.clear();
     // every send still on its way fails (machine/sends.ts)
@@ -133,7 +135,10 @@ export class Store extends StoreVoice {
     }
     for (const s of this.subs.values()) {
       // a window's page asked of the old core never comes
-      delete this.thread(threadKey(s.project, s.agent)).ask;
+      const key = threadKey(s.project, s.agent);
+      const t = this.thread(key);
+      delete t.ask;
+      this.setSyncing(key, t, true);
       this.command({
         cmd: "subscribe",
         project: s.project,
@@ -164,6 +169,25 @@ export class Store extends StoreVoice {
     const ask = t.ask !== undefined && answers(t.ask, t.view, pos) ? t.ask : null;
     if (ask !== null) delete t.ask;
     this.setView(key, t, merged(t.view, pos, ev.before, ev.more, ask));
+    // the first page after a subscribe that answers no window ask is its newest one: the view is
+    // current (the hub answers a connection's commands in order)
+    if (ask === null) this.setSyncing(key, t, false);
+  }
+
+  /** The thread's newest page is on its way, or came (thread-loading: the list's cue). */
+  private setSyncing(key: string, t: Thread, on: boolean): void {
+    if ((t.syncing === true) === on) return;
+    t.syncing = on;
+    this.emit(`sync:${key}`);
+  }
+
+  /** @internal for apply.ts: a subscribe the hub refused (no such agent): its threads wait for nothing. */
+  subscribeFailed(project: string): void {
+    for (const s of this.subs.values()) {
+      if (s.project !== project) continue;
+      const key = threadKey(s.project, s.agent);
+      this.setSyncing(key, this.thread(key), false);
+    }
   }
 
   private setView(key: string, t: Thread, v: ThreadOrder): void {
@@ -448,7 +472,9 @@ export class Store extends StoreVoice {
 
   /** A thread's newest page then its live entries; kept, and asked again of a core that comes back up. */
   subscribeThread(project: string, agent: string, limit?: number): void {
-    this.subs.set(threadKey(project, agent), { project, agent, limit });
+    const key = threadKey(project, agent);
+    this.subs.set(key, { project, agent, limit });
+    this.setSyncing(key, this.thread(key), true);
     this.command({
       cmd: "subscribe",
       project,
@@ -457,7 +483,10 @@ export class Store extends StoreVoice {
     });
   }
   unsubscribeThread(project: string, agent: string): void {
-    this.subs.delete(threadKey(project, agent));
+    const key = threadKey(project, agent);
+    this.subs.delete(key);
+    const t = this.threads.get(key);
+    if (t !== undefined) this.setSyncing(key, t, false);
     this.command({ cmd: "unsubscribe", project, agent });
   }
   /** The page before the oldest entry held (nothing when there is no more). */

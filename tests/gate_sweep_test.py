@@ -139,6 +139,37 @@ sleep 300
               "a reused pid (another start time): not nested")
         check(nested(BISE_GATE_RUN=sib) == "", "no start time: not nested")
         check(nested(BISE_GATE_RUN="999999", BISE_GATE_START=start) == "", "a dead outer gate: not nested")
+        # gate.sh stop: this checkout's gate only (repl-kill: agents stopped their
+        # gate with `pkill -f "gate.sh quick" -P <pid>`, and macOS pkill took the
+        # -P for a pattern: every agent's gate died). Two runs in a gate dir of
+        # this test's, one per checkout; stop of A TERMs A's gate, never B's.
+        home = os.path.join(tmp, "home")
+        os.makedirs(os.path.join(home, "gate"))
+        stopfn = os.path.join(tmp, "stopfn.sh")
+        with open(stopfn, "w") as f:
+            f.write(functions(["proc_start", "gate_dirs", "gate_stop"]))
+        runs = {}
+        for name in ("A", "B"):
+            g = subprocess.Popen(["bash", "-c", "trap 'echo TERM >%s/%s.term; exit 143' TERM; while :; do sleep 0.1; done"
+                                  % (tmp, name)], preexec_fn=os.setpgrp)
+            groups.add(g.pid)
+            runs[name] = g
+            start = subprocess.run(["bash", "-c", "source %s; proc_start %d" % (fn, g.pid)], capture_output=True,
+                                   text=True).stdout.strip()
+            d = os.path.join(home, "gate", str(g.pid))
+            os.makedirs(d)
+            open(os.path.join(d, ".owner"), "w").write(start + "\n")
+            open(os.path.join(d, ".root"), "w").write(os.path.join(tmp, "root" + name) + "\n")
+        out = subprocess.run(["bash", "-c", "source %s; gate_stop %s" % (stopfn, os.path.join(tmp, "rootA"))],
+                             env={**os.environ, "BISE_HOME": home}, capture_output=True, text=True).stdout
+        check(runs["A"].wait(timeout=20) == 143 and os.path.exists(os.path.join(tmp, "A.term")),
+              "gate.sh stop: this checkout's gate got its TERM (%r)" % out)
+        check(runs["B"].poll() is None and not os.path.exists(os.path.join(tmp, "B.term")),
+              "gate.sh stop: another checkout's gate runs on")
+        runs["B"].kill()
+        none = subprocess.run(["bash", "-c", "source %s; gate_stop %s" % (stopfn, os.path.join(tmp, "rootC"))],
+                              env={**os.environ, "BISE_HOME": home}, capture_output=True, text=True).stdout
+        check("no gate runs in" in none, "gate.sh stop: no gate in this checkout says so (%r)" % none)
         # the wiring in gate.sh: a nested gate skips both sweeps and its exit's orphan sweep
         src = open(GATE).read()
         check('nested="$(gate_nested)"' in src and '[ -f "$root/.git" ] && [ -z "$nested" ]' in src
