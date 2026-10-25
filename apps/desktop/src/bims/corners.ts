@@ -111,6 +111,8 @@ export interface Placed {
   readonly n?: number;
   readonly glass: boolean;
   readonly pill: PluginObject['pill'];
+  /** the plugin its pill is for when not its own (plugin-objects.ts uniqueObjects) */
+  readonly pillOf?: string;
   /** its middle on the floor (office units) and its turn (three's y rotation; 0: its front to +z) */
   readonly x: number;
   readonly z: number;
@@ -601,7 +603,7 @@ export function objectSpots(o: Office, objs: readonly PluginObject[], prev: read
 
 function placedOf(p: PluginObject, obj: ObjId, size: Size, foot: FootOf, corner: Corner, t: Try): Placed {
   return {
-    key: p.key, obj, of: p.obj, ...(p.n === undefined ? {} : { n: p.n }), glass: p.glass, pill: p.pill,
+    key: p.key, obj, of: p.obj, ...(p.n === undefined ? {} : { n: p.n }), glass: p.glass, pill: p.pill, ...(p.pillOf === undefined ? {} : { pillOf: p.pillOf }),
     x: t.x, z: t.z, rot: t.rot, compact: size > 0, scaled: size === 2 || (size === 1 && COMPACT[p.obj] === undefined), foot, corner, box: boxOf(t.x, t.z, foot.w, foot.d, t.rot),
   };
 }

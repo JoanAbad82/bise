@@ -174,6 +174,18 @@ describe('uniqueObjects: each object once in an office (bims-plugins m_42693)', 
     expect(uniqueObjects([o('a', 'printer', { pill: '✗' }), o('b', 'printer')]).map((x) => [x.key, x.obj, x.pill])).toEqual([['a', 'printer', '✗'], ['b', 'press', null]]);
   });
 
+  it("an object carries the worst state of the plugins it stands for, '✗' over '?' (designer m_43133)", () => {
+    // the failed one keeps the printer, the one waiting on a login takes the press, the fine one is not drawn
+    const out = uniqueObjects([o('docs', 'printer'), o('sheets', 'printer', { pill: '?' }), o('slides', 'printer', { pill: '✗' })]);
+    expect(out.map((x) => [x.key, x.obj, x.pill])).toEqual([['sheets', 'press', '?'], ['slides', 'printer', '✗']]);
+    // his pick keeps the printer, the failed one takes the press; the one not drawn puts its '?' on the printer, and the pill is that plugin's
+    const picked = uniqueObjects([o('docs', 'printer', { picked: true }), o('sheets', 'printer', { pill: '?' }), o('slides', 'printer', { pill: '✗' })]);
+    expect(picked.map((x) => [x.key, x.obj, x.pill, x.pillOf])).toEqual([['docs', 'printer', '?', 'sheets'], ['slides', 'press', '✗', undefined]]);
+    // a better state never hides a worse one
+    const kept = uniqueObjects([o('a', 'chess', { picked: true, pill: '✗' }), o('b', 'chess', { pill: '?' })]);
+    expect(kept.map((x) => [x.key, x.pill, x.pillOf])).toEqual([['a', '✗', undefined]]);
+  });
+
   it('a plugin keeps its own object before another takes it as a kin', () => {
     // a dashboard plugin (datadog) keeps the dashboard a second charts one would take
     expect(pairs(uniqueObjects([o('a', 'charts'), o('b', 'charts'), o('z', 'dashboard')]))).toEqual([['a', 'charts'], ['z', 'dashboard']]);

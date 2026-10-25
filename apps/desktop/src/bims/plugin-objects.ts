@@ -39,6 +39,8 @@ export interface PluginObject {
   readonly pill: '✗' | '?' | null;
   /** true: his pick, not the default */
   readonly picked: boolean;
+  /** the plugin its pill is for when not its own (uniqueObjects: a plugin not drawn whose object this is, its state worse); its click opens that one */
+  readonly pillOf?: string;
 }
 
 /** His picks for one project: plugin key → object. */
@@ -214,8 +216,11 @@ const KIN: Partial<Record<ObjId, readonly ObjId[]>> = {
   visio: ['crt'],
 };
 
-/** who keeps a contested object (bims-plugins m_42693): his pick, then a pill (it asks him something), then lit, then glass */
-const rankOf = (o: PluginObject): number => (o.picked ? 0 : o.pill !== null ? 1 : !o.glass ? 2 : 3);
+/** who keeps a contested object (bims-plugins m_42693): his pick, then the worst state (designer m_43133: '✗' over '?'), then lit, then glass */
+const rankOf = (o: PluginObject): number => (o.picked ? 0 : o.pill === '✗' ? 1 : o.pill === '?' ? 2 : !o.glass ? 3 : 4);
+const PILL_RANK = { '✗': 2, '?': 1 } as const;
+/** the worse of two pills: '✗' over '?' over none */
+const worse = (a: PluginObject['pill'], b: PluginObject['pill']): boolean => (b === null ? 0 : PILL_RANK[b]) > (a === null ? 0 : PILL_RANK[a]);
 const byKey = (a: PluginObject, b: PluginObject): number => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 
 /**
@@ -239,7 +244,13 @@ export function uniqueObjects(objs: readonly PluginObject[]): readonly PluginObj
   // a kin only once every plugin had its own: a dashboard plugin keeps the dashboard a third charts one would take
   for (const o of lost) {
     const kin = (KIN[o.obj] ?? []).find((k) => !taken.has(k));
-    if (kin === undefined) continue;
+    if (kin === undefined) {
+      // not drawn: its object carries the worst state of the plugins it stands for (designer m_43133)
+      const at = out.findIndex((h) => unitOf(h) === unitOf(o));
+      const h = out[at];
+      if (h !== undefined && worse(h.pill, o.pill)) out[at] = { ...h, pill: o.pill, pillOf: o.key };
+      continue;
+    }
     taken.add(kin);
     out.push({ key: o.key, obj: kin, glass: o.glass, pill: o.pill, picked: o.picked });
   }
