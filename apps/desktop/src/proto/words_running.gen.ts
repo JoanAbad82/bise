@@ -48,6 +48,30 @@ export const running = {
   usage: (a: { cpu: string | number; mb: string | number }): string => "cpu " + String(a.cpu) + "% · " + String(a.mb) + " MB",
   /** the output when no file of it can be read */
   no_output: "no output kept: it doesn't write to a file bise can read.",
+  /** the output while a running one has printed nothing yet: `running for 3 min · nothing printed yet` */
+  quiet_running: (a: { age: string | number }): string => "running for " + String(a.age) + " · nothing printed yet",
+  /** the output of one that ended without printing anything, its code known: `… · exit 0` */
+  quiet_ended_rc: (a: { rc: string | number }): string => "it ended without printing anything · exit " + String(a.rc),
+  /** the output of one that ended (or was stopped) without printing anything */
+  quiet_ended: "it ended without printing anything",
+  /** the output's head: how long it has run, `running for 3 min` */
+  running_for: (a: { age: string | number }): string => "running for " + String(a.age),
+  /** it ended less than a minute ago */
+  ended_now: "ended just now",
+  /** a row's mark tip: it ended with that code, `ended, exit 1` */
+  mark_exit: (a: { rc: string | number }): string => "ended, exit " + String(a.rc),
+  /** a row's mark tip: it ended, its code not known */
+  mark_ended: "ended",
+  /** a row's address, short and quiet: `:5173 ↗` */
+  url_row: (a: { port: string | number }): string => ":" + String(a.port) + " ↗",
+  /** its tip: `open localhost:5173` */
+  url_tip: (a: { port: string | number }): string => "open localhost:" + String(a.port),
+  /** the output's head: stop asks once more before it stops */
+  stop_confirm: "stop it?",
+  /** the output scrolled up from its end: back to it */
+  jump_end: "jump to end ↓",
+  /** the output beside the list when none is picked */
+  pick_one: "pick a process to read its output.",
   /** the TUI's full screen output's keys */
   keys_output: "↓ follows the end   / find   o open   s stop   esc back",
   /** the TUI list's keys at 150 columns */
@@ -82,10 +106,6 @@ export const running = {
   find_words: "running · dev servers · background",
   /** the screen's head under its title: how many run, in how many projects (`3 running in 1 project`) */
   running_in: (a: { count: string | number; n: number }): string => a.n === 1 ? String(a.count) + " running in " + String(a.n) + " project" : String(a.count) + " running in " + String(a.n) + " projects",
-  /** the screen's filter: the running ones */
-  filter_running: (a: { n: string | number }): string => "running · " + String(a.n),
-  /** the screen's filter: the ones that ended today */
-  filter_ended: (a: { n: string | number }): string => "ended today · " + String(a.n),
   /** the search field's placeholder (`/` focuses it) */
   search: "search",
   /** the output's head: open its address */

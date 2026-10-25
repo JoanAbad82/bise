@@ -63,3 +63,6 @@ export function bytesOf(b64: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
+
+/** It has printed something: a byte was written. */
+export const printed = (s: OutState): boolean => s.next !== null && s.next > 0;

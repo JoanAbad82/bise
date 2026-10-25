@@ -60,6 +60,30 @@ crate::words! { running:
     usage(cpu, mb) = "cpu {cpu}% · {mb} MB";
     /// the output when no file of it can be read
     no_output = "no output kept: it doesn't write to a file bise can read.";
+    /// the output while a running one has printed nothing yet: `running for 3 min · nothing printed yet`
+    quiet_running(age) = "running for {age} · nothing printed yet";
+    /// the output of one that ended without printing anything, its code known: `… · exit 0`
+    quiet_ended_rc(rc) = "it ended without printing anything · exit {rc}";
+    /// the output of one that ended (or was stopped) without printing anything
+    quiet_ended = "it ended without printing anything";
+    /// the output's head: how long it has run, `running for 3 min`
+    running_for(age) = "running for {age}";
+    /// it ended less than a minute ago
+    ended_now = "ended just now";
+    /// a row's mark tip: it ended with that code, `ended, exit 1`
+    mark_exit(rc) = "ended, exit {rc}";
+    /// a row's mark tip: it ended, its code not known
+    mark_ended = "ended";
+    /// a row's address, short and quiet: `:5173 ↗`
+    url_row(port) = ":{port} ↗";
+    /// its tip: `open localhost:5173`
+    url_tip(port) = "open localhost:{port}";
+    /// the output's head: stop asks once more before it stops
+    stop_confirm = "stop it?";
+    /// the output scrolled up from its end: back to it
+    jump_end = "jump to end ↓";
+    /// the output beside the list when none is picked
+    pick_one = "pick a process to read its output.";
 
     // ---- keys
     /// the TUI's full screen output's keys
@@ -100,10 +124,6 @@ crate::words! { running:
     find_words = "running · dev servers · background";
     /// the screen's head under its title: how many run, in how many projects (`3 running in 1 project`)
     running_in(count, n) = one "{count} running in {n} project" | "{count} running in {n} projects";
-    /// the screen's filter: the running ones
-    filter_running(n) = "running · {n}";
-    /// the screen's filter: the ones that ended today
-    filter_ended(n) = "ended today · {n}";
     /// the search field's placeholder (`/` focuses it)
     search = "search";
     /// the output's head: open its address

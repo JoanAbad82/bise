@@ -7,7 +7,7 @@ import type { ProcItem, RunningPorts } from './index';
 
 // the terminal is xterm's (a canvas): here its props only
 vi.mock('./Output', () => ({
-  Output: ({ id, none, live }: { id: string; none: boolean; live: boolean }) => <div data-testid="running.out" data-id={id} data-none={none} data-live={live} />,
+  Output: ({ id, none, live, quiet }: { id: string; none: boolean; live: boolean; quiet: string }) => <div data-testid="running.out" data-id={id} data-none={none} data-live={live} data-quiet={quiet} />,
 }));
 const { RunningView } = await import('./Screen');
 
@@ -61,17 +61,30 @@ describe('the running screen', () => {
     expect(p.log).toEqual(['watch true', 'watch false']);
   });
 
-  it("groups project › agent, running ones under 'running · N', ended ones under 'ended today · N'", () => {
+  it("groups by project, running ones under 'running N', ended ones under 'ended today N'", () => {
     render(<RunningView items={[stripe, dev, failed, nohup]} ports={ports()} now={NOW} />);
-    expect(screen.getByTestId('running.filter.running').textContent).toBe('running · 3');
-    expect(screen.getByTestId('running.filter.ended').textContent).toBe('ended today · 1');
+    expect(screen.getByTestId('running.filter.running').textContent).toBe('running 3');
+    expect(screen.getByTestId('running.filter.ended').textContent).toBe('ended today 1');
+    expect(screen.getAllByTestId(/^running\.group\./u).map((g) => g.querySelector('.run-ghead')?.textContent)).toEqual(['storefront', 'tele']);
     expect(screen.getByTestId('running.sub').textContent).toBe('3 running in 2 projects · 1 listening');
     expect(rowIds()).toEqual(['shop/checkout/bg1', 'shop/perf/bg3', 'tele/p99/p9.1']);
-    expect(screen.getByTestId('running.row.shop/perf/bg3.url').textContent).toBe('localhost:5173 ↗');
+    expect(screen.getByTestId('running.row.shop/perf/bg3.url').textContent).toBe(':5173 ↗');
+    expect(screen.getByTestId('running.row.shop/perf/bg3.url').getAttribute('data-tip')).toBe('open localhost:5173');
+    expect(screen.getByTestId('running.row.shop/perf/bg3.mark').getAttribute('data-tip')).toBe('running');
     expect(screen.getByTestId('running.row.shop/perf/bg3.end').textContent).toBe('14 min');
     fireEvent.click(screen.getByTestId('running.filter.ended'));
     expect(rowIds()).toEqual(['shop/checkout/bg2']);
     expect(screen.getByTestId('running.row.shop/checkout/bg2.end').textContent).toBe('ended 3 min ago · rc 1');
+    expect(screen.getByTestId('running.row.shop/checkout/bg2.mark').getAttribute('data-tip')).toBe('ended, exit 1');
+  });
+
+  it("one project: no head, the hero says it; a row's program by name, its whole command in its tip (designer m_41694 #1 #2)", () => {
+    const py = at('shop', proc({ id: 'bg5', agent: 'perf', cmd: '/Library/Developer/CommandLineTools/usr/bin/python3 -m http.server 8765' }));
+    render(<RunningView items={[dev, py]} ports={ports()} now={NOW} />);
+    expect(document.querySelector('.run-ghead')).toBeNull();
+    const cmd = screen.getByTestId('running.row.shop/perf/bg5.cmd');
+    expect(cmd.textContent).toBe('python3 -m http.server 8765');
+    expect(cmd.getAttribute('data-tip')?.split('\n')[0]).toBe(py.p.cmd);
   });
 
   it("in the bar's scope (a project's, an agent's 'all ›') its head names no projects (designer m_38700)", () => {
@@ -89,18 +102,19 @@ describe('the running screen', () => {
     // a second s sends nothing more
     fireEvent.keyDown(screen.getByTestId('running.screen'), { key: 's' });
     expect(p.log.filter((l) => l.startsWith('stop'))).toHaveLength(1);
-    const ended = at('shop', { ...dev.p, state: { is: 'stopped_by_you' }, ended_ms: new Date(2026, 9, 23, 14, 5).getTime() });
-    expect(rowIds()).toEqual(['shop/perf/bg3', 'shop/checkout/bg1']);
+    const ended = at('shop', { ...dev.p, state: { is: 'stopped_by_you' }, ended_ms: new Date(2026, 9, 23, 14, 5, 30).getTime() });
+    expect(rowIds()).toEqual(['shop/checkout/bg1', 'shop/perf/bg3']);
     v.rerender(<RunningView items={[ended, stripe]} ports={p} now={NOW} />);
-    expect(rowIds()).toEqual(['shop/perf/bg3', 'shop/checkout/bg1']);
+    expect(rowIds()).toEqual(['shop/checkout/bg1', 'shop/perf/bg3']);
     expect(screen.getByTestId('running.row.shop/perf/bg3.end').textContent).toBe('stopped by you · 14:05');
   });
 
   it('opens the output beside the list: head, meta, keys; o opens its address; no output kept: the dim line', () => {
     const p = ports();
     render(<RunningView items={[dev, nohup]} ports={p} now={NOW} opened="shop/perf/bg3" />);
-    expect(screen.getByTestId('running.pane.cmd').textContent).toBe('pnpm dev');
-    expect(screen.getByTestId('running.pane.meta').textContent).toContain('localhost:5173');
+    expect(screen.getByTestId('running.pane.cmd').textContent.trim()).toBe('pnpm dev');
+    expect(screen.getByTestId('running.pane.meta').textContent).toContain('running for 14 min');
+    expect(screen.getByTestId('running.pane.open').getAttribute('data-tip')).toBe('open localhost:5173');
     expect(screen.getByTestId('running.out').getAttribute('data-live')).toBe('true');
     fireEvent.keyDown(screen.getByTestId('running.screen'), { key: 'o' });
     expect(p.log).toContain('open http://127.0.0.1:5173');
@@ -109,6 +123,34 @@ describe('the running screen', () => {
     expect(screen.queryByTestId('running.pane.open')).toBeNull();
     fireEvent.keyDown(screen.getByTestId('running.screen'), { key: 'Escape' });
     expect(screen.queryByTestId('running.pane')).toBeNull();
+    // none picked: the pane says what it is for (designer m_41694 #12)
+    expect(screen.getByTestId('running.pane.none').textContent).toBe('pick a process to read its output.');
+  });
+
+  it("the pane shows the whole command, wrapped, highlighted as bash by the thread's highlighter (Gabriel's ask)", () => {
+    const cmd = 'export BEND_MEM_LIMIT_MB=16384; R=$PWD; (scripts/heavy-run --low -- cargo test -p sb-core 2>&1 | tail -n 40) && echo "rc=$?"';
+    const long = at('shop', proc({ id: 'bg6', agent: 'perf', cmd }));
+    render(<RunningView items={[long]} ports={ports()} now={NOW} opened="shop/perf/bg6" />);
+    const box = screen.getByTestId('running.pane.cmd');
+    // whole, never cut with an ellipsis
+    expect(box.textContent.trim()).toBe(cmd);
+    expect(box.querySelector('code.language-bash')).not.toBeNull();
+    // its tokens colored: a keyword, a variable, a string, a flag each in its own run
+    const runs = [...box.querySelectorAll('code > span > span')].map((r) => [r.textContent, (r as HTMLElement).style.color]);
+    expect(runs).toContainEqual(['export', 'var(--md-syn-keyword)']);
+    expect(runs.some(([t, c]) => t === '"rc=$?"' && c === 'var(--md-syn-string)')).toBe(true);
+    // the empty state's words go to the output (quietWords)
+    expect(screen.getByTestId('running.out').getAttribute('data-quiet')).toBe('running for 14 min · nothing printed yet');
+  });
+
+  it('stop asks once before it stops: the first click asks, the second stops', () => {
+    const p = ports();
+    render(<RunningView items={[dev]} ports={p} now={NOW} opened="shop/perf/bg3" />);
+    fireEvent.click(screen.getByTestId('running.pane.stop'));
+    expect(screen.getByTestId('running.pane.stop').textContent).toBe('stop it?');
+    expect(p.log.filter((l) => l.startsWith('stop'))).toHaveLength(0);
+    fireEvent.click(screen.getByTestId('running.pane.stop'));
+    expect(p.log).toContain('stop shop/perf/bg3');
   });
 
   it("a route to an ended one opens it under 'ended today'", () => {

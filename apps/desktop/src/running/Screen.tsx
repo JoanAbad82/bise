@@ -9,14 +9,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { nextHit, type Hit } from './find';
 import type { Terminal as Xterm } from '@xterm/xterm';
-import { Field, PageHero, Press, tipAttrs } from '@/ds';
+import { Empty, Field, PageHero, Press, Seg, tipAttrs } from '@/ds';
+import { Code } from '@/thread/Code';
 import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
 import { useKeptScroll } from '@/app/keep';
-import { useStore } from '@/store';
+import { useProjects, useStore } from '@/store';
+import { useBarAgents } from '@/app/baragents';
+import { procRoots } from '@/app/barrows';
 import { useRoute } from '@/app/router';
 import { useAllProcesses } from './hooks';
-import { countsOf, endWords, groupsOf, inScope, isRunning, keyOf, markOf, matches, metaOf, stateOf, tipOf, urlWords, type Filter, type ProcItem } from './model';
+import { countsOf, endWords, groupsOf, inScope, isRunning, keyOf, markOf, markTip, matches, metaOf, quietWords, paneWhere, rowCmd, stateOf, tipOf, urlWords, type Filter, type ProcItem, type Root } from './model';
 import { Output } from './Output';
 import { running } from '@/proto/words_running.gen';
 import './running.css';
@@ -56,11 +59,16 @@ export function RunningScreen() {
   // the bar's 'all ›' keeps its scope: a project's, an agent's; none: every project's
   const scope = route.screen === 'running' ? route.scope : undefined;
   const shown = useMemo(() => inScope(items, scope), [items, scope]);
-  return <RunningView items={shown} ports={ports} home={home} opened={opened} scoped={scope !== undefined} />;
+  const projects = useProjects();
+  const agents = useBarAgents('');
+  const roots = useMemo(() => procRoots(projects, agents), [projects, agents]);
+  return <RunningView items={shown} ports={ports} home={home} roots={roots} opened={opened} scoped={scope !== undefined} />;
 }
 
 /** How often the shown screen says it again: the core lets its hold go 30 s after the last (LISTS_LEASE). */
 export const RENEW_MS = 10_000;
+
+const FILTERS: readonly Filter[] = ['running', 'ended'];
 
 /** The screen from props (tests, shots). */
 export function RunningView({
@@ -68,6 +76,7 @@ export function RunningView({
   ports,
   now: pinned,
   home,
+  roots,
   opened,
   scoped = false,
 }: {
@@ -75,6 +84,8 @@ export function RunningView({
   ports: RunningPorts;
   now?: number;
   home?: string | undefined;
+  /** where each project's processes run (procRoots): the pane says a folder past its worktree */
+  roots?: ReadonlyMap<string, readonly Root[]> | undefined;
   /** the bar's scope ('all ›' from a project's or an agent's thread): its head names no projects */
   scoped?: boolean;
   /** the process the route opens ('project/agent/id': the bar's row, a thread's backgrounded call) */
@@ -115,8 +126,8 @@ export function RunningView({
       if (endedOne(opened) && !kept.has(opened)) setFilter('ended');
     }
   }
-  const counts = countsOf(items);
-  const groups = groupsOf(items.filter((x) => matches(x, q)), filter, kept);
+  const counts = countsOf(items, now);
+  const groups = groupsOf(items.filter((x) => matches(x, q)), filter, now, kept);
   const order = groups.flatMap((g) => g.items.map(keyOf));
   const term = useRef<Xterm | null>(null);
   const onTerm = useCallback((t: Xterm | null) => {
@@ -192,22 +203,17 @@ export function RunningView({
           testId="running.hero"
         />
         <div className="run-bar">
-          <div className="run-filters" role="tablist">
-            {(['running', 'ended'] as const).map((f) => (
-              <Press
-                key={f}
-                role="tab"
-                aria-selected={filter === f}
-                look={filter === f ? 'run-filter on' : 'run-filter'}
-                data-testid={`running.filter.${f}`}
-                onClick={() => {
-                  pick(f);
-                }}
-              >
-                {f === 'running' ? running.filter_running({ n: counts.running }) : running.filter_ended({ n: counts.ended })}
-              </Press>
+          {/* the plugins place's tabs: text, the chosen one underlined, its count in text-3 (designer m_41694 #3) */}
+          <Seg
+            items={FILTERS.map((f) => (
+              <span key={f} data-testid={`running.filter.${f}`} aria-selected={filter === f}>
+                {f === 'running' ? running.state_running : running.ended_today} <span className="run-n">{f === 'running' ? counts.running : counts.ended}</span>
+              </span>
             ))}
-          </div>
+            on={FILTERS.indexOf(filter)}
+            onPick={(i) => { pick(FILTERS[i] ?? 'running'); }}
+            testId="running.filters"
+          />
           <span className="run-search">
             <Field slash placeholder={running.search} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="running.search" />
           </span>
@@ -220,14 +226,14 @@ export function RunningView({
           <div className="run-list" role="listbox" data-testid="running.list">
             {groups.map((g) => (
               <div key={g.key} className="run-group" data-testid={`running.group.${g.key}`}>
-                <div className="run-ghead">
-                  {g.projectName} <span className="run-gsep">›</span> {g.agent}
-                </div>
+                {/* one head per project; none with one project: the hero says it (designer m_41694 #2) */}
+                {groups.length > 1 && <div className="run-ghead">{g.projectName}</div>}
                 {g.items.map((x) => {
                   const k = keyOf(x);
                   const s = stateOf(x.p, stopping.has(k));
                   const m = markOf(s);
                   const u = urlWords(x.p, s);
+                  const c = rowCmd(x.p.cmd, x.p.cwd);
                   return (
                     <div
                       key={k}
@@ -237,26 +243,31 @@ export function RunningView({
                       data-row={k}
                       data-state={s.k}
                       data-testid={`running.row.${k}`}
-                      {...tipAttrs(tipOf(x.p, home))}
                       onClick={() => {
                         setSel(k);
                         setOpen(k);
                       }}
                     >
-                      <span className={`run-mark ${m.tone}`}>{m.glyph}</span>
-                      <span className="run-cmd">{x.p.cmd}</span>
+                      <span className={`run-mark ${m.tone}`} data-testid={`running.row.${k}.mark`} {...tipAttrs(markTip(x.p, s, now))}>{m.glyph}</span>
+                      {/* its program by name, its arguments dimmer; the whole command in its tip (designer m_41694 #1) */}
+                      <span className="run-cmd" data-testid={`running.row.${k}.cmd`} {...tipAttrs(`${x.p.cmd}\n${tipOf(x.p, home)}`)}>
+                        <span className="run-prog">{c.prog}</span>
+                        {c.args !== '' && <span className="run-args">{` ${c.args}`}</span>}
+                      </span>
+                      <span className="run-agent">{x.p.agent}</span>
                       {u !== null ? (
                         <a
                           className="run-url"
                           href={u.url}
                           data-testid={`running.row.${k}.url`}
+                          {...tipAttrs(u.tip)}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             ports.open(u.url);
                           }}
                         >
-                          {u.label}
+                          {u.row}
                         </a>
                       ) : (
                         <span />
@@ -273,18 +284,24 @@ export function RunningView({
         )}
         </div>
       </div>
-      {cur && (
+      {cur ? (
         <Pane
+          key={keyOf(cur)}
           x={cur}
           st={stateOf(cur.p, stopping.has(keyOf(cur)))}
           now={now}
-          home={home}
+          where={paneWhere(cur, roots?.get(cur.project) ?? [], home)}
           onTerm={onTerm}
           onBack={() => { setOpen(null); }}
           onStop={() => { stop(cur); }}
           onOpen={() => { openUrl(cur); }}
           find={finding ? <Find term={term} onDone={() => { setFinding(false); ref.current?.focus({ preventScroll: true }); }} /> : null}
         />
+      ) : (
+        // none picked: the pane says what it is for, never a blank (designer m_41694 #12)
+        <aside className="run-pane none" data-testid="running.pane.none">
+          <Empty title={running.pick_one} />
+        </aside>
       )}
     </section>
   );
@@ -323,35 +340,50 @@ function Find({ term, onDone }: { term: { readonly current: Xterm | null }; onDo
   );
 }
 
-function Pane({ x, st, now, home, onTerm, onBack, onStop, onOpen, find }: { x: ProcItem; st: ReturnType<typeof stateOf>; now: number; home: string | undefined; onTerm: (t: Xterm | null) => void; onBack: () => void; onStop: () => void; onOpen: () => void; find: ReactNode }) {
+function Pane({ x, st, now, where, onTerm, onBack, onStop, onOpen, find }: { x: ProcItem; st: ReturnType<typeof stateOf>; now: number; where: string; onTerm: (t: Xterm | null) => void; onBack: () => void; onStop: () => void; onOpen: () => void; find: ReactNode }) {
   const u = urlWords(x.p, st);
   const live = st.k === 'running' || st.k === 'stopping';
+  // stop is the only danger: a first click asks, the second stops (designer m_41694 #8)
+  const [asking, setAsking] = useState(false);
+  const cwd = x.p.cwd ?? '';
   return (
     <aside className="run-pane" data-testid="running.pane">
       <div className="run-phead">
         <Press look="run-back" onClick={onBack} data-testid="running.back">{`‹ ${running.heading}`}</Press>
-        <span className="run-pcmd" data-testid="running.pane.cmd">{x.p.cmd}</span>
-        <span className="run-pwho">{`${x.p.agent} · ${x.projectName}`}</span>
+        <div className="run-meta" data-testid="running.pane.meta">
+          {metaOf(x, st, now, where).map((m) => (
+            <span key={m.k} className={`run-m-${m.k}`} {...tipAttrs(m.k === 'where' ? cwd : undefined)}>{m.w}</span>
+          ))}
+        </div>
         <span className="run-pacts">
           {u !== null && (
-            <Press look="run-act" onClick={onOpen} data-testid="running.pane.open">{running.open}</Press>
+            <Press look="run-act" onClick={onOpen} data-testid="running.pane.open" {...tipAttrs(u.tip)}>{running.open}</Press>
           )}
           {st.k === 'running' && (
-            <Press look="run-act" onClick={onStop} data-testid="running.pane.stop">{running.stop}</Press>
+            <Press
+              look={`run-act${asking ? ' ask' : ''}`}
+              onClick={() => {
+                if (asking) onStop();
+                else setAsking(true);
+              }}
+              onBlur={() => { setAsking(false); }}
+              data-testid="running.pane.stop"
+            >
+              {asking ? running.stop_confirm : running.stop}
+            </Press>
           )}
         </span>
       </div>
-      <div className="run-meta" data-testid="running.pane.meta">
-        {metaOf(x.p, st, now, home).map((w) => (
-          <span key={w}>{w}</span>
-        ))}
-      </div>
+      {/* the whole command, wrapped, highlighted as the thread's '$' rows are (Gabriel's ask) */}
+      <pre className="run-pcmd" data-testid="running.pane.cmd">
+        <Code text={x.p.cmd} lang="bash" />
+      </pre>
       {find}
-      <Output project={x.project} agent={x.p.agent} id={x.p.id} none={x.p.out === 'none' || x.p.out === 'unknown'} live={live} onTerm={onTerm} />
+      <Output project={x.project} agent={x.p.agent} id={x.p.id} none={x.p.out === 'none' || x.p.out === 'unknown'} live={live} quiet={quietWords(x.p, st, now)} onTerm={onTerm} />
       <div className="run-keys" data-testid="running.keys">
         <span><b>↓</b> {running.key_follow}</span>
-        <span><b>⌘F</b> {running.key_find}</span>
-        <span><b>⌘C</b> {running.key_copy}</span>
+        <span className="run-k-find"><b>⌘F</b> {running.key_find}</span>
+        <span className="run-k-copy"><b>⌘C</b> {running.key_copy}</span>
         {live && <span><b>s</b> {running.key_stop}</span>}
         {u !== null && <span><b>o</b> {running.key_open}</span>}
         <span><b>esc</b> {running.key_back}</span>

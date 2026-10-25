@@ -60,6 +60,11 @@
     "one": null,
     "text": "it has ended: nothing to open."
   },
+  "running.ended_now": {
+    "args": [],
+    "one": null,
+    "text": "ended just now"
+  },
   "running.ended_today": {
     "args": [],
     "one": null,
@@ -71,20 +76,6 @@
     ],
     "one": null,
     "text": "rc {rc}"
-  },
-  "running.filter_ended": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "ended today · {n}"
-  },
-  "running.filter_running": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "running · {n}"
   },
   "running.find_words": {
     "args": [],
@@ -103,6 +94,11 @@
     "args": [],
     "one": null,
     "text": "processes"
+  },
+  "running.jump_end": {
+    "args": [],
+    "one": null,
+    "text": "jump to end ↓"
   },
   "running.key_back": {
     "args": [],
@@ -159,6 +155,18 @@
     "one": null,
     "text": "↓ follows the end   / find   o open   s stop   esc back"
   },
+  "running.mark_ended": {
+    "args": [],
+    "one": null,
+    "text": "ended"
+  },
+  "running.mark_exit": {
+    "args": [
+      "rc"
+    ],
+    "one": null,
+    "text": "ended, exit {rc}"
+  },
   "running.no_output": {
     "args": [],
     "one": null,
@@ -193,6 +201,11 @@
     "one": null,
     "text": "opening localhost:{port}"
   },
+  "running.pick_one": {
+    "args": [],
+    "one": null,
+    "text": "pick a process to read its output."
+  },
   "running.pid_of": {
     "args": [
       "pid"
@@ -206,6 +219,32 @@
     ],
     "one": null,
     "text": ":{port}"
+  },
+  "running.quiet_ended": {
+    "args": [],
+    "one": null,
+    "text": "it ended without printing anything"
+  },
+  "running.quiet_ended_rc": {
+    "args": [
+      "rc"
+    ],
+    "one": null,
+    "text": "it ended without printing anything · exit {rc}"
+  },
+  "running.quiet_running": {
+    "args": [
+      "age"
+    ],
+    "one": null,
+    "text": "running for {age} · nothing printed yet"
+  },
+  "running.running_for": {
+    "args": [
+      "age"
+    ],
+    "one": null,
+    "text": "running for {age}"
   },
   "running.running_in": {
     "args": [
@@ -229,6 +268,11 @@
     "args": [],
     "one": null,
     "text": "stop"
+  },
+  "running.stop_confirm": {
+    "args": [],
+    "one": null,
+    "text": "stop it?"
   },
   "running.stopped_by_you": {
     "args": [],
@@ -289,6 +333,20 @@
     ],
     "one": null,
     "text": "localhost:{port} ↗"
+  },
+  "running.url_row": {
+    "args": [
+      "port"
+    ],
+    "one": null,
+    "text": ":{port} ↗"
+  },
+  "running.url_tip": {
+    "args": [
+      "port"
+    ],
+    "one": null,
+    "text": "open localhost:{port}"
   },
   "running.usage": {
     "args": [

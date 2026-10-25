@@ -80,6 +80,20 @@ export function markOf(s: St): { readonly glyph: string; readonly tone: 'dim' | 
   }
 }
 
+/** A row's mark's tip: 'running', 'ended, exit 1', 'stopped by you · 10:12' (designer m_41694 #6). */
+export function markTip(p: Proc, s: St, now: number): string {
+  switch (s.k) {
+    case 'running':
+      return running.state_running;
+    case 'exited':
+      return s.rc === null ? running.mark_ended : running.mark_exit({ rc: s.rc });
+    default:
+      return endWords(p, s, now);
+  }
+}
+
+const MIN = 60_000;
+
 /** A row's right end: its age while it runs, else how it ended ('stopped by you · 10:12'). */
 export function endWords(p: Proc, s: St, now: number): string {
   switch (s.k) {
@@ -88,8 +102,9 @@ export function endWords(p: Proc, s: St, now: number): string {
     case 'stopping':
       return running.stopping;
     case 'exited': {
-      const ago = shortAge(now - (s.at ?? now));
-      return s.rc === 0 || s.rc === null ? running.ended_ago({ ago }) : `${running.ended_ago({ ago })} · ${running.exit_rc({ rc: s.rc })}`;
+      // under a minute: 'ended just now', never 'ended now ago' (designer m_41694 #8)
+      const ended = now - (s.at ?? now) < MIN ? running.ended_now : running.ended_ago({ ago: shortAge(now - (s.at ?? now)) });
+      return s.rc === 0 || s.rc === null ? ended : `${ended} · ${running.exit_rc({ rc: s.rc })}`;
     }
     case 'by_you':
       return running.stopped_by_you_at({ at: hm(s.at) });
@@ -103,12 +118,49 @@ export function endWords(p: Proc, s: St, now: number): string {
  * found HTTP there (`url`, procs-bar: a port that isn't a web page opened an empty tab); none when
  * it doesn't listen, isn't HTTP, or ended.
  */
-export function urlWords(p: Proc, s: St): { readonly label: string; readonly url: string } | null {
+export function urlWords(p: Proc, s: St): { readonly label: string; readonly url: string; readonly row: string; readonly tip: string } | null {
   if (s.k !== 'running' && s.k !== 'stopping') return null;
   const url = p.url ?? '';
   const port = /^https?:\/\/[^/]*:(\d+)/u.exec(url)?.[1];
   if (port === undefined) return null;
-  return { label: `localhost:${port} ↗`, url };
+  // the screen's row says it quietly, ':5173 ↗', its tip the whole address (designer m_41694 #4)
+  return { label: `localhost:${port} ↗`, url, row: running.url_row({ port }), tip: running.url_tip({ port }) };
+}
+
+/**
+ * A screen row's command (designer m_41694 #1): its program by name ('python3', not
+ * '/Library/…/bin/python3') and its arguments as they are; a leading 'cd <its own folder> &&' says
+ * nothing and goes, any other cd stays. The whole command is in the tip and the pane. Pure.
+ */
+export function rowCmd(cmd: string, cwd?: string | null): { readonly prog: string; readonly args: string } {
+  const clean = (x: string) => x.replace(/^['"]|['"]$/gu, '').replace(/\/+$/u, '');
+  let c = cmd.trim();
+  const cd = /^cd\s+("[^"]*"|'[^']*'|\S+)\s*(?:&&|;)\s*/u.exec(c);
+  if (cd !== null && cwd != null && cwd !== '' && clean(cd[1] ?? '') === clean(cwd)) c = c.slice(cd[0].length);
+  const sp = c.search(/\s/u);
+  const first = sp < 0 ? c : c.slice(0, sp);
+  const args = sp < 0 ? '' : c.slice(sp).trim();
+  const prog = /^['"]?\//u.test(first) ? (clean(first).split('/').pop() ?? first) : first;
+  return { prog, args };
+}
+
+/**
+ * The output's words while it has printed nothing (designer m_41694 #10): running, 'running for
+ * 3 min · nothing printed yet'; ended, 'it ended without printing anything · exit 0'. Pure.
+ */
+export function quietWords(p: Proc, s: St, now: number): string {
+  if (s.k === 'running' || s.k === 'stopping') return running.quiet_running({ age: ageWords(now - p.started_ms) });
+  return s.k === 'exited' && s.rc !== null ? running.quiet_ended_rc({ rc: s.rc }) : running.quiet_ended;
+}
+
+/** An age in the pane's words: under a minute '1 min' would lie, 'less than a minute' is long: 'a moment'. */
+const ageWords = (ms: number): string => (ms < MIN ? '< 1 min' : shortAge(ms));
+
+/** The day of `ms` is `now`'s, in the window's time zone. */
+export function today(ms: number, now: number): boolean {
+  const a = new Date(ms);
+  const b = new Date(now);
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 /** A port it listens on that isn't a web page: ':9229', plain (no link); none when it has a url or no port. */
@@ -144,6 +196,19 @@ export function whereOf(cwd: string | null | undefined, roots: readonly Root[]):
 }
 
 /**
+ * The pane's 'where' (designer m_41694 #8): its folder past its agent's own worktree ('apps/web';
+ * none at the worktree's root: the head names the agent already), past the project's root, else
+ * short ('~/…/shop/perf'). Pure.
+ */
+export function paneWhere(x: ProcItem, roots: readonly Root[], home?: string): string {
+  const cwd = x.p.cwd ?? '';
+  const w = whereOf(cwd, roots);
+  if (w === x.p.agent) return '';
+  if (w.startsWith(`${x.p.agent}/`)) return w.slice(x.p.agent.length + 1);
+  return w !== '' || cwd === '' ? w : shortCwd(cwd, home);
+}
+
+/**
  * A worktree's name from its path: its folder, or the one above when the folder is the repo's own
  * name (bise's `worktrees/<hub>/<task>/<repo>`: the task). Pure.
  */
@@ -172,56 +237,85 @@ export function tipOf(p: Proc, home?: string): string {
   return p.kind.is === 'detached' ? `${head}\n${running.tip_detached({ agent: p.agent })}` : head;
 }
 
-/** The output's meta line, in order: state and age, its address, pid, cpu and memory, its folder. */
-export function metaOf(p: Proc, s: St, now: number, home?: string): readonly string[] {
-  const st = s.k === 'running' ? `∿ ${running.state_running} · ${shortAge(now - p.started_ms)}` : `${markOf(s).glyph} ${endWords(p, s, now)}`;
-  const url = urlWords(p, s);
+/**
+ * The output's head line (designer m_41694 #8), in order: its mark and 'running for 3 min' (or how
+ * it ended), pid, cpu and memory while it runs, where it runs (`where`: its folder past its
+ * worktree, whereOf), whose ('perf · storefront'). Its address is the head's 'open ↗'.
+ */
+export function metaOf(x: ProcItem, s: St, now: number, where: string): readonly MetaPart[] {
+  const p = x.p;
+  const st = s.k === 'running' ? `∿ ${running.running_for({ age: ageWords(now - p.started_ms) })}` : `${markOf(s).glyph} ${endWords(p, s, now)}`;
   const live = s.k === 'running' || s.k === 'stopping';
-  return [
-    st,
-    url === null ? '' : url.label.replace(/ ↗$/u, ''),
-    running.pid_of({ pid: p.pid }),
-    live ? running.usage({ cpu: Math.round(p.cpu), mb: p.rss_mb }) : '',
-    p.cwd != null && p.cwd !== '' ? shortCwd(p.cwd, home) : '',
-  ].filter((x) => x !== '');
+  const parts: MetaPart[] = [
+    { k: 'state', w: st },
+    { k: 'pid', w: running.pid_of({ pid: p.pid }) },
+    { k: 'usage', w: live ? running.usage({ cpu: Math.round(p.cpu), mb: p.rss_mb }) : '' },
+    { k: 'where', w: where },
+    { k: 'whose', w: running.whose({ agent: p.agent, project: x.projectName }) },
+  ];
+  return parts.filter((m) => m.w !== '');
+}
+
+/** A part of the head line, by kind: a narrow pane drops pid first, then usage (designer m_41800 #2). */
+export interface MetaPart {
+  readonly k: 'state' | 'pid' | 'usage' | 'where' | 'whose';
+  readonly w: string;
 }
 
 export type Filter = 'running' | 'ended';
 
-/** One agent's processes under its project's head ('storefront › perf'). */
+/** One project's processes under its head ('storefront'); the agent is a column of each row (designer m_41694 #2). */
 export interface Group {
   readonly key: string;
   readonly project: string;
   readonly projectName: string;
-  readonly agent: string;
   readonly items: readonly ProcItem[];
 }
 
-/**
- * The screen's list: the filter's rows grouped project > agent, projects and agents in the order
- * they come (his sidebar's), running ones oldest first, ended ones newest first. `kept`: rows that
- * ended (or he stopped) while the screen is open stay in 'running' where they were (designer
- * m_38389: nothing jumps under his pointer).
- */
-export function groupsOf(items: readonly ProcItem[], filter: Filter, kept: ReadonlySet<string> = new Set()): Group[] {
-  const shown = items.filter((x) => (filter === 'running' ? isRunning(x.p) || kept.has(keyOf(x)) : !isRunning(x.p)));
-  const order = filter === 'running' ? (a: ProcItem, b: ProcItem) => a.p.started_ms - b.p.started_ms : (a: ProcItem, b: ProcItem) => (endedAt(b.p) ?? 0) - (endedAt(a.p) ?? 0);
-  const groups = new Map<string, { project: string; projectName: string; agent: string; items: ProcItem[] }>();
-  for (const x of shown) {
-    const k = `${x.project}/${x.p.agent}`;
-    const g = groups.get(k) ?? { project: x.project, projectName: x.projectName, agent: x.p.agent, items: [] };
-    g.items.push(x);
-    groups.set(k, g);
-  }
-  return [...groups.entries()].map(([key, g]) => ({ key, ...g, items: [...g.items].sort(order) }));
+/** How long a row that ended stays in place under 'running' (designer m_38389), then it goes to 'ended' (m_41694 #5). */
+export const KEEP_MS = 60_000;
+
+/** It shows under 'running': it runs, or it ended a moment ago while he looked (`kept`). */
+function underRunning(x: ProcItem, kept: ReadonlySet<string>, now: number): boolean {
+  if (isRunning(x.p)) return true;
+  if (!kept.has(keyOf(x))) return false;
+  const at = endedAt(x.p);
+  return at === null || now - at < KEEP_MS;
 }
 
-/** The filters' counts: what runs, what ended. */
-export function countsOf(items: readonly ProcItem[]): { readonly running: number; readonly ended: number; readonly projects: number; readonly listening: number } {
+/** It shows under 'ended today': it ended, today in his time zone (designer m_41694 #3). */
+const endedToday = (x: ProcItem, now: number): boolean => {
+  if (isRunning(x.p)) return false;
+  return today(endedAt(x.p) ?? x.p.started_ms, now);
+};
+
+/**
+ * The screen's list: the filter's rows grouped by project in the order they come (his sidebar's),
+ * an agent's rows together in the order its first one comes; running ones oldest first, ended ones
+ * newest first. `kept`: rows seen running while 'running' is shown; one that ends stays where it
+ * was for KEEP_MS (designer m_38389: nothing jumps under his pointer).
+ */
+export function groupsOf(items: readonly ProcItem[], filter: Filter, now: number, kept: ReadonlySet<string> = new Set()): Group[] {
+  const shown = items.filter((x) => (filter === 'running' ? underRunning(x, kept, now) : endedToday(x, now)));
+  const order = filter === 'running' ? (a: ProcItem, b: ProcItem) => a.p.started_ms - b.p.started_ms : (a: ProcItem, b: ProcItem) => (endedAt(b.p) ?? 0) - (endedAt(a.p) ?? 0);
+  const sorted = [...shown].sort(order);
+  const agents = [...new Set(sorted.map((x) => `${x.project}/${x.p.agent}`))];
+  const groups = new Map<string, { project: string; projectName: string; items: ProcItem[] }>();
+  for (const x of shown) {
+    const g = groups.get(x.project) ?? { project: x.project, projectName: x.projectName, items: [] };
+    g.items.push(x);
+    groups.set(x.project, g);
+  }
+  const rank = (x: ProcItem) => agents.indexOf(`${x.project}/${x.p.agent}`);
+  return [...groups.entries()].map(([key, g]) => ({ key, ...g, items: [...g.items].sort((a, b) => rank(a) - rank(b) || order(a, b)) }));
+}
+
+/** The filters' counts: what runs, what ended today (his day). */
+export function countsOf(items: readonly ProcItem[], now: number): { readonly running: number; readonly ended: number; readonly projects: number; readonly listening: number } {
   const live = items.filter((x) => isRunning(x.p));
   return {
     running: live.length,
-    ended: items.length - live.length,
+    ended: items.filter((x) => endedToday(x, now)).length,
     projects: new Set(live.map((x) => x.project)).size,
     listening: live.filter((x) => portsOf(x.p).length > 0).length,
   };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Proc } from '@/proto';
-import { barProcs, procOfCall, countsOf, endWords, groupsOf, inScope, keyOf, markOf, matches, metaOf, portWords, shortCmd, shortCwd, stateOf, tipOf, urlWords, whereOf, worktreeName, type ProcItem } from './model';
+import { barProcs, procOfCall, countsOf, endWords, groupsOf, inScope, KEEP_MS, keyOf, markOf, markTip, matches, metaOf, paneWhere, portWords, quietWords, rowCmd, shortCmd, shortCwd, stateOf, tipOf, today, urlWords, whereOf, worktreeName, type ProcItem } from './model';
 
 const NOW = new Date(2026, 9, 23, 14, 6).getTime();
 const MIN = 60_000;
@@ -28,7 +28,7 @@ describe('a row', () => {
     const s = stateOf(p);
     expect(markOf(s)).toEqual({ glyph: '∿', tone: 'dim' });
     expect(endWords(p, s, NOW)).toBe('14 min');
-    expect(urlWords(p, s)).toEqual({ label: 'localhost:5173 ↗', url: 'http://127.0.0.1:5173' });
+    expect(urlWords(p, s)).toEqual({ label: 'localhost:5173 ↗', url: 'http://127.0.0.1:5173', row: ':5173 ↗', tip: 'open localhost:5173' });
     expect(portWords(p, s)).toBe('');
     // the hub's url is the port that answered HTTP, not the first one
     const late = proc({ id: 'bg3', agent: 'perf', ports: [5173, 24678], url: 'http://127.0.0.1:24678' });
@@ -83,11 +83,58 @@ describe('a row', () => {
     );
   });
 
-  it('the output head: state, address, pid, cpu and memory while it runs, folder', () => {
+  it("the output head: 'running for', pid, cpu and memory while it runs, where, whose (designer m_41694 #8)", () => {
     const p = proc({ id: 'bg3', agent: 'perf', ports: [5173], url: 'http://127.0.0.1:5173' });
-    expect(metaOf(p, stateOf(p), NOW, '/Users/g')).toEqual(['∿ running · 14 min', 'localhost:5173', 'pid 48211', 'cpu 12% · 340 MB', '~/…/shop/perf']);
+    expect(metaOf(item('shop', p), stateOf(p), NOW, 'perf/apps/web').map((m) => m.w)).toEqual(['∿ running for 14 min', 'pid 48211', 'cpu 12% · 340 MB', 'perf/apps/web', 'perf · shop']);
     const gone = proc({ id: 'bg3', agent: 'perf', ports: [5173], cwd: undefined, state: { is: 'exited', rc: 2 }, ended_ms: NOW - MIN });
-    expect(metaOf(gone, stateOf(gone), NOW)).toEqual(['✗ ended 1 min ago · rc 2', 'pid 48211']);
+    expect(metaOf(item('shop', gone), stateOf(gone), NOW, '').map((m) => m.w)).toEqual(['✗ ended 1 min ago · rc 2', 'pid 48211', 'perf · shop']);
+  });
+
+  it("the pane's where: past its agent's own worktree, none at its root, past the project's root, else short", () => {
+    const roots = [{ path: '/Users/g/code/shop', name: '' }, { path: '/Users/g/.bise/worktrees/shop/perf', name: 'perf' }];
+    const at = (cwd: string) => item('shop', proc({ id: 'bg3', agent: 'perf', cwd }));
+    expect(paneWhere(at('/Users/g/.bise/worktrees/shop/perf'), roots)).toBe('');
+    expect(paneWhere(at('/Users/g/.bise/worktrees/shop/perf/apps/web'), roots)).toBe('apps/web');
+    expect(paneWhere(at('/Users/g/code/shop/site'), roots)).toBe('site');
+    expect(paneWhere(at('/Users/g/elsewhere/tool'), [], '/Users/g')).toBe('tool');
+  });
+
+  it("under a minute it 'ended just now', never 'ended now ago'", () => {
+    const p = proc({ id: 'bg3', agent: 'perf', state: { is: 'exited', rc: 0 }, ended_ms: NOW - 20_000 });
+    expect(endWords(p, stateOf(p), NOW)).toBe('ended just now');
+    const young = proc({ id: 'bg3', agent: 'perf', started_ms: NOW - 20_000 });
+    expect(metaOf(item('shop', young), stateOf(young), NOW, '')[0]?.w).toBe('∿ running for < 1 min');
+  });
+
+  it("each mark has its tip: 'running', 'ended, exit 0', 'ended, exit 1' (designer m_41694 #6)", () => {
+    const run = proc({ id: 'bg3', agent: 'perf' });
+    expect(markTip(run, stateOf(run), NOW)).toBe('running');
+    const ok = proc({ id: 'bg3', agent: 'perf', state: { is: 'exited', rc: 0 }, ended_ms: NOW });
+    expect(markTip(ok, stateOf(ok), NOW)).toBe('ended, exit 0');
+    const bad = proc({ id: 'bg3', agent: 'perf', state: { is: 'exited', rc: 1 }, ended_ms: NOW });
+    expect(markTip(bad, stateOf(bad), NOW)).toBe('ended, exit 1');
+    expect(markOf(stateOf(bad)).tone).toBe('err');
+  });
+
+  it("the row's command: its program by name, its arguments as they are; 'cd <its own folder> &&' goes, another cd stays", () => {
+    const py = '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3 -m http.server 8765';
+    expect(rowCmd(py)).toEqual({ prog: 'python3', args: '-m http.server 8765' });
+    const wt = '/Users/g/.bise/worktrees/h/bims-life/harness';
+    expect(rowCmd(`cd ${wt} && pnpm dev --port 4000`, wt)).toEqual({ prog: 'pnpm', args: 'dev --port 4000' });
+    expect(rowCmd(`cd '${wt}/' ; make watch`, wt)).toEqual({ prog: 'make', args: 'watch' });
+    expect(rowCmd('cd apps/desktop && pnpm build >/dev/null 2>&1', wt)).toEqual({ prog: 'cd', args: 'apps/desktop && pnpm build >/dev/null 2>&1' });
+    expect(rowCmd('export BEND_MEM_LIMIT_MB=16384; R=$PWD; (scripts/heavy-run -x)')).toEqual({ prog: 'export', args: 'BEND_MEM_LIMIT_MB=16384; R=$PWD; (scripts/heavy-run -x)' });
+    expect(rowCmd('stripe')).toEqual({ prog: 'stripe', args: '' });
+  });
+
+  it("nothing printed yet: 'running for 3 min · nothing printed yet', ended: 'it ended without printing anything · exit 0'", () => {
+    const run = proc({ id: 'bg3', agent: 'perf', started_ms: NOW - 3 * MIN });
+    expect(quietWords(run, stateOf(run), NOW)).toBe('running for 3 min · nothing printed yet');
+    expect(quietWords(run, stateOf(run, true), NOW)).toBe('running for 3 min · nothing printed yet');
+    const ok = proc({ id: 'bg3', agent: 'perf', state: { is: 'exited', rc: 0 }, ended_ms: NOW });
+    expect(quietWords(ok, stateOf(ok), NOW)).toBe('it ended without printing anything · exit 0');
+    const by = proc({ id: 'bg3', agent: 'perf', state: { is: 'stopped_by_you' }, ended_ms: NOW });
+    expect(quietWords(by, stateOf(by), NOW)).toBe('it ended without printing anything');
   });
 
   it('a folder short: home as ~, the last two folders', () => {
@@ -132,22 +179,33 @@ describe('the list', () => {
   const dock = item('tele', proc({ id: 'bg9', agent: 'main', cmd: 'docker compose up', state: { is: 'stopped_by_you' }, ended_ms: NOW - 60 * MIN }));
   const all = [pw, stripe, dev, test, bench, dock];
 
-  it("'running': project > agent in the order they come, oldest first; ended ones are 'ended today'", () => {
-    const g = groupsOf(all, 'running');
-    expect(g.map((x) => x.key)).toEqual(['shop/perf', 'shop/checkout', 'tele/p99']);
-    expect(g[0]?.items.map((x) => x.p.id)).toEqual(['bg3', 'bg4']);
-    expect(groupsOf(all, 'ended').flatMap((x) => x.items.map(keyOf))).toEqual(['shop/checkout/bg2', 'tele/main/bg9']);
+  it("'running': one group per project in the order they come, an agent's rows together, oldest first; ended ones are 'ended today'", () => {
+    const g = groupsOf(all, 'running', NOW);
+    expect(g.map((x) => x.key)).toEqual(['shop', 'tele']);
+    expect(g[0]?.items.map(keyOf)).toEqual(['shop/checkout/bg1', 'shop/perf/bg3', 'shop/perf/bg4']);
+    expect(groupsOf(all, 'ended', NOW).flatMap((x) => x.items.map(keyOf))).toEqual(['shop/checkout/bg2', 'tele/main/bg9']);
+  });
+
+  it("'ended today' is his day: one that ended yesterday is in neither tab (designer m_41694 #3)", () => {
+    const old = item('shop', proc({ id: 'bg5', agent: 'perf', state: { is: 'exited', rc: 0 }, ended_ms: NOW - 18 * 60 * MIN }));
+    expect(today(NOW - 14 * 60 * MIN, NOW)).toBe(true);
+    expect(today(NOW - 18 * 60 * MIN, NOW)).toBe(false);
+    expect(groupsOf([...all, old], 'ended', NOW).flatMap((x) => x.items.map(keyOf))).not.toContain(keyOf(old));
+    expect(groupsOf([...all, old], 'running', NOW, new Set([keyOf(old)])).flatMap((x) => x.items.map(keyOf))).not.toContain(keyOf(old));
+    expect(countsOf([...all, old], NOW).ended).toBe(2);
   });
 
   it("a row that ended while the screen is open stays in 'running' where it was (designer m_38389)", () => {
     const stopped = item('shop', { ...dev.p, state: { is: 'stopped_by_you' }, ended_ms: NOW });
     const kept = new Set([keyOf(dev)]);
-    expect(groupsOf([stopped, pw], 'running', kept)[0]?.items.map((x) => x.p.id)).toEqual(['bg3', 'bg4']);
-    expect(groupsOf([stopped, pw], 'running')[0]?.items.map((x) => x.p.id)).toEqual(['bg4']);
+    expect(groupsOf([stopped, pw], 'running', NOW, kept)[0]?.items.map((x) => x.p.id)).toEqual(['bg3', 'bg4']);
+    expect(groupsOf([stopped, pw], 'running', NOW)[0]?.items.map((x) => x.p.id)).toEqual(['bg4']);
+    // a while later it goes to 'ended': 'running' shows running ones only (designer m_41694 #5)
+    expect(groupsOf([stopped, pw], 'running', NOW + KEEP_MS, kept)[0]?.items.map((x) => x.p.id)).toEqual(['bg4']);
   });
 
   it("the counts: running, ended, projects that run something, the listening ones", () => {
-    expect(countsOf(all)).toEqual({ running: 4, ended: 2, projects: 2, listening: 2 });
+    expect(countsOf(all, NOW)).toEqual({ running: 4, ended: 2, projects: 2, listening: 2 });
   });
 
   it('the search: the command, its agent, the project, a port', () => {

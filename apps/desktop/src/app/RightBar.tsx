@@ -10,10 +10,9 @@
 // at a time past its cap ('show 50 more · N left', then 'show less' beside it), kept per
 // section and per scope (his m_26894, barrows.ts pageRows).
 // Owner: amb-win. The rows' words are pure (barrows.ts).
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
 import { markTip } from './tipwords';
-import type { Agent } from '@/proto';
 import { common } from '@/proto/words_common.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { useAllArtifacts } from '@/artifacts';
@@ -23,7 +22,7 @@ import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { barProcs, isRunning, keyOf, stateOf, urlWords, useAllProcesses } from '@/running';
 import { running } from '@/proto/words_running.gen';
-import { useCards, useComputerLive, useGrowth, usePlaces, usePlugins, usePrefs, useProjects, useStore, type Store } from '@/store';
+import { useCards, useComputerLive, useGrowth, usePlaces, usePlugins, usePrefs, useProjects, useStore } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -33,7 +32,8 @@ import { useNowFor } from './clock';
 import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
-import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type MoreWords, type ProjAgent } from './barrows';
+import { useBarAgents } from './baragents';
+import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type MoreWords } from './barrows';
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
@@ -50,40 +50,6 @@ import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
 import { getPref, type Prefs } from '@/settings/prefs';
 import { showsWide, useBimsView, wideMode } from '@/bims/view';
 import { bimsLit, followOf, useBimsLit } from '@/bims/focus';
-
-const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
-
-/** The agents of one project, or of every project ('' = bise's thread), with a stable snapshot. */
-export function useBarAgents(project: string): readonly ProjAgent[] {
-  const store = useStore();
-  const ids = (s: Store) => (project === '' ? s.projects().map((p) => p.project) : [project]);
-  return useSyncExternalStore(
-    (cb) => {
-      const offs = ids(store).map((p) => store.subscribe(`agents:${p}`, cb));
-      offs.push(store.subscribe('projects', cb));
-      return () => {
-        for (const off of offs) off();
-      };
-    },
-    () => {
-      const list = ids(store);
-      const names = list.map((p) => {
-        const row = store.projects().find((x) => x.project === p);
-        return row !== undefined && row.name !== '' ? row.name : p;
-      });
-      const from = list.map((p) => store.agents(p));
-      const key = `${project}\u0000${names.join('\n')}`;
-      const was = lastAgents.get(key);
-      if (was !== undefined && was.from.length === from.length && was.from.every((x, i) => x === from[i])) return was.items;
-      const items: ProjAgent[] = [];
-      list.forEach((p, i) => {
-        for (const a of from[i] ?? []) items.push({ project: p, projectName: names[i] ?? p, a });
-      });
-      lastAgents.set(key, { from, items });
-      return items;
-    },
-  );
-}
 
 /** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre');
  *  `byDefault` until he changes it (ARCHIVED starts folded: his ask, main m_23467). */
