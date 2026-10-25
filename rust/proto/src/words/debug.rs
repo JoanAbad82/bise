@@ -12,27 +12,39 @@ crate::words! { debug:
     role_user = "user";
     /// the model's text and thinking
     role_assistant = "assistant";
+    /// a call the model made
     role_tool_call = "tool call";
+    /// what a call gave back
     role_tool_result = "tool result";
 
     // ---- a part's kind (the second level; a tool is its own name)
+    /// the system prompt at the top
     kind_prompt = "system prompt";
+    /// the tools' definitions in the request
     kind_tools = "tool definitions";
+    /// the model, max_tokens and the other keys
     kind_params = "request params";
     /// a system or developer message among the messages
     kind_mid = "system message";
     /// his own messages
     kind_words = "your words";
+    /// another agent's message
     kind_agent_message = "agent message";
     /// the live state bise adds before each call
     kind_bise_state = "bise state";
+    /// the agent's role preamble
     kind_preamble = "role preamble";
+    /// the compaction's summary and its note
     kind_summary = "compaction summary";
     /// a `[bise]` line
     kind_note = "bise note";
+    /// another tagged text (its tag next level)
     kind_tagged = "tagged text";
+    /// the model's text, or a user text with no envelope
     kind_text = "text";
+    /// the model's thinking
     kind_thinking = "thinking";
+    /// an image
     kind_image = "image";
     /// what the classifier does not know; also the rest of a level past its top 7
     kind_other = "other";
@@ -70,7 +82,9 @@ crate::words! { debug:
     tip_message(pos, what, tokens) = "#{pos} · {what} · {tokens} tokens";
     /// the charts' tabs in a narrow window
     tab_tokens = "tokens";
+    /// the histogram, in a narrow window
     tab_sizes = "sizes";
+    /// the per-message series, in a narrow window
     tab_series = "per message";
     /// a request with no parts (an older hub)
     no_parts = "no chart for this request: its hub is older";
@@ -84,5 +98,6 @@ crate::words! { debug:
     tip_clear = "clear this filter";
     /// the foot's key words
     key_clear = "clear filter";
+    /// v in the foot
     key_charts = "hide the charts";
 }
