@@ -278,6 +278,9 @@ fn bises_plugins_bridge_is_never_listed() {
         r(101, 100, 101, 101, t, "/v/repl-live"),
         r(320, 1, 101, 101, t, "/v/bise plugins serve --dir /h/run/50158/plugins --parent 101"),
         r(321, 320, 101, 101, t, "node /h/plugins/x/server.js"),
+        // an app bundle whose path holds a space (a release candidate's
+        // 'bise cand.app'): ps joins argv with spaces (agents-new, 090684cfb)
+        r(322, 1, 101, 101, t, "/d/bise cand.app/Contents/Resources/bin/bise plugins serve --dir /h/run/50159/plugins --parent 101"),
         r(330, 1, 330, 330, t, "bise plugins serve --dir /tmp/p"),
         r(340, 1, 340, 340, t, "python3 -m http.server 8000"),
     ];

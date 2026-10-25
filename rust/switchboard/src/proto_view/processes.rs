@@ -272,11 +272,13 @@ fn bise_wrapper(args: &str, dir: &str) -> bool {
 /// bise's plugins bridge for a REPL (`<bise> plugins serve --dir <run>/plugins
 /// --parent <repl>`, plugins/src/bridge.rs): it forks away from its REPL
 /// (its parent is 1) and ends with it, and its port is bise's loopback
-/// API, never the agent's server (Gabriel's 13 rows, procs-bar).
+/// API, never the agent's server (Gabriel's 13 rows, procs-bar). `args` is
+/// ps's space-joined line, so the binary's path is all before
+/// ` plugins serve `: it can hold spaces (`.../bise cand.app/.../bin/bise`,
+/// a release candidate or a renamed app), never split on whitespace.
 fn bise_bridge(args: &str) -> bool {
-    let mut w = args.split_whitespace();
-    let bin = w.next().unwrap_or("");
-    (bin == "bise" || bin.ends_with("/bise")) && w.next() == Some("plugins") && w.next() == Some("serve") && args.contains(" --parent ")
+    let Some((bin, rest)) = args.split_once(" plugins serve ") else { return false };
+    (bin == "bise" || bin.ends_with("/bise")) && format!(" {rest}").contains(" --parent ")
 }
 
 fn descendants(from: &[u32], kids: &BTreeMap<u32, Vec<u32>>) -> BTreeSet<u32> {

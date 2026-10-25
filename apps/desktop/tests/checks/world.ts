@@ -16,6 +16,9 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { launchDesktop, type LaunchOptions, type Session } from '../harness';
+import { tuiAgents } from './tui-panel';
+
+export { tuiAgents, tuiInbox } from './tui-panel';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
 const QA = path.join(REPO, 'dev', 'plugins', 'ambient-qa', 'qa.py');
@@ -209,37 +212,6 @@ export function feedLines(text: string, kind: string): { raw: string; json?: Rec
   return out;
 }
 
-/**
- * The TUI's side panel, one trimmed string per screen line: the text between the panel's left
- * border (the '┬' in the top border) and the right border. Cut by column, not by '│': a tip
- * popover ('new: your agents…') drawn over the feed can cover the border between feed and panel.
- */
-function panelOf(screen: string): string[] {
-  const lines = screen.split('\n');
-  const col = (lines[0] ?? '').indexOf('┬');
-  // no '┬' (the top border is the title bar): the panel's width from its 'agents' head line
-  // ('│  agents   │'), cut from each line's right border. Not by '│': the first-run tip box
-  // ('new: your agents…', qa-native e3f7e598) drawn just left of the panel puts its own corners and
-  // borders on the agent rows' lines, so the cell before the last '│' can be the whole feed.
-  // With a '┬' too: a feed line holding a character of two code units ('✉︎' is U+2709 + U+FE0E, the
-  // TUI's message rows) shifts everything after it by one, so a cut at the '┬' column misses the
-  // panel on that line ('│  agents' instead of 'agents'); from the right border it never does.
-  const head = lines.find((l) => /│\s+agents\s+│\s*$/.test(l));
-  const width = head ? head.lastIndexOf('│') - head.lastIndexOf('│', head.lastIndexOf('agents')) - 1 : -1;
-  return lines.map((l) => {
-    if (width > 0) {
-      const end = l.lastIndexOf('│');
-      return end > width ? l.slice(end - width, end).trim() : '';
-    }
-    if (col < 0) {
-      const cells = l.split('│');
-      return (cells.length >= 3 ? (cells[cells.length - 2] ?? '') : '').trim();
-    }
-    const end = l.lastIndexOf('│');
-    return end > col ? l.slice(col + 1, end).trim() : '';
-  });
-}
-
 /** The terminal on the same hub, in a detached tmux session of its own (never his tmux server). */
 export type Tui = { screen: () => string; keys: (...k: string[]) => void; close: () => void };
 
@@ -291,46 +263,6 @@ export async function tuiReady(t: Tui, timeoutMs = 20_000): Promise<void> {
     if (Date.now() - t0 > timeoutMs) throw new Error(`the TUI isn't ready after ${timeoutMs} ms:\n${s}`);
     await sleep(300);
   }
-}
-
-/**
- * The TUI's inbox, from its side panel (`inbox`, then rows `N ? <agent>  <text…>`), in its order:
- * [{ n, agent, text }] with the text as drawn (cut with … at the panel's width).
- */
-export function tuiInbox(screen: string): { n: number; agent: string; text: string }[] {
-  const panel = panelOf(screen);
-  const at = panel.indexOf('inbox');
-  if (at < 0) return [];
-  const out: { n: number; agent: string; text: string }[] = [];
-  for (const row of panel.slice(at + 1)) {
-    const m = /^(\d+) \S (\S+)\s+(.*)$/.exec(row);
-    if (!m) break;
-    out.push({ n: Number(m[1]), agent: m[2] ?? '', text: (m[3] ?? '').replace(/…$/, '').trim() });
-  }
-  return out;
-}
-
-/**
- * The TUI's agents, from its side panel (`agents`, then rows `N <glyph> <name> …`), in its order:
- * [{ n, glyph, name }]. The glyph is its status (rust/tui/src/theme.rs, TUI_STATUS).
- */
-export function tuiAgents(screen: string): { n: number; glyph: string; name: string }[] {
-  const panel = panelOf(screen);
-  const at = panel.indexOf('agents');
-  if (at < 0) return [];
-  const out: { n: number; glyph: string; name: string }[] = [];
-  for (const raw of panel.slice(at + 1)) {
-    // the first-run tip box ('new: your agents… ⌥ 1 to look inside') can end on the panel's left
-    // edge on the agent rows' lines (qa-native, packed e3f7e598): its border chars lead the row
-    const row = raw.replace(/^[│╮╯╭╰─┐┘\s]+/u, '');
-    // a feature's agents come under its own head ('ψ gift-cards'), after a blank line
-    if (row === '' || row.startsWith('ψ ')) continue;
-    if (row === 'inbox') break;
-    const m = /^(\d+) (\S) (\S+)/.exec(row);
-    if (!m) break;
-    out.push({ n: Number(m[1]), glyph: m[2] ?? '', name: m[3] ?? '' });
-  }
-  return out;
 }
 
 /**
