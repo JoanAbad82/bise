@@ -318,10 +318,14 @@ const sortedBy = (cs: readonly Card[]): boolean =>
   });
 
 const SEEDS = process.env["SEED"] !== undefined ? [Number(process.env["SEED"])] : Array.from({ length: 200 }, (_, i) => i + 1);
+// the 200 seeds in 10 tests of 20: each ~3 s alone, so each fits its 60 s under a tip gate's load
+// (one test of 200 took 30 s alone and 68 s at load 20-60 on 41dd76670). Same seeds, same laws.
+const CHUNK = 20;
+const CHUNKS = Array.from({ length: Math.ceil(SEEDS.length / CHUNK) }, (_, i) => SEEDS.slice(i * CHUNK, (i + 1) * CHUNK));
 
 describe("the cards slice's law", () => {
-  it("over seeded runs: the inbox is the hub's open cards less his acts in flight; one gesture, one command; a reload keeps his; the hub's rank orders it; nothing changed is the same state", () => {
-    for (const seed of SEEDS) {
+  for (const chunk of CHUNKS) it(`over seeded runs ${String(chunk[0])}-${String(chunk[chunk.length - 1])}: the inbox is the hub's open cards less his acts in flight; one gesture, one command; a reload keeps his; the hub's rank orders it; nothing changed is the same state`, () => {
+    for (const seed of chunk) {
       let s: CardsState = cardsInit(null);
       let f: HubFacts = NO_FACTS;
       const m: Model = { flight: new Map(), attempts: new Map(), refused: new Map(), answering: new Map(), answersFrom: new Map(), jumps: [] };
