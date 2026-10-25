@@ -42,7 +42,7 @@ type AnchorRect = { x: number; y: number; w: number; h: number };
 /** The wire's anchor (bise_proto::anchor), the fields these scripts read. */
 type Anchor = {
   kind?: string; block?: string; blocks?: string[]; quote?: string; offset?: number; sheet?: string; range?: string;
-  slide?: number; para?: number; rect?: AnchorRect | null; page?: number | null; line?: number; t?: number;
+  slide?: number; shape?: string | number; para?: number; rect?: AnchorRect | null; page?: number | null; line?: number; t?: number;
 };
 /** What block anchoring reads of a note (notes.js's). */
 type BlockNote = { block?: string | null; kind?: string; blocks?: string[]; after?: string; before?: string; quote?: string; offset?: number };
@@ -139,7 +139,25 @@ declare var AmbPearl: {
 // ---- notes.js: the note layer (the console's look: BiseNotes.live)
 /** a voice note's phase and its words (SSE voice, relayed by kit.js) */
 type BiseVoice = { phase?: string; text?: string };
-declare var BiseNotes: { core: unknown; mount(doc: Document): unknown; live?: unknown; [k: string]: unknown } | undefined;
+/** The words of notes.js that the artifact viewer's list reuses (kit/office/select.js). */
+type NotesWords = {
+  moved: string; say: Record<string, string>; placeholder: string; send: string; failed: string; done: string; sentTag: string; remove: string;
+  sent(agent: string): string; listTitle(page: string, n: number): string; sendBar(n: number, agent: string): string;
+};
+/** A note as the viewer's list keeps it (notes.js's model keeps the fields it is given: `at`, `rev`). */
+type OfficeNote = {
+  id: string; status: string; kind?: string; at?: Anchor; quote?: string; text?: string | null; version?: number;
+  rev?: number; done_in?: number | string | null; answer?: string; here?: boolean;
+};
+/** The part of notes.js's model the viewer's list calls. */
+type NotesModelLike = {
+  all(): OfficeNote[]; drafts(): OfficeNote[]; add(n: Partial<OfficeNote>, now?: number): OfficeNote; remove(id: string): unknown;
+  merge(server: Partial<OfficeNote>[] | null | undefined): void; sent(now: number): void; payload(only?: string): { notes: Partial<OfficeNote>[] };
+};
+declare var BiseNotes: {
+  core: { NW: NotesWords; spaced(s: string): string; model(notes: never[]): NotesModelLike; [k: string]: unknown };
+  mount(doc: Document): unknown; live?: unknown; [k: string]: unknown;
+} | undefined;
 
 // ---- the document events between the scripts (detail: what the listeners read)
 interface DocumentEventMap {

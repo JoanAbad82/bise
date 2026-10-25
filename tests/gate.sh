@@ -242,7 +242,10 @@ kit_check() {
     echo "tsc -p kit/tsconfig.node.json"; "$tsc" -p "$root/kit/tsconfig.node.json" || return 1
     # the page scripts: their types, and the committed .js is what their .ts emits
     echo "tsc -p kit/tsconfig.json"; "$tsc" -p "$root/kit/tsconfig.json" || return 1
-    echo "ts_emit kit/tsconfig.json --check"; NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/kit/tsconfig.json" --check || return 1
+    # the artifact viewer's modules (kit/office): theirs, on office/dist's types
+    echo "tsc -p kit/office/tsconfig.json"; "$tsc" -p "$root/kit/office/tsconfig.json" || return 1
+    echo "ts_emit kit/tsconfig.json kit/office/tsconfig.json --check"
+    NODE_OPTIONS="$TS_NODE_OPTIONS" node "$root/scripts/ts_emit.ts" "$root/kit/tsconfig.json" "$root/kit/office/tsconfig.json" --check || return 1
   else echo "skipped kit types: no office/sdk/node_modules (pnpm -C office/sdk install)"; fi
 }
 # the extension's unit tests (no browser), then the types of its tests and the bench
