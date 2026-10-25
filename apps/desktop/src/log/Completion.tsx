@@ -297,24 +297,24 @@ export function Completion({
           {raw && <span className="lg-raw"> · raw json</span>}
         </div>
       )}
-      <div className={`lg-cbody${charts ? "" : " bare"}`}>
+      <div className="lg-cbody">
       <div className="lg-cmain">
       {filtering && (
         <div className="lg-cfilter" data-testid="comp.filter">
           {filter.sel !== undefined && (
             <span className="lg-fchip" data-testid="comp.filter.group">
               {selWords(filter.sel)}
-              <button type="button" data-tip={debug.tip_clear} aria-label={debug.tip_clear} onClick={() => { onCrumb(0); }}>
+              <Press look="x" data-tip={debug.tip_clear} aria-label={debug.tip_clear} onClick={() => { onCrumb(0); }}>
                 ×
-              </button>
+              </Press>
             </span>
           )}
           {filter.size !== undefined && (
             <span className="lg-fchip" data-testid="comp.filter.size">
               {debug.chip_size({ from: kTokens(filter.size.from), to: kTokens(filter.size.to) })}
-              <button type="button" data-tip={debug.tip_clear} aria-label={debug.tip_clear} onClick={() => { setFilter((f) => ({ ...f, size: undefined })); }}>
+              <Press look="x" data-tip={debug.tip_clear} aria-label={debug.tip_clear} onClick={() => { setFilter((f) => ({ ...f, size: undefined })); }}>
                 ×
-              </button>
+              </Press>
             </span>
           )}
           <span className="count" data-testid="comp.filter.count">

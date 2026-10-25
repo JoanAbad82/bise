@@ -423,12 +423,12 @@
   color: var(--c-text);
   font: 400 var(--t-12) / 1 var(--font-mono);
 }
-.lg-fchip > button {
+.lg-fchip > .x {
   padding: 0 var(--s-1);
   border-radius: var(--r-pill);
   color: var(--c-text-3);
 }
-.lg-fchip > button:hover {
+.lg-fchip > .x:hover {
   color: var(--c-text);
   background: var(--c-hover);
 }
@@ -553,7 +553,7 @@
 .lg-hist {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 0;
   height: 92px;
   border-bottom: 1px solid var(--c-line-strong);
 }
@@ -565,7 +565,8 @@
   padding: 0;
 }
 .lg-bin .fill {
-  width: 100%;
+  width: 80%;
+  margin: 0 auto;
   min-height: 1px;
   background: var(--c-line-strong);
 }
@@ -606,12 +607,12 @@
   inset: 0;
   display: flex;
 }
-.lg-series .hits > button {
+.lg-series .hits > .hit {
   flex: 1 1 0;
   min-width: 0;
   padding: 0;
 }
-.lg-series .hits > button:hover {
+.lg-series .hits > .hit:hover {
   background: var(--c-hover);
 }
 .lg-series .peak {
@@ -631,8 +632,8 @@
 }
 .lg-series .peak .lab {
   position: absolute;
-  left: 12px;
-  bottom: 4px;
+  left: var(--s-3);
+  bottom: var(--s-1);
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -647,10 +648,10 @@
   font: 400 var(--t-11) / 1.3 var(--font-mono);
   color: var(--c-text-3);
 }
-.lg-next > button {
+.lg-next > .nx {
   color: var(--c-text-2);
 }
-.lg-next > button:hover {
+.lg-next > .nx:hover {
   text-decoration: underline;
   color: var(--c-text);
 }
@@ -679,12 +680,12 @@
     display: flex;
     gap: var(--s-1);
   }
-  .lg-ctabs > button {
+  .lg-ctabs > .ct {
     padding: var(--s-1) var(--pad-control-x-sm);
     border-radius: var(--r-pill);
     color: var(--c-text-3);
   }
-  .lg-ctabs > button.on {
+  .lg-ctabs > .ct.on {
     color: var(--c-text);
     background: var(--c-active);
   }

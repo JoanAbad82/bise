@@ -8,6 +8,7 @@
 // Owner: debug-viz.
 import { useMemo, useState } from "react";
 import type { CompKind, CompRole, CompRow } from "@/proto";
+import { Press } from "@/ds";
 import { debug } from "@/proto/words_debug.gen";
 import { histogram, kTokens, level, peaks, sameSel, series, share, topPart, total, type Filter, type Node, type Sel } from "./viz";
 
@@ -92,9 +93,9 @@ export function Charts({
     <aside className="lg-charts" data-testid="comp.charts" data-tab={tab}>
       <div className="lg-ctabs" role="tablist">
         {tabs.map(([t, w]) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => { setTab(t); }} data-testid={`comp.charts.tab.${t}`}>
+          <Press key={t} role="tab" aria-selected={tab === t} look={tab === t ? "ct on" : "ct"} onClick={() => { setTab(t); }} data-testid={`comp.charts.tab.${t}`}>
             {w}
-          </button>
+          </Press>
         ))}
       </div>
       <Bars nodes={nodes} drill={drill} whole={whole} sel={sel} onBar={onBar} onCrumb={onCrumb} />
@@ -123,9 +124,9 @@ function Bars({ nodes, drill, whole, sel, onBar, onCrumb }: { nodes: Node[]; dri
             {i === crumbs.length - 1 ? (
               <span className="at">{c}</span>
             ) : (
-              <button type="button" className="up" onClick={() => { onCrumb(i); }}>
+              <Press look="up" onClick={() => { onCrumb(i); }}>
                 {c}
-              </button>
+              </Press>
             )}
           </span>
         ))}
@@ -135,10 +136,10 @@ function Bars({ nodes, drill, whole, sel, onBar, onCrumb }: { nodes: Node[]; dri
           const on = sameSel(sel, n);
           const name = keyWord(n.key);
           return (
-            <button
+            <Press
               key={n.key}
-              type="button"
-              className={`lg-bar${on ? " on" : ""}`}
+             
+              look={`lg-bar${on ? " on" : ""}`}
               onClick={() => { onBar(n); }}
               data-tip={debug.tip_bar({ name, tokens: kTokens(n.tokens), share: share(n.tokens, whole) })}
               data-testid={`comp.chart.bar.${n.key}`}
@@ -149,7 +150,7 @@ function Bars({ nodes, drill, whole, sel, onBar, onCrumb }: { nodes: Node[]; dri
               </span>
               <span className="v">{kTokens(n.tokens)}</span>
               <span className="pc">{share(n.tokens, whole)}</span>
-            </button>
+            </Press>
           );
         })}
       </div>
@@ -173,17 +174,17 @@ function Sizes({ rows, sel, size, onBin }: { rows: readonly CompRow[]; sel: Sel 
         {h.bins.map((b, i) => {
           const on = size !== undefined && size.from === b.from && size.to === b.to;
           return (
-            <button
+            <Press
               key={i}
-              type="button"
-              className={`lg-bin${on ? " on" : ""}`}
+             
+              look={`lg-bin${on ? " on" : ""}`}
               disabled={b.count === 0}
               onClick={() => { onBin(b.from, b.to); }}
               data-tip={debug.tip_bin({ from: kTokens(b.from), to: kTokens(b.to), n: b.count })}
               data-testid={`comp.chart.bin.${String(i)}`}
             >
               <span className="fill" style={{ height: `${String((100 * b.count) / max)}%` }} />
-            </button>
+            </Press>
           );
         })}
       </div>
@@ -242,13 +243,13 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
         </svg>
         <div className="hits">
           {bars.map((b, i) => (
-            <button key={b.n} type="button" tabIndex={-1} onClick={() => { open(i); }} data-tip={debug.tip_message({ pos: String(b.n), what: what(b.n), tokens: kTokens(b.tokens) })} data-testid={`comp.chart.msg.${String(b.n)}`} />
+            <Press key={b.n} look="hit" tabIndex={-1} onClick={() => { open(i); }} data-tip={debug.tip_message({ pos: String(b.n), what: what(b.n), tokens: kTokens(b.tokens) })} data-testid={`comp.chart.msg.${String(b.n)}`} />
           ))}
         </div>
         {first !== undefined && (
-          <button
-            type="button"
-            className="peak"
+          <Press
+           
+            look="peak"
             style={{ left: `${String((100 * (bars.findIndex((b) => b.n === first.n) + 0.5)) / W)}%`, bottom: `${String((100 * first.picked) / max)}%` }}
             onClick={() => { onOpen(first.n); }}
             data-tip={label(first.n, first.picked)}
@@ -256,16 +257,16 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
           >
             <span className="dot" />
             <span className="lab">{label(first.n, first.picked)}</span>
-          </button>
+          </Press>
         )}
       </div>
       {top.length > 1 && (
         <div className="lg-next">
           <span>{debug.series_next}</span>
           {top.slice(1).map((b) => (
-            <button key={b.n} type="button" onClick={() => { onOpen(b.n); }} data-tip={label(b.n, b.picked)} data-testid={`comp.chart.next.${String(b.n)}`}>
+            <Press key={b.n} look="nx" onClick={() => { onOpen(b.n); }} data-tip={label(b.n, b.picked)} data-testid={`comp.chart.next.${String(b.n)}`}>
               {label(b.n, b.picked)}
-            </button>
+            </Press>
           ))}
         </div>
       )}
