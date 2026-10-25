@@ -25,6 +25,8 @@ from bise_env import clean_env, drop_git_repo_vars, refuse_real_home, refuse_rea
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
+# his own words' frame (msg-forward); a routed one (`via="main"`) keeps its frame
+USER_FRAME = re.compile(r'<user_message id="[^"]*">\s*(.*?)\s*</user_message>', re.S)
 
 # a test's git stays in its own throwaway repo (bise_env.GIT_REPO_VARS)
 drop_git_repo_vars()
@@ -288,10 +290,16 @@ class Env:
             print("kept", self.tmp)
 
     def fake_requests(self):
+        """The fake provider's requests; each one's `user` with his words out of
+        their `<user_message id>` frame (msg-forward), as fake_provider acks them"""
         try:
-            return [json.loads(l) for l in open(self.fake_log)]
+            rs = [json.loads(l) for l in open(self.fake_log)]
         except FileNotFoundError:
             return []
+        for r in rs:
+            if isinstance(r.get("user"), str):
+                r["user"] = USER_FRAME.sub(r"\1", r["user"])
+        return rs
 
 
 def sh(cwd, script):
