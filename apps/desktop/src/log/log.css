@@ -433,6 +433,10 @@
   background: var(--c-hover);
 }
 
+/* one colour for every role in the completion list (designer debug-viz #5): the kind column says it */
+.lg .lg-c {
+  --lg-k: var(--c-text-2);
+}
 .lg-charts {
   flex: 0 0 440px;
   min-height: 0;
@@ -449,6 +453,7 @@
   display: none;
 }
 .lg-chart {
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
@@ -586,6 +591,7 @@
 
 /* the series: one bar per message (svg), a hit column over each, the tallest peak labelled */
 .lg-series {
+  flex: none;
   position: relative;
   height: 140px;
   border-bottom: 1px solid var(--c-line-strong);
@@ -640,6 +646,10 @@
   white-space: nowrap;
   font: 400 var(--t-11) / 1 var(--font-mono);
   color: var(--c-text-2);
+}
+.lg-series .peak .lab.left {
+  left: auto;
+  right: var(--s-3);
 }
 .lg-next {
   display: flex;

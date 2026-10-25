@@ -225,6 +225,7 @@ dependencies = [
 name = "bise-session"
 version = "0.1.0"
 dependencies = [
+ "bend-images",
  "bise-proto",
  "bise-secrets",
  "libc",

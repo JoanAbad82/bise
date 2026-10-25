@@ -460,6 +460,10 @@ fn with_parts(mut rows: Vec<CompRow>, s: &Split, red: &Redactor) -> Vec<CompRow>
         if let Some(p) = parts.get_mut(r.n as usize) {
             r.parts = std::mem::take(p);
         }
+        // an image counts as its provider counts it, not as its base64 (groups)
+        if !r.parts.is_empty() {
+            r.tokens = r.parts.iter().map(|p| p.tokens).sum();
+        }
     }
     rows
 }

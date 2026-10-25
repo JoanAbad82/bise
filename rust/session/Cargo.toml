@@ -10,6 +10,8 @@ description = "The bise session log: typed events, reader, writer, resume (BISE-
 bise-secrets = { path = "../secrets" }
 # shown_name for /log's message rows (history.rs): one rule, the feed's
 bise-proto = { path = "../proto" }
+# an image's size in its header: /debug's token count of an image (completion::groups)
+bend-images = { path = "../images" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 ring = "0.17"

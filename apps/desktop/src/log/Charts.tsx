@@ -213,6 +213,8 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
   };
   const label = (n: number, t: number) => `#${String(n)} · ${kTokens(t)} · ${what(n)}`;
   const first = top[0];
+  // its label at the left of its dot when the peak is in the right half (it stays in the chart)
+  const firstAt = first === undefined ? 0 : bars.findIndex((b) => b.n === first.n);
   // a bar is about 1 px wide: a click opens the tallest bar within 3 of it
   const open = (i: number) => {
     let best = i;
@@ -250,13 +252,13 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
           <Press
            
             look="peak"
-            style={{ left: `${String((100 * (bars.findIndex((b) => b.n === first.n) + 0.5)) / W)}%`, bottom: `${String((100 * first.picked) / max)}%` }}
+            style={{ left: `${String((100 * (firstAt + 0.5)) / W)}%`, bottom: `${String((100 * first.picked) / max)}%` }}
             onClick={() => { onOpen(first.n); }}
             data-tip={label(first.n, first.picked)}
             data-testid="comp.chart.peak"
           >
             <span className="dot" />
-            <span className="lab">{label(first.n, first.picked)}</span>
+            <span className={firstAt > W / 2 ? "lab left" : "lab"}>{label(first.n, first.picked)}</span>
           </Press>
         )}
       </div>

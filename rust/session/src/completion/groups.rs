@@ -4,7 +4,10 @@
 //! body (a content block, a call, a tool's definition), the row's envelope
 //! (`{"role":…,"content":[`, commas) goes to its first part, so the parts'
 //! tokens sum to the row's. A tool result is named through its call's id;
-//! an orphan is `Other`. The desktop only sums and bins them.
+//! an orphan is `Other`. An image counts as its provider counts it, from
+//! its size in its header ([`image_tokens`]), not as its base64's bytes;
+//! the row's tokens are then its parts' sum (the list and the charts say
+//! the same). The desktop only sums and bins them.
 
 use super::{Family, Items, Pairs, Part, Split};
 use crate::Redactor;
@@ -21,10 +24,12 @@ struct Raw {
     kind: CompKind,
     names: Vec<String>,
     bytes: u64,
+    /// an image's tokens as its provider counts them (not its bytes)
+    fixed: Option<u64>,
 }
 
 fn raw(role: CompRole, kind: CompKind, names: Vec<String>, bytes: usize) -> Raw {
-    Raw { role, kind, names, bytes: bytes as u64 }
+    Raw { role, kind, names, bytes: bytes as u64, fixed: None }
 }
 
 /// The parts of every row, indexed by its `n`.
@@ -53,27 +58,93 @@ pub fn parts(s: &Split, red: &Redactor) -> Vec<Vec<CompPart>> {
         .collect()
 }
 
-/// The parts' tokens: the row's leftover bytes (its envelope) on the first
-/// part, then each part's share cut so the sum is `bytes.div_ceil(4)`.
+/// The parts' tokens: an image its own count; the row's leftover bytes
+/// (its envelope) on its first other part, then each one's share of the
+/// bytes cut so they sum to their bytes' `div_ceil(4)`. The row's tokens
+/// are the parts' sum ([`super::rows`]).
 fn tokens(mut ps: Vec<Raw>, bytes: u64, red: &Redactor) -> Vec<CompPart> {
     if ps.is_empty() {
         return Vec::new();
     }
     let inside: u64 = ps.iter().map(|p| p.bytes).sum();
-    ps[0].bytes += bytes.saturating_sub(inside);
+    let envelope = bytes.saturating_sub(inside);
+    match ps.iter_mut().find(|p| p.fixed.is_none()) {
+        Some(p) => p.bytes += envelope,
+        None => ps[0].fixed = ps[0].fixed.map(|t| t + envelope.div_ceil(4)),
+    }
     let mut cum = 0u64;
     ps.into_iter()
         .map(|p| {
-            let before = cum.div_ceil(4);
-            cum += p.bytes;
-            CompPart {
-                role: p.role,
-                kind: p.kind,
-                names: p.names.iter().map(|n| red.text(n)).collect(),
-                tokens: cum.div_ceil(4) - before,
-            }
+            let tokens = match p.fixed {
+                Some(t) => t,
+                None => {
+                    let before = cum.div_ceil(4);
+                    cum += p.bytes;
+                    cum.div_ceil(4) - before
+                }
+            };
+            CompPart { role: p.role, kind: p.kind, names: p.names.iter().map(|n| red.text(n)).collect(), tokens }
         })
         .collect()
+}
+
+/// An image's tokens as its provider counts them, from the width and
+/// height in its header (None: no base64 or no size read; it then counts
+/// as its bytes). Anthropic: w*h/750 after its resize to 1568 on the long
+/// edge and 1.15 megapixels; OpenAI: 85, plus 170 per 512 tile after its
+/// fit in 2048 and 768 on the short side, unless `detail` is low.
+pub fn image_tokens(family: Family, v: &Value) -> Option<u64> {
+    let data = ["/source/data", "/image_url/url", "/image_url", "/data"].iter().find_map(|p| v.pointer(p).and_then(Value::as_str))?;
+    let b64 = data.find(";base64,").map_or(data, |i| &data[i + ";base64,".len()..]);
+    // the head is enough: a JPEG's size can sit some KB in
+    let head = &b64[..b64.len().min(87_380)];
+    let head = &head[..head.len() - head.len() % 4];
+    let (w, h) = bend_images::dimensions(&bend_images::base64_decode(head)?)?;
+    let (w, h) = (f64::from(w.max(1)), f64::from(h.max(1)));
+    Some(match family {
+        Family::Anthropic => {
+            let s = (1568.0 / w.max(h)).min((1_150_000.0 / (w * h)).sqrt()).min(1.0);
+            ((w * s).round() * (h * s).round() / 750.0).ceil() as u64
+        }
+        Family::Chat | Family::Responses => {
+            let detail = v.pointer("/image_url/detail").or_else(|| v.get("detail")).and_then(Value::as_str);
+            if detail == Some("low") {
+                return Some(85);
+            }
+            let s = (2048.0 / w.max(h)).min(1.0);
+            let (w, h) = (w * s, h * s);
+            let s = (768.0 / w.min(h)).min(1.0);
+            let (w, h) = ((w * s).round(), (h * s).round());
+            85 + 170 * ((w / 512.0).ceil() * (h / 512.0).ceil()) as u64
+        }
+    })
+}
+
+fn is_image(v: &Value) -> bool {
+    matches!(str_at(v, "type"), "image" | "input_image" | "image_url")
+}
+
+fn image(family: Family, role: CompRole, names: Vec<String>, v: &Value, bytes: usize) -> Raw {
+    Raw { fixed: image_tokens(family, v), ..raw(role, CompKind::Image, names, bytes) }
+}
+
+/// A part whose `key` may be a list holding images (a tool result with a
+/// screenshot): the images as their own parts (`Image`, the tool's name),
+/// the rest the part itself.
+fn with_images(family: Family, base: Raw, raw_v: &str, key: &str) -> Vec<Raw> {
+    let mut out = vec![base];
+    let list = keys(raw_v).into_iter().find(|(k, _)| k == key);
+    let Some(Ok(Items(xs))) = list.map(|(_, l)| serde_json::from_str::<Items>(l.get())) else { return out };
+    for x in xs {
+        let xv: Value = serde_json::from_str(x.get()).unwrap_or(Value::Null);
+        if is_image(&xv) {
+            let len = x.get().len();
+            out[0].bytes = out[0].bytes.saturating_sub(len as u64);
+            let names = out[0].names.first().cloned().into_iter().collect();
+            out.push(image(family, out[0].role, names, &xv, len));
+        }
+    }
+    out
 }
 
 /// A key of the request's head: each tool's definition, the rest params.
@@ -200,13 +271,13 @@ fn item(family: Family, raw_v: &str, first: bool, calls: &mut HashMap<String, Ve
             calls.insert(str_at(&v, "call_id").to_string(), names.clone());
             return vec![tool(CompRole::ToolCall, names, len)];
         }
-        (Family::Responses, "function_call_output" | "custom_tool_call_output") => return vec![result(calls.get(str_at(&v, "call_id")), len)],
+        (Family::Responses, "function_call_output" | "custom_tool_call_output") => return with_images(family, result(calls.get(str_at(&v, "call_id")), len), raw_v, "output"),
         (Family::Responses, "reasoning") => return vec![raw(CompRole::Assistant, CompKind::Thinking, vec![], len)],
         _ => {}
     }
     let role_word = str_at(&v, "role");
     if family == Family::Chat && role_word == "tool" {
-        return vec![result(calls.get(str_at(&v, "tool_call_id")), len)];
+        return with_images(family, result(calls.get(str_at(&v, "tool_call_id")), len), raw_v, "content");
     }
     let role = match role_word {
         "assistant" => CompRole::Assistant,
@@ -217,7 +288,7 @@ fn item(family: Family, raw_v: &str, first: bool, calls: &mut HashMap<String, Ve
     let mut out = Vec::new();
     for (k, val) in keys(raw_v) {
         match k.as_str() {
-            "content" => content(role, first, val.get(), calls, &mut out),
+            "content" => content(family, role, first, val.get(), calls, &mut out),
             "tool_calls" => {
                 if let Ok(Items(xs)) = serde_json::from_str::<Items>(val.get()) {
                     for c in xs {
@@ -260,7 +331,7 @@ fn text_part(role: CompRole, first: bool, t: &str, bytes: usize) -> Raw {
 }
 
 /// A content: a string (one part) or a list of blocks (one part each).
-fn content(role: CompRole, first: bool, raw_v: &str, calls: &mut HashMap<String, Vec<String>>, out: &mut Vec<Raw>) {
+fn content(family: Family, role: CompRole, first: bool, raw_v: &str, calls: &mut HashMap<String, Vec<String>>, out: &mut Vec<Raw>) {
     let Ok(Items(xs)) = serde_json::from_str::<Items>(raw_v) else {
         let t = serde_json::from_str::<String>(raw_v).unwrap_or_default();
         out.push(text_part(role, first, &t, raw_v.len()));
@@ -269,17 +340,17 @@ fn content(role: CompRole, first: bool, raw_v: &str, calls: &mut HashMap<String,
     for p in xs {
         let pv: Value = serde_json::from_str(p.get()).unwrap_or(Value::Null);
         let len = p.get().len();
-        out.push(match str_at(&pv, "type") {
-            "text" | "input_text" | "output_text" => text_part(role, first, str_at(&pv, "text"), len),
-            "thinking" | "redacted_thinking" | "reasoning_text" | "summary_text" => raw(role, CompKind::Thinking, vec![], len),
-            "image" | "input_image" | "image_url" => raw(role, CompKind::Image, vec![], len),
+        out.extend(match str_at(&pv, "type") {
+            "text" | "input_text" | "output_text" => vec![text_part(role, first, str_at(&pv, "text"), len)],
+            "thinking" | "redacted_thinking" | "reasoning_text" | "summary_text" => vec![raw(role, CompKind::Thinking, vec![], len)],
+            "image" | "input_image" | "image_url" => vec![image(family, role, vec![], &pv, len)],
             "tool_use" => {
                 let names = call_names(str_at(&pv, "name"), &pv.get("input").map(Value::to_string).unwrap_or_default());
                 calls.insert(str_at(&pv, "id").to_string(), names.clone());
-                tool(CompRole::ToolCall, names, len)
+                vec![tool(CompRole::ToolCall, names, len)]
             }
-            "tool_result" => result(calls.get(str_at(&pv, "tool_use_id")), len),
-            _ => raw(role, CompKind::Other, vec![], len),
+            "tool_result" => with_images(family, result(calls.get(str_at(&pv, "tool_use_id")), len), p.get(), "content"),
+            _ => vec![raw(role, CompKind::Other, vec![], len)],
         });
     }
 }

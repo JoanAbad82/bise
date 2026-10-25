@@ -138,3 +138,50 @@ fn an_unknown_tag_is_tagged_with_its_name() {
     assert_eq!(text_kind("plain words"), (CompKind::Text, vec![]));
     assert_eq!(text_kind("<user_messages>"), (CompKind::Tagged, vec!["user_messages".to_string()]));
 }
+
+/// A PNG's head (its signature and IHDR) of that size, as base64.
+fn png(w: u32, h: u32) -> String {
+    let mut b = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, b'I', b'H', b'D', b'R'];
+    b.extend(w.to_be_bytes());
+    b.extend(h.to_be_bytes());
+    b.extend([8, 6, 0, 0, 0, 0, 0, 0, 0]);
+    b.extend(std::iter::repeat_n(0u8, 3000));
+    bend_images::base64_encode(&b)
+}
+
+/// Gabriel (main m_41815): an image counts as its provider counts it,
+/// from its size, not as its base64's bytes.
+#[test]
+fn an_image_counts_as_its_provider_counts_it() {
+    let anth = |w, h| image_tokens(Family::Anthropic, &serde_json::json!({"type":"image","source":{"type":"base64","media_type":"image/png","data":png(w, h)}}));
+    assert_eq!(anth(1000, 500), Some(667));
+    // resized to 1.15 megapixels first: 1238 x 929
+    assert_eq!(anth(4000, 3000), Some(1534));
+    let url = |w, h, detail: &str| serde_json::json!({"type":"image_url","image_url":{"url":format!("data:image/png;base64,{}", png(w, h)),"detail":detail}});
+    // 1024 square: 768 on the short side, 2 x 2 tiles
+    assert_eq!(image_tokens(Family::Chat, &url(1024, 1024, "high")), Some(765));
+    assert_eq!(image_tokens(Family::Chat, &url(1024, 1024, "low")), Some(85));
+    let resp = serde_json::json!({"type":"input_image","image_url":format!("data:image/png;base64,{}", png(512, 512))});
+    assert_eq!(image_tokens(Family::Responses, &resp), Some(255));
+    assert_eq!(image_tokens(Family::Anthropic, &serde_json::json!({"type":"image","source":{"data":"bm90IGFuIGltYWdl"}})), None);
+}
+
+/// A screenshot in a tool result is its own part (tool result › image ›
+/// its tool), his image too; the row's tokens are the parts' sum.
+#[test]
+fn an_image_is_its_own_part() {
+    let img = png(1000, 500);
+    let body = format!(
+        r#"{{"model":"claude-x","system":"x","messages":[{{"role":"user","content":[{{"type":"text","text":"<user_message id=\"m_1\">\nlook\n</user_message>"}},{{"type":"image","source":{{"type":"base64","media_type":"image/png","data":"{img}"}}}}]}},{{"role":"assistant","content":[{{"type":"tool_use","id":"t1","name":"computer","input":{{"action":"screenshot"}}}}]}},{{"role":"user","content":[{{"type":"tool_result","tool_use_id":"t1","content":[{{"type":"text","text":"done"}},{{"type":"image","source":{{"type":"base64","media_type":"image/png","data":"{img}"}}}}]}}]}}]}}"#
+    );
+    let s = split(&body).unwrap();
+    let rs = rows(&s, &Redactor::default());
+    sums(&rs);
+    let ks: Vec<_> = rs.iter().flat_map(|r| r.parts.clone()).map(|p| (p.role, p.kind, p.names, p.tokens)).collect();
+    assert!(ks.contains(&(CompRole::User, CompKind::Image, vec![], 667)), "{ks:?}");
+    assert!(ks.contains(&(CompRole::ToolResult, CompKind::Image, vec!["computer".to_string()], 667)), "{ks:?}");
+    assert!(ks.iter().any(|(r, k, n, _)| *r == CompRole::ToolResult && *k == CompKind::Tool && n == &vec!["computer".to_string()]), "{ks:?}");
+    let last = rs.last().unwrap();
+    assert!(last.tokens < last.bytes / 4, "the row counts its image as the provider does: {} tokens for {} bytes", last.tokens, last.bytes);
+    assert_eq!(rs.iter().map(|r| &r.parts).collect::<Vec<_>>(), raw_rows(&s, &Redactor::default()).iter().map(|r| &r.parts).collect::<Vec<_>>());
+}
