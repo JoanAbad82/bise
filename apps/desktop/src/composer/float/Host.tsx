@@ -118,6 +118,9 @@ function Float({ to: def }: { to: FloatTo }) {
   const tkey = threadKey(project, agent);
   const order = useThreadOrder(tkey);
   const empty = order.loaded && order.order.length === 0;
+  // its first page on its way: the loading line only, the float as short as when empty (ui-review
+  // m_42926: never a tall blank glass while it loads)
+  const loading = !order.loaded && order.order.length === 0;
   // open, it holds the addressee's thread as a thread screen does (the store pages it in)
   const open = state === 'open';
   useEffect(() => {
@@ -131,7 +134,7 @@ function Float({ to: def }: { to: FloatTo }) {
   const col = useSideLayout();
   const listRef = useRef<ThreadListHandle | null>(null);
   return (
-    <div ref={root} className="cmp-float" data-state={state} data-empty={(state === 'open' && empty) || undefined} data-testid="composer.float" data-project={project} data-agent={agent}
+    <div ref={root} className="cmp-float" data-state={state} data-empty={(state === 'open' && (empty || loading)) || undefined} data-testid="composer.float" data-project={project} data-agent={agent}
       role="region" aria-label={composer.float_name} style={{ left: col.colLeft + col.colW / 2 }}
       onFocus={() => {
         go('focus');

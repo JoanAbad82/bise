@@ -32,9 +32,23 @@
   height: min(var(--float-h-open), var(--float-max-h));
   box-shadow: var(--e-3);
 }
-/* open with nothing in the thread yet: one line over the field, no blank glass */
+/* open with nothing in the thread yet, or its first page still on its way: one line over the field
+   (the empty line, or the loading dots), no blank glass */
 .cmp-float[data-state='open'][data-empty] {
   height: auto;
+}
+.cmp-float[data-empty] .body {
+  flex: none;
+}
+.cmp-float[data-empty] .th-loading {
+  flex: none;
+  min-height: var(--s-10);
+}
+/* its dots on the empty line's inset, the line's height, never on the glass's edge */
+.cmp-float[data-empty] .th-loading .th-sync {
+  top: 0;
+  height: auto;
+  padding: 0 var(--s-4);
 }
 .cmp-float .body-empty {
   margin: 0;
@@ -158,4 +172,18 @@
   border-radius: 0;
   background: none;
   box-shadow: inset 0 -1px 0 var(--c-line);
+}
+/* its open item lies flat too (ui-review m_42926): no card's fill, radius or frame in the glass; a
+   question that takes his words keeps the 2 px accent rail on its left */
+.cmp-float .inbox-block-open {
+  margin: 0;
+}
+.cmp-float .inbox-block-open .ic,
+.cmp-float .inbox-block-open[data-answering] .ic {
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.cmp-float .inbox-block-open[data-answering] .ic {
+  box-shadow: inset 2px 0 0 var(--c-accent);
 }
