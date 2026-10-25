@@ -124,6 +124,14 @@ describe('the other things', () => {
     expect(actsOf(menuOf({ e, row: artifact({ path: '/w/acme/notes.md', gone: true }) }))).toEqual(['move-right', 'new-window', 'copy-link']);
   });
 
+  it("a Copy › of one item is that item flat ('Copy Link'), never a submenu of one", () => {
+    const e = { kind: 'process', project: P, agent: 'perf', id: 'p1' } as const;
+    expect(shape(menuOf({ e, row: proc() }))).toContain(menus.copy_one({ what: menus.copy_link }));
+    expect(shape(menuOf({ e, row: proc() }))).not.toContain(`${menus.copy} ›`);
+    // two items stay a submenu
+    expect(shape(menuOf({ e: { kind: 'artifact', project: P, id: 'a1' }, row: artifact({ path: '/w/acme/notes.md' }) }))).toContain(`${menus.copy} ›`);
+  });
+
   it('a process: Stop process only while it runs; its browser items only with a page', () => {
     const e = { kind: 'process', project: P, agent: 'perf', id: 'p1' } as const;
     expect(actsOf(menuOf({ e, row: proc() }))).toEqual(['move-right', 'open-browser', 'copy-link', 'stop-process']);
@@ -138,12 +146,14 @@ describe('the other things', () => {
 
   it("a tab: its thing's menu (no Move to right pane, it is there), then the tab's own", () => {
     const inner = agentFacts(agent({ status: 'working' }));
-    const acts = actsOf(menuOf({ e: { kind: 'tab', id: 'agent:acme/perf' }, inner, moveable: false, others: true }));
+    const acts = actsOf(menuOf({ e: { kind: 'tab', id: 'agent:acme/perf' }, inner, moveable: false, closable: true, others: true }));
     expect(acts).not.toContain('move-right');
     expect(acts.slice(-2)).toEqual(['close-tab', 'close-others']);
     expect(acts).toContain('archive');
     // a terminal: it moves to the bottom; alone, no Close other tabs
-    expect(actsOf(menuOf({ e: { kind: 'tab', id: 'term:acme#1' }, inner: undefined, moveable: true, others: false }))).toEqual(['move-bottom', 'close-tab']);
+    expect(actsOf(menuOf({ e: { kind: 'tab', id: 'term:acme#1' }, inner: undefined, moveable: true, closable: true, others: false }))).toEqual(['move-bottom', 'close-tab']);
+    // Overview never closes (nm-panel's closable): no Close Tab, Close Other Tabs stays
+    expect(actsOf(menuOf({ e: { kind: 'tab', id: 'overview' }, inner: undefined, moveable: false, closable: false, others: true }))).toEqual(['close-others']);
   });
 });
 

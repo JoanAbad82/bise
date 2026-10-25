@@ -16,6 +16,8 @@ export const menus = {
   changes: "Changes",
   /** the submenu of what can be copied */
   copy: "Copy",
+  /** a Copy › with one item only, flat (macOS: no submenu of one): `Copy Link` */
+  copy_one: (a: { what: string | number }): string => "Copy " + String(a.what),
   /** Copy › the agent's or the project's name */
   copy_name: "Name",
   /** Copy › its folder (the worktree, the project's folder) */
@@ -23,13 +25,13 @@ export const menus = {
   /** Copy › its git branch */
   copy_branch: "Branch",
   /** Copy › the agent's last answer, as text */
-  copy_reply: "Last reply",
+  copy_reply: "Last Reply",
   /** Copy › an artifact's or a process's link */
   copy_link: "Link",
   /** open it in a tab of the panel on the right */
-  move_right: "Move to right pane",
+  move_right: "Move to Right Pane",
   /** open it in a window of its own */
-  new_window: "Open in new window",
+  new_window: "Open in New Window",
   /** the submenu of the Mac apps it opens in */
   open_in: "Open in",
   /** Open in › the Finder */
@@ -47,15 +49,15 @@ export const menus = {
   /** its file selected in a Finder window */
   show_in_finder: "Show in Finder",
   /** a process's page in his browser */
-  open_browser: "Open in browser",
+  open_browser: "Open in Browser",
   /** a process: stop it */
-  stop_process: "Stop process",
+  stop_process: "Stop Process",
   /** a scheduled task: stop it */
-  stop_scheduled: "Stop schedule",
+  stop_scheduled: "Stop Schedule",
   /** close the tab */
-  close_tab: "Close tab",
+  close_tab: "Close Tab",
   /** close every other tab */
-  close_others: "Close other tabs",
+  close_others: "Close Other Tabs",
   /** the terminal tab goes back to the bottom panel */
-  move_bottom: "Move to bottom",
+  move_bottom: "Move to Bottom",
 } as const;

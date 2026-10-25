@@ -5,6 +5,7 @@ import type { ClipOp } from './clipfence';
 import { externalUrl } from './external';
 import { menuTarget, menuTemplate } from './menu';
 import { nativeItems, popupPoint } from './menu-popup';
+import { menuWindow } from './agentmenu';
 import { KEYS, menuOf } from '../app/menus/registry';
 import { menus } from '../proto/words_menus.gen';
 
@@ -181,5 +182,15 @@ describe("the Agent menu (bise fait mac, d4): the agent in view's '…' in the m
   it("the '…' opens its menu under the button, at its left edge; a right click at the pointer", () => {
     expect(popupPoint({ x: 100.4, y: 40, width: 28, height: 28 })).toEqual({ x: 100, y: 68 });
     expect(popupPoint(undefined)).toBeUndefined();
+  });
+});
+
+describe("the window the Agent menu speaks for (ui-review m_42540)", () => {
+  it('the focused one; none focused (another app, an off-screen window): the last focused, unless it closed', () => {
+    const gone = (w: string) => w === 'closed';
+    expect(menuWindow('a', 'b', gone)).toBe('a');
+    expect(menuWindow(null, 'b', gone)).toBe('b');
+    expect(menuWindow(null, 'closed', gone)).toBeNull();
+    expect(menuWindow<string>(null, null, gone)).toBeNull();
   });
 });

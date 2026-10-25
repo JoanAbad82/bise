@@ -18,12 +18,12 @@
   "menus.close_others": {
     "args": [],
     "one": null,
-    "text": "Close other tabs"
+    "text": "Close Other Tabs"
   },
   "menus.close_tab": {
     "args": [],
     "one": null,
-    "text": "Close tab"
+    "text": "Close Tab"
   },
   "menus.copy": {
     "args": [],
@@ -45,6 +45,13 @@
     "one": null,
     "text": "Name"
   },
+  "menus.copy_one": {
+    "args": [
+      "what"
+    ],
+    "one": null,
+    "text": "Copy {what}"
+  },
   "menus.copy_path": {
     "args": [],
     "one": null,
@@ -53,7 +60,7 @@
   "menus.copy_reply": {
     "args": [],
     "one": null,
-    "text": "Last reply"
+    "text": "Last Reply"
   },
   "menus.editor": {
     "args": [],
@@ -68,22 +75,22 @@
   "menus.move_bottom": {
     "args": [],
     "one": null,
-    "text": "Move to bottom"
+    "text": "Move to Bottom"
   },
   "menus.move_right": {
     "args": [],
     "one": null,
-    "text": "Move to right pane"
+    "text": "Move to Right Pane"
   },
   "menus.new_window": {
     "args": [],
     "one": null,
-    "text": "Open in new window"
+    "text": "Open in New Window"
   },
   "menus.open_browser": {
     "args": [],
     "one": null,
-    "text": "Open in browser"
+    "text": "Open in Browser"
   },
   "menus.open_in": {
     "args": [],
@@ -123,12 +130,12 @@
   "menus.stop_process": {
     "args": [],
     "one": null,
-    "text": "Stop process"
+    "text": "Stop Process"
   },
   "menus.stop_scheduled": {
     "args": [],
     "one": null,
-    "text": "Stop schedule"
+    "text": "Stop Schedule"
   },
   "menus.unpin": {
     "args": [],

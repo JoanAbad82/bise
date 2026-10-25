@@ -54,7 +54,7 @@ export type MenuFacts =
   | { readonly e: Of<'process'>; readonly row: Proc | undefined }
   | { readonly e: Of<'scheduled'>; readonly row: ScheduledTask | undefined }
   /** a panel tab: the menu of the thing in it (`inner`, none for Overview, New tab, a terminal) under its own items */
-  | { readonly e: Of<'tab'>; readonly inner: MenuFacts | undefined; readonly moveable: boolean; readonly others: boolean }
+  | { readonly e: Of<'tab'>; readonly inner: MenuFacts | undefined; readonly moveable: boolean; readonly closable: boolean; readonly others: boolean }
   /** an office, a PR, a commit, a diff, a plugin: opened in a tab or a window */
   | { readonly e: Of<'office' | 'pr' | 'commit' | 'diff' | 'plugin'> };
 
@@ -111,6 +111,13 @@ function sub(label: string, icon: string, items: readonly PopupItem[]): PopupIte
   return items.length === 0 ? [] : [{ type: 'submenu', label, icon, items }];
 }
 
+/** Copy ›, or with one item only that item flat ('Copy Link', ui-review m_42540: no submenu of one). */
+function copySub(items: readonly PopupItem[]): PopupItem[] {
+  const [only] = items;
+  if (items.length === 1 && only !== undefined && only.type !== 'separator' && only.type !== 'submenu') return [{ ...only, label: menus.copy_one({ what: only.label }), icon: COPY_ICON }];
+  return sub(menus.copy, COPY_ICON, items);
+}
+
 const when = (on: boolean, ...items: PopupItem[]): PopupItem[] => (on ? items : []);
 
 /** The groups, separators between the non-empty ones. */
@@ -146,7 +153,7 @@ function agentMenu(a: Agent, pinned: boolean, reply: boolean): PopupItem[] {
   return grouped([
     [...when(live && !a.main, item('rename', menus.rename)), ...when(live, pinned ? item('unpin', menus.unpin) : item('pin', menus.pin))],
     when(!a.main && (a.changes?.files ?? 0) > 0, item('changes', menus.changes)),
-    sub(menus.copy, COPY_ICON, [
+    copySub([
       item('copy-name', menus.copy_name),
       ...when(path !== undefined, item('copy-path', menus.copy_path)),
       ...when(agentBranch(a) !== undefined, item('copy-branch', menus.copy_branch)),
@@ -166,7 +173,7 @@ function projectMenu(p: ProjectRow): PopupItem[] {
   const path = present(p.path) ? p.path : undefined;
   return grouped([
     [item('rename', menus.rename)],
-    sub(menus.copy, COPY_ICON, [item('copy-name', menus.copy_name), ...when(path !== undefined, item('copy-path', menus.copy_path))]),
+    copySub([item('copy-name', menus.copy_name), ...when(path !== undefined, item('copy-path', menus.copy_path))]),
     [item('new-window', menus.new_window), ...sub(menus.open_in, OPEN_IN_ICON, when(path !== undefined, item('open-finder', menus.finder), item('open-editor', menus.editor)))],
   ]);
 }
@@ -177,7 +184,7 @@ function artifactMenu(a: Artifact): PopupItem[] {
   return grouped([
     [item('move-right', menus.move_right), item('new-window', menus.new_window)],
     when(file, item('quick-look', menus.quick_look), item('show-in-finder', menus.show_in_finder)),
-    sub(menus.copy, COPY_ICON, [...when(present(a.url), item('copy-link', menus.copy_link)), ...when(file, item('copy-path', menus.copy_path))]),
+    copySub([...when(present(a.url), item('copy-link', menus.copy_link)), ...when(file, item('copy-path', menus.copy_path))]),
   ]);
 }
 
@@ -186,7 +193,7 @@ function processMenu(p: Proc): PopupItem[] {
   const url = procUrl(p);
   return grouped([
     [item('move-right', menus.move_right)],
-    [...when(url !== undefined, item('open-browser', menus.open_browser)), ...sub(menus.copy, COPY_ICON, when(url !== undefined, item('copy-link', menus.copy_link)))],
+    [...when(url !== undefined, item('open-browser', menus.open_browser)), ...copySub(when(url !== undefined, item('copy-link', menus.copy_link)))],
     when(p.state.is === 'running', item('stop-process', menus.stop_process)),
   ]);
 }
@@ -226,7 +233,7 @@ export function menuOf(f: MenuFacts): PopupItem[] {
       return grouped([
         trimSeparators(inner),
         [...when(t.moveable, item('move-bottom', menus.move_bottom))],
-        [item('close-tab', menus.close_tab), ...when(t.others, item('close-others', menus.close_others))],
+        [...when(t.closable, item('close-tab', menus.close_tab)), ...when(t.others, item('close-others', menus.close_others))],
       ]);
     }
     case 'office':

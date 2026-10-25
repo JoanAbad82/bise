@@ -6,7 +6,8 @@
 .app-palette {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  /* over the right side's world and bubbles (side3d.css's 30): ⌘K dims all of the window (ui-review m_42540) */
+  z-index: 40;
   /* the same 45 % wash of the window's background in both themes (designer m_11923) */
   background: color-mix(in srgb, var(--c-solid) 45%, transparent);
 }
@@ -115,7 +116,6 @@
 .app-k-row .g {
   display: flex;
   justify-content: center;
-  font-family: var(--font-mono);
   color: var(--c-text-2);
 }
 .app-k-row .g.acc {
@@ -221,6 +221,13 @@
   width: 1.2em;
   overflow: hidden;
   vertical-align: top;
+}
+
+.app-k-keys .kp,
+.app-k-row .rt .hint .kp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
 }
 
 .app-k-keys {

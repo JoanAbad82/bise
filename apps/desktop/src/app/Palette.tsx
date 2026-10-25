@@ -23,7 +23,7 @@ import { appPages } from './pages';
 import { MAIN, parseRoute } from './route';
 import { useRoute, useRouter } from './router';
 import './palette.css';
-import { AppIcon, Input, Press } from '@/ds';
+import { AppIcon, Input, Kbd, Press, type AppIconName } from '@/ds';
 
 /** The kept view bit: ⌘K open (lead m_11997, keep.ts: an open panel, no age). */
 const OPEN_KEY = 'palette.open';
@@ -63,7 +63,8 @@ export function keyLine(l: SearchList, at: Hit | undefined, scope: Scope): strin
 }
 
 /** Key pairs ('⏎ open   esc close') drawn with the TUI's 3-space gap (about 1.2em, designer
- * m_11923): each gap is its own span, so the text still reads with its 3 spaces. */
+ * m_11923): each gap is its own span, so the text still reads with its 3 spaces; each pair's key
+ * in the ds kbd (native-mac §6, ui-review m_42540), its words after it. */
 function Pairs({ text }: { text: string }): ReactNode {
   const parts = text.split(/ {3}/);
   const out: ReactNode[] = [];
@@ -74,10 +75,39 @@ function Pairs({ text }: { text: string }): ReactNode {
           {'   '}
         </span>,
       );
-    out.push(<span key={`p${i}`}>{p}</span>);
+    const at = p.indexOf(' ');
+    out.push(
+      at > 0 ? (
+        <span className="kp" key={`p${i}`}>
+          <Kbd>{p.slice(0, at)}</Kbd>
+          {p.slice(at)}
+        </span>
+      ) : (
+        <span key={`p${i}`}>{p}</span>
+      ),
+    );
   });
   return out;
 }
+
+/** A hit's line icon (nm-ds's family, native-mac §6: no text glyph as an icon), from its kind and the sign search gives it. Pure. */
+export function iconOf(h: Pick<Hit, 'kind' | 'glyph' | 'tone' | 'archived'>): AppIconName {
+  if (h.tone === 'pearl' || h.tone === 'bise') return 'folder';
+  if (h.archived) return 'archive';
+  const by: Record<string, AppIconName> =
+    h.kind === 'agent'
+      ? { '?': 'inbox', '✓': 'check', '✗': 'close', '–': 'archive' }
+      : h.kind === 'artifact'
+        ? { '⇡': 'branch', '◫': 'grid', '▤': 'file', '↗': 'browser' }
+        : h.kind === 'scheduled'
+          ? {}
+          : { '↗': 'artifacts', '?': 'inbox', '#': 'inbox', '◷': 'scheduled', '⊞': 'plugins', '∿': 'terminal', '⚙': 'settings', '·': 'list' };
+  const fallback: AppIconName = h.kind === 'agent' ? 'thread' : h.kind === 'scheduled' ? 'scheduled' : h.kind === 'artifact' ? 'artifacts' : 'right';
+  return by[h.glyph] ?? fallback;
+}
+
+/** search's mark of a browser-only artifact in its dim words (search/data.ts): drawn as the 'open' icon. */
+const BROWSER_MARK = '↗';
 
 /** The events that change what the search reads. */
 const READS = new Set<Ev['ev']>(['agents', 'artifacts', 'cards', 'projects', 'scheduled']);
@@ -313,14 +343,20 @@ export function Palette({ onClose }: { onClose: () => void }) {
                     }}
                     data-testid={`app.palette.item.${String(n)}`}
                   >
-                    <span className={`g ${h.tone}`} aria-hidden>
-                      {h.tone === 'pearl' ? <i className="app-k-pearl" /> : h.tone === 'bise' ? <i className="app-k-pearl bise" data-testid={`app.palette.item.${String(n)}.pink`} /> : h.glyph}
+                    <span className={`g ${h.tone === 'bise' ? 'acc' : h.tone}`} aria-hidden data-testid={h.tone === 'bise' ? `app.palette.item.${String(n)}.pink` : undefined}>
+                      <AppIcon name={iconOf(h)} size={16} />
                     </span>
                     <span className="nm">
                       {h.parent !== undefined && <span className="up">{h.parent} › </span>}
                       <Marked text={h.name} q={q} />
                       {h.of !== undefined && <span className="up"> · {h.of}</span>}
-                      {h.detail !== '' && <span className="d">{h.detail}</span>}
+                      {h.detail === BROWSER_MARK ? (
+                        <span className="d">
+                          <AppIcon name="open" size={14} />
+                        </span>
+                      ) : (
+                        h.detail !== '' && <span className="d">{h.detail}</span>
+                      )}
                     </span>
                     <span className="rt">
                       {h.where !== '' && <span className="pj">{h.where}</span>}
