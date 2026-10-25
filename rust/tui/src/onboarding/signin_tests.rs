@@ -162,6 +162,17 @@ fn fake_check(c: &crate::keycheck::Call, _: Option<String>) -> Result<(), crate:
     }
 }
 
+/// Held by a test while it looks at `Sub::Checking`: the check's thread
+/// answers only once the test lets go (else a fast thread answers in the
+/// same tick that started it, and the screen goes straight to Works).
+static CHECK_HELD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// [`fake_check`], once [`CHECK_HELD`] is free.
+fn held_check(c: &crate::keycheck::Call, url: Option<String>) -> Result<(), crate::keycheck::Fail> {
+    drop(CHECK_HELD.lock().unwrap_or_else(|e| e.into_inner()));
+    fake_check(c, url)
+}
+
 /// The first run's key step on a temp HOME, the fake sign-in in.
 fn first_run(e: Env) -> Onb {
     let mut o = Onb::new(e);
@@ -290,13 +301,17 @@ fn continue_with_chatgpt_waits_then_signs_in_checks_and_runs_main_on_the_plan() 
     assert_eq!(crate::clipboard::test_clipboard().as_deref(), Some(URL));
     has(&screen(&o), &["c copied   esc cancel"]);
     assert!(matches!(o.sub, Sub::SignIn(Kind::ChatGpt, Some(_))));
-    // still waiting, then back from the browser: signed in, the plan checked
+    // still waiting, then back from the browser: signed in, the plan
+    // checked (its answer held until the checking screen is seen)
+    o.checker = held_check;
+    let held = CHECK_HELD.lock().unwrap_or_else(|e| e.into_inner());
     o.tick(&e);
     assert!(matches!(o.sub, Sub::SignIn(..)));
     o.tick(&e);
     assert!(matches!(o.sub, Sub::Checking(_, _, Tried::Plan(_))), "{:?}", o.sub);
     assert!(o.flow.is_none());
     has(&screen(&o), &["✓ signed in as you@example.com · ChatGPT Plus", "checking your plan…"]);
+    drop(held);
     settle(&mut o, &e);
     assert_eq!(o.sub, Sub::Works(o.plan_provider().unwrap(), "chatgpt/gpt-6.1-sol".into()));
     let sc = screen(&o);
