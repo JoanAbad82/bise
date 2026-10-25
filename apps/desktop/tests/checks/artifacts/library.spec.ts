@@ -98,7 +98,8 @@ for (const theme of THEMES) {
         const card0 = page.locator('[data-testid^="artifacts.grid.card."]').first();
         await card0.hover();
         await shot('card-hover');
-        await page.locator('[data-testid^="artifacts.grid.card.stack:"]').first().dblclick();
+        // one click opens it (ba2cb2d60); a double click's second click opens a sheet item
+        await page.locator('[data-testid^="artifacts.grid.card.stack:"]').first().click();
         await expect(id(page, 'artifacts.sheet')).toBeVisible();
         await page.locator('[data-testid^="artifacts.sheet.chip."]').nth(1).click();
         await shot('stack-open');
@@ -124,8 +125,9 @@ for (const theme of THEMES) {
         await id(page, 'artifacts.delete.cancel').click();
 
         // the m picker on the first card, then typing
+        // ⌘-click picks without opening (a plain click opens it, ba2cb2d60)
         const first = page.locator('[data-testid="artifacts.grid"] [data-row]').first();
-        await first.click();
+        await first.click({ modifiers: ['Meta'] });
         await page.keyboard.press('m');
         await expect(id(page, 'artifacts.move')).toContainText(library.all_folders);
         await shot('move');
@@ -140,7 +142,9 @@ for (const theme of THEMES) {
         await shot('card-menu');
         await page.keyboard.press('Escape');
         const cards = page.locator('[data-testid="artifacts.grid"] [data-row]');
-        await cards.nth(0).click();
+        // the picks of the m picker go first (its esc, the bar's esc), then three ⌘-clicks
+        if (await id(page, 'artifacts.selbar.esc').isVisible()) await id(page, 'artifacts.selbar.esc').click();
+        await cards.nth(0).click({ modifiers: ['Meta'] });
         await cards.nth(1).click({ modifiers: ['Meta'] });
         await cards.nth(2).click({ modifiers: ['Meta'] });
         await expect(id(page, 'artifacts.selbar')).toContainText(library.picked({ n: 3 }));
