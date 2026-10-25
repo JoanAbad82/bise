@@ -115,12 +115,25 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
       fontSize: 12,
       lineHeight: 1.5,
       cursorBlink: true,
+      cursorInactiveStyle: 'block',
       scrollback: 5000,
-      theme: themeOf(),
+      theme: themeOf(false),
     });
     const fitter = new FitAddon();
     term.loadAddon(fitter);
     term.open(el);
+    // the cursor in the text ink, a block at 70 % while the tab isn't focused (designer m_43294: pink is only for what waits on him)
+    const ink = (on: boolean) => {
+      term.options.theme = themeOf(on);
+    };
+    const onIn = () => {
+      ink(true);
+    };
+    const onOut = () => {
+      ink(false);
+    };
+    term.textarea?.addEventListener('focus', onIn);
+    term.textarea?.addEventListener('blur', onOut);
     // ⌘ keys stay the app's (copy, paste, ⌘K...), ⌃` hides the panel
     term.attachCustomKeyEventHandler((e) => shellTakes(e));
 
@@ -194,6 +207,8 @@ function ShellView({ project, n, shown }: { project: string; n: number; shown: b
       sized.dispose();
       offData();
       offExit();
+      term.textarea?.removeEventListener('focus', onIn);
+      term.textarea?.removeEventListener('blur', onOut);
       term.dispose();
       live.current = null;
     };
@@ -247,14 +262,14 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-/** xterm's colors from the ds palette (dark or light, as his theme). */
-function themeOf() {
+/** xterm's colors from the ds palette (dark or light, as his theme); the cursor in the ink, 70 % unfocused. */
+export function themeOf(focused: boolean) {
   const bg = cssVar('--p-bg') || '#141211';
   const text = cssVar('--p-text') || '#ece6da';
   return {
     background: bg,
     foreground: text,
-    cursor: cssVar('--p-accent') || text,
+    cursor: focused || !/^#[0-9a-f]{6}$/i.test(text) ? text : `${text}b3`,
     cursorAccent: bg,
     selectionBackground: cssVar('--p-rule') || '#4a4540',
   };
