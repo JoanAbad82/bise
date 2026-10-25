@@ -3,6 +3,7 @@
 // of the terrace (a hedge along its front, a tree in its far corner, stepping stones on its path from
 // the door). The generic look, every growing map's until its own (a map's style comes as data in its
 // look later). Owner: bims-life.
+import type { Object3D } from 'three';
 import type { Build } from './maps/look';
 import type { MapId } from '../maps/ids';
 import { WORLD } from './palette';
@@ -25,10 +26,11 @@ const STONE = '#e9dcc4';
 const STONE_STEP = 0.7;
 
 /** The wing and the garden of a grown office (nothing on a square one). */
-export function buildExtensions(b: Build): void {
-  const { k, root, o } = b;
+export function buildExtensions(b: Build, into: (of: 'wing' | 'garden') => Object3D): void {
+  const { k, o } = b;
   const { style, pal } = k;
   if (o.wing !== undefined) {
+    const root = into('wing');
     const w = o.wing;
     const ww = w.x1 - w.x0;
     const wd = w.z1 - w.z0;
@@ -55,6 +57,7 @@ export function buildExtensions(b: Build): void {
     k.add(style.cylinder(0.2, 0.28), k.glow(pal.lamp, { night: 1, emissive: pal.lampOn }), root, lx, 1.5, lz);
   }
   if (o.garden !== undefined) {
+    const root = into('garden');
     const g = o.garden;
     const gw = g.x1 - g.x0;
     // a low hedge along its front, a tree in its far corner

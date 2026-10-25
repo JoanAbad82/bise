@@ -59,6 +59,8 @@ export interface World {
   readonly pieces: Pieces;
   /** each lounge bed's rest at this stage, measured on these meshes (render/nap.ts napRests; pose.ts lays its napper on it) */
   readonly naps: readonly (NapRest | undefined)[];
+  /** his sketch's extensions as drawn, each its own group (its slab, floor, walls, garden): office-scene.ts drops a new one in */
+  readonly ext: ReadonlyMap<'wing' | 'garden', Group>;
   /** the snow on the lawn and the terrace only (never desks or floors, bims m_33030): 0 none .. 1 white */
   cover(level: number): void;
   /** its night glows and lights (kit.ts glow, light: lanterns, pendants, shades, the lamp pools) at this level, 0..1: the sky's lamps */
@@ -156,6 +158,19 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   const k = kitOf(style, pal);
   const root = new Group();
 
+  // his sketch's extensions, each its own group (office-scene.ts drops a new one in: drop, squash, settle)
+  const ext = new Map<'wing' | 'garden', Group>();
+  const extGroup = (of: 'wing' | 'garden'): Group => {
+    let g = ext.get(of);
+    if (!g) {
+      g = new Group();
+      g.name = `ext:${of}`;
+      ext.set(of, g);
+      root.add(g);
+    }
+    return g;
+  };
+
   // the floating grass block, as wide as the garden has grown (camera.ts groundOf)
   const site = groundOf(o, grow);
   const gw = site.x1 - site.x0;
@@ -175,8 +190,9 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
       const ed = e.z1 - e.z0;
       const ex = (e.x0 + e.x1) / 2;
       const ez = (e.z0 + e.z1) / 2;
-      k.add(slabWithPits(style, ew, 1.2, ed, 0.45, ex, ez, []), dirt, root, ex, SLAB_LOW + 0.6, ez);
-      k.add(slabWithPits(style, ew, 0.16, ed, 0, ex, ez, []), k.mat(pal.grass), root, ex, -0.1, ez);
+      const into = extGroup(e.kind);
+      k.add(slabWithPits(style, ew, 1.2, ed, 0.45, ex, ez, []), dirt, into, ex, SLAB_LOW + 0.6, ez);
+      k.add(slabWithPits(style, ew, 0.16, ed, 0, ex, ez, []), k.mat(pal.grass), into, ex, -0.1, ez);
     }
     // the night's warm pools over main's desk, the island, the lounge and one desk: the lamps' (kit.light)
     for (const p of poolsOf(o)) {
@@ -211,7 +227,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   desks.set(mainName, mainDesk);
   look.growth(b);
   // his sketch's extensions when his objects needed them (extensions.ts): the wing, the garden
-  buildExtensions(b);
+  buildExtensions(b, extGroup);
   // what makes it cozy from day one, and cozier at each stage (render/cozy.ts, Office.cozy)
   buildCozy(b, look.cozy, desks, mainName);
   // what each napper rests on, as built (bims-nap: never in the air over its bed)
@@ -241,6 +257,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
     pal,
     pieces,
     naps,
+    ext,
     lit(level) {
       if (level === glowing) return;
       glowing = level;

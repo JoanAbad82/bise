@@ -3,7 +3,7 @@
 // whole site (the floating grass block, the office on it, its trees) shows, never cropped. index.ts
 // copies a Fit onto three's OrthographicCamera; headOf and pick use toScreen, the same numbers.
 // His pinch and pan (zoom.ts Cam) are a view inside the fit (viewFit), the canvas's size unchanged.
-import type { Box, Office } from '../model';
+import type { Office } from '../model';
 import type { Cam } from '../zoom';
 import { WIDE_GARDEN, groundMargin } from '../growth';
 
@@ -63,12 +63,21 @@ export function groundOf(o: Office, g: { readonly stage: number; readonly garden
  * past its right side from its back, the garden's past its front from its left. The outline is
  * his sketch's: a square and its offset extensions, never one wider block.
  */
-export function extSlabsOf(o: Office, g: { readonly stage: number; readonly garden: number }): Box[] {
+export function extSlabsOf(o: Office, g: { readonly stage: number; readonly garden: number }): ExtSlab[] {
   const G = groundOf(o, g);
-  const out: Box[] = [];
-  if (o.wing !== undefined && o.wing.x1 + EXT_PAD > G.x1) out.push({ x0: G.x1, x1: o.wing.x1 + EXT_PAD, z0: G.z0, z1: Math.max(G.z0 + 1, o.wing.z1 + EXT_PAD) });
-  if (o.garden !== undefined && o.garden.z1 + EXT_PAD > G.z1) out.push({ x0: G.x0, x1: Math.max(G.x0 + 1, o.garden.x1 + EXT_PAD), z0: G.z1, z1: o.garden.z1 + EXT_PAD });
+  const out: ExtSlab[] = [];
+  if (o.wing !== undefined && o.wing.x1 + EXT_PAD > G.x1) out.push({ kind: 'wing', x0: G.x1, x1: o.wing.x1 + EXT_PAD, z0: G.z0, z1: Math.max(G.z0 + 1, o.wing.z1 + EXT_PAD) });
+  if (o.garden !== undefined && o.garden.z1 + EXT_PAD > G.z1) out.push({ kind: 'garden', x0: G.x0, x1: Math.max(G.x0 + 1, o.garden.x1 + EXT_PAD), z0: G.z1, z1: o.garden.z1 + EXT_PAD });
   return out;
+}
+
+/** an extension's slab, and which extension it is */
+export interface ExtSlab {
+  readonly kind: 'wing' | 'garden';
+  readonly x0: number;
+  readonly x1: number;
+  readonly z0: number;
+  readonly z1: number;
 }
 
 /** the ground and its extensions' slabs together (the weather's cube, the town's lot) */

@@ -106,6 +106,18 @@ export interface OfficeScene {
 
 /** a newcomer's pop in, s */
 export const APPEAR_S = 0.45;
+/** his sketch's new extension's arrival (drop, squash, settle), s; how high it falls from; how much it squashes */
+export const ARRIVE_S = 0.4;
+const ARRIVE_DROP = 1.2;
+const ARRIVE_SQUASH = 0.12;
+
+/** a new extension's height over its place and its height's scale at p (0..1) of its arrival: it falls, squashes, settles. Pure. */
+export function arriveAt(p: number): { y: number; sy: number } {
+  if (p >= 1) return { y: 0, sy: 1 };
+  if (p < 0.6) return { y: ARRIVE_DROP * (1 - (p / 0.6) ** 2), sy: 1 };
+  if (p < 0.85) return { y: 0, sy: 1 - ARRIVE_SQUASH * Math.sin((Math.PI * (p - 0.6)) / 0.25) };
+  return { y: 0, sy: 1 + 0.3 * ARRIVE_SQUASH * Math.sin((Math.PI * (p - 0.85)) / 0.15) };
+}
 
 /** the pop's scale at p in [0, 1]: an ease-out a little past 1 (back, ~6%), then settled. Pure. */
 export function appearOut(p: number): number {
@@ -168,6 +180,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   // when the office opens are simply there.
   const shownLast = new Set<string>();
   const appearing = new Map<string, number>();
+  /** his sketch's extensions arriving (null: its first frame starts it), and the ones the office on screen had */
+  const arriving = new Map<'wing' | 'garden', number | null>();
+  let extHad: { map: string; wing: boolean; garden: boolean } | null = null;
   let primed = false;
   // and a soft poof as it does (poof.ts, main m_38961): seen, never kitsch; none under reduced motion
   const poofs = makePoofs(root, style);
@@ -498,6 +513,12 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     setOffice(o, as) {
       // another map: its bims dress for it (the look's wear)
       if (office && office.map !== o.map) dropBims();
+      // a new extension on the same map (extensions.ts): it arrives like an object (frame: drop, squash, settle)
+      if (extHad !== null && extHad.map === o.map) {
+        if (o.wing !== undefined && !extHad.wing) arriving.set('wing', null);
+        if (o.garden !== undefined && !extHad.garden) arriving.set('garden', null);
+      }
+      extHad = { map: o.map, wing: o.wing !== undefined, garden: o.garden !== undefined };
       office = o;
       agents = as;
       rebuildWorld(night ?? false);
@@ -583,6 +604,17 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       if (drawPlanes(t, frames, fit, !look.night, look.reduced, look.planeFrom, look.planesUp === true)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
+      // a new extension arriving: it falls in, squashes, settles; reduced motion: there at once
+      for (const [kind, t0] of arriving) {
+        const g = world.ext.get(kind);
+        const p = look.reduced || g === undefined ? 1 : t0 === null ? 0 : (t - t0) / ARRIVE_S;
+        if (t0 === null && p < 1) arriving.set(kind, t);
+        const a = arriveAt(p);
+        g?.position.setY(a.y);
+        g?.scale.setY(a.sy);
+        if (p >= 1) arriving.delete(kind);
+        else motion = 'walk';
+      }
       // the unlock moment: two bims bring the new piece in from the door
       if (unlock.update(t, office, look.unlock, look.unlock ? world.pieces.get(look.unlock.stage) : undefined, look.reduced, mapLook())) motion = 'walk';
       return motion;
