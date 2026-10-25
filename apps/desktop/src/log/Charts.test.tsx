@@ -4,7 +4,7 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CompPart, CompRow } from "@/proto";
-import { Charts, keyWord, selWords } from "./Charts";
+import { Charts, keyWord, labelAt, selWords } from "./Charts";
 
 afterEach(cleanup);
 
@@ -57,5 +57,18 @@ describe("src/log charts (debug-viz)", () => {
     fireEvent.click(getByTestId("comp.chart.msg.1"));
     expect(onOpen).toHaveBeenCalledWith(3);
     expect(getByTestId("comp.chart.peak").getAttribute("data-tip")).toBe("#3 · 2.0k · tool result bash rg");
+  });
+
+  it("the peak's label sits 4 px over the tallest bar under it, at the dot's left in the right half (designer m_42012)", () => {
+    // 100 bars of 1 px; a peak at 20 of 1000, a bar of 500 under the label's span
+    const bars = Array.from({ length: 100 }, (_, i) => ({ tokens: i === 20 ? 1000 : i === 40 ? 500 : 10 }));
+    expect(labelAt(bars, 20, 1000, 10, { w: 100, h: 140 })).toEqual({ x: 32.5, y: 74, left: false });
+    // nothing tall under it: just over the low bars
+    const low = Array.from({ length: 100 }, (_, i) => ({ tokens: i === 90 ? 1000 : 10 }));
+    expect(labelAt(low, 90, 1000, 4, { w: 100, h: 140 })).toEqual({ x: 21.5, y: 5, left: true });
+    // never over the plot's top
+    const tall = Array.from({ length: 10 }, () => ({ tokens: 1000 }));
+    expect(labelAt(tall, 2, 1000, 4, { w: 100, h: 140 })?.y).toBe(124);
+    expect(labelAt(tall, 2, 1000, 4, { w: 0, h: 0 })).toBeUndefined();
   });
 });

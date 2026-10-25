@@ -473,6 +473,9 @@
   letter-spacing: 0;
   font-weight: 400;
 }
+.lg-charts[data-more] {
+  mask-image: linear-gradient(to bottom, black calc(100% - 16px), transparent);
+}
 .lg-hint {
   color: var(--c-text-3);
   font-size: var(--t-11);
@@ -636,20 +639,21 @@
   border: 1.5px solid var(--c-text);
   background: var(--c-solid);
 }
-.lg-series .peak .lab {
+.lg-series > .lab {
   position: absolute;
-  left: var(--s-3);
-  bottom: var(--s-1);
   max-width: 260px;
+  padding: 0 var(--s-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 400 var(--t-11) / 1 var(--font-mono);
+  font: 400 var(--t-11) / 16px var(--font-mono);
   color: var(--c-text-2);
+  /* a knockout on the pane's own ground: no bar ever crosses the words */
+  background: color-mix(in srgb, var(--p-bg) 55%, var(--p-frame));
+  border-radius: var(--r-1);
 }
-.lg-series .peak .lab.left {
-  left: auto;
-  right: var(--s-3);
+.lg-series > .lab:hover {
+  color: var(--c-text);
 }
 .lg-next {
   display: flex;
@@ -681,10 +685,13 @@
   }
   .lg-charts {
     flex: 0 0 auto;
-    max-height: 45%;
     border-left: 0;
     border-bottom: 1px solid var(--c-line);
     gap: var(--s-3);
+  }
+  /* the how-to lines go at this width: the bars' tips say it (designer m_42012) */
+  .lg-charts .how {
+    display: none;
   }
   .lg-ctabs {
     display: flex;

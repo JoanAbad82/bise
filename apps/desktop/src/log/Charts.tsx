@@ -6,7 +6,7 @@
 // column goes above the list, one chart at a time behind three tabs (log.css, @container).
 // The numbers are the hub's (bise_session::completion::groups): viz.ts only sums and bins them.
 // Owner: debug-viz.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CompKind, CompRole, CompRow } from "@/proto";
 import { Press } from "@/ds";
 import { debug } from "@/proto/words_debug.gen";
@@ -74,6 +74,19 @@ export function Charts({
   onOpen: (n: number) => void;
 }) {
   const [tab, setTab] = useState<Tab>("tokens");
+  // the column scrolls on its own; a fade at its foot while there's more (designer m_42012)
+  const box = useRef<HTMLElement>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (el === null) return;
+    const check = () => { setMore(el.scrollTop + el.clientHeight < el.scrollHeight - 1); };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    el.addEventListener("scroll", check, { passive: true });
+    return () => { ro.disconnect(); el.removeEventListener("scroll", check); };
+  }, [rows, drill, filter, tab]);
   const sel = filter.sel;
   const nodes = useMemo(() => level(rows, drill), [rows, drill]);
   const whole = useMemo(() => total(rows), [rows]);
@@ -90,7 +103,7 @@ export function Charts({
     ["series", debug.tab_series],
   ];
   return (
-    <aside className="lg-charts" data-testid="comp.charts" data-tab={tab}>
+    <aside className="lg-charts" ref={box} data-testid="comp.charts" data-tab={tab} data-more={more || undefined}>
       <div className="lg-ctabs" role="tablist">
         {tabs.map(([t, w]) => (
           <Press key={t} role="tab" aria-selected={tab === t} look={tab === t ? "ct on" : "ct"} onClick={() => { setTab(t); }} data-testid={`comp.charts.tab.${t}`}>
@@ -154,7 +167,7 @@ function Bars({ nodes, drill, whole, sel, onBar, onCrumb }: { nodes: Node[]; dri
           );
         })}
       </div>
-      <div className="lg-hint">{leaf ? debug.hint_leaf : debug.hint_bars}</div>
+      <div className="lg-hint how">{leaf ? debug.hint_leaf : debug.hint_bars}</div>
     </section>
   );
 }
@@ -213,8 +226,17 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
   };
   const label = (n: number, t: number) => `#${String(n)} · ${kTokens(t)} · ${what(n)}`;
   const first = top[0];
-  // its label at the left of its dot when the peak is in the right half (it stays in the chart)
   const firstAt = first === undefined ? 0 : bars.findIndex((b) => b.n === first.n);
+  const plot = useRef<HTMLDivElement>(null);
+  const [px, setPx] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = plot.current;
+    if (el === null) return;
+    const ro = new ResizeObserver(() => { setPx({ w: el.clientWidth, h: el.clientHeight }); });
+    ro.observe(el);
+    return () => { ro.disconnect(); };
+  }, []);
+  const lab = first === undefined ? undefined : labelAt(bars, firstAt, max, label(first.n, first.picked).length, px);
   // a bar is about 1 px wide: a click opens the tallest bar within 3 of it
   const open = (i: number) => {
     let best = i;
@@ -230,7 +252,7 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
         <span className="t">{debug.series_title}</span>
         <span className="n">{bars.length > 0 ? `#${String(bars[0]?.n ?? 1)} → #${String(bars.at(-1)?.n ?? 1)}` : ""}</span>
       </div>
-      <div className="lg-series">
+      <div className="lg-series" ref={plot}>
         <svg viewBox={`0 0 ${String(W)} ${String(H)}`} preserveAspectRatio="none" aria-hidden="true">
           {bars.map((b, i) => {
             const h = (H * b.tokens) / max;
@@ -250,7 +272,6 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
         </div>
         {first !== undefined && (
           <Press
-           
             look="peak"
             style={{ left: `${String((100 * (firstAt + 0.5)) / W)}%`, bottom: `${String((100 * first.picked) / max)}%` }}
             onClick={() => { onOpen(first.n); }}
@@ -258,7 +279,17 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
             data-testid="comp.chart.peak"
           >
             <span className="dot" />
-            <span className={firstAt > W / 2 ? "lab left" : "lab"}>{label(first.n, first.picked)}</span>
+          </Press>
+        )}
+        {first !== undefined && lab !== undefined && (
+          <Press
+            look={lab.left ? "lab left" : "lab"}
+            style={lab.left ? { right: `${String(lab.x)}px`, bottom: `${String(lab.y)}px` } : { left: `${String(lab.x)}px`, bottom: `${String(lab.y)}px` }}
+            onClick={() => { onOpen(first.n); }}
+            data-tip={label(first.n, first.picked)}
+            data-testid="comp.chart.peak.label"
+          >
+            {label(first.n, first.picked)}
           </Press>
         )}
       </div>
@@ -272,7 +303,32 @@ function Series({ rows, sel, onOpen }: { rows: readonly CompRow[]; sel: Sel | un
           ))}
         </div>
       )}
-      <div className="lg-hint">{debug.hint_series}</div>
+      <div className="lg-hint how">{debug.hint_series}</div>
     </section>
   );
+}
+
+/** about the width of a character of the label (mono at --t-11) and its height, in px */
+const CHAR_PX = 6.9;
+const LABEL_PX = 16;
+/** clear of the bars under it */
+const CLEAR_PX = 4;
+
+/**
+ * Where the tallest peak's label goes (designer m_42012): beside its dot, right of it (left of it in
+ * the right half), raised above the tallest bar under its span plus 4 px, so no bar crosses it.
+ * `x`: from the plot's left edge (right edge when `left`), `y`: from its bottom.
+ */
+export function labelAt(bars: readonly { tokens: number }[], at: number, max: number, chars: number, plot: { w: number; h: number }): { x: number; y: number; left: boolean } | undefined {
+  if (plot.w <= 0 || plot.h <= 0 || bars.length === 0) return undefined;
+  const bar = plot.w / bars.length;
+  const dot = (at + 0.5) * bar;
+  const width = chars * CHAR_PX + 8;
+  const left = dot > plot.w / 2;
+  const from = left ? dot - 12 - width : dot + 12;
+  const to = from + width;
+  let tall = 0;
+  for (let i = Math.max(0, Math.floor(from / bar)); i <= Math.min(bars.length - 1, Math.ceil(to / bar)); i++) tall = Math.max(tall, bars[i]?.tokens ?? 0);
+  const y = Math.min(plot.h - LABEL_PX, (plot.h * tall) / Math.max(1, max) + CLEAR_PX);
+  return { x: left ? plot.w - dot + 12 : dot + 12, y: Math.round(y), left };
 }
