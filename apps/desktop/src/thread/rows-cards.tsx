@@ -19,6 +19,7 @@ import { PartChips, partImageWords } from './YouBody';
 import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
 import { drawnParts, pageAnswer, pageOf, youView } from './parts';
+import { forwardLine, forwardOf, forwardTip, type Forward } from './forward';
 /** The hub's words about him in the 3rd person, said to him: 'he showed it' -> 'you showed it'. Pure. */
 export function toYou(words: string): string {
   return words.replace(/\bhe\b/gu, 'you').replace(/\bHe\b/gu, 'You').replace(/\bhis\b/gu, 'your').replace(/\bhim\b/gu, 'you');
@@ -355,9 +356,12 @@ export function AgentNote({ pos, from, to, text: said, parts, ctx, testId, tag, 
   // send-parts: an agent's attachments (`sb send --attach`) are his message's chips under its
   // words, never their markers; a message without any: its text as ever
   const drawn = drawnParts(parts);
-  const view = drawn !== null ? youView(drawn) : null;
+  // msg-forward (designer m_41546): a forward's note is its words; the original goes quoted under
+  // its '↪' line (ForwardBody), never the header the model reads
+  const fwd = forwardOf(drawn);
+  const view = drawn !== null && fwd === null ? youView(drawn) : null;
   const attached = view !== null && (view.images.length > 0 || view.files.length > 0);
-  const text = attached ? view.words : said;
+  const text = fwd !== null ? youView(fwd.note).words : attached ? view.words : said;
   // ctrl+o / ⌘E open and close it with every fold; a click opens it in place (desktop-notices (c))
   const [open, setOpen] = useFold(false, pos);
   const lines = text.split('\n').filter((l) => l.trim() !== '');
@@ -406,6 +410,50 @@ export function AgentNote({ pos, from, to, text: said, parts, ctx, testId, tag, 
           </div>
         ))}
       {attached && <PartChips view={view} ctx={ctx} id={`thread.you.${String(pos)}`} named />}
+      {fwd !== null && <ForwardBody f={fwd} to={to} open={open} onToggle={toggle} ctx={ctx} pos={pos} testId={testId} />}
+    </div>
+  );
+}
+
+/**
+ * A forward's original under its note (msg-forward, designer m_41546): '↪ forwarded from you → main ·
+ * 12:26' faint (the id in its tip), then the original quoted: a 2 px faint rule on its left, its
+ * words in text-2, its quotes as lines, its pastes, images and files as his bubble's chips. Folded,
+ * its words on two lines then '… ▸'; open, whole. The TUI's: rust/tui/src/forwarded.rs.
+ */
+function ForwardBody({ f, to, open, onToggle, ctx, pos, testId }: { f: Forward; to: string; open: boolean; onToggle: () => void; ctx: RowCtx; pos: number; testId: string }) {
+  const view = youView(f.original);
+  const lines = view.words.split('\n').filter((l) => l.trim() !== '');
+  const more = lines.length > NOTE_LINES || view.words.length > NOTE_CHARS;
+  return (
+    <div className="th-fwd" data-testid={`${testId}.fwd`}>
+      <div className="th-fwd-line" title={forwardTip(f.fwd, to)} data-testid={`${testId}.fwd.line`}>
+        {forwardLine(f.fwd, (ms) => clock(ms))}
+      </div>
+      <div className="th-fwd-orig" data-testid={`${testId}.fwd.original`}>
+        {view.quotes.map((q, i) => (
+          <div key={i} className="th-fwd-quote" data-testid={`${testId}.fwd.quote.${String(i + 1)}`}>
+            ❝ {q.text.split('\n')[0] ?? ''}
+            <span className="th-note-faint">{`\u00a0· ${shownName(q.from)}`}</span>
+          </div>
+        ))}
+        {view.words !== '' &&
+          (open ? (
+            <div className="th-fwd-words" data-testid={`${testId}.fwd.words`}>
+              <Markdown text={view.words} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
+            </div>
+          ) : (
+            <div className="th-fwd-words folded" data-testid={`${testId}.fwd.words`}>
+              <span className="th-fwd-clamp">{lines.slice(0, NOTE_LINES).join('\n')}</span>
+              {more && (
+                <Act onClick={onToggle} testId={`${testId}.fwd.more`}>
+                  … ▸
+                </Act>
+              )}
+            </div>
+          ))}
+        <PartChips view={view} ctx={ctx} id={`thread.fwd.${String(pos)}`} named />
+      </div>
     </div>
   );
 }

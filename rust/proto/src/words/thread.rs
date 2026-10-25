@@ -258,6 +258,18 @@ crate::words! { thread:
     from_fn_tip = "sent with fn, from another app";
     /// a long message, open: the act that folds it
     fold_it = "fold it";
+
+    // ---- a forwarded message (msg-forward, designer m_41546)
+    /// its line between the forwarder's note and the original, quoted:
+    /// `↪ forwarded from you → main · 12:26` (`from`: `you` when he wrote
+    /// it; `at`: his local time)
+    forwarded_from(from, to, at) = "↪ forwarded from {from} → {to} · {at}";
+    /// the same, its time unknown
+    forwarded_from_untimed(from, to) = "↪ forwarded from {from} → {to}";
+    /// who wrote a forwarded message, when he did
+    forwarded_you = "you";
+    /// the hover of its `↪`: where the original is (`m_3`, `sb show m_3`)
+    forwarded_tip(by, to, id) = "{by} forwarded this message to {to} · {id}";
     /// a long message, folded
     show_all(n) = "show all · {n} lines";
     /// a send that failed

@@ -8,7 +8,7 @@ fn thinking(open: bool) -> Ev {
 
 fn report(open: bool) -> Ev {
     let text = "[report: done] p95 at 180 ms.\n- ran 3 times";
-    Ev::AgentMsg { from: "bench".into(), to: String::new(), text: text.into(), level: 3, id: "m_3".into(), open, fold: false }
+    Ev::AgentMsg { from: "bench".into(), to: String::new(), text: text.into(), level: 3, id: "m_3".into(), parts: Vec::new(), open, fold: false }
 }
 
 fn opens(app: &App) -> Vec<bool> {

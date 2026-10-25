@@ -257,6 +257,7 @@ fn an_open_report_hangs_its_rows() {
         text: format!("[report: done] {}", long),
         level: 3,
         id: String::new(),
+        parts: Vec::new(),
         open: true,
         fold: false,
     };

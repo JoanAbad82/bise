@@ -6,6 +6,7 @@ import Base
 import ../hub/gen/state.bend as HS
 import ../hub/core.bend as HC
 import ../hub/forward.bend as HFW
+import ../vendor/json.bend as J
 
 # LAW: the forward's message carries the forwarded id as a typed field
 # (Msg.fwd): no reader ever finds it in the header's text.
@@ -69,11 +70,20 @@ law forward_names_source:
   {HFW.header(m, by, "") == String.concat(["[forwarded ", HFW.mid(HS.Msg.id(m)), " · from ", HFW.who(HS.Msg.from(m)), " to ", HFW.who(HS.Msg.to(m)),
     " · forwarded by ", by, " · its place: sb show ", HFW.mid(HS.Msg.id(m)), "]\n"]) : String}
 
-# LAW: an original without parts makes a forward without parts (its
-# message is a plain text one).
-law forward_no_parts:
-  for +note: String
+# LAW: no note: the forward's parts open on the forwarded part (the
+# header's typed twin, architect m_41547), then the original's. With a
+# note, its text part comes first (note_parts). That they render to the
+# forward's text is pinned across Bend and Rust by
+# rust/switchboard/src/core_forward_tests.rs (Bend has no parts render).
+law forward_no_note_parts:
   for +m: HS.Msg
   for +by: String
   for +at: String
-  {HFW.parts(note, HS.Msg.with_parts(m, ""), by, at) == "" : String}
+  {HFW.parts("", m, by, at) == J.stringify(J.JArr{HFW.fwd_part(m, by, at) <> HFW.orig(m)}) : String}
+
+# LAW: an original without parts is forwarded as its text, one text
+# part: a forward always has parts, so every client draws it from them.
+law forward_plain_original:
+  for +m: HS.Msg
+  for e: {HS.Msg.parts(m) == "" : String}
+  {HFW.orig(m) == [HFW.text_part(HS.Msg.text(m))] : List<&2, J.Json>}

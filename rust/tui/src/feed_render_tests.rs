@@ -480,7 +480,7 @@ fn measure_feed() -> Vec<Ev> {
     vec![
         Ev::You(prose.clone().into(), Mark::Read, false, None),
         Ev::Assistant(prose.clone()),
-        Ev::AgentMsg { from: "docs".into(), to: "main".into(), text: prose.clone(), level: 3, id: String::new(), open: false, fold: false },
+        Ev::AgentMsg { from: "docs".into(), to: "main".into(), text: prose.clone(), level: 3, id: String::new(), parts: Vec::new(), open: false, fold: false },
         Ev::Thinking { ms: 1200, text: prose.clone(), open: true },
         Ev::Tool(tool),
     ]
@@ -612,7 +612,7 @@ fn vibe_edit_and_write_file_show_as_diffs() {
 }
 
 fn agent_msg(from: &str, text: &str) -> Ev {
-    Ev::AgentMsg { from: from.into(), to: String::new(), text: text.into(), level: 3, id: "m_3".into(), open: false, fold: false }
+    Ev::AgentMsg { from: from.into(), to: String::new(), text: text.into(), level: 3, id: "m_3".into(), parts: Vec::new(), open: false, fold: false }
 }
 
 #[test]
@@ -711,7 +711,7 @@ fn mockup_turn(open: bool) -> Vec<Ev> {
     }
     let brief = "# Task `auth-fix`\n\nthe login breaks on safari 18. reproduce with playwright, fix it,\nkeep the chrome path unchanged. report with the test output.";
     vec![
-        Ev::AgentMsg { from: "main".into(), to: String::new(), text: brief.into(), level: 3, id: "m_1".into(), open, fold: false },
+        Ev::AgentMsg { from: "main".into(), to: String::new(), text: brief.into(), level: 3, id: "m_1".into(), parts: Vec::new(), open, fold: false },
         Ev::Thinking { ms: 14_000, text: "safari drops the session cookie on the redirect. SameSite=None needs\nSecure, and the dev server sets it without. check session.ts first.".into(), open },
         Ev::Tool(b),
         Ev::Tool(t),
@@ -956,11 +956,11 @@ fn feed_entities_use_the_book_glyphs() {
 // ---- BISE-14: the three levels, folding, time marks (book §9, §10) ----
 
 fn l3(from: &str, to: &str, text: &str) -> Ev {
-    Ev::AgentMsg { from: from.into(), to: to.into(), text: text.into(), level: 3, id: String::new(), open: false, fold: false }
+    Ev::AgentMsg { from: from.into(), to: to.into(), text: text.into(), level: 3, id: String::new(), parts: Vec::new(), open: false, fold: false }
 }
 
 fn to_you(from: &str, text: &str) -> Ev {
-    Ev::AgentMsg { from: from.into(), to: "you".into(), text: text.into(), level: 2, id: String::new(), open: false, fold: false }
+    Ev::AgentMsg { from: from.into(), to: "you".into(), text: text.into(), level: 2, id: String::new(), parts: Vec::new(), open: false, fold: false }
 }
 
 /// Events pushed one by one, as they arrive (the merge and the cache

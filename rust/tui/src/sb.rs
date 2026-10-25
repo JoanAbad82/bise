@@ -1089,7 +1089,7 @@ pub(super) fn parse_hub_line(rest: &str) -> Option<Ev> {
 /// level 3), `msg-you` (an agent writing to the user, level 2) and
 /// `answered` (main answered an agent for the user, level 2).
 pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
-    let msg = |from: String, to: String, text: String, level: u8, id: String| Ev::AgentMsg { from, to, text, level, id, open: false, fold: false };
+    let msg = |from: String, to: String, text: String, level: u8, id: String| Ev::AgentMsg { from, to, text, level, id, parts: Vec::new(), open: false, fold: false };
     Some(match h {
         Hub::You(text, via) => Ev::You(crate::said::Said::via(text, via.as_deref()), Mark::Sent, false, None),
         Hub::Routed { name, msg, .. } => Ev::YouWent { msg, name },

@@ -534,6 +534,12 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
             let (kind, body) = report_parts(text).unwrap_or_default();
             report_lines(from, kind, body, *open, width)
         }
+        Ev::AgentMsg { from, to, level: 3, id, open, parts, .. } if crate::forwarded::of(parts).is_some() => {
+            let f = crate::forwarded::of(parts).unwrap_or_else(|| unreachable!());
+            let mut ls = vec![l3_chip_row(chip_form(), from, to, id, width)];
+            ls.extend(l3_forward_under(&f, *open, width));
+            ls
+        }
         Ev::AgentMsg { from, to, text, level: 3, id, open, .. } => l3_lines(from, to, id, text, *open, width),
         Ev::AgentMsg { from, text, .. } => l2_lines(from, text, width),
         Ev::Answered { agent, question, answer, why, open } => {
@@ -772,6 +778,21 @@ pub(crate) fn l3_lines_as(
     ls
 }
 
+/// A forwarded message under its chip (forwarded.rs, designer m_41546):
+/// its note as a level-3 text, the `↪` line, the original quoted, all at
+/// x0+2 like [`l3_under`].
+fn l3_forward_under(f: &crate::forwarded::Fwd, open: bool, width: usize) -> Vec<Line<'static>> {
+    let room = width.saturating_sub(L3_UNDER.len());
+    let rows = crate::forwarded::rows(f, open, room, crate::running::clock, |note| l3_text_rows(note, open, room));
+    rows.into_iter()
+        .map(|r| {
+            let mut spans = vec![Span::raw(L3_UNDER)];
+            spans.extend(r.spans);
+            Line::from(spans)
+        })
+        .collect()
+}
+
 /// The chip row of a level-3 message. W, the reading width from x0
 /// (book §9 'Short on room'): names cut at 24 / 16 / 10, and then only
 /// as the row's room asks (BISE-109); under 40, the compact chip.
@@ -807,11 +828,15 @@ fn l3_under(text: &str, open: bool, width: usize) -> Vec<Line<'static>> {
 /// (book §9, BISE-127): no chip, its text alone at x0+2, like
 /// [`ev_rows`] would draw it under the chip.
 pub(crate) fn l3_text_only_rows(ev: &Ev, width: usize) -> Vec<Line<'static>> {
-    let Ev::AgentMsg { text, open, .. } = ev else {
+    let Ev::AgentMsg { text, open, parts, .. } = ev else {
         return Vec::new();
     };
     let w = code_width(width);
-    l3_under(text, *open, w).into_iter().flat_map(|l| wrap_line(l, w)).collect()
+    let under = match crate::forwarded::of(parts) {
+        Some(f) => l3_forward_under(&f, *open, w),
+        None => l3_under(text, *open, w),
+    };
+    under.into_iter().flat_map(|l| wrap_line(l, w)).collect()
 }
 
 /// The speaker of a level-2 block is bold (book §9 'Emphasis'): main's
@@ -978,7 +1003,7 @@ pub(crate) fn you_paste_rows(msg: &Said, open: bool, width: usize) -> usize {
 
 /// His quotes (BISE-134), one dim line each: `❝ the selected words… ·
 /// main · 3 lines`.
-fn quote_lines(quotes: &[crate::quote::Quote], width: usize) -> Vec<Line<'static>> {
+pub(crate) fn quote_lines(quotes: &[crate::quote::Quote], width: usize) -> Vec<Line<'static>> {
     let d = Style::default().fg(dim());
     quotes
         .iter()
@@ -1844,7 +1869,7 @@ Anthropic has the most users, OpenAI the most demand.";
         // a level-3 message opens whole: every line under the chip at
         // x0+2 (BISE-127)
         let text = format!("one{}two {}", '\n', "x ".repeat(30));
-        let s = screen(Ev::AgentMsg { from: "main".into(), to: "docs".into(), text, level: 3, id: String::new(), open: true, fold: false }, 70);
+        let s = screen(Ev::AgentMsg { from: "main".into(), to: "docs".into(), text, level: 3, id: String::new(), parts: Vec::new(), open: true, fold: false }, 70);
         let head = format!(" {} main → docs", super::G_ENVELOPE);
         assert_eq!(s[0], head, "{s:#?}");
         let hang = "  ";
@@ -1881,6 +1906,7 @@ mod emphasis_tests {
             text: text.into(),
             level,
             id: String::new(),
+            parts: Vec::new(),
             open: false,
             fold: false,
         }
@@ -1967,7 +1993,7 @@ mod chip_tests {
     use unicode_width::UnicodeWidthStr;
 
     fn msg(from: &str, to: &str, text: &str) -> Ev {
-        Ev::AgentMsg { from: from.into(), to: to.into(), text: text.into(), level: 3, id: String::new(), open: false, fold: false }
+        Ev::AgentMsg { from: from.into(), to: to.into(), text: text.into(), level: 3, id: String::new(), parts: Vec::new(), open: false, fold: false }
     }
 
     fn text_of(l: &Line) -> String {

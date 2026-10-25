@@ -37,6 +37,7 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
         text: text.clone(),
         level,
         id: e.msg.map(|m| format!("m_{m}")).unwrap_or_default(),
+        parts: e.parts.clone(),
         open: false,
         fold: false,
     };

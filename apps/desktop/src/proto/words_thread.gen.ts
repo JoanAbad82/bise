@@ -234,6 +234,14 @@ export const thread = {
   from_fn_tip: "sent with fn, from another app",
   /** a long message, open: the act that folds it */
   fold_it: "fold it",
+  /** its line between the forwarder's note and the original, quoted: `↪ forwarded from you → main · 12:26` (`from`: `you` when he wrote it; `at`: his local time) */
+  forwarded_from: (a: { from: string | number; to: string | number; at: string | number }): string => "↪ forwarded from " + String(a.from) + " → " + String(a.to) + " · " + String(a.at),
+  /** the same, its time unknown */
+  forwarded_from_untimed: (a: { from: string | number; to: string | number }): string => "↪ forwarded from " + String(a.from) + " → " + String(a.to),
+  /** who wrote a forwarded message, when he did */
+  forwarded_you: "you",
+  /** the hover of its `↪`: where the original is (`m_3`, `sb show m_3`) */
+  forwarded_tip: (a: { by: string | number; to: string | number; id: string | number }): string => String(a.by) + " forwarded this message to " + String(a.to) + " · " + String(a.id),
   /** a long message, folded */
   show_all: (a: { n: string | number }): string => "show all · " + String(a.n) + " lines",
   /** a send that failed */

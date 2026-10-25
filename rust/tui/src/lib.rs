@@ -44,6 +44,7 @@ mod wire;
 // his message as text + typed parts, and the history's view (msg-parts)
 mod said;
 mod agent_parts;
+mod forwarded;
 // the hub's entries as feed events (client-protocol step 4): the feed
 // from entries (sb/feed_entries.rs) and its parity law
 mod entry_ev;

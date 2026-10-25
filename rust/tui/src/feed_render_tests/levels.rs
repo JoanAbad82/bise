@@ -215,7 +215,7 @@ fn whats_for_you_matches_the_mockup() {
         l3("auth-fix", "release", "heads-up, i'm touching web/src/auth."),
         l3("release", "auth-fix", "ok, i'll mention the fix."),
         l3("bench", "main", "✓ done. p95 180 ms, 3 runs."),
-        Ev::AgentMsg { from: "bench".into(), to: String::new(), text: "[report: done] p95 at 180 ms, nothing to fix.\nran it 3 times".into(), level: 3, id: String::new(), open: false, fold: false },
+        Ev::AgentMsg { from: "bench".into(), to: String::new(), text: "[report: done] p95 at 180 ms, nothing to fix.\nran it 3 times".into(), level: 3, id: String::new(), parts: Vec::new(), open: false, fold: false },
         l3("api-v2", "main", "? i need the v2 schema file, it isn't in the repo."),
         Ev::Card { card: crate::wire::CardParts::of_line("#4 question @api-v2 : the v2 schema file isn't in the repo. where is it?"), closed: String::new() },
     ];
@@ -262,7 +262,7 @@ fn a_busy_hour_matches_the_mockup() {
     evs.extend(traffic(47, 30, 0));
     evs.push(Ev::Assistant("the 12 endpoint agents agreed on one error format; i picked it for the sdk agents too.".into()));
     evs.extend(traffic(23, 9, 100));
-    evs.push(Ev::AgentMsg { from: "ep-users".into(), to: String::new(), text: "[report: done] 4 endpoints are done: users, orgs, keys, audit.\nmore".into(), level: 3, id: String::new(), open: false, fold: false });
+    evs.push(Ev::AgentMsg { from: "ep-users".into(), to: String::new(), text: "[report: done] 4 endpoints are done: users, orgs, keys, audit.\nmore".into(), level: 3, id: String::new(), parts: Vec::new(), open: false, fold: false });
     evs.extend([
         l3("sdk-py", "sdk-ts", "same pagination shape as you?"),
         l3("sdk-ts", "sdk-py", "yes: cursor + limit, max 200."),

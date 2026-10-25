@@ -212,8 +212,9 @@ pub(crate) fn view_of(text: &str, parts: &[Part]) -> View {
             // attach::chip_spans); a listed file in the list after
             Part::File { path, name, missing } if !name.is_empty() => v.body.push_str(&parts::file_marker(name, path, *missing)),
             Part::File { path, .. } => files.push(path),
-            // the hub's line for the model (the capsule's), never drawn
-            Part::Hint { .. } => {}
+            // the hub's line for the model (the capsule's), never drawn;
+            // a forward's header: its own line (agent_msg.rs), never here
+            Part::Hint { .. } | Part::Forwarded { .. } => {}
             // his notes on a page, never the hub's template
             Part::Page { notes, .. } => v.body.push_str(&page_words(notes, "\n")),
             // a part of an artifact he selected: where, never its JSON
@@ -255,7 +256,7 @@ pub(crate) fn gist(parts: &[Part]) -> String {
             Part::Page { notes, .. } => words.push_str(&page_words(notes, " · ")),
             Part::Anchor { .. } => words.push_str(&anchor_words(p)),
             // the hub's line for the model, never his words (m_22706)
-            Part::Hint { .. } | Part::Unknown(_) => {}
+            Part::Hint { .. } | Part::Forwarded { .. } | Part::Unknown(_) => {}
         }
     }
     quotes.push(words.split_whitespace().collect::<Vec<_>>().join(" "));

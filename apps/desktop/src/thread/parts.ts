@@ -130,7 +130,7 @@ export function partsGist(parts: readonly Part[]): string {
       const file = p.source.split('/').at(-1) ?? '';
       words += `▣ ${p.name.startsWith('[') || file === '' ? p.name : file}`;
     } else if (p.kind === 'page') words += p.notes.map((n) => pageNoteWords(n, true)).join(' · ');
-    else if (p.kind === 'hint') continue;
+    else if (p.kind === 'hint' || p.kind === 'forwarded') continue;
     else if (p.name !== undefined && p.name !== '') words += `▯ ${p.path.split('/').at(-1) ?? p.path}`;
     else words += ` ${p.path}`;
   }
@@ -138,7 +138,7 @@ export function partsGist(parts: readonly Part[]): string {
 }
 
 /** The part kinds this window draws; an entry with another kind (a newer hub's) is drawn from its text. */
-const KNOWN_KINDS: ReadonlySet<string> = new Set(['text', 'quote', 'paste', 'image', 'file', 'page', 'hint', 'anchor']);
+const KNOWN_KINDS: ReadonlySet<string> = new Set(['text', 'quote', 'paste', 'image', 'file', 'page', 'hint', 'anchor', 'forwarded']);
 
 /** He typed it with fn space (designer m_22714: 'from fn' on his bubble): a capsule hint in his
  *  parts and not said (a fn talk keeps 'said'). bise_proto::parts::via_fn, the same cases

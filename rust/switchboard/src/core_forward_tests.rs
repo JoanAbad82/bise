@@ -4,6 +4,7 @@
 //! line limit).
 
 use super::super::*;
+use bise_proto::parts::Part;
 
 const IMG: &str = r#"{"kind":"image","name":"[Image #1]","source":"/u/s.png","mime":"image/png","b64_file":"/h/images/1.b64"}"#;
 
@@ -35,7 +36,48 @@ fn main_forwards_his_message_whole_with_a_note() {
     // the reference is a typed field: no reader parses the header
     let m = t.hub.st.msgs().values().find(|m| m.to == "docs" && m.from == MAIN && m.fwd.is_some()).expect("the forward").clone();
     assert_eq!(m.fwd, Some(n));
-    assert!(m.parts.is_empty(), "a plain original makes a plain forward");
+    // a plain original goes as one text part after the forwarded part
+    // (architect m_41547): every client draws a forward from its parts
+    let got: Vec<Part> = serde_json::from_str(&m.parts).expect("its parts");
+    assert!(matches!(&got[1], Part::Forwarded { id, from, to, by, .. } if *id == n && from == USER && to == MAIN && by == MAIN), "{got:?}");
+    assert_eq!(got.last(), Some(&Part::Text { text: "tiens au fait, forward my words".into() }));
+}
+
+/// Architect m_41547: the header has two writers (forward.bend composes
+/// it, bise_proto::parts renders it). Real forwards through sb-core (a
+/// note and none, a plain original, one with an image, one with a quote
+/// in front, a chain): the parts render to the text the model reads.
+#[test]
+fn a_forwards_parts_render_to_its_text() {
+    let mut t = T::new();
+    t.spawn_task("a");
+    t.spawn_task("b");
+    t.turn("a", "ok");
+    t.turn("b", "ok");
+    t.user(MAIN, "plain words");
+    t.turn(MAIN, "ok");
+    let plain = his_id(&t, "plain words");
+    let rich = format!(r#"[{{"kind":"quote","from":"t1","text":"the quoted line"}},{{"kind":"text","text":"look "}},{IMG},{{"kind":"paste","n":1,"text":"a\nb"}}]"#);
+    let p: Vec<Part> = serde_json::from_str(&rich).unwrap();
+    let text = bise_proto::parts::render(&p);
+    t.req(MAIN, AgentReq::Send { to: "a".into(), text: text.clone(), expect_reply: false, reply_to: None, queued: false, why: String::new(), switch: None, parts: rich, attach: Vec::new(), fwd: None });
+    let rich = t.hub.st.msgs().values().find(|m| m.text == text).unwrap().id;
+    let check = |t: &T, n: u64| {
+        let m = t.hub.st.msgs().values().filter(|m| m.fwd == Some(n)).max_by_key(|m| m.id).expect("the forward").clone();
+        let got: Vec<Part> = serde_json::from_str(&m.parts).expect("its parts");
+        assert_eq!(bise_proto::parts::render(&got), m.text, "the parts render to the text the model reads");
+        m.id
+    };
+    for (who, to, note, n) in [(MAIN, "a", "see", plain), (MAIN, "b", "", plain), ("a", "b", "", rich), ("a", "b", "look at it", rich)] {
+        let (tok, fx) = t.req(who, fwd(to, note, n));
+        assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{fx:?}");
+        check(&t, n);
+    }
+    // a chain: b forwards a's forward back to a
+    let last = t.hub.st.msgs().values().filter(|m| m.fwd == Some(rich)).max_by_key(|m| m.id).unwrap().id;
+    let (tok, fx) = t.req("b", fwd("a", "again", last));
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{fx:?}");
+    check(&t, last);
 }
 
 #[test]

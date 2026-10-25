@@ -520,6 +520,37 @@
     "one": null,
     "text": "fold it"
   },
+  "thread.forwarded_from": {
+    "args": [
+      "from",
+      "to",
+      "at"
+    ],
+    "one": null,
+    "text": "↪ forwarded from {from} → {to} · {at}"
+  },
+  "thread.forwarded_from_untimed": {
+    "args": [
+      "from",
+      "to"
+    ],
+    "one": null,
+    "text": "↪ forwarded from {from} → {to}"
+  },
+  "thread.forwarded_tip": {
+    "args": [
+      "by",
+      "to",
+      "id"
+    ],
+    "one": null,
+    "text": "{by} forwarded this message to {to} · {id}"
+  },
+  "thread.forwarded_you": {
+    "args": [],
+    "one": null,
+    "text": "you"
+  },
   "thread.from_at": {
     "args": [
       "time"

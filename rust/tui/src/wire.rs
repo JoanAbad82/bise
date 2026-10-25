@@ -288,6 +288,10 @@ pub(crate) enum Ev {
         text: String,
         level: u8,
         id: String,
+        // its typed parts (the entry's; none: its text alone). A forward's
+        // (a `forwarded` part, msg-forward): drawn as the note, the `↪`
+        // line and the original quoted (forwarded.rs), never its text
+        parts: Vec<bise_proto::parts::Part>,
         // in memory only (not on the wire): a folded message (a report,
         // a brief) is disclosed (BISE-12, a click or feed::toggle_event);
         // a level-3 line shows its whole text (BISE-14)

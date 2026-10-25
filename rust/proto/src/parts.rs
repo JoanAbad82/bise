@@ -149,6 +149,22 @@ pub enum Part {
         of: HintKind,
         text: String,
     },
+    /// a message forwarded whole (msg-forward, architect m_41547): message
+    /// `id`, `from` wrote it to `to` (`user`: him), at `at` (the shell's
+    /// UTC time, "" not said), and `by` forwards it. It renders to the
+    /// header line the model reads, and what comes after it renders as
+    /// the original message of its own ([`render`]); the clients draw it
+    /// as one line and the parts after it as the original, quoted. Only
+    /// sb-core makes one (bend/hub/forward.bend; `parts_in::said` refuses
+    /// it from a client, [`parse`] never makes one).
+    Forwarded {
+        id: u64,
+        from: String,
+        to: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        at: String,
+        by: String,
+    },
     /// a part a newer client sent: kept whole, never rendered
     #[serde(untagged)]
     #[cfg_attr(feature = "ts", ts(skip))]
@@ -400,8 +416,29 @@ const FILE_OPEN: &str = "<file name=\"";
 
 // ---- render ----
 
-/// The text the model gets for `parts` (see the module's header).
+/// The text the model gets for `parts` (see the module's header). A
+/// [`Part::Forwarded`] splits them: what comes before it, its header,
+/// then what comes after it rendered as a message of its own (its quotes
+/// in its own front), as sb-core writes the forward's text.
 pub fn render(parts: &[Part]) -> String {
+    if let Some(i) = parts.iter().position(|p| matches!(p, Part::Forwarded { .. })) {
+        let Part::Forwarded { id, from, to, at, by } = &parts[i] else { unreachable!() };
+        return format!("{}{}{}", render_one(&parts[..i]), forward_header(*id, from, to, at, by), render(&parts[i + 1..]));
+    }
+    render_one(parts)
+}
+
+/// The header line of a forward (with its newline), byte for byte
+/// bend/hub/forward.bend's `header`: who wrote message `id` to whom,
+/// when ("" left out), who forwards it, and where to open it.
+pub fn forward_header(id: u64, from: &str, to: &str, at: &str, by: &str) -> String {
+    let who = |n: &str| if n == "user" { "the user".to_string() } else { n.to_string() };
+    let at = if at.is_empty() { String::new() } else { format!(" · {at}") };
+    format!("[forwarded m_{id} · from {} to {}{at} · forwarded by {by} · its place: sb show m_{id}]\n", who(from), who(to))
+}
+
+/// [`render`] of parts with no [`Part::Forwarded`].
+fn render_one(parts: &[Part]) -> String {
     let mut head: Vec<String> = Vec::new();
     let mut body = String::new();
     let mut files: Vec<&str> = Vec::new();
@@ -420,7 +457,7 @@ pub fn render(parts: &[Part]) -> String {
             Part::Page { text, .. } => body.push_str(text),
             Part::Anchor { artifact, version, rev, anchor, quote, n: None } => head.push(anchor_tag(artifact, *version, *rev, anchor, quote, None)),
             Part::Anchor { artifact, version, rev, anchor, quote, n: Some(n) } => body.push_str(&anchor_tag(artifact, *version, *rev, anchor, quote, Some(*n))),
-            Part::Unknown(_) => {}
+            Part::Unknown(_) | Part::Forwarded { .. } => {}
         }
     }
     if !body.is_empty() {

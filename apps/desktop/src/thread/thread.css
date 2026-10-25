@@ -1986,6 +1986,45 @@
 .th-note-row .b-act {
   flex: none;
 }
+/* a forwarded message (msg-forward, designer m_41546): '↪ forwarded from you → main · 12:26' faint
+   at +16, then the original quoted, a 2 px faint rule on its left, its words text-2 */
+.th-fwd {
+  margin-top: var(--gap-tight);
+  padding-left: var(--s-4);
+}
+.th-fwd-line {
+  color: var(--c-text-3);
+  cursor: default;
+}
+.th-fwd-orig {
+  margin-top: var(--s-1);
+  padding-left: var(--s-2);
+  border-left: 2px solid color-mix(in srgb, var(--c-text) 12%, transparent);
+  color: var(--c-text-2);
+  min-width: 0;
+}
+.th-fwd-quote {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.th-fwd-words {
+  overflow-wrap: anywhere;
+}
+.th-fwd-words.folded {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.th-fwd-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: pre-line;
+  min-width: 0;
+}
 /* the fold of a run sits on the text column: its left edge is the prose's */
 .th-screen .th-run {
   box-sizing: border-box;

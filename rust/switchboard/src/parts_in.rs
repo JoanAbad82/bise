@@ -76,6 +76,9 @@ pub fn said(parts: &[Part], door: &Door) -> Result<Said, String> {
             // a hint is the hub's line for the model, hidden from him:
             // never a client's (architect m_22715)
             Part::Hint { .. } => return Err("a hint part is the hub's: update bise".into()),
+            // a forward's header is sb-core's (msg-forward, architect
+            // m_41547): never a client's
+            Part::Forwarded { .. } => return Err("a forwarded part is the hub's: forward with sb send --forward".into()),
             // a part of an artifact he selected: that artifact and version
             // exist here (pages/artifact/notes.rs records it after)
             // an anchor this hub can't read: a known kind with bad fields, or
@@ -305,6 +308,15 @@ mod tests {
     fn a_clients_hint_part_is_refused() {
         let ps = [t("hi"), bise_proto::parts::capsule_hint("capsule").unwrap()];
         assert_eq!(said(&ps, &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }), Err("a hint part is the hub's: update bise".into()));
+    }
+
+    /// architect m_41547: a forward's header is sb-core's; a client's
+    /// `forwarded` part is refused, nothing delivered.
+    #[test]
+    fn a_clients_forwarded_part_is_refused() {
+        let fwd = Part::Forwarded { id: 3, from: "user".into(), to: "main".into(), at: String::new(), by: "main".into() };
+        let r = said(&[t("hi"), fwd], &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) });
+        assert!(r.is_err_and(|e| e.contains("forwarded part is the hub's")));
     }
 
     /// architect m_17621 Q2: b64_file only inside the image store.
