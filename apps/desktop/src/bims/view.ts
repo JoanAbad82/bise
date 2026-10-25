@@ -1,18 +1,13 @@
 // How the right bar shows its agents (page bims-office v7, bims m_27494): 'list' (the rows alone,
 // the default: the office is an easter egg he opens with the title bar's icon, Frame.tsx) or 'bims'
 // (the office above the rows: he keeps the list while the bims are open), and with bims
-// on, the bar at 320 or 'wide' (640 px while the office shows: docked when the window has room for
-// it and the thread's 520, sliding over the thread otherwise).
-// Both kept per window (keep.ts, like the sections' folds), one store for the window so the frame
-// (its column's width and the title bar's icon) and the bar (its head's 320 | wide) read the same. Owner: bims-wire.
+// on, the bar at 320 or 'wide'. Both kept per window (keep.ts, like the sections' folds), one
+// store for the window. The wide bar's column (panelColumn, usePanelColumn, wideMode) left with
+// the right bar (nm-panel's tabbed panel, native-mac). Owner: bims-wire.
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
-import { MAIN_MIN } from '@/app/resize';
 
 export type AgentsView = 'list' | 'bims';
-
-/** The bar's width while the office shows wide. */
-export const WIDE_PX = 640;
 
 const VIEW_KEY = 'frame.rb.agents.view';
 const WIDE_KEY = 'frame.rb.agents.wide';
@@ -70,38 +65,4 @@ export function useBimsView(): BimsView {
     },
     read,
   );
-}
-
-/** Whether the bar shows wide now: bims on, wide picked, and a bar (a project's office, or the town on bise's thread). Pure. */
-export function showsWide(v: BimsView, project: string | undefined): boolean {
-  return v.view === 'bims' && v.wide && v.lost !== true && project !== undefined;
-}
-
-/**
- * The right column's width (--panel-w): his kept width, or 640 while the office shows wide and the
- * window has room for it beside the sidebar and the thread's MAIN_MIN. Short of room the column
- * keeps his width and the bar slides over the thread at 640 (office.css, .app-rb[data-wide]). Pure.
- */
-export function panelColumn(panelW: number, wide: boolean, win: number, side: number): number {
-  if (!wide || panelW >= WIDE_PX) return panelW;
-  return win - side - WIDE_PX >= MAIN_MIN ? WIDE_PX : panelW;
-}
-
-/** The wide bar in its column ('docked': the column is 640) or over the thread ('over': short of room, or the bar sliding over under 1000 px). Pure. */
-export function wideMode(sliding: boolean, column: number | undefined): 'docked' | 'over' {
-  return !sliding && column !== undefined && column >= WIDE_PX ? 'docked' : 'over';
-}
-
-const noSub = (): (() => void) => () => undefined;
-const onResize = (cb: () => void): (() => void) => {
-  window.addEventListener('resize', cb);
-  return () => {
-    window.removeEventListener('resize', cb);
-  };
-};
-
-/** The frame's right column for the bar of `project` (panelColumn): it follows the window's width only while the office shows wide. */
-export function usePanelColumn(panelW: number, side: number, project: string | undefined): number {
-  const wide = showsWide(useBimsView(), project);
-  return useSyncExternalStore(wide ? onResize : noSub, () => panelColumn(panelW, wide, window.innerWidth, side));
 }

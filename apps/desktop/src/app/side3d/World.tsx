@@ -3,8 +3,9 @@
 // no ground) with a 3-layer drop shadow on its alpha (--sh-world on the wrapper: the filter follows
 // the scaled canvas). Drawn once at 384 and shown at 148 by a scale from its top-right corner, so the
 // hover's growth is one transform: after HOVER_MS of hover it grows to 384 in --d-base, a glass
-// legend pill 8 under it (the project, '3 at their desks · 1 asks', ↗); it folds back when the
-// pointer leaves; never under reduced motion. A click opens the office in a tab. The office lives
+// legend pill 8 under it (the project, '3 at their desks · 1 asking', ↗), floating over the
+// bubbles, which never move (designer m_42536: a target never moves away from the pointer); it
+// folds back GRACE_MS after the pointer leaves; never under reduced motion. A click opens the office in a tab. The office lives
 // (its bims move) on its own loop, which already rests while the window is away (bims/room.ts);
 // SideHost unmounts the world while the right side is hidden. As a 5th bubble (no room, d3) the
 // same office draws at the bubble's 68 object. The office takes no pointer here: its labels, pills
@@ -22,6 +23,8 @@ import { side } from '@/proto/words_side.gen';
 
 /** the hover that grows the world, ms (native-mac §7) */
 export const HOVER_MS = 300;
+/** the pointer gone, the big world waits this long before it folds (designer m_42536) */
+export const GRACE_MS = 150;
 /** the office's drawn width: the big world's; the small one is it scaled */
 export const BIG = 384;
 export const SMALL = 148;
@@ -61,12 +64,10 @@ export interface WorldProps extends OfficeOf {
   readonly says: string;
   /** a click: the office in a tab */
   readonly onOpen: () => void;
-  /** it grew or folded (the bubbles move down under it) */
-  readonly onBig: (big: boolean) => void;
 }
 
 /** The world, small at rest, big after a hover. */
-export function World({ project, name, says, agents, cards, onOpen, onBig }: WorldProps) {
+export function World({ project, name, says, agents, cards, onOpen }: WorldProps) {
   const [big, setBig] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stop = () => {
@@ -74,20 +75,19 @@ export function World({ project, name, says, agents, cards, onOpen, onBig }: Wor
     timer.current = null;
   };
   useEffect(() => stop, []);
-  useEffect(() => {
-    onBig(big);
-  }, [big, onBig]);
-  const enter = () => {
-    if (noGrow()) return;
+  const after = (ms: number, next: boolean) => {
     stop();
     timer.current = setTimeout(() => {
       timer.current = null;
-      setBig(true);
-    }, HOVER_MS);
+      setBig(next);
+    }, ms);
+  };
+  const enter = () => {
+    if (noGrow()) return;
+    after(big ? 0 : HOVER_MS, true);
   };
   const leave = () => {
-    stop();
-    setBig(false);
+    after(GRACE_MS, false);
   };
   const label = side.world_open({ project: name });
   return (

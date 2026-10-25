@@ -11,12 +11,18 @@
   right: 0;
   width: 0;
   height: 0;
-  z-index: 30;
+  /* over the thread's composer (10), under the palette (20), the sheets and the menus */
+  z-index: 15;
 }
 
-/* the world: the office drawn at --world-big, scaled to --world from its top-right corner */
+/* the world: the office drawn at --world-big, scaled to --world from its top-right corner; grown,
+   it floats over the bubbles (they never move) */
 .s3-world-at {
   position: absolute;
+  z-index: 1;
+}
+.s3-card {
+  z-index: 2;
 }
 .s3-world {
   position: relative;
@@ -94,7 +100,8 @@
 /* a bubble: 44 round glass, its object 68 rising 28 out of its top */
 .s3-bubble {
   position: absolute;
-  right: var(--s-4);
+  /* on the world's right edge: the 68 objects and the pills keep 24 from the 92 band's left (d3) */
+  right: var(--s-3);
   width: var(--bubble);
   height: var(--bubble);
   border-radius: 50%;
@@ -167,12 +174,14 @@
   background: var(--c-accent);
 }
 
-/* a card: 360, 12 left of the bubbles (16 + 44 + 12), r 16, glass, --e-3 */
+/* a card: 360 with its padding, 12 left of the bubbles (12 + 44 + 12), r 16, glass, --e-3; it stops
+   --float-room above the window's bottom (the composer's) and scrolls inside */
 .s3-card {
   position: absolute;
-  right: calc(var(--s-4) + var(--bubble) + var(--s-3));
+  box-sizing: border-box;
+  right: calc(var(--s-3) + var(--bubble) + var(--s-3));
   width: var(--w-flyout);
-  max-height: calc(100vh - var(--h-bar) - var(--s-6));
+  max-height: calc(100vh - var(--h-bar) - var(--float-room) - var(--s-3));
   display: flex;
   flex-direction: column;
   padding: var(--s-2) var(--s-2) var(--s-3);

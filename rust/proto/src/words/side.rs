@@ -23,7 +23,7 @@ crate::words! { side:
     /// a count of working agents (a bubble's tip, the agents card's head)
     working(n) = "{n} working";
     /// a count of agents that ask him something
-    asks(n) = "{n} asks";
+    asks(n) = "{n} asking";
     /// a count of new artifacts
     new_count(n) = "{n} new";
     /// a count of artifacts (the artifacts bubble's tip)

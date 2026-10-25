@@ -7,10 +7,12 @@
 // office unmounted: no loop while hidden). The project is the route's (bise's home on a page with
 // none). One card open at a time: a bubble's click or ⌥⌘1-⌥⌘4 (keys.ts) toggle it; esc and a click
 // outside close it. Places, in px under the bar: the world 12 from the top and the right edge; the
-// bubbles 16 from the right, 152 from the top (348 while the world is big), 80 apart (44 + 36);
-// with the world folded into a bubble, it is the stack's first, at 40; a card 72 from the right,
-// 12 above its bubble's top, kept inside the window. Owner: nm-side.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// bubbles 12 from the right, 152 from the top, 80 apart (44 + 36), never moving (the big world
+// floats over them, designer m_42536); with the world folded into a bubble, it is the stack's
+// first, at 40; a card 68 from the right, 12 above its bubble's top, kept --float-room above the
+// window's bottom. Under every palette, sheet and menu (z 15: over the composer's 10, under the
+// palette's 20). Owner: nm-side.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNowFor } from '../clock';
 import { useRoute, useRouter } from '../router';
 import { MAIN, projectOf } from '../route';
@@ -35,20 +37,21 @@ import './side3d.css';
 
 /** the world's top and right, px */
 const EDGE = 12;
-/** the first bubble's top under the small world, under the big one, as the 5th bubble's stack */
+/** the first bubble's top under the world (the big one floats over them: they never move), as the 5th bubble's stack */
 const TOP_SMALL = 152;
-const TOP_BIG = 348;
 const TOP_STACK = 40;
 /** one bubble and the room to the next: 44 + 36 */
 const STEP = 80;
 /** a card's top over its bubble's */
 const CARD_UP = 12;
+/** the room the window keeps at its bottom for the floating composer (--float-room): a card stops above it */
+const FLOAT_ROOM = 84;
 /** how many rows a card lists before 'all … ›' */
 const ROWS = 6;
 
 /** Where each bubble's top goes, px under the bar. Pure. */
-export function bubbleTops(world: 'small' | 'big' | 'bubble'): { readonly world: number | null; readonly bubbles: Readonly<Record<BubbleId, number>> } {
-  const first = world === 'bubble' ? TOP_STACK + STEP : world === 'big' ? TOP_BIG : TOP_SMALL;
+export function bubbleTops(world: 'small' | 'bubble'): { readonly world: number | null; readonly bubbles: Readonly<Record<BubbleId, number>> } {
+  const first = world === 'bubble' ? TOP_STACK + STEP : TOP_SMALL;
   const tops = Object.fromEntries(BUBBLES.map((b, i) => [b, first + i * STEP])) as Record<BubbleId, number>;
   return { world: world === 'bubble' ? TOP_STACK : null, bubbles: tops };
 }
@@ -108,11 +111,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     running: procs.filter((x) => isRunning(x.p)).length,
   };
   const [open, setOpen] = useState<BubbleId | null>(null);
-  const [big, setBig] = useState(false);
-  const onBig = useCallback((b: boolean) => {
-    setBig(b);
-  }, []);
-  const tops = bubbleTops(world === 'bubble' ? 'bubble' : big ? 'big' : 'small');
+  const tops = bubbleTops(world === 'bubble' ? 'bubble' : 'small');
   const toggle = (b: BubbleId) => {
     setOpen((o) => (o === b ? null : b));
   };
@@ -158,7 +157,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
       return;
     }
     const r = el.getBoundingClientRect();
-    setLift(Math.max(0, r.bottom + lift - (window.innerHeight - EDGE)));
+    setLift(Math.max(0, r.bottom + lift - (window.innerHeight - FLOAT_ROOM)));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- measured again when the card or its rows change
   }, [open, live.length, artifacts.length, procs.length, tasks.length]);
   const here = route.screen === 'thread' ? { project: route.project, agent: route.agent } : { project: null, agent: null };
@@ -173,10 +172,10 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   const running = procs.filter((x) => isRunning(x.p));
   const doneToday = procs.filter((x) => !isRunning(x.p) && (endedAt(x.p) ?? 0) > 0 && today(endedAt(x.p) ?? 0, now)).length;
   return (
-    <div className="s3-side" ref={root} data-world={world} data-big={big || undefined} data-testid="app.side">
+    <div className="s3-side" ref={root} data-world={world} data-testid="app.side">
       {world !== 'bubble' && (
         <div className="s3-world-at" style={{ top: EDGE, right: EDGE }}>
-          <World project={project} name={name} says={says} agents={live} cards={cards} onBig={onBig} onOpen={() => {
+          <World project={project} name={name} says={says} agents={live} cards={cards} onOpen={() => {
             openTab({ kind: 'office', project });
           }} />
         </div>
@@ -211,26 +210,38 @@ function Side({ project, home, world }: { project: string; home: string; world: 
             {artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} />)}
           </Flyout>
         )}
-        {(open === 'processes' || open === 'scheduled') && (
-          <Flyout id={open} name={bubbleName('processes')} says={bubbleSays('processes', counts)} top={cardTop(open)}
-            onPin={() => { openOverview(project, 'processes'); }}
-            foot={{ left: doneToday > 0 ? side.done_today({ n: doneToday }) : '', right: side.all_processes, onRight: () => { router.go({ screen: 'running', scope: { project } }); } }}>
-            {running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.p.agent}/${x.p.id}`} x={x} now={now} />)}
-            <div className="s3-card-sub">
-              <b>{bubbleName('scheduled')}</b>
-              <span className="s3-card-says">{bubbleSays('scheduled', counts)}</span>
-              <SideLink onClick={() => { router.go({ screen: 'scheduled' }); }} testId={`app.flyout.${open}.scheduled.all`}>
-                {side.all_scheduled}
-              </SideLink>
-            </div>
-            {tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
+        {(open === 'processes' || open === 'scheduled') && (() => {
+          // one card for both (mockup 15), the clicked kind first under the card's head, the other under it
+          const other: BubbleId = open === 'processes' ? 'scheduled' : 'processes';
+          const goAll: Record<'processes' | 'scheduled', () => void> = {
+            processes: () => { router.go({ screen: 'running', scope: { project } }); },
+            scheduled: () => { router.go({ screen: 'scheduled' }); },
+          };
+          const rowsOf = (k: 'processes' | 'scheduled') =>
+            k === 'processes' ? (
+              running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.p.agent}/${x.p.id}`} x={x} now={now} />)
+            ) : tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
               <>
                 {tasks.slice(0, ROWS).map((x) => <TaskRow key={x.t.id} x={x} now={now} />)}
                 {watching.map((a) => <WatchRows key={a.name} project={project} a={a} now={now} onOpen={openAgent} />)}
               </>
-            )}
-          </Flyout>
-        )}
+            );
+          return (
+            <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={cardTop(open)}
+              onPin={() => { openOverview(project, 'processes'); }}
+              foot={{ left: open === 'processes' && doneToday > 0 ? side.done_today({ n: doneToday }) : '', right: open === 'processes' ? side.all_processes : side.all_scheduled, onRight: goAll[open] }}>
+              {rowsOf(open)}
+              <div className="s3-card-sub" data-testid={`app.flyout.${open}.${other}`}>
+                <b>{bubbleName(other)}</b>
+                <span className="s3-card-says">{bubbleSays(other, counts)}</span>
+                <SideLink onClick={goAll[other === 'processes' ? 'processes' : 'scheduled']} testId={`app.flyout.${open}.${other}.all`}>
+                  {other === 'processes' ? side.all_processes : side.all_scheduled}
+                </SideLink>
+              </div>
+              {rowsOf(other === 'processes' ? 'processes' : 'scheduled')}
+            </Flyout>
+          );
+        })()}
       </div>
     </div>
   );

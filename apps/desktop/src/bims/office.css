@@ -362,34 +362,6 @@
   }
 }
 
-/* the bar wide while the office shows (bims m_27494): 640 px. The frame's column (--panel-w) is
-   640 when the window has room (view.ts panelColumn): data-wide='docked'. Short of room the column
-   keeps his width, fixed, and the bar, 640 at the column's end, slides over the thread on its left
-   (data-wide='over'); under 1000 px it already slides over in its own layer (.over) */
-.app-panel.app-rb[data-wide] {
-  width: max(var(--panel-w, 320px), 640px);
-}
-.app-shell:has(.app-panel.app-rb[data-wide='over']:not(.over)) .b-win > .cols {
-  grid-template-columns: var(--side-w, 240px) minmax(0, 1fr) var(--panel-w, 320px);
-}
-.app-shell.no-side:has(.app-panel.app-rb[data-wide='over']:not(.over)) .b-win > .cols {
-  grid-template-columns: minmax(0, 1fr) var(--panel-w, 320px);
-}
-.app-panel.app-rb[data-wide='over']:not(.over) {
-  justify-self: end;
-  position: relative;
-  /* over the thread's composer and its pick (z 10, composer.css), solid like the sliding bar
-     (.app-panel.over): through the window's translucent ground the composer showed in the rows
-     (designer m_28601) */
-  z-index: 11;
-  background: var(--c-solid);
-  box-shadow: var(--e-3);
-}
-/* the column's border he drags (.app-split.panel, fixed, z 30) stays at the 320 column's edge: over
-   the wide bar it cut the office in two, a col-resize strip that ate his pinch and clicks there */
-.app-shell:has(.app-panel.app-rb[data-wide='over']:not(.over)) .app-split.panel {
-  display: none;
-}
 /* the AGENTS head's small toggles: 'bims' (the office above the rows), '320 | wide' */
 .bims-switch {
   display: inline-flex;

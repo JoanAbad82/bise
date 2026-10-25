@@ -130,6 +130,13 @@ describe('the right side, folded', () => {
       emitAction('side-4');
     });
     expect(v.getByTestId('app.flyout.processes').textContent).toContain(side.no_processes);
+    // the scheduled bubble: its own head first, the processes under it
+    act(() => {
+      emitAction('side-3');
+    });
+    const card = v.getByTestId('app.flyout.scheduled');
+    expect(card.querySelector('.s3-card-head b')?.textContent).toBe(side.scheduled);
+    expect(v.getByTestId('app.flyout.scheduled.processes').textContent).toContain(side.processes);
   });
 
   it('1100 wide: the world folds into a 5th bubble on top of the stack', () => {
@@ -145,9 +152,8 @@ describe('the right side, folded', () => {
     expect(v.queryByTestId('app.side')).toBeNull();
   });
 
-  it('the bubbles under the small world at 152, 80 apart; under the big one at 348; as a 5th bubble the world tops the stack', () => {
+  it('the bubbles under the world at 152, 80 apart, put whatever the world does; as a 5th bubble the world tops the stack', () => {
     expect(bubbleTops('small').bubbles).toEqual({ agents: 152, artifacts: 232, scheduled: 312, processes: 392 });
-    expect(bubbleTops('big').bubbles.agents).toBe(348);
     expect(bubbleTops('bubble')).toEqual({ world: 40, bubbles: { agents: 120, artifacts: 200, scheduled: 280, processes: 360 } });
   });
 });
