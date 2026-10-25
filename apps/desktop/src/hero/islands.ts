@@ -1,9 +1,9 @@
 // bise.dev's home islands, live (designer's brief, page bims-home v11): the seven little clay islands
 // beside the sections' titles drawn in 3D by the hero's own engine (three, the bims, in film.js),
 // loaded through the hero entry (hero.ts loadIslands) so they share its chunk. ONE WebGL renderer
-// for all of them, off the page: each island on screen that moves is drawn into it, then copied into
-// its own transparent 2D canvas on the page (never a context per island); nothing moves, nothing is
-// drawn. Per island: an entry like the hero's (islands-time.ts), then its gag (gags.ts), then its
+// for all of them, off the page (an OffscreenCanvas): each island on screen that moves is drawn into
+// it, then handed whole to its own transparent canvas on the page (one size for all; never a
+// context per island); nothing moves, nothing is drawn. Per island: an entry like the hero's (islands-time.ts), then its gag (gags.ts), then its
 // held pose that blinks every 7-9 s; a hover tilts it toward the pointer (6° at most), the bims'
 // heads follow it, and the scene plays its own move once (moves.ts); a tap is a hover; a click on a
 // bim hops it. Reduced motion: drawn built, no entry, no tilt, no move, only the heads turn. The
@@ -18,7 +18,7 @@ import { FPS, type Frame, ISLANDS, type Island, type IslandId, SLAB, type V } fr
 import { type Move, gagAt, gagLength, looking, moveOf } from '@/bims/sprites/moves';
 import { HALF, type IslandScene, TARGET, buildIsland, sunOn } from '@/bims/sprites/scene';
 import { rimmedMaterial } from './entry';
-import { GRID, cellsOf, cubeAt, dropAt, landAt, planOf, settled, shadowAt } from './islands-time';
+import { type Cell, GRID, cellAt, cellsOf, cubeAt, landAt, planOf, settled, shadowAt, thingAt } from './islands-time';
 
 /** css px per office unit (the sprites' sheet: 128 px a unit at 2x) */
 const S = Math.round(HALF * 2 * 128) / 2 / (HALF * 2);
@@ -28,6 +28,8 @@ const TILT = (6 * Math.PI) / 180;
 const EASE_MS = 75;
 const BLINK_MS = 150;
 const HOP_MS = 450;
+/** every island's canvas, css px: the largest island (islands.json) and its room (site/bims-islands.ts ROOM) fit in it */
+const CANVAS = { w: 300, h: 330 } as const;
 /** the sun's shadow map, px */
 const SHADOW_PX = 1024;
 
@@ -91,12 +93,17 @@ type Mode = 'wait' | 'entry' | 'rest';
 interface Live {
   readonly s: Island;
   readonly b: IslandBox;
-  readonly ctx: CanvasRenderingContext2D | null;
+  /** where its frame goes: handed over whole (the renderer off the page, no copy), or copied (no OffscreenCanvas) */
+  readonly out: { readonly kind: 'bitmap'; readonly ctx: ImageBitmapRenderingContext } | { readonly kind: '2d'; readonly ctx: CanvasRenderingContext2D } | null;
   readonly scene: Scene;
   readonly cam: OrthographicCamera;
   readonly isl: IslandScene;
   readonly cubes: readonly InstancedMesh[];
-  readonly cells: ReturnType<typeof cellsOf>;
+  readonly cells: readonly Cell[];
+  /** the cube each prop stands on: it comes with it */
+  readonly propCells: readonly Cell[];
+  /** a cube's side */
+  readonly side: number;
   readonly plan: ReturnType<typeof planOf>;
   readonly move: Move;
   readonly rest: Frame;
@@ -150,21 +157,26 @@ function originOf(cam: OrthographicCamera, under: readonly number[]): [number, n
 
 export function mountIslands(o: { readonly reduced: boolean; readonly probe?: boolean }): LiveIslands | null {
   if (!webgl()) return null;
-  const glCanvas = document.createElement('canvas');
+  // the renderer's canvas, off the page: an OffscreenCanvas hands each island its frame whole
+  // (transferToImageBitmap, no copy back from the GPU); without one, a canvas the frames are copied from
+  const off = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(1, 1) : null;
+  const glCanvas = off ?? document.createElement('canvas');
   const renderer = new WebGLRenderer({ canvas: glCanvas, antialias: STYLE.antialias, alpha: true, powerPreference: 'low-power' });
   renderer.shadowMap.enabled = STYLE.shadows;
   renderer.shadowMap.type = PCFShadowMap;
   renderer.setPixelRatio(1);
   renderer.setClearColor(0x000000, 0);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  let glW = 1, glH = 1;
+  /** every island's canvas: one size (the renderer's), its box placed in it by its own room */
+  const cw = Math.round(CANVAS.w * dpr), ch = Math.round(CANVAS.h * dpr);
+  renderer.setSize(cw, ch, false);
   const lives: Live[] = [];
   const reduced = o.reduced;
   const frames: number[] = [];
   let raf = 0;
   let gone = false;
   let lost = false;
-  glCanvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; });
+  glCanvas.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); lost = true; });
 
   const now = (l: Live): number => (l.still ? 0 : performance.now());
 
@@ -195,20 +207,22 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
 
   /** the entry's slab, props and bim at ms; true while it builds */
   function entryAt(l: Live, ms: number): void {
-    const up = settled(ms);
+    const up = settled(ms, l.cells);
     for (const m of l.isl.slab) m.visible = up;
     for (const c of l.cubes) {
       c.visible = !up;
       if (up) continue;
       l.cells.forEach((cell, i) => {
-        const a = cubeAt(ms, cell.start);
+        const a = cubeAt(ms, cell.start, l.side);
         const y = (c.userData.y as number) + a.y;
         c.setMatrixAt(i, m4.compose(p3.set(cell.x, y, cell.z), q0, s3.setScalar(a.s)));
       });
       c.instanceMatrix.needsUpdate = true;
     }
     l.isl.props.forEach((g, i) => {
-      const d = dropAt(ms, l.plan.props[i] ?? 0);
+      const cell = l.propCells[i];
+      if (!cell) return;
+      const d = thingAt(ms, cell, l.side);
       g.position.y = d.y;
       g.scale.set(d.s, d.s * d.sy, d.s);
     });
@@ -304,23 +318,17 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
   }
 
   function draw(l: Live): void {
-    const cw = Math.round(l.w * dpr), ch = Math.round(l.h * dpr);
-    if (cw > glW || ch > glH) {
-      glW = Math.max(glW, cw);
-      glH = Math.max(glH, ch);
-      renderer.setSize(glW, glH, false);
-    }
-    renderer.setViewport(0, 0, cw, ch);
-    renderer.setScissor(0, 0, cw, ch);
-    renderer.setScissorTest(true);
-    renderer.clear();
     renderer.render(l.scene, l.cam);
-    const ctx = l.ctx;
-    if (!ctx) return;
-    if (l.b.canvas.width !== cw || l.b.canvas.height !== ch) { l.b.canvas.width = cw; l.b.canvas.height = ch; }
-    ctx.clearRect(0, 0, cw, ch);
-    // the drawing buffer's rows start at its bottom
-    ctx.drawImage(glCanvas, 0, glH - ch, cw, ch, 0, 0, cw, ch);
+    const o = l.out;
+    if (!o) return;
+    if (o.kind === 'bitmap' && off) {
+      o.ctx.transferFromImageBitmap(off.transferToImageBitmap());
+      return;
+    }
+    if (o.kind === '2d') {
+      o.ctx.clearRect(0, 0, cw, ch);
+      o.ctx.drawImage(glCanvas, 0, 0);
+    }
   }
 
   let last = performance.now();
@@ -380,7 +388,11 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
     const [ox, oy] = originOf(cam, b.under);
-    const { l: pl, t: pt, r: pr, b: pb } = b.pad;
+    // its room: the page's on the left and the top, the rest of the one canvas size on the right and the bottom
+    const { l: pl, t: pt } = b.pad;
+    const pr = Math.max(b.pad.r, CANVAS.w - b.w - pl);
+    const pb = Math.max(b.pad.b, CANVAS.h - b.h - pt);
+    if (b.w + pl + pr > CANVAS.w || b.h + pt + pb > CANVAS.h) throw new Error(`${b.id}: ${String(b.w)}x${String(b.h)} and its room past the islands' canvas`);
     cam.left = -HALF + (ox - pl) / S;
     cam.right = -HALF + (ox + b.w + pr) / S;
     cam.top = HALF - (oy - pt) / S;
@@ -414,27 +426,60 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
       isl.root.add(im);
       return im;
     });
+    const propCells = isl.props.map((g) => cellAt(cells, g.position.x, g.position.z));
     const rest = s.frames[s.idle] ?? s.frames[0];
     const first = s.frames[s.seq[0] ?? 0] ?? rest;
     if (!rest || !first) throw new Error(`${s.id}: no frames`);
-    const w = b.w + pl + pr, h = b.h + pt + pb;
+    const w = CANVAS.w, h = CANVAS.h;
     b.canvas.style.width = `${String(w)}px`;
     b.canvas.style.height = `${String(h)}px`;
+    b.canvas.width = cw;
+    b.canvas.height = ch;
+    const bm = off ? b.canvas.getContext('bitmaprenderer') : null;
+    const c2 = bm ? null : b.canvas.getContext('2d');
+    const out: Live['out'] = bm ? { kind: 'bitmap', ctx: bm } : c2 ? { kind: '2d', ctx: c2 } : null;
     return {
-      s, b, ctx: b.canvas.getContext('2d'), scene, cam, isl, cubes, cells, plan: planOf(s.props.length), move: moveOf(s), rest, first,
+      s, b, out, scene, cam, isl, cubes, cells, propCells, side: c, plan: planOf(cells, propCells), move: moveOf(s), rest, first,
       mode: 'wait', t0: 0, done: null, on: false, dirty: true, ptr: null, look: [0, 1, 3], head: 0,
       tilt: new Quaternion(), tiltTo: new Quaternion(), moveT0: null, hopT0: null, blinkAt: Infinity, tapUntil: 0,
       shadow: null, shadowNow: -1, still: null, w, h,
     };
   }
 
+  /**
+   * An island's programs compiled before it first draws (its cubes, its gag's and its move's bits made
+   * now: their pools grow on first use), one island per idle moment: the entry's first frame never
+   * stalls on a shader.
+   */
+  const warming: Live[] = [];
+  const warmNext = (): void => {
+    const l = warming.shift();
+    if (!l || gone) return;
+    for (const f of l.s.frames) l.isl.pose(f);
+    for (let k = 0.05; k < 1; k += 0.1) l.isl.pose(l.move.at(k).frame);
+    l.isl.pose(l.rest);
+    for (const c of l.cubes) c.visible = true;
+    renderer.compile(l.scene, l.cam);
+    for (const c of l.cubes) c.visible = false;
+    if (warming.length > 0) later(warmNext);
+  };
+  const later = (f: () => void): void => {
+    // Safari has no requestIdleCallback
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(f, { timeout: 1000 });
+    else setTimeout(f, 50);
+  };
+
   const api: LiveIslands = {
     add(b) {
       const l = build(b);
       lives.push(l);
+      warming.push(l);
+      if (warming.length === 1) later(warmNext);
       const handle: LiveIsland = {
         play(done) {
           if (reduced) { handle.hold(); done(); return; }
+          const w = warming.indexOf(l);
+          if (w >= 0) { warming.splice(w, 1); warming.unshift(l); warmNext(); }
           l.mode = 'entry';
           l.t0 = performance.now();
           l.done = done;

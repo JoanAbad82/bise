@@ -16,7 +16,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeF
 import { createServer } from 'node:http';
 import { extname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { type Browser, type Page, chromium } from '@playwright/test';
+import { type Browser, type Locator, type Page, chromium } from '@playwright/test';
 
 const here = resolve(import.meta.dirname, '..');
 const site = resolve(here, '../../site');
@@ -26,7 +26,7 @@ mkdirSync(out, { recursive: true });
 const IDS = ['ways', 'why', 'arts', 'fun', 'hard', 'faq', 'end'] as const;
 /** each move's peak, k */
 const PEAK: Record<(typeof IDS)[number], number> = { ways: 0.55, why: 0.66, arts: 0.5, fun: 0.45, hard: 0.42, faq: 0.72, end: 0.36 };
-const ENTRY_MS = [0, 150, 300, 450, 600, 750, 900, 1100, 1300, 1600];
+const ENTRY_MS = [0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200];
 const ROOM = { l: 40, t: 64, r: 40, b: 24 };
 const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 
@@ -60,23 +60,50 @@ async function open(b: Browser, o: { width: number; dark?: boolean; reduced?: bo
   return page;
 }
 
-/** an island's box on the page, its canvas's room around it */
-async function boxOf(page: Page, id: string, room = ROOM): Promise<{ x: number; y: number; width: number; height: number } | null> {
-  await page.evaluate((i) => document.querySelector(`#${i} h2`)?.scrollIntoView({ block: 'center' }), id);
-  await page.waitForTimeout(250);
-  const i = IDS.indexOf(id as (typeof IDS)[number]);
-  const r = await page.evaluate((k) => {
-    const el = document.querySelectorAll<HTMLElement>('.bp > div')[k];
-    if (!el || el.hidden) return null;
-    const b = el.getBoundingClientRect();
-    return { x: b.left, y: b.top, w: b.width, h: b.height };
-  }, i);
-  if (!r) return null;
-  return { x: Math.max(0, r.x - room.l), y: Math.max(0, r.y - room.t), width: r.w + room.l + room.r, height: r.h + room.t + room.b };
+/** an island on the page (the layer's children follow islands.json's order): its canvas when live, its box with the sprites */
+const islandOf = (page: Page, id: string, live = true): Locator => {
+  const box = page.locator(`.bp > div:nth-child(${String(IDS.indexOf(id as (typeof IDS)[number]) + 1)})`);
+  return live ? box.locator('canvas') : box;
+};
+
+/** on screen, the layout settled (lazy images above it load as it nears): its box, or null when it is not placed */
+async function bring(el: Locator): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  try {
+    if (await el.evaluate((e) => e.closest<HTMLElement>('.bp > div')?.hidden ?? false)) return null;
+    let last = '';
+    for (let i = 0; i < 12; i++) {
+      await el.evaluate((e) => { e.scrollIntoView({ block: 'center', behavior: 'instant' }); });
+      await el.page().waitForTimeout(150);
+      const b = await el.boundingBox();
+      const k = JSON.stringify(b);
+      if (b && k === last) return b;
+      last = k;
+    }
+    return await el.boundingBox();
+  } catch {
+    return null;
+  }
 }
 
-const still = (page: Page, id: string, s: Still): Promise<void> =>
-  page.evaluate(([i, x]) => { (window as unknown as { bimsLive: (id: string, s: Still) => void }).bimsLive(i, x); }, [id, s] as const);
+/** a shot of an island (scrolled to, its layout settled first); a failure is written down and the sheet goes on */
+async function shoot(el: Locator, file: string): Promise<boolean> {
+  try {
+    await el.screenshot({ path: join(out, file) });
+    return true;
+  } catch (e) {
+    errors.push(`${file}: ${e instanceof Error ? e.message.split('\n')[0] ?? '' : String(e)}`);
+    return false;
+  }
+}
+
+/** a live island held at a moment; a failure is written down and the sheet goes on */
+async function still(page: Page, id: string, s: Still): Promise<void> {
+  try {
+    await page.evaluate(([i, x]) => { (window as unknown as { bimsLive: (id: string, s: Still) => void }).bimsLive(i, x); }, [id, s] as const);
+  } catch (e) {
+    errors.push(`${id} ${JSON.stringify(s)}: ${e instanceof Error ? e.message.split('\n')[0] ?? '' : String(e)}`);
+  }
+}
 
 const browser = await chromium.launch({ args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const shots: { group: string; file: string; label: string }[] = [];
@@ -85,18 +112,21 @@ try {
   {
     const page = await open(browser, { width: 1440, played: true });
     for (const id of IDS) {
-      const clip = await boxOf(page, id);
-      if (!clip) { errors.push(`${id}: not placed at 1440`); continue; }
+      const el = islandOf(page, id);
+      if (!await bring(el)) { errors.push(`${id}: not placed at 1440`); continue; }
       for (const ms of ENTRY_MS) {
         await still(page, id, { entry: ms });
         const file = `entry-${id}-${String(ms)}.png`;
-        await page.screenshot({ path: join(out, file), clip });
+        await shoot(el, file);
         shots.push({ group: `entry · ${id}`, file, label: `${String(ms)} ms` });
       }
-      // the gag's first frame (the bim landed), then held
+      // the gag's first frame (the bim landed), then its held pose
       await still(page, id, { gag: 0 });
-      await page.screenshot({ path: join(out, `entry-${id}-gag.png`), clip });
+      await shoot(el, `entry-${id}-gag.png`);
       shots.push({ group: `entry · ${id}`, file: `entry-${id}-gag.png`, label: 'gag starts' });
+      await still(page, id, {});
+      await shoot(el, `held-${id}.png`);
+      shots.push({ group: 'held poses · 1440 light', file: `held-${id}.png`, label: id });
     }
     await page.context().close();
   }
@@ -104,15 +134,15 @@ try {
   for (const dark of [false, true]) {
     const page = await open(browser, { width: 1440, played: true, dark });
     for (const id of IDS) {
-      const clip = await boxOf(page, id);
-      if (!clip) continue;
+      const el = islandOf(page, id);
+      if (!await bring(el)) continue;
       const m = await page.evaluate((k) => {
-        const el = document.querySelectorAll<HTMLElement>('.bp > div')[k];
-        return el ? [el.offsetWidth * 0.8, el.offsetHeight * 0.25] as const : [0, 0] as const;
+        const e = document.querySelectorAll<HTMLElement>('.bp > div')[k];
+        return e ? [e.offsetWidth * 0.8, e.offsetHeight * 0.25] as const : [0, 0] as const;
       }, IDS.indexOf(id));
       await still(page, id, { move: PEAK[id], pointer: m });
       const file = `move-${id}-${dark ? 'dark' : 'light'}.png`;
-      await page.screenshot({ path: join(out, file), clip });
+      await shoot(el, file);
       shots.push({ group: `hover at its peak · ${dark ? 'dark' : 'light'}`, file, label: id });
     }
     await page.context().close();
@@ -121,11 +151,11 @@ try {
   {
     const page = await open(browser, { width: 390, played: true });
     for (const id of ['ways', 'why', 'fun', 'end']) {
-      const clip = await boxOf(page, id, { l: 8, t: 30, r: 8, b: 12 });
-      if (!clip) { errors.push(`${id}: not placed at 390`); continue; }
+      const el = islandOf(page, id);
+      if (!await bring(el)) { errors.push(`${id}: not placed at 390`); continue; }
       await page.waitForTimeout(400);
       const file = `phone-${id}.png`;
-      await page.screenshot({ path: join(out, file), clip: { ...clip, x: 0, width: 390 } });
+      await shoot(el, file);
       shots.push({ group: '390', file, label: id });
     }
     await page.context().close();
@@ -134,14 +164,15 @@ try {
   {
     const page = await open(browser, { width: 1440, reduced: true });
     for (const id of ['ways', 'faq']) {
-      const clip = await boxOf(page, id);
-      if (!clip) continue;
+      const el = islandOf(page, id);
+      const b = await bring(el);
+      if (!b) continue;
       await page.waitForTimeout(500);
-      await page.screenshot({ path: join(out, `reduced-${id}.png`), clip });
+      await shoot(el, `reduced-${id}.png`);
       shots.push({ group: 'reduced motion', file: `reduced-${id}.png`, label: `${id}, as it comes` });
-      await page.mouse.move(clip.x + clip.width - 30, clip.y + ROOM.t + 10);
+      await page.mouse.move(b.x + b.width - ROOM.r - 20, b.y + ROOM.t + 10);
       await page.waitForTimeout(600);
-      await page.screenshot({ path: join(out, `reduced-${id}-hover.png`), clip });
+      await shoot(el, `reduced-${id}-hover.png`);
       shots.push({ group: 'reduced motion', file: `reduced-${id}-hover.png`, label: `${id}, hovered: the head only` });
     }
     await page.context().close();
@@ -154,10 +185,10 @@ try {
     await page.goto(`${base}/?light`);
     await page.waitForFunction(() => document.querySelectorAll('.bp > div').length > 0, null, { timeout: 30_000 });
     for (const id of ['ways', 'arts']) {
-      const clip = await boxOf(page, id);
-      if (!clip) continue;
+      const el = islandOf(page, id, false);
+      if (!await bring(el)) continue;
       await page.waitForTimeout(800);
-      await page.screenshot({ path: join(out, `fallback-${id}.png`), clip });
+      await shoot(el, `fallback-${id}.png`);
       shots.push({ group: 'no WebGL: the sprites', file: `fallback-${id}.png`, label: id });
     }
     const canvases = await page.evaluate(() => document.querySelectorAll('.bp canvas').length);
@@ -173,14 +204,14 @@ try {
     };
     await page.waitForTimeout(1500);
     await take();
-    const clip = await boxOf(page, 'ways');
+    const clip = await bring(islandOf(page, 'ways'));
     await page.waitForTimeout(5200);
     if (clip) {
       await page.mouse.move(clip.x + clip.width * 0.7, clip.y + clip.height * 0.4, { steps: 8 });
       await page.waitForTimeout(2000);
       await page.mouse.move(10, clip.y + 10, { steps: 6 });
     }
-    const c2 = await boxOf(page, 'arts');
+    const c2 = await bring(islandOf(page, 'arts'));
     await page.waitForTimeout(5200);
     if (c2) {
       await page.mouse.move(c2.x + c2.width * 0.4, c2.y + c2.height * 0.5, { steps: 8 });

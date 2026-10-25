@@ -301,15 +301,13 @@ function fun(s: Island): Move {
   };
 }
 
-/** a skater's deck height over the floor (gags.ts) */
-const DECK = 0.17;
-
 // the hard parts (skate): a kickflip by the ramp, then it lands.
 function hard(s: Island): Move {
   const rest = restOf(s);
   const R = one(rest);
-  const crouch: Rig = { ...R, y: -0.12, body: [0.25, 0, 0], head: [-0.2, -0.5, 0], armL: [0, 0, -0.5], armR: [0, 0, 0.5] };
-  const up: Rig = { ...R, y: 0, body: [0, 0, 0], armL: [0, 0, -1.35], armR: [0, 0, 1.35], mouth: 'oh', head: [0.1, -0.3, 0] };
+  // its stance across the board (gags.ts SIDE): the knees bend, the body stays sideways, the head looks ahead
+  const crouch: Rig = { ...R, y: R.y - 0.11, legL: 1.0, legR: -0.6, body: [0.15, R.body[1], 0], head: [-0.15, 0.6, 0], armL: [0, 0, -0.9], armR: [0, 0, 0.9] };
+  const up: Rig = { ...R, legL: 0.8, legR: -0.5, armL: [0, 0, -1.35], armR: [0, 0, 1.35], mouth: 'oh', head: [0.15, 0.4, 0] };
   const top: Rig = { ...up, mouth: 'laugh', eyes: 0.3 };
   const landed: Rig = { ...crouch, mouth: 'laugh', eyes: 0.3 };
   const yes: Rig = { ...R, mouth: 'laugh', eyes: 0.3, armR: [0, 0, 2.4] };
@@ -325,8 +323,9 @@ function hard(s: Island): Move {
         const flip = env(u, 0.1, 0.85);
         r = {
           ...r,
-          lift: DECK + 0.5 * Math.sin(Math.PI * u),
-          board: { x: 0, y: 0.1 + 0.12 * Math.sin(Math.PI * u), z: 0, rot: [-0.3 * bump(u, 0, 0.3), 0, TAU * flip] },
+          lift: 0.5 * Math.sin(Math.PI * u),
+          // the kickflip: the board pops up to the feet's height and rolls once about its length
+          board: { x: 0, y: 0.08 + 0.1 * Math.sin(Math.PI * u), z: 0, rot: [-0.3 * bump(u, 0, 0.3), 0, TAU * flip] },
         };
       }
       if (k > B && k < 0.8) r = { ...r, squash: { k: 0.3 * bump(k, B, 0.8), at: 0 } };
@@ -368,8 +367,8 @@ function faq(s: Island): Move {
 function end(s: Island): Move {
   const rest = restOf(s);
   const A = one(rest, 0), B = one(rest, 1);
-  const a1: Rig = { ...A, ...spot(-0.2, 0.05), dir: facing(1, 0.6), armR: [0, 0, 2.7], armL: [0, 0, -0.3], mouth: 'smile' };
-  const b1: Rig = { ...B, ...spot(0.2, -0.05), dir: facing(-1, 0.6), armL: [0, 0, -2.7], armR: [0, 0, 0.3], mouth: 'smile' };
+  const a1: Rig = { ...A, ...spot(-0.27, 0.05), dir: facing(1, 0.6), armR: [0, 0, 2.7], armL: [0, 0, -0.3], mouth: 'smile' };
+  const b1: Rig = { ...B, ...spot(0.27, -0.05), dir: facing(-1, 0.6), armL: [0, 0, -2.7], armR: [0, 0, 0.3], mouth: 'smile' };
   const a2: Rig = { ...a1, body: [0, 0, -0.18], armR: [0, 0, 2.2], mouth: 'laugh', eyes: 0.3 };
   const b2: Rig = { ...b1, body: [0, 0, 0.18], armL: [0, 0, -2.2], mouth: 'laugh', eyes: 0.3 };
   const arm = (k: number): number => 2.5 - Math.sin(k * TAU) * 0.4;

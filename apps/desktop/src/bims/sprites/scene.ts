@@ -177,8 +177,10 @@ function makeZ(): Group {
 /** a sleep bubble: a see-through ball with a small z inside */
 function makeBubble(): Group {
   const g = new Group();
-  const p = partOf(g, OPTS);
-  p.pane(0.2, 0.2, 0.2, BUBBLE, 0.45, 0, 0, 0, 0.1);
+  const ball = new Mesh(STYLE.ball(0.1), STYLE.material(BUBBLE, { opacity: 0.45 }));
+  (ball.material).depthWrite = false;
+  ball.userData.noShadow = true;
+  g.add(ball);
   const z = makeZ();
   z.scale.setScalar(0.6);
   g.add(z);

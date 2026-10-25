@@ -40,7 +40,7 @@ const RISE = 1.6;
 /** an office's drop, css px */
 const DROP_PX = 16;
 /** a thing not in yet: drawn this small, so its shaders compile with the rest */
-const NOT_YET = 1e-4;
+export const NOT_YET = 1e-4;
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
@@ -75,11 +75,14 @@ export function tileStart(d: number, dmax: number): number {
   return ENTRY.tiles.from + ENTRY.tiles.span * (dmax > 0 ? Math.min(1, d / dmax) : 0);
 }
 
-/** a cube at ms: its scale (NOT_YET before it starts) and how far under its place it still is (town units). Pure. */
-export function tileAt(ms: number, start: number): { readonly s: number; readonly y: number } {
-  if (ms < start) return { s: NOT_YET, y: -RISE };
+/** how far below its place a cube starts, by its side (the town's RISE for its CELL): the home islands' smaller cubes rise as far for their size */
+export const riseFor = (side: number): number => (RISE * side) / CELL;
+
+/** a cube at ms: its scale (NOT_YET before it starts) and how far under its place it still is (town units, or `rise` for a smaller cube). Pure. */
+export function tileAt(ms: number, start: number, rise: number = RISE): { readonly s: number; readonly y: number } {
+  if (ms < start) return { s: NOT_YET, y: -rise };
   const p = clamp01((ms - start) / ENTRY.tiles.dur);
-  return { s: Math.max(NOT_YET, popOut(p)), y: p >= 1 ? 0 : -RISE * (1 - p) ** 3 };
+  return { s: Math.max(NOT_YET, popOut(p)), y: p >= 1 ? 0 : -rise * (1 - p) ** 3 };
 }
 
 /** a thing's scale at ms: not yet, popping in over `dur`, there. Pure. */

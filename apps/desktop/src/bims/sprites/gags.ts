@@ -231,18 +231,30 @@ function fun(): Island {
 // the hard parts, done right: on its skateboard by a tiny quarter pipe, one clean ollie.
 /** at the island's right, its front (and its curve's foot) to the left: its side shows the curve */
 export const RAMP = { kind: 'ramp', ...spot(0.62, -0.25), turn: facing(-1, 0) } as const;
-/** a rider's lift: its feet on the deck (bim.ts: the deck's top 0.17 over the floor) */
-const DECK = 0.17;
+/** a rider's feet on the deck (bim.ts: the deck's top 0.17 over the floor): its body that high, the board on the floor */
+export const DECK = 0.17;
+/**
+ * a skater stands across its board (render/skate.ts rigFrom's stance, mirrored so its front is
+ * toward you; Gabriel: « il devrait etre sur le coté »): the board along its way, the body turned
+ * this far from it, front foot by the front bolts, back foot on the tail
+ */
+export const SIDE = -1.25;
+/** the board under the feet, on its wheels (rigFrom's) */
+const BOARD = { x: 0, y: 0.08, z: 0, rot: [0, 0, 0] as Rot };
 function hard(): Island {
   const name = 'qa';
   const dir = facing(1, 0);
+  /** its head's turn from its sideways body: ahead along the board, or to you */
+  const AHEAD = 1.0;
+  const YOU = -Math.PI / 2 - SIDE;
   const ride = (u: number, o: Partial<Rig> = {}): Actor => bim(name, {
-    ...spot(u - 0.25, 0.3), dir, lift: DECK, armL: [0, 0, -0.75], armR: [0, 0, 0.75], head: [0, -0.5, 0], props: { ...NO_PROPS, skate: true }, ...o,
+    ...spot(u - 0.25, 0.3), dir, y: DECK - 0.04, body: [0, SIDE, 0], head: [0, AHEAD, 0], armL: [0, 0, -1.0], armR: [0, 0, 1.0],
+    legL: 0.5, legR: -0.3, board: BOARD, props: { ...NO_PROPS, skate: true }, ...o,
   });
   /** in the air `h` over the floor, the board kept under the feet, pitched `p` */
   const air = (u: number, h: number, p: number, o: Partial<Rig> = {}): Actor =>
-    ride(u, { lift: DECK + h, board: { x: 0, y: 0.08, z: 0, rot: [p, 0, 0] }, armL: [0, 0, -1.3], armR: [0, 0, 1.3], ...o });
-  const crouch: Partial<Rig> = { y: -0.12, body: [0.25, 0, 0], head: [-0.2, -0.4, 0] };
+    ride(u, { lift: h, board: { ...BOARD, rot: [p, 0, 0] }, armL: [0, 0, -1.35], armR: [0, 0, 1.35], legL: 0.8, legR: -0.5, ...o });
+  const crouch: Partial<Rig> = { y: DECK - 0.14, legL: 1.0, legR: -0.6, body: [0.15, SIDE, 0], head: [-0.15, AHEAD, 0] };
   const frames: Frame[] = [
     { bims: [ride(-0.4)] }, // 0 rolling in
     { bims: [ride(-0.27)] },
@@ -251,8 +263,8 @@ function hard(): Island {
     { bims: [air(0.09, 0.36, 0, { mouth: 'laugh', eyes: 0.3 })] }, // 4 its top, the board level
     { bims: [air(0.2, 0.18, 0.15, { mouth: 'laugh', eyes: 0.3 })] }, // 5 coming down
     { bims: [ride(0.3, { ...crouch, mouth: 'laugh', eyes: 0.3 })] }, // 6 landed, knees bent
-    { bims: [ride(0.36, { armR: [0, 0, 2.6], mouth: 'laugh', eyes: 0.3, head: [0, -0.8, 0] })] }, // 7 yes!
-    { bims: [ride(0.38, { armL: [0, 0, -0.3], armR: [0, 0, 0.3], head: [0, -0.9, 0.06] })] }, // 8 holds, turned to you
+    { bims: [ride(0.36, { armR: [0, 0, 2.6], mouth: 'laugh', eyes: 0.3, head: [0, YOU * 0.6, 0] })] }, // 7 yes!
+    { bims: [ride(0.38, { armL: [0, 0, -0.6], armR: [0, 0, 0.6], legL: 0.35, legR: -0.2, y: DECK - 0.03, head: [0, YOU, 0.06] })] }, // 8 holds, turned to you
   ];
   frames.push(shut(frames[8] as Frame)); // 9 its blink
   const seq = [0, 0, 1, 1, 2, 2, 2, 3, 4, 4, 5, 6, 6, 7, 7, 7, 7, 8];

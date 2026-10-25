@@ -171,8 +171,10 @@
             el.append(cv, fr);
             g.li = lives.add({ id: m.id, canvas: cv, w: m.w, h: m.h, under: m.under, pad: ROOM });
             const sh = el.querySelector('.sh > b');
-            g.li.onShadow((k) => { if (sh)
-                sh.style.opacity = String(k); });
+            g.li.onShadow((k) => { if (sh) {
+                sh.style.opacity = String(k);
+                sh.style.transform = k >= 1 ? '' : `scale(${String(0.35 + 0.65 * k)})`;
+            } });
             // a click on its bim hops it
             hit.addEventListener('pointerdown', () => g.li?.hop());
             return g;
