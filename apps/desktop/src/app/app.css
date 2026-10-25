@@ -546,6 +546,20 @@ body:has(.app-shell) {
   max-width: 100%;
   -webkit-app-region: no-drag;
 }
+/* the page's room in the bar (barslot.tsx): its search (200 × 28) and its action, 8 apart; the slot
+   drags, what a page puts there doesn't; empty, it takes no room */
+.app-barslot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.app-barslot:empty {
+  display: none;
+}
+.app-barslot > * {
+  -webkit-app-region: no-drag;
+}
 .app-crumb .last {
   color: var(--c-text);
   font-weight: 600;

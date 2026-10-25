@@ -23,6 +23,8 @@ import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
 import { BarTabs } from "./panel/BarTabs";
+import { BarSlot } from "./barslot";
+import { frameLeft, useLeft } from "./frame-state";
 import {
   keptWidth,
   PANEL,
@@ -132,7 +134,10 @@ export function useFrame(): FrameState {
   const route = useRoute();
   const rows = useProjects();
   const home = rows.find((p) => p.home)?.project;
-  const [hidden, setHidden] = useKeptFlag("frame.side.hidden");
+  // the sidebar's kept state: one store, read by the right side too (frame-state.ts)
+  const { hidden, width: sideW } = useLeft();
+  const setHidden = frameLeft.hide;
+  const setSideW = frameLeft.width;
   const [kept, setKept] = useKeptFlag("frame.panel");
   // what slid over, for the route and the width class it opened on (overOf, over.ts)
   const at_ = formatRoute(route);
@@ -144,16 +149,10 @@ export function useFrame(): FrameState {
     const next = f(over);
     setSlid(next === null ? null : { what: next, at: at_, width });
   };
-  const side = width !== "narrow" && hidden !== true;
+  const side = width !== "narrow" && !hidden;
   const project = panelProject(route, home, rows.filter((p) => !p.home).length);
   const row = rows.find((p) => p.project === project);
   const at = panelAt(WIDE_PX[width], kept);
-  const [sideW, setSideW] = useKeptWidth(
-    "frame.side.w",
-    SIDE.min,
-    SIDE.max,
-    SIDE.def,
-  );
   const [panelW, setPanelW] = useKeptWidth(
     "frame.panel.w",
     PANEL.min,
@@ -477,6 +476,8 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       <StatusSlot>
         <TitleStatus />
       </StatusSlot>
+      {/* the page's search and action (barslot.tsx: a page's <InBar>) */}
+      <BarSlot />
       {/* bise fait mac: the panel's tabs in the bar (nm-panel's mount point) */}
       <BarTabs />
       {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
