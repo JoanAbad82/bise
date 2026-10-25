@@ -28,7 +28,8 @@
 .sp-more { visibility: hidden; }
 .sp-more .b-ibtn { color: var(--c-text-3); }
 .sp-more .b-ibtn:hover { color: var(--c-text); }
-.sp-row:hover .sp-more, .sp-row:focus-visible .sp-more, .sp-row:focus-within .sp-more, .sp-row[data-menu] .sp-more { visibility: visible; }
+.sp-row:hover .sp-more, .sp-row:focus-visible .sp-more, .sp-more:focus-within, .sp-row[data-menu] .sp-more { visibility: visible; }
+.sp-row:active { cursor: grabbing; }
 .sp-list[data-drag] .sp-more { visibility: hidden; }
 .sp-menu-err .b-picker-row { color: var(--c-err); }
 .sp-add { display: block; margin: var(--s-3) 0 0 calc(-1 * var(--pad-control-x-sm)); }

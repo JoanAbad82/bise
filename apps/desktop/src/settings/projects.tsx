@@ -81,6 +81,8 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
     if (e.button !== 0 || renaming !== null || confirm !== null) return;
     // a press on the ⋯ or a field is theirs
     if ((e.target as HTMLElement).closest('button, input') !== null) return;
+    // a press never focuses the row: its ring and its ⋯ are the keyboard's only (designer m_41911)
+    e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     setDrag({ from: i, y0: e.clientY, dy: 0, to: i, on: false });
   };
@@ -126,7 +128,6 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
               data-drop={dropHere ? 'before' : dropEnd ? 'after' : undefined}
               data-menu={menu === p.project || undefined}
               style={lifted ? { transform: `translateY(${String(drag.dy)}px)` } : undefined}
-              {...tipAttrs(renaming === p.project || drag !== null ? undefined : settings.project_tip({ path: p.path }))}
               onPointerDown={down(i)}
               onPointerMove={moving}
               onPointerUp={up}
@@ -162,7 +163,9 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
               ) : (
                 <span className="sp-name">
                   <span className="sp-n">{p.name}</span>
-                  <span className={p.missing === true || (p.down != null && p.down !== '') ? 'sp-path err' : 'sp-path'} data-testid={`settings.project.${p.project}.path`}>
+                  {/* its tip: the whole folder, never cut (designer m_41911) */}
+                  <span className={p.missing === true || (p.down != null && p.down !== '') ? 'sp-path err' : 'sp-path'} data-testid={`settings.project.${p.project}.path`}
+                    {...tipAttrs(drag === null ? p.path : undefined)}>
                     {projectSub(p, home)}
                   </span>
                 </span>

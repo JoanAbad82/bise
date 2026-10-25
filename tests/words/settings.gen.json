@@ -3686,13 +3686,6 @@
     "one": null,
     "text": "rename"
   },
-  "settings.project_tip": {
-    "args": [
-      "path"
-    ],
-    "one": null,
-    "text": "{path} · drag to move it"
-  },
   "settings.project_up": {
     "args": [],
     "one": null,

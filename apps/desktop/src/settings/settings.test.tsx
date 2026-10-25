@@ -218,7 +218,7 @@ describe('Settings', () => {
     expect(row.querySelector('.sp-name .b-kbd')).toBeNull();
     // its folder said short, the whole one in the row's tip
     expect(screen.getByTestId('settings.project.acme-1a2b3c4d.path').textContent).toBe('~/acme');
-    expect(row.getAttribute('data-tip')).toContain('/Users/camille/acme');
+    expect(screen.getByTestId('settings.project.acme-1a2b3c4d.path').getAttribute('data-tip')).toBe('/Users/camille/acme');
   });
 
   it('projects: remove asks once; rename; add a found repo with land', () => {
