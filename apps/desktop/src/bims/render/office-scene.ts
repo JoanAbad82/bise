@@ -5,7 +5,7 @@
 // (render/index.ts) draws it through its view, the town places one per project. frame() poses it
 // for time t and says how the loop must run next (Motion); the caller renders. The sky's lamps and
 // snow cover come from its caller (weather(): sky.ts through render/index.ts or town.ts). Owner: bims-wire.
-import { Color, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, Vector3, type ColorRepresentation, type Object3D } from 'three';
+import { Color, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, Vector3, type ColorRepresentation, type Material, type Object3D } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, Motion, Office, Pt } from '../model';
 import { makeBim, nearAt, type Bim } from './bim';
@@ -110,6 +110,47 @@ export const APPEAR_S = 0.45;
 export const ARRIVE_S = 0.4;
 const ARRIVE_DROP = 1.2;
 const ARRIVE_SQUASH = 0.12;
+/** it fades in over the first part of its fall, so the eye catches the drop (designer m_41488) */
+const ARRIVE_FADE = 0.4;
+/** the garden lands this long after the wing when both come: two growths, not one jolt */
+const ARRIVE_STAGGER = 0.15;
+/** where it lands (arriveAt's): the dust puffs at its edges */
+const ARRIVE_LAND = 0.6;
+
+/**
+ * A group's meshes at this opacity: their own transparent copies of their materials while it fades
+ * (kit.mat shares one per colour: the room's would fade too), back to the shared ones at 1.
+ */
+function fadeIn(g: Object3D, kept: Map<Mesh, Material | Material[]>, opacity: number): void {
+  if (opacity >= 1) {
+    for (const [m, mat] of kept) {
+      const copies: Material[] = Array.isArray(m.material) ? m.material : [m.material];
+      for (const c of copies) c.dispose();
+      m.material = mat;
+    }
+    kept.clear();
+    return;
+  }
+  g.traverse((o) => {
+    if (!(o instanceof Mesh)) return;
+    const m = o as Mesh;
+    if (!kept.has(m)) {
+      const own: Material | Material[] = m.material;
+      kept.set(m, own);
+      m.material = Array.isArray(own) ? own.map((c) => c.clone()) : own.clone();
+    }
+    const mats: Material[] = Array.isArray(m.material) ? m.material : [m.material];
+    for (const c of mats) {
+      c.transparent = true;
+      c.opacity = opacity;
+    }
+  });
+}
+
+/** a new extension's opacity at p (0..1) of its arrival. Pure. */
+export function arriveFade(p: number): number {
+  return Math.max(0, Math.min(1, p / ARRIVE_FADE));
+}
 
 /** a new extension's height over its place and its height's scale at p (0..1) of its arrival: it falls, squashes, settles. Pure. */
 export function arriveAt(p: number): { y: number; sy: number } {
@@ -181,7 +222,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   const shownLast = new Set<string>();
   const appearing = new Map<string, number>();
   /** his sketch's extensions arriving (null: its first frame starts it), and the ones the office on screen had */
-  const arriving = new Map<'wing' | 'garden', number | null>();
+  const arriving = new Map<'wing' | 'garden', { t0: number | null; delay: number; landed: boolean; fades: Map<Mesh, Material | Material[]> }>();
   let extHad: { map: string; wing: boolean; garden: boolean } | null = null;
   let primed = false;
   // and a soft poof as it does (poof.ts, main m_38961): seen, never kitsch; none under reduced motion
@@ -515,8 +556,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       if (office && office.map !== o.map) dropBims();
       // a new extension on the same map (extensions.ts): it arrives like an object (frame: drop, squash, settle)
       if (extHad !== null && extHad.map === o.map) {
-        if (o.wing !== undefined && !extHad.wing) arriving.set('wing', null);
-        if (o.garden !== undefined && !extHad.garden) arriving.set('garden', null);
+        const wing = o.wing !== undefined && !extHad.wing;
+        if (wing) arriving.set('wing', { t0: null, delay: 0, landed: false, fades: new Map() });
+        if (o.garden !== undefined && !extHad.garden) arriving.set('garden', { t0: null, delay: wing ? ARRIVE_STAGGER : 0, landed: false, fades: new Map() });
       }
       extHad = { map: o.map, wing: o.wing !== undefined, garden: o.garden !== undefined };
       office = o;
@@ -605,13 +647,20 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       // a new extension arriving: it falls in, squashes, settles; reduced motion: there at once
-      for (const [kind, t0] of arriving) {
+      for (const [kind, ar] of arriving) {
         const g = world.ext.get(kind);
-        const p = look.reduced || g === undefined ? 1 : t0 === null ? 0 : (t - t0) / ARRIVE_S;
-        if (t0 === null && p < 1) arriving.set(kind, t);
+        if (ar.t0 === null) ar.t0 = t + ar.delay;
+        const p = look.reduced || g === undefined ? 1 : Math.max(0, (t - ar.t0) / ARRIVE_S);
         const a = arriveAt(p);
         g?.position.setY(a.y);
         g?.scale.setY(a.sy);
+        if (g !== undefined) fadeIn(g, ar.fades, p >= 1 ? 1 : arriveFade(p));
+        // at the landing, a puff of dust at its slab's front corners (the bims' poof), then nothing
+        const box = kind === 'wing' ? office.wing : office.garden;
+        if (!ar.landed && p >= ARRIVE_LAND && p < 1 && box !== undefined) {
+          ar.landed = true;
+          for (const [x, z] of [[box.x0, box.z1], [box.x1, box.z1], [box.x1, box.z0], [(box.x0 + box.x1) / 2, box.z1]] as const) poofList.push({ x, y: 0, z, t0: t, seed: hash(`${kind}${String(x)}`) });
+        }
         if (p >= 1) arriving.delete(kind);
         else motion = 'walk';
       }
