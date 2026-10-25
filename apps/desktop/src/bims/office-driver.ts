@@ -15,7 +15,7 @@ import { MAX_WALK_S, SETTLE_S } from './timeline';
 import type { MapId } from './maps/ids';
 import { skyAt, skyOf, type Sky, type Weather } from './sky';
 import { forcedPokes, notePokes, NO_POKES, pokesAt, pokeWake, roomOf, type Click, type PokeLog } from './pokes';
-import type { PluginObject } from './plugin-objects';
+import { uniqueObjects, type PluginObject } from './plugin-objects';
 import { NO_CORNERS, objectSpots, type Corners } from './corners';
 import { GROWS, NO_NEED, either, grownFor, type Need } from './extensions';
 
@@ -85,7 +85,7 @@ export interface OfficeDriver {
   grow(g: Grow, t: number): void;
   /** hub/activity: a plane, a visit, a report */
   event(e: BimEvent): void;
-  /** his plugins' objects (plugin-objects.ts officeObjects): the next step places them (corners.ts); no desk moves for them */
+  /** his plugins' objects (plugin-objects.ts officeObjects): each at most once (uniqueObjects), the next step places them (corners.ts); no desk moves for them */
   objects(list: readonly PluginObject[]): void;
   /** the extensions this map already had (Office.tsx's kept mark): they come back, and never go */
   seedNeed(map: MapId, kept: Need): void;
@@ -170,7 +170,8 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       fresh = true;
     },
     objects(list) {
-      objs = list;
+      // each object at most once in an office (plugin-objects.ts uniqueObjects, Gabriel m_42685)
+      objs = uniqueObjects(list);
       // a map that grows like his sketch may need an extension for them (extensions.ts)
       if (map !== null && GROWS.has(map)) {
         regrow = true;

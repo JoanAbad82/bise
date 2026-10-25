@@ -12,7 +12,8 @@
 // walk never crosses an object, and the desks never move for one (the plan lays them without the
 // objects). When the office changes (an agent comes, a new size), an object keeps its spot while
 // it is still free, else slides to the nearest free one of its corner; one with no room takes its
-// compact one (COMPACT), and only then waits in `left` (p5's growth makes room).
+// compact one (COMPACT), and only then waits in `left` (p5's growth makes room). A compact swap
+// that is another of his objects is never taken: each object stands once (Gabriel m_42685).
 // objectSpots is the one seam p4's per-map corners plug into: the signature stays.
 // Pure, no three. Owner: bims-life.
 import type { Box, Office, Prop, Pt } from './model';
@@ -377,7 +378,12 @@ interface Ctx {
   readonly grids: Map<Corner, readonly Pt[]>;
   readonly zoned: Map<Corner, readonly Pt[]>;
   readonly seeds: Map<Corner, readonly Box[]>;
+  /** the objects his plugins bring: a compact swap that is one of them is never taken (each object once, Gabriel m_42685) */
+  readonly have: ReadonlySet<ObjId>;
 }
+
+/** a size of `p`'s that draws another object already in the office: never taken */
+const swapTaken = (c: Ctx, p: PluginObject, obj: ObjId): boolean => obj !== p.obj && c.have.has(obj);
 
 function gridOf(c: Ctx, corner: Corner): readonly Pt[] {
   const had = c.grids.get(corner);
@@ -561,7 +567,7 @@ function orderOf(objs: readonly PluginObject[], garden: boolean): PluginObject[]
  */
 export function objectSpots(o: Office, objs: readonly PluginObject[], prev: readonly Placed[] = []): Corners {
   if (objs.length === 0) return NO_CORNERS;
-  const c: Ctx = { o, keep: keepOf(o), spans: wallSpans(o), grids: new Map(), zoned: new Map(), seeds: new Map() };
+  const c: Ctx = { o, keep: keepOf(o), spans: wallSpans(o), grids: new Map(), zoned: new Map(), seeds: new Map(), have: new Set(objs.map((p) => p.obj)) };
   const was = new Map(prev.map((p) => [p.key, p]));
   const placed: Placed[] = [];
   const left: PluginObject[] = [];
@@ -603,7 +609,7 @@ function placedOf(p: PluginObject, obj: ObjId, size: Size, foot: FootOf, corner:
 /** its spot of before, while it is still free and the same object; null: it moves */
 function kept(c: Ctx, p: PluginObject, before: Placed, taken: readonly Placed[]): Placed | null {
   const { obj, foot } = footOf(p.obj, sizeOf(before));
-  if (before.obj !== obj || before.of !== p.obj) return null;
+  if (before.obj !== obj || before.of !== p.obj || swapTaken(c, p, obj)) return null;
   return free(c, before.box, before.corner, areaOf(c.o, before.corner), taken, foot.h) ? placedOf(p, obj, sizeOf(before), foot, before.corner, before) : null;
 }
 
@@ -621,6 +627,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
   for (const [size, against] of modes) {
     if (size === 1 && COMPACT[p.obj] === undefined && !(FEET[p.obj].w * FEET[p.obj].d > 1)) continue;
     const { obj, foot } = footOf(p.obj, size);
+    if (swapTaken(c, p, obj)) continue;
     // a swap may stand in its own corner too (a yard's terrace with no room for the ping-pong: its babyfoot by the nap place)
     const own = size > 0 && obj !== p.obj ? CORNER[obj] : undefined;
     for (const corner of own === undefined || corners.includes(own) ? corners : [...corners, own]) {

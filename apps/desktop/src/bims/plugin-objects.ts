@@ -5,7 +5,9 @@
 // writer, next to bims.map and bims.grow; an object so p4's spot joins it without a shape change).
 // Its look comes from the plugins event's typed fields only, never a status text: loaded = the
 // object, disabled = glass, invalid or a failed server = lit with the '✗' pill, a login he
-// owes = the '?' pill; a shadowed row brings nothing (the plugin that wins it does).
+// owes = the '?' pill; a shadowed row brings nothing (the plugin that wins it does). In the office
+// each object stands once (uniqueObjects, Gabriel m_42685, bims-plugins m_42693): a plugin whose
+// object is taken gets its kin, or none; the plugins page's room keeps one per plugin.
 // Pure, no React, no three: the office driver and settings › plugins read it. Owner: bims-link.
 import type { JsonValue, Plugin } from '@/proto';
 import { isObjId, type ObjId } from './render/objects/ids';
@@ -184,6 +186,64 @@ export function objectOf(row: PluginRow, picks: Picks): PluginObject | null {
     pill: broken ? '✗' : owesLogin(row) ? '?' : null,
     picked: pick !== undefined,
   };
+}
+
+/**
+ * What may stand at most once in an office (bims-plugins m_42693): the object, and for a plant its
+ * pot (a plant per kind: makeObject's n, 1 to 3, anything else the teal one).
+ */
+export function unitOf(o: { readonly obj: ObjId; readonly n?: number }): string {
+  if (o.obj !== 'plant') return o.obj;
+  const pot = o.n === 1 || o.n === 2 || o.n === 3 ? o.n : 0;
+  return `plant:${String(pot)}`;
+}
+
+/**
+ * A taken object's kin, in order (bims-plugins m_42693): the same job at a glance, in the same
+ * corner of corners.ts (so it stands where its own would). An object with none: the plugin that
+ * loses it is not drawn.
+ */
+const KIN: Partial<Record<ObjId, readonly ObjId[]>> = {
+  printer: ['press'],
+  charts: ['dashboard'],
+  dashboard: ['charts'],
+  library: ['shelf'],
+  shelf: ['library'],
+  rack: ['crt'],
+  booth: ['rotary'],
+  visio: ['crt'],
+};
+
+/** who keeps a contested object (bims-plugins m_42693): his pick, then a pill (it asks him something), then lit, then glass */
+const rankOf = (o: PluginObject): number => (o.picked ? 0 : o.pill !== null ? 1 : !o.glass ? 2 : 3);
+const byKey = (a: PluginObject, b: PluginObject): number => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+/**
+ * The office's objects, each at most once (Gabriel m_42685: three printers clutter it; not every
+ * plugin needs one). Each plugin keeps its own object while no one before it (rankOf, then the
+ * key) has it; the ones that lost it then take their object's first free kin (its own look, no
+ * count), else they are not drawn. A plant is one per pot (unitOf). By key, like officeObjects. Pure.
+ */
+export function uniqueObjects(objs: readonly PluginObject[]): readonly PluginObject[] {
+  const taken = new Set<string>();
+  const out: PluginObject[] = [];
+  const lost: PluginObject[] = [];
+  for (const o of [...objs].sort((a, b) => rankOf(a) - rankOf(b) || byKey(a, b))) {
+    const u = unitOf(o);
+    if (taken.has(u)) lost.push(o);
+    else {
+      taken.add(u);
+      out.push(o);
+    }
+  }
+  // a kin only once every plugin had its own: a dashboard plugin keeps the dashboard a third charts one would take
+  for (const o of lost) {
+    const kin = (KIN[o.obj] ?? []).find((k) => !taken.has(k));
+    if (kin === undefined) continue;
+    taken.add(kin);
+    out.push({ key: o.key, obj: kin, glass: o.glass, pill: o.pill, picked: o.picked });
+  }
+  return out.sort(byKey);
 }
 
 /** Every plugin's object, in a stable order (by key), one per key (the first row wins). */

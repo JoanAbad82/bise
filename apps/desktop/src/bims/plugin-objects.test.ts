@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Plugin, PluginState } from '@/proto';
-import { defaultObject, kindOf, objectOf, objectsPrefKey, officeObjects, picksOf, pluginKey, withPick, type PluginRow } from './plugin-objects';
+import { defaultObject, kindOf, objectOf, objectsPrefKey, officeObjects, picksOf, pluginKey, uniqueObjects, unitOf, withPick, type PluginObject, type PluginRow } from './plugin-objects';
+import type { ObjId } from './render/objects/ids';
 
 const NONE = new Map();
 // main's row: no id, no kind (a real plugin's id is its bare name)
@@ -151,5 +152,42 @@ describe('officeObjects', () => {
     const rows = [mainRow('slides'), mainRow('docs'), mainRow('docs', 'disabled'), mainRow('x', 'shadowed')];
     expect(officeObjects(rows, NONE).map((o) => [o.key, o.glass])).toEqual([['docs', false], ['slides', false]]);
     expect(officeObjects(null, NONE)).toEqual([]);
+  });
+});
+
+describe('uniqueObjects: each object once in an office (bims-plugins m_42693)', () => {
+  const o = (key: string, obj: ObjId, more: Partial<PluginObject> = {}): PluginObject => ({ key, obj, glass: false, pill: null, picked: false, ...more });
+  const pairs = (objs: readonly PluginObject[]) => objs.map((x) => [x.key, x.obj]);
+
+  it('three printers: one keeps it, one takes the press, the third is not drawn', () => {
+    const out = uniqueObjects([o('slides', 'printer', { n: 3 }), o('docs', 'printer', { n: 1 }), o('sheets', 'printer', { n: 2 })]);
+    expect(pairs(out)).toEqual([['docs', 'printer'], ['sheets', 'press']]);
+    // a replacement has its own look: no count
+    expect(out[1]?.n).toBeUndefined();
+  });
+
+  it('his pick, then a pill, then lit, then glass keeps a contested object', () => {
+    expect(pairs(uniqueObjects([o('a', 'chess', { glass: true }), o('b', 'chess')]))).toEqual([['b', 'chess']]);
+    expect(pairs(uniqueObjects([o('a', 'chess'), o('b', 'chess', { pill: '?' })]))).toEqual([['b', 'chess']]);
+    expect(pairs(uniqueObjects([o('a', 'chess', { pill: '✗' }), o('b', 'chess', { picked: true })]))).toEqual([['b', 'chess']]);
+    // the winner keeps its pill
+    expect(uniqueObjects([o('a', 'printer', { pill: '✗' }), o('b', 'printer')]).map((x) => [x.key, x.obj, x.pill])).toEqual([['a', 'printer', '✗'], ['b', 'press', null]]);
+  });
+
+  it('a plugin keeps its own object before another takes it as a kin', () => {
+    // a dashboard plugin (datadog) keeps the dashboard a second charts one would take
+    expect(pairs(uniqueObjects([o('a', 'charts'), o('b', 'charts'), o('z', 'dashboard')]))).toEqual([['a', 'charts'], ['z', 'dashboard']]);
+  });
+
+  it('a plant once per pot', () => {
+    const out = uniqueObjects([o('a', 'plant', { n: 0 }), o('b', 'plant', { n: 0 }), o('c', 'plant', { n: 1 }), o('d', 'plant')]);
+    expect(pairs(out)).toEqual([['a', 'plant'], ['c', 'plant']]);
+    expect(unitOf({ obj: 'plant' })).toBe('plant:0');
+    expect(unitOf({ obj: 'printer', n: 2 })).toBe('printer');
+  });
+
+  it('nothing shared: the same objects', () => {
+    const objs = [o('a', 'chess'), o('b', 'piano')];
+    expect(uniqueObjects(objs)).toEqual(objs);
   });
 });
