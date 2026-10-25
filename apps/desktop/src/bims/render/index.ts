@@ -15,7 +15,7 @@
 import { Vector3 } from 'three';
 import type { BimFrame, Look, MakeRenderer, Motion, OfficeRenderer } from '../model';
 import { FIT, type Cam } from '../zoom';
-import { type Fit, fitSite, groundOf, siteOf, toScreen, viewFit, wideSiteOf } from './camera';
+import { type Fit, fitSite, groundAllOf, siteOf, toScreen, viewFit, wideSiteOf } from './camera';
 import { NO_GROW } from '../growth';
 import { pickAt, type Target } from './pick';
 import type { Rig } from './pose';
@@ -293,7 +293,7 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
         for (const z of [-HULL_PAD, o.D + HULL_PAD])
           for (const y of [-0.2, HULL_H]) pts.push(toScreen(fit, { x, y, z }));
       // where it falls: over the cube only (bims m_34321), its top's outline raised by the room's height
-      const g = groundOf(o, lastLook.grow ?? NO_GROW);
+      const g = groundAllOf(o, lastLook.grow ?? NO_GROW);
       const cube: { x: number; y: number }[] = [];
       for (const x of [g.x0, g.x1]) for (const z of [g.z0, g.z1]) for (const y of [0, HULL_H]) cube.push(toScreen(fit, { x, y, z }));
       return { rain: s.rain, snow: s.snow, hull: hullOf(pts), cube: hullOf(cube) };

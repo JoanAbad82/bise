@@ -3,7 +3,7 @@
 // whole site (the floating grass block, the office on it, its trees) shows, never cropped. index.ts
 // copies a Fit onto three's OrthographicCamera; headOf and pick use toScreen, the same numbers.
 // His pinch and pan (zoom.ts Cam) are a view inside the fit (viewFit), the canvas's size unchanged.
-import type { Office } from '../model';
+import type { Box, Office } from '../model';
 import type { Cam } from '../zoom';
 import { WIDE_GARDEN, groundMargin } from '../growth';
 
@@ -37,16 +37,45 @@ export const SHADOW_BLUR = 0.55;
 /** the building's site: what the camera fits at 320 (the garden past it is cropped, a soft fade); its low end takes the cube's shadow in */
 export function siteOf(o: Office): Site {
   // his sketch's extensions (extensions.ts) are the building's too: the wing past its right side, the garden past the terrace
-  const x1 = Math.max(o.x0 + o.W, o.wing?.x1 ?? -Infinity, o.garden?.x1 ?? -Infinity);
-  const z1 = Math.max(o.D + 4.8, (o.garden?.z1 ?? -Infinity) + 0.6);
-  return { x0: o.x0 - 1.2, x1: x1 + 1.2, z0: -1.5, z1, yLow: SLAB_LOW - SHADOW_DROP, yHigh: o.height ?? 2.5 };
+  const s = squareSiteOf(o);
+  const x1 = Math.max(s.x1, (o.wing?.x1 ?? -Infinity) + EXT_PAD, (o.garden?.x1 ?? -Infinity) + EXT_PAD);
+  const z1 = Math.max(s.z1, (o.garden?.z1 ?? -Infinity) + EXT_PAD);
+  return { ...s, x1, z1 };
 }
 
-/** The whole ground for this growth: the grass block world.ts builds (growth.ts groundMargin). */
+/** the square's site alone: its building, the terrace in front */
+function squareSiteOf(o: Office): Site {
+  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: SLAB_LOW - SHADOW_DROP, yHigh: o.height ?? 2.5 };
+}
+
+/** how far an extension's slab reaches past its floor or garden */
+export const EXT_PAD = 0.6;
+
+/** The whole ground for this growth: the square's grass block world.ts builds (growth.ts groundMargin); his sketch's extensions add their own slabs (extSlabsOf). */
 export function groundOf(o: Office, g: { readonly stage: number; readonly garden: number }): Site {
-  const s = siteOf(o);
+  const s = squareSiteOf(o);
   const m = groundMargin(g);
   return { x0: s.x0 - m, x1: s.x1 + m, z0: s.z0 - m / 2, z1: s.z1 + m / 2, yLow: s.yLow, yHigh: g.stage >= 13 ? Math.max(3.0, s.yHigh) : s.yHigh };
+}
+
+/**
+ * His sketch's extensions' own slabs (extensions.ts), off the square's ground block: the wing's
+ * past its right side from its back, the garden's past its front from its left. The outline is
+ * his sketch's: a square and its offset extensions, never one wider block.
+ */
+export function extSlabsOf(o: Office, g: { readonly stage: number; readonly garden: number }): Box[] {
+  const G = groundOf(o, g);
+  const out: Box[] = [];
+  if (o.wing !== undefined && o.wing.x1 + EXT_PAD > G.x1) out.push({ x0: G.x1, x1: o.wing.x1 + EXT_PAD, z0: G.z0, z1: Math.max(G.z0 + 1, o.wing.z1 + EXT_PAD) });
+  if (o.garden !== undefined && o.garden.z1 + EXT_PAD > G.z1) out.push({ x0: G.x0, x1: Math.max(G.x0 + 1, o.garden.x1 + EXT_PAD), z0: G.z1, z1: o.garden.z1 + EXT_PAD });
+  return out;
+}
+
+/** the ground and its extensions' slabs together (the weather's cube, the town's lot) */
+export function groundAllOf(o: Office, g: { readonly stage: number; readonly garden: number }): Site {
+  const G = groundOf(o, g);
+  const xs = extSlabsOf(o, g);
+  return { ...G, x0: Math.min(G.x0, ...xs.map((b) => b.x0)), x1: Math.max(G.x1, ...xs.map((b) => b.x1)), z0: Math.min(G.z0, ...xs.map((b) => b.z0)), z1: Math.max(G.z1, ...xs.map((b) => b.z1)) };
 }
 
 /**

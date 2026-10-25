@@ -31,7 +31,7 @@ import type { Office } from '../model';
 import { NO_GROW, type Grow } from '../growth';
 import { POOL, SIDE_MIN } from '../sky';
 import { buildExtensions } from './extensions';
-import { SHADOW_BLUR, SHADOW_DROP, SLAB_LOW, groundOf } from './camera';
+import { SHADOW_BLUR, SHADOW_DROP, SLAB_LOW, extSlabsOf, groundOf } from './camera';
 import { slabWithPits } from './ground';
 import { kitOf } from './kit';
 import { buildCozy } from './cozy';
@@ -169,6 +169,15 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   if (ground) {
     k.add(slabWithPits(style, gw, 1.2, gd, 0.45, gx, gz, pits), dirt, root, gx, SLAB_LOW + 0.6, gz);
     k.add(slabWithPits(style, gw, 0.16, gd, 0, gx, gz, pits), k.mat(pal.grass), root, gx, -0.1, gz);
+    // his sketch's extensions' own slabs (camera.ts extSlabsOf): the outline stays a square and its offset steps
+    for (const e of extSlabsOf(o, grow)) {
+      const ew = e.x1 - e.x0;
+      const ed = e.z1 - e.z0;
+      const ex = (e.x0 + e.x1) / 2;
+      const ez = (e.z0 + e.z1) / 2;
+      k.add(slabWithPits(style, ew, 1.2, ed, 0.45, ex, ez, []), dirt, root, ex, SLAB_LOW + 0.6, ez);
+      k.add(slabWithPits(style, ew, 0.16, ed, 0, ex, ez, []), k.mat(pal.grass), root, ex, -0.1, ez);
+    }
     // the night's warm pools over main's desk, the island, the lounge and one desk: the lamps' (kit.light)
     for (const p of poolsOf(o)) {
       const l = k.light(new PointLight(POOL.color, p.i, POOL.distance, POOL.decay));
