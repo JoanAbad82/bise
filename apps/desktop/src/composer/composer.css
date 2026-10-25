@@ -44,6 +44,11 @@
   pointer-events: none;
   user-select: none;
 }
+/* folded at rest (ds/css/composer.css), the field's line is centred on the send's row: the placeholder
+   sits on that line, not 3 px under it (his bug m_43032) */
+.b-composer.fold:not(:focus-within) .b-field-ph {
+  top: 0;
+}
 .b-composer .b-field-ph .ph-head,
 .b-composer .b-field-ph .ph-tail {
   flex: none;

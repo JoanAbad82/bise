@@ -25,9 +25,11 @@
 .b-composer .in{flex:1;font:var(--t-15)/1.45 var(--font-read)}
 .b-composer .in .ph{color:var(--c-text-3)}
 .b-composer .in .cur{display:inline-block;width:2px;height:1.1em;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
-/* folded off the thread, at rest (ui-review-app #1, designer m_41569): one line, back whole at its focus */
-.b-composer.fold:not(:focus-within) .tab,.b-composer.fold:not(:focus-within) .box .row,.b-composer.fold:not(:focus-within) .keys{display:none}
-.b-composer.fold:not(:focus-within) .box{padding-block:var(--s-3)}
+/* folded off the thread, at rest (ui-review-app #1, designer m_41569): one line, back whole at its focus;
+   that line keeps its round send at the right, the field and the send centred on one row, 8 px around the send (his bug m_43032) */
+.b-composer.fold:not(:focus-within) .tab,.b-composer.fold:not(:focus-within) .box .row>:not(.send),.b-composer.fold:not(:focus-within) .keys{display:none}
+.b-composer.fold:not(:focus-within) .box{flex-direction:row;align-items:center;padding-block:var(--s-2);padding-right:var(--s-2)}
+.b-composer.fold:not(:focus-within) .box .line{flex:1;align-items:center}
 .b-composer .keys{font:var(--t-11) var(--font-mono);color:var(--c-text-3);padding:var(--s-2) var(--s-1) 0;white-space:pre}
 .b-composer .send{width:var(--h-control);height:var(--h-control);border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-13);flex:none}
 .b-composer .send.off{background:var(--c-active);color:var(--c-text-3)}
