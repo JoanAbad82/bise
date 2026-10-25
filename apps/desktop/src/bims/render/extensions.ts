@@ -1,0 +1,53 @@
+// His sketch's extensions as drawn (extensions.ts, bims-plugins p5): the wing is the office going on,
+// open to it (its floor, its back wall at the square's height, a window), the garden a lawn in front
+// of the terrace (a hedge along its front, a tree in its far corner, stepping stones on its path from
+// the door). The generic look, every growing map's until its own (a map's style comes as data in its
+// look later). Owner: bims-life.
+import type { Box } from '../model';
+import type { Build } from './maps/look';
+
+/** the wing's back wall: the square's (the loft's 1.7) */
+const WALL_H = 1.7;
+const HEDGE = '#4f9e45';
+const TRUNK = '#8a5a3a';
+const LEAF = '#5fb35a';
+const STONE = '#e9dcc4';
+
+/** a stepping stone every this far along a path, and its size */
+const STONE_STEP = 0.7;
+
+/** The wing and the garden of a grown office (nothing on a square one). */
+export function buildExtensions(b: Build): void {
+  const { k, root, o } = b;
+  const { style, pal } = k;
+  if (o.wing !== undefined) {
+    const w = o.wing;
+    const ww = w.x1 - w.x0;
+    const wd = w.z1 - w.z0;
+    // the floor goes on from the square's (a hair under it where they meet: no seam to fight)
+    const floor = k.add(style.box(ww, 0.14, wd), style.floor(pal.floor, ww, wd), root, (w.x0 + w.x1) / 2, -0.051, (w.z0 + w.z1) / 2);
+    floor.receiveShadow = true;
+    k.add(style.box(ww + 0.1, WALL_H, 0.2), k.mat(pal.wall), root, (w.x0 + w.x1) / 2 + 0.05, WALL_H / 2, -0.1);
+    // a window in the middle of its back wall
+    k.add(style.box(Math.min(1.4, ww / 3), 0.8, 0.04), k.glow(pal.window, { night: 0.4 }), root, (w.x0 + w.x1) / 2, 1.05, 0.02);
+  }
+  if (o.garden !== undefined) {
+    const g = o.garden;
+    const gw = g.x1 - g.x0;
+    // a low hedge along its front, a tree in its far corner
+    k.add(style.box(gw - 0.6, 0.45, 0.4, 0.15), k.mat(HEDGE), root, (g.x0 + g.x1) / 2, 0.22, g.z1 - 0.4);
+    k.add(style.box(0.2, 1.0, 0.2, 0.05), k.mat(TRUNK), root, g.x0 + 0.7, 0.5, g.z1 - 1.1);
+    k.add(style.ball(0.6), k.mat(LEAF), root, g.x0 + 0.7, 1.45, g.z1 - 1.1);
+    // the stone path: from the door, the walks the office added for it (extensions.ts gardenLegs)
+    for (const s of pathStones(o.door, g)) k.add(style.box(0.46, 0.05, 0.36, 0.06), k.mat(STONE), root, s.x, 0.0, s.z);
+  }
+}
+
+/** where the path's stones lie: down from the door to the garden, then along its back. Pure. */
+export function pathStones(door: { readonly x: number; readonly z: number }, g: Box): { x: number; z: number }[] {
+  const out: { x: number; z: number }[] = [];
+  const z = g.z0 + 0.6;
+  for (let at = door.z + 0.9; at <= z; at += STONE_STEP) out.push({ x: door.x + (out.length % 2 ? 0.08 : -0.08), z: at });
+  for (let x = door.x - STONE_STEP; x >= g.x0 + 1.0; x -= STONE_STEP) out.push({ x, z: z + (out.length % 2 ? 0.08 : -0.08) });
+  return out;
+}

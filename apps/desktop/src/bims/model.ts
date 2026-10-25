@@ -211,6 +211,14 @@ export interface Office {
   readonly gym?: Gym;
   /** how high its building stands past the common 2.5 (the gym's hall): the camera's fit takes it in (render/camera.ts siteOf); absent: 2.5 */
   readonly height?: number;
+  /**
+   * His sketch's extensions (extensions.ts, bims-plugins p5), when his plugins' objects ran out of
+   * room: `wing` the office going on past its right side, open to it, aligned on the back wall
+   * (office floor, bims walk there, no desk); `garden` a garden in front of the terrace, aligned
+   * on the left, a stone path to it from the door. Absent: the square alone.
+   */
+  readonly wing?: Box;
+  readonly garden?: Box;
   /** its cozy pieces (cozy.ts placeCozy, maps/index.ts layoutOf): the coffee corner's spot is on `walks`; absent: a bare room */
   readonly cozy?: Cozy;
   /** where it hangs night lamps past the common pools (the workshop's pods): render/world.ts poolsOf lights them, within the town's cap there; absent: none */

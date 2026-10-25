@@ -36,7 +36,10 @@ export const SHADOW_BLUR = 0.55;
 
 /** the building's site: what the camera fits at 320 (the garden past it is cropped, a soft fade); its low end takes the cube's shadow in */
 export function siteOf(o: Office): Site {
-  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: SLAB_LOW - SHADOW_DROP, yHigh: o.height ?? 2.5 };
+  // his sketch's extensions (extensions.ts) are the building's too: the wing past its right side, the garden past the terrace
+  const x1 = Math.max(o.x0 + o.W, o.wing?.x1 ?? -Infinity, o.garden?.x1 ?? -Infinity);
+  const z1 = Math.max(o.D + 4.8, (o.garden?.z1 ?? -Infinity) + 0.6);
+  return { x0: o.x0 - 1.2, x1: x1 + 1.2, z0: -1.5, z1, yLow: SLAB_LOW - SHADOW_DROP, yHigh: o.height ?? 2.5 };
 }
 
 /** The whole ground for this growth: the grass block world.ts builds (growth.ts groundMargin). */

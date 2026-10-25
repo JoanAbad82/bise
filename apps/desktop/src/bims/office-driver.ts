@@ -7,7 +7,7 @@
 // the caller hands it the clock (t, his local time, night, reduced motion) and the forced eggs of
 // a check; the look carries his local time's sky (sky.ts skyAt; none for the hero's film). Owner: bims-wire.
 import type { Agent } from '@/proto';
-import type { BimEvent, BimFrame, Label, Look, NewTimelineFn, ActivitiesFn, LabelsFn, LayoutFn, Office, Snapshot, Timeline } from './model';
+import type { BimEvent, BimFrame, Box, Label, Look, NewTimelineFn, ActivitiesFn, LabelsFn, LayoutFn, Office, Snapshot, Timeline } from './model';
 import { clockSig, eggLabels, eggsAt, NO_EGGS, noteLands, withForced, type Forced, type Land, type Local } from './eggs';
 import { builtAt, NO_GROW, UNLOCK_LABEL, UNLOCK_WALK, unlockOf, type Grow } from './growth';
 import { dayOf } from './skate';
@@ -17,6 +17,7 @@ import { skyAt, skyOf, type Sky, type Weather } from './sky';
 import { forcedPokes, notePokes, NO_POKES, pokesAt, pokeWake, roomOf, type Click, type PokeLog } from './pokes';
 import type { PluginObject } from './plugin-objects';
 import { NO_CORNERS, objectSpots, type Corners } from './corners';
+import { GROWS, NO_NEED, grownFor, type Need } from './extensions';
 
 /** The pure modules a driver runs on: feed.ts's, or fakes in a test. */
 export interface DriverParts {
@@ -138,6 +139,11 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
   let objs: readonly PluginObject[] = [];
   let corners: Corners = NO_CORNERS;
   let placedIn: { office: Office; objs: readonly PluginObject[] } | null = null;
+  /** the office as its plan lays it (before his sketch's extensions), the extensions come (never go: a high-water mark per map), and his objects changed since */
+  let laid: Office | null = null;
+  let need: Need = NO_NEED;
+  let needMap: MapId | null = null;
+  let regrow = false;
 
   return {
     rows(s, as, m) {
@@ -161,6 +167,11 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
     },
     objects(list) {
       objs = list;
+      // a map that grows like his sketch may need an extension for them (extensions.ts)
+      if (map !== null && GROWS.has(map)) {
+        regrow = true;
+        fresh = true;
+      }
     },
     konami(t) {
       konamiAt = t;
@@ -197,11 +208,20 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       if (fresh) {
         fresh = false;
         const key = officeKey(agents, map);
-        if (office === null || key !== shape) {
+        if (office === null || laid === null || key !== shape) {
           shape = key;
-          office = parts.layoutOf(agents, map);
+          laid = parts.layoutOf(agents, map);
+          office = grown(laid);
           reshaped = true;
+        } else if (regrow) {
+          // his objects changed: the office grows when they need it (a new wing or garden is a new office)
+          const next = grown(laid);
+          if (next.wing !== office.wing || next.garden !== office.garden) {
+            office = next;
+            reshaped = true;
+          }
         }
+        regrow = false;
         const acts = parts.activities(snap, t);
         lastActs = JSON.stringify([...acts]);
         // a map with a park: who skates reads the stage, the jobs' high-water mark (never the live count), his day, reduced motion
@@ -246,6 +266,21 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake, corners: cornersIn(office) };
   }
 
+  /** the office his objects need (extensions.ts): the laid one on a map that does not grow yet; the extensions already come stay */
+  function grown(o: Office): Office {
+    if (!GROWS.has(o.map)) return o;
+    if (needMap !== o.map) {
+      need = NO_NEED;
+      needMap = o.map;
+    }
+    const prev = placedIn !== null && placedIn.office.map === o.map ? corners.placed : [];
+    const r = grownFor(o, objs, prev, need);
+    need = r.need;
+    // the same extensions as the office on screen: that office (its wing and garden kept by identity)
+    if (office !== null && office.map === o.map && laid === o && sameExt(office.wing, r.office.wing) && sameExt(office.garden, r.office.garden)) return office;
+    return r.office;
+  }
+
   /** the objects' spots in this office: placed again only when the office or the objects changed, each kept where it still fits */
   function cornersIn(office: Office): Corners {
     if (placedIn === null || placedIn.office !== office || placedIn.objs !== objs) {
@@ -257,3 +292,6 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
     return corners;
   }
 }
+
+const sameExt = (a: Box | undefined, b: Box | undefined): boolean =>
+  a === b || (a !== undefined && b !== undefined && a.x0 === b.x0 && a.x1 === b.x1 && a.z0 === b.z0 && a.z1 === b.z1);

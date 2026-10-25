@@ -212,10 +212,10 @@ function keepOf(o: Office): Keep {
   for (const f of [dec.parasol, dec.palm]) boxes.push({ x0: f.x - CANOPY, x1: f.x + CANOPY, z0: f.z - CANOPY, z1: f.z + CANOPY });
   const spots: Pt[] = [o.door, o.mainDesk, ...o.desks.values(), ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, ...o.terrace, ...(o.nooks ?? []), ...(c?.coffeeSpots ?? [])];
   const t = terraceSlab(o);
-  const gx = Math.min(o.x0, t.x0) - CELL;
+  const gx = Math.min(o.x0, t.x0, o.garden?.x0 ?? t.x0) - CELL;
   const gz = Math.min(0, t.z0) - CELL;
-  const nx = Math.ceil((Math.max(o.x0 + o.W, t.x1) + CELL - gx) / CELL);
-  const nz = Math.ceil((Math.max(o.D, t.z1) + CELL - gz) / CELL);
+  const nx = Math.ceil((Math.max(o.x0 + o.W, t.x1, o.wing?.x1 ?? t.x1, o.garden?.x1 ?? t.x1) + CELL - gx) / CELL);
+  const nz = Math.ceil((Math.max(o.D, t.z1, o.garden?.z1 ?? t.z1) + CELL - gz) / CELL);
   const kept = new Uint8Array(nx * nz);
   const mark = (x0: number, x1: number, z0: number, z1: number, keepIf?: (cx: number, cz: number) => boolean): void => {
     const i0 = Math.max(0, Math.floor((x0 - gx) / CELL));
@@ -226,6 +226,13 @@ function keepOf(o: Office): Keep {
   };
   // a cell is kept when any of its square comes within reach: its middle within reach + half its diagonal
   const half = CELL * Math.SQRT1_2;
+  // a grown office: what is no floor in the room-and-wing's or the terrace-and-garden's bounds (the corner past the wing, beside the garden)
+  if (o.wing !== undefined || o.garden !== undefined) {
+    const floors = floorsOf(o);
+    const h = CELL / 2;
+    const onFloor = (x: number, z: number): boolean => floors.some((f) => x >= f.x0 + h && x <= f.x1 - h && z >= f.z0 + h && z <= f.z1 - h);
+    mark(gx, gx + nx * CELL, gz, gz + nz * CELL, (x, z) => !onFloor(x, z) && !(z > o.D && z < t.z0));
+  }
   for (const b of boxes) {
     // outside the room (the terrace's loungers, the parasol, the ramp): a bim's width round them
     const m = b.z0 >= o.D - 1e-6 ? BIM_W : AROUND;
@@ -272,8 +279,17 @@ function keptIn(k: Keep, b: Box): number {
 
 /** the floor an object may stand on in a corner: the room's, or the terrace's slab */
 function areaOf(o: Office, corner: Corner): Box {
-  if (corner === 'terrace') return terraceSlab(o);
-  return { x0: o.x0 + EDGE, x1: o.x0 + o.W - EDGE, z0: EDGE, z1: o.D - EDGE };
+  // a grown office's (extensions.ts): the wing widens the room, the garden the terrace; what is no floor between them is kept (keepOf)
+  if (corner === 'terrace') {
+    const t = terraceSlab(o);
+    return o.garden === undefined ? t : { x0: Math.min(t.x0, o.garden.x0 + EDGE), x1: Math.max(t.x1, o.garden.x1 - EDGE), z0: t.z0, z1: o.garden.z1 - EDGE };
+  }
+  return { x0: o.x0 + EDGE, x1: (o.wing?.x1 ?? o.x0 + o.W) - EDGE, z0: EDGE, z1: o.D - EDGE };
+}
+
+/** the floors a grown office stands things on: the room and its wing, the terrace and its garden */
+function floorsOf(o: Office): Box[] {
+  return [{ x0: o.x0, x1: o.x0 + o.W, z0: 0, z1: o.D }, terraceSlab(o), ...(o.wing ? [o.wing] : []), ...(o.garden ? [o.garden] : [])];
 }
 
 /** where a corner gathers (its things are searched nearest first) */
@@ -367,7 +383,7 @@ function zoneGridOf(c: Ctx, corner: Corner): readonly Pt[] {
   const out = gridOf(c, corner).filter((p) => {
     if (corner === 'read') return p.x <= area.x0 + ZONE + HALF_MAX;
     const b = { x0: p.x - HALF_MAX, x1: p.x + HALF_MAX, z0: p.z - HALF_MAX, z1: p.z + HALF_MAX };
-    return inZone(area, b, corner, seeds);
+    return inZone(area, b, corner, seeds, [], c.o.wing);
   });
   c.zoned.set(corner, out);
   return out;
@@ -476,7 +492,7 @@ export function underCanopy(o: Office, b: Box, h: number): boolean {
  */
 export function touches(o: Office, b: Box, corner: Corner, taken: readonly Placed[], seeds: readonly Box[], play: readonly Box[] = []): boolean {
   const area = areaOf(o, corner);
-  if (!inZone(area, b, corner, seeds, play)) return false;
+  if (!inZone(area, b, corner, seeds, play, o.wing)) return false;
   // the door's things stand against its wall, on the way-out side, each of them (designer m_41307): never on a rug or a pod's place inside
   if (corner === 'door') return b.z1 >= area.z1 - TOUCH && seeds.some((s) => overlaps(b, s, TOUCH));
   if (corner === 'terrace' && (b.x0 <= area.x0 + TOUCH || b.x1 >= area.x1 - TOUCH || b.z0 <= area.z0 + TOUCH || b.z1 >= area.z1 - TOUCH)) return true;
@@ -494,8 +510,10 @@ export const PLAY_ZONE = 1.5;
  * hung things; the terrace anywhere on its slab). The reading corner's wall stops where the play
  * corner's place starts (`play`: the nap place's seeds): the games come first by the nap place.
  */
-function inZone(area: Box, b: Box, corner: Corner, seeds: readonly Box[], play: readonly Box[] = []): boolean {
+function inZone(area: Box, b: Box, corner: Corner, seeds: readonly Box[], play: readonly Box[] = [], wing?: Box): boolean {
   if (corner === 'terrace') return true;
+  // his sketch's wing (extensions.ts) is the office going on: any indoor corner may gather there too (not the door's, not a hung thing)
+  if (wing !== undefined && corner !== 'door' && corner !== 'hang' && b.x0 >= wing.x0 - 1e-9) return true;
   if (corner === 'read') return b.x0 <= area.x0 + ZONE && !play.some((s) => overlaps(b, s, ZONE));
   if (corner === 'hang') return b.z0 <= area.z0 + TOUCH || b.x0 <= area.x0 + TOUCH;
   // the games stay right by the nap place, never halfway to main's desk (designer m_41180)
@@ -592,7 +610,7 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
       const hd = (foot.w * sn + foot.d * cs) / 2;
       for (const q of zoneGridOf(c, corner)) {
         const b = { x0: q.x - hw, x1: q.x + hw, z0: q.z - hd, z1: q.z + hd };
-        if (!inZone(area, b, corner, seeds, play)) continue;
+        if (!inZone(area, b, corner, seeds, play, c.o.wing)) continue;
         if (b.x0 < area.x0 || b.x1 > area.x1 || b.z0 < area.z0 || b.z1 > area.z1 || keptIn(c.keep, b) > 0) continue;
         if (!touches(c.o, b, corner, taken, seeds, play)) continue;
         if (free(c, b, corner, area, taken, foot.h)) return placedOf(p, obj, size, foot, corner, { x: q.x, z: q.z, rot: turn });

@@ -30,6 +30,7 @@ import {
 import type { Office } from '../model';
 import { NO_GROW, type Grow } from '../growth';
 import { POOL, SIDE_MIN } from '../sky';
+import { buildExtensions } from './extensions';
 import { SHADOW_BLUR, SHADOW_DROP, SLAB_LOW, groundOf } from './camera';
 import { slabWithPits } from './ground';
 import { kitOf } from './kit';
@@ -200,6 +201,8 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   const mainDesk = look.mainDesk(b, mainName);
   desks.set(mainName, mainDesk);
   look.growth(b);
+  // his sketch's extensions when his objects needed them (extensions.ts): the wing, the garden
+  buildExtensions(b);
   // what makes it cozy from day one, and cozier at each stage (render/cozy.ts, Office.cozy)
   buildCozy(b, look.cozy, desks, mainName);
   // what each napper rests on, as built (bims-nap: never in the air over its bed)
