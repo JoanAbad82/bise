@@ -90,15 +90,18 @@ function Pairs({ text }: { text: string }): ReactNode {
   return out;
 }
 
-/** A hit's line icon (nm-ds's family, native-mac §6: no text glyph as an icon), from its kind and the sign search gives it. Pure. */
-export function iconOf(h: Pick<Hit, 'kind' | 'glyph' | 'tone' | 'archived'>): AppIconName {
+/** search's mark of a browser-only artifact in its dim words (search/data.ts): drawn as the 'open' icon. */
+const BROWSER_MARK = '↗';
+
+/** A hit's line icon (nm-ds's family, native-mac §6: no text glyph as an icon), from its kind and the sign search gives it; the globe only for a link or a PR (browser-only, ui-review m_42633), a page is the file. Pure. */
+export function iconOf(h: Pick<Hit, 'kind' | 'glyph' | 'tone' | 'archived' | 'detail'>): AppIconName {
   if (h.tone === 'pearl' || h.tone === 'bise') return 'folder';
   if (h.archived) return 'archive';
   const by: Record<string, AppIconName> =
     h.kind === 'agent'
       ? { '?': 'inbox', '✓': 'check', '✗': 'close', '–': 'archive' }
       : h.kind === 'artifact'
-        ? { '⇡': 'branch', '◫': 'grid', '▤': 'file', '↗': 'browser' }
+        ? { '⇡': 'branch', '◫': 'grid', '▤': 'file', '↗': h.detail === BROWSER_MARK ? 'browser' : 'file' }
         : h.kind === 'scheduled'
           ? {}
           : { '↗': 'artifacts', '?': 'inbox', '#': 'inbox', '◷': 'scheduled', '⊞': 'plugins', '∿': 'terminal', '⚙': 'settings', '·': 'list' };
@@ -106,8 +109,6 @@ export function iconOf(h: Pick<Hit, 'kind' | 'glyph' | 'tone' | 'archived'>): Ap
   return by[h.glyph] ?? fallback;
 }
 
-/** search's mark of a browser-only artifact in its dim words (search/data.ts): drawn as the 'open' icon. */
-const BROWSER_MARK = '↗';
 
 /** The events that change what the search reads. */
 const READS = new Set<Ev['ev']>(['agents', 'artifacts', 'cards', 'projects', 'scheduled']);

@@ -4,11 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { artifactGlyph } from '@/search/rank';
 import { iconOf } from './Palette';
 
-const hit = (kind: 'agent' | 'page' | 'artifact' | 'scheduled', glyph: string, over: { tone?: '' | 'acc' | 'err' | 'ink' | 'pearl' | 'bise'; archived?: boolean } = {}) => ({
+const hit = (kind: 'agent' | 'page' | 'artifact' | 'scheduled', glyph: string, over: { tone?: '' | 'acc' | 'err' | 'ink' | 'pearl' | 'bise'; archived?: boolean; detail?: string } = {}) => ({
   kind,
   glyph,
   tone: over.tone ?? '',
   archived: over.archived ?? false,
+  detail: over.detail ?? '',
 });
 
 describe("⌘K's row icons", () => {
@@ -20,11 +21,12 @@ describe("⌘K's row icons", () => {
     expect(iconOf(hit('agent', '∿', { tone: 'ink' }))).toBe('thread');
   });
 
-  it("an artifact by its kind's sign: a PR the branch, images the grid, a file the file, a page the browser", () => {
+  it("an artifact by its kind's sign: a PR the branch, images the grid, a file or a page the file, a link the globe", () => {
     expect(iconOf(hit('artifact', artifactGlyph('pr')))).toBe('branch');
     expect(iconOf(hit('artifact', artifactGlyph('images')))).toBe('grid');
     expect(iconOf(hit('artifact', artifactGlyph('csv')))).toBe('file');
-    expect(iconOf(hit('artifact', artifactGlyph('page')))).toBe('browser');
+    expect(iconOf(hit('artifact', artifactGlyph('page'), { detail: 'page · v2' }))).toBe('file');
+    expect(iconOf(hit('artifact', artifactGlyph('link'), { detail: '↗' }))).toBe('browser');
   });
 
   it('a project (its pearl) the folder; a scheduled task the clock; a page its place', () => {
