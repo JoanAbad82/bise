@@ -12,7 +12,8 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--s-2) var(--pad-panel) var(--s-6);
+  /* the rows' text on the page's column (--pad-page-x), their tint hung out --pad-row-x */
+  padding: var(--s-2) calc(var(--pad-page-x) - var(--pad-row-x)) var(--s-6);
 }
 
 /* the region that has the keys shows no ring: the key line says it (designer m_21379 (5)) */
@@ -59,6 +60,10 @@
 .rv-foot {
   color: var(--c-text-2);
   margin: var(--gap-tight) var(--pad-row-x);
+}
+/* the foot's act: its words on the rows' edge, its --s-1 padding hung out */
+.rv-foot {
+  margin-inline: calc(var(--pad-row-x) - var(--s-1));
 }
 /* a file's note is in the file's own column, already on the edge */
 .rv-file > .rv-note {

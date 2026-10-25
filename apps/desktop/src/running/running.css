@@ -1,6 +1,6 @@
 /* src/running: the running screen (designer's running-procs). ds tokens only, 4 px grid, no accent. */
 .run-screen { display: flex; height: 100%; min-height: 0; outline: none; }
-.run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: var(--s-5) var(--pad-column) 0; box-sizing: border-box; }
+.run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: var(--s-5) var(--pad-page-x) 0; box-sizing: border-box; }
 /* the hero, the filters and the list in one scroller (designer m_39330: the hero scrolls away) */
 .run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .run-scroll > * { flex: none; }

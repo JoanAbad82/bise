@@ -1,7 +1,7 @@
 /* bise desktop window · settings */
 .b-set{display:grid;grid-template-columns:200px minmax(0,1fr);min-height:380px}
 .b-set .nav{padding:var(--s-3) var(--pad-row-x);background:var(--c-sidebar)}
-.b-set .pg{padding:var(--s-5) var(--s-6)}
+.b-set .pg{padding:var(--s-5) var(--pad-page-x)}
 .b-h{font-size:var(--t-22);font-weight:650;letter-spacing:-.015em}
 .b-sub{color:var(--c-text-2);margin:var(--s-1) 0 var(--s-4)}
 .b-group{border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1);margin-bottom:var(--gap-section)}

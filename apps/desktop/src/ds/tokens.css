@@ -79,6 +79,9 @@
   --pad-card: var(--pad-card-y) var(--pad-card-x); /* a card, the docked inbox, a bubble */
   --pad-panel: var(--s-4);    /* side panels' heads and content */
   --pad-column: var(--s-6);   /* the thread's column, each side */
+  /* a shell page's sides: --pad-column, more past --w-col so its content holds the one column,
+     centred (designer m_41569, ui-review-app #16). Its % is the page's own width where it is used */
+  --pad-page-x: max(var(--pad-column), calc((100% - var(--w-col)) / 2));
   --pad-sheet: var(--s-6);    /* a modal sheet; its groups --gap-section apart, its foot 24 */
   /* heights: the text is centered in them, never placed with a vertical padding */
   --h-control-sm: 28px;  /* bar and row buttons, the title's controls */

@@ -11,7 +11,7 @@
   /* the marks sit 6 px in from the picture's corners */
   --card-mark: 6px;
   --card-menu: var(--s-6);
-  --card-pick: 18px;
+  --card-pick: var(--s-6);
   /* the list behind ☰: 44 px rows, a 48 px picture */
   --list-row-h: 44px;
 }

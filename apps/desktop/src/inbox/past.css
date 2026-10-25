@@ -1,7 +1,7 @@
 /* src/inbox (inbox-screen): the inbox screen (designer's inbox-history pick A, m_24212). ds tokens
    only; the artifacts and scheduled screens' head, filters, day heads and key line. One left edge:
    the heads, the rows' text and the key line on the title's edge, a row's tint 8 px out. */
-.ip-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s-5) var(--pad-column) 0; box-sizing: border-box; outline: none; }
+.ip-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s-5) var(--pad-page-x) 0; box-sizing: border-box; outline: none; }
 /* the hero, the filters and the list (with the pane beside it) in one scroller, the key line under
    it (designer m_39330: the hero scrolls away with the page). A size container: the pane stays in
    view (sticky) at most the scroller's height */

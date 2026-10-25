@@ -190,7 +190,7 @@ body:has(.app-shell) {
 .app-cu {
   margin-left: var(--gap-inline);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--t-11);
 }
 .app-cu.ink {
   color: var(--c-text);
@@ -206,7 +206,7 @@ body:has(.app-shell) {
 .app-gauge {
   margin-left: var(--gap-inline);
   color: var(--c-text-2);
-  font-size: 11px;
+  font-size: var(--t-11);
   font-variant-numeric: tabular-nums;
 }
 
@@ -232,7 +232,7 @@ body:has(.app-shell) {
 .app-r kbd,
 .app-title kbd {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--t-11);
   color: var(--c-text-3);
   background: none;
   border: 0;
@@ -1171,16 +1171,15 @@ body:has(.app-shell) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--s-2) var(--pad-panel) var(--s-6);
+  padding: var(--s-2) calc(var(--pad-page-x) - var(--pad-row-x)) var(--s-6);
+}
+/* the page hero on the column's edge, 20 below the bar, as on changes (ui-review-app #2) */
+.app-report-body > .b-hero {
+  margin: var(--s-3) var(--pad-row-x) var(--s-6);
 }
 .app-report-text {
   max-width: var(--th-col, var(--w-col));
   margin: 0 auto;
-}
-.app-report-body > .app-dim {
-  max-width: var(--th-col, var(--w-col));
-  margin: var(--s-6) auto 0;
-  color: var(--c-text-3);
 }
 
 /* the side columns' borders he drags (designer m_19374): an 8 px hit area centred on the border, no

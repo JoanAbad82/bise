@@ -13,7 +13,7 @@
 /* IconButton: 28×28 (24 in bars), r-2, the glyph text-2, a 6% tint on hover, the ds focus ring */
 .b-ibtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--h-control-sm);height:var(--h-control-sm);padding:0;border:0;border-radius:var(--r-2);background:none;color:var(--c-text-2);font:var(--t-14)/1 var(--font-ui);transition:background var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out)}
 .b-ibtn.bar{width:var(--s-6);height:var(--s-6);font-size:var(--t-13)}
-.b-ibtn.row{width:var(--s-4);height:var(--s-5);border-radius:var(--r-1);color:var(--c-text-3);font:inherit}
+.b-ibtn.row{width:var(--s-6);height:var(--s-6);border-radius:var(--r-1);color:var(--c-text-3);font:inherit}
 .b-ibtn:hover,.b-ibtn.is-hover{background:var(--c-hover);color:var(--c-text)}
 .b-ibtn:active,.b-ibtn.is-active{background:var(--c-press)}
 .b-ibtn.on{background:var(--c-active);color:var(--c-text)}
@@ -28,7 +28,9 @@
 .b-search .w{flex:1}
 
 /* Act: an inline text action, text-2, underlined on hover, a 1 px focus ring; err: the error tone */
-.b-act{display:inline;padding:0 calc(var(--s-1) / 2);border:0;border-radius:4px;background:none;color:var(--c-text-2);font:inherit;text-underline-offset:2px;white-space:nowrap}
+/* an inline act: --s-1 round its words (ui-review-app #5): two acts side by side read apart, and its
+   target is 24 px high without moving the line (an inline's block padding takes no room) */
+.b-act{display:inline;padding:var(--s-1);border:0;border-radius:4px;background:none;color:var(--c-text-2);font:inherit;text-underline-offset:2px;white-space:nowrap}
 .b-act:hover,.b-act.is-hover{color:var(--c-text);text-decoration:underline}
 .b-act:focus-visible,.b-act.is-focus{outline:1px solid var(--c-focus);outline-offset:0}
 .b-act.err{color:var(--c-err)}
