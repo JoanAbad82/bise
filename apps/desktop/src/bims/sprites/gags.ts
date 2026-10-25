@@ -1,9 +1,9 @@
 // bise.dev's home bims (page bims-home v7, Gabriel's pick « les îles », on the whole home): each
 // section's gag lives on its own little clay island, the hero town's cube in miniature, in the
-// section's margin beside its title. Pure, no three: each island is its slab's top, its props (a tiny
-// desk, the upright piano, a beanbag, a whiteboard, a quarter pipe, a floor lamp and a pouf), its
-// bims' frames (the app's Rigs, as pose.ts makes them), the bits that move with them (music notes,
-// sticky notes, a paper plane, a book, a sleeper's z's) and the order they play in at FPS, then the
+// section's margin beside its title (seven: 'so here's how bise does it.' has no free side, designer
+// m_41966). Pure, no three: each island is its slab's top, its props (a tiny desk, the upright piano,
+// a beanbag, a quarter pipe, a floor lamp and a pouf), its bims' frames (the app's Rigs, as pose.ts
+// makes them), the bits that move with them (music notes, a paper plane, a book, a sleeper's z's) and the order they play in at FPS, then the
 // pose it holds and that pose's blink. studio.ts draws them with the app's own bims (render/bim.ts)
 // and scripts/bims-sprites.mts exports them into site/bims/, which site/bims-islands.ts plays on the
 // page. Units are the office's: a standing bim is ~1.2 tall, the island's top is y 0, its middle
@@ -33,8 +33,6 @@ export type Bit =
   | { readonly kind: 'note'; readonly at: V; readonly k: number }
   /** a sleeper's z rising, how far through (0..1) */
   | { readonly kind: 'z'; readonly at: V; readonly k: number }
-  /** a sticky note on the whiteboard, its colour (0..2), its tilt on the board, the board's turn */
-  | { readonly kind: 'sticky'; readonly at: V; readonly n: number; readonly tilt: number; readonly turn: number }
   /** the paper plane (render/plane.ts): its heading, its nose's pitch (up > 0), its fold (0 folded .. 1 open) */
   | { readonly kind: 'plane'; readonly at: V; readonly dir: number; readonly pitch: number; readonly fold: number }
   /** a small open book in its reader's hands: its reader's way, how far a page has turned (0..1) */
@@ -52,15 +50,13 @@ export type Prop =
   /** the upright piano (objects/music.ts), scaled */
   | { readonly kind: 'piano'; readonly x: number; readonly z: number; readonly turn: number; readonly scale: number }
   | { readonly kind: 'beanbag'; readonly x: number; readonly z: number }
-  /** a whiteboard on two legs; its surface's middle at `mid` high */
-  | { readonly kind: 'board'; readonly x: number; readonly z: number; readonly turn: number; readonly mid: number }
   /** a little quarter pipe, rising away from its front */
   | { readonly kind: 'ramp'; readonly x: number; readonly z: number; readonly turn: number }
   | { readonly kind: 'lamp'; readonly x: number; readonly z: number }
   /** a round pouf, its seat `h` high */
   | { readonly kind: 'pouf'; readonly x: number; readonly z: number; readonly h: number };
 
-export type IslandId = 'ways' | 'why' | 'lead' | 'arts' | 'fun' | 'hard' | 'faq' | 'end';
+export type IslandId = 'ways' | 'why' | 'arts' | 'fun' | 'hard' | 'faq' | 'end';
 
 export interface Island {
   readonly id: IslandId;
@@ -162,54 +158,6 @@ function why(): Island {
   frames.push(shut(frames[9] as Frame)); // 10 its blink
   const seq = [...times([0, 1, 2], 3), 3, 3, 3, 4, 4, 5, 6, 6, 7, 7, 7, 6, 8, 9];
   return { id: 'why', top: 'grass', props: [BEANBAG], frames, seq, idle: 9, blink: 10 };
-}
-
-// so here's how bise does it: at a small whiteboard, three sticky notes moved into order.
-/** the board turned a little toward the sun (upper left), so its white face reads white */
-const BOARD_TURN = facing(-0.45, 1);
-export const BOARD = { kind: 'board', ...spot(-0.3, -0.4), turn: BOARD_TURN, mid: 0.85 } as const;
-/** a point u along the board's face (to its right), out ahead of it */
-const onBoard = (u: number, out: number): { x: number; z: number } => ({
-  x: BOARD.x + Math.cos(BOARD.turn) * u + Math.sin(BOARD.turn) * out,
-  z: BOARD.z - Math.sin(BOARD.turn) * u + Math.cos(BOARD.turn) * out,
-});
-function lead(): Island {
-  const name = 'checkout';
-  /** a note at (u, v) on the board's face: u along it, v its height */
-  const note = (n: number, u: number, v: number, tilt: number, out = 0): Bit => {
-    const p = onBoard(u, 0.035 + out);
-    return { kind: 'sticky', at: [p.x, v, p.z], n, tilt, turn: BOARD.turn };
-  };
-  const from = [[0.22, 0.66, -0.25], [-0.26, 0.7, 0.2], [-0.01, 0.62, 0.12]] as const;
-  const to = (n: number): [number, number, number] => [-0.28 + n * 0.26, 1.02, 0];
-  /** the notes once `done` of them moved, the next one `half` way there */
-  const notes = (done: number, half = false): Bit[] => range(3).map((n) => {
-    const [fu, fv, ft] = from[n] ?? [0, 0, 0];
-    const [tu, tv] = to(n);
-    if (n < done) return note(n, tu, tv, 0);
-    if (n === done && half) return note(n, lerp(fu, tu, 0.5), lerp(fv, tv, 0.5) + 0.05, ft / 2, 0.06);
-    return note(n, fu, fv, ft);
-  });
-  // beside the board's right end, a step ahead of it, facing its middle
-  const stand = onBoard(0.72, 0.42);
-  const at: Partial<Rig> = { ...stand, dir: Math.atan2(BOARD.x - stand.x, BOARD.z - stand.z) };
-  const reach = (n: number, up: number): Actor => bim(name, {
-    ...at, armR: [-2.1 - 0.35 * up, 0, -0.25 - 0.1 * n], armL: [0, 0, -0.3], head: [-0.2 * up, 0.1, 0], body: [0.04, 0, 0],
-  });
-  const frames: Frame[] = [
-    { bims: [bim(name, { ...at, armR: [-2.4, 0, -0.9], armL: [-0.5, 0, -0.2], head: [-0.05, 0.2, 0.12] })], bits: notes(0) }, // 0 thinking, hand at its chin
-    { bims: [reach(0, 0)], bits: notes(0, true) }, // 1 the first note on its way
-    { bims: [reach(0, 1)], bits: notes(1) }, // 2 placed, up top
-    { bims: [reach(1, 0)], bits: notes(1, true) }, // 3
-    { bims: [reach(1, 1)], bits: notes(2) }, // 4
-    { bims: [reach(2, 0)], bits: notes(2, true) }, // 5
-    { bims: [reach(2, 1)], bits: notes(3) }, // 6 all three in order
-    { bims: [bim(name, { ...at, armL: [0, 0, -0.55], armR: [0, 0, 0.55], head: [-0.18, 0, 0], mouth: 'laugh', eyes: 0.3 })], bits: notes(3) }, // 7 a step back, pleased
-    { bims: [bim(name, { ...at, dir: facing(0.1, 1), armL: [0, 0, -0.3], armR: [0, 0, 0.3], head: [0, 0, 0.06] })], bits: notes(3) }, // 8 turned to you, holds
-  ];
-  frames.push(shut(frames[8] as Frame)); // 9 its blink
-  const seq = [0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 6, 7, 7, 7, 7, 8];
-  return { id: 'lead', top: 'floor', props: [BOARD], frames, seq, idle: 8, blink: 9 };
 }
 
 // questions you can actually answer: a paper plane (the hero's) lands in its hand; it unfolds it and reads.
@@ -358,5 +306,5 @@ function end(): Island {
   return { id: 'end', top: 'floor', props: [], frames, seq, idle: 6, blink: 7 };
 }
 
-/** the eight islands, in the page's order */
-export const ISLANDS: readonly Island[] = [ways(), why(), lead(), arts(), fun(), hard(), faq(), end()];
+/** the seven islands, in the page's order */
+export const ISLANDS: readonly Island[] = [ways(), why(), arts(), fun(), hard(), faq(), end()];

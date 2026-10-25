@@ -1,16 +1,16 @@
 // The studio that draws bise.dev's home islands (gags.ts) with the app's own bims: a little clay
 // island (the hero town's cube in miniature: a dirt slab, a top of floor or grass), its props (a tiny
-// desk with a little window, the music family's upright piano, a beanbag, a whiteboard, a quarter
-// pipe, a floor lamp and a pouf), its bims and their bits (notes, z's, sticky notes, the hero's paper
-// plane, a book), in the town's 2:1 iso camera and the day palette's fixed light (the hero film's,
-// TownOpts.themed by day), with the clay's soft sun shadow, on a transparent ground. Off screen, one
+// desk with a little window, the music family's upright piano, a beanbag, a quarter pipe, a floor
+// lamp and a pouf), its bims and their bits (notes, z's, the hero's paper plane, a book), in the
+// town's 2:1 iso camera and the day palette's fixed light (the hero film's, TownOpts.themed by day),
+// with the clay's soft sun shadow, on a transparent ground. Off screen, one
 // canvas: the island alone (its base), then each frame with its bims, cropped to where any frame
 // differs from the base; scripts/bims-sprites.mts packs them into WebP. Owner: bims-islands.
 import { type DirectionalLight, ExtrudeGeometry, Group, type Material, Mesh, type Object3D, Shape, Vector3 } from 'three';
 import { AZ, BACK, DIST } from '../render/camera';
 import { makeBim, type Bim } from '../render/bim';
 import { makeObject } from '../render/objects';
-import { CREAM, GREEN, INK, PANE, PAPER, SKY, SLATE, SLATE_L, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, darker, lighter, partOf } from '../render/objects/kit';
+import { CREAM, INK, PANE, PAPER, SKY, SLATE, SLATE_L, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, darker, lighter, partOf } from '../render/objects/kit';
 import { DAY, WORLD } from '../render/palette';
 import { makePlane, type Plane } from '../render/plane';
 import { STYLE } from '../render/style';
@@ -25,15 +25,13 @@ const HALF = 2.3;
 /** the sun: from the upper left, in front (the town's: its left side lit, its right in the shade) */
 const SUN = new Vector3(-2, 9, 3.5);
 const NOTE = WORLD.gold;
-/** the sticky notes' colours, by Bit.n */
-const STICKY = [YELLOW, SKY, GREEN] as const;
 const BEANBAG = VIOLET;
 const POUF = TEAL;
 const BOOK = SKY;
 /** the lamp's shade, warm (a light yellow, lit from inside) */
 const SHADE = lighter(YELLOW, 0.45);
 /** every colour the studio adds to the app's (the palette law checks them: never the accent pink or the error red) */
-export const STUDIO_COLOURS: readonly string[] = [NOTE, CREAM, INK, PANE, PAPER, SLATE, SLATE_L, STEEL, WOOD, WOOD_D, WOOD_L, ...STICKY, BEANBAG, POUF, BOOK, SHADE];
+export const STUDIO_COLOURS: readonly string[] = [NOTE, CREAM, INK, PANE, PAPER, SLATE, SLATE_L, STEEL, WOOD, WOOD_D, WOOD_L, BEANBAG, POUF, BOOK, SHADE];
 
 export interface Box { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
 
@@ -68,21 +66,6 @@ function deskOn(root: Group, d: Extract<Prop, { kind: 'desk' }>): void {
   for (let i = 0; i < 3; i++) w.ball(0.012, SLATE_L, -W / 2 + 0.05 + i * 0.035, y + H / 2 - 0.04, 0.027);
   w.box(0.14, H - 0.1, 0.01, PANE, -W / 2 + 0.09, y - 0.04, 0.02, 0.005);
   for (let i = 0; i < 3; i++) w.box([0.3, 0.24, 0.27][i] ?? 0.3, 0.025, 0.01, SLATE_L, 0.06 - (i === 1 ? 0.03 : 0), y + 0.06 - i * 0.08, 0.02, 0.004);
-}
-
-/** a whiteboard on two legs, its front to `turn`: a white face in a steel frame, a tray for its markers */
-function boardOn(root: Group, b: Extract<Prop, { kind: 'board' }>): void {
-  const g = partOf(root, OPTS).at(b.x, 0, b.z);
-  g.root.rotation.y = b.turn;
-  const W = 1.05, H = 0.66;
-  for (const x of [-W / 2 + 0.03, W / 2 - 0.03]) {
-    g.box(0.05, b.mid + H / 2, 0.05, SLATE_L, x, (b.mid + H / 2) / 2, -0.04, 0.015);
-    g.box(0.07, 0.04, 0.36, SLATE_L, x, 0.02, -0.04, 0.015);
-  }
-  g.box(W + 0.05, H + 0.05, 0.035, STEEL, 0, b.mid, 0, 0.015);
-  g.box(W - 0.02, H - 0.02, 0.012, CREAM, 0, b.mid, 0.02, 0.004);
-  g.box(W * 0.8, 0.025, 0.07, STEEL, 0, b.mid - H / 2 - 0.02, 0.04, 0.008);
-  for (const [x, c] of [[-0.2, SKY], [-0.12, INK]] as const) { const m = g.cyl(0.013, 0.09, c, x, b.mid - H / 2 + 0.01, 0.05); m.rotation.z = Math.PI / 2; }
 }
 
 /** a beanbag: a soft squashed ball, dented where its sleeper sits */
@@ -141,7 +124,6 @@ function poufOn(root: Group, p: Extract<Prop, { kind: 'pouf' }>): void {
 function propOn(root: Group, p: Prop): void {
   switch (p.kind) {
     case 'desk': deskOn(root, p); return;
-    case 'board': boardOn(root, p); return;
     case 'beanbag': beanbagOn(root, p); return;
     case 'ramp': rampOn(root, p); return;
     case 'lamp': lampOn(root, p); return;
@@ -179,14 +161,6 @@ function makeZ(): Group {
   return g;
 }
 
-function makeSticky(n: number): Group {
-  const g = new Group();
-  const inner = new Group();
-  g.add(inner);
-  partOf(inner, OPTS).box(0.17, 0.17, 0.012, STICKY[n % STICKY.length] ?? YELLOW, 0, 0, 0, 0.004);
-  return g;
-}
-
 /** a small open book: its cover toward the page, its pages toward its reader; one page turns about the spine */
 function makeBook(): { g: Group; page: Group } {
   const g = new Group();
@@ -207,14 +181,12 @@ function makeBook(): { g: Group; page: Group } {
 interface Pools {
   note: Group[];
   z: Group[];
-  sticky: Group[];
   plane: Plane[];
   book: { g: Group; page: Group }[];
 }
 
 function placeBits(root: Group, pools: Pools, bits: readonly Bit[]): void {
   const used = { note: 0, z: 0, plane: 0, book: 0 };
-  const stuck = new Set<number>();
   for (const b of bits) {
     const [x, y, z] = b.at;
     switch (b.kind) {
@@ -230,16 +202,6 @@ function placeBits(root: Group, pools: Pools, bits: readonly Bit[]): void {
         n.visible = true;
         n.position.set(x + Math.sin(b.k * 4) * 0.05, y, z);
         n.scale.setScalar(0.6 + b.k * 0.6);
-        break;
-      }
-      case 'sticky': {
-        while (pools.sticky.length <= b.n) more(root, pools.sticky, () => makeSticky(pools.sticky.length));
-        const s = pools.sticky[b.n] as Group;
-        stuck.add(b.n);
-        s.visible = true;
-        s.position.set(x, y, z);
-        s.rotation.set(0, b.turn, 0);
-        (s.children[0] as Group).rotation.z = b.tilt;
         break;
       }
       case 'plane': {
@@ -263,7 +225,6 @@ function placeBits(root: Group, pools: Pools, bits: readonly Bit[]): void {
   }
   pools.note.forEach((n, i) => { n.visible &&= i < used.note; });
   pools.z.forEach((n, i) => { n.visible = i < used.z; });
-  pools.sticky.forEach((n, i) => { n.visible = stuck.has(i); });
   pools.plane.forEach((n, i) => { n.group.visible = i < used.plane; });
   pools.book.forEach((n, i) => { n.g.visible = i < used.book; });
 }
@@ -349,7 +310,7 @@ export function drawIsland(s: Island): Drawn {
   });
   const movers = new Group();
   root.add(movers);
-  const pools: Pools = { note: [], z: [], sticky: [], plane: [], book: [] };
+  const pools: Pools = { note: [], z: [], plane: [], book: [] };
   const pose = (i: number): void => {
     const f = s.frames[i] ?? first;
     bims.forEach((b, k) => { const a = f.bims[k]; if (a) b.apply(a.rig); });

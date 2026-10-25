@@ -2,17 +2,19 @@
 // the home bims (page bims-home v7, Gabriel's pick « les îles »): one little clay island per section
 // (bims/<id>.webp + <id>-f.webp + islands.json, from apps/desktop/scripts/bims-sprites.mts), loaded by
 // index.html everywhere but bise.dev until his go. Each sits beside its section's title, in the
-// margin, never over text, a card or a button: the sides alternate (left, right, ...) and fall back
-// to the other one; no room on either side (a phone): the four of ROOMS get a room of their own
-// above their cards, scaled to 140 px, the others stay out. Each loads as its section nears, plays
+// margin, never over text, a card or a button, 48 px at least from the title's words (its shadow
+// included; designer m_41966): the sides alternate (left, right, ...) and fall back to the other one;
+// neither fits at that width: it stays out (no squeeze). A phone: the four of ROOMS get a room of
+// their own above their cards, scaled to 140 px. Each loads as its section nears, plays
 // once per visit on screen (one at a time: a second waits for the first), then holds its pose and
 // blinks every 7-9 s; off screen nothing moves; reduced motion: the held pose. Only the bims take
 // pointers (a hop).
 (() => {
     const FPS = 12;
     const KEY = 'bims-islands';
-    /** the gap to the title, and the room kept around text and cards */
-    const GAP = 24;
+    /** the gap from the title's words to the island's box: 48 px, plus its shadow's blur past the box */
+    const GAP = 56;
+    /** the room kept around text and cards */
     const PAD = 12;
     /** the phone's four: the cards they get a room above */
     const ROOMS = { ways: '#ways .apps', why: '#why .beat', fun: '#fun .funs', end: '#end .apps' };
@@ -51,14 +53,14 @@
             if (!title)
                 return;
             const t = inkOf(title);
-            // left, right, left...: beside the title's words, level with them, else a little higher
-            // a phone keeps to its four rooms
-            const xs = innerWidth > 600 ? [t.left - GAP - w, t.right + GAP] : [];
+            // left, right, left...: beside the title's words, level with them, else a little higher; a phone keeps to its four rooms
+            const phone = innerWidth <= 600;
+            const xs = phone ? [] : [t.left - GAP - w, t.right + GAP];
             if (i % 2)
                 xs.reverse();
             let at = null;
             for (const x of xs) {
-                for (let dy = 0; !at && dy <= 160; dy += 16) {
+                for (let dy = 0; !at && dy <= 64; dy += 16) {
                     const y = t.top + t.height / 2 - h / 2 - dy;
                     if (clear(x, y, w, h))
                         at = [x, y];
@@ -69,7 +71,7 @@
             let k = 1;
             const sel = ROOMS[id];
             const cards = sel ? q(sel) : null;
-            if (!at && cards) {
+            if (!at && cards && phone) {
                 k = 140 / w;
                 if (!g.room) {
                     g.room = document.createElement('div');

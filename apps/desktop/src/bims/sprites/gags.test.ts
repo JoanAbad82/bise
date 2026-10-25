@@ -1,5 +1,5 @@
 // The home islands' laws (gags.ts, page bims-home v7): one island per section, the brief's weight in
-// frames, every gag ending on the pose its bims then hold, the blink closing their eyes and nothing
+// frames (seven: no island beside 'so here's how bise does it.'), every gag ending on the pose its bims then hold, the blink closing their eyes and nothing
 // else, the bims and their bits never leaving the island, its own bims per gag, and no attention
 // colour among the studio's own.
 import { describe, expect, it } from 'vitest';
@@ -50,8 +50,8 @@ describe('the home islands', () => {
     }
   });
 
-  it('one island per section, in the page order', () => {
-    expect(ISLANDS.map((s) => s.id)).toEqual(['ways', 'why', 'lead', 'arts', 'fun', 'hard', 'faq', 'end']);
+  it('one island per section but the lead one, in the page order', () => {
+    expect(ISLANDS.map((s) => s.id)).toEqual(['ways', 'why', 'arts', 'fun', 'hard', 'faq', 'end']);
   });
 
   it('the same bims all through a gag, and no bim on two islands', () => {
