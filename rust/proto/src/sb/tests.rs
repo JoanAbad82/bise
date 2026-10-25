@@ -64,7 +64,12 @@ fn a_known_command_with_bad_fields_is_the_senders_error() {
 #[test]
 fn the_wire_shapes_read_as_their_values() {
     let r = req(json!({"cmd": "send", "to": "a", "text": "b", "reply_to": "12", "mode": "queued", "model": "m"}));
-    assert_eq!(r, Req::Send { to: "a".into(), text: "b".into(), expect_reply: false, reply_to: Some(12), queued: true, why: String::new(), switch: Some(("m".into(), String::new())), attach: vec![], parts: String::new() });
+    assert_eq!(r, Req::Send { to: "a".into(), text: "b".into(), expect_reply: false, reply_to: Some(12), queued: true, why: String::new(), switch: Some(("m".into(), String::new())), attach: vec![], parts: String::new(), fwd: None });
+    // msg-forward: `--forward m_<n>` reads as its id
+    let r = req(json!({"cmd": "send", "to": "a", "fwd": "m_7"}));
+    assert!(matches!(r, Req::Send { fwd: Some(7), .. }), "{r:?}");
+    let r = req(json!({"cmd": "show", "msg": "m_7"}));
+    assert!(matches!(r, Req::Show { msg: Some(7), .. }), "{r:?}");
     // an id that doesn't read is none, as before
     let r = req(json!({"cmd": "card", "text": "q", "for": "later"}));
     assert_eq!(r, Req::card("q"));

@@ -16,6 +16,8 @@
 //!   and rendered to the model's text (msg-parts);
 //! - `attach`: an agent's `sb send/spawn --attach` as its message's parts
 //!   (send-parts), the pure half of `daemon/attach.rs`;
+//! - `forward`: the shell's half of `sb send/spawn --forward m_<n>` (the
+//!   original's time for sb-core) and of `sb show m_<n>` (its position);
 //! - `daemon`: the imperative shell (sockets, journal, feeds), with
 //!   `daemon/repl` (REPL processes) and `daemon/versions` (`/version`);
 //! - `doing`, `activity`: les bims' facts, pure: an agent's `doing` from
@@ -60,6 +62,7 @@ pub mod first_run;
 pub mod flow;
 pub mod fn_context;
 pub mod forge;
+pub mod forward;
 pub mod idle;
 pub mod image_care;
 pub mod keeps;

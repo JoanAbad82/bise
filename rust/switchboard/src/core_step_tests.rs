@@ -62,7 +62,7 @@ fn an_answer_by_number_names_its_option_in_both_feeds() {
     t.spawn_task("docs");
     let (_, _) = t.req(
         "docs",
-        AgentReq::Send { to: MAIN.into(), text: "where?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() },
+        AgentReq::Send { to: MAIN.into(), text: "where?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new(), fwd: None },
     );
     let id = t.hub.st.msgs().values().find(|m| m.text == "where?").unwrap().id;
     t.req(MAIN, AgentReq::Card { text: "where does the balance show?\n1. at every step\n2. only at checkout".into(), for_msg: Some(id), page: None, artifact: None, open: Vec::new() });
@@ -170,6 +170,10 @@ mod core_names_tests;
 /// send-parts' tests, out of core_tests.rs too.
 #[path = "core_attach_tests.rs"]
 mod core_attach_tests;
+
+/// msg-forward's tests, out of core_tests.rs too.
+#[path = "core_forward_tests.rs"]
+mod core_forward_tests;
 
 /// issue 36 chunk 3's: photo / restore_photo, only on a fresh hub.
 #[path = "core_photo_tests.rs"]

@@ -35,6 +35,7 @@ fn a_real_hub() -> (T, u64) {
             ask: Default::default(),
             parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     assert!(fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "dark")), "{fx:?}");

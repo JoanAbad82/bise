@@ -12,7 +12,7 @@ fn at_task_to_a_busy_task_steers_and_answers_at_turn_end() {
     // docs is still in its first turn
     let fx = t.user(MAIN, "@docs où en es-tu ?");
     let s = steer_to(&fx, "docs").unwrap();
-    assert!(s.starts_with("<user_message via=\"main\">"), "{}", s);
+    assert!(s.starts_with("<user_message id=\"m_2\" via=\"main\">"), "{}", s);
     t.go(Input::ReplLine {
         agent: "docs".into(),
         line: "  obs: assistant: à mi-chemin".into(),

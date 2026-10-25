@@ -198,6 +198,7 @@ impl T {
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
                 attach: Vec::new(),
+                fwd: None,
             },
         );
         assert!(
@@ -275,12 +276,13 @@ fn recs_of(fx: &[Effect], agent: &str, kind: &str) -> Vec<Value> {
 fn the_user_talks_to_main_by_default() {
     let mut t = T::new();
     let fx = t.user(MAIN, "bonjour");
-    assert_eq!(say_to(&fx, MAIN).as_deref(), Some("bonjour"));
+    // msg-forward: his message carries its id (what `--forward` takes)
+    assert_eq!(say_to(&fx, MAIN).as_deref(), Some("<user_message id=\"m_1\">\nbonjour\n</user_message>"));
     assert!(has_rec(&fx, MAIN, json!({"sb": "you", "text": "bonjour"})));
     assert_eq!(t.status(MAIN), Status::Working);
     // main is busy: the next message steers the running turn
     let fx = t.user(MAIN, "et aussi");
-    assert_eq!(steer_to(&fx, MAIN).as_deref(), Some("et aussi"));
+    assert_eq!(steer_to(&fx, MAIN).as_deref(), Some("<user_message id=\"m_2\">\net aussi\n</user_message>"));
 }
 
 #[test]
@@ -331,6 +333,7 @@ fn the_board_of_main_follows_the_tasks() {
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     // a step with no delivery leaves them pending (core_contexts.rs)
@@ -361,7 +364,7 @@ fn steering_left_in_the_file_is_sent_again() {
         agent: MAIN.into(),
         leftover: true,
     });
-    assert_eq!(say_to(&fx, MAIN).as_deref(), Some("second"));
+    assert_eq!(say_to(&fx, MAIN).as_deref(), Some("<user_message id=\"m_2\">\nsecond\n</user_message>"));
 }
 
 #[test]
@@ -405,6 +408,7 @@ fn ask_waits_for_the_reply() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let r = reply(&fx, tok).expect("the wait ends");
@@ -457,6 +461,7 @@ fn a_waiting_agent_says_who_it_waits_on() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     assert!(reply(&fx, tok).is_some(), "the wait ends");
@@ -527,7 +532,7 @@ fn main_learns_what_the_user_said_directly() {
         focus: "docs".into(),
     });
     let fx = t.user("docs", "utilise la v2");
-    assert_eq!(say_to(&fx, "docs").as_deref(), Some("utilise la v2"));
+    assert_eq!(say_to(&fx, "docs").as_deref(), Some("<user_message id=\"m_3\">\nutilise la v2\n</user_message>"));
     t.turn("docs", "ok, v2");
     let fx = t.go(Input::ClientFocus {
         client: 1,
@@ -543,7 +548,7 @@ fn main_learns_what_the_user_said_directly() {
     let s = say_to(&fx, MAIN).unwrap();
     assert!(s.starts_with("<bise_notes>"), "{}", s);
     assert!(s.contains("utilise la v2") && s.contains("ok, v2"), "{}", s);
-    assert!(s.ends_with("où en est la doc ?"));
+    assert!(s.ends_with("où en est la doc ?\n</user_message>"), "{}", s);
     assert!(t.hub.st.main_notes.is_empty());
 }
 
@@ -561,7 +566,7 @@ fn at_task_from_main_view_answers_there_and_notes_main() {
     let s = say_to(&fx, "docs").unwrap();
     assert_eq!(
         s,
-        "<user_message via=\"main\">\nv1 ou v2 ?\n</user_message>"
+        "<user_message id=\"m_3\" via=\"main\">\nv1 ou v2 ?\n</user_message>"
     );
     assert!(has_rec(&fx, "docs", json!({"sb": "you", "text": "v1 ou v2 ?"})), "{:?}", fx);
     // its end-of-turn answer comes back to main's view, main not woken
@@ -578,10 +583,10 @@ fn at_task_from_main_view_answers_there_and_notes_main() {
         "{}",
         s
     );
-    // in the task's own view, it stays a plain user message
+    // in the task's own view, it stays a plain user message (with its id)
     t.turn(MAIN, "ok");
     let fx = t.user("docs", "@docs merci");
-    assert_eq!(say_to(&fx, "docs").as_deref(), Some("merci"));
+    assert_eq!(say_to(&fx, "docs").as_deref(), Some("<user_message id=\"m_5\">\nmerci\n</user_message>"));
     let fx = t.turn("docs", "de rien");
     assert!(!lines_of(&fx, MAIN).iter().any(|l| l.contains("de rien")), "{:?}", fx);
 }
@@ -771,6 +776,7 @@ fn answering_in_the_task_view_answers_its_question() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let id = t
@@ -864,6 +870,7 @@ fn peers_cannot_reach_an_archived_task_but_the_user_can() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     assert!(reply(&fx, tok).unwrap()["error"]
@@ -983,6 +990,7 @@ fn journal_replay_rebuilds_the_same_state() {
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     record(fx);
@@ -1127,6 +1135,7 @@ fn many_task_messages_always_reach_main() {
                 why: String::new(),
                 switch: None, parts: String::new(),
                 attach: Vec::new(),
+                fwd: None,
             },
         );
         assert!(say_to(&fx, MAIN).is_some(), "message {} held: {:?}", i, fx);
@@ -1139,7 +1148,7 @@ fn a_user_message_to_main_starts_with_the_task_status() {
     let fx = t.user(MAIN, "salut");
     assert_eq!(
         say_to(&fx, MAIN).as_deref(),
-        Some("salut"),
+        Some("<user_message id=\"m_1\">\nsalut\n</user_message>"),
         "no task: no status"
     );
     t.turn(MAIN, "ok");
@@ -1153,7 +1162,7 @@ fn a_user_message_to_main_starts_with_the_task_status() {
     let s = say_to(&fx, MAIN).unwrap();
     assert!(s.starts_with("<task_status>\ndocs working"), "{}", s);
     assert!(s.contains("now: bash `cargo test --all`"), "{}", s);
-    assert!(s.ends_with("où en est-on ?"), "{}", s);
+    assert!(s.ends_with("où en est-on ?\n</user_message>"), "{}", s);
     // a task's message to main carries no status block
     let (_, fx) = t.req(
         "docs",
@@ -1166,6 +1175,7 @@ fn a_user_message_to_main_starts_with_the_task_status() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let s = steer_to(&fx, MAIN).or_else(|| say_to(&fx, MAIN)).unwrap();
@@ -1191,6 +1201,7 @@ fn sb_tasks_details_every_task() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let (tok, fx) = t.req(MAIN, AgentReq::Tasks);
@@ -1244,6 +1255,7 @@ fn agents_talk_as_long_as_they_want() {
                 why: String::new(),
                 switch: None, parts: String::new(),
                 attach: Vec::new(),
+                fwd: None,
             },
         );
         assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "message {}", i);
@@ -1270,6 +1282,7 @@ fn send(t: &mut T, from: &str, to: &str, text: &str, queued: bool) -> (u64, Vec<
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     )
 }
@@ -1455,6 +1468,7 @@ fn a_queued_message_does_not_end_a_wait() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     assert!(
@@ -1484,6 +1498,7 @@ fn docs_question_card(t: &mut T) -> (u64, u64) {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let id = t
@@ -1526,6 +1541,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     assert!(t.hub.st.cards.contains_key(&card));
@@ -1544,6 +1560,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let e = err_of(&fx, tok);
@@ -1563,6 +1580,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let e = err_of(&fx, tok);
@@ -1594,6 +1612,7 @@ fn agent_traffic_never_reaches_the_user_inbox() {
                 why: String::new(),
                 switch: None, parts: String::new(),
                 attach: Vec::new(),
+                fwd: None,
             },
         )
     };
@@ -1639,6 +1658,7 @@ fn main_withdraws_its_own_card_with_a_why() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
@@ -1727,6 +1747,7 @@ fn question_then_reply(t: &mut T, queued: bool) -> (u64, u64) {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let q = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
@@ -1741,6 +1762,7 @@ fn question_then_reply(t: &mut T, queued: bool) -> (u64, u64) {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let r = t.hub.st.msgs().values().find(|m| m.text == "v2").unwrap().id;
@@ -1876,6 +1898,7 @@ fn spawn_in(t: &mut T, name: &str, place: &str) -> (u64, Vec<Effect>) {
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     )
 }
@@ -2028,6 +2051,7 @@ fn a_restored_idle_task_gets_its_queued_mail() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     t.req(
@@ -2082,6 +2106,7 @@ fn a_spawn_with_a_model_is_answered_by_the_daemons_pick() {
         feature: String::new(),
         ask: bise_catalog::spawn::Ask { model: model.into(), ..Default::default() }, parts: String::new(),
         attach: Vec::new(),
+        fwd: None,
     };
     let (tok, fx) = t.req(MAIN, spawn("fast", "mistral/mistral-small-latest"));
     let picked = fx.iter().find_map(|e| match e {
@@ -2215,6 +2240,7 @@ fn send_v2(t: &mut T, from: &str, to: &str, text: &str, expect: bool, reply_to: 
             why: why.into(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let r = reply(&fx, tok).expect("send answers");
@@ -2305,6 +2331,7 @@ fn main_answering_a_question_is_answered() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     t.turn(MAIN, "thinking");
@@ -2329,6 +2356,7 @@ fn main_answering_a_question_is_answered() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     let q2 = t.hub.st.msgs().values().filter(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).max().unwrap();
@@ -2388,6 +2416,7 @@ fn a_message_the_user_cannot_deliver_says_so() {
             why: String::new(),
             switch: None, parts: String::new(),
             attach: Vec::new(),
+            fwd: None,
         },
     );
     assert!(fx.iter().all(|e| !matches!(e, Effect::Line { line, .. } if line.starts_with("sb undelivered"))), "{:?}", fx);
@@ -2876,6 +2905,7 @@ mod prs {
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
                 attach: Vec::new(),
+                fwd: None,
             },
         );
         assert!(fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == name)), "{:?}", fx);
@@ -3527,6 +3557,7 @@ mod prs {
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
                 attach: Vec::new(),
+                fwd: None,
             },
         );
         assert!(!fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "github")), "{:?}", fx);
@@ -3687,7 +3718,7 @@ fn bise_forwards_his_message_once_and_settles_on_the_answer() {
     t.spawn_task("docs");
     let (tok, fx) = t.req("docs", AgentReq::ProjectSend { project: "shop".into(), msg: his });
     assert_eq!(reply(&fx, tok).unwrap()["ok"], false);
-    let (_, _) = t.req("docs", AgentReq::Send { to: MAIN.into(), text: "fyi".into(), expect_reply: false, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() });
+    let (_, _) = t.req("docs", AgentReq::Send { to: MAIN.into(), text: "fyi".into(), expect_reply: false, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new(), fwd: None });
     let theirs = last_msg(&t);
     let (tok, fx) = t.req(MAIN, AgentReq::ProjectSend { project: "shop".into(), msg: theirs });
     assert!(reply(&fx, tok).unwrap()["error"].as_str().unwrap().contains("not a message the user sent you"), "{:?}", fx);
@@ -3741,7 +3772,7 @@ fn a_project_says_bise_message_once_and_answers_it_once() {
     let fx = t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new(), parts: String::new() });
     assert_eq!(reply(&fx, 900).unwrap()["ok"], true, "{:?}", fx);
     let said = say_to(&fx, MAIN).expect("main hears it");
-    assert!(said.contains("<user_message via=\"bise\">") && said.contains("fix the login"), "{}", said);
+    assert!(said.contains("<user_message id=\"m_1\" via=\"bise\">") && said.contains("fix the login"), "{}", said);
     // his thread here shows them as his words, via bise (route-name)
     assert!(fx.iter().any(|e| matches!(e, Effect::Line { agent, line } if agent == MAIN && line == r#"sb you :: {"text":"fix the login","via":"bise"}"#)), "{:?}", fx);
     // the same origin again: acked, not said again
@@ -3757,7 +3788,7 @@ fn a_project_says_bise_message_once_and_answers_it_once() {
     assert!(said.contains("from=\"@bise\""), "{}", said);
     let q = last_msg(&t);
     let send = |t: &mut T| {
-        t.req(MAIN, AgentReq::Send { to: "@bise".into(), text: "green".into(), expect_reply: false, reply_to: Some(q), queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() })
+        t.req(MAIN, AgentReq::Send { to: "@bise".into(), text: "green".into(), expect_reply: false, reply_to: Some(q), queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new(), fwd: None })
     };
     let (tok, fx) = send(&mut t);
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
@@ -4307,7 +4338,7 @@ fn his_card_answer_keeps_its_parts() {
     t.spawn_task("docs");
     let (_, _) = t.req(
         "docs",
-        AgentReq::Send { to: MAIN.into(), text: "v1 ou v2 ?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() },
+        AgentReq::Send { to: MAIN.into(), text: "v1 ou v2 ?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new(), fwd: None },
     );
     let id = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
     t.req(MAIN, AgentReq::Card { text: "La doc : v1 ou v2 ?".into(), for_msg: Some(id), page: None, artifact: None, open: Vec::new() });

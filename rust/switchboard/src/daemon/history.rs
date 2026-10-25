@@ -121,6 +121,28 @@ impl Shell {
             .collect();
         answer(&mut self.search, &self.opts.paths.state.join("agents"), &who, look, now_ms())
     }
+
+    /// msg-forward: `sb show m_<n>`: the message's entry in its recipient's
+    /// thread (`forward::msg_pos` over the transcript as a stream), then
+    /// `sb show <agent>#<pos>`; not found: one line naming the recipient.
+    pub(super) fn show_msg(&mut self, n: u64, context: Option<u64>) -> Value {
+        let Some(m) = self.hub.st.msgs().get(&n) else {
+            return json!({"ok": false, "error": format!("m_{n} unknown")});
+        };
+        let to = self.hub.st.resolve(&m.to).unwrap_or_else(|| m.to.clone());
+        let Some(dir) = self.hub.st.agents.get(&to).map(|a| a.dir.clone()) else {
+            return json!({"ok": false, "error": format!("m_{n} went to {to}, which has no thread here")});
+        };
+        let path = self.opts.paths.state.join("agents").join(&dir).join("transcript.log");
+        let pos = std::fs::File::open(&path).ok().and_then(|f| {
+            use std::io::BufRead;
+            crate::forward::msg_pos(std::io::BufReader::new(f).lines().map_while(Result::ok), n)
+        });
+        match pos {
+            Some(pos) => self.search(&Look::show(&to, pos as u64, context)),
+            None => json!({"ok": false, "error": format!("m_{n} is not in {to}'s thread (its transcript was rotated or deleted)")}),
+        }
+    }
 }
 
 /// `sb inspect`'s page of the thread at `path` (agent `name`): the

@@ -142,12 +142,13 @@ impl Shell {
         let body = match req {
             // another project's thread (S2 C, xread.rs): `<p>/<agent>`
             AgentReq::Inspect(q) if xread::elsewhere(&q.agent) => self.xinspect(&q),
-            AgentReq::Show { agent, pos, context } if xread::elsewhere(&agent) => self.xshow(&agent, pos, context),
+            AgentReq::Show { msg: Some(n), context, .. } => self.show_msg(n, context),
+            AgentReq::Show { agent, pos, context, .. } if xread::elsewhere(&agent) => self.xshow(&agent, pos, context),
             AgentReq::History(h) if xread::wanted(&h) => self.xsearch(&h),
             // S10: bise's `sb follow <p>/<agent>`: on that project's hub
             AgentReq::Follow { agent, on, .. } if self.wants_follow(&agent) => return self.xfollow(stream, &from, &agent, on),
             AgentReq::Inspect(q) => self.inspect(&from, &q),
-            AgentReq::Show { agent, pos, context } => self.search(&history::Look::show(&agent, pos, context)),
+            AgentReq::Show { agent, pos, context, .. } => self.search(&history::Look::show(&agent, pos, context)),
             AgentReq::History(h) => self.search(&history::Look::history(&h)),
             r @ (AgentReq::PagePublish(_) | AgentReq::PageStart { .. } | AgentReq::PageTick { .. } | AgentReq::PageWaiting | AgentReq::PageList | AgentReq::PageNotes { .. }) => self.page_op(&from, r),
             AgentReq::Taste(k) => self.keeps_op("taste", &k),

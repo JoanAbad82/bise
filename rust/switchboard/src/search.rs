@@ -634,6 +634,12 @@ pub fn fmt_iso(ms: u64) -> String {
     format!("{:04}-{:02}-{:02}T{:02}:{:02}", y, m, d, r / 3600, r % 3600 / 60)
 }
 
+/// `2026-09-30 14:03 UTC`: a forwarded message's time in its header
+/// (msg-forward: the shell formats it, sb-core writes it as given).
+pub fn fmt_utc(ms: u64) -> String {
+    format!("{} UTC", fmt_iso(ms).replace('T', " "))
+}
+
 /// A time for `--since`/`--until`: an age (`30m`, `5h`, `2d`, `2j`,
 /// `2w`) before `now`, or a UTC date `YYYY-MM-DD[THH:MM]`.
 pub fn parse_time(s: &str, now: u64) -> Result<u64, String> {

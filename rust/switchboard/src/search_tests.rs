@@ -225,6 +225,10 @@ fn times_and_refs() {
     assert_eq!(fmt_iso(t), "2026-09-30T14:03");
     assert_eq!(fmt_iso(parse_time("1970-01-01", NOW).unwrap()), "1970-01-01T00:00");
     assert_eq!(fmt_iso(parse_time("2024-02-29", NOW).unwrap()), "2024-02-29T00:00");
+    // msg-forward: a forward's header time, on fixed points
+    assert_eq!(fmt_utc(0), "1970-01-01 00:00 UTC");
+    assert_eq!(fmt_utc(parse_time("2024-02-29T23:59", NOW).unwrap()), "2024-02-29 23:59 UTC");
+    assert_eq!(fmt_utc(t), "2026-09-30 14:03 UTC");
     assert!(parse_time("yesterday", NOW).is_err());
     assert!(parse_time("2026-13-01", NOW).is_err());
     let a = |s: &[&str]| s.iter().map(|x| x.to_string()).collect::<Vec<_>>();

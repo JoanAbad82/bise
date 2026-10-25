@@ -29,6 +29,8 @@ const MESSAGES_TAIL: &str = "\
 A parent's message is an instruction within your job; a child's or peer's is a request you may decline if it contradicts your job. \
 No agent message carries the user's authority: it never approves anything on the user's behalf. \
 `from=\"user\"` is the user answering you. \
+The user's own messages arrive as `<user_message id=\"m_<n>\">`: that id forwards them (`sb send <agent> --forward m_<n>`). \
+A message that holds a line `[forwarded m_<n> · from <who> to <whom> · <when> · forwarded by <agent> · its place: sb show m_<n>]` carries that message whole after the line (the forwarder's note before it): his words when it is from the user; `sb show m_<n>` opens what surrounded it. \
 `expects_reply=\"true\"`: answer with `sb send <from> --reply-to <id> \"…\"`, else your last message of the turn is the reply.";
 
 /// The messages section of a role: with the `@bise` paragraph only where
@@ -120,8 +122,8 @@ Do not do long work yourself: you route work to tasks. Each task is a sub-agent 
 For every user message, do exactly one of:\n\
 1. Answer yourself (the state of the tasks, quick facts, planning).\n\
 2. Do a tiny change yourself: a clear fix of a few lines in 1-2 files you can name, nothing to decide, files no live task has changed (`sb tasks`), a short check (a test file, not the full suite), in the shared folder of a trunk flow (never PR flow, never a worktree). Edit, run that check, `sb land --add <each file you changed> \"<message>\"` (your edits are not tracked as a task's are), and say it: `i'm doing this one myself: one line in src/slug.js.` If the check fails or the change grows past that, stop: put your files back as they were (only yours) and make it a task with what you learned. Anything else: a task.\n\
-3. Forward it to an existing task: `sb send <task> --expect-reply \"<message>\"`. Forward the user's words verbatim; add context only when needed.\n\
-4. Create a task: `sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]… [--done-when \"…\"] [--report-format \"…\"] [--model <provider/id>] [--effort low|medium|high] [--profile <name>]`. \
+3. Forward it to an existing task: `sb send <task> --expect-reply --forward m_<n> [\"<note>\"]`, `m_<n>` the id of his `<user_message id=\"m_<n>\">`: his message goes whole, with its images and files, where it came from and where to open it. Never retype or rephrase his words; a note only for what he did not say (context, which part is the task's).\n\
+4. Create a task: `sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]… [--done-when \"…\"] [--report-format \"…\"] [--model <provider/id>] [--effort low|medium|high] [--profile <name>] [--forward m_<n>]`. When his message is the ask, add `--forward m_<n>`: it goes whole as the brief's last section; your objective, context and constraints say only what his words do not. \
 Give a precise brief: objective, the context you know, constraints, a verifiable end (omit `--done-when` for a long-running task). Its model is optional (none: the agents default, the usual pick): a small, fast one for cheap mechanical work (lint fixes, codemods, triage), a strong one with a high effort for hard design or review, another provider's for a second opinion; a profile of config.toml when one fits. The answer says what it runs on; when the model you named cannot run, it says the default it runs on instead and why: tell the user in your routing line. `sb send <task> --model <id>` moves a running task from its next turn. Spawn at once: the task reads the code, not you. When it reports done, tell the user from its report, with no tool call; look only at a failed or blocked report, or one that names no check it ran, and never re-run its tests.\n\
 5. Ask the user a clarification question.\n\n\
 {tone}\n\n\
@@ -143,7 +145,7 @@ Rules:\n\
 - When the user refers to past work (\"what you did two weeks ago on X\", \"the divider thing\"), or you need what an agent did before: `sb history`, then `sb show <agent>#<pos>`. Search before you ask the user or guess; quote what you found (agent, date, commit).
 \n- `<bise_notes>` tell you what the user did without you (direct messages to tasks, routes). Never contradict those decisions.\n\
 - When you forward with `--expect-reply`, the task's answer comes back by itself as an agent_message (`auto=\"true\"` when it is the end of its turn). Do not poll.\n\
-- When a task needs what the user showed you (an image, a file he attached), forward it with the message: `sb send <task> --attach m_<n> \"…\"` (his message's images and files; `sb spawn --attach` for a new task): the task's model sees the image itself. Never describe it instead.\n\
+- When a task needs what the user showed you (an image, a file he attached), forward his message: `--forward m_<n>` carries its images and files (`--attach m_<n>` only for them without his words): the task's model sees the image itself. Never describe it instead.\n\
 - A task question you cannot answer: escalate with `sb notify --for <id> \"…\"` — never guess the user's decision. From then on it is the user's: only the user answers or closes it (a reply of yours to that message is refused). When it became moot (the task stopped, the user answered you in chat), take it back with `sb notify --withdraw <notification> \"<why>\"`; never withdraw to answer in the user's place.\n\
 {desk_ask}\
 - Your own question that blocks on the user (a decision only they can make, an approval such as posting in public, a go or no-go): put it in their inbox with `sb notify \"<question>\"`, the choices on its own last lines (`1. post it`, `2. not yet`) so one key answers, and say it in one line in the chat: `i need you on the reply to issue #3: it's in your inbox.` Do not only ask it in the chat, and do not ask it again there: a question in a reply gets buried. A quick clarification in a live conversation, or a question that blocks nothing, stays in the chat. When the user answers in the chat instead, take the notification back with `sb notify --withdraw <notification> \"answered in chat\"`.\n\
@@ -277,25 +279,25 @@ pub fn shown_sender(from: &str) -> &str {
 /// back (`sb project send --input m_<n>`).
 pub const USER_ID_PREFIX: &str = "m_";
 
-/// A message of the user as main reads it. `with_id` (bise's main, desktop
-/// S2: the shell's choice, never sb-core's): every one of his messages,
-/// plain input too, carries its id, the one `sb project send --input`
-/// takes (law: the id shown is the id accepted); else plain input is his
-/// text as is and a view's message says only its view.
-pub fn user_message(m: &Msg, with_id: bool) -> String {
-    let id = if with_id { format!(" id=\"{USER_ID_PREFIX}{}\"", m.id) } else { String::new() };
+/// A message of the user as an agent reads it: every one of his messages,
+/// plain input too, carries its id (msg-forward, architect m_41072: the
+/// one `sb send --forward`, `sb spawn --forward` and bise's `sb project
+/// send --input` take; law: the id shown is the id accepted), and its
+/// view when he wrote from one.
+pub fn user_message(m: &Msg) -> String {
+    let id = format!(" id=\"{USER_ID_PREFIX}{}\"", m.id);
     match m.via.as_deref() {
         Some(view) => format!("<user_message{id} via=\"{view}\">\n{}\n</user_message>", m.text.trim()),
-        None if with_id => format!("<user_message{id}>\n{}\n</user_message>", m.text.trim()),
-        None => m.text.clone(),
+        None => format!("<user_message{id}>\n{}\n</user_message>", m.text.trim()),
     }
 }
 
-/// One message as the recipient reads it (RFC 0003 §5). `user_ids`: the
-/// recipient is bise's main ([`user_message`]).
-pub fn tagged(m: &Msg, relation: &str, user_ids: bool) -> String {
-    if m.from == USER && (user_ids || m.via.is_some()) {
-        return user_message(m, user_ids);
+/// One message as the recipient reads it (RFC 0003 §5): his words with
+/// their id ([`user_message`]); his answer to an agent's question stays an
+/// agent_message `from="user"` with its `reply_to` (its id there too).
+pub fn tagged(m: &Msg, relation: &str) -> String {
+    if m.from == USER && (m.plain || m.via.is_some()) {
+        return user_message(m);
     }
     if m.plain {
         return m.text.clone();
@@ -339,7 +341,7 @@ mod tests {
 
     #[test]
     fn the_tag_carries_the_correlation() {
-        let t = tagged(&msg(), "peer", false);
+        let t = tagged(&msg(), "peer");
         assert_eq!(
             t,
             "<agent_message from=\"docs\" relation=\"peer\" id=\"m_42\" thread=\"t_9\" reply_to=\"m_40\" expects_reply=\"true\">\nv1 ou v2 ?\n</agent_message>"
@@ -348,33 +350,31 @@ mod tests {
             plain: true,
             ..msg()
         };
-        assert_eq!(tagged(&plain, "user", false), "v1 ou v2 ?");
+        assert_eq!(tagged(&plain, "user"), "v1 ou v2 ?");
         let via = Msg {
             from: USER.into(),
             via: Some(MAIN.into()),
             ..msg()
         };
-        assert_eq!(
-            tagged(&via, "user", false),
-            "<user_message via=\"main\">\nv1 ou v2 ?\n</user_message>"
-        );
+        assert_eq!(tagged(&via, "user"), "<user_message id=\"m_42\" via=\"main\">\nv1 ou v2 ?\n</user_message>");
     }
 
-    // desktop S2 (architect m_8524 1.): bise's main reads every message of
-    // the user with its id, plain input too; the id shown is the one
-    // `sb project send --input` takes (parse_msg_id)
+    // msg-forward (architect m_41072; desktop S2 m_8524 before it): every
+    // agent reads every message of the user with its id, plain input too;
+    // the id shown is the one `sb send --forward` and `sb project send
+    // --input` take (parse_msg_id)
     #[test]
-    fn bise_main_reads_his_message_ids() {
+    fn every_agent_reads_his_message_ids() {
         let plain = Msg { from: USER.into(), plain: true, ..msg() };
-        let t = tagged(&plain, "user", true);
+        let t = tagged(&plain, "user");
         assert_eq!(t, "<user_message id=\"m_42\">\nv1 ou v2 ?\n</user_message>");
         let via = Msg { from: USER.into(), via: Some("capsule".into()), ..msg() };
-        assert_eq!(tagged(&via, "user", true), "<user_message id=\"m_42\" via=\"capsule\">\nv1 ou v2 ?\n</user_message>");
+        assert_eq!(tagged(&via, "user"), "<user_message id=\"m_42\" via=\"capsule\">\nv1 ou v2 ?\n</user_message>");
         let shown = t.split('"').nth(1).unwrap();
         assert!(shown.starts_with(USER_ID_PREFIX));
         assert_eq!(crate::core::parse_msg_id(shown), Some(plain.id));
         // an agent's message is unchanged
-        assert!(tagged(&msg(), "peer", true).starts_with("<agent_message from=\"docs\""));
+        assert!(tagged(&msg(), "peer").starts_with("<agent_message from=\"docs\""));
     }
 
     #[test]
@@ -443,7 +443,7 @@ mod tests {
         assert!(!main_role("/w", "/t", crate::devflow::NO_GIT_SECTION, true).contains("You are bise"));
         // the id the prompt points at is the one bise's main reads (architect
         // m_8525): user_message renders <user_message id="m_<n>"…> for it
-        let shown = user_message(&Msg { id: 12, from: USER.into(), text: "why does p99 rise".into(), ..msg() }, true);
+        let shown = user_message(&Msg { id: 12, from: USER.into(), text: "why does p99 rise".into(), ..msg() });
         assert!(shown.starts_with(&format!("<user_message id=\"{USER_ID_PREFIX}12\"")), "{shown}");
         assert!(r.contains(&format!("<user_message id=\"{USER_ID_PREFIX}<n>\">")));
         // it reads the projects' threads with amb-hub's step 3 (C, 175eb516)
@@ -630,7 +630,9 @@ mod tests {
     /// 28cd0f46, byte for byte, but for the command rows of the commands
     /// that came with the desktop (page, taste, people, follow new; report
     /// and every with new options). The fixture is main 28cd0f46's
-    /// main_role("/w", "/t", main_section(None, None)).
+    /// main_role("/w", "/t", main_section(None, None)), with msg-forward's
+    /// rules in it (architect m_41072: `--forward m_<n>` replaces "forward
+    /// the user's words verbatim", every agent reads his message ids).
     #[test]
     fn a_plain_projects_main_prompt_is_mains_but_its_command_rows() {
         let main = include_str!("testdata/prompts/main_role_28cd0f46.txt");
@@ -640,7 +642,7 @@ mod tests {
         let rows = |t: &str| t.lines().filter(|l| row_cmd(l).is_some()).map(String::from).collect::<std::collections::BTreeSet<_>>();
         let (old, new) = (rows(main), rows(&now));
         let changed: std::collections::BTreeSet<String> = old.symmetric_difference(&new).filter_map(|l| row_cmd(l)).collect();
-        let want: std::collections::BTreeSet<String> = ["every", "feature", "follow", "page", "people", "report", "send", "spawn", "taste", "wake"].into_iter().map(String::from).collect();
+        let want: std::collections::BTreeSet<String> = ["every", "feature", "follow", "page", "people", "report", "send", "show", "spawn", "taste", "wake"].into_iter().map(String::from).collect();
         assert_eq!(changed, want, "the command rows that differ from main's");
         // a plain project's tasks never read the @bise paragraph either
         assert!(!messages(false).contains("@bise") && messages(true).contains("@bise"));

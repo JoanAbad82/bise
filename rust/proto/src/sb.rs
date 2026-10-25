@@ -96,6 +96,10 @@ sb_reqs! {
             /// the daemon's (daemon/attach.rs), never on the wire
             #[serde(skip)]
             parts: String,
+            /// msg-forward: `--forward m_<n>`, the message it forwards
+            /// (`text`: the forwarder's note, "" none)
+            #[serde(default, with = "wire::opt_msg_id", skip_serializing_if = "Option::is_none")]
+            fwd: Option<u64>,
         },
         /// `sb send <task> --model <id> [--effort <e>]` without a text
         Switch = "switch" {
@@ -188,6 +192,10 @@ sb_reqs! {
             /// send-parts: the brief's parts from `attach`, the daemon's
             #[serde(skip)]
             parts: String,
+            /// msg-forward: `--forward m_<n>`, the message the brief
+            /// carries as its last section
+            #[serde(default, with = "wire::opt_msg_id", skip_serializing_if = "Option::is_none")]
+            fwd: Option<u64>,
         },
         /// `sb feature new|sync|ready|merge|drop|retire|list [<name>]`
         Feature = "feature" {
@@ -301,6 +309,10 @@ sb_reqs! {
             pos: u64,
             #[serde(default, skip_serializing_if = "Option::is_none")]
             context: Option<u64>,
+            /// msg-forward: `sb show m_<n>`: message n's entry in its
+            /// recipient's thread (then `agent` and `pos` are unset)
+            #[serde(default, with = "wire::opt_msg_id", skip_serializing_if = "Option::is_none")]
+            msg: Option<u64>,
         },
         /// `sb taste`: ~/bise/taste.md
         Taste = "taste" (Keep),

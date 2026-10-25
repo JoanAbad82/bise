@@ -639,9 +639,6 @@ pub struct Hub {
     /// build builds or is on trial (the `Δ`). Runtime only.
     pub feature_lids: BTreeMap<String, String>,
     pub trying: BTreeSet<String>,
-    /// desktop S2, set by the daemon: this is bise's home hub, so main
-    /// reads every user message with its id (`prompts::user_message`).
-    pub user_ids: bool,
     /// pr-hub (pr-design §7-§10), runtime but `known`: what the journal
     /// says of each place's PR (its number; `pr_*` lines, read back by
     /// `replay`); `pr_lids`: the held line of a worktree with no PR yet
@@ -797,7 +794,6 @@ impl Hub {
             flow: None,
             feature_lids: BTreeMap::new(),
             trying: BTreeSet::new(),
-            user_ids: false,
             pr_known: BTreeMap::new(),
             pr_lids: BTreeMap::new(),
             pr_ok_ms: BTreeMap::new(),
@@ -1732,6 +1728,7 @@ impl Hub {
                 switch,
                 parts,
                 attach: _,
+                fwd,
             } => {
                 // issue #4: the model first, so the message's turn runs on it
                 if let Some((model, effort)) = switch {
@@ -1750,6 +1747,7 @@ impl Hub {
                 if !parts.is_empty() {
                     q["parts"] = json!(parts);
                 }
+                crate::forward::keys(&self.st, &mut q, fwd);
                 q
             }
             AgentReq::Switch { to, model, effort } => {
@@ -1839,6 +1837,7 @@ impl Hub {
                 ask,
                 parts,
                 attach: _,
+                fwd,
             } => {
                 // issue #4: the answer waits for the daemon's pick of the model
                 if !ask.is_empty() {
@@ -1861,6 +1860,7 @@ impl Hub {
                             v["join"] = json!(ws);
                             v["worktree"] = json!(false);
                         }
+                        crate::forward::keys(&self.st, &mut v, fwd);
                         v
                     }
                     Err(e) => json!({"cmd": "spawn", "pre_err": e}),

@@ -226,6 +226,8 @@ pub struct Msg {
     pub via: Option<String>,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub parts: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fwd: Option<u64>,
 }
 
 /// Not an object: an error (its reader skips it).
@@ -246,6 +248,7 @@ impl<'de> Deserialize<'de> for Msg {
             queued: field(&o, "queued"),
             via: field(&o, "via"),
             parts: field(&o, "parts"),
+            fwd: field(&o, "fwd"),
         })
     }
 }

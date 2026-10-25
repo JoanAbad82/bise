@@ -688,6 +688,7 @@ impl Shell {
                 switch: None,
                 attach: Vec::new(),
                 parts: String::new(),
+                fwd: None,
             },
         });
         self.state_now();
@@ -1584,7 +1585,6 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     crate::util::timing("start (socket bound)");
     let workspace = paths.workspace.to_string_lossy().to_string();
     let mut hub = Hub::with_core(&workspace, opts.core_bin.clone());
-    hub.user_ids = xhub::is_home(&paths.workspace);
     boot.core(hub.core_pid());
     let (mut events, unreadable) = journal_file::read(&paths.journal());
     // BISE-230: the task worktrees of the old place (<state>/worktrees/)

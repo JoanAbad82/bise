@@ -8,7 +8,7 @@ use std::time::Duration;
 
 mod attach;
 mod build;
-pub use build::build;
+pub use build::{build, FORWARD_OBJECTIVE};
 mod keeps;
 mod pages;
 mod report;
@@ -51,9 +51,9 @@ pub const COMMANDS: &[CmdDoc] = &[
     ),
     cmd("sb tasks", Who::Everyone, "every task in detail: what it is doing now, its last report, its open questions."),
     cmd(
-        "sb send <agent> \"<text>\" [--expect-reply] [--reply-to <id>] [--mode steer|queued] [--attach <path|m_<n>>]...",
+        "sb send <agent> \"<text>\" [--expect-reply] [--reply-to <id>] [--mode steer|queued] [--attach <path|m_<n>>]... | sb send <agent> --forward m_<n> [\"<note>\"] [...]",
         Who::Everyone,
-        "send a message (never blocks). `--mode steer` (default): a busy recipient gets it at once, mid-turn. `--mode queued`: it waits until the recipient's turn ends, then starts its next turn. `--attach` (10 at most): an image its model sees, a file it reads by its path (one in your $TMPDIR is copied to its own), or `m_<n>`: the images and files of a message you got.",
+        "send a message (never blocks). `--mode steer` (default): a busy recipient gets it at once, mid-turn. `--mode queued`: it waits until the recipient's turn ends, then starts its next turn. `--attach` (10 at most): an image its model sees, a file it reads by its path (one in your $TMPDIR is copied to its own), or `m_<n>`: the images and files of a message you got. `--forward m_<n>`: a message you got or sent (the user's too), whole, with its images and files, who wrote it to whom and when, and where to open it; your note (optional) goes first. Never retype a message you can forward.",
     ),
     cmd(
         "sb ask <agent> \"<question>\" [--timeout <s>]",
@@ -87,9 +87,9 @@ pub const COMMANDS: &[CmdDoc] = &[
         "search every agent's thread (main, tasks, archived tasks), from before any compaction too: ranked hits `<agent>#<pos>`, 10 per page. Use it when the user mentions past work (\"what you did last week on X\").",
     ),
     cmd(
-        "sb show <agent>#<pos> [--context <n>]",
+        "sb show <agent>#<pos> | m_<n> [--context <n>]",
         Who::Everyone,
-        "open a hit: the entry with its neighbors, the commands to move earlier/later, and the agents, messages and commits it mentions.",
+        "open a hit: the entry with its neighbors, the commands to move earlier/later, and the agents, messages and commits it mentions. `m_<n>`: that message where its recipient got it (a forwarded message's place).",
     ),
     cmd(
         "sb every <10m|1h|day 07:30> \"<message>\" [--until <18:00|tomorrow 18:00|2h>] [--times <n>] [--to <agent>] [--page <id>] | sb every | sb every --stop <id>",
@@ -127,9 +127,9 @@ pub const COMMANDS: &[CmdDoc] = &[
         "the user message that led to your creation, verbatim, and main's turn up to the spawn.",
     ),
     cmd(
-        "sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]... [--done-when \"…\"] [--report-format \"…\"] [--place new|<agent>|<branch> [--with-changes]] [--feature <name>] [--model <provider/id>] [--effort low|medium|high] [--profile <name>] [--attach <path|m_<n>>]...",
+        "sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]... [--done-when \"…\"] [--report-format \"…\"] [--place new|<agent>|<branch> [--with-changes]] [--feature <name>] [--model <provider/id>] [--effort low|medium|high] [--profile <name>] [--attach <path|m_<n>>]... [--forward m_<n>]",
         Who::Main,
-        "create a task (names: [a-z0-9-], at most 24 chars). Where it works: the shared folder by default; `--place new` a new git worktree (`--worktree` says the same); `--place <agent>` or `<branch>` the worktree of agents already on that change (they share it and its branch); `--feature <name>` its own worktree from that feature's tip, landing on the feature. Its model, for its whole life: `--model` the model the task runs on (default: the agents model, `bise config set agents`); `--effort` its reasoning effort (default: the model's); `--profile` a named model + effort from config.toml [profiles.<name>], e.g. fast, deep, review. A model that cannot run (unknown, no key) never fails the spawn: the task runs on the agents default and the answer says what was asked and why.",
+        "create a task (names: [a-z0-9-], at most 24 chars). `--forward m_<n>`: that message (the user's ask) goes whole as the brief's last section, its images and files with it; `--objective` is then optional. Where it works: the shared folder by default; `--place new` a new git worktree (`--worktree` says the same); `--place <agent>` or `<branch>` the worktree of agents already on that change (they share it and its branch); `--feature <name>` its own worktree from that feature's tip, landing on the feature. Its model, for its whole life: `--model` the model the task runs on (default: the agents model, `bise config set agents`); `--effort` its reasoning effort (default: the model's); `--profile` a named model + effort from config.toml [profiles.<name>], e.g. fast, deep, review. A model that cannot run (unknown, no key) never fails the spawn: the task runs on the agents default and the answer says what was asked and why.",
     ),
     cmd(
         "sb send <task> --model <provider/id> [--effort <e>] [\"<text>\"]",

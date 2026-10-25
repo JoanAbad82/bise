@@ -27,13 +27,19 @@ pub fn build(args: &[String]) -> Result<Req, String> {
         "history" => Req::History(history(rest)?),
         "show" => {
             let (pos, o) = parse_args(rest, &["context"], &[])?;
-            let (agent, pos) = crate::search::parse_ref(&pos).ok_or("usage: sb show <agent>#<pos> [--context <n>]")?;
             let context = if o.contains_key("context") {
                 str_of(&o, "context").parse::<u64>().map_err(|_| "--context expects a number".to_string())?
             } else {
                 crate::search::DEFAULT_CONTEXT as u64
             };
-            Req::Show { agent, pos: pos as u64, context: Some(context) }
+            // msg-forward: `sb show m_<n>`, the message where its recipient got it
+            if let [one] = pos.as_slice() {
+                if let Some(n) = crate::core::parse_msg_id(one) {
+                    return Ok(Req::Show { agent: String::new(), pos: 0, context: Some(context), msg: Some(n) });
+                }
+            }
+            let (agent, pos) = crate::search::parse_ref(&pos).ok_or("usage: sb show <agent>#<pos> | m_<n> [--context <n>]")?;
+            Req::Show { agent, pos: pos as u64, context: Some(context), msg: None }
         }
         "send" => send(rest)?,
         // desktop S2 (bise's main): the projects, his words forwarded by
@@ -168,8 +174,9 @@ pub fn build(args: &[String]) -> Result<Req, String> {
 
 /// `sb send <agent> "<text>"`, or a model switch alone (issue #4).
 fn send(rest: &[String]) -> Result<Req, String> {
-    let (pos, o) = parse_args(rest, &["reply-to", "mode", "why", "model", "effort", "attach"], &["expect-reply"])?;
+    let (pos, o) = parse_args(rest, &["reply-to", "mode", "why", "model", "effort", "attach", "forward"], &["expect-reply"])?;
     let to = agent_arg(&pos, "usage: sb send <agent> \"<text>\"")?;
+    let fwd = forward_of(&o)?;
     // desktop S2: `@bise` (bise's question in a project hub) is a sender
     // of its own, not the agent `bise`
     let to = if pos.first().map(String::as_str) == Some("@bise") { "@bise".to_string() } else { to };
@@ -177,10 +184,11 @@ fn send(rest: &[String]) -> Result<Req, String> {
     // the text is optional then (a switch alone)
     let (model, effort) = (str_of(&o, "model"), str_of(&o, "effort"));
     let switch = (!model.is_empty() || !effort.is_empty()).then(|| (model.clone(), effort.clone()));
-    if switch.is_some() && pos.len() < 2 {
+    if switch.is_some() && pos.len() < 2 && fwd.is_none() {
         return Ok(Req::Switch { to, model, effort });
     }
-    let text = text_of(&pos[1..])?;
+    // msg-forward: with `--forward`, the text is the forwarder's note, optional
+    let text = if fwd.is_some() { pos[1..].join(" ") } else { text_of(&pos[1..])? };
     let attach = attach::of(&o)?;
     let queued = match str_of(&o, "mode").as_str() {
         "" | "steer" => false,
@@ -194,17 +202,34 @@ fn send(rest: &[String]) -> Result<Req, String> {
     };
     // main answering a task for the user: the reason, shown to the user
     // in main's feed (C2 `answered`)
-    Ok(Req::Send { to, text, expect_reply: o.contains_key("expect-reply"), reply_to, queued, why: str_of(&o, "why"), switch, attach, parts: String::new() })
+    Ok(Req::Send { to, text, expect_reply: o.contains_key("expect-reply"), reply_to, queued, why: str_of(&o, "why"), switch, attach, parts: String::new(), fwd })
+}
+
+/// msg-forward: `--forward m_<n>` (one), never with `--attach` (v1: two
+/// numberings of `[Image #k]` in one message).
+fn forward_of(o: &Map<String, Value>) -> Result<Option<u64>, String> {
+    if !o.contains_key("forward") {
+        return Ok(None);
+    }
+    if list_of(o.get("forward")).len() > 1 {
+        return Err("--forward: one message per forward".into());
+    }
+    if o.contains_key("attach") {
+        return Err("--forward and --attach go in two messages".into());
+    }
+    let id = str_of(o, "forward");
+    crate::core::parse_msg_id(&id).map(Some).ok_or_else(|| format!("--forward expects a message id (m_<n>), not {id:?}"))
 }
 
 /// `sb spawn <name> --objective …` (RFC 0001 §7.1, dev-flow §3.1, §5.1).
 fn spawn(rest: &[String]) -> Result<Req, String> {
     let (pos, o) = parse_args(
         rest,
-        &["objective", "context", "constraint", "done-when", "report-format", "place", "feature", "model", "effort", "profile", "attach"],
+        &["objective", "context", "constraint", "done-when", "report-format", "place", "feature", "model", "effort", "profile", "attach", "forward"],
         &["worktree", "with-changes"],
     )?;
     let attach = attach::of(&o)?;
+    let fwd = forward_of(&o)?;
     // dev-flow §5.1: its own worktree from the feature's tip
     let feature = str_of(&o, "feature");
     if !feature.is_empty() && (o.contains_key("place") || o.contains_key("worktree")) {
@@ -214,8 +239,12 @@ fn spawn(rest: &[String]) -> Result<Req, String> {
     if objective.is_empty() && pos.len() > 1 {
         objective = pos[1..].join(" ");
     }
+    // msg-forward: the forwarded message is the objective when none is given
+    if objective.is_empty() && fwd.is_some() {
+        objective = FORWARD_OBJECTIVE.to_string();
+    }
     if objective.is_empty() {
-        return Err("sb spawn: --objective is required".into());
+        return Err("sb spawn: --objective (or --forward m_<n>) is required".into());
     }
     let some = |s: String| Some(s).filter(|s| !s.is_empty());
     let brief = Brief { objective, context: str_of(&o, "context"), constraints: list_of(o.get("constraint")), done_when: some(str_of(&o, "done-when")), report_format: some(str_of(&o, "report-format")) };
@@ -233,8 +262,12 @@ fn spawn(rest: &[String]) -> Result<Req, String> {
         ask,
         attach,
         parts: String::new(),
+        fwd,
     })
 }
+
+/// The objective of `sb spawn --forward` without `--objective`.
+pub const FORWARD_OBJECTIVE: &str = "do what the forwarded message at the end of this brief asks";
 
 /// `sb history "<words>"` (S2 C: `--project`, `--all` on bise's hub).
 fn history(rest: &[String]) -> Result<History, String> {

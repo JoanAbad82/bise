@@ -350,6 +350,10 @@ pub const STATE: State = State {
                 f("via", OptStr),
                 // his message's parts as JSON (msg-parts); "" none
                 f("parts", Str),
+                // msg-forward: the message this one forwards (`sb send
+                // --forward m_<n>`), none for any other; its text says it
+                // for the model, this field for every other reader
+                f("fwd", OptNat),
             ],
             shapes: &[Shape {
                 name: "journal",
@@ -368,6 +372,7 @@ pub const STATE: State = State {
                     k("queued", W::Bool),
                     k("via", W::OptStrOmit),
                     k("parts", W::StrOmit),
+                    k("fwd", W::OptNatOmit),
                 ],
             }],
         },
