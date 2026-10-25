@@ -10,6 +10,7 @@ import { bims } from '@/proto/words_bims.gen';
 import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { type BOffice, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, type Things, boxAt } from './plan';
+import { ROOM } from './room';
 
 export interface RiadOffice extends BOffice {
   /** the patio's floor box (zellige, the arcades round it, the orange trees in its corners) */
@@ -115,7 +116,16 @@ const THINGS: Things = {
 /** the patio's arcades on its sides and the orange trees in its corners (render/maps/riad.ts): nothing cozy along its edges */
 const riadKeep = (o: Office): Box[] => {
   const p = (o as RiadOffice).patio;
+  // the tea things on the banquette between the first beds (render/maps/riad.ts teaTable, stages 2's
+  // and later's pieces): a roomier office frees floor there for a floor lamp
+  const tea = [0, 1].flatMap((lane) => {
+    const a = o.lounge[lane];
+    const b = o.lounge[lane + 1];
+    const x = a && b ? (a.x + b.x) / 2 : undefined;
+    return x === undefined ? [] : [{ x0: x - 0.5, x1: x + 0.5, z0: 0, z1: 0.85 }];
+  });
   return [
+    ...tea,
     { x0: p.x0 - 0.5, x1: p.x0 + 1.3, z0: p.z0 - 0.5, z1: p.z1 + 0.5 },
     { x0: p.x1 - 1.3, x1: p.x1 + 0.5, z0: p.z0 - 0.5, z1: p.z1 + 0.5 },
     { x0: p.x0 - 0.5, x1: p.x1 + 0.5, z0: p.z0 - 0.5, z1: p.z0 + 1.3 },
@@ -123,4 +133,4 @@ const riadKeep = (o: Office): Box[] => {
   ];
 };
 
-export const riad: Plan<RiadOffice> = { id: 'riad', ready: true, layout: riadLayout, things: THINGS, cozy: { keepOut: riadKeep } };
+export const riad: Plan<RiadOffice> = { id: 'riad', ready: true, layout: riadLayout, things: THINGS, cozy: { keepOut: riadKeep }, room: ROOM };

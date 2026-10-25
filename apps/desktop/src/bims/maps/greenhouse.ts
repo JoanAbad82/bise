@@ -11,6 +11,7 @@ import type { Box, Leg, Pt, Spot } from '../model';
 import { backBusy, backFrames, type CozyHints } from '../cozy';
 import { type BOffice, LOFT_LIKE, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, boxAt } from './plan';
+import { ROOM } from './room';
 
 export interface GreenhouseOffice extends BOffice {
   /** the ring's centre (the tree), the chairs' radius, the outer ring's, the table's */
@@ -115,4 +116,4 @@ const greenhouseCozy: CozyHints = {
   ],
 };
 
-export const greenhouse: Plan<GreenhouseOffice> = { id: 'greenhouse', ready: true, layout: greenhouseLayout, things: LOFT_LIKE, cozy: greenhouseCozy };
+export const greenhouse: Plan<GreenhouseOffice> = { id: 'greenhouse', ready: true, layout: greenhouseLayout, things: LOFT_LIKE, cozy: greenhouseCozy, room: ROOM };

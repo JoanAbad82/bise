@@ -7,6 +7,8 @@ import { BASE_BEDS, LAST_STAGE, bedStage, bedsAt } from './growth';
 import { COZY_AT, coffeeAtCorner, cozyAt, placeCozy } from './cozy';
 import { PLANS, layoutOf } from './maps';
 import { placesOf } from './maps/plan';
+import { roomKeepOut, withRoom } from './maps/room';
+import type { Office } from './model';
 import { network } from './paths';
 import { withSeats } from './sit';
 
@@ -46,8 +48,11 @@ describe('the cozy curve', () => {
 describe('the cozy places', () => {
   it('the same office gives the same places; a new agent count may move them, a stage never does', () => {
     const o = layoutOf(crowd(5).agents, 'riad');
-    // layoutOf places them on the office with its chairs' ways in (sit.ts withSeats)
-    expect(placeCozy(withSeats(PLANS.riad.layout(crowd(5).agents)), PLANS.riad.cozy ?? {})).toEqual(o.cozy);
+    // layoutOf places them on the office with its room for objects (maps/room.ts) and its chairs' ways in (sit.ts withSeats)
+    const room = PLANS.riad.room ?? { left: 0, right: 0 };
+    const hints = PLANS.riad.cozy ?? {};
+    const keepOut = (x: Office) => [...(hints.keepOut?.(x) ?? []), ...roomKeepOut(x, room)];
+    expect(placeCozy(withSeats(withRoom(PLANS.riad.layout(crowd(5).agents), room)), { ...hints, keepOut })).toEqual(o.cozy);
     expect(JSON.stringify(layoutOf(crowd(5).agents, 'riad').cozy)).toBe(JSON.stringify(o.cozy));
   });
 

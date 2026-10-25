@@ -659,7 +659,7 @@ function poster(k: Kit, g0: Groups, p: Hung, c: CozyLook, st: CozyStage, i: numb
       };
       // each shape a step out from the one before (more than its 8 mm): the botanic's leaves cross
       // its stem, and in one plane they z-fought (walls.test.ts)
-      (shapes[c.poster] ?? shapes.flat ?? []).forEach(([dx, dy, sw, sh, col], i) => k.add(style.box(sw, sh, 0.008), k.mat(col), g, dx, dy, z2 + i * 0.013));
+      (shapes[c.poster] ?? shapes.flat ?? []).forEach(([dx, dy, sw, sh, col], i) => k.add(style.box(sw, sh, 0.008), k.mat(col), g, dx, dy, z2 + i * 0.016));
     }
   }
   if (st.framed) {

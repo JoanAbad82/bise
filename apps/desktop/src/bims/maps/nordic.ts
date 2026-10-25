@@ -7,10 +7,11 @@
 // Owner: maps-b.
 import type { Agent } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
-import type { Box, Leg, Spot } from '../model';
+import type { Box, Leg, Office, Spot } from '../model';
 import { backBusy, type CozyHints } from '../cozy';
 import { type BOffice, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, type Things, boxAt } from './plan';
+import { ROOM } from './room';
 
 export interface NordicOffice extends BOffice {
   /** the long table's floor box */
@@ -89,9 +90,17 @@ const THINGS: Things = {
 };
 
 /** its look's walls and what stands by them (render/maps/nordic.ts): the stove and its logs at the back left, the skis in the back right corner */
+/** the tall windows on the left wall (render/maps/nordic.ts shell): nothing hangs on them */
+function leftWindows(o: Office): [number, number][] {
+  const n = o as NordicOffice;
+  const out: [number, number][] = [];
+  for (let z = n.island.z1 + 0.4; z < n.D - 1.2; z += 2.4) out.push([z, z + 1.4]);
+  return out;
+}
+
 const nordicCozy: CozyHints = {
-  walls: (o) => [{ wall: 'back', top: 1.9, busy: backBusy(o) }, { wall: 'left', top: 1.3 }, { wall: 'right', top: 0 }],
+  walls: (o) => [{ wall: 'back', top: 1.9, busy: backBusy(o) }, { wall: 'left', top: 1.3, busy: leftWindows(o) }, { wall: 'right', top: 0 }],
   keepOut: (o) => [{ x0: o.x0, x1: o.x0 + 0.95, z0: 0.1, z1: 1.8 }, { x0: o.x0 + o.W - 0.75, x1: o.x0 + o.W, z0: 0, z1: 0.45 }],
 };
 
-export const nordic: Plan<NordicOffice> = { id: 'nordic', ready: true, layout: nordicLayout, things: THINGS, cozy: nordicCozy };
+export const nordic: Plan<NordicOffice> = { id: 'nordic', ready: true, layout: nordicLayout, things: THINGS, cozy: nordicCozy, room: ROOM };

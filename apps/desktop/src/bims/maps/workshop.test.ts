@@ -9,6 +9,7 @@ import type { Box, Leg, Pt } from '../model';
 import { network, path, along } from '../paths';
 import { legToBox } from '../cozy';
 import { layoutOf } from './index';
+import { ROOM } from './room';
 import { type WorkshopOffice, vespaBox, workshopLayout } from './workshop';
 import { CORNERS, WALL_MAX, cornersOf, podPieces, podsOf } from './workshop-floor';
 
@@ -34,7 +35,8 @@ describe('the workshop: walls, pods and corners', () => {
 
   it('is ~27 x 14 at 30 desks, the same room as at 18', () => {
     const o = ws(30);
-    expect(o.W).toBeCloseTo(27.35, 2);
+    // its desks' room, and the room it makes for his plugins' objects (maps/room.ts)
+    expect(o.W).toBeCloseTo(27.35 + ROOM.left + ROOM.right, 2);
     expect(o.D).toBeCloseTo(14.1, 2);
     expect(ws(18).W).toBeCloseTo(o.W, 6);
     expect(ws(18).D).toBeCloseTo(o.D, 6);

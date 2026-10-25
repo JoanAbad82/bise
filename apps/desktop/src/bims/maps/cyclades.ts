@@ -7,6 +7,7 @@
 import type { Agent } from '@/proto';
 import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { type Plan, boxAt, deskNames } from './plan';
+import { ROOM } from './room';
 import { CROSS_BACK, backZone, frontZone, keepSlots, slotsUsed, walksOf } from './yard';
 
 /** a cube: its middle (the desks' row), its width; the first one has the blue dome */
@@ -101,4 +102,13 @@ export function cycladesLayout(agents: readonly Agent[], prev?: CycladesOffice):
   return { ...base, walks: walksOf(base, trunk), queueMore: back.queueMore, rows, cubes, tables, posts, lanes: LANES };
 }
 
-export const cyclades: Plan<CycladesOffice> = { id: 'cyclades', ready: true, layout: cycladesLayout };
+/** the first cube's dome on its back wall (render/maps/cyclades.ts cube): no floor lamp's shade under it */
+const domeKeep = (o: Office): Box[] => {
+  const c = (o as CycladesOffice).cubes[0];
+  if (!c) return [];
+  const x = c.x - c.w / 2 + 0.8;
+  const z0 = c.z - 0.55;
+  return [{ x0: x - 0.65, x1: x + 0.65, z0: z0 - 0.65, z1: z0 + 0.65 }];
+};
+
+export const cyclades: Plan<CycladesOffice> = { id: 'cyclades', ready: true, layout: cycladesLayout, cozy: { keepOut: domeKeep }, room: ROOM };

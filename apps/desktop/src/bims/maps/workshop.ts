@@ -15,6 +15,7 @@ import type { Box, Leg, Nook, Office, Pt, Spot } from '../model';
 import type { CozyHints } from '../cozy';
 import { type BOffice, LOFT_LIKE, QUEUE_N, type Way, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { NAP_BED, NAP_ROW, type Plan, boxAt, napBedAt } from './plan';
+import { ROOM } from './room';
 import { type Corner, LINK_X, type Pod, VESPA_AT, VESPA_HALF, WALL_MAX, cornerOf, cornersOf, floorDepth, podAt, podDesk, podPieces, podsOf } from './workshop-floor';
 
 /** the nap place's columns: a bed (plan.ts NAP_BED) and a lane */
@@ -247,4 +248,4 @@ export function cornerRug(c: Corner): Box {
   return { x0: Math.min(c.x - 1.4, ...xs), x1: Math.max(c.x + 1.4, ...xs), z0: Math.min(c.z - 1.1, ...zs), z1: Math.max(c.z + 1.1, ...zs) };
 }
 
-export const workshop: Plan<WorkshopOffice> = { id: 'workshop', ready: true, layout: workshopLayout, things: LOFT_LIKE, cozy: workshopCozy };
+export const workshop: Plan<WorkshopOffice> = { id: 'workshop', ready: true, layout: workshopLayout, things: LOFT_LIKE, cozy: workshopCozy, room: ROOM };

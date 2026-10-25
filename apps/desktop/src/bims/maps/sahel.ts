@@ -8,6 +8,7 @@ import type { Agent } from '@/proto';
 import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { backBusy, backFrames, type CozyHints } from '../cozy';
 import { type Plan, boxAt, deskNames } from './plan';
+import { ROOM } from './room';
 import { CROSS_BACK, backZone, frontZone, keepSlots, slotsUsed, walksOf } from './yard';
 
 export interface SahelOffice extends Office {
@@ -92,4 +93,4 @@ const sahelCozy: CozyHints = {
   keepOut: (o) => [{ x0: o.door.x + 0.5, x1: o.door.x + 1.95, z0: o.D - 0.6, z1: o.D }],
 };
 
-export const sahel: Plan<SahelOffice> = { id: 'sahel', ready: true, layout: sahelLayout, cozy: sahelCozy };
+export const sahel: Plan<SahelOffice> = { id: 'sahel', ready: true, layout: sahelLayout, cozy: sahelCozy, room: ROOM };

@@ -87,7 +87,10 @@ function shell(b: Build): void {
   const banco = k.mat(k.pal.wall);
   k.add(k.style.box(W + 0.2, 1.5, 0.4), banco, root, x0 + W / 2, 0.75, -0.2);
   k.add(k.style.box(0.4, 1.2, D + 0.2), banco, root, x0 - 0.2, 0.6, D / 2);
-  for (let x = x0 + 0.6; x < x0 + W; x += 0.9) k.add(k.style.cylinder(0.035, 0.5), k.mat(WOOD), root, x, 1.2, 0.05).rotation.x = Math.PI / 2;
+  // the torons go round the posters on the back wall (a roomier office moves them under one)
+  const hung = (o.cozy?.posters ?? []).filter((p) => p.wall === 'back');
+  const underPoster = (x: number): boolean => hung.some((p) => Math.abs(p.x - x) < p.w / 2 + 0.08);
+  for (let x = x0 + 0.6; x < x0 + W; x += 0.9) if (!underPoster(x)) k.add(k.style.cylinder(0.035, 0.5), k.mat(WOOD), root, x, 1.2, 0.05).rotation.x = Math.PI / 2;
   for (let x = x0; x <= x0 + W + 0.01; x += W / 4) {
     k.add(k.style.box(0.55, 1.8, 0.6), banco, root, offNap(o, x), 0.9, -0.15);
     cone(k, root, 0.25, 0.5, k.pal.wall, offNap(o, x), 2.05, -0.15);

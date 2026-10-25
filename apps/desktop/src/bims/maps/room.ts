@@ -19,6 +19,8 @@ export const ROOM: Room = { left: 1.6, right: 1.4 };
 
 /** how far past the nap place's last row the play corner's back of the band reaches */
 const PLAY_DEPTH = 1.5;
+/** a poster's strip along its wall (cozy.ts boxOn's depth) */
+const POSTER_STRIP = 0.42;
 
 const same = (a: { x: number; z: number }, b: { x: number; z: number }): boolean => Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.z - b.z) < 1e-9;
 
@@ -36,5 +38,6 @@ export function withRoom<O extends Office>(o: O, r: Room): O {
 export function roomKeepOut(o: Office, r: Room): Box[] {
   if (r.left <= 0) return [];
   const back = Math.max(0, ...o.lounge.map((l) => l.z)) + PLAY_DEPTH;
-  return [{ x0: o.x0, x1: o.x0 + r.left, z0: 0, z1: back }];
+  // the wall's own strip stays a poster's (cozy.ts hangs them there; the objects keep off a poster's strip)
+  return [{ x0: o.x0 + POSTER_STRIP, x1: o.x0 + r.left, z0: 0, z1: back }];
 }

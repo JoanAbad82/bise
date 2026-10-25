@@ -77,6 +77,8 @@ export const WALK_GAP = BODY_R + 0.1;
 export const BIM_W = 2 * BODY_R + 0.03;
 /** how far from furniture, cozy pieces and the decor indoors */
 const AROUND = 0.2;
+/** a poster's strip along its wall (cozy.ts boxOn's depth) */
+const POSTER_STRIP = 0.42;
 /** the parasol's canopy's and the palm's fronds' half reach */
 const CANOPY = 0.9;
 const EDGE = 0.12;
@@ -189,6 +191,11 @@ function keepOf(o: Office): Keep {
   const c = o.cozy;
   if (c !== undefined) {
     for (const it of [c.coffee, c.shelf, ...c.lamps, ...c.plants]) boxes.push(it.box);
+    // a poster's strip along its wall: nothing stands in front of it
+    for (const h of c.posters) {
+      if (h.wall === 'back') boxes.push({ x0: h.x - h.w / 2, x1: h.x + h.w / 2, z0: 0, z1: POSTER_STRIP });
+      if (h.wall === 'left') boxes.push({ x0: o.x0, x1: o.x0 + POSTER_STRIP, z0: h.z - h.w / 2, z1: h.z + h.w / 2 });
+    }
   }
   if (o.inbox !== undefined) boxes.push(inboxBox(o.inbox));
   if (o.park !== undefined) boxes.push(o.park.area);
