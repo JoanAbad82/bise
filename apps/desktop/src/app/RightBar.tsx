@@ -641,6 +641,10 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                 onOpen={(agent) => {
                   openAgent(project, agent);
                 }}
+                // an object's '?' / '✗': its plugin on the plugins page
+                onOpenPlugin={(key) => {
+                  router.go({ screen: 'plugins', id: key });
+                }}
                 // the map chip's pick: the same prefs as '/bims <map>' (thread/commands.ts)
                 onPickMap={(m) => {
                   store.command({ cmd: 'prefs_set', key: mapPrefKey(project), value: m });

@@ -47,8 +47,8 @@ export function breaksOf(o: Office, c: Corners): string[] {
     });
     const floor = p.corner === 'terrace' ? terraceSlab(o) : room;
     if (!inside(p.box, floor)) out.push(`${at}: off its ${p.corner === 'terrace' ? 'terrace' : 'room'}`);
-    // only its own corner, or the other one a travel thing may take (the door or the terrace)
-    if (p.corner !== CORNER[p.of] && p.corner !== ALSO[p.of]) out.push(`${at}: ${CORNER[p.of]} thing in ${p.corner}`);
+    // only its own corner, or the other one a travel thing may take (the door or the terrace), or its swap's own (the ping-pong's babyfoot by the nap place)
+    if (p.corner !== CORNER[p.of] && p.corner !== ALSO[p.of] && !(p.obj !== p.of && p.corner === CORNER[p.obj])) out.push(`${at}: ${CORNER[p.of]} thing in ${p.corner}`);
     if (p.corner === 'hang' && p.box.z0 > 0.3 && p.box.x0 > o.x0 + 0.3) out.push(`${at}: hangs off the back and left walls`);
   });
   return out;

@@ -45,6 +45,7 @@ import type { Growth } from '@/proto';
 import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
 import type { PluginObject } from './plugin-objects';
 import type { Corners } from './corners';
+import { objPillsOf, type ObjPill } from './objpills';
 import { planOf } from './maps';
 import './office.css';
 
@@ -202,6 +203,7 @@ export function Office({
   parts,
   follow = null,
   onOpen,
+  onOpenPlugin,
   onPickMap,
   pins = false,
   transparent = false,
@@ -224,6 +226,8 @@ export function Office({
   follow?: string | null;
   /** a click on a bim: open that agent, as its row's click */
   onOpen: (agent: string) => void;
+  /** a click on an object's '?' / '✗' pill: open its plugin (its key); absent: the pill shows, no click */
+  onOpenPlugin?: (key: string) => void;
   /** his pick in the map chip's menu (MapChip.tsx, bottom left); absent (the town): no chip */
   onPickMap?: (map: MapId) => void;
   /** a new project's welcome (welcome/Welcome.tsx): the 1, 2, 3 pins over the lead, an empty desk, the tray (pins.tsx) */
@@ -307,6 +311,8 @@ export function Office({
   const high = useMemo(() => (testMode() ? ((window as { __biseGrow?: Growth }).__biseGrow ?? growth) : growHigh(project, growth)), [project, growth]);
   const growNow = useMemo(() => growOf(high), [high]);
   const [newTag, setNewTag] = useState<{ text: string; x: number; y: number } | null>(null);
+  // his plugins' objects' '?' / '✗' (plugin-objects.ts pill): over each object, where it stands
+  const [objPills, setObjPills] = useState<readonly ObjPill[]>([]);
   // the growth drawn: before the rows, so the first one is no unlock moment (no mark yet: a bare room)
   useEffect(() => {
     if (high === null) return;
@@ -409,6 +415,7 @@ export function Office({
     let tick: ReturnType<typeof setTimeout> | undefined;
     let lastLabels = '';
     let lastNew = 'null';
+    let lastPills = '[]';
     let reduced = reducedMotion();
     let firstDrawn = false;
     /** his last wheel (a pinch, a two-finger pan), ms: a sky blend waits HOLD_MS past it */
@@ -499,6 +506,12 @@ export function Office({
       if (JSON.stringify(tag) !== lastNew) {
         lastNew = JSON.stringify(tag);
         setNewTag(tag);
+      }
+      const pills = objPillsOf(step.corners.placed, (x, y, z) => r?.pointAt(x, y, z) ?? null);
+      const pillSig = JSON.stringify(pills);
+      if (pillSig !== lastPills) {
+        lastPills = pillSig;
+        setObjPills(pills);
       }
       ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
@@ -833,6 +846,22 @@ export function Office({
         <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
         {/* the ground's corner: hover says the level, the jobs done, the next piece (the map's own) */}
         <span className="bims-level" data-testid="app.right.bims.level" {...tipAttrs(tipOf(growNow, planOf(map).things))} />
+        {objPills.map((p) => (
+          <span
+            key={p.key}
+            className={`bims-pill bims-objpill ${p.pill === '?' ? 'asks' : 'failed'}`}
+            role={onOpenPlugin === undefined ? undefined : 'button'}
+            data-pill={p.pill === '?' ? 'asks' : 'failed'}
+            data-testid={`app.right.bims.objpill.${p.key}`}
+            style={{ left: `${String(p.x)}px`, top: `${String(p.y)}px` }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPlugin?.(p.key);
+            }}
+          >
+            {p.pill}
+          </span>
+        ))}
         {newTag !== null && (
           <div className="bims-label bims-new" data-mode="event" style={{ left: `${String(newTag.x)}px`, top: `${String(newTag.y)}px` }} data-testid="app.right.bims.new">
             {newTag.text}

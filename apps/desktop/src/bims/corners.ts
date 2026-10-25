@@ -556,7 +556,9 @@ function place(c: Ctx, p: PluginObject, taken: readonly Placed[]): Placed | null
   for (const [compact, against] of modes) {
     if (compact && COMPACT[p.obj] === undefined && !(FEET[p.obj].w * FEET[p.obj].d > 1)) continue;
     const { obj, foot } = footOf(p.obj, compact);
-    for (const corner of corners) {
+    // a swap may stand in its own corner too (a yard's terrace with no room for the ping-pong: its babyfoot by the nap place)
+    const own = compact && obj !== p.obj ? CORNER[obj] : undefined;
+    for (const corner of own === undefined || corners.includes(own) ? corners : [...corners, own]) {
       const area = areaOf(c.o, corner);
       const seeds = seedOfCorner(c, corner);
       const play = seedOfCorner(c, 'play');

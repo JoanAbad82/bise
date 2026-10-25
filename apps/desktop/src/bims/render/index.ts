@@ -229,6 +229,11 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
       const mid = toScreen(base, { x: feet.x, y: 0.5, z: feet.z });
       return { x: head.x, y: head.y, u: mid.x / base.widthPx, v: mid.y / base.heightPx };
     },
+    pointAt(x, y, z) {
+      if (!fit) return null;
+      const p = toScreen(fit, { x, y, z });
+      return p.x < 0 || p.y < 0 || p.x > fit.widthPx || p.y > fit.heightPx ? null : p;
+    },
     pieceOf(stage) {
       const at = office.pieceAt(stage);
       if (!fit || !at) return null;

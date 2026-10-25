@@ -201,6 +201,14 @@
   pointer-events: auto;
 }
 /* the unlock moment's 'new: <thing>' over the piece (3 s), centred above it */
+/* a plugin object's '?' / '✗' (objpills.ts): over the object's top, the bims' own pill */
+.bims-pill.bims-objpill {
+  position: absolute;
+  transform: translate(-50%, -100%);
+}
+.bims-pill.bims-objpill:not([role='button']) {
+  cursor: default;
+}
 .bims-label.bims-new {
   position: absolute;
   transform: translate(-50%, -100%);
