@@ -22,6 +22,7 @@
     "gallery": "vite src/ds/gallery",
     "hero": "vite -c hero.vite.config.ts",
     "build:hero": "vite build -c hero.vite.config.ts",
+    "sprites:home": "NODE_OPTIONS='--experimental-strip-types --disable-warning=ExperimentalWarning' node scripts/bims-sprites.mts",
     "dist": "electron-builder --config electron-builder.mjs --mac --dir"
   },
   "dependencies": {
