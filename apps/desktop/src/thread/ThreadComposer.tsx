@@ -54,6 +54,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   lead,
   mark,
   hubNotes = false,
+  fold = false,
 }: {
   project: string;
   agent: string;
@@ -64,6 +65,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   mark?: ReactNode;
   /** the hub's plain lines show on the key line too (a screen with no thread: no HubNoteRow says them) */
   hubNotes?: boolean;
+  /** the dock under a page off the thread: one line at rest, whole at its focus (ui-review-app #1) */
+  fold?: boolean;
   /** the tab's right instead of the context: 'esc to bise instead' while it answers, 'tab back to voice' */
   tabEnd?: string | undefined;
   /** the addressee's row: its model menu in the box's row (none: no menu) */
@@ -399,7 +402,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   useEffect(() => {
     doneRef.current = lineDone;
   });
-  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} fold={fold && quoting !== true} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
   return field;
 });
 

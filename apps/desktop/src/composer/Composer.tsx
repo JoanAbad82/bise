@@ -64,6 +64,9 @@ export interface ComposerProps {
   readonly answerTip?: string | undefined;
   /** with `answering`: lines only, no fill (an agent that is not main, agent-target) */
   readonly quiet?: boolean;
+  /** off the thread (the dock under a page): folded to one line at rest, while nothing is typed,
+   *  answered or said on its key line (ui-review-app #1) */
+  readonly fold?: boolean;
   /** the box's bottom row, left ('+', the mode menu), and right before send (the model menu) */
   readonly tools?: ReactNode;
   readonly toolsEnd?: ReactNode;
@@ -131,6 +134,7 @@ export const Composer = memo(function Composer(
     answering,
     answerTip,
     quiet,
+    fold = false,
     tools,
     toolsEnd,
     placeholder = composer.placeholder_bise,
@@ -219,6 +223,7 @@ export const Composer = memo(function Composer(
       answering={answering}
       answerTip={answerTip}
       {...(quiet === true ? { quiet } : {})}
+      fold={fold && !canSend && answering !== true && props.line == null}
       tools={tools}
       toolsEnd={toolsEnd}
       sent={sent}

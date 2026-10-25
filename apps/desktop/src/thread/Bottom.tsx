@@ -4,7 +4,10 @@
 // writes to whom the route says (bottomTarget: the review's agent, else the project's main, else
 // bise's main) and stays on the screen (the block never moves from screen to screen). The inbox
 // part is amb-home's InboxBlock (b2, eb3da983), the same as a thread's: an item opens in place and
-// tells the composer what his words do (a question's answer, or a plain message). Owner: amb-win.
+// tells the composer what his words do (a question's answer, or a plain message). At rest the dock is
+// small (ui-review-app #1, designer m_41569): the inbox one 32 px line (none on the inbox screen,
+// whose list is the inbox), the composer one line, its key bar only while it has the focus; an item
+// opened or a word typed brings each back whole. Owner: amb-win.
 import { useCallback, useState } from 'react';
 import { InboxBlock, type Answering } from '@/inbox';
 import { shownName } from '@/agents/model';
@@ -45,7 +48,7 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
     <div className="app-bottom th-screen" data-testid="app.bottom" data-project={project} data-agent={agent} data-answering={answering !== null}>
       {/* on the inbox screen the list is the inbox: the block shows only an item he opens (designer m_25639) */}
       <InboxBlock here={row?.home === true && agent === MAIN ? HERE_BISE : { project, agent }} onAnswer={setAnswering}
-        {...(route.screen === 'inbox' ? { rest: 'open-only' as const } : {})} />
+        rest={route.screen === 'inbox' ? 'open-only' : 'line'} />
       <ThreadComposer
         project={project}
         agent={agent}
@@ -60,6 +63,7 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
         onReady={NOOP}
         onSent={NOOP}
         hubNotes
+        fold
       />
     </div>
   );

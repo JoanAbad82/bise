@@ -9,7 +9,7 @@ import type { Card } from '@/proto';
  * it is bise's home (global bise and its agents) or the block sits on the inbox screen
  * (`rest: 'open-only'`). Pure.
  */
-export function inboxScope(here: { readonly project: string | null }, home: string, rest?: 'open-only'): string | null {
+export function inboxScope(here: { readonly project: string | null }, home: string, rest?: 'open-only' | 'line'): string | null {
   if (rest === 'open-only' || here.project === null || here.project === home) return null;
   return here.project;
 }

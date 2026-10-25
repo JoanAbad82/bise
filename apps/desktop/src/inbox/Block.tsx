@@ -81,9 +81,11 @@ export interface InboxBlockProps {
   readonly only?: (c: Card) => boolean;
   /**
    * 'open-only': at rest it shows nothing, only an item he opens (⏎, ⌘I): the inbox screen, whose list
-   * already shows the waiting items right above it (designer m_25639). Absent: folded as signed.
+   * already shows the waiting items right above it (designer m_25639). 'line': at rest one 32 px line,
+   * the count and the newest item cut with …; a click or ⌃1-3 opens one, never a hover (the dock
+   * under a page off the thread: designer m_41569, ui-review-app #1). Absent: folded as signed.
    */
-  readonly rest?: 'open-only';
+  readonly rest?: 'open-only' | 'line';
 }
 
 // ---- openInbox: ⌘I and a notification click (amb-win's keys and router call it; no route change)
@@ -698,6 +700,30 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
 
   if (list.length === 0 && !isClosed) return zero ? <InboxZero /> : null;
   if (rest === 'open-only' && openCard === undefined) return null;
+  if (rest === 'line' && openCard === undefined && !isClosed) {
+    // list holds one item at least here (the empty list returned above)
+    const newest = list.reduce((a, c) => (c.since_ms > a.since_ms ? c : a));
+    const w = rowWords(newest);
+    return (
+      <section className="inbox-strip inbox-block inbox-line" aria-label={inbox.head} data-testid="inbox.block" data-rest="line" data-count={list.length} data-ctrl={ctrl || undefined}>
+        <Row
+          lead={<span className="strip-title">{inbox.head}</span>}
+          name={
+            <span className="line-what">
+              <span className="strip-count">{headWords(list)}</span>
+              {' · '}
+              <span className="strip-who">{shownName(w.who)}</span> {w.what}
+            </span>
+          }
+          end={<span className="strip-keys"><Kbd>{list.length > 1 ? `⌃1–${String(Math.min(list.length, STRIP_KEYS))}` : '⌃1'}</Kbd> {inbox.key_open}</span>}
+          onClick={() => {
+            openTo(cardKey(newest));
+          }}
+          testId="inbox.block.line"
+        />
+      </section>
+    );
+  }
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
   // the closed card on top, open; the rows under it keep their ⌃N numbers
   const shown = [...(isClosed ? [openCard] : []), ...list.filter((_, i) => i < rowsFit || i === openAt)];
