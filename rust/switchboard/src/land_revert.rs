@@ -188,7 +188,7 @@ pub fn refusal(target: &str, undone: &[Undone]) -> Option<String> {
     let old: Vec<String> = undone.iter().filter(|u| u.before_records).map(|u| u.sha.chars().take(7).collect()).collect();
     if !old.is_empty() {
         line.push_str(&format!(
-            ". {} landed before bise kept land records: if it is your own earlier land, name it in your commit message ('reworks my {}') and land again",
+            ". {} landed before bise kept land records: if you mean to undo it (your own earlier land, or a planned removal), name it in your commit message ('undoes {}') and land again",
             old.join(", "),
             old[0]
         ));
@@ -389,7 +389,7 @@ mod tests {
         let u = |sha: &str, old: bool| Undone { sha: sha.into(), subject: "s".into(), by: None, before_records: old, files: vec!["f".into()] };
         let e = refusal("feat", &[u("723e639d5a", true), u("9f9f9f9f", false)]).unwrap();
         assert!(
-            e.ends_with("git revert 723e639. 723e639 landed before bise kept land records: if it is your own earlier land, name it in your commit message ('reworks my 723e639') and land again"),
+            e.ends_with("git revert 723e639. 723e639 landed before bise kept land records: if you mean to undo it (your own earlier land, or a planned removal), name it in your commit message ('undoes 723e639') and land again"),
             "{}",
             e
         );
