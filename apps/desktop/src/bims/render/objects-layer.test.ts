@@ -3,7 +3,7 @@
 // each object but its contact shadow, turned), not just the footprints; and a lit lamp's rug is
 // above the floor. Fixtures only; three without a renderer.
 import { describe, expect, it } from 'vitest';
-import { Box3, type Mesh, type Object3D } from 'three';
+import { Box3, Mesh, type Object3D } from 'three';
 import { layoutOf } from '../maps';
 import { MAP_IDS } from '../maps/ids';
 import { objectSpots } from '../corners';
@@ -17,7 +17,7 @@ const DRAWN_GAP = 0.15;
 function meshes(o: Object3D): Mesh[] {
   const out: Mesh[] = [];
   o.traverse((m) => {
-    if ((m as Mesh).isMesh) out.push(m as Mesh);
+    if (m instanceof Mesh) out.push(m as Mesh);
   });
   return out;
 }
