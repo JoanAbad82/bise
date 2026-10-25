@@ -10,14 +10,13 @@
 // page (site/bims-islands.ts) places the canvases, says what is on screen and passes the pointer.
 // ?herotest: window.__bimsIslands (each frame's cost, a still of any moment for the contact sheet).
 // Owner: bims-islands.
-import { Box3, type Color, DirectionalLight, HemisphereLight, InstancedMesh, type Material, Matrix4, type Mesh, OrthographicCamera, PCFShadowMap, Quaternion, Scene, Vector3, WebGLRenderer } from 'three';
+import { Box3, DirectionalLight, HemisphereLight, Matrix4, OrthographicCamera, PCFShadowMap, Quaternion, Scene, Vector3, WebGLRenderer } from 'three';
 import { BACK, DIST, RIGHT, UP } from '@/bims/render/camera';
 import { DAY } from '@/bims/render/palette';
 import { STYLE } from '@/bims/render/style';
 import { FPS, type Frame, ISLANDS, type Island, type IslandId, SLAB, type V } from '@/bims/sprites/gags';
 import { type Move, gagAt, gagLength, looking, moveOf } from '@/bims/sprites/moves';
 import { HALF, type IslandScene, TARGET, buildIsland, sunOn } from '@/bims/sprites/scene';
-import { rimmedMaterial } from './entry';
 import { type Cell, GRID, cellAt, cellsOf, cubeAt, landAt, planOf, settled, shadowAt, thingAt } from './islands-time';
 
 /** css px per office unit (the sprites' sheet: 128 px a unit at 2x) */
@@ -98,7 +97,6 @@ interface Live {
   readonly scene: Scene;
   readonly cam: OrthographicCamera;
   readonly isl: IslandScene;
-  readonly cubes: readonly InstancedMesh[];
   readonly cells: readonly Cell[];
   /** the cube each prop stands on: it comes with it */
   readonly propCells: readonly Cell[];
@@ -110,6 +108,8 @@ interface Live {
   /** the gag's first frame: the bim lands in it */
   readonly first: Frame;
   mode: Mode;
+  /** its ground and props at their places (no need to set them again) */
+  risen: boolean;
   t0: number;
   done: (() => void) | null;
   on: boolean;
@@ -205,20 +205,21 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
     return { f: l.rest, glow: 0, busy: false };
   }
 
-  /** the entry's slab, props and bim at ms; true while it builds */
-  function entryAt(l: Live, ms: number): void {
-    const up = settled(ms, l.cells);
-    for (const m of l.isl.slab) m.visible = up;
-    for (const c of l.cubes) {
-      c.visible = !up;
-      if (up) continue;
+  /** the ground's cubes at ms of the hero's wave (at rest: each at its place, scale 1) */
+  function cubesAt(l: Live, ms: number | null): void {
+    for (const c of l.isl.slab) {
+      const y0 = c.userData.y as number;
       l.cells.forEach((cell, i) => {
-        const a = cubeAt(ms, cell.start, l.side);
-        const y = (c.userData.y as number) + a.y;
-        c.setMatrixAt(i, m4.compose(p3.set(cell.x, y, cell.z), q0, s3.setScalar(a.s)));
+        const a = ms === null ? { s: 1, y: 0 } : cubeAt(ms, cell.start, l.side);
+        c.setMatrixAt(i, m4.compose(p3.set(cell.x, y0 + a.y, cell.z), q0, s3.setScalar(a.s)));
       });
       c.instanceMatrix.needsUpdate = true;
     }
+  }
+
+  /** the entry at ms: the ground's cubes in the wave, each prop on its cube, the page shadow with them */
+  function entryAt(l: Live, ms: number): void {
+    cubesAt(l, settled(ms, l.cells) ? null : ms);
     l.isl.props.forEach((g, i) => {
       const cell = l.propCells[i];
       if (!cell) return;
@@ -229,9 +230,11 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
     setShadow(l, shadowAt(ms, l.cells));
   }
 
+  /** built: what rose is what holds (the cubes stay, no other slab) */
   function built(l: Live): void {
-    for (const m of l.isl.slab) m.visible = true;
-    for (const c of l.cubes) c.visible = false;
+    if (l.risen) return;
+    l.risen = true;
+    cubesAt(l, null);
     for (const g of l.isl.props) { g.position.y = 0; g.scale.set(1, 1, 1); }
     setShadow(l, 1);
   }
@@ -408,24 +411,10 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
       for (const c of g.children) { c.position.x -= ctr.x; c.position.z -= ctr.z; }
       g.position.set(ctr.x, 0, ctr.z);
     }
-    // the slab as cubes while it rises: the dirt (rimmed: its inner sides the top's colour) and its top
+    // the ground: the scene's own cubes (scene.ts slabOn, in cellsOf's order); the wave moves them
     const cells = cellsOf(SLAB.w);
     const c = SLAB.w / GRID;
-    const centre = { value: { x: 0, y: 0 } };
-    const cubes = isl.slab.map((m: Mesh) => {
-      box.setFromObject(m);
-      const hgt = box.max.y - box.min.y;
-      const mat = m.material as Material;
-      const top = isl.slab[1]?.material as Material & { color: Color };
-      const im = new InstancedMesh(STYLE.box(c, hgt, c, Math.min(0.06, hgt * 0.3)), m === isl.slab[0] ? rimmedMaterial(mat, top.color, centre) : mat, cells.length);
-      im.userData.y = (box.max.y + box.min.y) / 2;
-      im.castShadow = false;
-      im.receiveShadow = true;
-      im.frustumCulled = false;
-      im.visible = false;
-      isl.root.add(im);
-      return im;
-    });
+    for (const m of isl.slab) m.frustumCulled = false;
     const propCells = isl.props.map((g) => cellAt(cells, g.position.x, g.position.z));
     const rest = s.frames[s.idle] ?? s.frames[0];
     const first = s.frames[s.seq[0] ?? 0] ?? rest;
@@ -439,8 +428,8 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
     const c2 = bm ? null : b.canvas.getContext('2d');
     const out: Live['out'] = bm ? { kind: 'bitmap', ctx: bm } : c2 ? { kind: '2d', ctx: c2 } : null;
     return {
-      s, b, out, scene, cam, isl, cubes, cells, propCells, side: c, plan: planOf(cells, propCells), move: moveOf(s), rest, first,
-      mode: 'wait', t0: 0, done: null, on: false, dirty: true, ptr: null, look: [0, 1, 3], head: 0,
+      s, b, out, scene, cam, isl, cells, propCells, side: c, plan: planOf(cells, propCells), move: moveOf(s), rest, first,
+      mode: 'wait', risen: false, t0: 0, done: null, on: false, dirty: true, ptr: null, look: [0, 1, 3], head: 0,
       tilt: new Quaternion(), tiltTo: new Quaternion(), moveT0: null, hopT0: null, blinkAt: Infinity, tapUntil: 0,
       shadow: null, shadowNow: -1, still: null, w, h,
     };
@@ -458,9 +447,7 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
     for (const f of l.s.frames) l.isl.pose(f);
     for (let k = 0.05; k < 1; k += 0.1) l.isl.pose(l.move.at(k).frame);
     l.isl.pose(l.rest);
-    for (const c of l.cubes) c.visible = true;
     renderer.compile(l.scene, l.cam);
-    for (const c of l.cubes) c.visible = false;
     if (warming.length > 0) later(warmNext);
   };
   const later = (f: () => void): void => {
@@ -481,6 +468,7 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
           const w = warming.indexOf(l);
           if (w >= 0) { warming.splice(w, 1); warming.unshift(l); warmNext(); }
           l.mode = 'entry';
+          l.risen = false;
           l.t0 = performance.now();
           l.done = done;
           l.dirty = true;
@@ -529,6 +517,7 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
         },
         still(st) {
           l.still = st;
+          l.risen = false;
           l.tilt.identity();
           l.head = 0;
           if (st.entry === undefined) built(l);

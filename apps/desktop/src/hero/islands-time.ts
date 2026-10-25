@@ -7,10 +7,11 @@
 // one small squash; the bim lands last (0.3 s), then the scene's gag plays, by 2.5 s. The page
 // shadow grows with the risen cubes and is never there before them. Pure (tested); islands.ts draws
 // it. Owner: bims-islands.
+import { SLAB } from '@/bims/sprites/gags';
 import { ENTRY, popAt, riseFor, tileAt, tileStart } from './entry';
 
 /** the slab cut into N x N cubes (the town's are ~4 % of its lawn's side; these ~14 %, still small at 200 px) */
-export const GRID = 7;
+export const GRID = SLAB.n;
 /** the timeline past the hero's own (ENTRY.tiles, ENTRY.thing), ms from the island's start */
 export const ISLAND_ENTRY = {
   /** a thing's one small squash once its cube has settled */

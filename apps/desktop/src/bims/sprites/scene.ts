@@ -5,13 +5,14 @@
 // hero's paper plane, a book), and the day sun that lights them (the hero film's, on both themes).
 // Two drawers share it: studio.ts (the WebP sprites, the no-WebGL fallback) and the hero bundle's
 // live islands (src/hero/islands.ts, page bims-home v11). Units are the office's (gags.ts). Owner: bims-islands.
-import { type DirectionalLight, ExtrudeGeometry, Group, type Material, Mesh, type MeshStandardMaterial, Shape, Vector3 } from 'three';
+import { Color, type DirectionalLight, ExtrudeGeometry, Group, InstancedMesh, type Material, Matrix4, Mesh, type MeshStandardMaterial, Shape, Vector3 } from 'three';
 import { AZ } from '../render/camera';
 import { makeBim, type Bim } from '../render/bim';
 import { MUSIC } from '../render/objects/music';
 import { CREAM, INK, PANE, PAPER, SKY, SLATE, SLATE_L, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, darker, lighter, partOf } from '../render/objects/kit';
 import { DAY, WORLD } from '../render/palette';
 import { makePlane, type Plane } from '../render/plane';
+import { rimmedMaterial } from '../render/rim';
 import { STYLE } from '../render/style';
 import { castShadows } from '../render/world';
 import { type Bit, type Frame, type Island, type Prop, SLAB } from './gags';
@@ -93,7 +94,7 @@ function rampOn(root: Group, r: Extract<Prop, { kind: 'ramp' }>): void {
   geo.translate(0, 0, -W / 2);
   const g = partOf(root, OPTS).at(r.x, 0, r.z);
   g.root.rotation.y = r.turn;
-  g.contact(W + 0.1, R + DECK_D + 0.1, 0, -(R + DECK_D) / 2);
+  // no contact patch: its own sun shadow grounds it (designer m_43276: the patch drew as a grey box behind it)
   // s back (local -z), the width along local x
   const ramp = new Mesh(geo, STYLE.material(WOOD));
   ramp.rotation.y = Math.PI / 2;
@@ -292,13 +293,28 @@ function placeBits(root: Group, pools: Pools, bits: readonly Bit[]): void {
   pools.book.forEach((n, i) => { n.g.visible = i < used.book; });
 }
 
-/** the island's slab: the dirt's rounded block, its top's layer (the town's cube in miniature) */
-function slabOn(root: Group, top: Island['top']): Mesh[] {
-  const dirt = new Mesh(STYLE.box(SLAB.w, SLAB.h, SLAB.w, SLAB.r), STYLE.material(DAY.dirt));
-  dirt.position.y = -SLAB.top - SLAB.h / 2 + 0.02;
-  const lid = new Mesh(STYLE.box(SLAB.w, SLAB.top, SLAB.w, 0.04), STYLE.material(topColour(top)));
-  lid.position.y = -SLAB.top / 2;
-  root.add(dirt, lid);
+/**
+ * The island's ground: n x n cubes (the hero town's ground at island scale, designer m_43276), each
+ * its dirt block (the dirt on its outer faces only: render/rim.ts) under its top's layer, every one
+ * at its place. The live island's entry rises them in the hero's wave (src/hero/islands.ts) and they
+ * stay: what rises is what holds. Each cube's middle in `cells` (x outer, z inner: islands-time.ts cellsOf's order).
+ */
+function slabOn(root: Group, top: Island['top']): InstancedMesh[] {
+  const n = SLAB.n;
+  const c = SLAB.w / n;
+  const dirt = new InstancedMesh(STYLE.box(c, SLAB.h, c, 0.035), rimmedMaterial(STYLE.material(DAY.dirt), new Color(topColour(top)), { value: { x: 0, y: 0 } }), n * n);
+  dirt.userData.y = -SLAB.top - SLAB.h / 2 + 0.02;
+  const lid = new InstancedMesh(STYLE.box(c, SLAB.top, c, 0.03), STYLE.material(topColour(top)), n * n);
+  lid.userData.y = -SLAB.top / 2;
+  const m = new Matrix4();
+  for (const im of [dirt, lid]) {
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) im.setMatrixAt(k++, m.makeTranslation((i - (n - 1) / 2) * c, im.userData.y as number, (j - (n - 1) / 2) * c));
+    }
+    im.instanceMatrix.needsUpdate = true;
+    root.add(im);
+  }
   return [dirt, lid];
 }
 
@@ -321,8 +337,8 @@ export function sunOn(sun: DirectionalLight, mapSize: number): void {
 export interface IslandScene {
   /** everything; the live island tilts it */
   readonly root: Group;
-  /** the slab's dirt and top */
-  readonly slab: readonly Mesh[];
+  /** the ground's cubes: their dirt, their tops (InstancedMesh, `userData.y` each one's height) */
+  readonly slab: readonly InstancedMesh[];
   /** each prop's own group, in the island's order */
   readonly props: readonly Group[];
   readonly bims: readonly Bim[];
@@ -340,6 +356,8 @@ export function buildIsland(s: Island): IslandScene {
   const slab = slabOn(root, s.top);
   const built = s.props.map((p) => propOn(root, p));
   castShadows(root);
+  // the ground takes the shadows; its cubes cast none (the hero's: a shadow pass of cubes for nothing)
+  for (const m of slab) m.castShadow = false;
   const first = s.frames[0];
   if (!first) throw new Error(`${s.id}: no frames`);
   const bims: Bim[] = first.bims.map((a) => {

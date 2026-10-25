@@ -16,8 +16,8 @@ export const FPS = 12;
 /** unique frames per island: 8 to 16 (the brief's weight) */
 export const MIN_FRAMES = 8;
 export const MAX_FRAMES = 16;
-/** the island's slab: as wide as deep, its dirt side, its top's layer */
-export const SLAB = { w: 2.2, h: 0.55, top: 0.12, r: 0.22 } as const;
+/** the island's slab: as wide as deep, its dirt side, its top's layer; its ground `n` x `n` cubes (the hero town's ground at island scale, designer m_43276) */
+export const SLAB = { w: 2.2, h: 0.55, top: 0.12, r: 0.22, n: 7 } as const;
 
 export interface Actor {
   readonly name: string;
