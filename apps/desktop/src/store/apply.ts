@@ -203,6 +203,19 @@ export function applyTyped(s: Store, ev: Ev): void {
     case "plugins":
       s.put(`plugins:${ev.project ?? ""}`, ev.items);
       return;
+    case "plugins_summary":
+      // the sidebar's plugins row and the place's band (bend_plugins::catalog::summary)
+      s.put(`plugins_summary:${ev.project ?? ""}`, ev.summary);
+      return;
+    case "browse":
+      // a source's plugins to add: the Mistral catalog, a marketplace (the plugins place's browse)
+      s.put(`browse:${ev.source}`, ev.items);
+      if (ev.source !== "mistral" && !s.browseSources().includes(ev.source)) s.put("browse_sources", [...s.browseSources(), ev.source]);
+      return;
+    case "plugin_preview":
+      // what an add will run, until he confirms or cancels (the add sheet clears it)
+      s.put("plugin_preview", { token: ev.token, preview: ev.preview });
+      return;
     case "computer_use":
       s.put("computer_use", ev);
       return;

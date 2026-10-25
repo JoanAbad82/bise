@@ -398,6 +398,73 @@ pub enum RunTransport {
     Unknown,
 }
 
+/// The Plugins list in a few numbers, for the sidebar's plugins row and
+/// the place's 'connect your tools' band (`core_ev::PluginsSummary`).
+/// Built by `bend_plugins::catalog::summary` from the same rows, its one
+/// builder: the window adds nothing up, it draws what it gets.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PluginsSummary {
+    /// rows on and loading (a plugin, a ready connector, a server, a
+    /// skills folder)
+    pub on: u32,
+    /// rows he turned off
+    pub off: u32,
+    /// on rows that wait on him: a login to do, a server that failed
+    /// (typed fields only: a part's `login: needs`, its `error`)
+    pub waiting: u32,
+    /// his Mistral connectors logged in
+    pub connected: u32,
+    /// every Mistral connector, connected or not
+    pub connectors: u32,
+    /// what to suggest, waiting ones first (login, error), then mistral,
+    /// import, workspace, marketplace
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suggest: Vec<PluginSuggest>,
+}
+
+/// One suggestion of a [`PluginsSummary`]. `n` is the full count; `ids`
+/// (PluginId strings) and `titles` (what he reads, same order) are capped
+/// at [`SUGGEST_CAP`], so `n >= ids.len() == titles.len()`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PluginSuggest {
+    pub kind: SuggestKind,
+    pub n: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub titles: Vec<String>,
+}
+
+/// At most this many `ids` and `titles` per [`PluginSuggest`].
+pub const SUGGEST_CAP: usize = 5;
+
+/// What a [`PluginSuggest`] proposes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum SuggestKind {
+    /// Mistral connectors not connected yet (`n`: all of them; `ids`: the
+    /// most useful first)
+    Mistral,
+    /// MCP servers found in other apps' configs (`n`: all their servers;
+    /// `ids`: the plugin each app's import makes, `titles`: the apps)
+    Import,
+    /// on rows whose login waits on him
+    Login,
+    /// on rows with a server that failed
+    Error,
+    /// this project's own plugins and skills (`n`: its skills and
+    /// plugins), only for a project
+    Workspace,
+    /// an added marketplace's plugins not added yet, one item per source
+    Marketplace,
+    /// a newer core's value
+    #[serde(other)]
+    Unknown,
+}
+
 /// What a plugin part is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

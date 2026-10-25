@@ -23,6 +23,10 @@ export const STATE_TAGS: ReadonlySet<string> = new Set([
   'merged',
   'jobs',
   'plugins',
+  // the plugins in numbers: the sidebar's '⊞ plugins' row, at the core's start only (plug-desktop)
+  'plugins_summary',
+  // what a source offers to add (Mistral's connectors, each marketplace): kept per source
+  'browse',
   // each role's model: sent at the core's start, so a window that loads later needs it kept
   // (settings' roles, the voice bar's 'Voxtral · Mistral')
   'roles',
@@ -46,7 +50,8 @@ export class Latest {
   keep(ev: Record<string, unknown>): void {
     const tag = ev['ev'];
     if (typeof tag !== 'string' || !STATE_TAGS.has(tag)) return;
-    const project = typeof ev['project'] === 'string' ? ev['project'] : '';
+    // browse is kept per source (Mistral's, each marketplace's), the others per project
+    const project = tag === 'browse' && typeof ev['source'] === 'string' ? ev['source'] : typeof ev['project'] === 'string' ? ev['project'] : '';
     // re-inserted: the snapshot keeps the order they last changed in
     const key = `${tag} ${project}`;
     this.last.delete(key);

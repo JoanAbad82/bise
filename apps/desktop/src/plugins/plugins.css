@@ -1,0 +1,107 @@
+/* src/plugins (plug-desktop): the plugins place (page plugins v48, plugins-ui's screens). ds tokens
+   only, the 4 px grid; colour only for what waits on him (accent) and what failed (err). */
+.plg-place { height: 100%; overflow-y: auto; box-sizing: border-box; padding: var(--s-5) var(--pad-column) var(--s-8); display: flex; flex-direction: column; gap: var(--gap-block); }
+.plg-place > * { max-width: 880px; width: 100%; margin-inline: auto; box-sizing: border-box; }
+
+/* the head: the words, then the room */
+.plg-head { display: grid; grid-template-columns: 1fr; gap: var(--s-2); padding: var(--pad-card); border-radius: var(--r-4, 12px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.plg-h1 { margin: 0; display: flex; align-items: center; gap: var(--s-2); font: 600 22px/1.2 var(--font-ui); color: var(--c-text); }
+.plg-h2 { font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.plg-counts { font: var(--t-12) var(--font-ui); color: var(--c-text-2); font-variant-numeric: tabular-nums; }
+.plg-acc { color: var(--c-accent); }
+.plg-dim { color: var(--c-text-3); }
+.plg-n { margin-left: var(--s-1); color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+.plg-mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* the room: bims' diorama goes here; until then his plugins' plain icons on a floor */
+.plg-room { min-height: 160px; display: flex; align-items: center; justify-content: center; }
+.plg-floor { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: var(--s-3); max-width: 560px; padding: var(--s-6) var(--s-8); border-radius: var(--r-3, 10px); background: var(--c-sunken); }
+.plg-room-sub { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+
+/* the bar: the search, add */
+.plg-bar { display: flex; justify-content: flex-end; align-items: center; gap: var(--gap-inline); }
+.plg-search { width: 260px; }
+.plg-add-words { display: inline-flex; align-items: center; gap: var(--s-2); }
+
+/* connect your tools */
+.plg-band { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--pad-card); border-radius: var(--r-4, 12px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.plg-band-head { display: flex; align-items: baseline; gap: var(--s-2); font: var(--t-13) var(--font-ui); }
+.plg-band-h { font-weight: 600; color: var(--c-text); }
+.plg-band-count { margin-left: auto; color: var(--c-text-2); font-variant-numeric: tabular-nums; }
+.plg-band-sub { font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.plg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-2); }
+.plg-card { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: var(--s-1) var(--s-2); padding: var(--s-2) var(--s-3); border-radius: var(--r-2); background: var(--c-surface); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); }
+.plg-card > .b-btn { grid-column: 2; justify-self: start; }
+.plg-card-words { display: flex; flex-direction: column; min-width: 0; }
+.plg-card-words > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.plg-card-words .plg-dim { font-size: 12px; }
+.plg-band-line { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); min-height: var(--h-row); padding: 0 var(--s-3); border-radius: var(--r-2); background: var(--c-surface); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); }
+.plg-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+
+/* installed | browse, the kinds */
+.plg-tabs { border-bottom: 1px solid var(--c-line); }
+.plg-kinds { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+
+/* the list */
+.plg-group { display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-group-head { display: flex; align-items: baseline; gap: var(--s-1); padding: var(--s-2) var(--s-1) 0; font: 600 11.5px/1.2 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-3); }
+.plg-list { border-radius: var(--r-3, 10px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); overflow: hidden; }
+.plg-row { display: flex; align-items: center; gap: var(--s-3); min-height: var(--s-12); padding: var(--s-2) var(--s-3); box-sizing: border-box; border-top: 1px solid var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); outline: none; }
+.plg-row:first-child { border-top: 0; }
+.plg-row:hover, .plg-row:focus-visible { background: var(--c-hover); }
+.plg-row.part { min-height: var(--s-10); }
+.plg-row.off .plg-row-words { opacity: 0.55; }
+.plg-row-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--s-1) / 2); }
+.plg-row-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.plg-title { font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.plg-tag { flex: none; padding: 0 var(--s-2); border-radius: 999px; box-shadow: inset 0 0 0 1px var(--c-line-strong); font: 400 11px/16px var(--font-ui); color: var(--c-text-2); }
+.plg-row-what { font: var(--t-12) var(--font-ui); color: var(--c-text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.plg-row-what.err { color: var(--c-err); }
+.plg-row-end { flex: none; display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
+.plg-lead { flex: none; width: var(--s-6); text-align: center; color: var(--c-text-3); font-family: var(--font-mono); }
+.plg-empty { padding: var(--s-6) var(--s-1); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+
+/* an icon: the plain stand-in for the plugin's object (bims' render goes in its place) */
+.plg-icon { position: relative; flex: none; display: inline-flex; }
+.plg-icon.row { width: var(--s-10); height: var(--s-10); }
+.plg-icon.head { width: calc(var(--s-12) + var(--s-2)); height: calc(var(--s-12) + var(--s-2)); }
+.plg-tile { width: 100%; height: 100%; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-2); background: var(--c-sunken); box-shadow: inset 0 0 0 1px var(--c-line); font: 600 11px/1 var(--font-ui); color: var(--c-text-2); text-transform: none; }
+.plg-icon.head .plg-tile { border-radius: var(--r-3, 10px); font-size: 18px; }
+.plg-icon.glass .plg-tile { opacity: 0.4; background: transparent; }
+.plg-badge { position: absolute; bottom: calc(var(--s-1) / -2); right: calc(var(--s-1) / -2); width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--c-accent); color: var(--c-on-ink, #fff); font: 700 9px/1 var(--font-ui); }
+.plg-badge.err { background: var(--c-err); }
+
+/* a plugin's page */
+.plg-page > .b-btn:first-child { align-self: flex-start; width: auto; margin-inline: 0 auto; }
+.plg-page-head { display: flex; align-items: center; gap: var(--s-4); }
+.plg-page-head .plg-head-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-page-acts { flex: none; display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
+.plg-ask { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-2); background: var(--c-err-soft); font: var(--t-13) var(--font-ui); color: var(--c-text); }
+.plg-acts { display: flex; gap: var(--gap-inline); }
+.plg-try { display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-try-line { display: flex; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) var(--s-3); border: 0; border-radius: var(--r-2); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-read); color: var(--c-text); text-align: left; }
+.plg-try-line:hover { background: var(--c-hover); }
+.plg-fold { align-self: flex-start; margin: 0; padding: var(--s-1) var(--s-3) var(--s-1) calc(var(--s-6) + var(--s-6)); border: 0; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.plg-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-1) var(--s-4); padding: var(--s-1) var(--s-3) var(--s-3) calc(var(--s-6) + var(--s-6)); }
+.plg-tool { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); min-height: var(--h-row-tight); }
+.plg-tool.off .plg-mono { opacity: 0.55; }
+.plg-about { display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--s-2) var(--gap-block); margin: 0; padding: var(--s-3); border-radius: var(--r-3, 10px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); }
+.plg-kv dt { color: var(--c-text-2); }
+.plg-kv dd { margin: 0; color: var(--c-text); overflow-wrap: anywhere; }
+
+/* the add sheets */
+.plg-form { display: flex; flex-direction: column; gap: var(--s-2); font: var(--t-13) var(--font-ui); }
+.plg-label { margin-top: var(--s-1); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
+.plg-runs { display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-run, .plg-secret { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: var(--s-2); }
+.plg-run-name { font-weight: 500; color: var(--c-text); }
+.plg-run-cmd { padding: var(--s-1) var(--s-2); border-radius: var(--r-1); background: var(--c-sunken); font: 12px/1.4 var(--font-mono); color: var(--c-text); overflow-wrap: anywhere; }
+
+@media (max-width: 1000px) {
+  .plg-place { padding: var(--s-4) var(--s-4) var(--s-6); }
+  .plg-search { width: auto; flex: 1 1 auto; }
+}
+/* a switch inside a tip's span: the span is a flex box, so the switch keeps its size */
+.plg-tg { display: inline-flex; align-items: center; }
+.plg-tool { min-width: 0; }

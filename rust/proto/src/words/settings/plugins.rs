@@ -311,4 +311,131 @@ crate::words! { settings:
     plugins_err_gone = "that preview is gone: add it again";
     /// connect: done
     plugins_connect_done(name) = "✓ {name} connected · your agents get it at their next call";
+
+    // ---- the desktop's plugins place (page plugins v48) ----
+
+    /// sidebar: the plugins row's tip, nothing waits
+    plugins_side_tip(n) = one "{n} plugin on" | "{n} plugins on";
+    /// sidebar: the plugins row's tip when some wait on him (`list`: each one's words)
+    plugins_side_tip_waits(on, n, list) = "{on} plugins on · {n} need you: {list}";
+    /// sidebar tip: a plugin whose login waits on him
+    plugins_waits_login(name) = "{name} needs a login";
+    /// sidebar tip: a plugin whose server failed
+    plugins_waits_error(name) = "{name} failed to start";
+    /// sidebar: the dot's tip (new things to connect he hasn't looked at)
+    plugins_side_new = "something new to connect";
+    /// place: under the title
+    plugins_place_sub = "what your agents can use, in every project";
+    /// place: the head's counts
+    plugins_place_counts(on, off) = "{on} on · {off} off";
+    /// place: the head's waiting part, in the accent
+    plugins_place_waits(n) = one "{n} needs you" | "{n} need you";
+    /// place: under the room
+    plugins_room_sub = "each plugin you add gets a place here.";
+    /// place: the search field
+    plugins_search = "search plugins, tools, skills";
+    /// place: the add button
+    plugins_add = "add";
+    /// band: its head
+    plugins_band_head = "connect your tools";
+    /// band: after its head
+    plugins_band_through = "through Mistral";
+    /// band: its count, right
+    plugins_band_count(connected, total) = "{connected} of {total} connected";
+    /// band: its sub
+    plugins_band_sub = "each one you connect, your agents reach in every project. a write still asks you first";
+    /// band: a connector's button
+    plugins_connect = "connect";
+    /// band: a connector with nothing more to say
+    plugins_band_popular = "popular at Mistral";
+    /// band: the MCP servers found in other apps (`list`: "Claude Code 2, Cursor 1")
+    plugins_band_found(n, list) = one "{n} MCP server found on this Mac: {list}" | "{n} MCP servers found on this Mac: {list}";
+    /// band: the import button
+    plugins_band_import(n) = "import {n}";
+    /// band: the project's own plugins and skills
+    plugins_band_workspace(project, n) = "{project} brings {n} of its own";
+    /// band: see the project's own ones
+    plugins_band_see = "see them";
+    /// band: a marketplace's plugins not added yet
+    plugins_band_market(n) = one "{n} new plugin in your marketplaces" | "{n} new plugins in your marketplaces";
+    /// band: browse them
+    plugins_band_browse = "browse";
+    /// place: the tabs
+    plugins_tab_installed = "installed";
+    /// place: the tabs
+    plugins_tab_browse = "browse";
+    /// place: the Mistral catalog's group in browse
+    plugins_browse_mistral = "Mistral connectors";
+    /// place: a row's tag, Mistral
+    plugins_tag_mistral = "Mistral";
+    /// place: a row's tag, MCP
+    plugins_tag_mcp = "MCP";
+    /// place: a row's tag, skills
+    plugins_tag_skills = "skills";
+    /// place: a failed server's button
+    plugins_details = "details";
+    /// place: a connector whose sign-in expired: its button
+    plugins_sign_in_again = "sign in again";
+    /// plugin page: its tools' head
+    plugins_tools_head = "tools";
+    /// place: a button that sets it up
+    plugins_set_up = "set up";
+    /// place: computer's row until it's set up
+    plugins_not_set_up = "not set up";
+    /// place: the '?' badge's tip
+    plugins_badge_waits = "waits for you";
+    /// place: the '✗' badge's tip
+    plugins_badge_failed = "failed: details says why";
+    /// place: an off row's toggle tip
+    plugins_toggle_tip(name) = "turn {name} on or off for your agents, in every project";
+    /// place: nothing yet
+    plugins_place_loading = "reading your plugins…";
+    /// place: a Mistral problem: no key
+    plugins_conn_no_key = "your Mistral account isn't connected: settings › keys";
+    /// place: a Mistral problem: the keychain is locked
+    plugins_conn_locked = "your keychain is locked: Mistral's connectors can't be read";
+    /// place: a Mistral problem: the last fetch failed
+    plugins_conn_fetch = "Mistral's connectors couldn't be read: these are the last ones";
+    /// place: read Mistral's catalog again
+    plugins_refresh = "read again";
+    /// plugin page: where it comes from
+    plugins_comes_from = "comes from";
+    /// plugin page: its about head
+    plugins_about = "about";
+    /// plugin page: its version
+    plugins_version = "version";
+    /// plugin page: for which projects
+    plugins_for = "for";
+    /// plugin page: for every project on this Mac
+    plugins_for_every = "every project on this Mac";
+    /// plugin page: for this project only
+    plugins_for_project = "this project only";
+    /// plugin page: when agents see a change
+    plugins_when = "your agents";
+    /// plugin page: an MCP part's tools, folded
+    plugins_tools_fold(n) = one "▸ {n} tool" | "▸ {n} tools";
+    /// plugin page: an MCP part's tools, open
+    plugins_tools_unfold(n) = one "▾ {n} tool" | "▾ {n} tools";
+    /// plugin page: a prompt to try, its tip
+    plugins_try_tip = "puts it in main's composer; you send it or change it";
+    /// plugin page: remove it
+    plugins_remove = "remove";
+    /// remove: the question
+    plugins_remove_confirm(name) = "remove {name}? its saved secrets and logins go too.";
+    /// remove: the confirm button
+    plugins_remove_yes = "remove it";
+    /// remove: keep it
+    plugins_remove_no = "keep it";
+    /// the add menu: browse
+    plugins_menu_browse = "browse";
+    /// the add menu: browse's line
+    plugins_menu_browse_what = "Mistral's connectors and your marketplaces";
+    /// add sheet: the add button
+    plugins_add_go = "add";
+    /// add sheet: cancel
+    plugins_cancel = "cancel";
+    /// add sheet: a secret's field, empty
+    plugins_secret_empty(name) = "leave empty to keep ${name} as it is";
+    /// browse: add a marketplace plugin
+    plugins_browse_add_one = "+ add";
 }

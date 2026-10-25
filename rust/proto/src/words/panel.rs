@@ -238,6 +238,8 @@ crate::words! { panel:
     artifacts = "artifacts";
     /// the scheduled row
     scheduled = "scheduled";
+    /// the sidebar's plugins row (and its crumb, its ⌘K page)
+    plugins = "plugins";
     /// the projects' head
     projects = "projects";
     /// no project yet

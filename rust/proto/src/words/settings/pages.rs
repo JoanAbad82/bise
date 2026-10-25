@@ -35,10 +35,6 @@ crate::words! { settings:
     page_projects = "projects";
     /// projects' hero sentence
     page_projects_sub = "the folders bise works in. each one has its own main.";
-    /// the nav's page: plugins
-    page_plugins = "plugins";
-    /// plugins' line under its title
-    page_plugins_sub = "what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.";
     /// the nav's page: computer use
     page_computer = "computer use";
     /// computer use's hero sentence

@@ -105,6 +105,15 @@ pub enum CoreEv {
     /// his click; `plugin_add_confirm {token}` adds it, `plugin_add_cancel`
     /// drops it (nothing of it ran)
     PluginPreview { token: String, preview: PluginPreview },
+    /// the Plugins list of `project`'s workspace (none: bise's home) in a
+    /// few numbers (`bend_plugins::catalog::summary`): the sidebar's
+    /// plugins row and the place's band; at the core's start and only
+    /// when it changes
+    PluginsSummary {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        summary: PluginsSummary,
+    },
     /// computer use (P.2): on (the built-in `computer` plugin), its setup's
     /// steps while the window's page checks them (none until a check
     /// came), ready (browser, extension and live test done), `said`: what
@@ -397,7 +406,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "browse", "plugin_preview", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "send_answered", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "browse", "plugin_preview", "plugins_summary", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "send_answered", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

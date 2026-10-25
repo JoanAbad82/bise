@@ -1,0 +1,219 @@
+// A plugin's page (page plugins §2-§3): its head (its object, its name, what it does, what it gives,
+// its switch: 'on for every project'), up to 3 lines to try (a click puts one in main's composer),
+// then its parts, each with its switch: skills, MCP servers (their status words, a login or a
+// failure's line, their tools folded under '▸ n tools', each tool a switch), a connector's tools;
+// then 'about': where it comes from, for which projects, when his agents see a change. A plugin of
+// his own folder has remove (one confirm, plug-tidy's `plugin_remove`). A row to add (browse) has
+// connect or + add in place of the switch. Every change is the core's. Owner: plug-desktop.
+import { useState } from 'react';
+import { Button, Press, Toggle, tipAttrs } from '@/ds';
+import type { AppCmd, Plugin, PluginPart } from '@/proto';
+import { settings } from '@/proto/words.gen';
+import { controlOf, gives, installed, isComputer, removable, tagsOf, titleOf, toolsOf } from './model';
+import { PluginIcon } from './PluginIcon';
+
+export interface PagePorts {
+  send: (cmd: AppCmd) => void;
+  back: () => void;
+  /** a line to try: into main's composer, never sent */
+  tryIt: (words: string) => void;
+  setUpComputer: () => void;
+  /** remove a plugin of his own folder (none: the core has no `plugin_remove` yet, no button) */
+  remove?: (name: string) => void;
+}
+
+/** When his agents see a change to this kind (a skill: their next turn; a tool, a connector: their next call). */
+function whenWords(p: Plugin): string {
+  return p.kind === 'skills' || (p.parts ?? []).some((x) => x.kind === 'skill') ? settings.plugins_next_turn : settings.plugins_next_call;
+}
+
+export function PluginPage({ p, project, ports }: { p: Plugin; project?: string; ports: PagePorts }) {
+  const id = p.id === '' ? p.name : p.id;
+  const at = project === undefined ? {} : { project };
+  const set = (name: string, on: boolean) => {
+    ports.send({ cmd: 'plugin_set', ...at, name, on });
+  };
+  const [asking, setAsking] = useState(false);
+  const c = controlOf(p);
+  const skills = (p.parts ?? []).filter((x) => x.kind === 'skill');
+  const servers = (p.parts ?? []).filter((x) => x.kind === 'mcp');
+  const tools = (p.parts ?? []).filter((x) => x.kind === 'tool');
+  const off = (p.parts ?? []).filter((x) => !x.on).length;
+  const tid = `plugins.page.${id}`;
+  return (
+    <section className="plg-place plg-page" data-testid={tid}>
+      <header className="plg-page-head">
+        <PluginIcon row={p} size="head" {...(project === undefined ? {} : { project })} {...(isComputer(p) ? { lit: true } : {})} />
+        <div className="plg-head-words">
+          <h1 className="plg-h1">
+            {titleOf(p)}
+            {tagsOf(p).map((t) => (
+              <span key={t} className="plg-tag">{t}</span>
+            ))}
+          </h1>
+          {p.what != null && <div className="plg-h2">{p.what}</div>}
+          <div className="plg-counts">{[gives(p), off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}</div>
+        </div>
+        <div className="plg-page-acts">
+          {!installed(p) ? (
+            p.action === 'connect' || p.action === 'set_up' ? (
+              <Button kind="pri" onClick={() => { ports.send({ cmd: 'plugin_connect', ...at, id }); }} testId={`${tid}.connect`}>
+                {p.action === 'set_up' ? settings.plugins_set_up : settings.plugins_connect}
+              </Button>
+            ) : null
+          ) : c.kind === 'locked' ? (
+            <span className="plg-dim">{settings.plugins_always_on}</span>
+          ) : c.kind === 'set_up_cu' || (isComputer(p) && !p.on) ? (
+            <Button kind="pri" onClick={ports.setUpComputer} testId={`${tid}.set_up`}>{settings.plugins_set_up}</Button>
+          ) : (
+            <>
+              <span className="plg-dim">{p.on ? settings.plugins_on_everywhere : settings.plugins_off_everywhere}</span>
+              <Toggle on={p.on} label={titleOf(p)} onChange={(on) => { set(id, on); }} testId={`${tid}.toggle`} />
+            </>
+          )}
+          {ports.remove !== undefined && removable(p) && (
+            <Button kind="ghost" size="sm" onClick={() => { setAsking(true); }} testId={`${tid}.remove`}>{settings.plugins_remove}</Button>
+          )}
+        </div>
+      </header>
+      {asking && ports.remove !== undefined && (
+        <div className="plg-ask" role="group" data-testid={`${tid}.ask`}>
+          <span>{settings.plugins_remove_confirm({ name: titleOf(p) })}</span>
+          <span className="plg-acts">
+            <Button kind="danger" size="sm" onClick={() => { setAsking(false); ports.remove?.(id); }} testId={`${tid}.ask.yes`}>{settings.plugins_remove_yes}</Button>
+            <Button kind="ghost" size="sm" onClick={() => { setAsking(false); }} testId={`${tid}.ask.no`}>{settings.plugins_remove_no}</Button>
+          </span>
+        </div>
+      )}
+      {(p.prompts ?? []).length > 0 && (
+        <div className="plg-try" data-testid={`${tid}.try`}>
+          {(p.prompts ?? []).map((t, i) => (
+            <Press key={i} look="plg-try-line" onClick={() => { ports.tryIt(t); }} {...tipAttrs(settings.plugins_try_tip)} data-testid={`${tid}.try.${String(i)}`}>
+              <span>{t}</span>
+              <span className="plg-dim">→</span>
+            </Press>
+          ))}
+        </div>
+      )}
+      {skills.length > 0 && (
+        <Parts head={settings.plugins_kind_skills} n={skills.length}>
+          {skills.map((x) => (
+            <PartRow key={x.id} x={x} lead="$" locked={p.locked === true} owner={p.on} onSet={set} />
+          ))}
+        </Parts>
+      )}
+      {servers.length > 0 && (
+        <Parts head={settings.plugins_group_mcp} n={servers.length}>
+          {servers.map((x) => (
+            <ServerRow key={x.id} x={x} owner={p.on} onSet={set} onLogin={(name) => { ports.send({ cmd: 'plugin_login', ...at, name }); }} />
+          ))}
+        </Parts>
+      )}
+      {tools.length > 0 && (
+        <Parts head={settings.plugins_tools_head} n={tools.length}>
+          {tools.map((x) => (
+            <PartRow key={x.id} x={x} lead="·" locked={false} owner={p.on} onSet={set} />
+          ))}
+        </Parts>
+      )}
+      <div className="plg-about" data-testid={`${tid}.about`}>
+        <div className="plg-group-head">{settings.plugins_about}</div>
+        <dl className="plg-kv">
+          {p.path != null && (
+            <>
+              <dt>{settings.plugins_comes_from}</dt>
+              <dd className="plg-mono">{p.path}</dd>
+            </>
+          )}
+          {p.version != null && (
+            <>
+              <dt>{settings.plugins_version}</dt>
+              <dd>{p.version}</dd>
+            </>
+          )}
+          <dt>{settings.plugins_for}</dt>
+          <dd>{p.scope === 'workspace' ? settings.plugins_for_project : settings.plugins_for_every}</dd>
+          <dt>{settings.plugins_when}</dt>
+          <dd>{settings.plugins_change_when({ when: whenWords(p) })}</dd>
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+/** A part group: its head as the list's ('SKILLS 1'), its rows. */
+function Parts({ head, n, children }: { head: string; n: number; children: React.ReactNode }) {
+  return (
+    <div className="plg-group">
+      <div className="plg-group-head">
+        <span>{head}</span>
+        <span className="plg-n">{n}</span>
+      </div>
+      <div className="plg-list">{children}</div>
+    </div>
+  );
+}
+
+/** A skill or a tool: its name, what it does, its switch (off with its plugin: no switch). */
+function PartRow({ x, lead, locked, owner, onSet }: { x: PluginPart; lead: string; locked: boolean; owner: boolean; onSet: (id: string, on: boolean) => void }) {
+  return (
+    <div className={`plg-row part${x.on ? '' : ' off'}`} data-testid={`plugins.part.${x.id}`}>
+      <span className="plg-lead">{lead}</span>
+      <span className="plg-row-words">
+        <span className="plg-row-name"><span className="plg-title">{x.name}</span></span>
+        {x.what != null && <span className="plg-row-what">{x.what}</span>}
+      </span>
+      <span className="plg-row-end">
+        {!locked && owner && <Toggle on={x.on} label={x.name} onChange={(on) => { onSet(x.id, on); }} testId={`plugins.part.${x.id}.toggle`} />}
+      </span>
+    </div>
+  );
+}
+
+/** An MCP server: its status words, a login or its failure, its tools folded. */
+function ServerRow({ x, owner, onSet, onLogin }: { x: PluginPart; owner: boolean; onSet: (id: string, on: boolean) => void; onLogin: (name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const tools = x.tools ?? [];
+  const n = toolsOf(x);
+  const off = tools.filter((t) => !t.on).length;
+  return (
+    <>
+      <div className={`plg-row part${x.on ? '' : ' off'}`} data-testid={`plugins.part.${x.id}`}>
+        <span className="plg-lead">≡</span>
+        <span className="plg-row-words">
+          <span className="plg-row-name"><span className="plg-title">{x.name}</span>{x.what != null && <span className="plg-dim">{x.what}</span>}</span>
+          {x.error != null ? (
+            <span className="plg-row-what err">{settings.plugins_failed({ why: x.error })}</span>
+          ) : (
+            x.status != null && <span className="plg-row-what">{x.status}</span>
+          )}
+        </span>
+        <span className="plg-row-end">
+          {x.on && (x.login === 'needs' || x.login === 'pending') && (
+            <Button size="sm" state={x.login === 'pending' ? 'loading' : undefined} onClick={() => { onLogin(x.name); }} testId={`plugins.part.${x.id}.login`}>{settings.plugins_key_login}</Button>
+          )}
+          {x.on && x.login === 'in' && (
+            <Button size="sm" kind="ghost" onClick={() => { /* log out: the TUI's /plugins logout */ }} testId={`plugins.part.${x.id}.logout`}>{settings.log_out}</Button>
+          )}
+          {owner && <Toggle on={x.on} label={x.name} onChange={(on) => { onSet(x.id, on); }} testId={`plugins.part.${x.id}.toggle`} />}
+        </span>
+      </div>
+      {tools.length > 0 && (
+        <Press look="plg-fold" onClick={() => { setOpen(!open); }} aria-expanded={open} data-testid={`plugins.part.${x.id}.fold`}>
+          {open ? settings.plugins_tools_unfold({ n: n ?? tools.length }) : settings.plugins_tools_fold({ n: n ?? tools.length })}
+          {off > 0 && <span className="plg-dim">{` · ${settings.plugins_n_off({ n: off })}`}</span>}
+        </Press>
+      )}
+      {open && (
+        <div className="plg-tools" data-testid={`plugins.part.${x.id}.tools`}>
+          {tools.map((t) => (
+            <span key={t.id} className={`plg-tool${t.on ? '' : ' off'}`}>
+              <span className="plg-mono">{t.name}</span>
+              {x.on && owner && <Toggle on={t.on} label={t.name} onChange={(on) => { onSet(t.id, on); }} testId={`plugins.part.${t.id}.toggle`} />}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

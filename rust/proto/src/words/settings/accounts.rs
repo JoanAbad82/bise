@@ -110,28 +110,8 @@ crate::words! { settings:
     /// setup check: read them again
     check_again = "check again";
 
-    /// plugins: a login needed
-    login_needs(host) = "{host} · needs a login";
-    /// plugins: logged in
-    login_in(host) = "{host} · logged in";
-    /// plugins: logged in, with its tools
-    login_in_tools(host, n) = one "{host} · logged in · {n} tool" | "{host} · logged in · {n} tools";
-    /// plugins: a login under way
-    login_pending(host) = "{host} · log in in your browser…";
-    /// plugins: logged out
-    login_out(host) = "{host} · not logged in";
-    /// plugins: none read yet
-    plugins_looking = "looking at your plugins…";
-    /// plugins: none at all
-    plugins_none = "no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md).";
-    /// plugins: the group's help
-    plugins_help = "a change applies to the agents' next sessions.";
-    /// plugins: the logins' group
-    plugins_logins = "servers that log in";
     /// plugins: log out
     log_out = "log out";
-    /// plugins: log in
-    log_in = "log in";
 
     /// computer use: the switch's row
     cu_label = "agents may drive Chrome and your apps";

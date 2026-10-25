@@ -20,6 +20,7 @@
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
 //   environments/<p>           its worktrees and dev servers
 //   settings[/<page>] | onboarding    amb-home's screens
+//   plugins[/skills | /p/<id>] the plugins place (every kind, or skills only: /skills), a plugin's page
 //   inbox/all                  the inbox screen: what waits on him, then what he answered (inbox-screen)
 //   ('inbox' and 'inbox?card=<p>/<id>' stay asks to open the block above the composer in place,
 //   read by inboxAtOf, never routes)
@@ -44,6 +45,11 @@ export type Route =
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'scheduled' }
+  /**
+   * the plugins place (page plugins v48): the list (`kind: 'skills'`: /skills, the same list on
+   * skills), or one plugin's page (`id`: its PluginId as written, `mistral:gmail`)
+   */
+  | { screen: 'plugins'; kind?: 'skills'; id?: string }
   /**
    * the processes his agents left running (designer's running-procs): every project's, or the bar's
    * scope (`scope`: a project's, an agent's; its 'all ›', designer m_38642); `open`: that one's
@@ -88,6 +94,9 @@ export function formatRoute(r: Route): string {
       return r.scope.agent === undefined ? `running/in/${r.scope.project}` : `running/in/${r.scope.project}/${r.scope.agent}`;
     case 'report':
       return r.log === 'restart' ? 'report/restart' : 'report';
+    case 'plugins':
+      if (r.id !== undefined) return `plugins/p/${encodeURIComponent(r.id)}`;
+      return r.kind === 'skills' ? 'plugins/skills' : 'plugins';
     case 'inbox':
       return 'inbox/all';
     case 'thread':
@@ -154,6 +163,17 @@ export function parseRoute(path: string): Route {
       return one === 'restart' ? { screen: 'report', log: 'restart' } : nf;
     case 'inbox':
       return one === 'all' ? { screen: 'inbox' } : nf;
+    case 'plugins': {
+      if (args.length === 0) return { screen: 'plugins' };
+      if (one === 'skills') return { screen: 'plugins', kind: 'skills' };
+      const [p, id] = args;
+      if (p !== 'p' || id === undefined || id === '' || args.length !== 2) return nf;
+      try {
+        return { screen: 'plugins', id: decodeURIComponent(id) };
+      } catch {
+        return nf;
+      }
+    }
     case 'project':
       return one !== undefined ? { screen: 'thread', project: one, agent: MAIN } : nf;
     case 'agent':

@@ -3,8 +3,8 @@
 // privacy, quiet moments, models, projects, keys. Each one draws its part
 // of SettingsData with the DS's Group rows and says what he changes.
 // Owner: amb-home.
-import { useEffect, useState, type ReactNode } from 'react';
-import type { AppCmd, JsonValue, Plugin } from '@/proto';
+import { useState, type ReactNode } from 'react';
+import type { AppCmd, JsonValue } from '@/proto';
 import { Act, Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/ds';
 import { Accounts } from './accounts';
 import { Roles } from './roles';
@@ -13,7 +13,6 @@ import { modelRow, needsSetup } from './hold';
 import { Projects } from './projects';
 import { UpdateGroup, updateRow } from './update';
 import { DistUpdateGroup } from './appupdate';
-import { Plugins } from './plugins';
 import { Computer } from './computer';
 import { checks, SetupCheck } from './check';
 import { KEY_SECTIONS } from './keys';
@@ -22,7 +21,7 @@ import type { SettingsData, SettingsPorts } from './Settings';
 import type { NotifyAuth } from '@/shared/api';
 import { settings } from '@/proto/words.gen';
 
-export type Page = 'setup' | 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'approvals' | 'projects' | 'plugins' | 'computer' | 'keys';
+export type Page = 'setup' | 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'approvals' | 'projects' | 'computer' | 'keys';
 
 export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'general', title: settings.page_general, sub: settings.page_general_sub },
@@ -33,7 +32,6 @@ export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'models', title: settings.page_models, sub: settings.page_models_sub },
   { id: 'approvals', title: settings.page_approvals, sub: settings.page_approvals_sub },
   { id: 'projects', title: settings.page_projects, sub: settings.page_projects_sub },
-  { id: 'plugins', title: settings.page_plugins, sub: settings.page_plugins_sub },
   { id: 'computer', title: settings.page_computer, sub: settings.page_computer_sub },
   { id: 'keys', title: settings.page_keys, sub: settings.page_keys_sub },
 ];
@@ -229,8 +227,6 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
           }}
         />
       );
-    case 'plugins':
-      return <PluginsPage items={data.plugins} send={ports.send} />;
     case 'computer':
       return <Computer cu={data.computerUse} send={ports.send} />;
     case 'keys':
@@ -348,14 +344,6 @@ function Privacy({ prefs, setPref, tg }: { prefs: Prefs | null; setPref: (key: s
       />
     </>
   );
-}
-
-/** the plugins page asks the core for them each time it opens (bise's home's) */
-function PluginsPage({ items, send }: { items: readonly Plugin[] | null; send: (cmd: AppCmd) => void }) {
-  useEffect(() => {
-    send({ cmd: 'plugins' });
-  }, [send]);
-  return <Plugins items={items} send={send} />;
 }
 
 /** a bundle id typed by hand (com.example.app), ⏎ adds it */

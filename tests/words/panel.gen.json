@@ -328,6 +328,11 @@
     "one": null,
     "text": "paused"
   },
+  "panel.plugins": {
+    "args": [],
+    "one": null,
+    "text": "plugins"
+  },
   "panel.pr_approved": {
     "args": [],
     "one": null,

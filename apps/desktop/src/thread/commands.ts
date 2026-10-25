@@ -40,7 +40,7 @@ const at1 = (args: string): string => args.trim().split(/\s+/)[1] ?? '';
 const THEMES: Readonly<Record<string, string>> = { light: 'light', dark: 'dark', auto: 'system', system: 'system' };
 
 /**
- * /plugins <sub> <name> as settings · plugins sends it (rust/tui/src/plugins.rs's
+ * /plugins <sub> <name> as the plugins place sends it (rust/tui/src/plugins.rs's
  * subcommands); 'list', a bare login/logout or an unknown word: none (the screen
  * or the hub's usage line).
  */
@@ -111,9 +111,15 @@ export function windowRun(name: string, args: string, at: { project: string; age
     case 'setup':
       return go({ screen: 'settings', page: 'setup' });
     case 'plugins': {
-      // '/plugins off x' acts as settings · plugins' switch; 'list' or bare: the page;
+      // '/plugins off x' acts as the plugins place's switch; 'list' or bare: the place;
       // anything else goes to the hub, whose line says the usage
-      if (arg === '' || arg === 'list') return go({ screen: 'settings', page: 'plugins' });
+      if (arg === '' || arg === 'list') return go({ screen: 'plugins' });
+      const c = pluginsRun(args);
+      return c === undefined ? undefined : { app: c };
+    }
+    case 'skills': {
+      // /skills: the plugins place on skills; '/skills off x' as /plugins off x
+      if (arg === '' || arg === 'list') return go({ screen: 'plugins', kind: 'skills' });
       const c = pluginsRun(args);
       return c === undefined ? undefined : { app: c };
     }

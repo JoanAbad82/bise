@@ -858,7 +858,7 @@ pub fn default_import_name(from: ImportFrom) -> &'static str {
     }
 }
 
-fn import_title(from: ImportFrom) -> &'static str {
+pub(crate) fn import_title(from: ImportFrom) -> &'static str {
     match from {
         ImportFrom::Claude => "Claude Code",
         ImportFrom::Codex => "Codex",

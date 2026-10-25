@@ -7,7 +7,7 @@
 // A switch flips at once: the value he set shows until the core's next
 // prefs (which carries it, or not when the core refused it).
 import { useState } from 'react';
-import type { Account, AppCmd, Found, JsonValue, Model, Perm, Plugin, ProjectRow, RoleRow } from '@/proto';
+import type { Account, AppCmd, Found, JsonValue, Model, Perm, ProjectRow, RoleRow } from '@/proto';
 import type { Held } from './hold';
 import type { ApprovalsCmd, ApprovalsEv } from './approvals';
 import { Row, Settings as Frame } from '@/ds';
@@ -28,8 +28,6 @@ export interface SettingsData {
   projects: readonly ProjectRow[];
   /** the repos found_scan found in his folders (none yet: empty) */
   found: readonly Found[];
-  /** bise's home's agent plugins (none yet: null, the page asks) */
-  plugins: readonly Plugin[] | null;
   /** computer use's state (none yet: null) */
   computerUse: ComputerUse | null;
   /** the helper's permissions (none: not known, or no helper) */
@@ -132,8 +130,8 @@ export function Settings({ page, ports, prefs, ...data }: SettingsProps) {
         testId={`settings.page.${at.id}`}
         title={at.title}
         sub={at.sub}
-        // each section's hero card (designer's page-hero); plugins gets its own on the plugins feature
-        hero={at.id !== 'plugins'}
+        // each section's hero card (designer's page-hero); plugins left settings for its own place
+        hero
         nav={PAGES.map((p) => (
           <Row
             key={p.id}

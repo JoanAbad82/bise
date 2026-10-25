@@ -9,6 +9,7 @@
 // list (help, ⌘/); they are the ASKS below.
 import type { SearchPage } from '@/search/rank';
 import { running } from '@/proto/words_running.gen';
+import { panel } from '@/proto/words_panel.gen';
 import { formatRoute, MAIN, projectOf, type Route, type Screen } from './route';
 
 interface Named {
@@ -47,6 +48,7 @@ export const SCREENS: Record<Screen, readonly Rule[]> = {
   environments: [{ project: { name: 'environments', words: ['worktrees', 'dev servers'], route: (p) => ({ screen: 'environments', project: p }) } }],
   inbox: [{ app: { name: 'inbox', glyph: '?', words: ['answered', 'history', 'questions'], route: { screen: 'inbox' } } }],
   scheduled: [{ app: { name: 'scheduled', glyph: '◷', words: ['timers', 'every'], route: { screen: 'scheduled' } } }],
+  plugins: [{ app: { name: panel.plugins, glyph: '⊞', words: ['skills', 'tools', 'MCP', 'connectors', 'Mistral'], route: { screen: 'plugins' } } }],
   running: [{ app: { name: running.heading, glyph: '∿', words: running.find_words.split(' · '), route: { screen: 'running' } } }],
   report: [{ no: 'the last crash report: only after a crash, from its line' }],
   settings: [{ app: { name: 'settings', glyph: '⚙', words: ['preferences'], key: '⌘,', route: { screen: 'settings' } } }, { settings: true }],

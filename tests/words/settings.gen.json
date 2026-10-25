@@ -1616,11 +1616,6 @@
     "one": null,
     "text": "Français"
   },
-  "settings.log_in": {
-    "args": [],
-    "one": null,
-    "text": "log in"
-  },
   "settings.log_out": {
     "args": [],
     "one": null,
@@ -1640,42 +1635,6 @@
     "args": [],
     "one": null,
     "text": "on Max or Team?"
-  },
-  "settings.login_in": {
-    "args": [
-      "host"
-    ],
-    "one": null,
-    "text": "{host} · logged in"
-  },
-  "settings.login_in_tools": {
-    "args": [
-      "host",
-      "n"
-    ],
-    "one": "{host} · logged in · {n} tool",
-    "text": "{host} · logged in · {n} tools"
-  },
-  "settings.login_needs": {
-    "args": [
-      "host"
-    ],
-    "one": null,
-    "text": "{host} · needs a login"
-  },
-  "settings.login_out": {
-    "args": [
-      "host"
-    ],
-    "one": null,
-    "text": "{host} · not logged in"
-  },
-  "settings.login_pending": {
-    "args": [
-      "host"
-    ],
-    "one": null,
-    "text": "{host} · log in in your browser…"
   },
   "settings.minutes": {
     "args": [
@@ -2068,16 +2027,6 @@
     "one": null,
     "text": "the models your agents use, and how you pay for them: a plan, a key, or both."
   },
-  "settings.page_plugins": {
-    "args": [],
-    "one": null,
-    "text": "plugins"
-  },
-  "settings.page_plugins_sub": {
-    "args": [],
-    "one": null,
-    "text": "what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal."
-  },
   "settings.page_privacy": {
     "args": [],
     "one": null,
@@ -2180,6 +2129,16 @@
     "one": null,
     "text": "fn sends your words without a capture without it"
   },
+  "settings.plugins_about": {
+    "args": [],
+    "one": null,
+    "text": "about"
+  },
+  "settings.plugins_add": {
+    "args": [],
+    "one": null,
+    "text": "add"
+  },
   "settings.plugins_add_agent": {
     "args": [],
     "one": null,
@@ -2189,6 +2148,11 @@
     "args": [],
     "one": null,
     "text": "say what it should do; an agent builds it"
+  },
+  "settings.plugins_add_go": {
+    "args": [],
+    "one": null,
+    "text": "add"
   },
   "settings.plugins_add_import": {
     "args": [],
@@ -2279,6 +2243,84 @@
     "one": null,
     "text": "always on"
   },
+  "settings.plugins_badge_failed": {
+    "args": [],
+    "one": null,
+    "text": "failed: details says why"
+  },
+  "settings.plugins_badge_waits": {
+    "args": [],
+    "one": null,
+    "text": "waits for you"
+  },
+  "settings.plugins_band_browse": {
+    "args": [],
+    "one": null,
+    "text": "browse"
+  },
+  "settings.plugins_band_count": {
+    "args": [
+      "connected",
+      "total"
+    ],
+    "one": null,
+    "text": "{connected} of {total} connected"
+  },
+  "settings.plugins_band_found": {
+    "args": [
+      "n",
+      "list"
+    ],
+    "one": "{n} MCP server found on this Mac: {list}",
+    "text": "{n} MCP servers found on this Mac: {list}"
+  },
+  "settings.plugins_band_head": {
+    "args": [],
+    "one": null,
+    "text": "connect your tools"
+  },
+  "settings.plugins_band_import": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "import {n}"
+  },
+  "settings.plugins_band_market": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} new plugin in your marketplaces",
+    "text": "{n} new plugins in your marketplaces"
+  },
+  "settings.plugins_band_popular": {
+    "args": [],
+    "one": null,
+    "text": "popular at Mistral"
+  },
+  "settings.plugins_band_see": {
+    "args": [],
+    "one": null,
+    "text": "see them"
+  },
+  "settings.plugins_band_sub": {
+    "args": [],
+    "one": null,
+    "text": "each one you connect, your agents reach in every project. a write still asks you first"
+  },
+  "settings.plugins_band_through": {
+    "args": [],
+    "one": null,
+    "text": "through Mistral"
+  },
+  "settings.plugins_band_workspace": {
+    "args": [
+      "project",
+      "n"
+    ],
+    "one": null,
+    "text": "{project} brings {n} of its own"
+  },
   "settings.plugins_bise_title": {
     "args": [],
     "one": null,
@@ -2294,6 +2336,11 @@
     "one": null,
     "text": "⏎ adds it"
   },
+  "settings.plugins_browse_add_one": {
+    "args": [],
+    "one": null,
+    "text": "+ add"
+  },
   "settings.plugins_browse_connect": {
     "args": [],
     "one": null,
@@ -2303,6 +2350,11 @@
     "args": [],
     "one": null,
     "text": "nothing to browse: a marks a marketplace"
+  },
+  "settings.plugins_browse_mistral": {
+    "args": [],
+    "one": null,
+    "text": "Mistral connectors"
   },
   "settings.plugins_browse_question": {
     "args": [],
@@ -2324,6 +2376,11 @@
     "one": null,
     "text": "built-in"
   },
+  "settings.plugins_cancel": {
+    "args": [],
+    "one": null,
+    "text": "cancel"
+  },
   "settings.plugins_change_when": {
     "args": [
       "when"
@@ -2339,6 +2396,31 @@
     ],
     "one": null,
     "text": "a {kind} of {owner} · {state}"
+  },
+  "settings.plugins_comes_from": {
+    "args": [],
+    "one": null,
+    "text": "comes from"
+  },
+  "settings.plugins_conn_fetch": {
+    "args": [],
+    "one": null,
+    "text": "Mistral's connectors couldn't be read: these are the last ones"
+  },
+  "settings.plugins_conn_locked": {
+    "args": [],
+    "one": null,
+    "text": "your keychain is locked: Mistral's connectors can't be read"
+  },
+  "settings.plugins_conn_no_key": {
+    "args": [],
+    "one": null,
+    "text": "your Mistral account isn't connected: settings › keys"
+  },
+  "settings.plugins_connect": {
+    "args": [],
+    "one": null,
+    "text": "connect"
   },
   "settings.plugins_connect_done": {
     "args": [
@@ -2383,6 +2465,11 @@
     ],
     "one": null,
     "text": "{installed} installed · {browsable} to browse"
+  },
+  "settings.plugins_details": {
+    "args": [],
+    "one": null,
+    "text": "details"
   },
   "settings.plugins_disabled": {
     "args": [],
@@ -2498,6 +2585,21 @@
     "one": null,
     "text": "type to filter"
   },
+  "settings.plugins_for": {
+    "args": [],
+    "one": null,
+    "text": "for"
+  },
+  "settings.plugins_for_every": {
+    "args": [],
+    "one": null,
+    "text": "every project on this Mac"
+  },
+  "settings.plugins_for_project": {
+    "args": [],
+    "one": null,
+    "text": "this project only"
+  },
   "settings.plugins_group_mcp": {
     "args": [],
     "one": null,
@@ -2507,11 +2609,6 @@
     "args": [],
     "one": null,
     "text": "Mistral connectors"
-  },
-  "settings.plugins_help": {
-    "args": [],
-    "one": null,
-    "text": "a change applies to the agents' next sessions."
   },
   "settings.plugins_hint_connect_again": {
     "args": [],
@@ -2757,16 +2854,6 @@
     "one": null,
     "text": "browser open"
   },
-  "settings.plugins_logins": {
-    "args": [],
-    "one": null,
-    "text": "servers that log in"
-  },
-  "settings.plugins_looking": {
-    "args": [],
-    "one": null,
-    "text": "looking at your plugins…"
-  },
   "settings.plugins_mark_off": {
     "args": [],
     "one": null,
@@ -2788,6 +2875,16 @@
     "args": [],
     "one": null,
     "text": "a server gives your agents new tools. it runs on this Mac, or bise reaches it at a URL"
+  },
+  "settings.plugins_menu_browse": {
+    "args": [],
+    "one": null,
+    "text": "browse"
+  },
+  "settings.plugins_menu_browse_what": {
+    "args": [],
+    "one": null,
+    "text": "Mistral's connectors and your marketplaces"
   },
   "settings.plugins_more_tools": {
     "args": [
@@ -2851,11 +2948,6 @@
     "one": null,
     "text": "no remote MCP server that logs in (one without an Authorization header in its mcp.json)"
   },
-  "settings.plugins_none": {
-    "args": [],
-    "one": null,
-    "text": "no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md)."
-  },
   "settings.plugins_none_match": {
     "args": [],
     "one": null,
@@ -2865,6 +2957,11 @@
     "args": [],
     "one": null,
     "text": "not logged in"
+  },
+  "settings.plugins_not_set_up": {
+    "args": [],
+    "one": null,
+    "text": "not set up"
   },
   "settings.plugins_off_everywhere": {
     "args": [],
@@ -2934,6 +3031,31 @@
     "args": [],
     "one": null,
     "text": "~/.agents/skills"
+  },
+  "settings.plugins_place_counts": {
+    "args": [
+      "on",
+      "off"
+    ],
+    "one": null,
+    "text": "{on} on · {off} off"
+  },
+  "settings.plugins_place_loading": {
+    "args": [],
+    "one": null,
+    "text": "reading your plugins…"
+  },
+  "settings.plugins_place_sub": {
+    "args": [],
+    "one": null,
+    "text": "what your agents can use, in every project"
+  },
+  "settings.plugins_place_waits": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} needs you",
+    "text": "{n} need you"
   },
   "settings.plugins_preview_after": {
     "args": [],
@@ -3007,6 +3129,11 @@
     "one": null,
     "text": "what can your agents use?"
   },
+  "settings.plugins_refresh": {
+    "args": [],
+    "one": null,
+    "text": "read again"
+  },
   "settings.plugins_refresh_failed": {
     "args": [
       "why"
@@ -3019,12 +3146,34 @@
     "one": null,
     "text": "Mistral's connectors read again"
   },
+  "settings.plugins_remove": {
+    "args": [],
+    "one": null,
+    "text": "remove"
+  },
   "settings.plugins_remove_ask": {
     "args": [
       "name"
     ],
     "one": null,
     "text": "remove {name} and its saved secrets? /plugins remove {name} yes removes it."
+  },
+  "settings.plugins_remove_confirm": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "remove {name}? its saved secrets and logins go too."
+  },
+  "settings.plugins_remove_no": {
+    "args": [],
+    "one": null,
+    "text": "keep it"
+  },
+  "settings.plugins_remove_yes": {
+    "args": [],
+    "one": null,
+    "text": "remove it"
   },
   "settings.plugins_removed": {
     "args": [
@@ -3033,10 +3182,27 @@
     "one": null,
     "text": "removed {name} and its saved secrets — your agents lose its tools within a few seconds"
   },
+  "settings.plugins_room_sub": {
+    "args": [],
+    "one": null,
+    "text": "each plugin you add gets a place here."
+  },
   "settings.plugins_screen": {
     "args": [],
     "one": null,
     "text": "plugins"
+  },
+  "settings.plugins_search": {
+    "args": [],
+    "one": null,
+    "text": "search plugins, tools, skills"
+  },
+  "settings.plugins_secret_empty": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "leave empty to keep ${name} as it is"
   },
   "settings.plugins_secrets_where": {
     "args": [],
@@ -3052,20 +3218,102 @@
     "one": null,
     "text": "{name} {state}{unchanged} — applies at the next /reload"
   },
+  "settings.plugins_set_up": {
+    "args": [],
+    "one": null,
+    "text": "set up"
+  },
+  "settings.plugins_side_new": {
+    "args": [],
+    "one": null,
+    "text": "something new to connect"
+  },
+  "settings.plugins_side_tip": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} plugin on",
+    "text": "{n} plugins on"
+  },
+  "settings.plugins_side_tip_waits": {
+    "args": [
+      "on",
+      "n",
+      "list"
+    ],
+    "one": null,
+    "text": "{on} plugins on · {n} need you: {list}"
+  },
+  "settings.plugins_sign_in_again": {
+    "args": [],
+    "one": null,
+    "text": "sign in again"
+  },
   "settings.plugins_staging": {
     "args": [],
     "one": null,
     "text": "looking at it…"
+  },
+  "settings.plugins_tab_browse": {
+    "args": [],
+    "one": null,
+    "text": "browse"
+  },
+  "settings.plugins_tab_installed": {
+    "args": [],
+    "one": null,
+    "text": "installed"
+  },
+  "settings.plugins_tag_mcp": {
+    "args": [],
+    "one": null,
+    "text": "MCP"
+  },
+  "settings.plugins_tag_mistral": {
+    "args": [],
+    "one": null,
+    "text": "Mistral"
+  },
+  "settings.plugins_tag_skills": {
+    "args": [],
+    "one": null,
+    "text": "skills"
+  },
+  "settings.plugins_toggle_tip": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "turn {name} on or off for your agents, in every project"
+  },
+  "settings.plugins_tools_fold": {
+    "args": [
+      "n"
+    ],
+    "one": "▸ {n} tool",
+    "text": "▸ {n} tools"
   },
   "settings.plugins_tools_folded": {
     "args": [],
     "one": null,
     "text": "▸ tools"
   },
+  "settings.plugins_tools_head": {
+    "args": [],
+    "one": null,
+    "text": "tools"
+  },
   "settings.plugins_tools_open": {
     "args": [],
     "one": null,
     "text": "▾ tools"
+  },
+  "settings.plugins_tools_unfold": {
+    "args": [
+      "n"
+    ],
+    "one": "▾ {n} tool",
+    "text": "▾ {n} tools"
   },
   "settings.plugins_try_head": {
     "args": [],
@@ -3077,6 +3325,11 @@
     "one": null,
     "text": "try it · 1-3 puts it in main's composer"
   },
+  "settings.plugins_try_tip": {
+    "args": [],
+    "one": null,
+    "text": "puts it in main's composer; you send it or change it"
+  },
   "settings.plugins_unchanged": {
     "args": [],
     "one": null,
@@ -3087,6 +3340,11 @@
     "one": null,
     "text": "usage: /plugins [list] | /plugins on ID | /plugins off ID | /plugins login [NAME] | /plugins logout NAME | /plugins remove NAME"
   },
+  "settings.plugins_version": {
+    "args": [],
+    "one": null,
+    "text": "version"
+  },
   "settings.plugins_vibe_title": {
     "args": [],
     "one": null,
@@ -3096,6 +3354,25 @@
     "args": [],
     "one": null,
     "text": "~/.vibe/skills"
+  },
+  "settings.plugins_waits_error": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "{name} failed to start"
+  },
+  "settings.plugins_waits_login": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "{name} needs a login"
+  },
+  "settings.plugins_when": {
+    "args": [],
+    "one": null,
+    "text": "your agents"
   },
   "settings.privacy_add": {
     "args": [],

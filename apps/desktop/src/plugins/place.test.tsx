@@ -1,0 +1,155 @@
+// @vitest-environment happy-dom
+// The plugins place from props (Place.tsx, PluginPage.tsx, Add.tsx): the head's counts and the
+// band from the core's summary, a row's one control and what it sends, the kind filter, the
+// add sheet's secrets (sent once with the confirm, then dropped), a plugin's page and remove.
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { AppCmd, Plugin, PluginsSummary } from '@/proto';
+import { core_ev } from '@/proto/fixtures.gen';
+import { PlaceView } from './Place';
+import { PluginPage } from './PluginPage';
+import { AddSheet } from './Add';
+
+afterEach(cleanup);
+
+const full = (): PluginsSummary => {
+  const e = core_ev.find((x) => x.ev === 'plugins_summary' && x.project == null && x.summary.on > 0);
+  if (e?.ev !== 'plugins_summary') throw new Error('fixture');
+  return e.summary;
+};
+const preview = () => {
+  const e = core_ev.find((x) => x.ev === 'plugin_preview');
+  if (e?.ev !== 'plugin_preview') throw new Error('fixture');
+  return { token: e.token, preview: e.preview };
+};
+
+const row = (id: string, more: Partial<Plugin> = {}): Plugin => ({ id, name: id, kind: 'plugin', scope: 'user', title: id, state: 'loaded', on: true, ...more });
+const ROWS: Plugin[] = [
+  row('skills:bise', { kind: 'skills', scope: 'built-in', title: 'bise', locked: true }),
+  row('computer', { scope: 'built-in', on: false, state: 'disabled' }),
+  row('blender', { what: 'drive your running Blender', parts: [{ id: 'blender#skill:blender', kind: 'skill', name: 'blender', on: true }, { id: 'blender#mcp:blender', kind: 'mcp', name: 'blender', on: true, tool_count: 23 }] }),
+  row('mistral:outlook', { kind: 'mistral', scope: 'mistral', title: 'Outlook Calendar', login: 'needs' }),
+  row('linear', { kind: 'mcp', parts: [{ id: 'linear#mcp:linear', kind: 'mcp', name: 'linear', on: true, login: 'needs' }] }),
+  row('pg', { kind: 'mcp', parts: [{ id: 'pg#mcp:pg', kind: 'mcp', name: 'pg', on: true, error: 'exited at start: DATABASE_URL is not set' }] }),
+];
+const BROWSE = [{ source: 'mistral', items: [row('mistral:linear', { kind: 'mistral', scope: 'mistral', title: 'Linear', state: 'available', on: false, action: 'connect', what: 'issues, projects and cycles' })] }];
+
+function place(over: Partial<Parameters<typeof PlaceView>[0]> = {}) {
+  const sent: AppCmd[] = [];
+  const ports = { send: (c: AppCmd) => { sent.push(c); }, open: vi.fn(), setUpComputer: vi.fn(), add: vi.fn() };
+  render(<PlaceView rows={ROWS} summary={full()} browse={BROWSE} ports={ports} {...over} />);
+  return { sent, ports };
+}
+
+describe('the plugins place', () => {
+  it("heads with the core's counts and the band; connect sends plugin_connect", () => {
+    const { sent } = place();
+    expect(screen.getByTestId('plugins.counts').textContent).toBe('16 on · 2 off · 3 need you');
+    expect(screen.getByTestId('plugins.band.count').textContent).toBe('3 of 10 connected');
+    expect(screen.getByTestId('plugins.band.mistral:linear').textContent).toContain('issues, projects and cycles');
+    expect(screen.getByTestId('plugins.band.import').textContent).toContain('3 MCP servers found on this Mac: Claude Code, Cursor');
+    fireEvent.click(screen.getByTestId('plugins.band.mistral:linear.connect'));
+    expect(sent).toEqual([{ cmd: 'plugin_connect', id: 'mistral:linear' }]);
+  });
+
+  it("gives each row its one control: always on, set up, connect, log in, details + switch", () => {
+    const { sent, ports } = place();
+    expect(screen.getByTestId('plugins.row.skills:bise').textContent).toContain('always on');
+    expect(screen.queryByTestId('plugins.row.skills:bise.toggle')).toBeNull();
+    fireEvent.click(screen.getByTestId('plugins.row.computer.set_up'));
+    expect(ports.setUpComputer).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByTestId('plugins.row.mistral:outlook.connect'));
+    fireEvent.click(screen.getByTestId('plugins.row.linear.login'));
+    fireEvent.click(screen.getByTestId('plugins.row.blender.toggle'));
+    expect(sent).toEqual([
+      { cmd: 'plugin_connect', id: 'mistral:outlook' },
+      { cmd: 'plugin_login', name: 'linear' },
+      { cmd: 'plugin_set', name: 'blender', on: false },
+    ]);
+    expect(screen.getByTestId('plugins.row.blender').textContent).toContain('1 skill · 23 tools');
+    expect(screen.getByTestId('plugins.row.pg').textContent).toContain('✗ exited at start: DATABASE_URL is not set');
+    expect(screen.getByTestId('plugins.row.pg.details')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('plugins.row.blender'));
+    expect(ports.open).toHaveBeenCalledWith('blender');
+  });
+
+  it('filters by kind (/skills opens on skills) and lists Browse apart', () => {
+    place({ kind: 'skills' });
+    expect(screen.queryByTestId('plugins.group.plugin')).toBeNull();
+    expect(screen.getByTestId('plugins.group.skills')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('plugins.kind.all'));
+    expect(screen.getByTestId('plugins.group.plugin')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('plugins.tabs.1'));
+    expect(screen.getByTestId('plugins.browse.row.mistral:linear')).toBeTruthy();
+  });
+
+  it('says it reads before the rows came; no band before the summary', () => {
+    place({ rows: null, summary: null });
+    expect(screen.getByTestId('plugins.loading')).toBeTruthy();
+    expect(screen.queryByTestId('plugins.band')).toBeNull();
+  });
+});
+
+describe('the add sheet', () => {
+  it("sends the secrets' names first, their values only with the confirm, and forgets them", () => {
+    const sent: AppCmd[] = [];
+    const onClose = vi.fn();
+    const props = { item: 'mcp' as const, project: undefined, summary: full(), ports: { send: (c: AppCmd) => { sent.push(c); } }, onClose };
+    const r = render(<AddSheet {...props} preview={null} />);
+    fireEvent.change(screen.getByTestId('plugins.sheet.mcp.name'), { target: { value: 'linear' } });
+    fireEvent.change(screen.getByTestId('plugins.sheet.mcp.target'), { target: { value: 'npx -y linear-mcp' } });
+    fireEvent.change(screen.getByTestId('plugins.sheet.mcp.env'), { target: { value: 'LINEAR_TOKEN=sk-PLANTED' } });
+    fireEvent.click(screen.getByTestId('plugins.sheet.go'));
+    expect(sent).toEqual([{ cmd: 'plugin_add', add: { kind: 'mcp', name: 'linear', command: 'npx -y linear-mcp', secrets: ['LINEAR_TOKEN'] } }]);
+    expect(JSON.stringify(sent)).not.toContain('sk-PLANTED');
+    // the preview came: what runs, then add
+    const p = preview();
+    const withSecret = { ...p, preview: { ...p.preview, secrets: ['LINEAR_TOKEN'] } };
+    r.rerender(<AddSheet {...props} preview={withSecret} />);
+    expect(screen.getByTestId('plugins.preview.runs').textContent).toContain('npx -y latex-mcp');
+    fireEvent.click(screen.getByTestId('plugins.preview.add'));
+    expect(sent[1]).toEqual({ cmd: 'plugin_add_confirm', token: p.token, secrets: [{ name: 'LINEAR_TOKEN', value: 'sk-PLANTED' }] });
+    expect(onClose).toHaveBeenCalledOnce();
+    // opened again: nothing of the last one is left
+    r.rerender(<AddSheet {...props} preview={null} />);
+    expect(screen.getByTestId<HTMLTextAreaElement>('plugins.sheet.mcp.env').value).toBe('');
+  });
+
+  it('cancel on the preview sends plugin_add_cancel', () => {
+    const sent: AppCmd[] = [];
+    render(<AddSheet item="plugin" project={undefined} summary={null} preview={null} ports={{ send: (c) => { sent.push(c); } }} onClose={() => {}} />);
+    fireEvent.change(screen.getByTestId('plugins.sheet.plugin.source'), { target: { value: 'openai/plugins' } });
+    fireEvent.click(screen.getByTestId('plugins.sheet.go'));
+    expect(sent).toEqual([{ cmd: 'plugin_add', add: { kind: 'git', url: 'openai/plugins' } }]);
+    cleanup();
+    render(<AddSheet item="plugin" project={undefined} summary={null} preview={preview()} ports={{ send: (c) => { sent.push(c); } }} onClose={() => {}} />);
+    fireEvent.click(screen.getByTestId('plugins.sheet.cancel'));
+    expect(sent.at(-1)).toEqual({ cmd: 'plugin_add_cancel', token: preview().token });
+  });
+});
+
+describe("a plugin's page", () => {
+  it('switches its parts, tries a line, removes his own after one confirm', () => {
+    const sent: AppCmd[] = [];
+    const ports = { send: (c: AppCmd) => { sent.push(c); }, back: vi.fn(), tryIt: vi.fn(), setUpComputer: vi.fn(), remove: vi.fn() };
+    const blender = { ...(ROWS[2] as Plugin), prompts: ['make a low-poly fox'], path: '/Users/x/.agents/plugins/blender' };
+    render(<PluginPage p={blender} ports={ports} />);
+    fireEvent.click(screen.getByTestId('plugins.page.blender.try.0'));
+    expect(ports.tryIt).toHaveBeenCalledWith('make a low-poly fox');
+    fireEvent.click(screen.getByTestId('plugins.part.blender#skill:blender.toggle'));
+    expect(sent).toEqual([{ cmd: 'plugin_set', name: 'blender#skill:blender', on: false }]);
+    fireEvent.click(screen.getByTestId('plugins.page.blender.remove'));
+    expect(ports.remove).not.toHaveBeenCalled();
+    expect(screen.getByTestId('plugins.page.blender.ask').textContent).toContain('remove blender? its saved secrets and logins go too.');
+    fireEvent.click(screen.getByTestId('plugins.page.blender.ask.yes'));
+    expect(ports.remove).toHaveBeenCalledWith('blender');
+  });
+
+  it('no remove on a built-in, nor before the core has plugin_remove', () => {
+    render(<PluginPage p={row('docs', { scope: 'built-in' })} ports={{ send: () => {}, back: () => {}, tryIt: () => {}, setUpComputer: () => {}, remove: () => {} }} />);
+    expect(screen.queryByTestId('plugins.page.docs.remove')).toBeNull();
+    cleanup();
+    render(<PluginPage p={row('pay')} ports={{ send: () => {}, back: () => {}, tryIt: () => {}, setUpComputer: () => {} }} />);
+    expect(screen.queryByTestId('plugins.page.pay.remove')).toBeNull();
+  });
+});

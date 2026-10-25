@@ -24,6 +24,19 @@ describe('Latest', () => {
     expect(l.snapshot()).toEqual([]);
   });
 
+  it("keeps the plugins' summary and each source's browse: the sidebar's row at a window's load", () => {
+    const l = new Latest();
+    l.keep({ ev: 'plugins_summary', summary: { on: 1 } });
+    l.keep({ ev: 'browse', source: 'mistral', items: [1] });
+    l.keep({ ev: 'browse', source: 'openai/plugins', items: [2] });
+    l.keep({ ev: 'plugins_summary', summary: { on: 2 } });
+    expect(l.snapshot()).toEqual([
+      { ev: 'browse', source: 'mistral', items: [1] },
+      { ev: 'browse', source: 'openai/plugins', items: [2] },
+      { ev: 'plugins_summary', summary: { on: 2 } },
+    ]);
+  });
+
   it("keeps the roles: a window that loads later still knows the voice role's model", () => {
     const l = new Latest();
     l.keep({ ev: 'roles', items: [{ role: 'voice', model: 'mistral/voxtral-mini-latest' }] });

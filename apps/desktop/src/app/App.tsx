@@ -58,6 +58,7 @@ import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
 import { panel } from '@/terminal/panel';
 import { ArtifactOpen, ArtifactsScreen } from '@/artifacts';
 import { ScheduledScreen } from '@/scheduled';
+import { PluginsScreen } from '@/plugins';
 import { RunningScreen } from '@/running';
 import { InboxScreen } from '@/inbox/InboxScreen';
 import '@/ds/index.css';
@@ -448,6 +449,9 @@ function ScreenOf({ route }: { route: Route }) {
     case 'scheduled':
       // every project's live scheduled tasks (amb-kit's src/scheduled)
       return <ScheduledScreen />;
+    case 'plugins':
+      // what his agents can use (page plugins v48, src/plugins): the list, or one plugin's page
+      return <PluginsScreen {...(route.kind === undefined ? {} : { kind: route.kind })} {...(route.id === undefined ? {} : { id: route.id })} />;
     case 'running':
       // what his agents left running, every project's, with its output (src/running)
       return <RunningScreen />;

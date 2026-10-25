@@ -26,6 +26,9 @@ use bise_proto::app_rows::{ConnectorsProblem, LoginState, PartKind, Plugin, Plug
 use bise_proto::words::settings;
 use std::path::{Path, PathBuf};
 
+mod summary;
+pub use summary::{summary, Market, USEFUL};
+
 /// What the list is built from.
 pub struct Inputs<'a> {
     /// the real plugins, built-in, user and workspace (`resolve::resolve`)

@@ -184,6 +184,8 @@ export function crumbOf(route: Route, name: (project: string) => string): string
       return [route.log === 'restart' ? panel.crumb_update_log : panel.crumb_crash];
     case 'lab':
       return [panel.crumb_lab, route.lab];
+    case 'plugins':
+      return route.id === undefined ? [panel.plugins] : [panel.plugins, route.id];
     case 'running':
       // its noun, not its route's name (designer m_38642); in a scope, whose: 'acme › perf › processes'
       if (route.scope === undefined) return [running.heading];

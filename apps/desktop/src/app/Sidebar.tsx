@@ -13,7 +13,10 @@ import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type 
 import { IconButton, Kbd, PickerPop, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
 import type { ProjectRow } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
-import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
+import { useAgents, useHubRefused, usePluginsSummary, useProjects, useStore, type Store } from '@/store';
+import { settings } from '@/proto/words.gen';
+import { sideOf } from '@/plugins/model';
+import { useNewToConnect } from '@/plugins/seen';
 import { RefusedLine } from './Refused';
 import { useProjectWaiting, useWaitingCount } from '@/inbox/waiting';
 import { useNow } from './clock';
@@ -260,6 +263,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
       <SRow kind="top" lead="◷" name={panel.scheduled} end={scheduled > 0 ? String(scheduled) : ''} endTip={scheduledTip(scheduled)} on={route.screen === 'scheduled'}
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
+      <PluginsRow on={route.screen === 'plugins'} onClick={() => { router.go({ screen: 'plugins' }); }} />
       {/* no 'processes' row here: too technical for the sidebar (Gabriel, designer m_38642); the right
           bar's PROCESSES, ⌘K and /processes open the screen */}
       <SectionHead>{panel.projects}</SectionHead>
@@ -268,6 +272,31 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         <ProjectItem key={p.project} p={p} on={inView === p.project} route={route} hint={cmd && i < 9 ? i + 1 : undefined} />
       ))}
     </Side>
+  );
+}
+
+/**
+ * '⊞ plugins' (page plugins v48, plugins-ui m_40135): the plugins on, faint; when some wait on him
+ * (a login, a server that failed) their number in the accent, inbox's count, no pill; a faint ink
+ * dot while something new to connect waits that he hasn't seen in the place (the app's view state,
+ * plugins/seen.ts). Every number is the core's summary (bise's home's); its tip says what waits.
+ */
+function PluginsRow({ on, onClick }: { on: boolean; onClick: () => void }) {
+  const summary = usePluginsSummary();
+  const side = sideOf(summary);
+  const dot = useNewToConnect(summary);
+  return (
+    <SRow kind="top" lead="⊞" name={panel.plugins} end={side.end === '' && !dot ? '' : <PluginsEnd n={side.end} dot={dot} />} endTip={side.waits > 0 ? undefined : side.tip}
+      count={side.waits} countTip={side.tip} on={on} onClick={onClick} testId="app.sidebar.plugins" />
+  );
+}
+
+function PluginsEnd({ n, dot }: { n: string; dot: boolean }) {
+  return (
+    <>
+      {n}
+      {dot && <span className="app-newdot" {...tipAttrs(settings.plugins_side_new)} data-testid="app.sidebar.plugins.dot" />}
+    </>
   );
 }
 

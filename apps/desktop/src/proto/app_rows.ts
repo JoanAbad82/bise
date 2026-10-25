@@ -329,6 +329,53 @@ export type LoginState = "needs" | "in" | "out" | "pending" | "unknown";
 export type ConnectorsProblem = { "kind": "no_key" } | { "kind": "locked" } | { "kind": "fetch", why: string, } | { "kind": "unknown" };
 
 /**
+ * The Plugins list in a few numbers, for the sidebar's plugins row and
+ * the place's 'connect your tools' band (`core_ev::PluginsSummary`).
+ * Built by `bend_plugins::catalog::summary` from the same rows, its one
+ * builder: the window adds nothing up, it draws what it gets.
+ */
+export type PluginsSummary = { 
+/**
+ * rows on and loading (a plugin, a ready connector, a server, a
+ * skills folder)
+ */
+on: number, 
+/**
+ * rows he turned off
+ */
+off: number, 
+/**
+ * on rows that wait on him: a login to do, a server that failed
+ * (typed fields only: a part's `login: needs`, its `error`)
+ */
+waiting: number, 
+/**
+ * his Mistral connectors logged in
+ */
+connected: number, 
+/**
+ * every Mistral connector, connected or not
+ */
+connectors: number, 
+/**
+ * what to suggest, waiting ones first (login, error), then mistral,
+ * import, workspace, marketplace
+ */
+suggest?: Array<PluginSuggest>, };
+
+/**
+ * One suggestion of a [`PluginsSummary`]. `n` is the full count; `ids`
+ * (PluginId strings) and `titles` (what he reads, same order) are capped
+ * at [`SUGGEST_CAP`], so `n >= ids.len() == titles.len()`.
+ */
+export type PluginSuggest = { kind: SuggestKind, n: number, ids?: Array<string>, titles?: Array<string>, };
+
+/**
+ * What a [`PluginSuggest`] proposes.
+ */
+export type SuggestKind = "mistral" | "import" | "login" | "error" | "workspace" | "marketplace" | "unknown";
+
+/**
  * A step of computer use's setup (P.2, the TUI's `/computer-use`
  * screen as data: rust/tui/src/computer_use.rs rows).
  */

@@ -119,6 +119,13 @@ pub(crate) struct Setup {
     /// the add menu's previews waiting for his click (dropped with the
     /// core: their staged folders go)
     staged: bend_plugins::add::Held,
+    /// the other apps' MCP configs (`add::found`): read once with the rows,
+    /// again after a refresh or an add, never at each send
+    found: Option<Vec<bend_plugins::add::Found>>,
+    /// the marketplaces read so far, by source (their last `browse`)
+    markets: Vec<(String, Vec<bise_proto::app_rows::Plugin>)>,
+    /// the last `plugins_summary` sent, per project (only a change goes out)
+    summaries: std::collections::HashMap<Option<String>, bise_proto::app_rows::PluginsSummary>,
     /// computer use's page while it is open
     cu: Option<CuLive>,
     /// the desktop app's update check (bar S.6)
@@ -163,7 +170,7 @@ impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), staged: Default::default(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), staged: Default::default(), found: None, markets: Vec::new(), summaries: Default::default(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
     }
 
     /// R8: his `/model <model>` in `agent`'s view, before it goes to the
@@ -217,6 +224,7 @@ impl Core {
         self.emit_accounts();
         self.emit_roles();
         self.emit_keychain();
+        self.emit_summary_of(None);
     }
 
     /// N1: where his secrets are, and the last move's lines.
@@ -452,6 +460,12 @@ impl Core {
                 ("plugin_connect", res)
             }
             AppCmd::PluginsRefresh { project } => {
+                // the other apps' configs are read again with the next rows
+                if let Some(s) = self.setup.as_mut() {
+                    s.found = None;
+                }
+                let Some(s) = self.setup.as_ref() else { return };
+                let p = &s.ports;
                 (p.plugins_refresh)(project, s.tx.clone());
                 ("plugins_refresh", Ok(()))
             }
@@ -459,7 +473,11 @@ impl Core {
             AppCmd::PluginAddConfirm { token, secrets } => {
                 let ctx = (p.add_ctx)();
                 let res = match self.setup.as_mut() {
-                    Some(s) => s.staged.confirm(&token, &secrets, &ctx).map_err(|e| e.to_string()),
+                    Some(s) => {
+                        // an import changes what's left to import
+                        s.found = None;
+                        s.staged.confirm(&token, &secrets, &ctx).map_err(|e| e.to_string())
+                    }
                     None => Err("this core has no setup".into()),
                 };
                 // installed: its servers tried once, after his click only
@@ -607,12 +625,40 @@ impl Core {
     fn emit_plugins(&mut self, project: Option<String>) -> Result<(), String> {
         let ws = self.workspace_of(project.as_deref())?;
         let s = self.setup.as_ref().ok_or("this core has no setup")?;
-        let (browse, items): (Vec<_>, Vec<_>) =
-            (s.ports.plugins)(&ws, &s.logins).into_iter().partition(|r| r.state == bise_proto::app_rows::PluginState::Available);
+        let rows = (s.ports.plugins)(&ws, &s.logins);
         let connectors = (s.ports.connectors_problem)();
+        self.emit_summary(project.clone(), &rows);
+        let (browse, items): (Vec<_>, Vec<_>) = rows.into_iter().partition(|r| r.state == bise_proto::app_rows::PluginState::Available);
         self.ev(CoreEv::Plugins { project, items, connectors: connectors.clone() });
         self.ev(CoreEv::Browse { source: MISTRAL.into(), items: browse, connectors });
         Ok(())
+    }
+
+    /// `plugins_summary` of that workspace, its rows read now (the core's
+    /// start, a marketplace read): only when it changed.
+    fn emit_summary_of(&mut self, project: Option<String>) {
+        let Ok(ws) = self.workspace_of(project.as_deref()) else { return };
+        let Some(s) = self.setup.as_ref() else { return };
+        let rows = (s.ports.plugins)(&ws, &s.logins);
+        self.emit_summary(project, &rows);
+    }
+
+    /// `plugins_summary` from these rows (all of them, Browse's too:
+    /// bend_plugins::catalog::summary, the one builder), sent only when it
+    /// differs from the last one sent for that project.
+    fn emit_summary(&mut self, project: Option<String>, rows: &[bise_proto::app_rows::Plugin]) {
+        let Some(s) = self.setup.as_mut() else { return };
+        if s.found.is_none() {
+            s.found = Some(bend_plugins::add::found(&(s.ports.add_ctx)()));
+        }
+        let markets: Vec<bend_plugins::catalog::Market> =
+            s.markets.iter().map(|(source, items)| bend_plugins::catalog::Market { source, items }).collect();
+        let summary = bend_plugins::catalog::summary(rows, s.found.as_deref().unwrap_or_default(), &markets, project.is_some());
+        if s.summaries.get(&project) == Some(&summary) {
+            return;
+        }
+        s.summaries.insert(project.clone(), summary.clone());
+        self.ev(CoreEv::PluginsSummary { project, summary });
     }
 
     /// The add menu's item: staged off the loop (then a preview), a
@@ -727,7 +773,14 @@ impl Core {
                     let _ = self.emit_plugins(project);
                 }
                 Done::Market { source, res } => match res {
-                    Ok(items) => self.ev(CoreEv::Browse { source, items, connectors: None }),
+                    Ok(items) => {
+                        if let Some(s) = self.setup.as_mut() {
+                            s.markets.retain(|(src, _)| *src != source);
+                            s.markets.push((source.clone(), items.clone()));
+                        }
+                        self.ev(CoreEv::Browse { source, items, connectors: None });
+                        self.emit_summary_of(None);
+                    }
                     Err(e) => self.setup_error("plugin_add", &format!("{source}: {e}")),
                 },
                 Done::LoggedIn { name, project, res } => {

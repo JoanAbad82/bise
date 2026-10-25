@@ -21,6 +21,8 @@ import type {
   RoleRow,
   PickSkill,
   Plugin,
+  PluginPreview,
+  PluginsSummary,
   ProjectRow,
   ScheduledTask,
   Worktree,
@@ -121,6 +123,22 @@ export class StoreReads extends StoreBase {
   }
   found(): readonly Found[] {
     return this.slice("found", EMPTY);
+  }
+  /** a workspace's plugins in numbers (none: bise's home's); null until the core sent them */
+  pluginsSummary(project?: string): PluginsSummary | null {
+    return this.slice<PluginsSummary | null>(`plugins_summary:${project ?? ""}`, null);
+  }
+  /** what a source offers to add (`mistral`, a marketplace's address); null until it was read */
+  browse(source: string): readonly Plugin[] | null {
+    return this.slice<readonly Plugin[] | null>(`browse:${source}`, null);
+  }
+  /** the marketplaces read so far, in the order they came */
+  browseSources(): readonly string[] {
+    return this.slice<readonly string[]>("browse_sources", EMPTY);
+  }
+  /** the add sheet's preview waiting for his click; null when none */
+  pluginPreview(): { readonly token: string; readonly preview: PluginPreview } | null {
+    return this.slice<{ readonly token: string; readonly preview: PluginPreview } | null>("plugin_preview", null);
   }
   /** computer use's state (P.2); null until the core sent it */
   computerUse(): EvOf<"computer_use"> | null {

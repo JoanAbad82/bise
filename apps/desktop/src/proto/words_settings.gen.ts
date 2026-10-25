@@ -36,10 +36,6 @@ export const settings = {
   page_projects: "projects",
   /** projects' hero sentence */
   page_projects_sub: "the folders bise works in. each one has its own main.",
-  /** the nav's page: plugins */
-  page_plugins: "plugins",
-  /** plugins' line under its title */
-  page_plugins_sub: "what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.",
   /** the nav's page: computer use */
   page_computer: "computer use",
   /** computer use's hero sentence */
@@ -282,28 +278,8 @@ export const settings = {
   check_left: (a: { n: number }): string => a.n === 1 ? String(a.n) + " thing needs you." : String(a.n) + " things need you.",
   /** setup check: read them again */
   check_again: "check again",
-  /** plugins: a login needed */
-  login_needs: (a: { host: string | number }): string => String(a.host) + " · needs a login",
-  /** plugins: logged in */
-  login_in: (a: { host: string | number }): string => String(a.host) + " · logged in",
-  /** plugins: logged in, with its tools */
-  login_in_tools: (a: { host: string | number; n: number }): string => a.n === 1 ? String(a.host) + " · logged in · " + String(a.n) + " tool" : String(a.host) + " · logged in · " + String(a.n) + " tools",
-  /** plugins: a login under way */
-  login_pending: (a: { host: string | number }): string => String(a.host) + " · log in in your browser…",
-  /** plugins: logged out */
-  login_out: (a: { host: string | number }): string => String(a.host) + " · not logged in",
-  /** plugins: none read yet */
-  plugins_looking: "looking at your plugins…",
-  /** plugins: none at all */
-  plugins_none: "no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md).",
-  /** plugins: the group's help */
-  plugins_help: "a change applies to the agents' next sessions.",
-  /** plugins: the logins' group */
-  plugins_logins: "servers that log in",
   /** plugins: log out */
   log_out: "log out",
-  /** plugins: log in */
-  log_in: "log in",
   /** computer use: the switch's row */
   cu_label: "agents may drive Chrome and your apps",
   /** computer use: on and ready */
@@ -1558,4 +1534,128 @@ export const settings = {
   plugins_err_gone: "that preview is gone: add it again",
   /** connect: done */
   plugins_connect_done: (a: { name: string | number }): string => "✓ " + String(a.name) + " connected · your agents get it at their next call",
+  /** sidebar: the plugins row's tip, nothing waits */
+  plugins_side_tip: (a: { n: number }): string => a.n === 1 ? String(a.n) + " plugin on" : String(a.n) + " plugins on",
+  /** sidebar: the plugins row's tip when some wait on him (`list`: each one's words) */
+  plugins_side_tip_waits: (a: { on: string | number; n: string | number; list: string | number }): string => String(a.on) + " plugins on · " + String(a.n) + " need you: " + String(a.list),
+  /** sidebar tip: a plugin whose login waits on him */
+  plugins_waits_login: (a: { name: string | number }): string => String(a.name) + " needs a login",
+  /** sidebar tip: a plugin whose server failed */
+  plugins_waits_error: (a: { name: string | number }): string => String(a.name) + " failed to start",
+  /** sidebar: the dot's tip (new things to connect he hasn't looked at) */
+  plugins_side_new: "something new to connect",
+  /** place: under the title */
+  plugins_place_sub: "what your agents can use, in every project",
+  /** place: the head's counts */
+  plugins_place_counts: (a: { on: string | number; off: string | number }): string => String(a.on) + " on · " + String(a.off) + " off",
+  /** place: the head's waiting part, in the accent */
+  plugins_place_waits: (a: { n: number }): string => a.n === 1 ? String(a.n) + " needs you" : String(a.n) + " need you",
+  /** place: under the room */
+  plugins_room_sub: "each plugin you add gets a place here.",
+  /** place: the search field */
+  plugins_search: "search plugins, tools, skills",
+  /** place: the add button */
+  plugins_add: "add",
+  /** band: its head */
+  plugins_band_head: "connect your tools",
+  /** band: after its head */
+  plugins_band_through: "through Mistral",
+  /** band: its count, right */
+  plugins_band_count: (a: { connected: string | number; total: string | number }): string => String(a.connected) + " of " + String(a.total) + " connected",
+  /** band: its sub */
+  plugins_band_sub: "each one you connect, your agents reach in every project. a write still asks you first",
+  /** band: a connector's button */
+  plugins_connect: "connect",
+  /** band: a connector with nothing more to say */
+  plugins_band_popular: "popular at Mistral",
+  /** band: the MCP servers found in other apps (`list`: "Claude Code 2, Cursor 1") */
+  plugins_band_found: (a: { n: number; list: string | number }): string => a.n === 1 ? String(a.n) + " MCP server found on this Mac: " + String(a.list) : String(a.n) + " MCP servers found on this Mac: " + String(a.list),
+  /** band: the import button */
+  plugins_band_import: (a: { n: string | number }): string => "import " + String(a.n),
+  /** band: the project's own plugins and skills */
+  plugins_band_workspace: (a: { project: string | number; n: string | number }): string => String(a.project) + " brings " + String(a.n) + " of its own",
+  /** band: see the project's own ones */
+  plugins_band_see: "see them",
+  /** band: a marketplace's plugins not added yet */
+  plugins_band_market: (a: { n: number }): string => a.n === 1 ? String(a.n) + " new plugin in your marketplaces" : String(a.n) + " new plugins in your marketplaces",
+  /** band: browse them */
+  plugins_band_browse: "browse",
+  /** place: the tabs */
+  plugins_tab_installed: "installed",
+  /** place: the tabs */
+  plugins_tab_browse: "browse",
+  /** place: the Mistral catalog's group in browse */
+  plugins_browse_mistral: "Mistral connectors",
+  /** place: a row's tag, Mistral */
+  plugins_tag_mistral: "Mistral",
+  /** place: a row's tag, MCP */
+  plugins_tag_mcp: "MCP",
+  /** place: a row's tag, skills */
+  plugins_tag_skills: "skills",
+  /** place: a failed server's button */
+  plugins_details: "details",
+  /** place: a connector whose sign-in expired: its button */
+  plugins_sign_in_again: "sign in again",
+  /** plugin page: its tools' head */
+  plugins_tools_head: "tools",
+  /** place: a button that sets it up */
+  plugins_set_up: "set up",
+  /** place: computer's row until it's set up */
+  plugins_not_set_up: "not set up",
+  /** place: the '?' badge's tip */
+  plugins_badge_waits: "waits for you",
+  /** place: the '✗' badge's tip */
+  plugins_badge_failed: "failed: details says why",
+  /** place: an off row's toggle tip */
+  plugins_toggle_tip: (a: { name: string | number }): string => "turn " + String(a.name) + " on or off for your agents, in every project",
+  /** place: nothing yet */
+  plugins_place_loading: "reading your plugins…",
+  /** place: a Mistral problem: no key */
+  plugins_conn_no_key: "your Mistral account isn't connected: settings › keys",
+  /** place: a Mistral problem: the keychain is locked */
+  plugins_conn_locked: "your keychain is locked: Mistral's connectors can't be read",
+  /** place: a Mistral problem: the last fetch failed */
+  plugins_conn_fetch: "Mistral's connectors couldn't be read: these are the last ones",
+  /** place: read Mistral's catalog again */
+  plugins_refresh: "read again",
+  /** plugin page: where it comes from */
+  plugins_comes_from: "comes from",
+  /** plugin page: its about head */
+  plugins_about: "about",
+  /** plugin page: its version */
+  plugins_version: "version",
+  /** plugin page: for which projects */
+  plugins_for: "for",
+  /** plugin page: for every project on this Mac */
+  plugins_for_every: "every project on this Mac",
+  /** plugin page: for this project only */
+  plugins_for_project: "this project only",
+  /** plugin page: when agents see a change */
+  plugins_when: "your agents",
+  /** plugin page: an MCP part's tools, folded */
+  plugins_tools_fold: (a: { n: number }): string => a.n === 1 ? "▸ " + String(a.n) + " tool" : "▸ " + String(a.n) + " tools",
+  /** plugin page: an MCP part's tools, open */
+  plugins_tools_unfold: (a: { n: number }): string => a.n === 1 ? "▾ " + String(a.n) + " tool" : "▾ " + String(a.n) + " tools",
+  /** plugin page: a prompt to try, its tip */
+  plugins_try_tip: "puts it in main's composer; you send it or change it",
+  /** plugin page: remove it */
+  plugins_remove: "remove",
+  /** remove: the question */
+  plugins_remove_confirm: (a: { name: string | number }): string => "remove " + String(a.name) + "? its saved secrets and logins go too.",
+  /** remove: the confirm button */
+  plugins_remove_yes: "remove it",
+  /** remove: keep it */
+  plugins_remove_no: "keep it",
+  /** the add menu: browse */
+  plugins_menu_browse: "browse",
+  /** the add menu: browse's line */
+  plugins_menu_browse_what: "Mistral's connectors and your marketplaces",
+  /** add sheet: the add button */
+  plugins_add_go: "add",
+  /** add sheet: cancel */
+  plugins_cancel: "cancel",
+  /** add sheet: a secret's field, empty */
+  plugins_secret_empty: (a: { name: string | number }): string => "leave empty to keep $" + String(a.name) + " as it is",
+  /** browse: add a marketplace plugin */
+  plugins_browse_add_one: "+ add",
 } as const;

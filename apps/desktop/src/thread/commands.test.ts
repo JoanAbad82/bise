@@ -46,7 +46,9 @@ describe('a command line runs as the TUI runs it', () => {
     expect(windowRun('/inbox', '', at)).toEqual({ inbox: true });
     expect(windowRun('/help', '', at)).toEqual({ help: true });
     expect(windowRun('/shortcuts', '', at)).toEqual({ help: true });
-    expect(windowRun('/plugins', '', at)).toEqual({ go: { screen: 'settings', page: 'plugins' } });
+    expect(windowRun('/plugins', '', at)).toEqual({ go: { screen: 'plugins' } });
+    expect(windowRun('/skills', '', at)).toEqual({ go: { screen: 'plugins', kind: 'skills' } });
+    expect(windowRun('/skills', 'off bend', at)).toEqual({ app: { cmd: 'plugin_set', name: 'bend', on: false } });
     expect(windowRun('/welcome', '', at)).toEqual({ go: { screen: 'onboarding' } });
     expect(windowRun('/scheduled', '', at), 'R4').toEqual({ go: { screen: 'scheduled' } });
     // N1: /keychain on|off moves the secrets as settings' switch does; bare opens that page
@@ -72,7 +74,7 @@ describe('a command line runs as the TUI runs it', () => {
     expect(windowRun('/plugins', 'on computer', at)).toEqual({ app: { cmd: 'plugin_set', name: 'computer', on: true } });
     expect(windowRun('/plugins', 'login linear', at)).toEqual({ app: { cmd: 'plugin_login', name: 'linear' } });
     expect(windowRun('/plugins', 'logout linear', at)).toEqual({ app: { cmd: 'plugin_logout', name: 'linear' } });
-    expect(windowRun('/plugins', 'list', at), 'list: the page').toEqual({ go: { screen: 'settings', page: 'plugins' } });
+    expect(windowRun('/plugins', 'list', at), 'list: the place').toEqual({ go: { screen: 'plugins' } });
     expect(windowRun('/plugins', 'login', at), 'no name: the hub lists them').toBeUndefined();
     expect(windowRun('/plugins', 'frob x', at), 'unknown: the hub says the usage').toBeUndefined();
     expect(windowRun('/theme', 'light', at)).toEqual({ app: { cmd: 'prefs_set', key: 'theme', value: 'light' } });
