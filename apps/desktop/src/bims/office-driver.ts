@@ -17,7 +17,7 @@ import { skyAt, skyOf, type Sky, type Weather } from './sky';
 import { forcedPokes, notePokes, NO_POKES, pokesAt, pokeWake, roomOf, type Click, type PokeLog } from './pokes';
 import type { PluginObject } from './plugin-objects';
 import { NO_CORNERS, objectSpots, type Corners } from './corners';
-import { GROWS, NO_NEED, grownFor, type Need } from './extensions';
+import { GROWS, NO_NEED, either, grownFor, type Need } from './extensions';
 
 /** The pure modules a driver runs on: feed.ts's, or fakes in a test. */
 export interface DriverParts {
@@ -74,6 +74,8 @@ export interface Step {
   readonly wake: number | null;
   /** his plugins' objects at their spots in this office (corners.ts objectSpots): the same value until the office or the objects change */
   readonly corners: Corners;
+  /** the extensions come on this map (extensions.ts: a high-water mark, Office.tsx keeps it per project); null: a map that does not grow */
+  readonly grown: { readonly map: MapId; readonly need: Need } | null;
 }
 
 export interface OfficeDriver {
@@ -85,6 +87,8 @@ export interface OfficeDriver {
   event(e: BimEvent): void;
   /** his plugins' objects (plugin-objects.ts officeObjects): the next step places them (corners.ts); no desk moves for them */
   objects(list: readonly PluginObject[]): void;
+  /** the extensions this map already had (Office.tsx's kept mark): they come back, and never go */
+  seedNeed(map: MapId, kept: Need): void;
   /** he typed the konami code at t */
   konami(t: number): void;
   /** he clicked this bim: its poke (pokes.ts) starts at t */
@@ -172,6 +176,17 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
         regrow = true;
         fresh = true;
       }
+    },
+    seedNeed(m, kept) {
+      if (needMap !== m) {
+        need = NO_NEED;
+        needMap = m;
+      }
+      const next = either(need, kept);
+      if (next.wing === need.wing && next.garden === need.garden) return;
+      need = next;
+      regrow = true;
+      fresh = true;
     },
     konami(t) {
       konamiAt = t;
@@ -263,7 +278,7 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       const words = new Map([...pk].map(([n, x]) => [n, x.label]));
       const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), pokes: words, follow: a.follow, park: office.park });
       const wake = c.forced !== undefined ? null : pokeWake(pokes, frames, t, reduced);
-      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake, corners: cornersIn(office) };
+      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake, corners: cornersIn(office), grown: GROWS.has(office.map) && needMap === office.map ? { map: office.map, need } : null };
   }
 
   /** the office his objects need (extensions.ts): the laid one on a map that does not grow yet; the extensions already come stay */

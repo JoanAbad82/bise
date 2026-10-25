@@ -46,6 +46,7 @@ import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
 import type { PluginObject } from './plugin-objects';
 import type { Corners } from './corners';
 import { objPillsOf, type ObjPill } from './objpills';
+import { extKept, keepExt } from './ext-keep';
 import { planOf } from './maps';
 import './office.css';
 
@@ -276,6 +277,11 @@ export function Office({
   const measureBold = useMemo(() => textWidth(labelFont('600 ')), []);
   const heads = useRef(new Map<string, { x: number; y: number; feet: number; edge?: 'left' | 'right' | 'up' | 'down' }>());
   const kickRef = useRef<() => void>(() => undefined);
+  // the project the draw loop keeps the extensions for (a ref: a new project never rebuilds the renderer)
+  const projectRef = useRef(project);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
   // the bim under a point of the canvas, css px: the renderer's once loaded
   const pick = useRef<(x: number, y: number) => string | null>(() => null);
   const held = useModHeld('Control');
@@ -331,6 +337,11 @@ export function Office({
     driver.objects(objects);
     kickRef.current();
   }, [driver, objects]);
+  // the extensions this project's map already had (ext-keep.ts): they come back, never go
+  useEffect(() => {
+    driver.seedNeed(map, extKept(project, map));
+    kickRef.current();
+  }, [driver, project, map]);
   useEffect(() => {
     live.current.held = held;
     kickRef.current();
@@ -416,6 +427,7 @@ export function Office({
     let lastLabels = '';
     let lastNew = 'null';
     let lastPills = '[]';
+    let lastGrown = '';
     let reduced = reducedMotion();
     let firstDrawn = false;
     /** his last wheel (a pinch, a two-finger pan), ms: a sky blend waits HOLD_MS past it */
@@ -536,6 +548,11 @@ export function Office({
           if (h !== null) zs.set(name, h);
         }
         placeZzz(zzzRef.current, zs);
+      }
+      // the extensions come (extensions.ts): kept per project and map, so a reload never takes one away
+      if (step.grown !== null && JSON.stringify(step.grown) !== lastGrown) {
+        lastGrown = JSON.stringify(step.grown);
+        if (!testMode()) keepExt(projectRef.current, step.grown.map, step.grown.need);
       }
       const sig = labelsSig(shown);
       if (sig !== lastLabels) {

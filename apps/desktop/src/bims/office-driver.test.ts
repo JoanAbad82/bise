@@ -37,6 +37,25 @@ describe('office-driver: one office brain', () => {
     expect(k?.want).toBe('kyoto');
   });
 
+  it("his sketch's extensions: they come with the objects that need them, a kept mark brings them back, and they never go", () => {
+    const d = makeDriver(parts);
+    d.rows(snap, crew, 'loft');
+    expect(d.step(clock(T), NO_ATTENTION)?.grown).toEqual({ map: 'loft', need: { wing: 0, garden: false } });
+    // a kept mark (another session's): the wing comes back with no object needing it
+    d.seedNeed('loft', { wing: 4, garden: true });
+    const a = d.step(clock(T + 1), NO_ATTENTION);
+    expect(a?.reshaped).toBe(true);
+    expect(a?.office.wing?.z1).toBe(4);
+    expect(a?.office.garden).toBeDefined();
+    expect(a?.grown?.need).toEqual({ wing: 4, garden: true });
+    // a smaller mark never takes it away
+    d.seedNeed('loft', { wing: 0, garden: false });
+    expect(d.step(clock(T + 2), NO_ATTENTION)?.office.wing?.z1).toBe(4);
+    // a map that does not grow: none
+    d.rows(snap, crew, 'climb');
+    expect(d.step(clock(T + 3), NO_ATTENTION)?.grown).toBeNull();
+  });
+
   it('a stage past the last drawn one is the unlock moment, gone after its walk and label', () => {
     const d = makeDriver(parts);
     d.rows(snap, crew, 'loft');
