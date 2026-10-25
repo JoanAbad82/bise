@@ -38,8 +38,6 @@ mod tour_tests;
 mod places_tests;
 pub(super) use panel::{archived_refusal, PANEL_TITLE, archived_warn, draw_panel, focus_model, key_mode, panel_mouse, placeholder_fit, placeholder_parts, split, status_state, viewed_model, viewed_who, viewed_working, workspace};
 #[cfg(test)]
-pub(super) use panel::placeholder;
-#[cfg(test)]
 pub(super) use panel::status_text;
 pub(crate) use panel::{demo_ready, fill_demo, prefill_demo, short_age, DEMO, DEMO_READY};
 use panel::glyph;
