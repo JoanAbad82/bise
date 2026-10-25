@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   activate,
+  capW,
   clampW,
+  closable,
   closeIn,
   closeOthers,
   dropGone,
   FIRST,
+  fitCount,
   FOLDED,
   MAX_W,
   MIN_W,
@@ -77,17 +80,21 @@ describe('the tab model: close, reorder, step', () => {
   const three = openIn(openIn(openIn(FIRST, art('a')), art('b')), art('c'));
   it('closing the tab in front brings its right neighbour, else its left one', () => {
     const t = activate(three, 'artifact:acme/b');
-    expect(closeIn(t, 'artifact:acme/b')?.active).toBe('artifact:acme/c');
-    expect(closeIn(three, 'artifact:acme/c')?.active).toBe('artifact:acme/b');
+    expect(closeIn(t, 'artifact:acme/b').active).toBe('artifact:acme/c');
+    expect(closeIn(three, 'artifact:acme/c').active).toBe('artifact:acme/b');
   });
   it('closing another tab keeps the one in front', () => {
-    expect(closeIn(three, 'overview')?.active).toBe('artifact:acme/c');
+    expect(closeIn(three, 'artifact:acme/a').active).toBe('artifact:acme/c');
   });
-  it('the last tab closed leaves none: the panel folds', () => {
-    expect(closeIn(FIRST, 'overview')).toBeUndefined();
+  it('Overview, the home, never closes (no ×)', () => {
+    expect(closable('overview')).toBe(false);
+    expect(closable('artifact:acme/a')).toBe(true);
+    expect(closeIn(FIRST, 'overview')).toBe(FIRST);
+    expect(closeIn(three, 'overview')).toBe(three);
   });
-  it('close others keeps one', () => {
-    expect(ids(closeOthers(three, 'artifact:acme/a'))).toEqual(['artifact:acme/a']);
+  it('close others keeps that one and Overview', () => {
+    expect(ids(closeOthers(three, 'artifact:acme/a'))).toEqual(['overview', 'artifact:acme/a']);
+    expect(ids(closeOthers(three, 'overview'))).toEqual(['overview']);
   });
   it('a drag moves a tab to its place, the others keep their order', () => {
     expect(ids(moveIn(three, 'artifact:acme/c', 0))).toEqual(['artifact:acme/c', 'overview', 'artifact:acme/a', 'artifact:acme/b']);
@@ -118,6 +125,14 @@ describe('the tab model: six at most in the bar (HIG), the rest in the overflow 
   it('six or fewer: nothing overflows', () => {
     expect(shownOf(FIRST).over).toEqual([]);
   });
+  it('the row holds as many whole tabs as fit, six at most, one at least: none cut', () => {
+    expect(fitCount(384)).toBe(3);
+    expect(fitCount(640)).toBe(6);
+    expect(fitCount(2000)).toBe(6);
+    expect(fitCount(100)).toBe(1);
+    const t = activate(many, 'overview');
+    expect(shownOf(t, fitCount(384)).shown.map((x) => x.id)).toEqual(['overview', 'artifact:acme/a', 'artifact:acme/b']);
+  });
 });
 
 describe("the tab model: an agent's tabs go with the agent (a rename changes its key)", () => {
@@ -138,6 +153,12 @@ describe('the panel width (page native-mac §6: 384; mockup 2: 480; mockup 4: 64
     expect(widthOf({ kind: 'terminal', project: 'acme', n: 0 })).toBe('shell');
     expect(widthOf(art('a'))).toBe('page');
     expect(WIDTHS).toEqual({ rows: 384, shell: 480, page: 640 });
+  });
+  it('the thread keeps 560 beside the left: a wide tab caps, never under 320 (ui-review m_42509)', () => {
+    expect(capW(640, 1100, 296)).toBe(320);
+    expect(capW(640, 1440, 296)).toBe(584);
+    expect(capW(640, 1920, 296)).toBe(640);
+    expect(capW(384, 1440, 296)).toBe(384);
   });
   it('a drag stays from 320 to 640', () => {
     expect(clampW(100)).toBe(MIN_W);
@@ -160,6 +181,9 @@ describe('Recent', () => {
 });
 
 describe('the kept record (kept per window, read back after a reload)', () => {
+  it('a record without Overview gets it back first (the home)', () => {
+    expect(ids(parseKept({ tabs: { list: [{ what: { kind: 'launcher', n: 1 } }] } }).tabs)).toEqual(['overview', 'new:1']);
+  });
   it('a broken or missing record reads folded, on Overview', () => {
     expect(parseKept(undefined)).toEqual(FOLDED);
     expect(parseKept('x')).toEqual(FOLDED);
@@ -183,7 +207,7 @@ describe('the kept record (kept per window, read back after a reload)', () => {
   });
   it('a tab in front that is gone falls back to the first', () => {
     const k = parseKept({ tabs: { active: 'nope', list: [{ what: { kind: 'terminal', project: 'acme', n: 1 } }] } });
-    expect(k.tabs.active).toBe('term:acme#1');
+    expect(k.tabs.active).toBe('overview');
   });
   it('round-trips what it wrote', () => {
     const k = { ...FOLDED, open: true, tabs: openIn(FIRST, art('a')) };

@@ -3,29 +3,55 @@
    browser's address bar, a shell's tab; then the Overview's sections (the right bar's rows, moved
    from app.css with it). Every size a 4 px step or a token. Owner: nm-panel. */
 
-/* the panel: --c-solid, a 1 px line on its left; its width animates in 220 ms (--d-base: 0 under
-   reduce motion), its inside keeps the final width so nothing reflows */
+/* the panel: its column the window's height, its top row in the transparent 52 bar, its body on
+   --c-solid with a 1 px line on its left; its width animates in 220 ms (--d-base: 0 under reduce
+   motion), its inside keeps the final width so nothing reflows; folded, hidden once it has shut */
 .pn {
   position: relative;
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--c-solid);
-  transition: width var(--d-base) var(--ease-out);
+  transition: width var(--d-base) var(--ease-out), visibility 0s linear var(--d-base);
+  visibility: hidden;
 }
 .pn[data-open] {
-  border-left: 1px solid var(--c-line);
+  transition: width var(--d-base) var(--ease-out);
+  visibility: visible;
 }
 .pn[data-drag] {
   transition: none;
 }
-.pn-in {
+.pn-col {
   box-sizing: border-box;
   height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+/* its top row: in the window's 52 bar, transparent (the bar's vibrancy shows), the tabs from its
+   left + 12 (mockup 3), the window's drag region but its controls */
+.pn-top {
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: var(--h-bar);
+  padding: 0 var(--s-3);
+  -webkit-app-region: drag;
+}
+.pn-top > * {
+  -webkit-app-region: no-drag;
+}
+.pn-in {
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--c-line);
+  background: var(--c-solid);
 }
 .pn-in > * {
   flex: 1 1 auto;
@@ -52,22 +78,22 @@
 /* the tabs in the bar: 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…';
    × on the one in front and on hover; the one in front --c-active, never the accent */
 .pn-bar {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: var(--s-1);
-  min-width: 0;
   margin-left: auto;
 }
 .pn-tabs {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: var(--s-1);
   min-width: 0;
-  overflow: hidden;
 }
 .pn-tab {
   box-sizing: border-box;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: calc(var(--s-8) * 2 + var(--s-6));
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
@@ -86,6 +112,8 @@
 .pn-tab[data-on] {
   background: var(--c-active);
   color: var(--c-text);
+}
+.pn-tab:has(.pn-tab-x) {
   padding-right: var(--s-2);
 }
 .pn-tab[data-drag] {
@@ -104,7 +132,8 @@
   text-overflow: ellipsis;
 }
 .pn-tab-x {
-  display: none;
+  display: inline-flex;
+  visibility: hidden;
   flex: none;
   align-items: center;
   justify-content: center;
@@ -117,8 +146,9 @@
   color: var(--c-text-3);
 }
 .pn-tab[data-on] .pn-tab-x,
-.pn-tab:hover .pn-tab-x {
-  display: inline-flex;
+.pn-tab:hover .pn-tab-x,
+.pn-tab-x:focus-visible {
+  visibility: visible;
 }
 .pn-tab-x:hover {
   background: var(--c-hover);
@@ -341,6 +371,11 @@
   padding: var(--s-2);
 }
 
+/* a process's output in its tab: the output fills it, 8 in */
+.pn-proc {
+  padding: var(--s-2);
+}
+
 /* the centre while an artifact's maker's thread loads */
 .app-art-wait {
   flex: 1;
@@ -522,6 +557,40 @@
   flex: none;
   margin-left: auto;
 }
+/* a row's icon slot (mockup 1 .prow .ic): 14 icons, an agent's dot, text-3 */
+.app-rb-ic {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--s-4);
+  color: var(--c-text-3);
+}
+.app-rb-ic.acc {
+  color: var(--c-accent);
+}
+.app-rb-ic.err {
+  color: var(--c-err);
+}
+/* ⌥ held: the agent's key in the icon slot */
+.app-rb-key {
+  color: var(--c-text-2);
+  font: 400 var(--f-kbd);
+}
+/* an artifact's title in its pink chip: 22, r 6, icon 14, 13/500, cut with '…' */
+.app-rb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-width: 0;
+  max-width: 100%;
+}
+.app-rb-chip-t {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .app-rb-g {
   flex: none;
   width: 2.2ch;
@@ -546,6 +615,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--c-text);
+  font-weight: 500;
 }
 /* RUNNING's port at the row's end: underlined, it opens the address */
 .app-rb-end.app-rb-link {
@@ -589,8 +659,7 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--c-text-3);
-  font-size: var(--t-12);
+  color: var(--c-text-2);
 }
 .app-rb-end {
   flex: none;
@@ -625,8 +694,7 @@
 .app-rb-role {
   flex: 1 1 0;
   min-width: 0;
-  color: var(--c-text-3);
-  font-size: var(--t-12);
+  color: var(--c-text-2);
 }
 /* empty columns give their room to the now line (his ask m_26200): a row with neither a time nor a
    ring has no columns; an empty time goes (the % column right of it keeps the times aligned) */

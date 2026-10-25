@@ -6,7 +6,8 @@
 // (panelToggle), ⌃` (openShell), the launcher's picks. Owner: nm-panel.
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
-import { activate, closeIn, closeOthers, FIRST, moveIn, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widthOf, clampW, dropGone, type PanelKept, type TabWhat, type Tabs } from './model';
+import { useLeftWidth } from '@/app/frame-state';
+import { activate, closable, closeIn, closeOthers, moveIn, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widthOf, clampW, capW, dropGone, type PanelKept, type TabWhat, type Tabs } from './model';
 
 const KEY = 'panel';
 
@@ -20,9 +21,8 @@ function set(next: PanelKept): void {
   for (const l of listeners) l();
 }
 
-function setTabs(tabs: Tabs | undefined): void {
-  // the last tab closed: the panel folds, and opens again on Overview
-  set(tabs === undefined ? { ...state, open: false, tabs: FIRST } : { ...state, tabs });
+function setTabs(tabs: Tabs): void {
+  if (tabs !== state.tabs) set({ ...state, tabs });
 }
 
 export const panelState = {
@@ -45,10 +45,29 @@ export function usePanelState(): PanelKept {
   return useSyncExternalStore(panelState.subscribe, panelState.get);
 }
 
+/** The window's width, live. */
+function useWindowWidth(): number {
+  return useSyncExternalStore(
+    (cb) => {
+      window.addEventListener('resize', cb);
+      return () => {
+        window.removeEventListener('resize', cb);
+      };
+    },
+    () => window.innerWidth,
+  );
+}
+
+/** The panel's width in this window now: what the tab in front asks, the thread keeping its room (capW). */
+export function usePanelWidth(): number {
+  return capW(widthNow(usePanelState()), useWindowWidth(), useLeftWidth());
+}
+
 /** Open or folded, and its width now (0 folded): what the right side (nm-side's sideLayout) and the shell read. */
 export function usePanelBox(): { readonly open: boolean; readonly width: number } {
   const s = usePanelState();
-  return { open: s.open, width: s.open ? widthNow(s) : 0 };
+  const w = usePanelWidth();
+  return { open: s.open, width: s.open ? w : 0 };
 }
 
 /** The bar's ▯ and ⌥⌘0: fold or unfold, on the tab he left in front. */
@@ -103,11 +122,11 @@ export function stepTab(dir: 1 | -1): void {
   if (state.open) setTabs(stepIn(state.tabs, dir));
 }
 
-/** ⌘W on the panel: the tab in front closes; false when the panel is folded (the key is not its). */
-export function closeActive(): boolean {
-  if (!state.open) return false;
-  closeTabId(state.tabs.active);
-  return true;
+/** ⌘W on the panel: the tab in front closes; on Overview (the home, never closed) the panel folds. */
+export function closeActive(): void {
+  if (!state.open) return;
+  if (closable(state.tabs.active)) closeTabId(state.tabs.active);
+  else set({ ...state, open: false });
 }
 
 /** The panel's width now: the width the tab in front asks (kept per kind). */
@@ -150,6 +169,5 @@ export function takeSection(): OverviewSection | null {
 
 /** The rows came: the tabs of agents no longer in them go (model.ts dropGone). */
 export function dropGoneTabs(known: (project: string) => ReadonlySet<string> | undefined): void {
-  const next = dropGone(state.tabs, known);
-  if (next !== state.tabs) setTabs(next);
+  setTabs(dropGone(state.tabs, known));
 }

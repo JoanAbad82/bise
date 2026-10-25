@@ -5,7 +5,7 @@
 // browser's new tab becomes the page. The rows act as their keys do (keys.ts doPanelKey).
 // Owner: nm-panel.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppIcon, KindIcon, Kbd, iconKindOf, type AppIconName } from '@/ds';
+import { AppIcon, Input, KindIcon, Kbd, Press, iconKindOf, type AppIconName } from '@/ds';
 import { panel } from '@/proto/words_panel.gen';
 import { useAllArtifacts } from '@/artifacts';
 import { useProjects } from '@/store';
@@ -69,9 +69,9 @@ export function Launcher({ tabId, shown }: { tabId: string; shown: boolean }) {
     <div className="pn-launch" data-testid="app.panel.launcher">
       <label className="pn-search">
         <AppIcon name="search" size={14} />
-        <input
+        <Input
           ref={field}
-          className="pn-search-in"
+          look="pn-search-in"
           value={q}
           placeholder={panel.launch_search}
           aria-label={panel.launch_search}
@@ -91,10 +91,9 @@ export function Launcher({ tabId, shown }: { tabId: string; shown: boolean }) {
         <>
           <h3 className="pn-lh">{panel.launch_open}</h3>
           {OPEN.map((o) => (
-            <button
+            <Press
               key={o.k}
-              type="button"
-              className="pn-li"
+              look="pn-li"
               onClick={() => {
                 doPanelKey(o.k, ctx, tabId);
               }}
@@ -103,7 +102,7 @@ export function Launcher({ tabId, shown }: { tabId: string; shown: boolean }) {
               <AppIcon name={o.icon} size={16} />
               <span className="pn-li-t">{o.label}</span>
               <Kbd>{o.keys}</Kbd>
-            </button>
+            </Press>
           ))}
           <h3 className="pn-lh">{panel.launch_recent}</h3>
           {recent.length === 0 ? (
@@ -153,12 +152,12 @@ export function Launcher({ tabId, shown }: { tabId: string; shown: boolean }) {
 
 function Recent({ icon, title, sub, onPick, testId }: { icon: ReactNode; title: string; sub: string; onPick: () => void; testId: string }) {
   return (
-    <button type="button" className="pn-rec" onClick={onPick} data-testid={testId}>
+    <Press look="pn-rec" onClick={onPick} data-testid={testId}>
       <span className="pn-tile">{icon}</span>
       <span className="pn-rec-w">
         <span className="pn-rec-t">{title}</span>
         {sub !== '' && <span className="pn-rec-s">{sub}</span>}
       </span>
-    </button>
+    </Press>
   );
 }

@@ -91,24 +91,26 @@ export function nextShell(t: Tabs, project: string): number {
   return n;
 }
 
-/**
- * Closes `id`: the tab in front goes to its right neighbour, else its left one. The last tab
- * closed leaves no tab: undefined (the panel folds, and opens again on Overview). Pure.
- */
-export function closeIn(t: Tabs, id: string): Tabs | undefined {
+/** Overview is the panel's home (ui-review m_42482 #4): it never closes, it has no ×. Pure. */
+export function closable(id: string): boolean {
+  return id !== OVERVIEW.id;
+}
+
+/** Closes `id`: the tab in front goes to its right neighbour, else its left one; Overview stays. Pure. */
+export function closeIn(t: Tabs, id: string): Tabs {
   const i = t.list.findIndex((x) => x.id === id);
-  if (i < 0) return t;
+  if (i < 0 || !closable(id)) return t;
   const list = t.list.filter((x) => x.id !== id);
-  if (list.length === 0) return undefined;
   if (t.active !== id) return { list, active: t.active };
   const next = list[Math.min(i, list.length - 1)] as Tab;
   return { list, active: next.id };
 }
 
-/** Every tab but `id` closed (a tab's menu: Close others). Pure. */
+/** Every tab but `id` and Overview closed (a tab's menu: Close others). Pure. */
 export function closeOthers(t: Tabs, id: string): Tabs {
   const keep = t.list.find((x) => x.id === id);
-  return keep === undefined ? t : { list: [keep], active: keep.id };
+  if (keep === undefined) return t;
+  return { list: id === OVERVIEW.id ? [keep] : [OVERVIEW, keep].map((x) => t.list.find((y) => y.id === x.id) ?? x), active: keep.id };
 }
 
 /** Brings `id` to the front. Pure. */
@@ -134,9 +136,22 @@ export function stepIn(t: Tabs, dir: 1 | -1): Tabs {
   return { ...t, active: next.id };
 }
 
+/** The least a tab shrinks to before the next one goes to the overflow menu (its icon and a few letters). */
+export const TAB_MIN_W = 88;
+/** What the tab row keeps for its '+', the overflow button and their gaps. */
+export const ROW_KEEP_W = 104;
+
 /**
- * The tabs the bar shows (six at most, in their order) and the rest for the overflow menu. The tab
- * in front always shows: past the sixth, it takes the sixth place. Pure.
+ * How many whole tabs fit a row `width` wide, six at most, one at least: past it they go to the
+ * overflow menu, never one cut (ui-review m_42482 #3). Pure.
+ */
+export function fitCount(width: number, max = MAX_SHOWN): number {
+  return Math.max(1, Math.min(max, Math.floor((width - ROW_KEEP_W) / TAB_MIN_W)));
+}
+
+/**
+ * The tabs the row shows (`max` at most, six by default, in their order) and the rest for the
+ * overflow menu. The tab in front always shows: past the last place, it takes it. Pure.
  */
 export function shownOf(t: Tabs, max = MAX_SHOWN): { readonly shown: readonly Tab[]; readonly over: readonly Tab[] } {
   if (t.list.length <= max) return { shown: t.list, over: [] };
@@ -156,13 +171,13 @@ function agentOf(what: TabWhat): { readonly project: string; readonly agent: str
 /**
  * Drops the tabs of agents no longer in the rows (architect m_42089: an agent is keyed by its name,
  * a rename changes its key, a dead tab never shows). `known(project)` is the names of a project
- * whose rows came, undefined while they did not (its tabs wait). Undefined: no tab left. Pure.
+ * whose rows came, undefined while they did not (its tabs wait). Pure.
  */
-export function dropGone(t: Tabs, known: (project: string) => ReadonlySet<string> | undefined): Tabs | undefined {
-  let out: Tabs | undefined = t;
+export function dropGone(t: Tabs, known: (project: string) => ReadonlySet<string> | undefined): Tabs {
+  let out: Tabs = t;
   for (const x of t.list) {
     const a = agentOf(x.what);
-    if (a === undefined || out === undefined) continue;
+    if (a === undefined) continue;
     const names = known(a.project);
     if (names !== undefined && !names.has(a.agent)) out = closeIn(out, x.id);
   }
@@ -183,6 +198,17 @@ export function widthOf(what: TabWhat): WidthOf {
   if (what.kind === 'terminal') return 'shell';
   if (what.kind === 'thing') return 'page';
   return 'rows';
+}
+
+/** What the thread keeps beside the panel (ui-review m_42509: a 640 tab at 1100 left it 220). */
+export const THREAD_MIN = 560;
+
+/**
+ * The panel's width in a window: what its tab asks, capped so the thread keeps THREAD_MIN beside
+ * the left (rail and sidebar), never under MIN_W. Pure.
+ */
+export function capW(asked: number, win: number, left: number, threadMin = THREAD_MIN): number {
+  return Math.max(MIN_W, Math.min(asked, win - left - threadMin));
 }
 
 /** A width in the panel's limits. Pure. */
@@ -275,8 +301,10 @@ export function parseKept(raw: unknown): PanelKept {
     seen.add(tab.id);
     list.push(tab);
   }
+  // Overview is always there, the home (it never closes)
+  if (!seen.has(OVERVIEW.id)) list.unshift(OVERVIEW);
   const want = isObj(raw['tabs']) ? raw['tabs']['active'] : undefined;
-  const tabs: Tabs = list.length === 0 ? FIRST : { list, active: list.some((x) => x.id === want) ? (want as string) : (list[0] as Tab).id };
+  const tabs: Tabs = { list, active: list.some((x) => x.id === want) ? (want as string) : (list[0] as Tab).id };
   const w = isObj(raw['widths']) ? raw['widths'] : {};
   const width = (k: WidthOf) => (typeof w[k] === 'number' ? clampW(w[k]) : WIDTHS[k]);
   const recent = (Array.isArray(raw['recent']) ? (raw['recent'] as unknown[]) : []).map(entityOf).filter((e): e is Entity => e !== undefined).slice(0, RECENT_MAX);

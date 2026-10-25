@@ -35,11 +35,6 @@
     "one": null,
     "text": "agents"
   },
-  "panel.all": {
-    "args": [],
-    "one": null,
-    "text": "all ›"
-  },
   "panel.all_agents": {
     "args": [],
     "one": null,
@@ -405,6 +400,24 @@
     "args": [],
     "one": null,
     "text": "↗ opens in your browser"
+  },
+  "panel.ov_add_file": {
+    "args": [],
+    "one": null,
+    "text": "Add a file…"
+  },
+  "panel.ov_label_tip": {
+    "args": [
+      "label",
+      "n"
+    ],
+    "one": null,
+    "text": "{label} · {n}"
+  },
+  "panel.ov_show_all": {
+    "args": [],
+    "one": null,
+    "text": "Show all"
   },
   "panel.panel_label": {
     "args": [],

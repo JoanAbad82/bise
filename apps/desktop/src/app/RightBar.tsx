@@ -13,18 +13,18 @@
 // section and per scope (his m_26894, barrows.ts pageRows).
 // Owner: nm-panel (bise fait mac; amb-win before). The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
+import { Act, AppIcon, Dot, IconButton, KindIcon, MoreButton, Press, Ring, Slide, iconKindOf, tipAttrs, type AppIconName, type DotState } from '@/ds';
 import { markTip } from './tipwords';
 import { common } from '@/proto/words_common.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { useAllArtifacts } from '@/artifacts';
-import { LEAVES, useGoArtifact } from '@/artifacts/leave';
-import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
+import { useGoArtifact } from '@/artifacts/leave';
+import { AddDrop, useAddPlace } from '@/artifacts/Drops';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { barProcs, isRunning, keyOf, stateOf, urlWords, useAllProcesses } from '@/running';
 import { running } from '@/proto/words_running.gen';
-import { useCards, useComputerLive, usePlaces, useProjects, useStore } from '@/store';
+import { useCards, useComputerLive, usePlaces, useProjects, useStore, type Store } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -38,6 +38,7 @@ import { useBarAgents } from './baragents';
 import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type MoreWords } from './barrows';
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
+import { useMenuOf } from './panel/menu';
 import { DoneSign } from './Marks';
 
 /** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre');
@@ -79,6 +80,7 @@ function Section({
   summary,
   noFold = false,
   count,
+  items = [],
   scope = null,
   pageScope,
   full,
@@ -99,11 +101,13 @@ function Section({
   scope?: ScopeWords | null;
   /** whose list it shows ('<project>' or '<project>/<agent>', '' bise's thread): the pages he opened are kept per section and per scope */
   pageScope: string;
-  /** the rows of its full list, when it shows a part ('all ›' stays while the full list has some) */
+  /** the rows of its full list, when it shows a part ('Show all' stays while the full list has some) */
   full?: number;
   onAll: () => void;
-  /** a control in the head before 'all ›' (ARTIFACTS' '+ add') */
+  /** a control in the head before its '…' (Artifacts' '+') */
   act?: ReactNode;
+  /** more items of its '…' before 'Show all' (Artifacts' 'Add a file…') */
+  items?: readonly { readonly id: string; readonly label: string; readonly run: () => void }[];
   /** the section's own 'show N more' words (AGENTS': agentsMore) */
   say?: (folded: readonly BarRow[], next: number) => MoreWords;
   children: (r: BarRow) => ReactNode;
@@ -113,6 +117,9 @@ function Section({
   const head = useRef<HTMLDivElement>(null);
   const shut = folded && !noFold;
   const { shown, pages, more, words, less } = pageRows(rows, cap, kept, say);
+  const n = count ?? rows.length;
+  // the head's '…': the section's own acts, then its full list (the 'all ›' link it replaces)
+  const menu = useMenuOf([...items, ...((full ?? rows.length) > 0 ? [{ id: 'all', label: panel.ov_show_all, run: onAll }] : [])]);
   // a head that folds is a row: pointer, the rows' hover tint, a chevron ('▾' on hover while open,
   // '▸' always while folded); one that can't fold looks like a plain title (designer m_21633)
   return (
@@ -120,8 +127,8 @@ function Section({
       <div className="app-rb-head" ref={head} data-folds={!noFold || undefined}>
         <Press look="app-rb-title" aria-expanded={!shut} onClick={noFold ? undefined : toggle} data-testid={`app.right.${id}.head`}>
           {/* folded, the scope line goes with the rows: the count's tip says the scope (designer m_26425) */}
-          <span className="app-rb-label" {...tipAttrs(shut && scope !== null && (id === 'artifacts' || id === 'scheduled') ? scopeCountTip(id, count ?? rows.length, scope) : undefined)}>
-            {`${title} · ${String(count ?? rows.length)}`}
+          <span className="app-rb-label" {...tipAttrs(shut && scope !== null && (id === 'artifacts' || id === 'scheduled') ? scopeCountTip(id, n, scope) : panel.ov_label_tip({ label: title, n }))}>
+            {title}
           </span>
           {shut && summary !== '' && (
             <span className="app-rb-sum" data-testid={`app.right.${id}.summary`}>
@@ -130,12 +137,8 @@ function Section({
           )}
         </Press>
         {act}
-        {/* nothing to open at 0: the head stays, 'all ›' goes (designer m_20272 (4)) */}
-        {(full ?? rows.length) > 0 && (
-          <Act onClick={onAll} testId={`app.right.${id}.all`}>
-            {panel.all}
-          </Act>
-        )}
+        {/* its '…' (the text links went to a menu, page native-mac §3 #5); nothing to list at 0: none */}
+        {menu !== null && <MoreButton menu={menu} testId={`app.right.${id}.more-acts`} />}
       </div>
       {/* the scope's words, a line of their own under the head: on its line they ran under 'all ›'
           with a long agent name (his bug, main m_26417); a long name ends in '…'; folded, it goes */}
@@ -199,8 +202,23 @@ function Section({
   );
 }
 
-/** An artifact row's chip: art-chips' look, 8 px sides. */
-const CHIP = { className: 'b-artchip app-rb-chip', pad: 16 };
+/**
+ * An agent's sign in the row's 14 icon slot (page native-mac §6, sidebar §3: a dot, never a glyph):
+ * at work the breath, asking the accent dot, failed the error dot, done the ok one, the rest an
+ * empty one; its words stay in the tip. Pure.
+ */
+export function agentDot(g: string, working: boolean): DotState {
+  if (working) return 'wk';
+  if (g === '?') return 'nd';
+  if (g === '✗') return 'er';
+  if (g === '✓') return 'ok';
+  return 'off';
+}
+
+/** An archived agent's end in the icon slot: done, failed, stopped. Pure. */
+export function archivedIcon(g: string): AppIconName {
+  return g === '✓' ? 'check' : g === '✗' ? 'close' : 'stop';
+}
 /** His home folder (the preload's), for the tip's '~'. */
 const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
 
@@ -233,8 +251,10 @@ function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; 
   );
 }
 
-function Row({ r, onOpen, on, onOpenPr, onEnd }: {
+function Row({ r, onOpen, on, onOpenPr, onEnd, icon }: {
   r: BarRow;
+  /** the row's 14 icon (a section's line icon, an artifact's kind); none: the agent's dot */
+  icon?: ReactNode;
   onOpen: () => void;
   /** a click on its end alone (RUNNING's port): its own act */
   onEnd?: (() => void) | undefined;
@@ -256,14 +276,20 @@ function Row({ r, onOpen, on, onOpenPr, onEnd }: {
         data-slide-row
       >
         {/* each mark says itself in the ds tip (tipwords.ts); the row has none, its words are there */}
-        <span className={`app-rb-g ${r.tone}`} {...tipAttrs(head ? r.title : r.tips?.glyph)} data-testid={`${r.testId}.sign`}>
-          {r.working === true ? (
-            <Dot state="wk" tip={r.tips?.glyph} />
+        <span className={`app-rb-ic ${r.tone}`} {...tipAttrs(head ? r.title : r.tips?.glyph)} data-testid={`${r.testId}.sign`}>
+          {head ? (
+            <AppIcon name="branch" size={14} />
+          ) : r.glyph.startsWith('⌥') ? (
+            // ⌥ held: the agent's number, the key he can press (held.ts)
+            <span className="app-rb-key">{r.glyph}</span>
           ) : r.glyph === '✓' && r.agent !== undefined ? (
-            // it just finished: the kiss, ':*' lifts and fades into its '✓' (desktop-delight touch 1)
-            <DoneSign project={r.project} agent={r.agent} glyph={r.glyph} testId={`${r.testId}.kiss`} />
+            // it just finished: the kiss, ':*' lifts and fades into its dot (desktop-delight touch 1)
+            <>
+              <DoneSign project={r.project} agent={r.agent} glyph="" testId={`${r.testId}.kiss`} />
+              <Dot state="ok" tip={r.tips?.glyph} />
+            </>
           ) : (
-            r.glyph
+            <Dot state={agentDot(r.glyph, r.working === true)} tip={r.tips?.glyph} />
           )}
         </span>
         <span className={r.mono === true ? 'app-rb-name mono' : 'app-rb-name'}>{r.name}</span>
@@ -298,13 +324,19 @@ function Row({ r, onOpen, on, onOpenPr, onEnd }: {
   return (
     <Press look="app-rb-row" aria-current={on === true || undefined} {...tipAttrs(r.title)} onClick={onOpen} data-testid={r.testId}>
       {r.id !== undefined ? (
-        // an artifact: its kind's glyph and title in the pink chip (desktop-agents-bar §5, art-chips'
-        // .b-artchip), cut after a whole word with '…'; hover on the row lifts its tint to 16 %
-        <FitWords className="app-rb-chipbox" text={`${r.glyph} ${r.name}`} testId={`${r.testId}.chip`} chip={CHIP} />
+        // an artifact: its kind's icon and title in the pink chip (page native-mac §4: the artifact's
+        // chip everywhere), cut with '…'; hover on the row lifts its tint
+        <>
+          <span className="app-rb-ic" />
+          <span className="b-artchip app-rb-chip" data-testid={`${r.testId}.chip`}>
+            {icon}
+            <span className="app-rb-chip-t">{r.name}</span>
+          </span>
+        </>
       ) : (
         <>
-          <span className={`app-rb-g ${r.tone}`} {...tipAttrs(r.tips?.glyph)}>
-            {r.glyph}
+          <span className={`app-rb-ic ${r.tone}`} {...tipAttrs(r.tips?.glyph)}>
+            {icon ?? r.glyph}
           </span>
           {/* a command (PROCESSES): mono, it takes the room its row leaves (designer m_38897) */}
           <span className={r.mono === true ? 'app-rb-name mono' : 'app-rb-name'}>{r.name}</span>
@@ -312,7 +344,7 @@ function Row({ r, onOpen, on, onOpenPr, onEnd }: {
       )}
       {r.leaves === true && (
         <span className="app-rb-out" {...tipAttrs(panel.opens_in_browser)} data-testid={`${r.testId}.leaves`}>
-          {LEAVES}
+          <AppIcon name="open" size={14} />
         </span>
       )}
       {r.sub !== '' && r.mono === true ? (
@@ -377,6 +409,29 @@ function WatchDetail({ r, onStop, onAgent }: { r: BarRow; onStop: () => void; on
         </Act>
       </div>
     </div>
+  );
+}
+
+/** Where a file he adds goes: the project's main, bise's home on bise's own (Drops.tsx useAddPlace). */
+type AddPlace = NonNullable<ReturnType<typeof useAddPlace>>;
+
+/** Files he picks, into the project's artifacts (the same store intent as a drop, artifacts/Drops.tsx). */
+function addFiles(store: Store, place: AddPlace): void {
+  const pick = (window as Partial<Window>).bise?.pickFiles;
+  if (pick === undefined) return;
+  void pick().then((paths) => {
+    for (const p of paths) store.addArtifact(place.project, place.agent, p);
+  });
+}
+
+/** Artifacts' '+' (28, its tip the menu's words): his files into the project's artifacts. */
+function AddFile({ place }: { place: AddPlace | null }) {
+  const store = useStore();
+  if (place === null) return null;
+  return (
+    <IconButton label={panel.ov_add_file} size="bar" onClick={() => { addFiles(store, place); }} testId="app.right.artifacts.add">
+      <AppIcon name="plus" size={16} />
+    </IconButton>
   );
 }
 
@@ -559,7 +614,7 @@ export function RightBar({ project, name }: { project: string; name: string }) {
             if (!all) router.go({ screen: 'agents', project, archived: true });
           }}
         >
-          {(r) => <Row key={r.key} r={r} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />}
+          {(r) => <Row key={r.key} r={r} icon={<AppIcon name={archivedIcon(r.glyph)} size={14} />} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />}
         </Section>
         {/* a drop on the section adds a file there, '+ add' in its head (designer's office-artifacts pick 4) */}
         <AddDrop place={addHere} testId="app.right.artifacts.drop">
@@ -575,9 +630,13 @@ export function RightBar({ project, name }: { project: string; name: string }) {
             onAll={() => {
               router.go({ screen: 'artifacts', project });
             }}
-            act={<AddButton place={addHere} testId="app.right.artifacts.add" />}
+            act={<AddFile place={addHere} />}
+            items={addHere === null ? [] : [{ id: 'add', label: panel.ov_add_file, run: () => { addFiles(store, addHere); } }]}
           >
-            {(r) => <Row key={r.key} r={r} onOpen={() => { goArtifact(r.project, r.id ?? ''); }} />}
+            {(r) => {
+              const a = artifacts.find((x) => x.project === r.project && x.a.id === r.id)?.a;
+              return <Row key={r.key} r={r} icon={a === undefined ? null : <KindIcon kind={iconKindOf(a)} size={14} />} onOpen={() => { goArtifact(r.project, r.id ?? ''); }} />;
+            }}
           </Section>
         </AddDrop>
         <Section
@@ -598,6 +657,7 @@ export function RightBar({ project, name }: { project: string; name: string }) {
               <Fragment key={r.key}>
                 <Row
                   r={r}
+                  icon={<AppIcon name="scheduled" size={14} />}
                   on={watchOpen === r.key}
                   onOpen={() => {
                     setWatchOpen((k) => (k === r.key ? null : r.key));
@@ -620,6 +680,7 @@ export function RightBar({ project, name }: { project: string; name: string }) {
               <Row
                 key={r.key}
                 r={r}
+                icon={<AppIcon name="scheduled" size={14} />}
                 onOpen={() => {
                   if (r.agent !== undefined) openAgent(r.project, r.agent);
                   else router.go({ screen: 'scheduled' });
@@ -639,7 +700,7 @@ export function RightBar({ project, name }: { project: string; name: string }) {
             cap={5}
             pageScope={inView}
             scope={runningAgent === null ? null : { words: running.by({ agent: runningAgent }), tip: running.by({ agent: runningAgent }), empty: '' }}
-            summary={runs[0] === undefined ? '' : `∿ ${runs[0].name}`}
+            summary={runs[0] === undefined ? '' : runs[0].name}
             onAll={() => {
               router.go(procScope === undefined ? { screen: 'running' } : { screen: 'running', scope: procScope });
             }}
@@ -651,6 +712,7 @@ export function RightBar({ project, name }: { project: string; name: string }) {
                 <Row
                   key={r.key}
                   r={r}
+                  icon={<AppIcon name="terminal" size={14} />}
                   onOpen={() => {
                     if (x !== undefined) router.go({ screen: 'running', open: { project: x.project, agent: x.p.agent, id: x.p.id } });
                   }}

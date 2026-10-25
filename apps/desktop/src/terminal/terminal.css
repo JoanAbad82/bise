@@ -1,4 +1,4 @@
-/* The terminal panel under the screen (amb-win): the ds palette, the shell's mono. */
+/* The terminal: a tab of the panel (.term-tab) or the panel under the screen (.term-panel), the ds palette, the shell's mono. Owner: nm-panel (amb-win before). */
 .term-panel {
   position: relative;
   flex: none;
@@ -72,4 +72,16 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+
+/* a shell in a tab of the panel (bise fait mac, mockup 2): it fills the tab, 12/18 mono, 12 16 in */
+.term-tab {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--s-3) var(--s-4) 0;
+  background: var(--c-solid);
+}
+.term-tab .term-body {
+  padding: 0;
 }

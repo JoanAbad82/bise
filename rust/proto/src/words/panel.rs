@@ -140,8 +140,6 @@ crate::words! { panel:
     bar_artifacts = "Artifacts";
     /// the Overview tab's scheduled tasks and watches label
     bar_scheduled = "Scheduled";
-    /// a head's link to the full list
-    all = "all ›";
     /// a long section's next page, more than a page left
     show_more_left(n, left) = "show {n} more · {left} left";
     /// a long section's last page
@@ -380,4 +378,12 @@ crate::words! { panel:
     addr_out = "open in your browser";
     /// the bar's button over an artifact's tab: the artifact in a window of its own
     addr_window = "open in a window";
+
+    // ---- the Overview tab's sections (bise fait mac, mockup 1): the head's '…' menu
+    /// a section's '…': its full list (the 'all ›' it replaces)
+    ov_show_all = "Show all";
+    /// the artifacts section's '…' and '+': a file of his into the project's artifacts
+    ov_add_file = "Add a file…";
+    /// a section label's tip: its words and how many rows it has
+    ov_label_tip(label, n) = "{label} · {n}";
 }

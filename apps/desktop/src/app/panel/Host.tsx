@@ -1,28 +1,36 @@
 // src/app/panel · PanelHost: the tabbed panel in the shell's right column (App.tsx's <Win aside>),
 // so nm-panel never edits App.tsx (plan native-mac-plan v4 §3). Folded by default; ▯ and ⌥⌘0 unfold
-// it (state.ts, kept per window). Its width is the one the tab in front asks (384 rows, 480 a
-// shell, 640 a page; 320-640 by its border, kept per kind); opening animates the width in 220 ms
-// (--d-base, none under reduce motion) while its inside keeps its final width, so nothing in it
-// reflows and the thread beside glides. The tab in front draws; a shell's tab stays mounted
+// it (state.ts, kept per window). Its column runs the window's height: its own top row in the
+// transparent 52 bar (the tabs, '+', and 'open in a window' for an artifact: mockups 3 and 4), then
+// the body on --c-solid with its 1 px line. Its width is the one the tab in front asks (384 rows,
+// 480 a shell, 640 a page; 320-640 by its border, kept per kind); opening animates the width in
+// 220 ms (--d-base, none under reduce motion) while its inside keeps its final width, so nothing
+// in it reflows and the thread beside glides. Folded, it is inert and hidden: no Tab, no
+// VoiceOver reaches it (ui-review m_42482 #6). The tab in front draws; a shell's tab stays mounted
 // hidden (its shell runs on, the same one when it comes back), the others mount when in front.
 // The tabs of an agent no longer in the rows go (model.ts dropGone). Owner: nm-panel.
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { AppIcon, IconButton } from '@/ds';
+import { formatRoute } from '@/app/route';
 import { panel } from '@/proto/words_panel.gen';
 import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
 import { MAX_W, MIN_W, type Tab } from './model';
-import { dropGoneTabs, resetWidth, setWidth, usePanelState, widthNow } from './state';
+import { dropGoneTabs, resetWidth, setWidth, usePanelState, usePanelWidth } from './state';
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
+import { PanelTabs } from './BarTabs';
 import './panel.css';
 
 /** The tabbed panel on the window's right (--w-panel 384, from --w-panel-min to --w-panel-max). */
 export function PanelHost() {
   const s = usePanelState();
-  const width = widthNow(s);
+  const width = usePanelWidth();
   const [dragging, setDragging] = useState(false);
   useDropGone(s.tabs.list);
+  const front = s.tabs.list.find((t) => t.id === s.tabs.active);
+  const art = front?.what.kind === 'thing' && front.what.e.kind === 'artifact' ? front.what.e : undefined;
   return (
     <aside
       className="pn"
@@ -30,16 +38,35 @@ export function PanelHost() {
       data-open={s.open || undefined}
       data-drag={dragging || undefined}
       aria-label={panel.panel_label}
-      aria-hidden={!s.open || undefined}
+      inert={!s.open}
       style={{ width: s.open ? width : 0 }}
     >
       {s.open && <Border width={width} onDrag={setDragging} />}
-      <div className="pn-in" style={{ width }} role="tabpanel" data-testid={`app.panel.body.${s.tabs.active}`}>
-        {s.tabs.list.map((t) => (
-          <Body key={t.id} tab={t} shown={s.open && t.id === s.tabs.active} />
-        ))}
+      <div className="pn-col" style={{ width }}>
+        <PanelTabs end={art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />} />
+        <div className="pn-in" role="tabpanel" data-testid={`app.panel.body.${s.tabs.active}`}>
+          {s.tabs.list.map((t) => (
+            <Body key={t.id} tab={t} shown={s.open && t.id === s.tabs.active} />
+          ))}
+        </div>
       </div>
     </aside>
+  );
+}
+
+/** The tab row's end over an artifact (mockup 4): the artifact in a window of its own. */
+function WindowButton({ project, id }: { project: string; id: string }) {
+  return (
+    <IconButton
+      label={panel.addr_window}
+      size="bar"
+      onClick={() => {
+        (window as Partial<Window>).bise?.openWindow({ kind: 'artifact', route: formatRoute({ screen: 'artifacts', project, id }) });
+      }}
+      testId="app.panel.window"
+    >
+      <AppIcon name="window" size={16} />
+    </IconButton>
   );
 }
 

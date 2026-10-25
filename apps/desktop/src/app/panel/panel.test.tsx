@@ -16,6 +16,8 @@ import { openTab } from './tabs';
 afterEach(cleanup);
 beforeEach(() => {
   panelState.reset();
+  // a wide window: the panel's width is what its tab asks (capW keeps the thread 560 beside the left)
+  Object.defineProperty(window, 'innerWidth', { value: 1920, configurable: true });
 });
 const ACME = 'acme-1a2b3c4d';
 
@@ -38,20 +40,24 @@ function shell() {
 }
 
 describe('the tabbed panel', () => {
-  it('is folded by default: only ▯ in the bar, the panel 0 wide', () => {
+  it('is folded by default: ▯ in the bar, the panel 0 wide and inert (no Tab, no VoiceOver)', () => {
     const v = shell();
-    expect(v.queryByTestId('app.panel.tabs')).toBeNull();
     expect(v.getByTestId('app.panel.toggle').getAttribute('aria-pressed')).toBe('false');
     expect(v.getByTestId('app.panel').style.width).toBe('0px');
+    expect(v.getByTestId('app.panel').hasAttribute('inert')).toBe(true);
+    expect(v.queryByTestId('app.right')).toBeNull();
   });
-  it('▯ unfolds it on Overview at 384; again folds it', () => {
+  it('▯ unfolds it on Overview at 384, its tabs in its own top row; again folds it', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel.tab.overview').getAttribute('aria-selected')).toBe('true');
+    expect(v.getByTestId('app.panel.top').contains(v.getByTestId('app.panel.tabs'))).toBe(true);
+    expect(v.getByTestId('app.panel').contains(v.getByTestId('app.panel.top'))).toBe(true);
     expect(v.getByTestId('app.panel').style.width).toBe('384px');
+    expect(v.getByTestId('app.panel').hasAttribute('inert')).toBe(false);
     expect(v.getByTestId('app.right')).toBeTruthy();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
-    expect(v.queryByTestId('app.panel.tabs')).toBeNull();
+    expect(v.getByTestId('app.panel').style.width).toBe('0px');
   });
   it("'+' opens New tab: search, Open's five rows with their keys, Recent", () => {
     const v = shell();
@@ -71,7 +77,7 @@ describe('the tabbed panel', () => {
     expect(v.queryByTestId('app.panel.tab.new:1')).toBeNull();
     expect(v.getByTestId(`app.panel.tab.diff:${ACME}/perf`).getAttribute('aria-selected')).toBe('true');
   });
-  it('openTab unfolds it on the thing; × closes it; the last tab closed folds the panel', () => {
+  it('openTab unfolds it on the thing; × closes it; Overview, the home, has no ×', () => {
     const v = shell();
     act(() => {
       openTab({ kind: 'pr', project: ACME, number: 6 });
@@ -82,9 +88,8 @@ describe('the tabbed panel', () => {
     expect(v.getByTestId('app.panel').style.width).toBe('640px');
     fireEvent.click(v.getByTestId(`app.panel.tab.pr:${ACME}/6.close`));
     expect(v.getByTestId('app.panel.tab.overview').getAttribute('aria-selected')).toBe('true');
-    fireEvent.click(v.getByTestId('app.panel.tab.overview.close'));
-    expect(v.queryByTestId('app.panel.tabs')).toBeNull();
-    expect(panelState.get().open).toBe(false);
+    expect(v.queryByTestId('app.panel.tab.overview.close')).toBeNull();
+    expect(panelState.get().open).toBe(true);
   });
   it('past six tabs: an overflow button, the tab in front still shows', () => {
     const v = shell();
@@ -93,6 +98,7 @@ describe('the tabbed panel', () => {
     });
     expect(v.getAllByRole('tab')).toHaveLength(6);
     expect(v.getByTestId('app.panel.over').textContent).toContain('2');
+    expect(v.getByTestId(`app.panel.tab.commit:${ACME}/abcdef7`)).toBeTruthy();
     expect(v.getByTestId(`app.panel.tab.commit:${ACME}/abcdef7`).getAttribute('aria-selected')).toBe('true');
   });
   it('every tab has a VoiceOver name and a tip; the strip has its name', () => {

@@ -1,28 +1,63 @@
-// src/app/panel · BarTabs: the panel's tabs in the window's transparent bar (page native-mac §6:
-// 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…', × on the active one and
-// on hover; '+' 28 opens New tab), six at most (HIG) and the rest behind an overflow button whose
-// native menu lists them; a drag reorders; a right click is the tab's menu (nm-menus'
-// useEntityMenu({ kind: 'tab', id })). The ▯ button folds and unfolds the panel (⌥⌘0). Mounted by
-// Frame.tsx's title bar, so nm-panel never edits Frame.tsx (plan native-mac-plan v4 §3).
-// The tabs show while the panel is open; folded, only ▯. Owner: nm-panel.
-import { useState, type DragEvent, type KeyboardEvent } from 'react';
-import { AppIcon, IconButton, tipAttrs } from '@/ds';
+// src/app/panel · the panel's tabs and its ▯ (page native-mac §6 and mockups 1-4). BarTabs: the ▯
+// at the end of the window's title bar (Frame.tsx mounts it, so nm-panel never edits Frame.tsx),
+// pressed while the panel is open; ⌥⌘0 does the same. PanelTabs: the tabs in the panel's own top
+// row, in the transparent 52 bar over the panel's column (mockup 3: from the panel's left + 12;
+// ui-review m_42482 #1): 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…';
+// × on the one in front and on hover, its slot kept so a tab never changes width (#4); Overview,
+// the home, has none; '+' 28 opens New tab. As many whole tabs as the row holds, six at most
+// (HIG), the rest behind an overflow button whose native menu lists them, none cut (#3); a drag
+// reorders; a right click is the tab's menu (nm-menus' useEntityMenu({ kind: 'tab', id })).
+// Owner: nm-panel.
+import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { AppIcon, IconButton, Press, tipAttrs } from '@/ds';
 import { panel } from '@/proto/words_panel.gen';
 import { useEntityMenu } from '@/app/menus/use';
-import { shownOf, type Tab } from './model';
+import { closable, fitCount, shownOf, type Tab } from './model';
 import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanelState } from './state';
 import { useTabLooks, type TabLook } from './look';
 import { PANEL_KEYS } from './keys';
 
-/** The panel's tabs, in the bar over the panel, and its ▯. */
+/** The panel's ▯ at the title bar's end (⌥⌘0), pressed while it is open. */
 export function BarTabs() {
   const s = usePanelState();
-  const look = useTabLooks();
-  const { shown, over } = shownOf(s.tabs);
-  const [drag, setDrag] = useState<string | null>(null);
   return (
     <div className="pn-bar" data-testid="app.panel.bar" data-open={s.open || undefined}>
-      {s.open && (
+      <IconButton label={panel.panel_toggle({ key: PANEL_KEYS.toggle })} size="bar" pressed={s.open} onClick={panelToggle} testId="app.panel.toggle">
+        <AppIcon name="panel" size={16} />
+      </IconButton>
+    </div>
+  );
+}
+
+/** The width an element has, live. */
+function useWidthOf(): readonly [RefObject<HTMLDivElement | null>, number] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el === null) return;
+    setW(el.clientWidth);
+    const ro = new ResizeObserver(() => {
+      setW(el.clientWidth);
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+  return [ref, w];
+}
+
+/** The tabs in the panel's top row, '+', and at its end what the tab in front adds (`end`). */
+export function PanelTabs({ end }: { end?: ReactNode }) {
+  const s = usePanelState();
+  const look = useTabLooks();
+  const [row, width] = useWidthOf();
+  // before the first measure (a test's DOM has no layout): six, the HIG's most
+  const { shown, over } = shownOf(s.tabs, width === 0 ? undefined : fitCount(width));
+  const [drag, setDrag] = useState<string | null>(null);
+  return (
+    <div className="pn-top" ref={row} data-testid="app.panel.top">
         <div className="pn-tabs" role="tablist" aria-label={panel.tabs_label} data-testid="app.panel.tabs">
           {shown.map((t) => (
             <BarTab
@@ -48,10 +83,7 @@ export function BarTabs() {
             <AppIcon name="plus" size={16} />
           </IconButton>
         </div>
-      )}
-      <IconButton label={panel.panel_toggle({ key: PANEL_KEYS.toggle })} size="bar" pressed={s.open} onClick={panelToggle} testId="app.panel.toggle">
-        <AppIcon name="panel" size={16} />
-      </IconButton>
+        {end}
     </div>
   );
 }
@@ -114,9 +146,8 @@ function BarTab({ tab, look, on, dragging, onDragStart, onDropAt, onDragEnd }: {
     >
       {look.icon}
       <span className="pn-tab-t">{look.title}</span>
-      <button
-        type="button"
-        className="pn-tab-x"
+      {closable(tab.id) && <Press
+        look="pn-tab-x"
         aria-label={close}
         {...tipAttrs(close)}
         tabIndex={on ? 0 : -1}
@@ -127,7 +158,7 @@ function BarTab({ tab, look, on, dragging, onDragStart, onDropAt, onDragEnd }: {
         data-testid={`app.panel.tab.${tab.id}.close`}
       >
         <AppIcon name="close" size={14} />
-      </button>
+      </Press>}
     </div>
   );
 }
@@ -136,9 +167,8 @@ function BarTab({ tab, look, on, dragging, onDragStart, onDropAt, onDragEnd }: {
 function OverButton({ over, look }: { over: readonly Tab[]; look: (t: Tab) => TabLook }) {
   const words = panel.tabs_more({ n: over.length });
   return (
-    <button
-      type="button"
-      className="pn-over"
+    <Press
+      look="pn-over"
       aria-label={words}
       aria-haspopup="menu"
       {...tipAttrs(words)}
@@ -153,6 +183,6 @@ function OverButton({ over, look }: { over: readonly Tab[]; look: (t: Tab) => Ta
     >
       <AppIcon name="down" size={14} />
       <span>{over.length}</span>
-    </button>
+    </Press>
   );
 }
