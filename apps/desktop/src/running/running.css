@@ -2,13 +2,16 @@
    only, 4 px grid, no accent. The banner, the filters, the group labels and the rows are the ds's
    (PageBanner, FilterRow + Filters, GroupLabel, ListRow): here only the column, the rows' words and
    marks, and the selected one's output beside the list. */
-.run-screen { display: flex; height: 100%; min-height: 0; outline: none; }
+.run-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; outline: none; }
+/* under the banner (it spans the whole content area: designer m_43401), the list and its output */
+.run-body { flex: 1 1 auto; min-height: 0; display: flex; }
+.run-screen > .b-banner { flex: none; margin-bottom: 0; }
 .run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 /* the lead, the filters and the list in one scroller (designer m_39330: the lead scrolls away); the
    floating composer's room at its foot (--float-room). Beside the pane (always, over 1000 px) the
    list is its own column: the page's centring would squeeze it, so its sides are the page's least,
    --pad-column (ui-review qa g5) */
-.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 0 var(--float-room); box-sizing: border-box; }
+.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--s-6) 0 var(--float-room); box-sizing: border-box; }
 /* the banner (ds PageBanner) takes the list's width, 24 from its edges; the rest its column */
 .run-scroll > :not(.b-banner) { margin-inline: var(--pad-column); }
 @media (max-width: 1000px) { .run-screen:not(.has-pane) .run-scroll > :not(.b-banner) { margin-inline: var(--pad-page-x); } }
@@ -17,7 +20,7 @@
 .run-list { margin-top: var(--s-2); }
 /* the state column: a --c-ok dot while it runs, a check, a --c-err x, a minus (§8's line icons) */
 .run-mark { display: inline-flex; align-items: center; }
-.run-dot { display: block; width: var(--s-2); height: var(--s-2); border-radius: 50%; background: var(--c-ok); }
+.run-wave { font: 400 var(--f-ui); color: var(--c-text-3); }
 .run-err { display: inline-flex; color: var(--c-err); }
 /* the command in mono 12 (§8), its program then its arguments dimmer */
 .run-cmd { font: 400 var(--f-mono); }

@@ -200,22 +200,24 @@ export function RunningView({
   const cur = open === null ? null : (byKey.get(open) ?? null);
   return (
     <section ref={ref} className={`run-screen${cur ? ' has-pane' : ''}`} data-testid="running.screen" tabIndex={-1} onKeyDown={onKeyDown}>
-      <div className="run-main">
-        {/* one scroller: the lead scrolls away with the list (designer m_39330); its foot keeps the
-            floating composer's room (--float-room) */}
-        <div className="run-scroll" data-testid="running.scroll">
-        <PageBanner
+      {/* the banner over the whole content area, the list and the output under it (designer m_43401) */}
+      <PageBanner
           title={hero.processes_title}
           sentence={hero.processes_say}
           visual={<PageVignette page="processes" />}
           icon="terminal"
           // its list is a full-width column beside the output (--pad-column): the title 32 in
           edge="page"
-          gutter={cur ? 0 : gutter}
+          gutter={gutter}
           // 'in N projects' only on every project's list: a scoped one is one place (designer m_38700)
           facts={<span data-testid="running.sub">{`${scoped ? running.count_running({ n: counts.running }) : running.running_in({ count: counts.running, n: counts.projects })} · ${running.count_listening({ n: counts.listening })}`}</span>}
           testId="running.lead"
         />
+      <div className="run-body">
+      <div className="run-main">
+        {/* one scroller: the filters scroll away with the list; its foot keeps the floating
+            composer's room (--float-room) */}
+        <div className="run-scroll" data-testid="running.scroll">
         <FilterRow testId="running.filters">
           <Filters
             items={FILTERS.map((f) => ({ id: f, label: <>{sentenceCase(f === 'running' ? running.state_running : running.ended_today)}<span className="run-n">{f === 'running' ? counts.running : counts.ended}</span></> }))}
@@ -275,6 +277,7 @@ export function RunningView({
           <Empty title={running.pick_one} />
         </aside>
       )}
+      </div>
     </section>
   );
 }
@@ -358,11 +361,12 @@ function Pane({ x, st, now, where, onTerm, onBack, onStop, onOpen, onFind, find 
   );
 }
 
-/** A row's state column (§8's line icons, no glyph): a --c-ok dot while it runs, a check when it
- *  ended well, an x in --c-err when it failed, a dash otherwise; its tip says which. */
+/** A row's state column, as the terminal's /processes: '∿' in text-3 while it runs (green is only a
+ *  diff's +: designer m_43401), a check in ink when it ended well, an x in --c-err when it failed,
+ *  a dash otherwise; its tip says which. */
 function Mark({ s }: { s: ReturnType<typeof stateOf> }) {
   const m = markOf(s);
-  if (s.k === 'running' || s.k === 'stopping') return <span className="run-dot" />;
+  if (s.k === 'running' || s.k === 'stopping') return <span className="run-wave">{m.glyph}</span>;
   if (m.tone === 'ink') return <AppIcon name="check" size={14} />;
   if (m.tone === 'err') return <span className="run-err"><AppIcon name="close" size={14} /></span>;
   return <AppIcon name="fold" size={14} />;

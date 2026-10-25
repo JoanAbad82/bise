@@ -9,6 +9,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { AppIcon, BarSearch, Button, Empty, GroupLabel, ListRow, MoreButton, PageBanner, Press, sentenceCase } from '@/ds';
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
+import { shownName } from '@/agents/model';
 import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
 import { InBar } from '@/app/barslot';
@@ -175,7 +176,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
           <div className="sch-runs">{cur.t.done === 0 ? scheduled.none_yet : runsWords(cur.t)}</div>
           {asking ? (
             <div className="sch-ask" role="group" data-testid="scheduled.ask">
-              <span>{scheduled.stop_ask_desktop({ agent: cur.t.agent })}</span>
+              <span>{scheduled.stop_ask_desktop({ agent: shownName(cur.t.agent) })}</span>
               <span className="sch-acts">
                 <Button kind="danger" onClick={() => { stop(cur); }} testId="scheduled.ask.stop">{sentenceCase(scheduled.key_stop)}</Button>
                 <Button kind="ghost" onClick={() => { setAsking(false); }} testId="scheduled.ask.keep">{sentenceCase(scheduled.key_keep)}</Button>
@@ -204,7 +205,8 @@ function Row({ x, on, now, onClick }: { x: Task; on: boolean; now: number; onCli
       <ListRow on={on} testId={`scheduled.row.${String(x.t.id)}`} tip={x.t.words} onClick={onClick} onContextMenu={menu.onContextMenu}
         state={<AppIcon name="scheduled" size={14} />}
         title={<><span className="sch-name">{asks(x.t)}</span><span className="sch-often">{howOften(x.t)}</span></>}
-        sub={next === undefined ? x.t.agent : `${x.t.agent} · ${next}`}
+        // main is 'bise' in the window (designer m_43401)
+        sub={next === undefined ? shownName(x.t.agent) : `${shownName(x.t.agent)} · ${next}`}
         end={<MoreButton menu={menu} testId={`scheduled.row.${String(x.t.id)}.more`} />} />
     </div>
   );

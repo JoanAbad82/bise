@@ -5,6 +5,10 @@
 // page's own still (440x264, one size). useBannerGutter: the room the right side keeps free, for
 // PageBanner's gutter. bims-plugins owns the images; nm-pages-a the code; nm-pages-b imports both.
 import { useSideLayout } from '@/app/side3d/place';
+import { useContext, useSyncExternalStore } from 'react';
+import { RouterContext } from '@/app/router';
+import { projectOf } from '@/app/route';
+import { useProjects } from '@/store';
 import artifacts_light from './artifacts-hero-light.png';
 import artifacts_dark from './artifacts-hero-dark.png';
 import inbox_light_1 from './inbox-light@1x.webp';
@@ -76,8 +80,19 @@ export function PageVignette({ page }: { page: VignettePage }) {
   );
 }
 
-/** PageBanner's gutter: the band the right side keeps free at the window's right (0 when it hides). */
+/**
+ * PageBanner's gutter: the band the right side keeps free at the window's right while it is drawn;
+ * 0 when nothing is drawn there (the panel open, or no project to show: SideHost draws nothing
+ * then, app/side3d/Host.tsx), so the banner ends 24 from the content's edge (designer m_43401).
+ */
 export function useBannerGutter(): number {
   const l = useSideLayout();
-  return l.side ? l.gutter : 0;
+  // a page drawn outside the app's router (a test, the gallery) reads as on no project's route
+  const router = useContext(RouterContext);
+  const route = useSyncExternalStore((l) => (router === null ? noSub() : router.subscribe(l)), () => router?.get() ?? null);
+  const home = useProjects().find((p) => p.home)?.project ?? '';
+  const drawn = l.side && ((route === null ? null : projectOf(route)) ?? home) !== '';
+  return drawn ? l.gutter : 0;
 }
+
+const noSub = (): (() => void) => () => undefined;

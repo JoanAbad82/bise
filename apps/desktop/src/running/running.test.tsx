@@ -89,7 +89,8 @@ describe('the running screen', () => {
     expect(screen.getByTestId('running.row.shop/perf/bg3.go').getAttribute('data-tip')).toBe('open localhost:5173');
     // every row has its '…' (its menu: stop, open in a tab: nm-menus); no glyph as a mark
     expect(screen.getByTestId('running.row.shop/perf/bg3.more')).toBeTruthy();
-    expect(screen.getByTestId('running.row.shop/perf/bg3.mark').querySelector('.run-dot')).not.toBeNull();
+    // running: '∿' in text-3, as the terminal's /processes (green is only a diff's +: designer m_43401)
+    expect(screen.getByTestId('running.row.shop/perf/bg3.mark').querySelector('.run-wave')?.textContent).toBe('∿');
     expect(screen.getByTestId('running.row.shop/perf/bg3.mark').getAttribute('data-tip')).toBe('running');
     expect(screen.getByTestId('running.row.shop/perf/bg3.end').textContent).toBe('14 min');
     fireEvent.click(screen.getByTestId('running.filter.ended'));
