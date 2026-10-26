@@ -584,12 +584,14 @@ fn run_main() -> std::io::Result<()> {
                     .unwrap_or(switchboard::switch::PROBATION);
                 let restart = rest.iter().any(|a| a == "--restart");
                 let reload = rest.iter().any(|a| a == "--reload");
+                let release = rest.iter().any(|a| a == "--release");
                 std::process::exit(switchboard::switch::run(
                     &paths,
                     std::path::Path::new(&to),
                     period,
                     restart,
                     reload,
+                    release,
                 ));
             }
             Some("--version" | "-V" | "version") => {

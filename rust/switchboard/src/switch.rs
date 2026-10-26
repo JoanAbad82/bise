@@ -450,7 +450,21 @@ pub fn take_reload(paths: &Paths) -> Option<String> {
 /// hub, e.g. a stuck one); the agents are kept the same way. `reload`
 /// (BISE-131, implies `restart`): the new hub also relaunches every
 /// agent's REPL (at its next idle, same session) and the TUIs.
-pub fn run(paths: &Paths, to: &Path, period: Duration, restart: bool, reload: bool) -> i32 {
+/// `release` (update-flow): a switch to the machine's `update now`
+/// release: it holds the machine's switch lock (bise_home::release_offer)
+/// through the switch and its probation, so one hub switches at a time;
+/// another holder: nothing done (the hub asks again at its next look).
+pub fn run(paths: &Paths, to: &Path, period: Duration, restart: bool, reload: bool, release: bool) -> i32 {
+    let _machine = match release {
+        true => match bise_home::release_offer::try_lock(&bise_home::Home::from_env().switch_lock()) {
+            Some(l) => Some(l),
+            None => {
+                log(paths, "another project is switching to the new release: this one waits its turn");
+                return 1;
+            }
+        },
+        false => None,
+    };
     let lock = paths.state.join("switch.pid");
     if let Some(p) = std::fs::read_to_string(&lock)
         .ok()

@@ -490,6 +490,12 @@ pub enum Effect {
     UpdateLater {
         id: String,
     },
+    /// update-flow: the machine's `update now` is installed and this hub
+    /// still runs an older version: the daemon switches it to release
+    /// `id` when no turn runs and no other hub is switching.
+    ReleaseSwitch {
+        id: String,
+    },
     /// desktop S2, bise's home hub: deliver outbox entry `xid` to the
     /// project hub `project` (a hub id; started when stopped), on a
     /// thread; it comes back as `Input::XAck` or `Input::XFail`.

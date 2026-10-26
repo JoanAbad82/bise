@@ -365,9 +365,12 @@ struct Shell {
     /// and the version already announced as ready.
     update_checked: Option<std::time::Instant>,
     update_told: Option<std::path::PathBuf>,
-    /// update-card: when the release channel was last checked (None: not
-    /// yet, the first tick checks).
+    /// update-card: when this hub last looked at the machine's release
+    /// offer (None: not yet, the first tick looks).
     release_checked: Option<std::time::Instant>,
+    /// update-flow: when this hub last started its switch to the
+    /// machine's `update now` release (no second one while it starts).
+    release_switched: Option<std::time::Instant>,
     /// Agents whose REPL was found dead at boot in the middle of a turn
     /// (killed by a restart, a crash): once respawned on their session,
     /// they are told to continue where they left off.
@@ -981,6 +984,7 @@ impl Shell {
             Effect::Feature { token, op, name, agents } => self.feature(token, op, name, agents),
             Effect::Update { card, id, version } => self.update_to(card, id, version),
             Effect::UpdateLater { id } => versions::update_later(&id),
+            Effect::ReleaseSwitch { id } => self.release_switch(&id),
             Effect::XDeliver { xid, project, kind, text, context, parts } => self.xdeliver(xid, project, kind, text, context, parts),
             Effect::XReply { hub, xid, text } => self.xreply_back(hub, xid, text),
             Effect::Route { rid, to, name, text, due_ms, why } => self.proto_route(HubEv::Route { project: self.project(), rid, to, name, text, correct_until_ms: due_ms, why }),
@@ -1687,6 +1691,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         update_checked: None,
         update_told: None,
         release_checked: None,
+        release_switched: None,
         resume_turn: BTreeSet::new(),
         recorders: BTreeMap::new(),
         reload_id: String::new(),

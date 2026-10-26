@@ -3103,22 +3103,39 @@ mod prs {
         assert_eq!(t.status("dark"), Status::Archived);
     }
 
-    fn release(id: &str, newer: bool, later: Option<&str>) -> Input {
-        use crate::core::update_card::{ReleaseCheck, ReleaseNews};
+    /// A look at the machine's offer (bise_home::release_offer), this hub
+    /// running 4.
+    fn offer(id: &str, state: bise_home::release_offer::State) -> Input {
+        use bise_home::release_offer::{Latest, Offer, State};
+        use crate::core::update_card::ReleaseCheck;
         Input::Release(ReleaseCheck {
-            news: Some(ReleaseNews {
-                id: id.into(),
-                version: format!("2026.10.2-{}", id),
-                notes: vec!["the inbox keeps your place".into(), "/update from any thread".into()],
-                url: format!("https://github.com/o/r/releases/tag/v2026.10.2-{}", id),
-                running_id: "4".into(),
-                running: "2026.10.2-4".into(),
-                newer,
-                later: later.map(String::from),
+            offer: Some(Offer {
+                release: Latest {
+                    id: id.into(),
+                    version: format!("2026.10.2-{}", id),
+                    notes: vec!["the inbox keeps your place".into(), "/update from any thread".into()],
+                    url: format!("https://github.com/o/r/releases/tag/v2026.10.2-{}", id),
+                },
+                switch_me: state == State::Updating,
+                state,
             }),
+            running_id: "4".into(),
+            running: "2026.10.2-4".into(),
             asked: None,
             error: None,
         })
+    }
+
+    fn release(id: &str, newer: bool, later: Option<&str>) -> Input {
+        use bise_home::release_offer::State;
+        offer(
+            id,
+            match (newer, later == Some(id)) {
+                (false, _) => State::UpToDate,
+                (true, true) => State::Later,
+                (true, false) => State::Ready,
+            },
+        )
     }
 
     fn update_cards(t: &T) -> Vec<Card> {
@@ -3183,17 +3200,57 @@ mod prs {
         let id = update_cards(&t)[0].id;
         t.user(MAIN, &format!("/answer {} 1", id));
         let fx = t.go(Input::Updated { card: id, version: "v2026.10.2-6".into(), res: Ok(()) });
-        assert!(has_line(&fx, MAIN, "updated to v2026.10.2-6. switching now, your agents keep running."), "{:?}", fx);
+        assert!(
+            has_line(&fx, MAIN, "installed v2026.10.2-6. every project switches to it, one at a time; your agents keep running."),
+            "{:?}",
+            fx
+        );
         assert_eq!(update_cards(&t).len(), 1);
+        // the machine says this hub switches: the daemon is asked, the
+        // item stays, `updating…`
+        let fx = t.go(offer("6", bise_home::release_offer::State::Updating));
+        assert!(fx.iter().any(|e| matches!(e, Effect::ReleaseSwitch { id } if id == "6")), "{:?}", fx);
+        assert_eq!(update_cards(&t).iter().map(|c| c.id).collect::<Vec<_>>(), [id]);
         // the new hub runs 6: the item closes
         let mut now = release("6", false, None);
         if let Input::Release(c) = &mut now {
-            let n = c.news.as_mut().unwrap();
-            n.running_id = "6".into();
+            c.running_id = "6".into();
         }
         t.go(now);
         assert!(update_cards(&t).is_empty());
         assert_eq!(closed_as(&t, id).as_deref(), Some("updated"));
+    }
+
+    /// update-flow: the offer is the machine's. `1` or `later` in another
+    /// project reaches this hub's item at its next look, and an old item
+    /// left open (a hub that was down) closes at the first look.
+    #[test]
+    fn the_update_item_follows_the_machine() {
+        use bise_home::release_offer::State;
+        let mut t = T::new();
+        t.go(release("5", true, None));
+        let id = update_cards(&t)[0].id;
+        // `update now` in another project: installing, then updating here
+        t.go(offer("5", State::Installing));
+        let note = |t: &mut T| t.hub.snapshot(3_000).card_of("update").and_then(|x| x.note.clone());
+        assert_eq!(note(&mut t).as_deref(), Some("updating to v2026.10.2-5…"));
+        let fx = t.go(offer("5", State::Installing));
+        assert!(!fx.iter().any(|e| matches!(e, Effect::ReleaseSwitch { .. })), "installing: no switch yet");
+        // this hub's switch rolled back: closed once, never asked again
+        t.go(offer("5", State::Failed { why: "the hub died".into() }));
+        assert_eq!(closed_as(&t, id).as_deref(), Some("update failed"));
+        let fx = t.go(offer("5", State::Failed { why: "the hub died".into() }));
+        assert!(update_cards(&t).is_empty() && !fx.iter().any(|e| matches!(e, Effect::ReleaseSwitch { .. })));
+        // a newer release: asked again; `later` said elsewhere closes it here
+        t.go(release("6", true, None));
+        let id = update_cards(&t)[0].id;
+        t.go(release("6", true, Some("6")));
+        assert_eq!(closed_as(&t, id).as_deref(), Some("later"));
+        // a stale item from a release this hub never saw: the first look closes it
+        t.go(release("7", true, None));
+        let id = update_cards(&t)[0].id;
+        t.go(release("7", false, None));
+        assert_eq!(closed_as(&t, id).as_deref(), Some("up to date"));
     }
 
     #[test]

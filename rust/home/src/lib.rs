@@ -44,6 +44,7 @@ pub mod migrate;
 pub mod prefs;
 pub mod projects;
 pub mod release;
+pub mod release_offer;
 pub mod socket;
 pub mod style;
 pub mod test_home;

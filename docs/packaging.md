@@ -457,13 +457,19 @@ downloaded once by hand.
   `--local ... --whats-new <file>` (make-release.sh `--whats-new`).
   Forgotten, or to fix them: `publish-release.sh vX.Y.Z --whats-new
   <file>` on the published release. An installed bise checks latest.json
-  at its hub's start and every hour (`bise update --manifest`, one small
-  GET; `BISE_RELEASE_CHECK_SECS`; off with `BISE_NO_UPDATE=1`; never in
-  bise's source tree) and, for a newer release, opens ONE quiet inbox
-  item: `bise vX.Y.Z is out`, the lines, `you're on v…`, then `1 update
-  now` (`bise update` + a switch onto it, probation, agents kept), `2
-  later` (not again for this release), `3 release notes ↗`. `/update`
-  checks now. No notes: the item has no body.
+  once an hour for the whole machine (`bise update --manifest`, one small
+  GET, one hub at a time under a flock; `BISE_RELEASE_CHECK_SECS`; off
+  with `BISE_NO_UPDATE=1`; never in bise's source tree). The offer is the
+  machine's (update-flow, `bise_home::release_offer`): every hub plans it
+  from the same files every 30 s. For a newer release each hub opens ONE
+  quiet inbox item: `bise vX.Y.Z is out`, the lines, `you're on v…`, then
+  `1 update now` (installs it once, then every project switches to it one
+  at a time, probation, agents kept), `2 later` (not again for this
+  release, in any project), `3 release notes ↗`. A project whose switch
+  rolled back doesn't retry that release. `/update` checks now. No notes:
+  the item has no body. (The item becomes a status line next: page
+  update-flow-forms.) The desktop app's own updater is separate: it swaps
+  the app, never the hubs.
 - **Private repo**: a plain download of an asset answers 404. install.sh
   and `bise update` (the daily check, `/restart latest`) then ask
   `gh release download` (the GitHub CLI, `gh auth login`), else the API
