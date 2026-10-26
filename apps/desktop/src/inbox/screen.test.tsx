@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { core_ev } from '@/proto/fixtures.gen';
 import { replay, Store, StoreProvider } from '@/store';
@@ -36,13 +36,9 @@ const mount = (node: React.ReactNode) => {
 };
 
 describe('the store-fed screens', () => {
-  it('settings read the prefs event and send prefs_set through the store; the nav moves the route', () => {
-    const { sent, router } = mount(<SettingsScreen page="quiet" />);
+  it('settings read the prefs event and send prefs_set through the store', () => {
+    const { sent } = mount(<SettingsScreen page="quiet" />);
     fireEvent.click(screen.getByTestId('settings.pref.quiet.share'));
     expect(sent).toEqual([{ cmd: 'prefs_set', key: 'quiet.share', value: false }]);
-    act(() => {
-      fireEvent.click(screen.getByTestId('settings.nav.models.open'));
-    });
-    expect(router.get()).toEqual({ screen: 'settings', page: 'models' });
   });
 });

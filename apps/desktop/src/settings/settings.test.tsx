@@ -120,13 +120,12 @@ describe('Settings', () => {
     expect(screen.getByTestId('settings.pref.quiet.call').getAttribute('aria-checked')).toBe('false');
   });
 
-  it('the nav goes to a page; esc goes back; an unknown page is general', () => {
+  it('esc goes back; an unknown page is general', () => {
     const p = ports();
     view('nope', p);
     expect(screen.getByTestId('settings.page.general')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('settings.nav.keys.open'));
     fireEvent.keyDown(screen.getByTestId('settings.root'), { key: 'Escape' });
-    expect(p.went).toEqual(['keys', 'back']);
+    expect(p.went).toEqual(['back']);
   });
 
   it("general: macOS notifications' row asks when never asked, opens System Settings when off or asked, says on, and is gone without the api", () => {

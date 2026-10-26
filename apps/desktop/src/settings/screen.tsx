@@ -20,6 +20,7 @@ import { useNotifyAuth } from '@/inbox';
 import { Settings } from './Settings';
 import { pageOf } from './pages';
 import { pickerPort } from './picker';
+import { leaveSettings } from './nav';
 import type { Prefs } from './prefs';
 
 /** The prefs event's value as an object (anything else: none yet). */
@@ -246,7 +247,7 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
           store.command({ cmd: 'sign_in_cancel', id });
         },
         back: () => {
-          router.back();
+          leaveSettings(router);
         },
         go: (p) => {
           router.go({ screen: 'settings', page: p });

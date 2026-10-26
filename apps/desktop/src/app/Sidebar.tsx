@@ -18,6 +18,7 @@ import { panel } from '@/proto/words_panel.gen';
 import { useAgents, useProjects, useStore } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { ArtLibrary } from '@/artifacts';
+import { SettingsNav } from '@/settings/nav';
 import { useWaitingCount } from '@/inbox/waiting';
 import { useEntityMenu } from './menus/use';
 import { useEntityAction } from './menus/actions';
@@ -143,8 +144,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         <Row kind="top" icon="search" name={frame.search} end={<kbd>⌘K</kbd>} onClick={onSearch} testId="app.side.search" />
       </div>
       {/* the swap is a crossfade (app.css .app-s-swap): a new key fades the other list in */}
-      <div className="app-s-swap" key={library ? 'library' : 'projects'}>
-        {library ? <LibraryList /> : <ProjectList />}
+      <div className="app-s-swap" key={library ? 'library' : route.screen === 'settings' ? 'settings' : 'projects'}>
+        {library ? <LibraryList /> : route.screen === 'settings' ? <SettingsNav /> : <ProjectList />}
       </div>
     </aside>
   );

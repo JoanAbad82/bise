@@ -1,6 +1,5 @@
-/* settings (src/settings, nm-settings): ds tokens only; the window's frame is the ds's .b-swin
-   (ds/css/settings.css), the whole window, its sidebar and its page scrolling apart */
-.settings-window { height: 100vh; overflow: hidden; }
+/* settings (src/settings, r2-settings): ds tokens only; the route's page and its nav are the ds's
+   .b-settings and .b-snav (ds/css/settings.css) */
 .settings-row-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
 /* settings › projects (projects.tsx, designer m_41841, m_43851): the rows in a box like every
    settings group (r 10, a hairline, rows 44 at 0 12, a hairline between them); the name, then its

@@ -49,7 +49,7 @@ export function webPreferences(surface: Surface, testMode: boolean): BrowserWind
  * Loads the renderer for `surface` (its URL says which: '?surface=window' or
  * '?surface=capsule', so tests and the guard tell the two pages apart:
  * qa-type m_9675), on `route` when given ('#route=<route>'). `own`: a window of its own
- * (openWindowOf: '?own=settings'), which never keeps its route as the main window's.
+ * (openWindowOf: '?own=artifact'), which never keeps its route as the main window's.
  */
 export function loadRenderer(win: BrowserWindow, surface: Surface, route: string | undefined, own?: WindowOpen['kind']): void {
   const hash = route === undefined || route === '' ? '' : `route=${encodeURIComponent(route)}`;
@@ -220,19 +220,16 @@ export class MainWindow {
   }
 }
 
-/** The settings window's size (page native-mac §6: its own window, ⌘,). */
-export const SETTINGS_SIZE = { width: 780, height: 600 } as const;
 /** An artifact's or an agent's own window, first open. */
 export const OWN_SIZE = { width: 1100, height: 760 } as const;
 
-/** Which open own window a WindowOpen goes to: settings has one, the others one per route. Pure. */
-export const ownKey = (to: WindowOpen): string => (to.kind === 'settings' ? 'settings' : `${to.kind}:${to.route}`);
+/** Which open own window a WindowOpen goes to: one per route. Pure. */
+export const ownKey = (to: WindowOpen): string => `${to.kind}:${to.route}`;
 
 /**
- * The windows of their own (window.bise.openWindow with a WindowOpen; bise fait mac): settings
- * (780 × 600, one at a time: opening it again brings it to the front on the asked page; the page
- * reopens on its last page itself, app/title.ts ownStart), an artifact, an agent's thread (one
- * window per route). The same renderer bundle as the main window, on that route, '?own=<kind>'.
+ * The windows of their own (window.bise.openWindow with a WindowOpen; bise fait mac): an
+ * artifact, an agent's thread (one window per route; settings is a route of the main window,
+ * r2-settings). The same renderer bundle as the main window, on that route, '?own=<kind>'.
  */
 export class OwnWindows {
   private readonly open_ = new Map<string, BrowserWindow>();
@@ -260,10 +257,9 @@ export class OwnWindows {
       return;
     }
     const test = this.testMode;
-    const size = to.kind === 'settings' ? SETTINGS_SIZE : OWN_SIZE;
     const win = new BrowserWindow({
-      ...size,
-      ...(to.kind === 'settings' ? { minWidth: SETTINGS_SIZE.width, minHeight: SETTINGS_SIZE.height, fullscreenable: false } : { minWidth: MAIN_SIZE.minWidth }),
+      ...OWN_SIZE,
+      minWidth: MAIN_SIZE.minWidth,
       ...(test || this.offscreen ? { x: OFF, y: OFF } : {}),
       show: false,
       ...(test ? { focusable: false } : {}),
@@ -291,9 +287,7 @@ export function windowTarget(raw: unknown): { readonly main: string | undefined 
   if (typeof raw === 'object' && raw !== null) {
     const r = raw as Record<string, unknown>;
     const kind = r['kind'];
-    if ((kind === 'settings' || kind === 'artifact' || kind === 'agent') && typeof r['route'] === 'string') return { own: { kind, route: r['route'] } };
+    if ((kind === 'artifact' || kind === 'agent') && typeof r['route'] === 'string') return { own: { kind, route: r['route'] } };
   }
-  // settings is a window of its own (nm-settings): the capsule's 'settings' (on its last page) or a 'settings/<page>'
-  if (typeof raw === 'string' && /^settings(\/|$)/u.test(raw)) return { own: { kind: 'settings', route: raw === 'settings' ? '' : raw } };
   return { main: typeof raw === 'string' ? raw : undefined };
 }

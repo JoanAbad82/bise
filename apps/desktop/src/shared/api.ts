@@ -401,7 +401,7 @@ export interface CapsuleApi {
 
 /** A window of its own (window.bise.openWindow): its kind and the route it opens on. */
 export interface WindowOpen {
-  readonly kind: 'settings' | 'artifact' | 'agent';
+  readonly kind: 'artifact' | 'agent';
   readonly route: string;
 }
 

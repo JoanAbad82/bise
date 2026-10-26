@@ -1,11 +1,12 @@
-// The settings window's content (route settings[/<page>], bise fait mac
-// mockup 10): the glass sidebar of pages, the bar with the page's title,
-// one page under it with its sentence as a lead line (no banner). Draws
+// A settings page (route settings[/<page>] of the main window, r2-settings;
+// the look of bise fait mac's mockup 10): the page with its sentence as a
+// lead line (no banner, no second title: the bar's crumb says it; the
+// pages' nav is the frame's sidebar, nav.tsx). Draws
 // what the core sends (prefs, accounts, his projects, the repos found) and
 // says what he changes through `send` (the core's AppCmd: prefs_set,
 // sign_in, provider_use, project_*); reads nothing itself (the store-fed
-// screen in screen.tsx gives it its props; window.tsx is the window).
-// Owner: nm-settings.
+// screen in screen.tsx gives it its props).
+// Owner: r2-settings.
 //
 // A switch flips at once: the value he set shows until the core's next
 // prefs (which carries it, or not when the core refused it).
@@ -13,10 +14,8 @@ import { useState } from 'react';
 import type { Account, AppCmd, Found, JsonValue, Model, Perm, ProjectRow, RoleRow } from '@/proto';
 import type { Held } from './hold';
 import type { ApprovalsCmd, ApprovalsEv } from './approvals';
-import { AppIcon, ListRow, type AppIconName } from '@/ds';
-import { settings } from '@/proto/words.gen';
 import { putPref, type Prefs } from './prefs';
-import { PAGES, PageBody, pageOf, type Page } from './pages';
+import { PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
 import type { Perms } from './check';
 import type { SignIn } from './accounts';
@@ -117,11 +116,11 @@ export function Settings({ page, ports, prefs, ...data }: SettingsProps) {
     setPend({ base: prefs, sets: [...sets, [key, value]] });
     ports.send({ cmd: 'prefs_set', key, value });
   };
-  // the window (mockup 10): the glass sidebar under the lights, the bar with the page's title, the
-  // page on the solid ground; no banner, the page's sentence as its lead line
+  // a route of the main window (r2-settings, designer m_44311): its nav is the frame's sidebar
+  // (nav.tsx), the bar's crumb says the page; here the page alone, its sentence as its lead line
   return (
     <section
-      className="b-swin"
+      className="b-settings"
       data-testid="settings.root"
       tabIndex={-1}
       onKeyDown={(e) => {
@@ -132,45 +131,10 @@ export function Settings({ page, ports, prefs, ...data }: SettingsProps) {
         }
       }}
     >
-      <nav className="b-swin-side" aria-label={settings.nav_label} data-testid="settings.nav">
-        {PAGES.map((p) => (
-          <ListRow
-            key={p.id}
-            title={p.title}
-            state={
-              <span className="b-swin-tile">
-                <AppIcon name={PAGE_ICON[p.id]} size={14} />
-              </span>
-            }
-            on={p.id === at.id}
-            onClick={() => {
-              ports.go(p.id);
-            }}
-            testId={`settings.nav.${p.id}`}
-          />
-        ))}
-      </nav>
-      <header className="b-swin-bar" data-testid="settings.bar">
-        <h1 className="b-swin-title">{at.title}</h1>
-      </header>
-      <div className="b-swin-page" data-testid={`settings.page.${at.id}`}>
-        <p className="b-swin-lead">{at.sub}</p>
+      <div className="b-settings-page" data-testid={`settings.page.${at.id}`}>
+        <p className="b-settings-lead">{at.sub}</p>
         <PageBody page={at.id} prefs={shown} setPref={setPref} data={{ ...data, prefs: shown }} ports={ports} />
       </div>
     </section>
   );
 }
-
-/** Each page's tile in the sidebar (mockup 10). */
-const PAGE_ICON: Record<Page, AppIconName> = {
-  general: 'settings',
-  setup: 'check',
-  voice: 'mic',
-  privacy: 'eye',
-  quiet: 'moon',
-  models: 'cpu',
-  approvals: 'shield',
-  projects: 'folder',
-  computer: 'cursor',
-  keys: 'keyboard',
-};

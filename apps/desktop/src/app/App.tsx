@@ -21,8 +21,7 @@ import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
 import { useFnVoice } from '@/voicemode';
-import { SettingsWindow } from '@/settings/window';
-import { toMainWindow, toSettingsWindow } from '@/settings/where';
+import { SettingsScreen } from '@/settings';
 import { useSetupFirstOpens } from '@/settings/setup-first';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
 import { paletteOpen } from '@/setup/useTour';
@@ -76,8 +75,7 @@ import { useKissWatch } from './Marks';
 import { StoreEdge } from './edge';
 
 export function App() {
-  // settings has a window of its own (nm-settings' settings/where.ts): each window sends the other its routes
-  const [router] = useState(() => createRouter(firstRoute(), sessionHistory(), ownWindow() === 'settings' ? toMainWindow() : toSettingsWindow()));
+  const [router] = useState(() => createRouter(firstRoute(), sessionHistory()));
   // the window reopens where he left it, after a reload, an update swap or the next day (m_11763);
   // its back and forward places come back after a reload only (the window's session)
   useEffect(() => {
@@ -99,7 +97,7 @@ export function App() {
     <RouterContext value={router}>
       {/* the store's machine's effects run here, the one edge (edge.tsx) */}
       <StoreEdge />
-      {ownWindow() === 'settings' ? <SettingsWindow /> : <Shell />}
+      <Shell />
     </RouterContext>
   );
 }
@@ -110,14 +108,8 @@ export function App() {
  * closed, amb-mac 339d3e5e) is bise's thread with the panel shown.
  */
 function firstRoute(): Route {
-  // the settings window reopens on its last page; an artifact's or an agent's on its route (own.ts)
-  const own = ownWindow();
-  if (own !== undefined) {
-    const asked = startRouteOf(window.location.hash);
-    // a page asked (/model, a settings link) wins over the one he left
-    if (own === 'settings') return asked ?? keptRoute('route.settings') ?? { screen: 'settings' };
-    return asked ?? { screen: 'bise' };
-  }
+  // an artifact's or an agent's own window opens on its route (own.ts)
+  if (ownWindow() !== undefined) return startRouteOf(window.location.hash) ?? { screen: 'bise' };
   if (TERMINAL.test(window.location.hash)) {
     panel.show();
     return { screen: 'bise' };
@@ -156,8 +148,8 @@ function sessionHistory(): SavedHistory | undefined {
 }
 
 /** Where he was when the window last closed (keep.ts), unless that was a test lab. */
-function keptRoute(key = 'route'): Route | undefined {
-  const s = keep.view(key);
+function keptRoute(): Route | undefined {
+  const s = keep.view('route');
   if (typeof s !== 'string' || s === '') return undefined;
   const r = parseRoute(s);
   return r.screen === 'notfound' || r.screen === 'lab' ? undefined : r;
@@ -410,6 +402,9 @@ function ScreenOf({ route }: { route: Route }) {
     case 'report':
       // the last crash report (CoreLine's 'show the report')
       return <ReportScreen log={route.log} />;
+    case 'settings':
+      // a route of the main window (r2-settings, his m_44293): its nav in the frame's sidebar
+      return <SettingsScreen page={route.page} />;
     case 'onboarding':
       return <OnboardingScreen />;
     case 'lab':

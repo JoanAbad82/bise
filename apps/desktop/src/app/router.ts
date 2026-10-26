@@ -6,9 +6,7 @@
 // move to the route already shown does nothing (no new history step, no
 // listener call), so a deep link sent twice never stacks. 50 places per
 // window; App.tsx keeps the stack in the window's sessionStorage, so a
-// reload gives it back and a relaunch starts fresh. A route another window
-// shows (its Outside: settings has its own window, settings/where.ts) goes
-// there, and this window's place and history stay as they were.
+// reload gives it back and a relaunch starts fresh.
 import { createContext, useContext, useSyncExternalStore } from 'react';
 import { formatRoute, parseRoute, type Route, sameRoute } from './route';
 
@@ -59,36 +57,19 @@ export function stepOf(from: Route, to: Route): 'none' | 'replace' | 'push' {
  * reload, a relaunch, a deep link); the session only adds what was behind and ahead of it. The
  * session's place is the start route: its past and future come back. Another start route (a
  * deep link, a notification): it is a new step after the session's place, nothing ahead. Bad
- * strings drop out, and so do the routes another window shows (`elsewhere`: the main window's old
- * settings steps). Pure.
+ * strings drop out. Pure.
  */
-export function restoreHistory(start: Route, saved: SavedHistory | undefined, elsewhere?: (r: Route) => boolean): { past: Route[]; future: Route[] } {
+export function restoreHistory(start: Route, saved: SavedHistory | undefined): { past: Route[]; future: Route[] } {
   if (saved === undefined) return { past: [], future: [] };
-  const routes = (xs: readonly string[]) => xs.map(parseRoute).filter((r) => r.screen !== 'notfound' && r.screen !== 'lab' && elsewhere?.(r) !== true);
+  const routes = (xs: readonly string[]) => xs.map(parseRoute).filter((r) => r.screen !== 'notfound' && r.screen !== 'lab');
   const [was] = routes([saved.now]);
   if (was !== undefined && sameRoute(was, start)) return { past: routes(saved.past).slice(-DEPTH), future: routes(saved.future).slice(0, DEPTH) };
   const past = was === undefined ? routes(saved.past) : [...routes(saved.past), was];
   return { past: past.slice(-DEPTH), future: [] };
 }
 
-/**
- * Where a route another window shows goes instead (bise fait mac: settings has its own window, the
- * settings window sends the rest to the main window): `elsewhere` says it is not this window's,
- * `send` takes it there. This window's history never holds it.
- */
-export interface Outside {
-  readonly elsewhere: (r: Route) => boolean;
-  readonly send: (r: Route) => void;
-}
-
-export function createRouter(start: Route, saved?: SavedHistory, outside?: Outside): Router {
-  let { past, future } = restoreHistory(start, saved, outside?.elsewhere);
-  // a move to another window's route goes there; this window stays where it is
-  const away = (r: Route): boolean => {
-    if (outside?.elsewhere(r) !== true) return false;
-    outside.send(r);
-    return true;
-  };
+export function createRouter(start: Route, saved?: SavedHistory): Router {
+  let { past, future } = restoreHistory(start, saved);
   let now = start;
   const listeners = new Set<() => void>();
   const emit = () => {
@@ -112,7 +93,6 @@ export function createRouter(start: Route, saved?: SavedHistory, outside?: Outsi
   return {
     get: () => now,
     go(r) {
-      if (away(r)) return;
       const step = stepOf(now, r);
       if (step === 'none') return;
       if (step === 'push') {
@@ -123,7 +103,7 @@ export function createRouter(start: Route, saved?: SavedHistory, outside?: Outsi
       emit();
     },
     replace(r) {
-      if (away(r) || sameRoute(r, now)) return;
+      if (sameRoute(r, now)) return;
       now = r;
       emit();
     },

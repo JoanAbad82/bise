@@ -364,8 +364,8 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     </div>
   ),
   settings: () => (
-    // a settings group (the window's own frame is settings/Settings.tsx, nm-settings)
-    <div className="b-swin-page">
+    // a settings group (the route's page is settings/Settings.tsx)
+    <div className="b-settings">
       <Group title="Appearance" testId="ds.group" items={[
         { id: "theme", label: "theme", control: <Seg items={["system", "dark", "light"]} on={0} /> },
         { id: "sounds", label: "sounds", sub: "a soft tick when an agent needs you", control: <Toggle on /> },
