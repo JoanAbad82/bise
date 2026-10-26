@@ -173,12 +173,14 @@
   color: var(--c-text-2);
 }
 
-/* a beat's name label (camera.ts, designer m_43213): over the followed bim, which the camera puts
-   at the island's middle (`top`: that middle); its bottom 16 above it, so the bim's head shows */
+/* a beat's name label (camera.ts, designer m_43213, m_44998): over its bim's head on the whole map
+   (World.tsx beatPlace: `left`, `top`); its bottom 4 above it, so the head shows */
 .s3-beat {
   position: absolute;
   left: 50%;
-  transform: translate(-50%, calc(-100% - var(--s-4)));
+  /* its bottom 4 over the bim's head on the 148 map (the 16 of the old zoomed camera floated it
+     off the bim, ui-review m_45360) */
+  transform: translate(-50%, calc(-100% - var(--s-1)));
   display: inline-flex;
   align-items: center;
   gap: var(--s-1);
@@ -238,6 +240,9 @@
   /* the coin's side, px */
   --s3-coin-h: 3px;
   position: absolute;
+  /* its own stacking context: its pills stack inside the coin, so the grown world (z 1) draws over
+     the whole coin, pills too (ui-review m_45360) */
+  z-index: 0;
   /* on the world's right edge: the objects and the pills keep 24 from the 92 band's left (d3) */
   right: var(--s-3);
   box-sizing: border-box;
