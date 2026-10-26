@@ -951,6 +951,7 @@ pub(crate) fn closed_word(res: &str) -> String {
         "vue" => thread::closed_seen.into(),
         "reprise" => thread::closed_resumed.into(),
         "task stopped" => thread::closed_stopped.into(),
+        "handed to main" => thread::closed_handed("main"),
         "" => thread::closed_answered.into(),
         r => r.to_string(),
     }

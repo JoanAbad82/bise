@@ -61,26 +61,39 @@ fn an_agent_says_where_it_works() {
     let _ = std::fs::remove_dir_all(&wt);
 }
 
-/// A feature's try that did not go through (the rebase conflicts, the
-/// feature is busy): the item opens again with why on it, under a new
-/// number (both apps show it again), and the old one closes with that line.
+/// brief-feature-merge: his merge, try or drop that did not go through
+/// (a conflict, a red check, a race): his item closes once, `handed to
+/// main`, no item opens, and main gets exactly one message, the brief.
+/// An agent's own `sb feature` that failed (no handoff, a feed line)
+/// sends nothing and touches no item.
 #[test]
-fn a_refused_feature_answer_says_why_on_its_item() {
-    let mut t = T::new();
-    let place = crate::feature::place_id("bims");
-    let text = "bims is ready to try\n24 commits on bims\n\n1. try it\n2. show the diff\n3. not yet";
-    let open = ci::CardOpen { kind: "feature_try".into(), agent: MAIN.into(), text: text.into(), place: Some(place.clone()), pr: None };
-    let mut fx = Vec::new();
-    t.hub.core(&mut fx, &mut t.env, None, In::CardOpen(open));
-    let id = *t.hub.st.cards.keys().max().unwrap();
-    let why = crate::feature::refused_line("try", "a.txt changed on main too: the rebase of bims conflicts");
-    t.go(Input::Feature(FeatureDone { name: "bims".into(), refused: Some(why.clone()), ..FeatureDone::default() }));
-    assert!(!t.hub.st.cards.contains_key(&id), "the old item closed");
-    let open: Vec<_> = t.hub.st.open_cards().collect();
-    assert_eq!(open.len(), 1, "{open:?}");
-    let c = open[0];
-    assert_eq!((c.kind.as_str(), c.place.as_deref()), ("feature_try", Some(place.as_str())));
-    assert!(c.id > id && c.text.contains(&why) && c.text.ends_with("3. not yet"), "{}", c.text);
+fn a_failed_feature_answer_is_handed_to_main_once() {
+    for (kind, op) in [("feature_merge", "merge"), ("feature_try", "try"), ("feature_merge", "drop")] {
+        let mut t = T::new();
+        let place = crate::feature::place_id("bims");
+        let text = "merge bims into main?\n3 commits.\n\n1. merge\n2. keep working\n3. drop the branch";
+        let open = ci::CardOpen { kind: kind.into(), agent: MAIN.into(), text: text.into(), place: Some(place.clone()), pr: None };
+        t.hub.core(&mut Vec::new(), &mut t.env, None, In::CardOpen(open));
+        let id = *t.hub.st.cards.keys().max().unwrap();
+        let msgs = |t: &T| t.hub.st.msgs().values().filter(|m| m.to == MAIN).map(|m| m.text.clone()).collect::<Vec<_>>();
+        let before = msgs(&t).len();
+        // an agent's own step failed: its stream said it; nothing here
+        let line = Some(Feed::warn("bims: sync did not go through: x"));
+        t.go(Input::Feature(FeatureDone { name: "bims".into(), line, ..FeatureDone::default() }));
+        assert!(t.hub.st.cards.contains_key(&id), "{op}: the item stays");
+        assert_eq!(msgs(&t).len(), before, "{op}: no message");
+        // his answer failed
+        let brief = format!("the user picked '{op}' on feature bims at ...");
+        let fx = t.go(Input::Feature(FeatureDone { name: "bims".into(), handoff: Some(brief.clone()), ..FeatureDone::default() }));
+        assert!(!t.hub.st.cards.contains_key(&id), "{op}: the item closed");
+        assert_eq!(t.hub.st.open_cards().count(), 0, "{op}: nothing opens again");
+        let got = msgs(&t);
+        assert_eq!(got.len(), before + 1, "{op}: one message: {got:?}");
+        assert!(got.iter().any(|m| m.contains(&brief)), "{op}: the brief: {got:?}");
+        let closed = recs_of(&fx, MAIN, "card-closed");
+        assert_eq!(closed.len(), 1, "{op}: closed once: {closed:?}");
+        assert_eq!((closed[0]["id"].as_u64(), closed[0]["res"].as_str()), (Some(id), Some(crate::feature::HANDED)), "{op}: {closed:?}");
+    }
 }
 
 // moved from core_tests.rs (hub-loop: its line count)
@@ -209,12 +222,10 @@ fn a_feature_item_runs_his_answer_until_its_step_ends() {
     // another feature's step ends: still his merge
     t.go(Input::Feature(FeatureDone { name: "other".into(), ..FeatureDone::default() }));
     assert_eq!(running(&mut t, id), Some(true));
-    // it fails (or the shell refused it: busy): the item it opens again runs nothing
-    let why = crate::feature::refused_line("merge", "the rebase of cu on main failed");
-    t.go(Input::Feature(FeatureDone { name: "cu".into(), refused: Some(why), ..FeatureDone::default() }));
+    // it fails: handed to main, the item closed in the same step
+    t.go(Input::Feature(FeatureDone { name: "cu".into(), handoff: Some("brief".into()), ..FeatureDone::default() }));
     assert_eq!(running(&mut t, id), None, "closed");
-    let again = *t.hub.st.cards.keys().max().unwrap();
-    assert_eq!(running(&mut t, again), Some(false));
+    assert!(t.hub.running_cards().is_empty(), "nothing runs");
     // a try: running until its step ends with the merge item
     let try_id = open(&mut t, "feature_try");
     t.user(MAIN, &format!("/answer {} 1", try_id));

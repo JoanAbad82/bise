@@ -142,6 +142,43 @@ def main():
         w.wait(lambda: feat("cu") is None, 30, "no feature row left")
         c.wait_idle("main")
 
+        # brief-feature-merge: a feature that merged main in (a conflict
+        # resolved), then main moves on the same file: his merge pick
+        # conflicts. His item closes `handed to main`, main gets the brief,
+        # nothing asks him again; fixed in the feature, merged as a merge
+        # commit (first parent: main's tip)
+        c.say("[[bash: sb feature new mf]]")
+        c.wait_line("main", "mf is a feature", 60)
+        c.wait_idle("main")
+        sh(E.ws, "git worktree add -q ../mf-wt mf && cd ../mf-wt && echo mine > conf && git add conf && git commit -qm 'mf conf'")
+        sh(E.ws, "echo theirs > conf && git add conf && git commit -qm 'main conf'")
+        sh(E.ws, "cd ../mf-wt && (git merge -q main -m x || true) && echo resolved > conf && git commit -qam 'merge main into mf'")
+        c.say("[[bash: sb feature ready mf]]")
+        c.wait(lambda: card(c, "feature_try") is not None, 60, "mf's try item")
+        c.wait_idle("main")
+        c.say("/answer %d 1" % card(c, "feature_try")["id"])
+        c.wait(lambda: card(c, "feature_merge") is not None, 60, "mf's merge item")
+        mm = card(c, "feature_merge")
+        c.wait_idle("main")
+        sh(E.ws, "echo theirs2 > conf && git commit -qam 'main conf again'")
+        before_mf = out(E.ws, "git rev-parse main")
+        c.say("/answer %d 1" % mm["id"])
+        c.wait_line("main", "the user picked 'merge' on feature mf", 90)
+        c.wait(lambda: card(c, "feature_merge") is None, 30, "his merge item closed")
+        check(card(c, "feature_try") is None and card(c, "feature_merge") is None, "no item opens again: %r" % c.cards())
+        c.wait_line("main", "handed to main", 30)
+        check(out(E.ws, "git rev-parse main") == before_mf, "main did not move")
+        c.wait_idle("main")
+        # fixed in the feature (main merged in, resolved); main merges again
+        sh(E.ws, "cd ../mf-wt && (git merge -q main -m y || true) && echo final > conf && git commit -qam 'merge main into mf again'")
+        c.say("[[bash: sb feature merge mf]]")
+        c.wait_line("main", "✓ mf merged into main", 90)
+        check(out(E.ws, "git rev-parse main^1") == before_mf, "a merge commit, first parent main's tip")
+        check(out(E.ws, "git show main:conf") == "final", "the feature's resolution kept")
+        check(card(c, "feature_merge") is None, "still no item")
+        sh(E.ws, "git worktree remove --force ../mf-wt")
+        c.wait_idle("main")
+
         # a feature dropped (main runs it on the user's word)
         c.say("[[bash: sb feature new exp && git -C %s commit -q --allow-empty -m tmp]]" % E.ws)
         c.wait_line("main", "exp is a feature", 60)

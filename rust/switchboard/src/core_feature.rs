@@ -2,7 +2,8 @@
 //! (`feature_done`: its items, the agents a merge or a drop archives, the
 //! agents a retire moves to the trunk through sb-core's `feature_retire`),
 //! the user's numbers on a feature item (refused or failed: the item
-//! opens again with why on it), the live agents of a feature,
+//! closes `handed to main`, and main gets one message with a ready
+//! brief, `feature::handoff`; nothing opens again), the live agents of a feature,
 //! the worktree of `sb spawn --feature`, and where an agent lands
 //! ([`onto`]: the land job's target, read again by a land that waited
 //! behind a retire). Git runs in daemon/features.rs, never here.
@@ -25,8 +26,10 @@ pub struct FeatureDone {
     pub ack: Option<feature::Ack>,
     /// a record for main's feed (`info`, `warn`).
     pub line: Option<Feed>,
-    /// His answer didn't go through: its open items open again with this line on them.
-    pub refused: Option<String>,
+    /// His answer didn't go through: its open items close as
+    /// [`feature::HANDED`], and main (their agent) gets this brief
+    /// ([`feature::handoff`]); nothing opens again.
+    pub handoff: Option<String>,
 }
 
 /// Where `sb land` puts a worktree agent's commits: its feature's branch,
@@ -69,19 +72,21 @@ impl Hub {
                 self.close_card(fx, env, id, &res);
             }
         }
-        // his answer did not go through: the item says why, as a new item
-        // (its number changes: both apps show it again)
-        if let Some(why) = &d.refused {
-            let open: Vec<(u64, String, String)> = self
+        // his answer did not go through: his item closes, handed over in
+        // one message to its agent (main), which decides what follows;
+        // nothing asks him the same thing again (#780 -> #782 -> #789)
+        if let Some(brief) = &d.handoff {
+            let open: Vec<(u64, String)> = self
                 .st
                 .open_cards()
                 .filter(|c| c.place.as_deref() == Some(place.as_str()))
-                .map(|c| (c.id, c.kind.clone(), crate::feature::with_refusal(&c.text, why)))
+                .map(|c| (c.id, c.agent.clone()))
                 .collect();
-            for (id, kind, text) in open {
-                self.close_card(fx, env, id, why);
-                self.open_card(fx, env, merge::HubItem { kind: &kind, agent: MAIN, text: &text, place: &place, pr: None });
+            let to = open.first().map(|(_, a)| a.clone()).unwrap_or_else(|| MAIN.to_string());
+            for (id, _) in open {
+                self.close_card(fx, env, id, crate::feature::HANDED);
             }
+            self.core(fx, env, None, In::HubMsg(ci::HubMsg { to, text: brief.clone() }));
         }
         if let Some((kind, text)) = &d.open {
             self.open_card(

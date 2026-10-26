@@ -4,7 +4,10 @@
 //! and the try build run in a thread, in line on the land queue (the
 //! feature's lands wait meanwhile; a merge waits for main's line too);
 //! the registry and the facts are shared with those threads; the end
-//! comes back to the hub as `Input::Feature`. The typed `features` rows
+//! comes back to the hub as `Input::Feature`. His answer waits its turn
+//! behind a step already running (an agent's `sb feature` is refused
+//! then); when it fails, the end carries `feature::handoff`'s brief for
+//! main ([`handed`]), never a re-asked item. The typed `features` rows
 //! (bar A.6, `proto_view::features`) read the same registry and facts,
 //! never git, on the loop (`daemon/proto.rs` sends them).
 
@@ -25,8 +28,10 @@ struct Inner {
     facts: BTreeMap<String, Facts>,
     /// Try builds running, by feature.
     building: BTreeSet<String>,
-    /// A step running, by feature: one at a time per feature.
-    busy: BTreeSet<String>,
+    /// The steps running or waiting, by feature: an agent's `sb feature`
+    /// is refused while any runs; his answer waits its turn (the
+    /// feature's land turn, which every git step takes).
+    busy: BTreeMap<String, usize>,
     /// The trunk's short name at the last refresh ("" before it).
     main: String,
     /// When the last refresh began (ms; 0: never).
@@ -148,7 +153,7 @@ struct Job {
 }
 
 /// A step's end: the agent's answer (ok, text) and the hub's part.
-type Out = Result<(String, FeatureDone), String>;
+type Out = Result<(String, FeatureDone), feature::Failed>;
 
 impl Shell {
     /// `Effect::Feature`: checks on the loop (no git), the step in a thread.
@@ -156,16 +161,18 @@ impl Shell {
         let mut stream = token.and_then(|t| self.replies.remove(&t));
         let flow = FlowConfig::load(&self.opts.paths);
         // an agent's refusal is its answer; the user's (an item's number)
-        // goes on the item, with why
+        // is handed to main with a brief, his item closed
         let tx = self.tx.clone();
-        let (op_, name_) = (op.clone(), name.clone());
+        let (op_, name_, agents_) = (op.clone(), name.clone(), agents.clone());
+        let picked = crate::util::now_ms();
         let refuse = |stream: &mut Option<std::os::unix::net::UnixStream>, e: String| match stream.as_mut() {
             Some(s) => {
                 write_json(s, &json!({"ok": false, "error": e}));
             }
             None => {
-                let refused = Some(feature::refused_line(&op_, &e));
-                let _ = tx.send(Msg::input(Input::Feature(FeatureDone { name: name_.clone(), refused, ..FeatureDone::default() })));
+                let failed = feature::Failed::Other(e);
+                let d = handed(&op_, &name_, &agents_, picked, None, &failed);
+                let _ = tx.send(Msg::input(Input::Feature(d)));
             }
         };
         if op == "list" || (op.is_empty() && name.is_empty()) {
@@ -196,10 +203,11 @@ impl Shell {
         }
         {
             let mut g = self.features.lock();
-            if !g.busy.insert(name.clone()) {
+            if stream.is_some() && g.busy.get(&name).is_some_and(|n| *n > 0) {
                 drop(g);
                 return refuse(&mut stream, format!("{} is busy (a sync, a try or a merge runs): try again when it ends", name));
             }
+            *g.busy.entry(name.clone()).or_default() += 1;
             if op == "try" {
                 g.building.insert(name.clone());
             }
@@ -225,7 +233,12 @@ impl Shell {
             let res = step(&job);
             {
                 let mut g = job.features.lock();
-                g.busy.remove(&job.name);
+                if let Some(n) = g.busy.get_mut(&job.name) {
+                    *n = n.saturating_sub(1);
+                    if *n == 0 {
+                        g.busy.remove(&job.name);
+                    }
+                }
                 g.building.remove(&job.name);
             }
             job.features.refresh(&job.shared);
@@ -238,12 +251,16 @@ impl Shell {
                 }
                 Err(e) => {
                     if let Some(s) = stream.as_mut() {
-                        write_json(s, &json!({"ok": false, "error": e}));
+                        write_json(s, &json!({"ok": false, "error": e.to_string()}));
                     }
-                    // the user's answer failed: main hears it, the item waits
-                    let line = (!job.asked).then(|| Feed::warn(format!("{}: {} did not go through: {}", job.name, job.op, e)));
-                    let refused = (!job.asked).then(|| feature::refused_line(&job.op, &e));
-                    FeatureDone { name: job.name.clone(), line, refused, ..FeatureDone::default() }
+                    if job.asked {
+                        FeatureDone { name: job.name.clone(), ..FeatureDone::default() }
+                    } else {
+                        // the user's answer failed: his item closes, main gets the brief
+                        let mut d = handed(&job.op, &job.name, &job.agents, picked, Some(&job.shared), &e);
+                        d.line = Some(Feed::warn(format!("{}: {} did not go through: {}", job.name, job.op, e)));
+                        d
+                    }
                 }
             };
             let _ = job.tx.send(Msg::input(Input::Feature(done)));
@@ -278,6 +295,23 @@ impl Shell {
             let _ = tx.send(Msg::Land { line: None });
         });
     }
+}
+
+/// His answer on feature `name`'s item failed (`failed`): the hub closes
+/// the item and hands it to main with [`feature::handoff`]'s brief
+/// (`shared`: the repo, for the tips; None: not read).
+fn handed(op: &str, name: &str, agents: &[(String, String)], picked_ms: u64, shared: Option<&Path>, failed: &feature::Failed) -> FeatureDone {
+    let (trunk, base, tip) = match shared {
+        Some(s) => {
+            let main = crate::trunk::trunk_ref(s).unwrap_or_default();
+            let tip = |r: &str| crate::land::git(s, &["rev-parse", "--verify", r]).map(|t| crate::land::shorten(s, &t)).unwrap_or_default();
+            (main_short(s), tip(&main), tip(&format!("refs/heads/{}", name)))
+        }
+        None => ("main".to_string(), String::new(), String::new()),
+    };
+    let agents: Vec<String> = agents.iter().map(|(a, _)| a.clone()).collect();
+    let h = feature::Handoff { op, name, trunk: &trunk, base: &base, tip: &tip, picked_ms, failed, agents: &agents };
+    FeatureDone { name: name.to_string(), handoff: Some(feature::handoff(&h)), ..FeatureDone::default() }
 }
 
 fn main_short(shared: &Path) -> String {
@@ -361,7 +395,7 @@ fn step(job: &Job) -> Out {
             job.features.update(&job.state, name, |f| f.checked = job.flow.check.as_ref().map(|_| tip.clone()));
             let f = feature::facts(&job.shared, &format!("refs/heads/{}", main), name)?;
             if f.ahead == 0 {
-                return Err(format!("{} has no commit that {} lacks: nothing to try", name, main));
+                return Err(format!("{} has no commit that {} lacks: nothing to try", name, main).into());
             }
             let mut d = done();
             d.open = Some((feature::TRY.into(), feature::try_text(name, &f, &main, job.flow.check.is_some())));
@@ -464,7 +498,7 @@ fn step(job: &Job) -> Out {
             Ok((line, d))
         }
         "retire" => retire(job, &feature_ref, &place, &main),
-        op => Err(format!("unknown feature step: {}", op)),
+        op => Err(format!("unknown feature step: {}", op).into()),
     }
 }
 
@@ -488,7 +522,7 @@ fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
     if branch {
         let missing = feature::missing(&job.shared, &trunk, name)?;
         if missing > 0 {
-            return Err(feature::retire_refusal(name, main, missing));
+            return Err(feature::retire_refusal(name, main, missing).into());
         }
     }
     let known = job.features.names().iter().any(|n| n == name);
@@ -499,7 +533,7 @@ fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
     };
     if !branch && !known && job.agents.is_empty() {
         return match kept.is_empty() {
-            true => Err(format!("no feature {}: `sb feature` lists them", name)),
+            true => Err(format!("no feature {}: `sb feature` lists them", name).into()),
             false => {
                 let d = FeatureDone { name: name.to_string(), ..FeatureDone::default() };
                 Ok((format!("{} is retired already (its branch is {}): nothing left to do.", name, kept), d))
@@ -517,7 +551,7 @@ fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
             ..FeatureDone::default()
         };
         if job.tx.send(Msg::input(Input::Feature(step))).is_err() || rx.recv().is_err() {
-            return Err("the hub stopped before the retire: nothing changed; run it again".into());
+            return Err(feature::Failed::Other("the hub stopped before the retire: nothing changed; run it again".into()));
         }
         did.push(match job.agents.len() {
             0 => "no live agent to move".to_string(),

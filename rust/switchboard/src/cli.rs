@@ -139,7 +139,7 @@ pub const COMMANDS: &[CmdDoc] = &[
     cmd(
         "sb feature [new|sync|ready|merge|drop|retire|list] <name>",
         Who::Main,
-        "feature branches (trunk flow): `new` a local branch from main's tip (an existing local branch is adopted), never pushed; `sync` rebases it on main and moves its agents' worktrees; `ready` runs the check and opens the user's \"ready to try\" item; `merge` (only on the user's go) rebases, checks, fast-forwards main, pushes, archives its agents; `drop` (only on the user's word) deletes it, its tip kept in refs/switchboard/trash/; `retire` ends a feature already inside main (refused otherwise): its agents stay and land on main from then on, the branch renamed <name>-retired. No argument: the list.",
+        "feature branches (trunk flow): `new` a local branch from main's tip (an existing local branch is adopted), never pushed; `sync` rebases it on main (merges main in when it holds merges) and moves its agents' worktrees; `ready` runs the check and opens the user's \"ready to try\" item; `merge` (only on the user's go) rebases (a feature that holds merges: one merge commit, never a rebase), checks, moves main, pushes, archives its agents; `drop` (only on the user's word) deletes it, its tip kept in refs/switchboard/trash/; `retire` ends a feature already inside main (refused otherwise): its agents stay and land on main from then on, the branch renamed <name>-retired. No argument: the list.",
     ),
     cmd(
         "sb move <agent> new|shared|<agent>|<branch>",

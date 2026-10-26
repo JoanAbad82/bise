@@ -15,6 +15,14 @@
 //!   `feature`, id `feature:<name>`.
 //! - The registry (`<state>/features.json`) keeps what git does not: when
 //!   it was made, the tip the check last passed on, the last try.
+//! - Sync and merge ([`rebase`], [`merge`]): a rebase on main, but a
+//!   feature that holds merges ([`has_merges`]: it merged main in) gets
+//!   main merged into it, and lands as one merge commit (`merge --no-ff`,
+//!   first parent main's tip): never a rebase of its merges, nor
+//!   `--rebase-merges`. A race on a ref: once more, then [`Failed::Moved`].
+//! - His answer that failed is never asked again: the hub closes its item
+//!   [`HANDED`] and main gets [`handoff`]'s ready brief
+//!   (brief-feature-merge, #780 -> #782 -> #789).
 //!
 //! THE CONTRACT (with the TUI and pr-merge, docs/dev-flow.md §5.1, §7):
 //! - the place id [`place_id`] (`feature:<name>`), the card kinds
@@ -189,47 +197,130 @@ pub fn create(shared: &Path, name: &str, now: u64) -> Result<Feature, String> {
     Ok(Feature { name: name.into(), base, created_ms: now, ..Feature::default() })
 }
 
-/// The feature rebased on main in a scratch worktree, the check run
-/// there (`check`), then the branch moved (compare-and-swap). None:
-/// already on main's tip. Some(old tip, new tip).
-pub fn rebase(shared: &Path, scratch: &Path, name: &str, check: Option<&str>) -> Result<Option<(String, String)>, String> {
-    rebase_then(shared, scratch, name, check, &mut |_, _| Ok(()))
+/// Why a feature step failed: the words the agent's `sb feature` reads
+/// (its `Display`), and what the brief handed to main says
+/// ([`handoff`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Failed {
+    /// The rebase or the merge conflicts: these files, and the line.
+    Conflicts { files: Vec<String>, line: String },
+    /// The check (or the repo's land check) failed: its words, the tail of its output.
+    Check(String),
+    /// A branch moved meanwhile (the compare-and-swap), twice.
+    Moved(String),
+    Other(String),
 }
 
-/// [`rebase`], with `verify(base, new tip)` before the branch moves (a
-/// merge's land check): an Err there moves nothing.
-fn rebase_then(
+impl Failed {
+    pub fn line(&self) -> &str {
+        match self {
+            Failed::Conflicts { line, .. } | Failed::Check(line) | Failed::Moved(line) | Failed::Other(line) => line,
+        }
+    }
+}
+
+impl std::fmt::Display for Failed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.line())
+    }
+}
+
+impl From<String> for Failed {
+    fn from(e: String) -> Failed {
+        Failed::Other(e)
+    }
+}
+
+/// Whether feature `name` holds merge commits the trunk (`main`, a ref)
+/// lacks (it merged main in, native-mac did): it then syncs and lands by
+/// merges, never by a rebase (which fails on the merge's conflicts again,
+/// or brings back what the merge deleted; never `--rebase-merges`
+/// either, which re-resolves every conflict).
+pub fn has_merges(shared: &Path, main: &str, name: &str) -> Result<bool, String> {
+    let range = format!("{}..{}", main, branch_ref(name));
+    Ok(!git(shared, &["rev-list", "--merges", "-n1", &range])?.is_empty())
+}
+
+/// Which way main and the feature meet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum How {
+    /// main into the feature, the feature's ref moves (`sb feature sync`, a try).
+    Sync,
+    /// the feature onto main, then main moves ([`merge`]).
+    Merge,
+}
+
+/// The feature synced on main in a scratch worktree (rebased; merged
+/// when it holds merges: [`has_merges`]), the check run there (`check`),
+/// then the branch moved (compare-and-swap; a race: once more on the new
+/// tips, then [`Failed::Moved`]). None: already on main's tip. Some(old
+/// tip, new tip).
+pub fn rebase(shared: &Path, scratch: &Path, name: &str, check: Option<&str>) -> Result<Option<(String, String)>, Failed> {
+    again_once(|| integrate(shared, scratch, name, check, How::Sync, &mut |_, _| Ok(())))
+}
+
+/// `f`, once more when a branch moved under it.
+fn again_once<T>(mut f: impl FnMut() -> Result<T, Failed>) -> Result<T, Failed> {
+    match f() {
+        Err(Failed::Moved(_)) => f(),
+        r => r,
+    }
+}
+
+/// [`rebase`]'s one try, `how`, with `verify(base, new tip)` before a
+/// ref moves (a merge's land check): an Err there moves nothing. A
+/// rebase moves the feature (a Sync, or a Merge before main
+/// fast-forwards to it); a Merge of a feature with merges moves nothing
+/// here: [`merge`] moves main to the merge commit. A Merge of a feature with merges is always a
+/// merge commit, its first parent main's tip (even when the feature holds
+/// that tip already: main never fast-forwards onto the feature's line).
+fn integrate(
     shared: &Path,
     scratch: &Path,
     name: &str,
     check: Option<&str>,
+    how: How,
     verify: &mut dyn FnMut(&str, &str) -> Result<(), String>,
-) -> Result<Option<(String, String)>, String> {
+) -> Result<Option<(String, String)>, Failed> {
     let main = crate::trunk::trunk_ref(shared)?;
     let b = branch_ref(name);
     let old = git(shared, &["rev-parse", "--verify", &b])?;
     let base = git(shared, &["rev-parse", "--verify", &main])?;
-    if git(shared, &["merge-base", "--is-ancestor", &base, &old]).is_ok() {
+    let merges = has_merges(shared, &main, name)?;
+    let on_tip = git(shared, &["merge-base", "--is-ancestor", &base, &old]).is_ok();
+    if on_tip && !(how == How::Merge && merges) {
         return Ok(None);
     }
-    let s = Scratch::new(shared, scratch, &format!("sync-{}", name), &old)?;
-    if let Err(e) = git(&s.dir, &["rebase", "-q", &base]) {
+    let (from, what) = match (how, merges) {
+        (_, false) => (&old, format!("the rebase of {} on {}", name, short(&main))),
+        (How::Sync, true) => (&old, format!("the merge of {} into {}", short(&main), name)),
+        (How::Merge, true) => (&base, format!("the merge of {} into {}", name, short(&main))),
+    };
+    let s = Scratch::new(shared, scratch, &format!("sync-{}", name), from)?;
+    let run = match (how, merges) {
+        (_, false) => git(&s.dir, &["rebase", "-q", &base]),
+        (How::Sync, true) => git(&s.dir, &["merge", "--no-ff", "-q", "-m", &format!("merge {} into {}", short(&main), name), &base]),
+        (How::Merge, true) => git(&s.dir, &["merge", "--no-ff", "-q", "-m", &format!("merge {}", name), &old]),
+    };
+    if let Err(e) = run {
         let conflicts = git(&s.dir, &["diff", "--name-only", "--diff-filter=U"]).unwrap_or_default();
-        let _ = git(&s.dir, &["rebase", "--abort"]);
-        let files: Vec<&str> = conflicts.lines().collect();
-        return Err(if files.is_empty() {
-            let other = format!("the rebase of {} on {} failed: {}", name, short(&main), e);
-            crate::land::rebase_failed(&s.dir, &e, "sync again", other)
-        } else {
-            format!("{} changed on {} too: the rebase of {} conflicts", files.join(", "), short(&main), name)
-        });
+        let _ = git(&s.dir, &[if merges { "merge" } else { "rebase" }, "--abort"]);
+        let files: Vec<String> = conflicts.lines().map(str::to_string).collect();
+        if files.is_empty() {
+            let other = format!("{} failed: {}", what, e);
+            return Err(Failed::Other(crate::land::rebase_failed(&s.dir, &e, "sync again", other)));
+        }
+        let line = format!("{} changed on {} too: {} conflicts", files.join(", "), short(&main), what);
+        return Err(Failed::Conflicts { files, line });
     }
     if let Some(c) = check {
-        crate::land::run_check(&s.dir, c)?;
+        crate::land::run_check(&s.dir, c).map_err(Failed::Check)?;
     }
     let new = git(&s.dir, &["rev-parse", "HEAD"])?;
-    verify(&base, &new)?;
-    git(shared, &["update-ref", &b, &new, &old]).map_err(|_| format!("{} moved meanwhile: sync it again", name))?;
+    verify(&base, &new).map_err(Failed::Check)?;
+    if how == How::Sync || !merges {
+        git(shared, &["update-ref", &b, &new, &old]).map_err(|_| Failed::Moved(format!("{} moved meanwhile: sync it again", name)))?;
+    }
     Ok(Some((old, new)))
 }
 
@@ -339,13 +430,18 @@ pub struct Merged {
     pub push_error: Option<String>,
 }
 
-/// `1 merge` (the user's go): rebased on main and checked in a scratch
-/// worktree (the check always runs: the full one), then the repo's land
-/// check on the rebased tip in the warm check tree under `checks`
-/// (`land_check`, issue 28 part 2; red: neither the feature nor main
-/// moves), main fast-forwarded, pushed when the flow says so. The branch
-/// itself is deleted after, by [`trash`], once the agents are archived.
-/// `turn`: main's land-queue turn, held by the caller.
+/// `1 merge` (the user's go): integrated with main and checked in a
+/// scratch worktree (the check always runs: the full one): rebased, or,
+/// for a feature that holds merges ([`has_merges`]), a merge commit
+/// (`merge --no-ff`, first parent main's tip; the feature ref stays as
+/// it was, its tip inside main, until [`trash`]: a failure in between
+/// leaves a harmless ref that a later retire or drop clears). Then the
+/// repo's land check on the new tip in the warm check tree under
+/// `checks` (`land_check`, issue 28 part 2; red: neither the feature nor
+/// main moves), main moved (compare-and-swap; a race: once more on the
+/// new tip, then [`Failed::Moved`]), pushed when the flow says so. The
+/// branch itself is deleted after, by [`trash`], once the agents are
+/// archived. `turn`: main's land-queue turn, held by the caller.
 pub fn merge(
     shared: &Path,
     scratch: &Path,
@@ -353,32 +449,10 @@ pub fn merge(
     name: &str,
     flow: &crate::flow::FlowConfig,
     turn: &crate::land::Turn,
-) -> Result<Merged, String> {
-    use crate::land_check::{checked, in_check_tree, Via};
+) -> Result<Merged, Failed> {
     let main = crate::trunk::trunk_ref(shared)?;
-    let b = branch_ref(name);
-    let base = git(shared, &["rev-parse", "--verify", &main])?;
-    let old = git(shared, &["rev-parse", "--verify", &b])?;
-    if git(shared, &["merge-base", "--is-ancestor", &old, &base]).is_ok() {
-        return Err(format!("nothing to merge: {} has no commit that {} lacks", name, short(&main)));
-    }
-    let via = Via::Merge(name);
-    let land_check = |base: &str, tip: &str| in_check_tree(shared, checks, base, tip, via, turn);
-    let tip = match rebase_then(shared, scratch, name, flow.check.as_deref(), &mut |b, t| {
-        if checked(via, true, true) { land_check(b, t) } else { Ok(()) }
-    })? {
-        Some((_, new)) => new,
-        None => {
-            // on main's tip already: the checks still run on what lands
-            let tip = check(shared, scratch, name, flow.check.as_deref())?;
-            if checked(via, true, false) {
-                land_check(&base, &tip)?;
-            }
-            tip
-        }
-    };
+    let (base, tip) = again_once(|| merge_once(shared, scratch, checks, name, flow, turn, &main))?;
     let commits = git(shared, &["rev-list", "--count", &format!("{}..{}", base, tip)])?.parse::<usize>().unwrap_or(0);
-    crate::land::move_main(shared, &main, &base, &tip)?;
     let (pushed, push_error) = if flow.mode == Some(crate::flow::FlowMode::Trunk) && flow.push {
         match crate::land::push(shared, &main) {
             Ok(()) => (Some(true), None),
@@ -389,6 +463,45 @@ pub fn merge(
         (None, None)
     };
     Ok(Merged { commits, sha: crate::land::shorten(shared, &tip), pushed, push_error })
+}
+
+/// [`merge`]'s one try: main moved to the integrated tip. (base, tip).
+fn merge_once(
+    shared: &Path,
+    scratch: &Path,
+    checks: &Path,
+    name: &str,
+    flow: &crate::flow::FlowConfig,
+    turn: &crate::land::Turn,
+    main: &str,
+) -> Result<(String, String), Failed> {
+    use crate::land_check::{checked, in_check_tree, Via};
+    let b = branch_ref(name);
+    let base = git(shared, &["rev-parse", "--verify", main])?;
+    let old = git(shared, &["rev-parse", "--verify", &b])?;
+    if git(shared, &["merge-base", "--is-ancestor", &old, &base]).is_ok() {
+        return Err(Failed::Other(format!("nothing to merge: {} has no commit that {} lacks", name, short(main))));
+    }
+    let via = Via::Merge(name);
+    let land_check = |base: &str, tip: &str| in_check_tree(shared, checks, base, tip, via, turn);
+    let tip = match integrate(shared, scratch, name, flow.check.as_deref(), How::Merge, &mut |b, t| {
+        if checked(via, true, true) { land_check(b, t) } else { Ok(()) }
+    })? {
+        Some((_, new)) => new,
+        None => {
+            // on main's tip already: the checks still run on what lands
+            let tip = check(shared, scratch, name, flow.check.as_deref()).map_err(Failed::Check)?;
+            if checked(via, true, false) {
+                land_check(&base, &tip).map_err(Failed::Check)?;
+            }
+            tip
+        }
+    };
+    crate::land::move_main(shared, main, &base, &tip).map_err(|e| {
+        let moved = git(shared, &["rev-parse", "--verify", main]).map(|now| now != base).unwrap_or(false);
+        if moved { Failed::Moved(e) } else { Failed::Other(e) }
+    })?;
+    Ok((base, tip))
 }
 
 /// The `[flow] try` build of the feature's tip. `{branch}` in the command:
@@ -503,26 +616,71 @@ pub fn try_text(name: &str, f: &Facts, main: &str, checked: bool) -> String {
     )
 }
 
-/// What a refused or failed answer says on its item.
-const REFUSED: &str = " didn't go through: ";
+/// The close word of a feature item whose answer failed: the hub hands
+/// it to main ([`handoff`]), it never opens again (the clients' word:
+/// `render::closed_word`).
+pub const HANDED: &str = "handed to main";
 
-/// The line an item gets when the user's answer did not go through:
-/// `try didn't go through: <why>` (one line, clipped).
-pub fn refused_line(op: &str, why: &str) -> String {
-    let why: String = why.split_whitespace().collect::<Vec<_>>().join(" ");
-    let why = if why.chars().count() > 200 { format!("{}…", why.chars().take(199).collect::<String>()) } else { why };
-    format!("{}{}{}", op, REFUSED, why)
+/// A step of his that failed, for [`handoff`].
+pub struct Handoff<'a> {
+    /// What he picked: `merge`, `try`, `drop`.
+    pub op: &'a str,
+    pub name: &'a str,
+    /// The trunk's short name.
+    pub trunk: &'a str,
+    /// The trunk's and the feature's tips when it failed (short; "" unknown).
+    pub base: &'a str,
+    pub tip: &'a str,
+    pub picked_ms: u64,
+    pub failed: &'a Failed,
+    /// The feature's live agents.
+    pub agents: &'a [String],
 }
 
-/// The item's text again, with `line` (a [`refused_line`]) as the last
-/// line of its body, before its options; an earlier one goes.
-pub fn with_refusal(text: &str, line: &str) -> String {
-    let (body, opts) = match text.find("\u{a}\u{a}1. ") {
-        Some(i) => text.split_at(i),
-        None => (text, ""),
+/// The ready brief main gets when his pick on a feature item failed
+/// (brief-feature-merge): what he picked and when, what failed, the
+/// steps to finish it, the agents that must not land meanwhile.
+/// Model-facing text (main's), not UI words: no words catalog.
+pub fn handoff(h: &Handoff) -> String {
+    let (name, trunk) = (h.name, h.trunk);
+    let tips = match (h.base.is_empty(), h.tip.is_empty()) {
+        (false, false) => format!(" ({} at {}, {} at {})", trunk, h.base, name, h.tip),
+        _ => String::new(),
     };
-    let kept: Vec<&str> = body.lines().filter(|l| !l.contains(REFUSED)).collect();
-    format!("{}\u{a}{}{}", kept.join("\u{a}"), line, opts)
+    let what = match h.failed {
+        Failed::Conflicts { files, .. } => format!("it conflicts on {}:\n{}", plural(files.len(), "file", "files"), files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n")),
+        Failed::Check(out) => format!("the check failed. its last lines:\n{}", crate::util::clip_tail(out.trim(), 1200)),
+        Failed::Moved(e) => format!("{} moved under it twice (a race with another land): {}", trunk, e),
+        Failed::Other(e) => format!("it failed: {}", e),
+    };
+    let finish = match h.op {
+        "try" => format!("`sb feature sync {}` (it takes the clean path), then `sb feature ready {}`: his inbox asks him to try it again.", name, name),
+        "drop" => format!("`sb feature drop {}` (only his word allowed it: he gave it).", name),
+        _ => format!("`sb feature merge {}` again: it takes the clean path now (he said merge: no need to ask him again).", name),
+    };
+    let fix = match h.failed {
+        Failed::Conflicts { .. } | Failed::Check(_) => format!(
+            "1. a worktree on {} (an agent spawned with `--feature {}`, or yours).\n2. merge {} into it (`git merge {}`); never rebase a feature that holds merges.\n3. resolve the conflicts, fix what the check says.\n4. `tests/gate.sh quick` green, then `sb land` (onto {}).\n5. {}",
+            name, name, trunk, trunk, name, finish
+        ),
+        _ => format!("1. see why above; fix it if it needs fixing.\n2. {}", finish),
+    };
+    let agents = if h.agents.is_empty() {
+        format!("{} has no live agent.", name)
+    } else {
+        let who: Vec<String> = h.agents.iter().map(|a| format!("@{}", a)).collect();
+        format!("its live agents ({}) must not land on {} meanwhile: tell them.", who.join(", "), name)
+    };
+    format!(
+        "the user picked '{}' on feature {} at {}. it did not go through, so bise hands it to you: his card is closed, nothing asks him again. do it, or give it to an agent; ask him only a NEW question if a choice really is his.\n\nwhat failed{}: {}\n\nthe steps:\n{}\n\n{}",
+        h.op,
+        name,
+        crate::search::fmt_utc(h.picked_ms),
+        tips,
+        what,
+        fix,
+        agents
+    )
 }
 
 /// The options as pr-merge's choice cards write them (tui cards.rs

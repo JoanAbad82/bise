@@ -835,6 +835,7 @@ fn an_answered_card_fades_in_place() {
         ("accepted", "dropped"),
         ("refused", "kept"),
         ("task stopped", "agent stopped"),
+        ("handed to main", "handed to main"),
     ] {
         let ev = Ev::Card { card: crate::wire::CardParts::of_line("#5 drop @x : y"), closed: res.into() };
         // a drop card says its own title (drop-card, designer m_37336)

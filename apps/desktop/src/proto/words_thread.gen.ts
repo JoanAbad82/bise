@@ -288,6 +288,8 @@ export const thread = {
   closed_resumed: "resumed",
   /** how a card was closed: its agent stopped */
   closed_stopped: "agent stopped",
+  /** how a card was closed: his pick failed, the hub handed it to main (a feature's merge); `main`: the view's own word for main (the window: bise) */
+  closed_handed: (a: { main: string | number }): string => "handed to " + String(a.main),
   /** how a card was closed: answered */
   closed_answered: "answered",
   /** right under the ask it answers */

@@ -267,7 +267,10 @@ their worktrees.
 **Keeping up with main.** The branch drifts while main moves. `sb
 feature sync <name>` (main runs it when the branch is far behind, or
 before a try): the hub holds the feature's lands, rebases the branch on
-main, runs the check, then each agent's worktree moves to the new tip.
+main (a branch that holds merges, one that merged main in: main is
+merged into it, never a rebase, which would meet the merge's conflicts
+again or bring back what it deleted; never `--rebase-merges` either),
+runs the check, then each agent's worktree moves to the new tip.
 A conflict goes to the agent the files belong to (Q7). Never automatic
 mid-work.
 
@@ -319,8 +322,17 @@ commits go.` `1 drop it` / `2 keep it` (the tip is still kept in
 full check, fast-forwards main (the history stays linear, as in this
 repo), pushes main (`push = true`), archives the feature's agents, then
 deletes the local branch (its tip kept in `refs/switchboard/trash/` like
-a drop). A conflict or a red check: back to the agents, and the item
-waits. You can also just say "merge computer-use" to main: same steps.
+a drop). A feature that holds merges lands as one merge commit instead
+(`merge --no-ff`, its first parent main's tip), with the same checks.
+A conflict, a red check or main moving twice under it: the hub never
+asks you again. The item closes `handed to main`, and main gets one
+message with a ready brief (what you picked and when, what failed, the
+steps: merge main into the feature, resolve, the quick gate, then `sb
+feature merge` again, and the agents that must not land meanwhile); main
+does it, gives it to an agent, or asks you a new question only if a
+choice really is yours. A failed try or drop goes the same way. A pick
+that comes while another step runs on the feature waits its turn.
+You can also just say "merge computer-use" to main: same steps.
 Main never merges a feature without your go; nothing else lands a
 feature on main.
 

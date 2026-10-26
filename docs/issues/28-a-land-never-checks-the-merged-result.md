@@ -106,7 +106,8 @@ exact tree it will point at. The four ways main moves:
 3. **`sb land --here` onto main** (main's checkout): the new commit is
    checked in the check tree after `commit-tree`, before the compare-and-
    swap; red: no ref moves, the files stay as they were;
-4. **`sb feature merge`**: the feature rebased in its scratch worktree,
+4. **`sb feature merge`**: the feature rebased in its scratch worktree
+   (one that holds merges: merged, `merge --no-ff` onto main's tip),
    then its tip checked in the check tree before the feature's ref and
    main move; red: neither moves.
 

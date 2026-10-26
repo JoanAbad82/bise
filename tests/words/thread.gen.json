@@ -201,6 +201,13 @@
     "one": null,
     "text": "dropped"
   },
+  "thread.closed_handed": {
+    "args": [
+      "main"
+    ],
+    "one": null,
+    "text": "handed to {main}"
+  },
   "thread.closed_kept": {
     "args": [],
     "one": null,
