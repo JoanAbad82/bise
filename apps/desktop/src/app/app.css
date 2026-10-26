@@ -256,11 +256,13 @@ body:has(.app-shell) {
 .app-rail-gap {
   flex: 1;
 }
-/* ⌘ held: the place's key in place of its icon, centred, mono 11 text-2; ⇧⌘A fits in 28 (designer m_45492) */
-.app-rail-key .b-kbd {
+/* ⌘ held: the place's key in place of its icon, centred, mono 11 text-2, 28 wide at least so ⇧⌘A
+   fits (designer m_45492); over .app-keyhint's 16 square (the bar's ⌘B), hence the two classes */
+.app-keyhint.app-rail-key .b-kbd {
   min-width: calc(var(--s-6) + var(--s-1));
+  height: var(--s-5);
   padding: 0 var(--s-1);
-  font-family: var(--font-mono);
+  font: 400 var(--t-11) / var(--s-5) var(--font-mono);
   color: var(--c-text-2);
 }
 

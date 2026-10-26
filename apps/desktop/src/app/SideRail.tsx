@@ -87,7 +87,8 @@ function RailButton({ place, on, children, dot, tip }: { place: RailPlace; on: b
       ) : (
         children
       )}
-      {dot === true && <span className="app-rail-dot" data-testid={`app.rail.${place}.dot`} />}
+      {/* the dot would sit on the cap's corner: it steps aside while ⌘ is held (ui-review m_45572) */}
+      {dot === true && !held && <span className="app-rail-dot" data-testid={`app.rail.${place}.dot`} />}
     </Press>
   );
 }
