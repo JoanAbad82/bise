@@ -21,7 +21,9 @@
 // before any other window listener), reads the facts and runs the act of 2 and 6-9 itself, then
 // stops the esc: nothing below sees it, the route never also goes back. 1, 3-5 and 10 are the
 // handlers' own: the listener leaves the esc to them. The surfaces of 2, 8 and 9 hand their act in
-// with useEscLayer; 6 and 7 read their own state (zoomKeys.ts, the panel's). Esc goes up, never
+// with useEscLayer; 6 and 7 read their own state (zoomKeys.ts, the panel's). An esc from inside an
+// artifact's page never reaches this listener: its frame forwards it and frameEsc runs 6 then 7
+// for it (panel/Browser.tsx). Esc goes up, never
 // back down (designer m_44802): the library's esc to a parent replaces the step, and at its root
 // libraryExit gives the way out to where he was before it (artifacts/Screen.tsx). Owner: r3-escape.
 import { useEffect } from 'react';
@@ -121,6 +123,19 @@ export function closeArtifactTab(tab: string): void {
   if (r.screen !== 'artifacts' || r.project !== project || r.id !== id) return;
   if (router.canBack()) router.back();
   else router.go({ screen: 'thread', project, agent: store?.artifacts(project).find((a) => a.id === id)?.agent ?? MAIN });
+}
+
+const ESC_KEY = { key: 'Escape', code: 'Escape', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false } as const;
+
+/**
+ * The artifact page's own esc (its frame forwards the one it didn't use, guard.ts ESC_FORWARD;
+ * panel/Browser.tsx hears it): the same order as the window's 6 then 7. A zoomed page or image
+ * goes back to fit first (his focus is in the page after a pinch, so the window's keydown never
+ * sees that esc: web-pinch, ui-review m_45656); the next esc closes the tab `tab`.
+ */
+export function frameEsc(tab: string): void {
+  if (takeZoomKey(ESC_KEY)) return;
+  closeArtifactTab(tab);
 }
 
 function run(act: Exclude<EscAct, 'below'>, e: KeyboardEvent): void {

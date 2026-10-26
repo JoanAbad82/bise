@@ -48,17 +48,25 @@ export async function frameInput(page: Page, frame: Frame): Promise<FrameInput> 
   }
   const cdp = await page.context().newCDPSession(frame);
   let held = false;
-  /** The browser's hit test, done here: the iframe must be on top at (x, y); its frame coordinates. */
+  /**
+   * The browser's hit test, done here: the iframe must be on top at (x, y); its frame coordinates.
+   * A page zoomed by the window (web-pinch: the iframe element scaled, origin 0 0) maps back through
+   * the inverse transform, as the browser does: its box on screen is z times its own, so the frame
+   * point is (screen - box) / z (ui-review m_45656: without it, zoomed events fell off the page).
+   */
   const at = async (x: number, y: number) => {
-    const top = await el.evaluate((f, p) => {
+    const hit = await el.evaluate((f, p) => {
       const e = f.ownerDocument?.elementFromPoint(p.x, p.y) ?? null;
-      if (e === f) return null;
-      return e ? `${e.tagName.toLowerCase()}${e.getAttribute("data-testid") ? `[data-testid=${e.getAttribute("data-testid")}]` : ""}${e.className && typeof e.className === "string" ? `.${e.className.split(/\s+/).join(".")}` : ""}` : "nothing";
+      const own = { w: (f as HTMLElement).offsetWidth, h: (f as HTMLElement).offsetHeight };
+      if (e === f) return { top: null, own };
+      return { top: e ? `${e.tagName.toLowerCase()}${e.getAttribute("data-testid") ? `[data-testid=${e.getAttribute("data-testid")}]` : ""}${e.className && typeof e.className === "string" ? `.${e.className.split(/\s+/).join(".")}` : ""}` : "nothing", own };
     }, { x, y });
-    if (top !== null) throw new Error(`frameInput: at (${x}, ${y}) the window shows ${top} over the frame: his pointer wouldn't reach it`);
+    if (hit.top !== null) throw new Error(`frameInput: at (${x}, ${y}) the window shows ${hit.top} over the frame: his pointer wouldn't reach it`);
     const b = await el.boundingBox();
     if (b === null) throw new Error("frameInput: the frame is not on screen");
-    return { x: x - b.x, y: y - b.y };
+    const zx = hit.own.w > 0 ? b.width / hit.own.w : 1;
+    const zy = hit.own.h > 0 ? b.height / hit.own.h : 1;
+    return { x: (x - b.x) / zx, y: (y - b.y) / zy };
   };
   type MouseType = "mouseMoved" | "mousePressed" | "mouseReleased" | "mouseWheel";
   type MouseMore = { button?: "left"; buttons?: number; clickCount?: number; deltaX?: number; deltaY?: number; modifiers?: number };

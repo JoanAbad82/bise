@@ -10,7 +10,7 @@ import { artifact, artifacts } from '../../tests/feature/inputs';
 import { claimZoomKeys } from '@/artifacts/zoomKeys';
 import { createRouter, RouterContext, type Router } from './router';
 import type { Route } from './route';
-import { escapeAct, closeArtifactTab, useEscLayer, type EscFacts } from './escape';
+import { escapeAct, closeArtifactTab, frameEsc, useEscLayer, type EscFacts } from './escape';
 import { useHistoryWays } from './esc-up';
 import { openLauncher, panelState } from './panel/state';
 import { openTab } from './panel/tabs';
@@ -244,6 +244,28 @@ describe('esc, one case at a time', () => {
     expect(stillOpen()).toBe(true);
     esc();
     expect(panelState.get().open).toBe(false);
+  });
+
+  it("a zoomed page, the esc from inside it (its frame's message): back to fit first, the next one closes (ui-review m_45656)", () => {
+    const w = world(ART_ROUTE, LIBRARY);
+    withArtifact();
+    const fit = vi.fn();
+    const letGo = claimZoomKeys(() => {
+      fit();
+      letGo();
+    });
+    act(() => {
+      frameEsc(artTab);
+    });
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(stillOpen()).toBe(true);
+    expect(w.back).not.toHaveBeenCalled();
+    act(() => {
+      frameEsc(artTab);
+    });
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(panelState.get().open).toBe(false);
+    expect(w.back).toHaveBeenCalledTimes(1);
   });
 
   it('the panel as a sheet with an artifact in front: the artifact closes, never the sheet', () => {
