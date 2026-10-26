@@ -138,6 +138,31 @@ fn turn_lines_read_through_the_line_reader() {
     assert_eq!(turn_line("  obs: assistant: turn_started"), TurnLine::Other);
 }
 
+/// Law (architect m_44901): every line the line reader gives as a turn
+/// start or end, in both forms (the obs record, the older text), passes
+/// turn_line's cheap look: a renamed kind can't zero the buckets.
+#[test]
+fn every_turn_line_the_reader_knows_passes_the_cheap_look() {
+    use bise_proto::thread::obs::{self as o, ObsRec};
+    let recs = [
+        ObsRec::TurnStarted(o::TurnStarted {}).line(),
+        ObsRec::TurnDone(o::TurnDone { end: "completed".into(), why: String::new() }).line(),
+        ObsRec::TurnDone(o::TurnDone { end: "failed".into(), why: "provider 500".into() }).line(),
+        ObsRec::TurnDone(o::TurnDone { end: "interrupted".into(), why: "main".into() }).line(),
+    ];
+    let mut all: Vec<String> = recs.to_vec();
+    all.extend([START, DONE, FAIL, "  obs: turn_done: interrupted"].map(String::from));
+    for l in &all {
+        let want = match lines::read(l) {
+            Rec::Obs(Obs::TurnStarted) => TurnLine::Start,
+            Rec::Obs(Obs::TurnDone(end)) => TurnLine::Done { failed: matches!(end, TurnEnd::Failed(_)) },
+            r => panic!("{l}: not a turn line to the reader: {r:?}"),
+        };
+        assert_eq!(turn_line(l), want, "{l}");
+    }
+    assert_eq!(turn_line(&recs[2]), TurnLine::Done { failed: true });
+}
+
 /// A transcript read backwards by the fill (lines before `until`).
 fn back(lines: &[(u64, &str)], since: u64, until: u64) -> Turns {
     let mut b = TurnsBack::new(since, until);

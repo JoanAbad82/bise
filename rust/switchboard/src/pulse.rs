@@ -109,10 +109,24 @@ pub enum TurnLine {
     Other,
 }
 
+/// The turn kinds' names on the wire (`turn_started`, `turn_done`), from
+/// bise_proto's obs records (their one owner): both line forms, the
+/// record and the older text, carry them.
+fn turn_kinds() -> &'static [String; 2] {
+    use bise_proto::thread::obs::{self as o, ObsRec};
+    static KINDS: std::sync::OnceLock<[String; 2]> = std::sync::OnceLock::new();
+    KINDS.get_or_init(|| {
+        let start = ObsRec::TurnStarted(o::TurnStarted {}).tag().to_string();
+        let done = ObsRec::TurnDone(o::TurnDone { end: String::new(), why: String::new() }).tag().to_string();
+        [start, done]
+    })
+}
+
 /// A transcript line (without its time) read for the turns: bise_proto's
-/// line reader, after a cheap look (most lines never mention a turn).
+/// line reader, after a cheap look for a turn kind's name (most lines
+/// never mention one).
 pub fn turn_line(line: &str) -> TurnLine {
-    if !line.contains("turn_") {
+    if !turn_kinds().iter().any(|k| line.contains(k.as_str())) {
         return TurnLine::Other;
     }
     match lines::read(line) {
