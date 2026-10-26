@@ -120,6 +120,15 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* the thread's column inside the glass (Gabriel m_44317: the rows sat flush on its edges): the
+     rows' text, their separators and the day lines 24 in from each side (--pad-column, like the
+     field and the bar row), the list's scroller and its fades still edge to edge. These are
+     .th-screen's (thread.css): the float's rows are not in a thread screen */
+  --th-col: calc(100% - 2 * var(--pad-column));
+  --th-col-x: var(--pad-column);
+  --lh-row: 1.5;
+  --s-thread-end: var(--s-6);
+  --th-mark: 1em;
 }
 /* the composer inside: no frame of its own (the float is the frame), one row: '+', the field, the
    mic, send; 44 at rest, 48 focused; a rule over it when the thread is open */

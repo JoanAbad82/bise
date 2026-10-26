@@ -2,10 +2,37 @@
 // 32 px row per entry: its kind's glyph (only when the list mixes kinds: '@' agents, '↗' artifacts,
 // none for files; a folder ends with '/'), its name, its description (or a file's folder) inline. The
 // editor keeps the keys: the keyboard's row is `active`; a greyed row reads `not yet`. A click picks.
-// Its height: up to the room above the composer, less 16.
-import { useLayoutEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { Picker as DsPicker, type PickerRow } from '@/ds';
+// It floats on <body>, never inside the composer's box (its overflow is hidden, and the floating
+// composer's too: Gabriel m_44279 saw them cut): 8 px above the box, below when the room above is
+// short, its height the room less 24, the list scrolling inside (pickPlace). Placed when it opens,
+// again on a window resize or the box's own resize (his lines growing it), never per keystroke.
+// Owner: r2-hints (nm-composer's before).
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
+import { createPortal } from 'react-dom';
+import { PICKER_CAP, Picker as DsPicker, type PickerRow } from '@/ds';
 import type { Row } from './pick';
+
+/** The room a list needs to open on the box's side it prefers (above), else it opens on the larger one. */
+const MIN_ROOM = 240;
+/** Between the list and the box. */
+const GAP = 8;
+/** Kept free between the list and the window's edge (r2-hints item 2). */
+const EDGE = 24;
+
+/** Where the @ $ / list floats from the composer's box: its left edge on the box's, 8 px above it
+ *  (below when the room above is under 240 px and below is larger), its whole height the room on
+ *  that side less 24, and at most half the window; fixed coordinates, inside the window. Pure. */
+export function pickPlace(
+  box: { top: number; bottom: number; left: number },
+  win: { width: number; height: number },
+): { style: CSSProperties; maxHeight: number; up: boolean } {
+  const above = box.top - GAP - EDGE;
+  const below = win.height - box.bottom - GAP - EDGE;
+  const up = above >= MIN_ROOM || above >= below;
+  const left = Math.max(GAP, Math.min(box.left, win.width - GAP - MIN_ROOM));
+  const y: CSSProperties = up ? { bottom: win.height - box.top + GAP } : { top: box.bottom + GAP };
+  return { style: { position: 'fixed', left, ...y }, maxHeight: Math.max(0, Math.min(Math.floor(win.height * PICKER_CAP), up ? above : below)), up };
+}
 
 /** A row's words on the ds Picker: the kind's glyph out of the label, a file's folder under its name. Pure. */
 export function pickerRow(r: Row, testId: string): PickerRow {
@@ -40,26 +67,44 @@ export function pickerRow(r: Row, testId: string): PickerRow {
 }
 
 export function Picker({ rows, index, testId, onPick }: { rows: readonly Row[]; index: number; testId: string; onPick: (i: number) => void }): JSX.Element {
-  const box = useRef<HTMLDivElement>(null);
-  const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
+  // where it is in the composer: its box (the frame's .box), measured from here
+  const at = useRef<HTMLSpanElement>(null);
+  const [place, setPlace] = useState<ReturnType<typeof pickPlace> | null>(null);
   useLayoutEffect(() => {
-    const top = box.current?.parentElement?.getBoundingClientRect().top;
-    if (top !== undefined) setMaxHeight(Math.max(96, top - 16));
+    const box = at.current?.closest('.box') ?? at.current?.parentElement ?? null;
+    if (box === null) return;
+    const measure = () => {
+      const next = pickPlace(box.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight });
+      setPlace((p) => (p !== null && JSON.stringify(p) === JSON.stringify(next) ? p : next));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    ro?.observe(box);
+    return () => {
+      window.removeEventListener('resize', measure);
+      ro?.disconnect();
+    };
   }, []);
   const groups = useMemo(() => [{ id: 'rows', rows: rows.map((r) => pickerRow(r, testId)) }], [rows, testId]);
   return (
-    <div className="b-composer-pick" ref={box}>
-      <DsPicker
-        groups={groups}
-        active={rows[index]?.id ?? null}
-        onPick={(id) => {
-          const i = rows.findIndex((r) => r.id === id);
-          if (i >= 0) onPick(i);
-        }}
-        maxHeight={maxHeight}
-        inline
-        testId={testId}
-      />
-    </div>
+    <span ref={at} className="b-composer-pick-at" hidden>
+      {createPortal(
+        <div className="b-composer-pick" style={place?.style} data-up={place?.up === false ? 'false' : undefined}>
+          <DsPicker
+            groups={groups}
+            active={rows[index]?.id ?? null}
+            onPick={(id) => {
+              const i = rows.findIndex((r) => r.id === id);
+              if (i >= 0) onPick(i);
+            }}
+            maxHeight={place?.maxHeight}
+            inline
+            testId={testId}
+          />
+        </div>,
+        document.body,
+      )}
+    </span>
   );
 }

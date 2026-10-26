@@ -260,11 +260,15 @@
 .b-composer-strip .n {
   color: var(--c-text-2);
 }
+/* the @ $ / list floats on <body> (Picker.tsx pickPlace gives its fixed place): over the floating
+   composer (40), like the ds's floating picker (dropdown.css) */
 .b-composer-pick {
-  position: absolute;
-  left: var(--pad-card-x);
-  bottom: calc(100% - var(--s-2));
-  z-index: 10;
+  position: fixed;
+  z-index: 45;
+}
+/* its place in the composer (what it measures the box from): nothing drawn */
+.b-composer-pick-at {
+  display: none;
 }
 .b-composer {
   position: relative;
@@ -461,7 +465,8 @@
   gap: var(--s-1);
   height: var(--h-control-sm);
 }
-.b-composer .cmp-held-sep {
+.b-composer .cmp-held-sep,
+.b-composer .cmp-held-word {
   color: var(--c-text-3);
 }
 @keyframes cmp-held-in {
