@@ -112,10 +112,7 @@
 /* search */
 .art-found{margin:0 0 var(--s-3);font-size:var(--t-13);color:var(--c-text-3)}
 .art-found b{font-weight:600;color:var(--c-text)}
-.art-group{margin:0 0 var(--s-6)}
 /* a group's 'all 6 ›' at its foot (the one text link a group keeps) */
-.art-group-all{height:var(--h-control-sm);padding:0 var(--s-3);border:0;background:none;font:400 var(--f-ui);color:var(--c-text-2)}
-.art-group-all:hover{color:var(--c-text)}
 
 /* search's no-result page and the results' column */
 .art-none,.art-results{min-width:0}

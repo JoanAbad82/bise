@@ -366,33 +366,6 @@ export function searchItems(lib: Library, items: readonly Item[], words: readonl
   });
 }
 
-/** One group of results: a folder's path (or unfiled) and its items, 4 shown. */
-export interface Group {
-  readonly id: string | null;
-  readonly title: string;
-  readonly items: readonly Item[];
-}
-
-/** How many results a group shows before its 'all 6 ›'. */
-export const GROUP_SHOWN = 4;
-
-/** The results by folder, the group with the newest first. Pure. */
-export function groupByFolder(lib: Library, items: readonly Item[]): Group[] {
-  const groups = new Map<string, { id: string | null; title: string; items: Item[] }>();
-  const sorted = [...items].sort((x, y) => y.a.at_ms - x.a.at_ms);
-  for (const it of sorted) {
-    const id = lib.folderOf(it);
-    const k = id ?? '';
-    let g = groups.get(k);
-    if (g === undefined) {
-      g = { id, title: id === null ? sentenceCase(library.unfiled) : pathOf(lib, id), items: [] };
-      groups.set(k, g);
-    }
-    g.items.push(it);
-  }
-  return [...groups.values()];
-}
-
 /** The project a typed 'in:ai' means: an exact id or name, else the one that starts so. Pure. */
 export function projectOfTyped(projects: readonly { project: string; name: string }[], typed: string): string | null {
   const t = typed.toLowerCase();

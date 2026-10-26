@@ -173,8 +173,6 @@ crate::words! { library:
     found(n, q) = "{n} found for \"{q}\"";
     /// the results' head, where it looked and its keys
     found_where = "in all folders · ⏎ opens the first, esc clears";
-    /// a group's more, `all 6 ›`
-    all_n(n) = "all {n} ›";
     /// the kind filter's first (in the toolbar above the list), `all 17`
     all_kinds = "All";
     /// the kind filter, for VoiceOver

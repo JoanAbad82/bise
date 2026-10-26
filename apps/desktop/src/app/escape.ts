@@ -4,7 +4,8 @@
 //   1. a menu, a dialog (⌘K, the keys sheet, a bubble's card, a status popover), a composer list
 //      (/ @ $): theirs, they close (a bubble's card gives the focus back to its bubble)
 //   2. the sidebar slid over (narrow): it closes                                  layer 'over'
-//   3. the focus in the find bar: theirs, find closes
+//   3. the focus in the find bar: theirs, find closes; the focus in a page's search field
+//      (ds BarSearch, data-esc-own): theirs, its words clear, then it gives the focus back
 //   4. an inbox item open in place: theirs, it folds
 //   5. the focus in the unfolded floating composer: theirs (its lists, then it folds)
 //   6. a zoomed image: back to fit                                                'zoom'
@@ -41,6 +42,8 @@ export interface EscFacts {
   readonly over: boolean;
   /** the focus in the thread's find bar */
   readonly find: boolean;
+  /** the focus in a page's search field that takes esc itself (data-esc-own: ds BarSearch) */
+  readonly field: boolean;
   /** an inbox item open in place */
   readonly inboxItem: boolean;
   /** the focus in the unfolded floating composer */
@@ -61,7 +64,7 @@ export type EscAct = 'below' | 'over' | 'zoom' | 'artifact' | 'sheet' | 'float';
 export function escapeAct(f: EscFacts): EscAct {
   if (f.popup) return 'below';
   if (f.over) return 'over';
-  if (f.find || f.inboxItem || f.inFloat) return 'below';
+  if (f.find || f.field || f.inboxItem || f.inFloat) return 'below';
   if (f.zoomed) return 'zoom';
   if (f.artifact) return 'artifact';
   if (f.sheet) return 'sheet';
@@ -91,6 +94,7 @@ export function escFacts(doc: Document = document): EscFacts {
     popup: doc.querySelector(POPUP) !== null,
     over: (layers.get('over')?.length ?? 0) > 0,
     find: inside('[data-testid="thread.find"]'),
+    field: inside('[data-esc-own]'),
     inboxItem: doc.querySelector('[data-testid="inbox.block"][data-open]') !== null,
     inFloat: (layers.get('float')?.length ?? 0) > 0 && inside('[data-testid="composer.float"]'),
     zoomed: isZoomed(),

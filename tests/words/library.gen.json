@@ -20,13 +20,6 @@
     "one": null,
     "text": "All"
   },
-  "library.all_n": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "all {n} ›"
-  },
   "library.all_projects": {
     "args": [],
     "one": null,

@@ -35,7 +35,7 @@ import { itemsOf, ownerOf, topOf, whenOf, type Card, type Place, type Stack } fr
 import { Thumb } from './thumbs';
 import { keyOf, revealPathOf, splitArchived, type Item } from './model';
 import {
-  atOfPath, atPath, chipOf, chipsOf, countsOf, coverOf, crumbOf, folderLine, groupByFolder, inFolder, itemsAt, libraryFacts, libraryOf,
+  atOfPath, atPath, chipOf, chipsOf, countsOf, coverOf, crumbOf, folderLine, inFolder, itemsAt, libraryFacts, libraryOf,
   nameOf, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type At, type ChipKind, type Library,
 } from './folders';
 import { FolderColumn, type Editing } from './Column';
@@ -101,7 +101,6 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const setView = (v: View) => { keepView(v); setViewRaw(v); };
   const setOpen = (o: ReadonlySet<string>) => { keepOpen(o); setOpenRaw(o); };
   const setFull = (f: ReadonlySet<string>) => { keepFull(f); setFullRaw(f); };
-  const [whole, setWhole] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<Editing>(null);
   const [over, setOver] = useState<Over>(null);
   const [stack, setStack] = useState<Stack | null>(null);
@@ -393,13 +392,13 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   // then each kind with its count), the project scope; the cards/list switch, the search ('/'), +
   const kindsTotal = searching ? found.length : here.length;
   const toolbar = stack === null && (
-    <Toolbar testId="artifacts.toolbar"
+    <Toolbar testId="artifacts.toolbar" lead={narrow ? fold : null}
       kinds={searching || chips.length > 1 ? [{ id: 'all', word: library.all_kinds, n: kindsTotal }, ...chips.map((c) => ({ id: c.kind, word: chipWord(c.kind), n: c.n }))] : null}
       kind={chip ?? 'all'} onKind={(id) => { setChip(id === 'all' ? null : (id as ChipKind)); }}
       scope={<ProjectScope all={base} project={eff} projectName={projectName} onPick={pickScope} testId="artifacts.projects" />}
       projects={[{ project: '', name: sentenceCase(library.all_projects), n: base.length }, ...scopeRows(base)]} project={eff} onProject={pickScope}
       view={view} onView={setView}
-      q={q} onQ={(e) => { setQ(e.currentTarget.value); setWhole(new Set()); }} onQKey={searchKey}
+      q={q} onQ={(e) => { setQ(e.currentTarget.value); }} onQKey={searchKey}
       onClear={() => { setQ(''); searchRef.current?.focus(); }} searchRef={searchRef}
       add={<AddButton place={place_} testId="artifacts.add" />}
       scroller={scrollEl} />
@@ -435,12 +434,11 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
             action={<Button kind="ghost" onClick={() => { setQ(''); searchRef.current?.focus(); }} testId="artifacts.nothing.clear">{library.clear_search}</Button>} />
         );
       }
-      const groups = groupByFolder(lib, shown);
+      // a filter on the same list (designer m_45293): every match, under the same day heads as All
       return (
-        <SearchResults q={parsed.words.join(' ')} total={found.length} groups={groups} whole={whole}
-          onWhole={(g) => { setWhole(new Set([...whole, g])); }}
-          cards={(items, g) => grid(items.map((it) => cards.find((c) => c.key === keyOf(it)) ?? { kind: 'one', key: keyOf(it), it }), { kind: 'search' }, false, `artifacts.results.${g.id ?? 'unfiled'}`)}
-          testId="artifacts.results" />
+        <SearchResults q={searchWords} total={found.length} testId="artifacts.results">
+          {grid(cards, place, true, 'artifacts.grid')}
+        </SearchResults>
       );
     }
     if (atNow.at === 'all') {
@@ -522,7 +520,6 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     // the place's name is the window's bar's (its crumb: 'artifacts › launch'), never a second time
     // here (designer's rule on #5); under 900 the fold's crumb opens the library
     <header className="art-head" data-testid="artifacts.head" onContextMenu={folderMenu?.onContextMenu}>
-      {narrow && <div className="art-head-t">{fold}</div>}
       <p className="art-head-s">
         {folderMenu !== null && <MoreButton menu={folderMenu} testId="artifacts.head.more" />}
         {atNow.at === 'folder' ? folderLine(lib, atNow.id, here) : atNow.at === 'unfiled' ? library.unfiled_say : ''}
@@ -542,8 +539,6 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       </div>
     </header>
   );
-  // all artifacts and a search have no head: under 900 the line keeps the fold's crumb
-  const bareHead = narrow ? <div className="art-head"><div className="art-head-t">{fold}</div></div> : null;
 
   return (
     <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} data-narrow={narrow || undefined}
@@ -562,7 +557,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
           {!narrow && !sideLib && column}
           <div className="art-main">
             {toolbar}
-            {stackHead ?? head ?? bareHead}
+            {stackHead ?? head}
             <AddDrop place={place_} testId="artifacts.drop">{body}</AddDrop>
             {archivedRow}
           </div>

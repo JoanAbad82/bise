@@ -3,17 +3,18 @@
 // the list, its edges the list rows' edges. Left the filters as they were in the bar (the kinds,
 // ds Filters, then 'all projects ⌄'), 8 apart; right the cards/list switch, the search (200, 160
 // under a 900 window; its '/' keycap until it has the focus or words, × to clear) and +. Sticky at
-// the top of the page's scroller, a 1 px line under it only while stuck. Under 560 of its own width
-// the filters fold into one 'filters ⌄' menu that says how many are on; the search stays. What the
-// filters and the keys do stays the screen's (Screen.tsx). Owner: m-artifacts (nm-pages-a's page).
+// the top of the page's scroller, a 1 px line under it only while stuck. When the row has less room
+// than they need, the filters fold into one 'filters ⌄' menu that says how many are on; the search stays. What the
+// filters and the keys do stays the screen's (Screen.tsx). Under 900 the library's crumb (its
+// column folded, Fold.tsx) leads the row. Owner: m-artifacts (nm-pages-a's page).
 import { useLayoutEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { AppIcon, BarSearch, Dropdown, Filters, Press, sentenceCase, tipAttrs } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import type { View } from './gridKeys';
 import './toolbar.css';
 
-/** Under this width of its own the filters fold into one menu. */
-export const FOLD_FILTERS_PX = 560;
+/** The room between the filters and the right side (--s-2). */
+const GAP_PX = 8;
 
 export interface KindOpt {
   readonly id: string;
@@ -26,6 +27,8 @@ export interface ToolbarProps {
   readonly kinds: readonly KindOpt[] | null;
   readonly kind: string;
   readonly onKind: (id: string) => void;
+  /** first on the left, never folded: under 900 the library's crumb (Fold.tsx), else nothing */
+  readonly lead?: ReactNode;
   /** the project scope as drawn wide (Scope.tsx ProjectScope) */
   readonly scope: ReactNode;
   /** the projects for the folded menu, 'all projects' first */
@@ -51,22 +54,44 @@ export function filtersOn(kind: string, project: string): number {
   return (kind === 'all' ? 0 : 1) + (project === '' ? 0 : 1);
 }
 
-export function Toolbar({ kinds: kindOpts, kind, onKind, scope, projects, project, onProject, view, onView, q, onQ, onQKey, onClear, searchRef, add, scroller, testId }: ToolbarProps) {
+export function Toolbar({ lead, kinds: kindOpts, kind, onKind, scope, projects, project, onProject, view, onView, q, onQ, onQKey, onClear, searchRef, add, scroller, testId }: ToolbarProps) {
   const box = useRef<HTMLDivElement>(null);
   const [folded, setFolded] = useState(false);
   const [stuck, setStuck] = useState(false);
-  // its own width (the page column and the window's sidebar take theirs): fold under 560; an
-  // unmeasured box (a first paint, a test's DOM) stays whole
+  // the filters fold once the row has less room than they need beside the right side (never an
+  // overflow, ui-review m_45291): what they need is measured while whole and kept while folded; new
+  // kinds or another project measure again. An unmeasured box (a test's DOM) stays whole.
+  const left = useRef<HTMLSpanElement>(null);
+  const right = useRef<HTMLSpanElement>(null);
+  const need = useRef(0);
+  const isFolded = useRef(false);
+  const sig = `${(kindOpts ?? []).map((k) => `${k.id}${String(k.n)}`).join()}|${project}`;
   useLayoutEffect(() => {
     const el = box.current;
     if (el === null) return undefined;
-    const measure = () => { const w = el.clientWidth; setFolded(w > 0 && w < FOLD_FILTERS_PX); };
+    isFolded.current = false;
+    setFolded(false);
+    const measure = () => {
+      const w = el.clientWidth;
+      if (w === 0) return;
+      if (!isFolded.current) {
+        const l = left.current;
+        const r = right.current;
+        if (l === null || r === null) return;
+        need.current = l.scrollWidth + r.offsetWidth + GAP_PX;
+      }
+      const fold = w < need.current;
+      if (fold !== isFolded.current) {
+        isFolded.current = fold;
+        setFolded(fold);
+      }
+    };
     measure();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => { ro.disconnect(); };
-  }, []);
+  }, [sig]);
   // stuck: the page scrolled and the row sits at the scroller's top
   useLayoutEffect(() => {
     const el = box.current;
@@ -81,7 +106,8 @@ export function Toolbar({ kinds: kindOpts, kind, onKind, scope, projects, projec
   const on = filtersOn(kind, project);
   return (
     <div ref={box} className="art-toolbar" data-stuck={stuck || undefined} data-folded={folded || undefined} data-testid={testId}>
-      <span className="art-tb-l">
+      <span ref={left} className="art-tb-l">
+        {lead}
         {folded ? (
           <Dropdown testId={`${testId}.fold`}
             label={<>{sentenceCase(library.filters)}{on > 0 && <span className="art-n">{on}</span>}</>}
@@ -97,7 +123,7 @@ export function Toolbar({ kinds: kindOpts, kind, onKind, scope, projects, projec
           </>
         )}
       </span>
-      <span className="art-tb-r">
+      <span ref={right} className="art-tb-r">
         <span className="art-views">
           <Press look="art-view" aria-pressed={view === 'grid'} aria-label={library.tip_cards} onClick={() => { onView('grid'); }} data-testid="artifacts.view.grid" {...tipAttrs(library.tip_cards)}><AppIcon name="grid" size={16} /></Press>
           <Press look="art-view" aria-pressed={view === 'list'} aria-label={library.tip_list} onClick={() => { onView('list'); }} data-testid="artifacts.view.list" {...tipAttrs(library.tip_list)}><AppIcon name="list" size={16} /></Press>

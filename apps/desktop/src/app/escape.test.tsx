@@ -15,7 +15,7 @@ import { useHistoryWays } from './esc-up';
 import { openLauncher, panelState } from './panel/state';
 import { openTab } from './panel/tabs';
 
-const NONE: EscFacts = { popup: false, over: false, find: false, inboxItem: false, inFloat: false, zoomed: false, artifact: false, sheet: false, float: false };
+const NONE: EscFacts = { popup: false, over: false, find: false, field: false, inboxItem: false, inFloat: false, zoomed: false, artifact: false, sheet: false, float: false };
 
 describe('escapeAct: the order, innermost first', () => {
   it('each fact alone gives its act', () => {
@@ -23,6 +23,7 @@ describe('escapeAct: the order, innermost first', () => {
     expect(escapeAct({ ...NONE, popup: true })).toBe('below');
     expect(escapeAct({ ...NONE, over: true })).toBe('over');
     expect(escapeAct({ ...NONE, find: true })).toBe('below');
+    expect(escapeAct({ ...NONE, field: true })).toBe('below');
     expect(escapeAct({ ...NONE, inboxItem: true })).toBe('below');
     expect(escapeAct({ ...NONE, inFloat: true, float: true })).toBe('below');
     expect(escapeAct({ ...NONE, zoomed: true })).toBe('zoom');
@@ -32,7 +33,7 @@ describe('escapeAct: the order, innermost first', () => {
   });
 
   it('each one beats every one after it', () => {
-    const order: (keyof EscFacts)[] = ['popup', 'over', 'find', 'inboxItem', 'inFloat', 'zoomed', 'artifact', 'sheet', 'float'];
+    const order: (keyof EscFacts)[] = ['popup', 'over', 'find', 'field', 'inboxItem', 'inFloat', 'zoomed', 'artifact', 'sheet', 'float'];
     const alone = (k: keyof EscFacts) => escapeAct({ ...NONE, [k]: true, ...(k === 'inFloat' ? { float: true } : {}) });
     order.forEach((k, i) => {
       for (const later of order.slice(i + 1)) {

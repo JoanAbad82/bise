@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Artifact } from '@/proto';
 import { library } from '@/proto/words_library.gen';
 import {
-  atOfPath, atPath, chipsOf, countsOf, countWords, coverOf, crumbOf, folderLine, groupByFolder, itemsAt, libraryFacts, libraryOf,
+  atOfPath, atPath, chipsOf, countsOf, countWords, coverOf, crumbOf, folderLine, itemsAt, libraryFacts, libraryOf,
   moveRows, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type Folder,
 } from './folders';
 import { cardRows, folderRows } from './Menus';
@@ -148,11 +148,6 @@ describe('search across folders', () => {
     expect(searchItems(lib, ITEMS, ['agent', 'view']).map((it) => it.a.id)).toEqual(['step2', 'fixes']);
     expect(searchItems(lib, ITEMS, ['amb-win']).map((it) => it.a.id)).toEqual(['fixes']);
     expect(searchItems(lib, ITEMS, ['pages']).map((it) => it.a.id)).toEqual(['hero-shots']);
-  });
-
-  it('groups by folder, unfiled its own group', () => {
-    const groups = groupByFolder(lib, ITEMS);
-    expect(groups.map((g) => [g.title, g.items.length])).toEqual([['desktop app / agent view', 2], ['desktop app / page heroes', 1], ['36 rue de Montreuil', 2], ['Unfiled', 2]]);
   });
 
   it('counts its kind chips, the most first', () => {

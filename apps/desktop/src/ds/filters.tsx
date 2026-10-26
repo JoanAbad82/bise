@@ -72,7 +72,8 @@ export function BarSearch({ value, onChange, onKeyDown, keys = "/", placeholder 
   return (
     <label className="b-barsearch" {...tipAttrs(ds.search_tip({ key: keys }))} data-testid={testId}>
       <AppIcon name="search" size={14} />
-      <input ref={ref} type="search" value={value} placeholder={placeholder} aria-label={placeholder} spellCheck={false}
+      {/* data-esc-own: esc is its own (it clears, then gives the focus back), before the float's (app/escape.ts) */}
+      <input ref={ref} type="search" value={value} placeholder={placeholder} aria-label={placeholder} spellCheck={false} data-esc-own=""
         onChange={onChange} onKeyDown={onKeyDown} data-testid={sub(testId, "input")} />
       {value === "" && <span className="b-kbd">{keys}</span>}
       {value !== "" && onClear !== undefined && (

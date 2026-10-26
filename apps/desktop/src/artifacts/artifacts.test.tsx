@@ -104,6 +104,14 @@ describe('the page in bise fait mac (mockup 7, decision d2)', () => {
     expect(screen.getByTestId('artifacts.nothing').textContent).toContain(library.nothing_matches({ q: 'zzqx' }));
     fireEvent.click(screen.getByTestId('artifacts.search.clear'));
     expect(field.value).toBe('');
+    // esc clears its words and keeps the focus; a second esc gives it back to the list
+    field.focus();
+    fireEvent.change(field, { target: { value: 'note' } });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(field.value).toBe('');
+    expect(document.activeElement).toBe(field);
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(document.activeElement).toBe(screen.getByTestId('artifacts.screen'));
     expect(screen.getByTestId('artifacts.kinds.all').getAttribute('aria-selected')).toBe('true');
     expect(screen.queryByTestId('artifacts.hero')).toBeNull();
     expect(screen.getByTestId('artifacts.lead').textContent).toContain(library.say);
@@ -162,6 +170,10 @@ describe("'All' reaches every artifact (his m_44961: 'All 866' drew the newest 4
     fireEvent.keyDown(scr, { key: 'End' });
     fireEvent.keyDown(scr, { key: 'Enter' });
     expect(router.get()).toEqual({ screen: 'artifacts', project: 'acme-2', id: `a${String(N - 1)}` });
+    // a search is a filter on the same list (designer m_45293): every match, no cap per folder
+    fireEvent.change(screen.getByTestId('artifacts.search.input'), { target: { value: 'piece' } });
+    expect(screen.getByTestId('artifacts.results.head').textContent).toContain(library.found({ n: N, q: 'piece' }));
+    expect(screen.getByTestId('artifacts.grid').getAttribute('data-n')).toBe(String(N));
   });
 });
 
