@@ -122,11 +122,13 @@ struct Conn {
     /// why its hub couldn't start (`HubIn::Down`'s cause), until it's up:
     /// the row's `down`
     down: Option<String>,
+    /// its hub's last `hub/pulse` (the row's `pulse` while it is held)
+    pulse: Option<bise_proto::rows::Pulse>,
 }
 
 impl Conn {
     fn new(hub: Hub, until: Option<Instant>) -> Conn {
-        Conn { hub, welcomed: false, rows: None, archived: Default::default(), pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default(), down: None }
+        Conn { hub, welcomed: false, rows: None, archived: Default::default(), pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default(), down: None, pulse: None }
     }
 
     /// One window command (a `HubCmd`'s JSON) to its hub, as a request
@@ -300,7 +302,7 @@ fn inbox_cards(cards: Vec<Card>, others: Vec<Card>) -> Vec<Card> {
 
 /// A held hub's own rows as a view (the sidebar's counts).
 fn live_view(project: &str, agents: &[Agent], cards: &[Card]) -> ProjectView {
-    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0, scheduled: vec![], growth: None }
+    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0, scheduled: vec![], growth: None, pulse: None }
 }
 
 impl Core {
@@ -847,6 +849,11 @@ impl Core {
                 let agents = c.rows.take().map(|r| r.0).unwrap_or_default();
                 c.rows = Some((agents, inbox_cards(cards, others)));
             }
+            // the H1 sidebar: the row's pulse (emit_rows sends it when it changed)
+            HubEv::Pulse { pulse, .. } => {
+                c.pulse = Some(pulse);
+                self.emit_projects();
+            }
             _ => {}
         }
         if let Some(t) = for_voice {
@@ -929,6 +936,13 @@ impl Core {
                     true => self.hubs.home_down.clone(),
                     false => conns.get(&f.row.id).and_then(|c| c.down.clone()).filter(|_| !held),
                 };
+                // a held hub's own pulse, else its view.json's (projects::row)
+                if let Some(p) = conns.get(&f.row.id).and_then(|c| c.pulse.clone()) {
+                    row.pulse = Some(p);
+                } else if row.pulse.is_none() && f.view.as_ref().is_some_and(|v| v.written_ms == 0) {
+                    // a held hub with no pulse yet: its view.json's last one
+                    row.pulse = (p.facts.view)(&f.row.id).and_then(|v| v.pulse);
+                }
                 row
             })
             .collect();

@@ -42,6 +42,8 @@ impl Shell {
             }
             out.push_str(&format!("{ts}\t{line}\n"));
             self.answers_line(name, pos, &line);
+            // the pulse's live side (daemon/pulse.rs): turns, main's entries
+            self.pulse_line(name, ts, &line);
             events.push(line_event(name, pos, ts, &line));
         }
         (out, events)

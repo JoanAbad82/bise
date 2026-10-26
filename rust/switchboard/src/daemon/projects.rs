@@ -6,7 +6,9 @@
 //!   hub (`SB_STATE_DIR`: its workspace is a throwaway).
 //! - It keeps `<state>/view.json` (`crate::view`): written at its start,
 //!   then when its state changed (debounced, checked at each tick), and
-//!   with `stopped_ms` when it stops for good (idle-exit or `stop_hub`).
+//!   with `stopped_ms` when it stops for good (idle-exit or `stop_hub`),
+//!   with the hub's pulse (daemon/pulse.rs: its last value, a fresh one
+//!   at the stop, so a stopped project's sidebar row keeps it).
 //!   Only this hub writes it; the window, `bise project list` and bise's
 //!   reads of other projects read it.
 
@@ -87,12 +89,14 @@ impl Shell {
         let arts = self.artifact_rows(&self.artifacts_ev());
         // les bims: the same cached growth as the typed event
         let growth = self.growth_of(Some(snap), Some(arts.len() as u32));
+        // and the same rows as the typed scheduled event
+        let sched = crate::proto_view::scheduled(self.hub.timers());
+        // the H1 sidebar: the pulse the typed event has (fresh at a stop)
+        let pulse = self.pulse_view(stopped_ms.is_some());
         self.setup();
         let cat = self.setup.as_ref().map(|(_, s)| &s.catalog);
         let vision = |m: &str| cat.and_then(|c| c.vision(m));
-        // and the same rows as the typed scheduled event
-        let sched = crate::proto_view::scheduled(self.hub.timers());
-        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision, arts, sched, growth);
+        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision, arts, sched, growth, pulse);
         let paths = self.opts.paths.clone();
         let (tmp, file) = (paths.state.join("view.json.tmp"), paths.state.join(view::FILE));
         if write_logged(&paths, &tmp, &view::render(&v)) {

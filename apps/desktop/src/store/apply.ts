@@ -117,6 +117,10 @@ export function applyTyped(s: Store, ev: Ev): void {
       // les bims: how much the project has done (the office's stages read it), at hello and on change
       s.put(`growth:${ev.project}`, ev.growth);
       return;
+    case "pulse":
+      // the H1 sidebar: the project's pulse (busy buckets, last activity, news), at hello and at most once a minute
+      s.put(`pulse:${ev.project}`, ev.pulse);
+      return;
     case "inbox_history": {
       // a page: the first one (no older held) replaces, an older one (its items older than the
       // held ones) goes after them; one record per card, newest first

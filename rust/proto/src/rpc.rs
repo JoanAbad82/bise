@@ -229,6 +229,8 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/switch", "switch", Scope::Hub),
     // les bims: how much the project has done (rows::growth)
     n("hub/growth", "growth", Scope::Hub),
+    // the H1 sidebar: the project's pulse (rows::pulse)
+    n("hub/pulse", "pulse", Scope::Hub),
     n("job/end", "job_end", Scope::Hub),
     n("job/followedEnd", "followed_end", Scope::Hub),
     // les bims: a message sent, a report made (no body, no text)

@@ -106,6 +106,8 @@ export const TAGS = {
   // title bar, words from Rust's switch_line (amb-home draws it)
   switch: true,
   growth: true,
+  // the H1 sidebar: a project's pulse (rows::Pulse; r3-projects draws it)
+  pulse: true,
   // running processes (procs-hub's proto, docs/processes.md): known; procs-desktop applies them
   processes: true,
   proc_out: true,

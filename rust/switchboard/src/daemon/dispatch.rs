@@ -120,6 +120,8 @@ impl Shell {
                     self.announce_update();
                     self.release_check(None);
                     self.plan_prs();
+                    w.phase("pulse");
+                    self.pulse_check();
                     w.phase("idle check");
                     self.idle_check();
                     w.phase("photo");
@@ -291,7 +293,11 @@ impl Shell {
             Msg::Changes { name, v } => self.on_changes(name, v),
             Msg::Serve { id, v, serve, root } => self.on_serve(&id, v, serve, root),
             Msg::RoleLine { dir, key, line } => self.step(Input::RoleLine { dir, key, line }),
-            Msg::UsageCounted(l) => self.usage_counted(*l),
+            Msg::UsageCounted(w) => {
+                let (ledger, week) = *w;
+                self.usage_counted(ledger);
+                self.pulse_filled(week);
+            }
             Msg::TimerName { id, reply } => self.step(Input::TimerName { id, reply }),
             Msg::GateChecked { dir, n, req, out } => self.on_checked(&dir, &n, *req, out),
             Msg::BuildEnded { rev } => {

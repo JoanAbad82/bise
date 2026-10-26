@@ -44,6 +44,12 @@ pub struct ProjectRow {
     /// backing off; the row says it at once, never a silent loop
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down: Option<String>,
+    /// its pulse (the H1 sidebar, rows::pulse): a held hub's own
+    /// `hub/pulse`, else its `view.json`'s (a stopped hub's last one).
+    /// New artifacts and unread are counted against `seen.<project>`
+    /// (rows::pulse's header); absent: none known yet
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pulse: Option<crate::rows::Pulse>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

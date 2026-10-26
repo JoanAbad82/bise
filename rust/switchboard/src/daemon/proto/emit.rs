@@ -374,6 +374,7 @@ impl Shell {
                 self.proto_note(&ids, &arts);
                 if let HubEv::Artifacts { items, .. } = &arts {
                     self.growth_changed(&ids, None, Some(items.len() as u32));
+                    self.pulse_artifacts(items);
                 }
             }
             // the answer as it streams in: to the connections subscribed

@@ -90,6 +90,7 @@ export const NOTIFICATIONS = {
   "hub/paused": { ev: "paused", scope: "hub" },
   "hub/switch": { ev: "switch", scope: "hub" },
   "hub/growth": { ev: "growth", scope: "hub" },
+  "hub/pulse": { ev: "pulse", scope: "hub" },
   "job/end": { ev: "job_end", scope: "hub" },
   "job/followedEnd": { ev: "followed_end", scope: "hub" },
   "hub/activity": { ev: "activity", scope: "hub" },

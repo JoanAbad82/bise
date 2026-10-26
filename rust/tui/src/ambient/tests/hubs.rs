@@ -66,6 +66,7 @@ pub(super) fn world_running(t: &mut T, up: &'static [&'static str]) -> World {
             artifacts_total: 0,
             scheduled: vec![serde_json::from_value(json!({"id": 7, "agent": "main", "by": "main", "words": "check the docs build", "every": "every day 07:30", "done": 2, "next_ms": 5})).unwrap()],
             growth: Some(bise_proto::rows::Growth { jobs_done: 4, days_used: 2, artifacts_made: 0, since_ms: Some(1) }),
+            pulse: Some(bise_proto::rows::Pulse { from_ms: 1, busy_ms: vec![0; 21], last_ms: Some(2), ..Default::default() }),
         })),
         running: Box::new(move |p| up.iter().any(|id| p == Path::new(&format!("/p/{id}")))),
         exists: Box::new(move |p| !gone2.lock().unwrap().iter().any(|g| g == p)),

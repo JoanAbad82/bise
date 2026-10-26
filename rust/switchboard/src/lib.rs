@@ -86,6 +86,7 @@ pub mod place;
 pub mod place_job;
 pub mod procs;
 pub mod proto_view;
+pub mod pulse;
 pub mod prompts;
 pub mod recycle;
 pub mod repl_start;

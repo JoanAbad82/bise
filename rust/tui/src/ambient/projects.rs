@@ -121,6 +121,9 @@ pub fn row(f: &Facts, order: u32, c: &Checkout) -> ProjectRow {
         web,
         // the core's own fact (its connection), set by core/hubs.rs
         down: None,
+        // its view.json's (a stopped hub's last); a held hub's own event
+        // replaces it (core/hubs.rs)
+        pulse: f.view.as_ref().and_then(|v| v.pulse.clone()),
     }
 }
 
@@ -224,6 +227,7 @@ mod tests {
             artifacts_total: 0,
             scheduled: vec![],
             growth: None,
+            pulse: None,
         };
         let v2 = view.clone();
         let f = facts(
@@ -264,7 +268,7 @@ mod tests {
         assert_eq!(read_view(&d), None);
         std::fs::write(d.join("view.json"), "{not json").unwrap();
         assert_eq!(read_view(&d), None);
-        let v = ProjectView { v: 1, project: "x-1".into(), written_ms: 1, stopped_ms: None, last_activity_ms: 1, agents: vec![], cards: vec![], artifacts: vec![], artifacts_total: 0, scheduled: vec![], growth: None };
+        let v = ProjectView { v: 1, project: "x-1".into(), written_ms: 1, stopped_ms: None, last_activity_ms: 1, agents: vec![], cards: vec![], artifacts: vec![], artifacts_total: 0, scheduled: vec![], growth: None, pulse: None };
         std::fs::write(d.join("view.json"), serde_json::to_string(&v).unwrap()).unwrap();
         assert_eq!(read_view(&d), Some(v.clone()));
         std::fs::write(d.join("view.json"), serde_json::to_string(&ProjectView { v: 2, ..v }).unwrap()).unwrap();

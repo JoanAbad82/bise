@@ -390,6 +390,9 @@ pub enum HubEv {
     /// how much the project has done (les bims' growing office,
     /// rows::growth): at hello and when a counter moves
     Growth { project: Project, growth: crate::rows::Growth },
+    /// the project's pulse (the H1 sidebar, rows::pulse): at hello, then
+    /// at most once a minute and only when it changed
+    Pulse { project: Project, pulse: crate::rows::Pulse },
     /// what the project's model calls cost (`usage/read`, an answer only:
     /// never pushed). `counting`: the hub is still reading the
     /// transcripts (its first read): the sums are not complete yet, ask
@@ -502,7 +505,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "pulse", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)

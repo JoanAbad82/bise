@@ -39,6 +39,7 @@ mod projects;
 mod prompt_inputs;
 use prompt_inputs::{plugins_fingerprint, prompt_is_stale, PromptInputs, PROMPT_PLUGINS_FILE};
 mod proto;
+mod pulse;
 mod repl;
 mod repl_starts;
 mod rpc;
@@ -228,8 +229,9 @@ enum Msg {
         line: Option<String>,
     },
     /// A timer-name call is over (every_name.rs).
-    /// `/usage`'s first read counted the transcripts (daemon/usage.rs).
-    UsageCounted(Box<crate::usage_ledger::Ledger>),
+    /// The week's transcripts read (daemon/usage.rs's fill): the usage
+    /// ledger and the pulse's week (daemon/pulse.rs).
+    UsageCounted(Box<(crate::usage_ledger::Ledger, pulse::Week)>),
     TimerName {
         id: u64,
         reply: Option<String>,
@@ -395,6 +397,9 @@ struct Shell {
     recycle: recycling::Recycle,
     /// What the project's calls cost, per agent and model (daemon/usage.rs).
     usage: usage::Usage,
+    /// The project's pulse: its turns, main's entries for him, its news
+    /// (daemon/pulse.rs).
+    pulse: pulse::PulseState,
     /// The last plugins check (every 2 s on the tick).
     plugins_checked: Option<std::time::Instant>,
     /// The small model failed and agent_model answered: role lines use
@@ -1691,6 +1696,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         plugins_checked: None,
         recycle: recycling::Recycle::from_env(),
         usage: Default::default(),
+        pulse: Default::default(),
         small_broken: Default::default(),
         setup: None,
         config_path: None,

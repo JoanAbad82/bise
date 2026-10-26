@@ -3,7 +3,7 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
 import type { Part } from './parts';
-import type { Agent, Artifact, Card, Growth, ScheduledTask } from './rows';
+import type { Agent, Artifact, Card, Growth, Pulse, ScheduledTask } from './rows';
 
 /**
  * Selected lines of a thread quoted in a message (❝).
@@ -53,4 +53,10 @@ scheduled?: Array<ScheduledTask>,
  * les bims: how much it has done, the typed `growth` event's value
  * (the same cached computation); none: a view written before it
  */
-growth?: Growth | null, };
+growth?: Growth | null, 
+/**
+ * the H1 sidebar: its pulse, the typed `pulse` event's value (one
+ * computation for both); after a stop its buckets stop moving.
+ * None: a view written before it
+ */
+pulse?: Pulse | null, };

@@ -8,7 +8,7 @@ import type { InboxRecord, StateFilter } from './inbox';
 import type { Completion, CompletionAsk, LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
-import type { Agent, ApprovalMode, ApprovalRule, ArchivedAgent, Artifact, ArtifactMoved, Card, CheckerKind, DevServer, Feature, FlowMode, Folder, FolderOp, Growth, LibraryProject, Merged, Model, Page, Place, Pr, Proc, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
+import type { Agent, ApprovalMode, ApprovalRule, ArchivedAgent, Artifact, ArtifactMoved, Card, CheckerKind, DevServer, Feature, FlowMode, Folder, FolderOp, Growth, LibraryProject, Merged, Model, Page, Place, Pr, Proc, Pulse, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
 import type { Entry, FindHit } from './thread';
 
 export type JobState = "running" | "done" | "failed";
@@ -89,7 +89,7 @@ key?: number | null, } | { "ev": "followed_end", project: string, agent: string,
 /**
  * the messages held so far (queued for an agent, not delivered)
  */
-held?: number, } | { "ev": "switch", project: string, switch?: SwitchRow | null, } | { "ev": "growth", project: string, growth: Growth, } | { "ev": "usage", project: string, counting?: boolean, 
+held?: number, } | { "ev": "switch", project: string, switch?: SwitchRow | null, } | { "ev": "growth", project: string, growth: Growth, } | { "ev": "pulse", project: string, pulse: Pulse, } | { "ev": "usage", project: string, counting?: boolean, 
 /**
  * boxed: HubEv stays small (hub::size)
  */

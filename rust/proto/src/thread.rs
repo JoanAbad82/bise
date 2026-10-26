@@ -81,6 +81,41 @@ pub enum EntryKind {
     Unknown,
 }
 
+impl EntryKind {
+    /// An entry written for him in main's thread (rows::Pulse's
+    /// `said_at`, "unread"): main's words, another agent's, bise's
+    /// notices and news; never his own, nor the work under them (tools,
+    /// thinking, compaction). The one rule (architect m_44825): every
+    /// kind is decided here, no wildcard, so a new kind must be.
+    pub fn for_him(self) -> bool {
+        match self {
+            EntryKind::Agent
+            | EntryKind::FromAgent
+            | EntryKind::Card
+            | EntryKind::Page
+            | EntryKind::Report
+            | EntryKind::Notice
+            | EntryKind::Landed
+            | EntryKind::Artifact
+            | EntryKind::Answered
+            | EntryKind::TurnFailed
+            | EntryKind::Wake
+            | EntryKind::Scheduled => true,
+            EntryKind::You
+            | EntryKind::Tools
+            | EntryKind::Stopped
+            | EntryKind::ToAgent
+            | EntryKind::Thinking
+            | EntryKind::Compacting
+            | EntryKind::Compacted
+            | EntryKind::NotDelivered
+            | EntryKind::Pr
+            | EntryKind::Approval
+            | EntryKind::Unknown => false,
+        }
+    }
+}
+
 /// A `turn_failed` entry (R12): why the turn failed, the runtime's words
 /// (a provider's error, a missing key, a budget).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

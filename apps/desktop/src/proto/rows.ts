@@ -1264,3 +1264,53 @@ days_used: number,
  * every artifact made, archived ones included
  */
 artifacts_made: number, since_ms?: number | null, };
+
+/**
+ * One project's pulse.
+ */
+export type Pulse = { 
+/**
+ * the start of the first bucket: a local 00:00, 08:00 or 16:00
+ */
+from_ms: number, 
+/**
+ * [`PULSE_BUCKETS`] buckets of 8 h from `from_ms`, oldest first
+ * (bucket i starts at `from_ms + i * 8 h`): the sum of its agents'
+ * turn time in it (turn start to turn end); parallel agents add up.
+ * A stopped hub's buckets stop moving: draw them from `from_ms`
+ */
+busy_ms: Array<number>, 
+/**
+ * its last activity: the latest turn end, or now while a turn runs
+ */
+last_ms?: number | null, 
+/**
+ * the one "last news" the hub picked (none: nothing to say)
+ */
+news?: News | null, 
+/**
+ * when the week's artifacts were made or changed, newest first, at
+ * most [`PULSE_CAP`]: new ones = `artifacts_at > seen.<project>`
+ */
+artifacts_at?: Array<number>, 
+/**
+ * when main's thread got an entry written for him this week (main's
+ * words, an agent's, bise's; never his own), newest first, at most
+ * [`PULSE_CAP`]: unread = `said_at > seen.<project>`
+ */
+said_at?: Array<number>, 
+/**
+ * the hub is still reading the week's transcripts: the buckets and
+ * `said_at` hold only what came since it started
+ */
+counting?: boolean, };
+
+/**
+ * The "last news" of a project: what happened (or will) and when.
+ */
+export type News = { at_ms: number, what: NewsWhat, };
+
+/**
+ * What the news is. `at_ms` is past for all but `scheduled` (its next run).
+ */
+export type NewsWhat = { "kind": "failed", agent: string, } | { "kind": "landed", agent: string, sha: string, target: string, } | { "kind": "artifact", id: string, title: string, } | { "kind": "scheduled", id: string, name: string, } | { "kind": "unknown" };

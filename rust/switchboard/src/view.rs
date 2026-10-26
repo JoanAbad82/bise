@@ -15,7 +15,7 @@
 use crate::proto_view::{self, Since};
 use bise_proto::draft::{ProjectView, VIEW_ARTIFACTS};
 use crate::snapshot::Snapshot;
-use bise_proto::rows::{Artifact, Growth, ScheduledTask};
+use bise_proto::rows::{Artifact, Growth, Pulse, ScheduledTask};
 use std::path::Path;
 
 /// The file's name in the hub's state folder.
@@ -35,6 +35,8 @@ pub const DEBOUNCE_MS: u64 = 2_000;
 /// (`proto_view::scheduled`, the same builder).
 /// `growth`: the hub's cached growth, the typed `growth` event's value
 /// (daemon/proto/growth.rs, one computation for both).
+/// `pulse`: the hub's pulse, the typed `pulse` event's value
+/// (daemon/pulse.rs, one computation for both).
 #[allow(clippy::too_many_arguments)]
 pub fn of(
     snap: &Snapshot,
@@ -47,6 +49,7 @@ pub fn of(
     artifacts: Vec<Artifact>,
     scheduled: Vec<ScheduledTask>,
     growth: Growth,
+    pulse: Pulse,
 ) -> ProjectView {
     let artifacts_total = artifacts.len() as u32;
     let mut artifacts = artifacts;
@@ -73,6 +76,7 @@ pub fn of(
         artifacts_total,
         scheduled,
         growth: Some(growth),
+        pulse: Some(pulse),
     }
 }
 
@@ -168,7 +172,7 @@ mod tests {
     #[test]
     fn the_view_has_the_windows_rows_and_no_running_flag() {
         let mut since = Since::new();
-        let v = of(&snap(), "api-12345678", 100, 90, None, &mut since, &|_| None, vec![], vec![], Growth::default());
+        let v = of(&snap(), "api-12345678", 100, 90, None, &mut since, &|_| None, vec![], vec![], Growth::default(), Pulse::default());
         assert_eq!((v.v, v.project.as_str(), v.written_ms, v.last_activity_ms, v.stopped_ms), (1, "api-12345678", 100, 90, None));
         assert_eq!(v.agents.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["main", "p99"]);
         assert_eq!(v.agents[1].branch.as_deref(), Some("sb/p99"));
@@ -179,7 +183,7 @@ mod tests {
         assert!(!text.contains("running"), "{text}");
         assert!(!text.contains("stopped_ms"), "absent while it runs: {text}");
         assert_eq!(parse(&text), Some(v.clone()));
-        let stopped = of(&snap(), "api-12345678", 200, 90, Some(200), &mut since, &|_| None, vec![], vec![], Growth::default());
+        let stopped = of(&snap(), "api-12345678", 200, 90, Some(200), &mut since, &|_| None, vec![], vec![], Growth::default(), Pulse::default());
         assert!(render(&stopped).contains("\"stopped_ms\": 200"));
     }
 
@@ -194,7 +198,7 @@ mod tests {
             .collect();
         let ev = serde_json::json!({"ev": "artifacts", "rows": rows, "seen_ms": 1_030});
         let typed = proto_view::artifacts(&ev, |_| None, None);
-        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, typed.clone(), vec![], Growth::default());
+        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, typed.clone(), vec![], Growth::default(), Pulse::default());
         assert_eq!((v.artifacts.len(), v.artifacts_total), (VIEW_ARTIFACTS, 60));
         let mut want = typed;
         want.sort_by_key(|a| std::cmp::Reverse(a.at_ms));
@@ -215,7 +219,7 @@ mod tests {
             "target": "/w/notes.md", "path": "/w/notes.md", "versions": [{"v": 1, "ts_ms": 1}, {"v": 2, "ts_ms": 3}, {"v": 3, "ts_ms": 5}]});
         let ev = serde_json::json!({"ev": "artifacts", "rows": [row], "seen_ms": 0});
         let typed = proto_view::artifacts(&ev, |_| None, None);
-        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, typed.clone(), vec![], Growth::default());
+        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, typed.clone(), vec![], Growth::default(), Pulse::default());
         assert_eq!(v.artifacts[0].path, typed[0].path, "the path stays");
         assert!(v.artifacts[0].versions.is_empty(), "no versions in the view");
         assert!(!render(&v).contains("versions"), "{}", render(&v));
@@ -231,7 +235,7 @@ mod tests {
         let rows = crate::proto_view::scheduled(&timers);
         assert!(rows.is_empty(), "no timer, no row");
         let t: bise_proto::rows::ScheduledTask = serde_json::from_value(serde_json::json!({"id": 7, "agent": "perf", "by": "main", "words": "check the build", "every": "every 2m", "times": 6, "done": 2, "next_ms": 1_000})).unwrap();
-        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, vec![], vec![t.clone()], Growth::default());
+        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, vec![], vec![t.clone()], Growth::default(), Pulse::default());
         assert_eq!(v.scheduled, vec![t]);
         assert_eq!(parse(&render(&v)), Some(v.clone()));
     }
@@ -241,7 +245,7 @@ mod tests {
         assert_eq!(parse(""), None);
         assert_eq!(parse("{not json"), None);
         assert_eq!(parse(r#"{"v":1}"#), None);
-        let mut v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, vec![], vec![], Growth::default());
+        let mut v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, vec![], vec![], Growth::default(), Pulse::default());
         v.v = 2;
         assert_eq!(parse(&render(&v)), None);
     }

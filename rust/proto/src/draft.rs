@@ -92,6 +92,11 @@ pub struct ProjectView {
     /// (the same cached computation); none: a view written before it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub growth: Option<crate::rows::Growth>,
+    /// the H1 sidebar: its pulse, the typed `pulse` event's value (one
+    /// computation for both); after a stop its buckets stop moving.
+    /// None: a view written before it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pulse: Option<crate::rows::Pulse>,
 }
 
 /// How many artifacts a `view.json` keeps (it is rewritten on every

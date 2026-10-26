@@ -2,7 +2,7 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
-import type { Agent, ArtLink, Artifact, Card, CardBatch, CardPage, Growth, Opt, ReportKind, ScheduledTask } from './rows';
+import type { Agent, ArtLink, Artifact, Card, CardBatch, CardPage, Growth, Opt, Pulse, ReportKind, ScheduledTask } from './rows';
 
 /**
  * One project in the window's sidebar.
@@ -44,7 +44,14 @@ web?: string | null,
  * absent: it runs, or nothing tried yet. The core keeps retrying,
  * backing off; the row says it at once, never a silent loop
  */
-down?: string | null, };
+down?: string | null, 
+/**
+ * its pulse (the H1 sidebar, rows::pulse): a held hub's own
+ * `hub/pulse`, else its `view.json`'s (a stopped hub's last one).
+ * New artifacts and unread are counted against `seen.<project>`
+ * (rows::pulse's header); absent: none known yet
+ */
+pulse?: Pulse | null, };
 
 export type OpenWhat = "thread" | "review" | "artifact" | "worktree";
 

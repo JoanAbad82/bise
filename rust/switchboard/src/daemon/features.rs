@@ -84,6 +84,11 @@ impl Features {
         due
     }
 
+    /// The trunk's short name the last refresh read ("" before it): no git.
+    pub(super) fn trunk(&self) -> String {
+        self.lock().main.clone()
+    }
+
     /// The views' part (`Hub::feature_lids`, `Hub::trying`), by place id,
     /// against the trunk the last refresh read: no git (it ran per
     /// snapshot, 2-3 subprocesses each, hub-lag-7).

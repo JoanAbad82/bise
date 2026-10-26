@@ -209,6 +209,7 @@ pub const VARS: &[Var] = &[
     test("SB_LOAD_FACTOR", "a file holding the machine's load factor the hub sees, 1 to 8, read each time (tests; switchboard::load)"),
     test("SB_ONBOARDING", "off/on: the onboarding (tests)"),
     internal("SB_PORT_OFFSET", "an agent's dev-server port offset"),
+    test("SB_PULSE_MS", "the shortest time between two pulse checks, 60 s by default (tests; daemon/pulse.rs)"),
     test_input("SB_SEARCH_BENCH", "a folder to bench search on (an ignored test)"),
     test("SB_SETUP", "off: no setup card (tests)"),
     test("SB_SLOW_SPAWN", "a file holding the ms each REPL start waits before its spawn (tests)"),
