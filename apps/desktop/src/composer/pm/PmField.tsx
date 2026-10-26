@@ -138,6 +138,8 @@ export interface PmFieldProps {
 
 /** The draft is written this long after the last change (never on each key of a burst). */
 const DRAFT_DEBOUNCE_MS = 400;
+/** A bare '@' with nothing but a files answer to wait for: how long before it says there is nothing. */
+export const NONE_WAIT_MS = 400;
 
 /** The list's session: the same trigger at the same place, whatever its query says. */
 const sessionKey = (t: Trigger | null): string =>
@@ -460,17 +462,27 @@ export function PmField(p: PmFieldProps): JSX.Element {
       : Math.max(0, leftIndex);
   // a bare '@' or '$' with nothing to offer (bise's home: no agents, no skills): one text-3 line,
   // never silence (designer m_44585: a key that opens nothing reads as broken); the next key or esc
-  // closes it, the '@' or '$' stays plain text
-  const none =
+  // closes it, the '@' or '$' stays plain text. An '@' whose files answer is late (or never comes:
+  // a hub with no workspace, ui-review m_44604) says so after NONE_WAIT_MS; a late answer with rows
+  // opens the list in its place
+  const [slow, setSlow] = useState("");
+  const bare =
     !open &&
     trigger !== null &&
     (trigger.kind === "at" || trigger.kind === "skill") &&
     trigger.query === "" &&
     rows.length === 0 &&
-    !waiting &&
-    dismissed !== `${trigger.kind}:${trigger.start}`
-      ? trigger.kind
-      : null;
+    dismissed !== `${trigger.kind}:${trigger.start}`;
+  useEffect(() => {
+    if (!bare || !waiting) return;
+    const t = setTimeout(() => {
+      setSlow(tkey);
+    }, NONE_WAIT_MS);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [bare, waiting, tkey]);
+  const none = bare && (!waiting || slow === tkey) ? trigger.kind : null;
   const live = useRef({ open, rows, index, trigger, tkey, none: none !== null });
   const fileList = open && trigger.kind === "at";
   useEffect(() => {

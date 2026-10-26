@@ -3,12 +3,12 @@
 // hidden, the floating composer's too). They float on <body> now: nothing above them clips them
 // (ds noClip), and pickPlace keeps the whole list inside a short window, docked or floating.
 import { act, cleanup, render } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { noClip } from '@/ds/noclip';
 import type { ComposerActions } from './actions';
 import type { Store } from './drafts';
 import { NO_SOURCES } from './sources';
-import { PmField } from './pm/PmField';
+import { NONE_WAIT_MS, PmField } from './pm/PmField';
 import { pickPlace } from './Picker';
 import { composer as words } from '../proto/words_composer.gen';
 
@@ -127,6 +127,33 @@ describe('the / @ $ lists', () => {
     });
     const pop = getByTestId('composer.pick').parentElement as HTMLElement;
     expect(pop.style.bottom).toBe(`${String(window.innerHeight - 528 + 8)}px`);
+  });
+
+  // ui-review m_44604: on bise's home the files answer never comes; the '@' said nothing
+  it("a bare '@' whose files answer doesn't come says so after NONE_WAIT_MS, never before", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const got: { a: ComposerActions | null } = { a: null };
+      const { queryByTestId } = render(
+        <div className="box">
+          <PmField target="p/main" busy={false} sources={{ ...NO_SOURCES, files: () => new Promise(() => undefined) }} store={memStore()} testId="composer"
+            placeholder="write to bise" send={() => undefined} queue={() => undefined} editNewest={() => false} command={() => undefined}
+            onCanSend={() => undefined} onStrip={() => undefined} onBar={() => undefined} onActions={(x) => (got.a = x)} />
+        </div>,
+      );
+      await act(async () => {
+        got.a?.insertText('@');
+        await Promise.resolve();
+      });
+      expect(queryByTestId('composer.pick'), 'its answer may still come').toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(NONE_WAIT_MS);
+        await Promise.resolve();
+      });
+      expect(queryByTestId('composer.pick')?.textContent).toBe(words.pick_none_at);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // designer m_44585: a key that opens nothing reads as broken
