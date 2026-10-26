@@ -12,6 +12,8 @@ import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
 import { panelState } from './state';
 import { openTab } from './tabs';
+import { PANEL_KEYS } from './keys';
+import { panel } from '@/proto/words_panel.gen';
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -114,13 +116,17 @@ describe('the tabbed panel', () => {
     expect(t.getAttribute('data-tip')).toBeNull();
     expect(v.getByTestId('app.panel.toggle').getAttribute('data-tip')).toContain('⌥⌘0');
   });
-  it('a narrow window: a sheet over the thread with its own ▯; esc or a click outside folds it (ui-review m_42642)', () => {
+  it("a narrow window: a sheet over the thread, the bar's ▯ its only one (designer m_44391); esc or a click outside folds it (ui-review m_42642)", () => {
     Object.defineProperty(window, 'innerWidth', { value: 1100, configurable: true });
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').hasAttribute('data-over')).toBe(true);
     expect(v.getByTestId('app.panel').style.width).toBe('0px');
-    fireEvent.click(v.getByTestId('app.panel.sheet.toggle'));
+    // the sheet's row starts with its tabs: one 'Hide panel' ▯ in the window, the bar's (pressed)
+    expect(v.getAllByLabelText(panel.panel_hide({ key: PANEL_KEYS.toggle }))).toEqual([v.getByTestId('app.panel.toggle')]);
+    expect(v.getByTestId('app.panel.top').firstElementChild?.nextElementSibling?.getAttribute('data-testid')).toBe('app.panel.tabs');
+    expect(v.getByTestId('app.panel.toggle').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -133,6 +139,6 @@ describe('the tabbed panel', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').hasAttribute('data-over')).toBe(false);
-    expect(v.queryByTestId('app.panel.sheet.toggle')).toBeNull();
+    expect(v.getAllByLabelText(panel.panel_hide({ key: PANEL_KEYS.toggle }))).toEqual([v.getByTestId('app.panel.toggle')]);
   });
 });

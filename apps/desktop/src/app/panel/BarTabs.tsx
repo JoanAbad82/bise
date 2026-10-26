@@ -18,15 +18,6 @@ import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanel
 import { useTabLooks, type TabLook } from './look';
 import { PANEL_KEYS } from './keys';
 
-/** The ▯ at a sheet's tab row start: the sheet covers the bar's own (ui-review m_42642). */
-export function SheetToggle() {
-  return (
-    <IconButton label={panel.panel_hide({ key: PANEL_KEYS.toggle })} size="bar" pressed onClick={panelToggle} testId="app.panel.sheet.toggle">
-      <AppIcon name="panel" size={16} />
-    </IconButton>
-  );
-}
-
 /** The panel's ▯ at the title bar's end (⌥⌘0), pressed while it is open. */
 export function BarTabs() {
   const s = usePanelState();
@@ -62,8 +53,11 @@ function useWidthOf(): readonly [RefObject<HTMLDivElement | null>, number] {
 const ADD_W = 28 + TAB_GAP;
 const OVER_W = 48 + TAB_GAP;
 
-/** The tabs in the panel's top row, '+', at its start `start` (a sheet's ▯) and at its end what the tab in front adds (`end`). */
-export function PanelTabs({ start, end }: { start?: ReactNode; end?: ReactNode }) {
+/**
+ * The tabs in the panel's top row, '+', and at its end what the tab in front adds (`end`). A sheet's
+ * row starts with its tabs too: the bar's ▯ above it, at the window's edge, folds it (designer m_44391).
+ */
+export function PanelTabs({ end }: { end?: ReactNode }) {
   const s = usePanelState();
   const look = useTabLooks();
   const [strip, room] = useWidthOf();
@@ -86,7 +80,6 @@ export function PanelTabs({ start, end }: { start?: ReactNode; end?: ReactNode }
   return (
     // the bar's own row over the panel's column: its ground zooms on a double-click as the bar's
     <div className="pn-top" data-testid="app.panel.top" onDoubleClick={barGroundDoubleClick}>
-        {start}
         <div className="pn-measure" ref={measure} aria-hidden>
           {s.tabs.list.map((t) => {
             const l = look(t);

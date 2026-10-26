@@ -21,7 +21,7 @@ import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
 import { BlankBrowser } from './Browser';
-import { PanelTabs, SheetToggle } from './BarTabs';
+import { PanelTabs } from './BarTabs';
 import './panel.css';
 
 /** The tabbed panel on the window's right (--w-panel 384, from --w-panel-min to --w-panel-max). */
@@ -48,7 +48,7 @@ export function PanelHost() {
     >
       {s.open && <Border width={width} onDrag={setDragging} />}
       <div className="pn-col" style={{ width }}>
-        <PanelTabs start={over ? <SheetToggle /> : undefined} end={art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />} />
+        <PanelTabs end={art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />} />
         <div className="pn-in" role="tabpanel" data-testid={`app.panel.body.${s.tabs.active}`}>
           {s.tabs.list.map((t) => (
             <Body key={t.id} tab={t} shown={s.open && t.id === s.tabs.active} />
