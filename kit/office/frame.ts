@@ -10,5 +10,11 @@
 // - fit: back to fit, window -> frame (image.js takes it only from window.parent)
 // - size: {h}, the height that holds the viewer's content, frame -> window (video.js: the screen
 //   at the clip's ratio and its bar; the window's card hugs it, designer m_32762)
+// - pinch: {dy, x, y, w}, a trackpad pinch the page didn't use, frame -> window (the desktop's
+//   injected main/pinch.ts PINCH_FORWARD; the window zooms the frame itself, useFrameNote.ts)
+// - pan: {dx, dy, w}, two fingers while the page is zoomed with room that way, frame -> window
+//   (PINCH_FORWARD; useFrameNote.ts)
+// - room: {room}, how far the zoomed page can still pan each way, null at fit, window -> frame
+//   (PINCH_FORWARD takes it only from window.parent)
 
-export const FRAME = Object.freeze({ anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size" });
+export const FRAME = Object.freeze({ anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size", pinch: "pinch", pan: "pan", room: "room" });

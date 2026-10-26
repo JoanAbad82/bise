@@ -38,6 +38,18 @@ describe("readFrame: an image's zoom from the side panel frame (image-pinch)", (
   it('the way back to fit is {bise: fit}', () => {
     expect(FIT_MESSAGE).toEqual({ bise: 'fit' });
   });
+  it("reads a web page's {bise: pinch} and {bise: pan} (web-pinch): finite numbers in bounds, a width above 0, only from that frame", () => {
+    const at = { origin: SRV, source: w };
+    expect(readFrame({ bise: 'pinch', dy: -4.5, x: 10, y: 20, w: 600 }, at, fr)).toEqual({ kind: 'pinch', dy: -4.5, x: 10, y: 20, w: 600 });
+    expect(readFrame({ bise: 'pan', dx: 3, dy: -7, w: 600, extra: 1 }, at, fr)).toEqual({ kind: 'pan', dx: 3, dy: -7, w: 600 });
+    for (const bad of [{ dy: Number.NaN }, { x: '10' }, { w: 0 }, { w: -1 }, { y: 1e9 }, { dy: undefined }]) {
+      expect(readFrame({ bise: 'pinch', dy: 1, x: 10, y: 20, w: 600, ...bad }, at, fr)).toBeNull();
+    }
+    expect(readFrame({ bise: 'pan', dx: 3, w: 600 }, at, fr)).toBeNull();
+    expect(readFrame({ bise: 'pinch', dy: 1, x: 1, y: 1, w: 600 }, { origin: SRV, source: { name: 'another tab' } }, fr)).toBeNull();
+    expect(readFrame({ bise: 'pan', dx: 1, dy: 1, w: 600 }, { origin: 'https://evil.example', source: w }, fr)).toBeNull();
+    expect(readFrame({ bise: 'room', room: null }, at, fr), "room is the window's, never read from a frame").toBeNull();
+  });
 });
 
 const SERVER = 'http://127.0.0.1:47438';

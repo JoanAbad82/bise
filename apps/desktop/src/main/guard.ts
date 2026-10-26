@@ -16,7 +16,10 @@
 //     (renderer/index.html): Chromium's CSP check failed it before the guard
 //     and left an error page in the panel (his blank page). The second wall:
 //     session.webRequest cancels any subframe request off the pages server;
-//   - no <webview>.
+//   - no <webview>;
+//   - an artifact's page gets two forwarders: its unused esc (ESC_FORWARD) and its pinch
+//     (pinch.ts PINCH_FORWARD: the window zooms the frame, as a browser's visual zoom; the
+//     window's own visual zoom stays off, it would zoom the whole app).
 // In test mode also: a window that isn't offscreen is destroyed at birth, and
 // every window's show/showInactive/focus are no-ops, with a 'show' that still
 // happens destroying the window (the last fence).
@@ -25,6 +28,7 @@ import { IPC, TEST_WINDOW_OPEN_HOOK } from '../shared/api';
 import { FRAME_KINDS } from '../shared/frame';
 import { frameLink, isPagesFrame, type FrameLink } from './framelink';
 import { openLink } from './ipc';
+import { PINCH_FORWARD } from './pinch';
 
 export interface OwnPage {
   /** the renderer's index.html as a file:// URL (the built app) */
@@ -114,12 +118,14 @@ function guardContents(wc: WebContents, own: OwnPage, testMode: boolean): void {
   wc.on('will-attach-webview', (e) => {
     e.preventDefault();
   });
-  // an artifact's page (a pages-server subframe): its esc reaches the window (ESC_FORWARD)
+  // an artifact's page (a pages-server subframe): its esc reaches the window (ESC_FORWARD), its
+  // pinch and two fingers while zoomed too (pinch.ts PINCH_FORWARD; the window zooms the frame)
   wc.on('did-frame-finish-load', (_e, isMainFrame, pid, rid) => {
     if (isMainFrame) return;
     const f = webFrameMain.fromId(pid, rid);
     if (f === undefined || !isPagesFrame(f.url)) return;
     f.executeJavaScript(ESC_FORWARD).catch(() => undefined);
+    f.executeJavaScript(PINCH_FORWARD).catch(() => undefined);
   });
 }
 

@@ -126,10 +126,24 @@ function fromFrame(from: FrameFrom, frame: FrameOf): boolean {
 export type FrameMsg =
   | { readonly kind: 'anchor'; readonly note: FrameNote }
   | { readonly kind: 'zoom'; readonly fit: boolean }
-  | { readonly kind: 'size'; readonly h: number };
+  | { readonly kind: 'size'; readonly h: number }
+  | { readonly kind: 'pinch'; readonly dy: number; readonly x: number; readonly y: number; readonly w: number }
+  | { readonly kind: 'pan'; readonly dx: number; readonly dy: number; readonly w: number };
 
 /** The tallest height a frame may ask for, in CSS px. */
 const MAX_FRAME_H = 20_000;
+/** The most one wheel may say, in CSS px (a pinch's delta, a pan's, a point, a width). */
+const MAX_WHEEL = 100_000;
+const num = (v: unknown): v is number => pct(v) && Math.abs(v) <= MAX_WHEEL;
+const width = (v: unknown): v is number => num(v) && v > 0;
+
+/** A web page's pinch or pan (main/pinch.ts PINCH_FORWARD): its numbers, all finite and in bounds; null else. Pure. */
+function readWheel(data: Obj): FrameMsg | null {
+  if (data.bise === FRAME_KINDS.pinch) {
+    return num(data.dy) && num(data.x) && num(data.y) && width(data.w) ? { kind: 'pinch', dy: data.dy, x: data.x, y: data.y, w: data.w } : null;
+  }
+  return num(data.dx) && num(data.dy) && width(data.w) ? { kind: 'pan', dx: data.dx, dy: data.dy, w: data.w } : null;
+}
 
 /**
  * A message from the frame, read once for every kind it may send the window (kit/office/frame.js):
@@ -140,6 +154,7 @@ export function readFrame(data: unknown, from: FrameFrom, frame: FrameOf): Frame
   if (!fromFrame(from, frame) || !isObj(data)) return null;
   if (data.bise === FRAME_KINDS.zoom) return typeof data.fit === 'boolean' ? { kind: 'zoom', fit: data.fit } : null;
   if (data.bise === FRAME_KINDS.size) return pct(data.h) && data.h > 0 && data.h <= MAX_FRAME_H ? { kind: 'size', h: Math.round(data.h) } : null;
+  if (data.bise === FRAME_KINDS.pinch || data.bise === FRAME_KINDS.pan) return readWheel(data);
   const note = readFrameNote(data, from, frame);
   return note === null ? null : { kind: 'anchor', note };
 }

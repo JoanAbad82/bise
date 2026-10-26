@@ -10,4 +10,10 @@
 // - fit: back to fit, window -> frame (kit/office/image.js)
 // - size: {h}, the height that holds the viewer's content, frame -> window (kit/office/video.js;
 //   the card hugs it: useFrameNote.ts, designer m_32762)
-export const FRAME_KINDS = { anchor: 'anchor', esc: 'esc', zoom: 'zoom', fit: 'fit', size: 'size' } as const;
+// - pinch: {dy, x, y, w}, a trackpad pinch the page didn't use, frame -> window (guard.ts injects
+//   main/pinch.ts PINCH_FORWARD; useFrameNote.ts zooms the frame, artifacts/pagezoom.ts)
+// - pan: {dx, dy, w}, two fingers while the page is zoomed with room that way, frame -> window
+//   (PINCH_FORWARD; useFrameNote.ts)
+// - room: {room}, how far the zoomed page can still pan each way, null at fit, window -> frame
+//   (useFrameNote.ts; PINCH_FORWARD takes it only from its parent)
+export const FRAME_KINDS = { anchor: 'anchor', esc: 'esc', zoom: 'zoom', fit: 'fit', size: 'size', pinch: 'pinch', pan: 'pan', room: 'room' } as const;
