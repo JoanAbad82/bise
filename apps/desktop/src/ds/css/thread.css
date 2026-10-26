@@ -78,4 +78,4 @@
 .b-brief-line .w{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .b-card-line{display:block;max-width:100%;margin:0 0 var(--gap-tight);padding:0;border:0;background:none;font:var(--t-14) var(--font-ui);color:var(--c-text);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .b-card-line:hover,.b-card-line.is-hover{color:var(--c-text)}
-.b-card-line .mark{color:var(--c-accent)}
+.b-card-line .b-rowmark{margin-right:var(--s-1)}

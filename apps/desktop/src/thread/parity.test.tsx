@@ -176,7 +176,8 @@ describe('code colors (tui-parity B15)', () => {
     // main's card follows its ask: one copy of the question (on the ask); with b the inbox block is the one
     // place to answer, so the card is one dim line pointing there, no options (designer m_15612)
     expect(v.queryByTestId('thread.asks.8')).toBeNull();
-    expect(v.getByTestId('thread.card.2').textContent).toBe('? waits for you · in the inbox below');
+    expect(v.getByTestId('thread.card.2').textContent).toBe('waits for you · in the inbox below');
+    expect(v.getByTestId('thread.card.2').querySelector('.b-rowmark')?.getAttribute('data-icon')).toBe('ask');
     expect(v.queryByTestId('thread.card.2.opt.2')).toBeNull();
     const opened: unknown[] = [];
     const off = onOpenInbox((at) => {

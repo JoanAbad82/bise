@@ -240,7 +240,8 @@ export interface CardLineProps {
 export function CardLine({ children, onClick, testId }: CardLineProps) {
   return (
     <button type="button" className="b-card-line" onClick={onClick} data-testid={testId}>
-      <span className="mark">?</span> {children}
+      <RowMark icon="ask" tone="accent" />
+      {children}
     </button>
   );
 }

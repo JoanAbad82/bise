@@ -71,6 +71,8 @@ const PARTS = {
   dot: [[12, 12, 1]],
   // nm-settings: settings › Shortcuts (designer m_43851)
   keyboard: ["M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z", "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"],
+  // nm-thread (ui-review m_43868): what waits on him in the thread, for ?
+  ask: [[12, 12, 9], "M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14", [12, 17, 1]],
 } as const satisfies Record<string, readonly Part[]>;
 
 /** Every app icon's name. */

@@ -407,13 +407,14 @@ export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; 
       <Markdown text={body} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
     </div>
   );
+  // the status line's '✓ ' / '✗ ' (reportStatus, the TUI's words) drawn as its line icon
+  const mark: AppIconName | null = line.startsWith('✓ ') ? 'check' : line.startsWith('✗ ') ? 'close' : null;
   if (dup) {
     // its words stay (designer, ambient-lead m_20040): '✓ <summary>… ▸ report', sans 13, text-2
-    const mark: AppIconName = line.startsWith('✓ ') ? 'check' : line.startsWith('✗ ') ? 'close' : 'dot';
     return (
       <div className="th-report" data-dup="true" data-testid={`thread.report.${String(pos)}`}>
         <Press look="th-report-fold" aria-expanded={open} onClick={toggle} data-testid={`thread.report.${String(pos)}.fold`}>
-          <RowMark icon={mark} tone={mark === 'close' ? 'err' : 'dim'} />
+          <RowMark icon={mark ?? 'dot'} tone={mark === 'close' ? 'err' : 'dim'} />
           <span className="th-report-words">{body.split('\n')[0] ?? ''}</span>
           <span className="th-report-more">
             <span className="th-sched-chev" data-open={open || undefined} aria-hidden="true">
@@ -429,7 +430,11 @@ export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; 
   return (
     <div className="th-report" data-waits={waits || undefined} data-testid={`thread.report.${String(pos)}`}>
       <div className="th-report-line">
-        <Marker>{line}</Marker>
+        {/* its status mark a line icon (ui-review m_43868), the words after it */}
+        <Marker>
+          {mark !== null && <RowMark icon={mark} tone={mark === 'close' ? 'err' : 'dim'} />}
+          {mark === null ? line : line.slice(2)}
+        </Marker>
         {more && (
           <Act onClick={toggle} testId={`thread.report.${String(pos)}.more`}>
             <span className="th-sched-chev" data-open={open || undefined} aria-hidden="true">
