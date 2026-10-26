@@ -150,3 +150,11 @@ trunk's tip lands as before.
   node_modules (no `three`), green after the real install.
 - **Known gap**: nothing removes a project's worktrees folder when the
   project goes, `.land-check/` included (scratch.rs's header says so).
+- **Follow-up (feature-merge, 7bda06b10; owner: designer, or whoever
+  draws closing words in the window)**: a feature card his pick could not
+  run closes with the hub's `handed to main` (`feature::HANDED`); the
+  TUI says it through `words::thread::closed_handed("main")`. The window
+  draws no closing word on a card yet: it should say `handed to bise`
+  (its own word for main, designer m_45201) with the tip `your pick
+  couldn't run (<reason>), so main has it, with a brief`, which needs the
+  reason on the wire.
