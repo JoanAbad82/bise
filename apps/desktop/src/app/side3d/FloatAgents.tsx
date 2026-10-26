@@ -122,7 +122,8 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group, onHandoff }: { r: B
         </span>
         {st !== undefined && (
           <span className="s3-arow-state" data-tone={st.tone} {...tipAttrs(st.tip)} data-testid={`${id}.state`}>
-            {st.g === '∿' ? <AgentSign mark="works" testId={`${id}.state`} /> : st.g !== '' && <span className="s3-arow-sg">{st.g}</span>}
+            {/* the ask's mark has one form across the window: the circled ? (designer m_45861) */}
+            {st.g === '∿' ? <AgentSign mark="works" testId={`${id}.state`} /> : st.g === '?' ? <AgentSign mark="asks" testId={`${id}.state`} /> : st.g !== '' && <span className="s3-arow-sg">{st.g}</span>}
             {st.words}
           </span>
         )}

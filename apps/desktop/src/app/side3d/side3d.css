@@ -1140,7 +1140,11 @@
 .s3-arow-state[data-tone='err'] {
   color: var(--c-err);
 }
-.s3-arow-state[data-tone='rest'] .s3-arow-sg {
+.s3-arow-state[data-tone='rest'] .s3-arow-state .b-rowmark svg {
+  width: 12px;
+  height: 12px;
+}
+.s3-arow-sg {
   color: var(--c-text);
 }
 .s3-arow-sg {
