@@ -49,7 +49,10 @@ describe('the app pages ⌘K finds (ambient-lead m_21499)', () => {
     const key = (id: string, route: Route = inThread) => appPages({ projects, route, settings: PAGES }).find((p) => p.id === id)?.key;
     expect(key('settings')).toBe('⌘,');
     expect(key('inbox')).toBe('⌘I');
-    expect(key('artifacts/acme-2')).toBe('⌘⇧A');
+    // ⇧⌘A is the rail's artifacts, every project's library (rail-keys)
+    expect(key('artifacts')).toBe('⇧⌘A');
+    expect([key('inbox/all'), key('scheduled'), key('plugins')]).toEqual(['⇧⌘I', '⌘Y', '⇧⌘X']);
+    expect(key('artifacts/acme-2')).toBe('');
     expect(key('artifacts/home-1')).toBe('');
     // ⌘D from an agent's thread is its review, from a project's main its changes
     expect(key('changes/acme-2')).toBe('');

@@ -568,8 +568,8 @@ export const settings = {
   key_panel: "show / hide the panel",
   /** ⌘0 */
   key_bise: "bise",
-  /** ⌘1 … ⌘9 */
-  key_project: "a project, in the order of Settings › Projects",
+  /** ⌘1 … ⌘9 (on the artifacts library: its rows, in their order; rail-keys) */
+  key_project: "a project, in the order of Settings › Projects; in the library, its rows",
   /** ⌥0 / ⌥1 … ⌥9 */
   key_main_or_agent: "the project's bise / an agent",
   /** ⌘N */
@@ -580,13 +580,19 @@ export const settings = {
   key_find_agent: "find an agent, a page or an artifact",
   /** ⌘[ / ⌘] */
   key_back_forward: "back / forward",
-  /** ⌘I */
-  key_inbox: "the inbox: what waits for you, most blocking first",
+  /** ⌘I: the inbox block, in place (b1/b2) */
+  key_inbox: "answer what waits, here",
+  /** ⇧⌘I: the rail's inbox button (designer m_45497) */
+  key_inbox_page: "open the inbox page",
+  /** ⌘Y: the rail's clock (History in Safari and Chrome) */
+  key_scheduled: "scheduled",
+  /** ⇧⌘X: the rail's plugins (Extensions in VS Code) */
+  key_plugins: "plugins",
   /** ⌘F */
   key_find: "find in the thread",
   /** ⌘D */
   key_diff: "the agent's changes",
-  /** ⌘⇧A */
+  /** ⇧⌘A */
   key_artifacts: "the artifacts",
   /** ⌘⏎ (artifact-shortcut): the artifact in front's head's first button */
   key_artifact_primary: "open the artifact in your browser, or save a copy",

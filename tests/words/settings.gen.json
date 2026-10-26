@@ -1544,7 +1544,12 @@
   "settings.key_inbox": {
     "args": [],
     "one": null,
-    "text": "the inbox: what waits for you, most blocking first"
+    "text": "answer what waits, here"
+  },
+  "settings.key_inbox_page": {
+    "args": [],
+    "one": null,
+    "text": "open the inbox page"
   },
   "settings.key_last": {
     "args": [],
@@ -1601,6 +1606,11 @@
     "one": null,
     "text": "pick the option on, or send your typed answer"
   },
+  "settings.key_plugins": {
+    "args": [],
+    "one": null,
+    "text": "plugins"
+  },
   "settings.key_prev_next": {
     "args": [],
     "one": null,
@@ -1614,7 +1624,7 @@
   "settings.key_project": {
     "args": [],
     "one": null,
-    "text": "a project, in the order of Settings › Projects"
+    "text": "a project, in the order of Settings › Projects; in the library, its rows"
   },
   "settings.key_put_away": {
     "args": [],
@@ -1635,6 +1645,11 @@
     "args": [],
     "one": null,
     "text": "remove"
+  },
+  "settings.key_scheduled": {
+    "args": [],
+    "one": null,
+    "text": "scheduled"
   },
   "settings.key_send": {
     "args": [],

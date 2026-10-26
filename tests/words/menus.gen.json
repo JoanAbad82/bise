@@ -77,6 +77,41 @@
     "one": null,
     "text": "Finder"
   },
+  "menus.go_artifacts": {
+    "args": [],
+    "one": null,
+    "text": "Artifacts"
+  },
+  "menus.go_bise": {
+    "args": [],
+    "one": null,
+    "text": "bise"
+  },
+  "menus.go_inbox": {
+    "args": [],
+    "one": null,
+    "text": "Inbox"
+  },
+  "menus.go_inbox_page": {
+    "args": [],
+    "one": null,
+    "text": "Inbox Page"
+  },
+  "menus.go_menu": {
+    "args": [],
+    "one": null,
+    "text": "Go"
+  },
+  "menus.go_plugins": {
+    "args": [],
+    "one": null,
+    "text": "Plugins"
+  },
+  "menus.go_scheduled": {
+    "args": [],
+    "one": null,
+    "text": "Scheduled"
+  },
   "menus.move_bottom": {
     "args": [],
     "one": null,

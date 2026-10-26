@@ -9,7 +9,7 @@
 // Owner: nm-menus.
 import type { MenuItemConstructorOptions } from 'electron';
 import { menus } from '../proto/words_menus.gen';
-import type { MenuAction, ViewSides } from '../shared/api';
+import type { GoAction, MenuAction, ViewSides } from '../shared/api';
 import type { ClipOp } from './clipfence';
 
 export interface MenuOptions {
@@ -125,9 +125,20 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
     ],
   };
 
+  // the rail's places, each with the key its button shows (rail-keys, designer m_45492 / m_45497;
+  // settings/keys.ts PLACE_KEYS): bise ⌘0, the inbox block ⌘I and its page ⇧⌘I, Scheduled ⌘Y,
+  // Artifacts ⇧⌘A, Plugins ⇧⌘X. The window's own key acts first; its echo here goes to the same
+  // route, dropped (app/menu.ts)
   const go: MenuItemConstructorOptions = {
-    label: 'Go',
-    submenu: [item('Inbox', 'CmdOrCtrl+I', 'inbox')],
+    label: menus.go_menu,
+    submenu: [
+      item(menus.go_bise, 'CmdOrCtrl+0', 'bise'),
+      item(menus.go_inbox, 'CmdOrCtrl+I', 'inbox'),
+      item(menus.go_inbox_page, 'Shift+CmdOrCtrl+I', 'inboxPage'),
+      item(menus.go_scheduled, 'CmdOrCtrl+Y', 'scheduled'),
+      item(menus.go_artifacts, 'Shift+CmdOrCtrl+A', 'artifacts'),
+      item(menus.go_plugins, 'Shift+CmdOrCtrl+X', 'plugins'),
+    ],
   };
 
   // the two sides first (his m_44999, designer m_45008): Hide or Show as the focused window's are
@@ -168,6 +179,11 @@ export const hasTestNotify = (appName: string, testMode: boolean): boolean => te
 
 export type MenuTarget = { readonly send: 'focused' } | { readonly open: string };
 
+/** The route a Go item opens the main window on when it does not have the keys (app/route.ts's
+ *  paths; 'inbox' alone is the block's ask, so the page is 'inbox/all'). */
+const GO_OPENS: Readonly<Record<GoAction, string>> = { bise: 'bise', inboxPage: 'inbox/all', scheduled: 'scheduled', artifacts: 'artifacts', plugins: 'plugins' };
+const isGo = (a: MenuAction): a is GoAction => a in GO_OPENS;
+
 /**
  * Pure: where a bise item of the menu goes (qa-native m_9724). Settings,
  * the inbox and the terminal panel are the main window's: to it when it has the keys, else
@@ -180,5 +196,5 @@ export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget
   // nothing in the capsule), never a route to open
   // the two sides are the focused window's own (View › Hide/Show Sidebar, Panel), never a route either
   if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || action === 'panelFull' || mainFocused) return { send: 'focused' };
-  return { open: action };
+  return { open: isGo(action) ? GO_OPENS[action] : action };
 }

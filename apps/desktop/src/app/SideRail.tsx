@@ -3,13 +3,16 @@
 // artifacts, plugins; settings at the bottom. Buttons 36 × 36 r 8, 4 apart, 8 from the top and 16
 // from the bottom; the line icons 18 (ds AppIcon); the current place --c-active and --c-text, the
 // others text-2; inbox's accent dot (8, at 6/6) only while something waits on him; each button a
-// tip with its key. It replaces the old 'rail under 1200 px with an artifact open'. Owner: nm-frame.
+// tip with its key, and ⌘ held (held.ts, its one delay) the key's cap in place of its icon, as the
+// bar's sidebar button (rail-keys, designer m_45492). It replaces the old 'rail under 1200 px with an artifact open'. Owner: nm-frame.
 import type { ReactNode } from 'react';
-import { AppIcon, type AppIconName, Press } from '@/ds';
+import { AppIcon, type AppIconName, Kbd, Press } from '@/ds';
+import { PLACE_KEYS } from '@/settings/keys';
 import { frame } from '@/proto/words_frame.gen';
 import { panel } from '@/proto/words_panel.gen';
 import type { Route } from './route';
 import { useRoute, useRouter } from './router';
+import { useModHeld } from './held';
 import { useWaitingTotal } from './Sidebar';
 import { waitsTip } from './tipwords';
 
@@ -30,7 +33,8 @@ export function railPlaceOf(route: Route): RailPlace {
   }
 }
 
-const GO: Record<RailPlace, Route> = {
+/** Where each place goes: a click on its button, and its key (keys.ts). */
+export const RAIL_GO: Record<RailPlace, Route> = {
   bise: { screen: 'bise' },
   inbox: { screen: 'inbox' },
   scheduled: { screen: 'scheduled' },
@@ -39,8 +43,15 @@ const GO: Record<RailPlace, Route> = {
   settings: { screen: 'settings' },
 };
 
-/** Each place's key, shown in its tip ('' when it has none). */
-export const RAIL_KEYS: Record<RailPlace, string> = { bise: '⌘0', inbox: '⌘I', scheduled: '', artifacts: '⌘⇧A', plugins: '', settings: '⌘,' };
+/** Each place's key (app/keys.ts opens it): its tip, its held cap, the Go menu. */
+export const RAIL_KEYS: Record<RailPlace, string> = {
+  bise: PLACE_KEYS.bise,
+  inbox: PLACE_KEYS.inbox,
+  scheduled: PLACE_KEYS.scheduled,
+  artifacts: PLACE_KEYS.artifacts,
+  plugins: PLACE_KEYS.plugins,
+  settings: PLACE_KEYS.settings,
+};
 
 const NAMES: Record<RailPlace, string> = {
   bise: panel.bise,
@@ -52,10 +63,12 @@ const NAMES: Record<RailPlace, string> = {
 };
 
 /** A place's tip: its name and its key ('inbox · ⌘I'). Pure. */
-export const railTip = (p: RailPlace): string => (RAIL_KEYS[p] === '' ? NAMES[p] : frame.tip_key({ what: NAMES[p], key: RAIL_KEYS[p] }));
+export const railTip = (p: RailPlace): string => frame.tip_key({ what: NAMES[p], key: RAIL_KEYS[p] });
 
 function RailButton({ place, on, children, dot, tip }: { place: RailPlace; on: boolean; children: ReactNode; dot?: boolean; tip?: string }) {
   const router = useRouter();
+  // ⌘ held: the key's cap in place of the icon (one cap, never stacked over it; designer m_45492)
+  const held = useModHeld('Meta');
   return (
     <Press
       look={on ? 'app-rail-b on' : 'app-rail-b'}
@@ -63,11 +76,17 @@ function RailButton({ place, on, children, dot, tip }: { place: RailPlace; on: b
       aria-current={on ? 'page' : undefined}
       data-tip={tip ?? railTip(place)}
       onClick={() => {
-        router.go(GO[place]);
+        router.go(RAIL_GO[place]);
       }}
       data-testid={`app.rail.${place}`}
     >
-      {children}
+      {held ? (
+        <span className="app-keyhint app-rail-key" data-testid={`app.rail.${place}.key`}>
+          <Kbd>{RAIL_KEYS[place]}</Kbd>
+        </span>
+      ) : (
+        children
+      )}
       {dot === true && <span className="app-rail-dot" data-testid={`app.rail.${place}.dot`} />}
     </Press>
   );

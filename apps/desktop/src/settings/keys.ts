@@ -9,6 +9,24 @@ import { settings } from '@/proto/words.gen';
  *  aliases ⌃⌘S, ⌘\ and ⌥⌘0 work and show nowhere (designer m_45164). app/keys.ts decides them. */
 export const FRAME_KEYS: Readonly<Record<'sidebar' | 'panel', string>> = { sidebar: '⌘B', panel: '⌥⌘B' };
 
+/** The left rail's places and the sidebar's head rows, each its own key (his m_45482, designer
+ *  m_45492 / m_45497): their tips, their held keycaps, the Go menu and this list. ⌘I stays the inbox
+ *  block in place (b1/b2); the rail's inbox button is the page, ⇧⌘I. app/keys.ts decides them. */
+export const PLACE_KEYS = {
+  bise: '⌘0',
+  inbox: '⇧⌘I',
+  scheduled: '⌘Y',
+  artifacts: '⇧⌘A',
+  plugins: '⇧⌘X',
+  settings: '⌘,',
+  search: '⌘K',
+  newProject: '⌘N',
+} as const;
+
+/** The artifacts library's rows (All artifacts, Recent, Unfiled, then the folders) take ⌘1 … ⌘9
+ *  in its order, as the projects do (designer m_45492). */
+export const LIBRARY_ROWS_MAX = 9;
+
 export interface KeyRow {
   /** the keys, as drawn ("⌘1 … ⌘9") */
   readonly keys: string;
@@ -39,20 +57,23 @@ export const KEY_SECTIONS: readonly KeySection[] = [
     rows: [
       { keys: FRAME_KEYS.sidebar, action: settings.key_sidebar },
       { keys: FRAME_KEYS.panel, action: settings.key_panel },
-      { keys: '⌘0', action: settings.key_bise },
+      { keys: PLACE_KEYS.bise, action: settings.key_bise },
       { keys: '⌘1 … ⌘9', action: settings.key_project },
       { keys: '⌥0 / ⌥1 … ⌥9', action: settings.key_main_or_agent, tui: '⌥ + 0…9' },
-      { keys: '⌘N', action: settings.key_new_project },
+      { keys: PLACE_KEYS.newProject, action: settings.key_new_project },
       { keys: '⇧⌘N', action: settings.key_new_agent },
-      { keys: '⌘K', action: settings.key_find_agent },
+      { keys: PLACE_KEYS.search, action: settings.key_find_agent },
       { keys: '⌘[ / ⌘]', action: settings.key_back_forward },
       { keys: '⌘I', action: settings.key_inbox, tui: '/inbox, ctrl+1-9' },
+      { keys: PLACE_KEYS.inbox, action: settings.key_inbox_page },
+      { keys: PLACE_KEYS.scheduled, action: settings.key_scheduled },
+      { keys: PLACE_KEYS.artifacts, action: settings.key_artifacts, tui: '/artifacts' },
+      { keys: PLACE_KEYS.plugins, action: settings.key_plugins },
       { keys: '⌘F', action: settings.key_find, tui: 'ctrl+f' },
       { keys: '⌘D', action: settings.key_diff, tui: '/diff' },
-      { keys: '⌘⇧A', action: settings.key_artifacts, tui: '/artifacts' },
       { keys: '⌘⏎', action: settings.key_artifact_primary },
       { keys: '⌘E', action: settings.key_fold, tui: 'ctrl+o' },
-      { keys: '⌘,', action: settings.key_settings },
+      { keys: PLACE_KEYS.settings, action: settings.key_settings },
       { keys: '⌘/', action: settings.key_this_list, tui: '/shortcuts' },
     ],
   },

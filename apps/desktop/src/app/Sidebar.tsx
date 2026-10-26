@@ -23,6 +23,7 @@ import { panel } from '@/proto/words_panel.gen';
 import { useAgents, useProjects, useStore } from '@/store';
 import { ArtLibrary } from '@/artifacts';
 import { SettingsNav } from '@/settings/nav';
+import { PLACE_KEYS } from '@/settings/keys';
 import { useProjectWaiting, useWaitingCount } from '@/inbox/waiting';
 import { useEntityMenu } from './menus/use';
 import { useEntityAction } from './menus/actions';
@@ -193,12 +194,12 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       {route.screen !== 'settings' && (
         <div className="app-s-head">
           <BiseRow />
-          <Row kind="top" icon="search" name={frame.search} end={<kbd>⌘K</kbd>} onClick={onSearch} testId="app.side.search" />
+          <Row kind="top" icon="search" name={frame.search} end={<kbd>{PLACE_KEYS.search}</kbd>} onClick={onSearch} testId="app.side.search" />
           <Row
             kind="top"
             icon="folderPlus"
             name={frame.new_project}
-            end={<kbd>⌘N</kbd>}
+            end={<kbd>{PLACE_KEYS.newProject}</kbd>}
             onClick={() => {
               addProject(router);
             }}
@@ -214,9 +215,11 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   );
 }
 
-/** d2: '← Projects' back (esc and ⌘[ too: router's back), then the library (nm-pages-a's ArtLibrary). */
+/** d2: '← Projects' back (esc and ⌘[ too: router's back), then the library (nm-pages-a's ArtLibrary);
+ *  ⌘ held, its rows' ⌘1-9 as the projects' (keys.ts opens them; rail-keys). */
 function LibraryList() {
   const router = useRouter();
+  const cmd = useModHeld('Meta');
   return (
     <div className="app-s-list" data-testid="app.side.library">
       <Row
@@ -229,7 +232,7 @@ function LibraryList() {
         }}
         testId="app.side.back"
       />
-      <ArtLibrary />
+      <ArtLibrary digits={cmd} />
     </div>
   );
 }
@@ -287,7 +290,7 @@ function BiseRow() {
       <CutName name={panel.bise} />
       {cmd ? (
         <span className="app-s-end">
-          <kbd data-testid={`${id}.digit`}>⌘0</kbd>
+          <kbd data-testid={`${id}.digit`}>{PLACE_KEYS.bise}</kbd>
         </span>
       ) : (
         waits > 0 && (

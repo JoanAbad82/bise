@@ -11,6 +11,7 @@
 import { takeZoomKey } from '@/artifacts/zoomKeys';
 import { useHasFront, usePrimaryKey } from '@/artifacts/front';
 import { inboxItemOpen } from '@/inbox';
+import { goLibrary, libraryPlaces } from '@/artifacts/library';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter, type SavedHistory } from './router';
 import { useHistoryWays } from './esc-up';
@@ -18,7 +19,7 @@ import { useAnswerJumps } from '@/thread/useAnswerJumps';
 import { formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { askInbox, useInboxAsks } from './inboxAsk';
 import { keep } from './keep';
-import { useMainRoutes, useMenuRouting } from './menu';
+import { noteWindowKey, useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
@@ -551,6 +552,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
       if (takeZoomKey(e)) {
         e.preventDefault();
         e.stopPropagation();
+        noteWindowKey(Date.now());
         return;
       }
       // the shell has the focus: every key but ⌘ ones is its own (⌥1, ctrl+y, End...)
@@ -561,6 +563,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
         agents: (p) => store.agents(p),
         typing: typingIn(document.activeElement),
         panelOpen: panelState.get().open,
+        library: libraryPlaces,
         // ⌥N reads the numbers he sees (held), then they hold still a moment (agent-rank)
         numbers: (p) => {
           const n = numbersOf(p, store.agents(p), true);
@@ -571,6 +574,8 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
       if (act === undefined) return;
       e.preventDefault();
       e.stopPropagation();
+      // the Go menu's echo of the same key is dropped (app/menu.ts)
+      noteWindowKey(Date.now());
       if ('go' in act) router.go(act.go);
       else if ('palette' in act) openPalette();
       else if ('help' in act) openHelp();
@@ -578,6 +583,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
         frameKeyAt[act.frame] = Date.now();
         frameRef.current(act.frame);
       }
+      else if ('library' in act) goLibrary(act.library);
       else if ('newProject' in act) addProject(router);
       else if ('newAgent' in act) newAgent(act.newAgent);
       else if ('panel' in act) doPanelKey(act.panel, { route: router.get(), home: store.projects().find((p) => p.home)?.project, agents: (p) => store.agents(p) });

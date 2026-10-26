@@ -256,6 +256,13 @@ body:has(.app-shell) {
 .app-rail-gap {
   flex: 1;
 }
+/* ⌘ held: the place's key in place of its icon, centred, mono 11 text-2; ⇧⌘A fits in 28 (designer m_45492) */
+.app-rail-key .b-kbd {
+  min-width: calc(var(--s-6) + var(--s-1));
+  padding: 0 var(--s-1);
+  font-family: var(--font-mono);
+  color: var(--c-text-2);
+}
 
 /* the sidebar: --p-raised 82%, a 12 top-left corner, 8 inside; its head stays, its list scrolls */
 .app-side {

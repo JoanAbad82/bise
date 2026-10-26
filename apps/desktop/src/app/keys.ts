@@ -3,14 +3,18 @@
 // one listener in the shell that acts on it. Owner: amb-win.
 //
 // ⌘B the sidebar · ⌥⌘B the panel ·
-// ⌘0 bise · ⌘1-9 a project in his order · ⌥0 the project's main · ⌥1-9
+// the rail's places (rail-keys, designer m_45492 / m_45497; PLACE_KEYS): ⌘0 bise · ⇧⌘I the inbox
+// page · ⌘Y scheduled · ⇧⌘A the artifacts library · ⇧⌘X plugins · ⌘, settings ·
+// ⌘1-9 a project in his order (on the artifacts library: its rows, All artifacts, Recent, Unfiled,
+// then the folders) · ⌥0 the project's main · ⌥1-9
 // its agents in the panel's order (the right side folded: ⌥1-4 its bubbles) · ⌘K the agent palette · ⌘D the agent's
-// changes · ⌘⇧A the artifacts · ⌘E fold/unfold everything · ⌘/ the key
+// changes · ⌘E fold/unfold everything · ⌘/ the key
 // list · end back to the bottom · ctrl+y copy a code
 // block · ⌥↑/⌥↓ the previous / next agent (empty composer).
 // Keys are read by `code` (⌥1 types '¡' on a Mac keyboard) and taken in the
 // capture phase, so the composer never gets the character.
 import type { Agent, ProjectRow } from '@/proto';
+import type { At } from '@/artifacts/folders';
 import { liveOf, rankedOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { projectsOf } from './siderows';
@@ -27,7 +31,7 @@ export type ScreenAction = 'fold-all' | 'stop' | 'to-end' | 'copy-code' | 'side-
 export type FrameAction = 'sidebar' | 'panel' | 'panelFull';
 
 /** The keys the two sides show: settings/keys.ts's (the key list, a leaf module), re-exported here for the shell. */
-export { FRAME_KEYS } from '@/settings/keys';
+export { FRAME_KEYS, PLACE_KEYS } from '@/settings/keys';
 
 /** How long after a window key the View menu's echo of the same key is dropped (Electron gives
  *  both: the page's keydown, then the menu item's accelerator), as the terminal's ⌃`. */
@@ -45,6 +49,8 @@ export type KeyAct =
   | { readonly help: true }
   | { readonly screen: ScreenAction }
   | { readonly frame: FrameAction }
+  /** ⌘1-9 on the artifacts library: its place, as a click on its row (artifacts/library.tsx goLibrary) */
+  | { readonly library: At }
   /** ⌘N: New project, the add-a-project sheet (addProject.ts; his m_44225) */
   | { readonly newProject: true }
   /** ⇧⌘N: New agent in the project in view, else bise's own (newagent.tsx) */
@@ -71,6 +77,8 @@ export interface KeyCtx {
   readonly numbers?: (project: string) => ReadonlyMap<string, number>;
   /** the tabbed panel is open: ⌘W and ⌘⇧[ ] are its */
   readonly panelOpen?: boolean;
+  /** the artifacts library's places in its order (artifacts/library.tsx libraryPlaces), none: no library */
+  readonly library?: () => readonly At[] | undefined;
 }
 
 const digit = (code: string): number | undefined => (/^Digit[0-9]$/.test(code) ? Number(code.slice(5)) : undefined);
@@ -92,6 +100,12 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   const n = digit(e.code);
   if (n !== undefined && only('meta')) {
     if (n === 0) return { go: { screen: 'bise' } };
+    // the artifacts library in view: ⌘1-9 are its rows, as the projects' in their place (designer m_45492)
+    const lib = c.route.screen === 'artifacts' ? c.library?.() : undefined;
+    if (lib !== undefined) {
+      const at = lib[n - 1];
+      return at === undefined ? undefined : { library: at };
+    }
     const p = projectsOf(c.projects)[n - 1];
     return p ? { go: { screen: 'thread', project: p.project, agent: MAIN } } : undefined;
   }
@@ -125,15 +139,17 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     return p === undefined ? undefined : { newAgent: p };
   }
   if (only('meta') && e.code === 'Comma') return { go: { screen: 'settings' } };
+  // the rail's places, each the key its button shows (PLACE_KEYS): ⇧⌘I the inbox page (⌘I stays the
+  // block in place, the Go menu's), ⌘Y scheduled, ⇧⌘A the artifacts library, ⇧⌘X plugins
+  if (only('meta', true) && e.code === 'KeyI') return { go: { screen: 'inbox' } };
+  if (only('meta') && e.code === 'KeyY') return { go: { screen: 'scheduled' } };
+  if (only('meta', true) && e.code === 'KeyA') return { go: { screen: 'artifacts', project: '' } };
+  if (only('meta', true) && e.code === 'KeyX') return { go: { screen: 'plugins' } };
   if (only('meta') && e.code === 'KeyD') {
     const r = c.route;
     if (r.screen === 'thread' && r.agent !== MAIN) return { go: { screen: 'review', project: r.project, agent: r.agent } };
     const p = here(c);
     return p ? { go: { screen: 'changes', project: p } } : undefined;
-  }
-  if (only('meta', true) && e.code === 'KeyA') {
-    const p = here(c);
-    return p ? { go: { screen: 'artifacts', project: p } } : undefined;
   }
   if (only('meta') && e.code === 'KeyE') return { screen: 'fold-all' };
   // the TUI's ctrl+o (ctrlhint.rs: open everything closed, else close what is open), the composer

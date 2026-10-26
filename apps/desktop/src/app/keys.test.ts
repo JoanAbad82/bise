@@ -42,11 +42,11 @@ describe("the window's keys", () => {
     expect(keyAction(k('Digit1', { altKey: true }), ctx({ route: { screen: 'inbox' } }))).not.toEqual({ screen: 'side-1' });
   });
 
-  it('⌘K palette, ⌘D changes / review, ⌘⇧A artifacts, ⌘E ctrl+y to the screen, ⌘/ the key list (⌘. is the Agent menu’s Stop)', () => {
+  it('⌘K palette, ⌘D changes / review, ⇧⌘A the artifacts library (as the rail), ⌘E ctrl+y to the screen, ⌘/ the key list (⌘. is the Agent menu’s Stop)', () => {
     expect(keyAction(k('KeyK', { metaKey: true }), ctx())).toEqual({ palette: true });
     expect(keyAction(k('KeyD', { metaKey: true }), ctx())).toEqual({ go: { screen: 'changes', project: 'a' } });
     expect(keyAction(k('KeyD', { metaKey: true }), ctx({ route: { screen: 'thread', project: 'a', agent: 'perf' } }))).toEqual({ go: { screen: 'review', project: 'a', agent: 'perf' } });
-    expect(keyAction(k('KeyA', { metaKey: true, shiftKey: true }), ctx())).toEqual({ go: { screen: 'artifacts', project: 'a' } });
+    expect(keyAction(k('KeyA', { metaKey: true, shiftKey: true }), ctx())).toEqual({ go: { screen: 'artifacts', project: '' } });
     expect(keyAction(k('KeyE', { metaKey: true }), ctx())).toEqual({ screen: 'fold-all' });
     // the TUI's ctrl+o, typing or not (his cb1f2b44 bug: nothing opened the folds)
     expect(keyAction(k('KeyO', { ctrlKey: true }), ctx())).toEqual({ screen: 'fold-all' });

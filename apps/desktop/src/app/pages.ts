@@ -10,6 +10,7 @@
 import type { SearchPage } from '@/search/rank';
 import { running } from '@/proto/words_running.gen';
 import { panel } from '@/proto/words_panel.gen';
+import { PLACE_KEYS } from '@/settings/keys';
 import { formatRoute, MAIN, projectOf, type Route, type Screen } from './route';
 
 interface Named {
@@ -42,16 +43,16 @@ export const SCREENS: Record<Screen, readonly Rule[]> = {
   commit: [{ no: 'one commit by its sha: the changes page' }],
   branch: [{ no: 'one branch by its name: /diff' }],
   artifacts: [
-    { app: { name: 'artifacts', glyph: '↗', words: ['every project'], route: { screen: 'artifacts', project: '' } } },
+    { app: { name: 'artifacts', glyph: '↗', words: ['every project'], key: PLACE_KEYS.artifacts, route: { screen: 'artifacts', project: '' } } },
     { project: { name: 'artifacts', glyph: '↗', route: (p) => ({ screen: 'artifacts', project: p }) } },
   ],
   environments: [{ project: { name: 'environments', words: ['worktrees', 'dev servers'], route: (p) => ({ screen: 'environments', project: p }) } }],
-  inbox: [{ app: { name: 'inbox', glyph: '?', words: ['answered', 'history', 'questions'], route: { screen: 'inbox' } } }],
-  scheduled: [{ app: { name: 'scheduled', glyph: '◷', words: ['timers', 'every'], route: { screen: 'scheduled' } } }],
-  plugins: [{ app: { name: panel.plugins, glyph: '⊞', words: ['skills', 'tools', 'MCP', 'connectors', 'Mistral'], route: { screen: 'plugins' } } }],
+  inbox: [{ app: { name: 'inbox', glyph: '?', words: ['answered', 'history', 'questions'], key: PLACE_KEYS.inbox, route: { screen: 'inbox' } } }],
+  scheduled: [{ app: { name: 'scheduled', glyph: '◷', words: ['timers', 'every'], key: PLACE_KEYS.scheduled, route: { screen: 'scheduled' } } }],
+  plugins: [{ app: { name: panel.plugins, glyph: '⊞', words: ['skills', 'tools', 'MCP', 'connectors', 'Mistral'], key: PLACE_KEYS.plugins, route: { screen: 'plugins' } } }],
   running: [{ app: { name: running.heading, glyph: '∿', words: running.find_words.split(' · '), route: { screen: 'running' } } }],
   report: [{ no: 'the last crash report: only after a crash, from its line' }],
-  settings: [{ app: { name: 'settings', glyph: '⚙', words: ['preferences'], key: '⌘,', route: { screen: 'settings' } } }, { settings: true }],
+  settings: [{ app: { name: 'settings', glyph: '⚙', words: ['preferences'], key: PLACE_KEYS.settings, route: { screen: 'settings' } } }, { settings: true }],
   onboarding: [{ no: "the first run's; settings › setup checks it again" }],
   lab: [{ no: 'test mode only' }],
   notfound: [{ no: 'a wrong link' }],
@@ -72,11 +73,6 @@ export interface PagesCtx {
   readonly settings: readonly { readonly id: string; readonly title: string }[];
 }
 
-/** The key that does exactly what a project page does, from the route in view ('' none). */
-function keyOf(r: Route, here: string | undefined): string {
-  if (r.screen === 'artifacts' && r.project === here) return '⌘⇧A';
-  return '';
-}
 
 /** Every page ⌘K lists, in the app's order: the asks, the app's, then each project's (the one in view first), the agent in view's. */
 export function appPages(c: PagesCtx): SearchPage[] {
@@ -109,7 +105,8 @@ export function appPages(c: PagesCtx): SearchPage[] {
     for (const r of rules)
       if ('project' in r) {
         const to = r.project.route(p);
-        const key = keyOf(to, here) || (to.screen === 'changes' ? dKey(p) : '');
+        // a project's own page has no key but ⌘D (⇧⌘A is every project's library, the rail's)
+        const key = to.screen === 'changes' ? dKey(p) : '';
         out.push(route(to, r.project, { of: pname(p), key }));
       }
   if (c.route.screen === 'thread')

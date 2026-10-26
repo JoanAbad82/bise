@@ -22,7 +22,7 @@ describe('the key list (V3)', () => {
 
   it('typing filters over section, keys, action and terminal key, case-insensitive; empty sections go', () => {
     const f = helpRows('shortcuts', 'ARTIFACTS');
-    expect(keysOf(f)).toEqual(['⌘⇧A']);
+    expect(keysOf(f)).toEqual(['⇧⌘A']);
     expect(f.map((s) => s.id)).toEqual(['window']);
     expect(keysOf(helpRows('shortcuts', 'the inbox')).length).toBeGreaterThan(5);
     expect(keysOf(helpRows('shortcuts', 'ctrl+x'))).toEqual(['⌘⌫']);

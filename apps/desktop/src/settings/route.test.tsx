@@ -49,7 +49,7 @@ function open(page: string | undefined, from = true) {
 
 describe('settings, a route of the main window', () => {
   it('⌘, (the menu bar, the tray) is the settings route, no window', () => {
-    expect(routeOfMenu('settings')).toBe('settings');
+    expect(routeOfMenu('settings')).toEqual({ screen: 'settings' });
   });
 
   for (const theme of ['light', 'dark'] as const) {

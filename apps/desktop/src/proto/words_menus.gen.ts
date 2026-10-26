@@ -6,6 +6,20 @@
 export const menus = {
   /** the menu bar's menu of the agent in view (main/menu.ts) */
   agent_menu: "Agent",
+  /** the menu bar's Go menu: the rail's places, each with its key (rail-keys, designer m_45492) */
+  go_menu: "Go",
+  /** Go › bise's place, ⌘0 (the brand stays lowercase, designer m_45492) */
+  go_bise: "bise",
+  /** Go › the inbox block in place, ⌘I (b1/b2) */
+  go_inbox: "Inbox",
+  /** Go › the inbox page, ⇧⌘I (designer m_45497) */
+  go_inbox_page: "Inbox Page",
+  /** Go › the scheduled page, ⌘Y */
+  go_scheduled: "Scheduled",
+  /** Go › the artifacts, ⇧⌘A */
+  go_artifacts: "Artifacts",
+  /** Go › the plugins page, ⇧⌘X */
+  go_plugins: "Plugins",
   /** rename the agent (its thread head takes the new name) */
   rename: "Rename",
   /** the agent's sheet on its model and reasoning (nm-pages-b, designer m_43315) */

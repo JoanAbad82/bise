@@ -52,13 +52,46 @@ export interface ColumnProps {
   readonly onMenu: (id: string, e: MouseEvent) => void;
   /** drawn in the window's sidebar (ArtLibrary, library.tsx): the sidebar's rows, not sticky */
   readonly side?: boolean;
+  /** ⌘ held (app/held.ts): each of the first 9 rows shows its ⌘1-9 in its end (rail-keys, designer m_45492) */
+  readonly digits?: boolean;
   readonly testId: string;
+}
+
+/** The places the column draws, top to bottom: All artifacts, Recent, Unfiled, then each theme and,
+ *  open, the tasks it shows. ⌘1-9 go to the first nine (app/keys.ts); the column numbers them the
+ *  same way. Pure. */
+export function columnPlaces(p: Pick<ColumnProps, 'lib' | 'open' | 'full'>): At[] {
+  const out: At[] = [{ at: 'all' }, { at: 'recent' }, { at: 'unfiled' }];
+  for (const t of p.lib.themes) {
+    out.push({ at: 'folder', id: t.id });
+    if (!p.open.has(t.id)) continue;
+    const tasks = p.lib.tasks.get(t.id) ?? [];
+    for (const f of p.full.has(t.id) ? tasks : tasks.slice(0, TASKS_SHOWN)) out.push({ at: 'folder', id: f.id });
+  }
+  return out;
+}
+
+/** A place's ⌘ digit in the column (1-9), none past the ninth. Pure. */
+function digitOf(places: readonly At[], at: At): number | undefined {
+  const i = places.findIndex((x) => same(x, at));
+  return i >= 0 && i < 9 ? i + 1 : undefined;
+}
+
+function Digit({ n, testId }: { n: number | undefined; testId: string }) {
+  return n === undefined ? null : (
+    <span className="end">
+      <kbd data-testid={`${testId}.digit`}>{`⌘${String(n)}`}</kbd>
+    </span>
+  );
 }
 
 const same = (a: At, b: At) => a.at === b.at && (a.at !== 'folder' || (b.at === 'folder' && a.id === b.id));
 
 export function FolderColumn(p: ColumnProps) {
   const { lib, counts, at, testId } = p;
+  // ⌘ held: the first nine places' ⌘1-9 in their ends, in place of the dot or the count
+  const places = p.digits === true ? columnPlaces(p) : [];
+  const digit = (a: At) => (p.digits === true ? digitOf(places, a) : undefined);
   const field = (parent: string | null) =>
     p.editing?.kind === 'new' && p.editing.parent === parent ? <EditRow key={`new:${parent ?? ''}`} indent={parent !== null} initial="" onEdited={p.onEdited} testId={`${testId}.field`} /> : null;
   const folderRow = (f: Folder, indent: boolean) => {
@@ -69,7 +102,7 @@ export function FolderColumn(p: ColumnProps) {
     const isOpen = p.open.has(f.id);
     return (
       <FolderRow key={f.id} id={f.id} name={f.name} indent={indent} theme={!indent} hasTasks={tasks.length > 0} isOpen={isOpen}
-        on={same(at, { at: 'folder', id: f.id })} count={counts.get(f.id)} flash={p.flash === f.id} over={p.drop?.over === f.id}
+        on={same(at, { at: 'folder', id: f.id })} digit={digit({ at: 'folder', id: f.id })} count={counts.get(f.id)} flash={p.flash === f.id} over={p.drop?.over === f.id}
         onGo={() => { p.onGo({ at: 'folder', id: f.id }); }} onToggle={() => { p.onToggle(f.id); }} onRename={() => { p.onRename(f.id); }}
         onMenu={(e) => { p.onMenu(f.id, e); }} drop={p.drop} testId={`${testId}.f.${f.id}`} />
     );
@@ -77,9 +110,9 @@ export function FolderColumn(p: ColumnProps) {
   return (
     <nav className={`art-col${p.side === true ? ' side' : ''}`} aria-label={library.library_head} data-testid={testId}>
       <div className="art-col-head">{library.library_head}</div>
-      <PlaceRow icon="artifacts" name={sentenceCase(library.all_artifacts)} on={at.at === 'all'} onGo={() => { p.onGo({ at: 'all' }); }} testId={`${testId}.all`} />
-      <PlaceRow icon="scheduled" name={library.recent} on={at.at === 'recent'} onGo={() => { p.onGo({ at: 'recent' }); }} testId={`${testId}.recent`} />
-      <PlaceRow icon="inbox" name={sentenceCase(library.unfiled)} on={at.at === 'unfiled'} count={counts.get('unfiled')} countAtRest
+      <PlaceRow icon="artifacts" name={sentenceCase(library.all_artifacts)} on={at.at === 'all'} digit={digit({ at: 'all' })} onGo={() => { p.onGo({ at: 'all' }); }} testId={`${testId}.all`} />
+      <PlaceRow icon="scheduled" name={library.recent} on={at.at === 'recent'} digit={digit({ at: 'recent' })} onGo={() => { p.onGo({ at: 'recent' }); }} testId={`${testId}.recent`} />
+      <PlaceRow icon="inbox" name={sentenceCase(library.unfiled)} on={at.at === 'unfiled'} digit={digit({ at: 'unfiled' })} count={counts.get('unfiled')} countAtRest
         over={p.drop?.over === 'unfiled'} drop={p.drop} dropId="unfiled" flash={p.flash === 'unfiled'}
         onGo={() => { p.onGo({ at: 'unfiled' }); }} testId={`${testId}.unfiled`} />
       {/* the folders' label, its + at its end (mockup 7): a field for a new folder's name */}
@@ -133,13 +166,13 @@ function dropAttrs(drop: DropTarget | undefined, id: string) {
   };
 }
 
-function PlaceRow(p: { icon: AppIconName; name: string; on: boolean; count?: Count | undefined; countAtRest?: boolean; over?: boolean; flash?: boolean; drop?: DropTarget | undefined; dropId?: string; onGo: () => void; testId: string }) {
+function PlaceRow(p: { icon: AppIconName; name: string; on: boolean; digit?: number | undefined; count?: Count | undefined; countAtRest?: boolean; over?: boolean; flash?: boolean; drop?: DropTarget | undefined; dropId?: string; onGo: () => void; testId: string }) {
   return (
     <Press look="art-col-row" aria-current={p.on || undefined} data-over={p.over || undefined} onClick={p.onGo} data-testid={p.testId}
       {...(p.dropId === undefined ? {} : dropAttrs(p.drop, p.dropId))}>
       <AppIcon name={p.icon} size={16} />
       <span className="nm">{p.name}</span>
-      {p.count !== undefined && p.count.total > 0 && <End count={p.count} atRest={p.countAtRest} flash={p.flash} />}
+      {p.digit !== undefined ? <Digit n={p.digit} testId={p.testId} /> : p.count !== undefined && p.count.total > 0 && <End count={p.count} atRest={p.countAtRest} flash={p.flash} />}
     </Press>
   );
 }
@@ -152,6 +185,7 @@ interface FolderRowProps {
   hasTasks: boolean;
   isOpen: boolean;
   on: boolean;
+  digit: number | undefined;
   count: Count | undefined;
   flash: boolean;
   over: boolean;
@@ -182,7 +216,7 @@ function FolderRow(p: FolderRowProps) {
       onKeyDown={key} data-testid={p.testId} {...dropAttrs(p.drop, p.id)}>
       {p.theme && <AppIcon name="folder" size={16} />}
       <span className="nm" {...tipAttrs(p.name)}>{p.name}</span>
-      <End count={p.count} flash={p.flash} />
+      {p.digit !== undefined ? <Digit n={p.digit} testId={p.testId} /> : <End count={p.count} flash={p.flash} />}
     </Press>
   );
 }

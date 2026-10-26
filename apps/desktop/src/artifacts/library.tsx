@@ -9,7 +9,8 @@
 // external store (useSyncExternalStore), no React context: the sidebar is outside the page's tree.
 // Owner: nm-pages-a.
 import { useEffect, useSyncExternalStore } from 'react';
-import { FolderColumn, type ColumnProps } from './Column';
+import { columnPlaces, FolderColumn, type ColumnProps } from './Column';
+import type { At } from './folders';
 
 /** What the page hands the library: the column's props but its test id. */
 export type ColumnBits = Omit<ColumnProps, 'testId'>;
@@ -39,8 +40,19 @@ export function useLibraryShown(): boolean {
   return useSyncExternalStore(subscribe, () => shown > 0);
 }
 
-/** The library as the sidebar mounts it (no props: nm-frame's contract, m_42267). */
-export function ArtLibrary() {
+/** The page's places in the column's order (Column.tsx columnPlaces), none while the page is not
+ *  mounted: app/keys.ts's ⌘1-9 on the artifacts page (rail-keys, designer m_45492). */
+export function libraryPlaces(): readonly At[] | undefined {
+  return bits === null ? undefined : columnPlaces(bits);
+}
+
+/** Go to a place of the library, as a click on its row. */
+export function goLibrary(at: At): void {
+  bits?.onGo(at);
+}
+
+/** The library as the sidebar mounts it (nm-frame's contract, m_42267); `digits`: ⌘ held, its rows' ⌘1-9. */
+export function ArtLibrary({ digits = false }: { digits?: boolean }) {
   useEffect(() => {
     shown += 1;
     notify();
@@ -50,5 +62,5 @@ export function ArtLibrary() {
     };
   }, []);
   const b = useSyncExternalStore(subscribe, () => bits);
-  return b === null ? null : <FolderColumn {...b} side testId="artifacts.lib" />;
+  return b === null ? null : <FolderColumn {...b} side digits={digits} testId="artifacts.lib" />;
 }

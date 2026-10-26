@@ -4,17 +4,19 @@
 // Owner: nm-menus.
 //
 // One subscription to the preload for the whole window (useMenuRouting,
-// in the shell); 'settings' is a route, 'inbox' opens the block in place, anything else goes to
-// the screens that listen for it (useMenuAction: the thread's ⌘F).
+// in the shell); 'settings' and the Go menu's places are routes, 'inbox' opens the block in place,
+// anything else goes to the screens that listen for it (useMenuAction: the thread's ⌘F). A Go item
+// right after the window took a key (noteWindowKey) is that key's echo: dropped, as the View menu's
+// (keys.ts menuEcho): a zoomed image's ⌘0 stays its own, never 'bise' as well.
 import { useEffect, useRef } from 'react';
 import type { MenuAction } from '@/shared/api';
 import type { Router } from './router';
-import { inboxAtOf, parseRoute, projectOf } from './route';
+import { inboxAtOf, parseRoute, projectOf, type Route } from './route';
 import { askInbox } from './inboxAsk';
 import { addProject } from './addProject';
 import { newAgent } from './newagent';
 import { useStore } from '@/store';
-import type { ScreenAction } from './keys';
+import { menuEcho, type ScreenAction } from './keys';
 import { panel } from '@/terminal/panel';
 import { useAgentMenuBar } from './menus/use';
 
@@ -29,9 +31,29 @@ export function emitAction(action: AppAction): void {
   for (const l of [...listeners]) l(action);
 }
 
-/** The route a menu action opens, if it is one. Pure. */
-export function routeOfMenu(action: MenuAction): 'settings' | undefined {
-  return action === 'settings' ? action : undefined;
+/** The route a menu action opens, if it is one: settings, and the Go menu's places (the rail's). Pure. */
+export function routeOfMenu(action: MenuAction): Route | undefined {
+  switch (action) {
+    case 'settings':
+    case 'bise':
+    case 'scheduled':
+    case 'plugins':
+      return { screen: action };
+    case 'inboxPage':
+      return { screen: 'inbox' };
+    case 'artifacts':
+      return { screen: 'artifacts', project: '' };
+    default:
+      return undefined;
+  }
+}
+
+/** When the window's own key listener last took a key (App.tsx useWindowKeys). */
+let windowKeyAt: number | undefined;
+
+/** The window took a key: the menu's echo of it, if any, comes within MENU_ECHO_MS. */
+export function noteWindowKey(now: number): void {
+  windowKeyAt = now;
 }
 
 /** In the shell: the menu's routes go to the router, the rest to the screens. */
@@ -60,9 +82,9 @@ export function useMenuRouting(router: Router) {
         if (p !== undefined) newAgent(p);
         return;
       }
-      const screen = routeOfMenu(action);
-      if (screen !== undefined) router.go({ screen });
-      else emitAction(action);
+      const to = routeOfMenu(action);
+      if (to === undefined) emitAction(action);
+      else if (!menuEcho(windowKeyAt, Date.now())) router.go(to);
     });
   }, [router, store]);
 }
