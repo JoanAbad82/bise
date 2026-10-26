@@ -24,6 +24,11 @@ describe('the hover tip (designer m_24359)', () => {
     expect(at.top).toBe(54);
   });
 
+  it('a mark that asks for below gets it, above when below has no room (designer m_45938)', () => {
+    expect(placeTip({ left: 100, top: 300, width: 20, height: 16 }, { width: 120, height: 24 }, VIEW, 'below')).toEqual({ left: 50, top: 324, side: 'below' });
+    expect(placeTip({ left: 100, top: 870, width: 20, height: 16 }, { width: 120, height: 24 }, VIEW, 'below')).toEqual({ left: 50, top: 838, side: 'above' });
+  });
+
   it('waits 400 ms cold, shows at once warm or on keyboard focus', () => {
     expect(tipWait(1000, 0, false)).toBe(TIP_DELAY_MS);
     expect(tipWait(1000, 1500, false)).toBe(0);
@@ -33,6 +38,7 @@ describe('the hover tip (designer m_24359)', () => {
   it("its words and key go in data attributes; none for no words", () => {
     expect(tipAttrs('4 agents working')).toEqual({ 'data-tip': '4 agents working' });
     expect(tipAttrs('sidebar', '⌘\\')).toEqual({ 'data-tip': 'sidebar', 'data-tip-keys': '⌘\\' });
+    expect(tipAttrs('the full option', undefined, 'below')).toEqual({ 'data-tip': 'the full option', 'data-tip-side': 'below' });
     expect(tipAttrs('')).toEqual({});
     expect(tipAttrs(undefined)).toEqual({});
   });

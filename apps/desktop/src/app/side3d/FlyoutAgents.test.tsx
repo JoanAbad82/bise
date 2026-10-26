@@ -52,6 +52,8 @@ describe('an ask option in the agents card', () => {
     const c = rule('.s3-say-btn-w');
     expect([c['-webkit-line-clamp'], c['line-clamp'], c.overflow]).toEqual(['2', '2', 'hidden']);
     expect(btn.getAttribute('data-tip')).toBe(LONG);
+    // below first: above, the tip covered the question it answers (designer m_45938)
+    expect(btn.getAttribute('data-tip-side')).toBe('below');
   });
 
   it('a short option has no tip: its words are all there', () => {

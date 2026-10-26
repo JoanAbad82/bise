@@ -134,4 +134,24 @@ describe('TipLayer', () => {
     });
     expect(tip()?.querySelector('.k')?.textContent).toBe('⌘\\');
   });
+
+  it('a mark that asks for below gets its tip below, with room above too (designer m_45938)', () => {
+    const v = render(
+      <div>
+        <span data-testid="up" {...tipAttrs('the question stays readable')} />
+        <span data-testid="down" {...tipAttrs('the full option', undefined, 'below')} />
+        <TipLayer />
+      </div>,
+    );
+    for (const id of ['up', 'down']) {
+      v.getByTestId(id).getBoundingClientRect = () => ({ left: 100, top: 300, right: 120, bottom: 316, width: 20, height: 16, x: 100, y: 300, toJSON: () => ({}) });
+    }
+    over(v.getByTestId('up'));
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(tip()?.dataset.side).toBe('above');
+    over(v.getByTestId('down'), v.getByTestId('up'));
+    expect(tip()?.dataset.side).toBe('below');
+  });
 });

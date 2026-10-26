@@ -39,7 +39,7 @@ function Head({ project, a, asks }: { project: string; a: Agent; asks: boolean }
   );
 }
 
-/** An ask's option: its words clamped at 2 lines (side3d.css .s3-say-btn-w), the full words in its tip only when the clamp cuts them. */
+/** An ask's option: its words clamped at 2 lines (side3d.css .s3-say-btn-w), the full words in its tip only when the clamp cuts them, below it first (above would cover the question it answers, designer m_45938). */
 export function OptButton({ label, onPick, testId }: { label: string; onPick: () => void; testId: string }) {
   const w = useRef<HTMLSpanElement>(null);
   const [cut, setCut] = useState(false);
@@ -48,7 +48,7 @@ export function OptButton({ label, onPick, testId }: { label: string; onPick: ()
     if (el !== null) setCut(el.scrollHeight > el.clientHeight);
   }, [label]);
   return (
-    <Press look="s3-say-btn" onClick={onPick} data-testid={testId} {...(cut ? tipAttrs(label) : {})}>
+    <Press look="s3-say-btn" onClick={onPick} data-testid={testId} {...(cut ? tipAttrs(label, undefined, 'below') : {})}>
       <span ref={w} className="s3-say-btn-w">{label}</span>
     </Press>
   );
