@@ -6,9 +6,10 @@
 // check while it is open (`check` now and every 30 s, `leave` when it
 // closes; the core stops by itself 2 min after the last check).
 // Owner: amb-home.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AppCmd, CoreEv } from '@/proto';
-import { Act, AppIcon, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
+import { AppIcon, Button, Group, Help, Toggle, type AppIconName, type GroupItem } from '@/ds';
+import { chromeCase } from './chrome';
 import { settings } from '@/proto/words.gen';
 
 export type ComputerUse = Extract<CoreEv, { ev: 'computer_use' }>;
@@ -16,8 +17,21 @@ export type ComputerUse = Extract<CoreEv, { ev: 'computer_use' }>;
 /** how often the open page says it is still open */
 export const KEEP_MS = 30_000;
 
-/** a step's mark (done is the line icon check, never a ✓ glyph) */
-const GLYPH: Record<string, string> = { waits: '?', checking: '…', failed: '▲', not_yet: '·' };
+/** how long the core's flash shows under the button he clicked (designer m_43882) */
+export const FLASH_MS = 3000;
+
+/** a step's mark, a line icon each (designer m_43882): done check in ink, waits ask in the accent (nm-thread's '?' icon), the rest dot in text-3, failed alert in red */
+const MARK: Record<string, AppIconName> = { done: 'check', waits: 'ask', checking: 'dot', failed: 'alert', not_yet: 'dot' };
+
+/**
+ * A numbered step's number and words ('1  ⏎ opens chrome://extensions · …', the core's help line):
+ * the number goes in the mark column, the words hang under their first word. A line with no number:
+ * none. Pure.
+ */
+export function stepOf(line: string): { n: string; text: string } {
+  const m = /^(\d+)\s+(.*)$/su.exec(line);
+  return m === null ? { n: '', text: line } : { n: m[1] ?? '', text: m[2] ?? '' };
+}
 
 export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: AppCmd) => void }) {
   // the screen hands a new `send` on each render (each core event): the check follows the page's
@@ -41,40 +55,64 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
     };
   }, []);
   const on = cu?.on ?? false;
+  // the core's flash ('opened · path copied') shows 3 s under the button he clicked, never at rest
+  const [asked, setAsked] = useState<string | null>(null);
+  useEffect(() => {
+    if (asked === null) return undefined;
+    const t = window.setTimeout(() => {
+      setAsked(null);
+    }, FLASH_MS);
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [asked]);
+  const [removing, setRemoving] = useState(false);
   const row = (r: ComputerUse['rows'][number]): GroupItem => ({
     id: r.id,
-    // designer (via cu-settings m_42955): the step's mark in a 16 px column on the title's line,
-    // the sub lines aligned to the title's text
+    // designer (via cu-settings m_42955, m_43882): the step's line icon in a 16 px column on the
+    // title's line, the sub lines aligned to the title's text, its numbered steps hanging on the column
     label: (
       <span className="settings-cu-t">
         <span className={`settings-cu-st ${r.state}`} aria-label={r.state} data-tip={r.state}>
-          {r.state === 'done' ? <AppIcon name="check" size={14} /> : (GLYPH[r.state] ?? '·')}
+          <AppIcon name={MARK[r.state] ?? 'dot'} size={14} />
         </span>
-        {r.label}
+        {chromeCase(r.label)}
       </span>
     ),
     sub: (
       <span className="settings-cu-sub">
         {r.detail}
         {r.state !== 'done' &&
-          (r.help ?? []).map((h) => (
-            <span key={h} className="settings-cu-help">
-              {h}
-            </span>
-          ))}
+          (r.help ?? []).map((h) => {
+            const s = stepOf(h);
+            return (
+              <span key={h} className="settings-cu-help">
+                <span className="settings-cu-n">{s.n}</span>
+                <span className="settings-cu-w">{s.text}</span>
+              </span>
+            );
+          })}
       </span>
     ),
     control:
       r.action != null && r.fix != null ? (
-        <Button
-          state={r.state === 'checking' ? 'loading' : undefined}
-          onClick={() => {
-            if (r.fix != null) send({ cmd: 'computer_use', act: 'fix', fix: r.fix });
-          }}
-          testId={`settings.cu.${r.id}`}
-        >
-          {r.action}
-        </Button>
+        <span className="settings-cu-act">
+          <Button
+            state={r.state === 'checking' ? 'loading' : undefined}
+            onClick={() => {
+              if (r.fix != null) send({ cmd: 'computer_use', act: 'fix', fix: r.fix });
+              setAsked(r.id);
+            }}
+            testId={`settings.cu.${r.id}`}
+          >
+            {chromeCase(r.action)}
+          </Button>
+          {asked === r.id && cu?.flash != null && (
+            <span className="settings-cu-flash" data-testid={`settings.cu.${r.id}.flash`}>
+              {cu.flash}
+            </span>
+          )}
+        </span>
       ) : undefined,
   });
   const rows = cu?.rows ?? [];
@@ -105,18 +143,51 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
       {on && web.length === 0 && <Help>{settings.cu_checking}</Help>}
       {on && web.length > 0 && <Group title={settings.cu_web} testId="settings.cu.web" items={web.map(row)} />}
       {on && apps.length > 0 && <Group title={settings.cu_apps} testId="settings.cu.apps" items={apps.map(row)} />}
-      {cu?.flash != null && <Chip tone="ok">{cu.flash}</Chip>}
       {cu?.said != null && <Help err>{cu.said}</Help>}
+      {/* the removal, a row at the page's end that asks once (designer m_43882): no red link */}
       {on && (
-        <Act
-          tone="err"
-          onClick={() => {
-            send({ cmd: 'computer_use', act: 'uninstall' });
-          }}
-          testId="settings.cu.uninstall"
-        >
-          {settings.cu_uninstall}
-        </Act>
+        <Group
+          testId="settings.cu.remove"
+          items={[
+            {
+              id: 'remove',
+              label: settings.cu_remove_label,
+              sub: removing ? settings.cu_remove_ask : settings.cu_remove_sub,
+              control: removing ? (
+                <span className="settings-row-acts">
+                  <Button
+                    kind="danger"
+                    onClick={() => {
+                      send({ cmd: 'computer_use', act: 'uninstall' });
+                      setRemoving(false);
+                    }}
+                    testId="settings.cu.uninstall"
+                  >
+                    {settings.cu_remove_yes}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setRemoving(false);
+                    }}
+                    testId="settings.cu.remove.keep"
+                  >
+                    {settings.cu_remove_keep}
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  kind="danger"
+                  onClick={() => {
+                    setRemoving(true);
+                  }}
+                  testId="settings.cu.remove.ask"
+                >
+                  {settings.cu_remove_button}
+                </Button>
+              ),
+            },
+          ]}
+        />
       )}
     </>
   );

@@ -448,6 +448,36 @@
     "one": null,
     "text": "ready: step by step, and you can take the wheel"
   },
+  "settings.cu_remove_ask": {
+    "args": [],
+    "one": null,
+    "text": "remove computer use? agents lose your browser and your apps."
+  },
+  "settings.cu_remove_button": {
+    "args": [],
+    "one": null,
+    "text": "Remove…"
+  },
+  "settings.cu_remove_keep": {
+    "args": [],
+    "one": null,
+    "text": "Keep"
+  },
+  "settings.cu_remove_label": {
+    "args": [],
+    "one": null,
+    "text": "Remove computer use"
+  },
+  "settings.cu_remove_sub": {
+    "args": [],
+    "one": null,
+    "text": "turns it off and deletes the extension's files"
+  },
+  "settings.cu_remove_yes": {
+    "args": [],
+    "one": null,
+    "text": "Remove"
+  },
   "settings.cu_set_up": {
     "args": [],
     "one": null,
@@ -457,11 +487,6 @@
     "args": [],
     "one": null,
     "text": "computer use"
-  },
-  "settings.cu_uninstall": {
-    "args": [],
-    "one": null,
-    "text": "Turn off and remove its files"
   },
   "settings.cu_web": {
     "args": [],

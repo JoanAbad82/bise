@@ -135,6 +135,16 @@ crate::words! { settings:
     cu_web = "In Chrome";
     /// computer use: the apps' steps' group
     cu_apps = "For apps";
-    /// computer use: remove it
-    cu_uninstall = "Turn off and remove its files";
+    /// computer use: the removal row at the page's end (designer m_43882)
+    cu_remove_label = "Remove computer use";
+    /// the removal row's line
+    cu_remove_sub = "turns it off and deletes the extension's files";
+    /// the removal row's destructive button: it asks once
+    cu_remove_button = "Remove…";
+    /// the removal asked once: its line
+    cu_remove_ask = "remove computer use? agents lose your browser and your apps.";
+    /// the removal asked once: yes
+    cu_remove_yes = "Remove";
+    /// the removal asked once: no
+    cu_remove_keep = "Keep";
 }

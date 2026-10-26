@@ -14,6 +14,7 @@ import { Projects } from './projects';
 import { UpdateGroup, updateRow } from './update';
 import { DistUpdateGroup } from './appupdate';
 import { Computer } from './computer';
+import { chromeCase, homeOf } from './chrome';
 import { checks, SetupCheck } from './check';
 import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
@@ -217,7 +218,15 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
     case 'approvals':
       return <Approvals approvals={data.approvals ?? null} send={ports.approvals ?? null} error={data.approvalsError ?? null} home={data.home ?? ''} />;
     case 'projects':
-      return <Projects projects={data.projects} found={data.found} ports={ports} home={data.home ?? ''} />;
+      return (
+        <Projects
+          projects={data.projects}
+          found={data.found}
+          ports={ports}
+          // ~/acme, never /Users/… (designer m_43851): the shell's home, or the folder that holds bise's home
+          home={homeOf(data.home, data.projects.map((p) => p.path), data.projects.find((p) => p.home)?.path) ?? ''}
+        />
+      );
     case 'setup':
       return (
         <SetupCheck
@@ -377,7 +386,8 @@ export function KeyList(): ReactNode {
           testId={`settings.keys.${s.id}`}
           items={s.rows.map((r) => ({
             id: r.keys,
-            label: r.action,
+            // a row title: sentence case like every page's rows (designer m_43882), the sub lowercase
+            label: chromeCase(r.action),
             sub: r.tui === undefined ? undefined : settings.key_terminal({ keys: r.tui }),
             control: <Kbd>{r.keys}</Kbd>,
           }))}

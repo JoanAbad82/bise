@@ -7,6 +7,7 @@ import type { AppCmd, Model, RoleRow } from '@/proto';
 import { Group, Help, Seg, Select, type GroupItem } from '@/ds';
 import { settings } from '@/proto/words.gen';
 import { modelRow } from './hold';
+import { chromeCase } from './chrome';
 
 /**
  * A role's name in the window, from its id (typed): main is called bise there (designer m_43851);
@@ -62,8 +63,8 @@ export function Roles({ roles, models, error = null, set }: RolesProps) {
     const known = models.some((m) => m.id === r.model);
     return {
       id: r.role,
-      // the core's role name is a row title: sentence case on screen (ui-review m_43805), the word stays the core's
-      label: <span className="settings-role-n">{roleName(r.role, r.name)}</span>,
+      // the core's role name is a row title: sentence case on screen (ui-review m_43805), bise as written (designer m_43882)
+      label: chromeCase(roleName(r.role, r.name)),
       sub: `${roleAbout(r)} · ${roleSource(r)}`,
       control: (
         <span className="settings-row-acts">

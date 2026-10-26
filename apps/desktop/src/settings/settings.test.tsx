@@ -15,6 +15,8 @@ import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, ty
 import { addPaths, offers, ordered, projectSub } from './projects';
 import { KEY_SECTIONS } from './keys';
 import { notifyRow } from './pages';
+import { chromeCase, homeOf } from './chrome';
+import { stepOf } from './computer';
 import { checks } from './check';
 import { FALLBACK } from './roles';
 import type { ComputerUse } from './computer';
@@ -253,9 +255,29 @@ describe('Settings', () => {
     view('keys');
     for (const s of KEY_SECTIONS) {
       const g = screen.getByTestId(`settings.keys.${s.id}`);
-      for (const r of s.rows) expect(g.textContent).toContain(r.action);
+      // row titles in sentence case (designer m_43882)
+      for (const r of s.rows) expect(g.textContent).toContain(chromeCase(r.action));
       expect(new Set(s.rows.map((r) => r.keys)).size).toBe(s.rows.length);
     }
+  });
+});
+
+describe('chrome words (designer m_43882)', () => {
+  it('a row title or a button takes a capital, the brand never', () => {
+    expect(chromeCase('accessibility')).toBe('Accessibility');
+    expect(chromeCase('open chrome://extensions')).toBe('Open chrome://extensions');
+    expect(chromeCase('bise')).toBe('bise');
+    expect(chromeCase('bise Computer Use')).toBe('bise Computer Use');
+    expect(chromeCase('')).toBe('');
+  });
+  it("a numbered help step's number goes to the mark column, its words hang", () => {
+    expect(stepOf('1  ⏎ opens chrome://extensions')).toEqual({ n: '1', text: '⏎ opens chrome://extensions' });
+    expect(stepOf("turn on bise Computer Use in the list. i'll see it")).toEqual({ n: '', text: "turn on bise Computer Use in the list. i'll see it" });
+  });
+  it('paths say ~ from the shell home, else from the folder holding bise\'s home project', () => {
+    expect(homeOf('/Users/c', ['/Users/c/acme'], '/Users/c/bise')).toBe('/Users/c');
+    expect(homeOf('/tmp/test-home', ['/Users/camille/acme'], '/Users/camille/bise')).toBe('/Users/camille');
+    expect(homeOf(undefined, ['/Users/camille/acme'], undefined)).toBeUndefined();
   });
 });
 
@@ -271,9 +293,16 @@ describe('computer use', () => {
     const { unmount } = view('computer', p, { computerUse: cu() });
     expect(p.sent).toEqual([{ cmd: 'computer_use', act: 'check' }]);
     expect(screen.getByTestId('settings.cu.web').textContent).toContain('add bise to Chrome');
-    expect(screen.getByTestId('settings.cu.apps').textContent).toContain('accessibility');
+    expect(screen.getByTestId('settings.cu.apps').textContent).toContain('Accessibility');
     expect(screen.queryByTestId('settings.cu.browser')).toBeNull();
+    // every step's mark is a line icon (designer m_43882): no ?, ✓ or · glyph
+    for (const g of ['settings.cu.web', 'settings.cu.apps']) {
+      for (const st of screen.getByTestId(g).querySelectorAll('.settings-cu-st')) expect(st.querySelector('svg')).not.toBeNull();
+    }
+    // the core's flash never shows at rest; 3 s under the button he clicked
+    expect(screen.queryByTestId('settings.cu.extension.flash')).toBeNull();
     fireEvent.click(screen.getByTestId('settings.cu.extension'));
+    expect(screen.getByTestId('settings.cu.extension.flash').textContent).toBe(cu().flash);
     fireEvent.click(screen.getByTestId('settings.cu.switch'));
     unmount();
     expect(p.sent.slice(1)).toEqual([
