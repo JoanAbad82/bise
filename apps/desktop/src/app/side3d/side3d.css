@@ -243,8 +243,8 @@
 }
 
 /* a card: 360 with its padding, 12 left of the bubbles (12 + 44 + 12), r 16, glass, --e-3; its top
-   on its bubble's, kept 24 inside the window, at most min(window - 48, 560) high (Host sets both,
-   layout cardTop / cardMaxH); its rows scroll inside */
+   always its bubble's, at most the room under it less 16 and 560 high (Host sets both, layout
+   cardMaxH); its rows scroll inside */
 .s3-card {
   position: absolute;
   box-sizing: border-box;
@@ -259,6 +259,10 @@
   box-shadow: var(--e-3);
   color: var(--c-text);
   transition: top var(--d-base) var(--ease-out);
+}
+/* the head and the foot stay whole: only the rows give room */
+.s3-card-head {
+  flex: none;
 }
 .s3-card-head,
 .s3-card-sub {
@@ -300,11 +304,11 @@
   min-height: 0;
   overflow-y: auto;
 }
-/* its rows overflow: a 24 fade at the bottom, and 24 of room under the last row so it scrolls
-   clear of the fade */
+/* its rows overflow: a 16 fade at the bottom, and 16 of room under the last row so it scrolls
+   clear of the fade (designer m_44499) */
 .s3-card-body[data-scrolls] {
-  padding-bottom: var(--s-6);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-6)), transparent);
+  padding-bottom: var(--s-4);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-4)), transparent);
 }
 /* one foot, the card's end: a rule, then a 32 row; no card padding under it */
 .s3-card[data-foot] {
@@ -600,6 +604,8 @@
 .s3-dot[data-tone='acc'] {
   background: var(--c-accent);
 }
-.s3-dot[data-tone='ok'] {
-  background: var(--c-ok);
+/* a running process: '∿' in text-3, as the processes page (running/Screen.tsx Mark) */
+.s3-wave {
+  font: 400 var(--f-ui);
+  color: var(--c-text-3);
 }

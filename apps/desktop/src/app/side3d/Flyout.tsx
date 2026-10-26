@@ -1,11 +1,11 @@
 // src/app/side3d · a bubble's card (page native-mac §7, mockups 12, 13, 15): 360 wide, 12 left of
-// the bubbles, its top on its bubble's and kept 24 inside the window, at most min(window − 48,
-// 560) high (layout cardTop, cardMaxH), r 16, glass (--c-overlay + --glass), --e-3; a head of 32
-// (its name 13/600, what it counts text-3, then '+' and '▯' open as a tab), its rows (they scroll
-// inside under a 24 fade when they overflow), one foot: a rule and a 32 row of 12 text-3 ('3
-// archived' · 'all agents ›'; every card's 'all … ›' is there, never on its head, designer
-// m_44411), the card's end (no padding under it). Floats over the page with
-// its whole shadow (SideHost is fixed at the shell's root: noClip). Its rows: SideRow, 48 high, a
+// the bubbles, its top on its bubble's, at most the room under it less 16 and 560 high (layout
+// cardMaxH), r 16, glass (--c-overlay + --glass), --e-3; a head of 32 (its name 13/600, what it
+// counts text-3, then '+' and '▯' open as a tab), its rows (they scroll inside under a 16 fade
+// when they overflow; the head and the foot stay whole), one foot: a rule and a 32 row of 12
+// text-3 ('3 archived' · 'all agents ›'; every card's 'all … ›' is there, never on its head,
+// designer m_44411), the card's end (no padding under it). Floats over the page with its whole
+// shadow (SideHost is fixed at the shell's root: noClip). Its rows: SideRow, 48 high, a
 // 40 object, 12 between, a name and a line under it, a dot at the end; its button is a `data-row`
 // (SideHost's ↑ ↓ walk the rows, ⏎ opens). Esc and a click outside close it (SideHost). Owner: nm-side.
 import type { MouseEventHandler, ReactNode } from 'react';
@@ -52,9 +52,9 @@ export interface FlyoutProps {
   readonly top: number;
   /** its foot: what it says on the left ('3 archived'), its full pages' links on the right ('all agents ›'; the combined card: 'all scheduled ›' then 'all processes ›', 16 apart) */
   readonly foot: { readonly left: string; readonly links: readonly FootLink[] } | null;
-  /** its height at most: the window's (layout cardMaxH, min(window − 48, 560)); its rows scroll inside */
+  /** its height at most (layout cardMaxH: the room under its bubble less 16, 560 at most); its rows scroll inside */
   readonly maxH: number;
-  /** its rows overflow: they scroll under a 24 fade at the bottom */
+  /** its rows overflow: they scroll under a 16 fade at the bottom */
   readonly scrolls?: boolean;
   readonly children: ReactNode;
 }

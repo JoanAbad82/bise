@@ -1,14 +1,15 @@
 // src/app/side3d · the artifacts card (mockup 13) and the processes + scheduled card (mockup 15):
 // rows of 48 with a 40 object per kind (objects.ts). Artifacts: the name as the pink chip, its
 // kind and agent under it, the accent dot when new, its age. Processes: the command mono 12, whose
-// and where under it, the --c-ok dot while it runs; then the scheduled ones: a timer's hourglass,
+// and where under it, '∿' in text-3 while it runs (the processes page's mark: green is only a
+// diff's +, designer m_44499); then the scheduled ones: a timer's hourglass,
 // a watch's telescope, its rhythm and next time. Each row opens its thing in a tab (openTab) and
 // wires its entity's menu (useEntityMenu). Owner: nm-side.
 import type { Agent, Proc } from '@/proto';
 import { AppIcon, tipAttrs, type AppIconName } from '@/ds';
 import { ago } from '@/agents/model';
 import { kindOf, type Item } from '@/artifacts/model';
-import { isRunning, portWords, shortCmd, stateOf, urlWords, type ProcItem } from '@/running/model';
+import { isRunning, markOf, portWords, shortCmd, stateOf, urlWords, type ProcItem } from '@/running/model';
 import { asks, howOften, nextWords, type Task } from '@/scheduled/model';
 import { alarms } from '@/thread/wake';
 import { panel } from '@/proto/words_panel.gen';
@@ -69,7 +70,7 @@ export function ProcRow({ x, now }: { x: ProcItem; now: number }) {
       pic={<ThingPic thing={{ obj: procObj(p) }} px={ROW_PX} tile="terminal" />}
       title={<span className="s3-cmd">{shortCmd(p.cmd)}</span>}
       sub={procSub(p, now)}
-      end={on ? <span className="s3-dot" data-tone="ok" {...tipAttrs(side.running_tip)} /> : undefined}
+      end={on ? <span className="s3-wave" {...tipAttrs(side.running_tip)} data-testid={`app.flyout.processes.${x.project}.${p.agent}.${p.id}.runs`}>{markOf(stateOf(p)).glyph}</span> : undefined}
       label={p.cmd}
       tip={p.cmd}
       onClick={() => {

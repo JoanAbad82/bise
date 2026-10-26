@@ -12,9 +12,9 @@
 // under the bar: the world 12 from the top and the right edge; the bubbles 12 from the right, 152
 // from the top, 80 apart (44 + 36), never moving (the big world floats over them, designer
 // m_42536); with the world folded into a bubble, it is the stack's first, at 40; a card 68 from
-// the right, its top on its bubble's, kept 24 inside the window and at most min(window − 48, 560)
-// high (layout cardTop, cardMaxH): placed on open, at a resize's end and when its own height
-// changes, never from where it was drawn (no measure loop). Under every palette, sheet and menu
+// the right, its top always its bubble's, at most the room under it less 16 and 560 (layout
+// cardMaxH, designer m_44499): nothing measured places it, so it never moves nor runs past the
+// window. Under every palette, sheet and menu
 // (z 15: over the composer's 10, under the palette's 20). Owner: nm-side.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNowFor } from '../clock';
@@ -30,7 +30,7 @@ import { Empty, Flyout, HeadButton } from './Flyout';
 import { AgentLine } from './FlyoutAgents';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useLayoutDriver, useSideLayout } from './place';
-import { cardMaxH, cardTop, sideShows } from './layout';
+import { CARD_MAX, cardMaxH, sideShows } from './layout';
 import { newAgent, openOverview, openTab, useLeftWidth, usePanelBox } from './ports';
 import { alarms } from '@/thread/wake';
 import { useAgents, useCards, useProjects, useStore } from '@/store';
@@ -73,12 +73,12 @@ export function artFoot(n: number, projects: number): string {
   return projects > 1 ? side.in_projects({ n, p: projects }) : side.artifact_count({ n });
 }
 
-/** Where the open card is: its top (side px; null before its first measure: on its bubble) and whether its rows scroll (the 24 fade). */
-interface CardPlace {
-  readonly top: number | null;
+/** The open card's height at most (null before its first layout: CARD_MAX) and whether its rows scroll (the 16 fade). */
+interface CardFit {
+  readonly maxH: number | null;
   readonly scrolls: boolean;
 }
-const NO_PLACE: CardPlace = { top: null, scrolls: false };
+const NO_FIT: CardFit = { maxH: null, scrolls: false };
 
 /** The window's height, at each resize's end only. */
 function useWinH(): number {
@@ -203,32 +203,29 @@ function Side({ project, home, world }: { project: string; home: string; world: 
       window.removeEventListener('pointerdown', down, true);
     };
   }, [open]);
-  // a card stays inside the window: on its bubble's top, lifted only as far as its drawn height
-  // needs. Its height cap is the window's (cardMaxH), never its place's: a new measure of the same
-  // card gives the same top, so nothing moves unless its rows, its bubble or the window change.
+  // a card's top is always its bubble's, its height at most the room under it less 16
+  // (cardMaxH: nothing measured, it never moves nor runs past the window); its rows scroll inside
+  // under a 16 fade, set once they overflow (a measure that finds the same sets nothing)
   const card = useRef<HTMLDivElement | null>(null);
   const winH = useWinH();
-  const [place, setPlace] = useState<CardPlace>(NO_PLACE);
-  // the place drawn last: a measure that finds it again sets nothing (not even a bailed-out render)
-  const placed = useRef<CardPlace>(NO_PLACE);
-  const put = (next: CardPlace) => {
-    if (next.top === placed.current.top && next.scrolls === placed.current.scrolls) return;
-    placed.current = next;
-    setPlace(next);
+  const [fit, setFit] = useState<CardFit>(NO_FIT);
+  const fitted = useRef<CardFit>(NO_FIT);
+  const put = (next: CardFit) => {
+    if (next.maxH === fitted.current.maxH && next.scrolls === fitted.current.scrolls) return;
+    fitted.current = next;
+    setFit(next);
   };
   useLayoutEffect(() => {
     const el = card.current?.firstElementChild;
     const side = root.current;
     if (!(el instanceof HTMLElement) || side === null || open === null) {
-      put(NO_PLACE);
+      put(NO_FIT);
       return;
     }
-    const sideTop = side.getBoundingClientRect().top;
-    const bubble = tops.bubbles[open];
+    const maxH = cardMaxH(side.getBoundingClientRect().top, tops.bubbles[open], winH);
     const measure = () => {
       const body = el.querySelector('.s3-card-body');
-      const next: CardPlace = { top: cardTop(sideTop, bubble, el.offsetHeight, winH), scrolls: body !== null && body.scrollHeight > body.clientHeight };
-      put(next);
+      put({ maxH, scrolls: body !== null && body.scrollHeight > body.clientHeight });
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
@@ -239,6 +236,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- its bubble's top follows `open` and the layout
   }, [open, world, winH]);
+  const maxH = fit.maxH ?? CARD_MAX;
   const here = route.screen === 'thread' ? { project: route.project, agent: route.agent } : { project: null, agent: null };
   const at = answerFrom(here, home);
   const openAgent = (agent: string) => {
@@ -271,7 +269,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
       ))}
       <div ref={card}>
         {open === 'agents' && (
-          <Flyout id="agents" name={bubbleName('agents')} says={bubbleSays('agents', counts)} top={place.top ?? tops.bubbles['agents']} maxH={cardMaxH(winH)} scrolls={place.scrolls}
+          <Flyout id="agents" name={bubbleName('agents')} says={bubbleSays('agents', counts)} top={tops.bubbles['agents']} maxH={maxH} scrolls={fit.scrolls}
             add={<HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />}
             onPin={() => { openOverview(project, 'agents'); }}
             foot={{ left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go({ screen: 'agents', project }); } }] }}>
@@ -281,7 +279,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
           </Flyout>
         )}
         {open === 'artifacts' && (
-          <Flyout id="artifacts" name={bubbleName('artifacts')} says={bubbleSays('artifacts', counts)} top={place.top ?? tops.bubbles['artifacts']} maxH={cardMaxH(winH)} scrolls={place.scrolls}
+          <Flyout id="artifacts" name={bubbleName('artifacts')} says={bubbleSays('artifacts', counts)} top={tops.bubbles['artifacts']} maxH={maxH} scrolls={fit.scrolls}
             add={<AddButton place={addPlace} testId="app.flyout.artifacts.add" />}
             onPin={() => { openOverview(project, 'artifacts'); }}
             foot={{ left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project }); } }] }}>
@@ -305,7 +303,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
               </>
             );
           return (
-            <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={place.top ?? tops.bubbles[open]} maxH={cardMaxH(winH)} scrolls={place.scrolls}
+            <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={tops.bubbles[open]} maxH={maxH} scrolls={fit.scrolls}
               onPin={() => { openOverview(project, 'processes'); }}
               foot={{ left: '', links: [
                 { text: open === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[open], testId: `app.flyout.${open}.all` },

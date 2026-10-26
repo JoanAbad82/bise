@@ -16,7 +16,7 @@ import { emitAction } from '../menu';
 import { HINT_HOLD_MS } from '../held';
 import { keyAction } from '../keys';
 import { SideHost, bubbleTops } from './Host';
-import { CARD_MAX } from './layout';
+import { CARD_MAX, cardMaxH } from './layout';
 import { sideLayoutNow } from './place';
 import { GRACE_MS, HOVER_MS, hitBox } from './World';
 
@@ -203,6 +203,17 @@ describe('the right side, folded', () => {
     expect(document.activeElement).toBe(v.getByTestId('app.bubble.agents'));
   });
 
+  it('a running process says \'∿\' in text-3, as the processes page, never a green dot (designer m_44499)', () => {
+    const { v, store } = side3d();
+    act(() => {
+      store.apply(ev('processes', { project: ACME }));
+    });
+    fireEvent.click(v.getByTestId('app.bubble.processes'));
+    const card = v.getByTestId('app.flyout.processes');
+    expect([...card.querySelectorAll('.s3-wave')].map((e) => e.textContent)).toContain('∿');
+    expect(card.querySelector('.s3-dot')).toBeNull();
+  });
+
   it('1100 wide: the world folds into a 5th bubble on top of the stack', () => {
     const { v } = side3d(1100);
     expect(v.queryByTestId('app.world')).toBeNull();
@@ -246,27 +257,20 @@ describe('the right side, folded', () => {
     expect(card.querySelector('footer')?.textContent).toBe(`${side.archived({ n: 1 })}${side.all_agents}`);
   });
 
-  it('a card\'s top is its bubble\'s; its height at most the window\'s (min(window − 48, 560))', () => {
+  it('a card\'s top is always its bubble\'s; its height at most the room under it less 16 (designer m_44499)', () => {
     Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
     const { v } = side3d();
     fireEvent.click(v.getByTestId('app.bubble.processes'));
     const card = v.getByTestId('app.flyout.processes');
     expect(card.style.top).toBe(v.getByTestId('app.bubble.processes').style.top);
-    expect(card.style.maxHeight).toBe(`${String(CARD_MAX)}px`);
+    // happy-dom puts the side at 0: 900 - 16 - 392
+    expect(card.style.maxHeight).toBe(`${String(cardMaxH(0, 392, 900))}px`);
+    fireEvent.click(v.getByTestId('app.bubble.agents'));
+    expect(v.getByTestId('app.flyout.agents').style.maxHeight).toBe(`${String(CARD_MAX)}px`);
   });
 
   it('a card open stays put: its own resize with nothing changed makes no new render (the jitter, Gabriel m_44190)', () => {
     Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
-    // a card's rows 900 tall: drawn at its cap, as Chromium would
-    const was = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
-    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-      configurable: true,
-      get(this: HTMLElement) {
-        if (!this.classList.contains('s3-card')) return 0;
-        const cap = parseFloat(this.style.maxHeight);
-        return Number.isNaN(cap) ? 900 : Math.min(900, cap);
-      },
-    });
     const seen: ResizeObserverCallback[] = [];
     vi.stubGlobal('ResizeObserver', class {
       constructor(cb: ResizeObserverCallback) {
@@ -283,18 +287,15 @@ describe('the right side, folded', () => {
       });
       fireEvent.click(v.getByTestId('app.bubble.processes'));
       const card = v.getByTestId('app.flyout.processes');
-      const top = card.style.top;
-      // lifted so its 560 end 24 above the window's bottom: 900 - 24 - 560 under the window's top
-      expect(top).toBe(`${String(900 - 24 - CARD_MAX - (card.parentElement?.getBoundingClientRect().top ?? 0))}px`);
+      const box = [card.style.top, card.style.maxHeight];
       const after = commits;
       act(() => {
         for (let i = 0; i < 5; i++) for (const cb of seen) cb([], {} as ResizeObserver);
       });
       expect(commits).toBe(after);
-      expect(card.style.top).toBe(top);
+      expect([card.style.top, card.style.maxHeight]).toEqual(box);
     } finally {
       vi.unstubAllGlobals();
-      if (was !== undefined) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', was);
     }
   });
 
