@@ -13,4 +13,6 @@ crate::words! { ds:
     search = "search";
     /// the same field's hover tip, with its key
     search_tip(key) = "search · {key}";
+    /// the same field's × once it has words: its VoiceOver name
+    search_clear = "clear the search";
 }

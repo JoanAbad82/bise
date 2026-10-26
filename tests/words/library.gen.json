@@ -66,15 +66,6 @@
     "one": null,
     "text": "clear the search"
   },
-  "library.closest": {
-    "args": [
-      "name",
-      "folder",
-      "v"
-    ],
-    "one": null,
-    "text": "the closest: {name}, in {folder}, at v{v}."
-  },
   "library.col_kind": {
     "args": [],
     "one": null,
@@ -146,6 +137,11 @@
     "args": [],
     "one": null,
     "text": "empty for now"
+  },
+  "library.filters": {
+    "args": [],
+    "one": null,
+    "text": "Filters"
   },
   "library.first_say": {
     "args": [],
@@ -271,11 +267,6 @@
     "args": [],
     "one": null,
     "text": "Library"
-  },
-  "library.looked_in": {
-    "args": [],
-    "one": null,
-    "text": "i looked in names, folders, agents and kinds."
   },
   "library.made_by_you": {
     "args": [],
@@ -417,19 +408,12 @@
     "one": null,
     "text": "nothing from {project} in this folder."
   },
-  "library.nothing_called": {
+  "library.nothing_matches": {
     "args": [
       "q"
     ],
     "one": null,
-    "text": "nothing called \"{q}\""
-  },
-  "library.nothing_found": {
-    "args": [
-      "q"
-    ],
-    "one": null,
-    "text": "nothing found for \"{q}\""
+    "text": "nothing matches “{q}”."
   },
   "library.of_total": {
     "args": [
@@ -484,13 +468,6 @@
     "one": null,
     "text": "video"
   },
-  "library.open_it": {
-    "args": [
-      "name"
-    ],
-    "one": null,
-    "text": "open {name}"
-  },
   "library.picked": {
     "args": [
       "n"
@@ -520,13 +497,6 @@
     "one": null,
     "text": "recent first"
   },
-  "library.recent_in": {
-    "args": [
-      "project"
-    ],
-    "one": null,
-    "text": "recent in {project}"
-  },
   "library.say": {
     "args": [],
     "one": null,
@@ -545,6 +515,11 @@
     ],
     "one": null,
     "text": "type a name in the search: \"in:{example}\""
+  },
+  "library.search_placeholder": {
+    "args": [],
+    "one": null,
+    "text": "search artifacts"
   },
   "library.sheet_all": {
     "args": [

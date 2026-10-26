@@ -1,11 +1,10 @@
 // Search across folders (page artifacts-gallery v7 'chercher'): / searches everywhere, whatever
 // folder is open: names, folders, agents, kinds. '17 found for "dark" in all folders · ⏎ opens the
 // first, esc clears', then the results grouped by folder, four a group, the rest behind 'all 6 ›'
-// (the kinds are the window's bar's Filters, Screen.tsx). Nothing found: where it looked, and the
-// nearest match to open. The cards are the grid's (art-grid's ArtifactGrid, through `cards`). A
-// pure render. Owner: nm-pages-a (art-folders' before).
+// (the kinds are the toolbar's Filters, Toolbar.tsx; nothing found is the screen's ds Empty). The
+// cards are the grid's (art-grid's ArtifactGrid, through `cards`). A pure render. Owner: nm-pages-a (art-folders' before).
 import type { ReactNode } from 'react';
-import { Button, Empty, GroupLabel, Press } from '@/ds';
+import { GroupLabel, Press } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { GROUP_SHOWN, type Group } from './folders';
 import type { Item } from './model';
@@ -47,23 +46,6 @@ export function SearchResults(p: SearchViewProps) {
           </section>
         );
       })}
-    </div>
-  );
-}
-
-/** Nothing found: where it looked, the nearest to open, a way out. */
-export function NothingFound({ q, nearest, nearestFolder, onOpen, onClear, testId }: { q: string; nearest: Item | null; nearestFolder: string; onOpen: (it: Item) => void; onClear: () => void; testId: string }) {
-  return (
-    <div className="art-none" data-testid={testId}>
-      <p className="art-found">{library.nothing_found({ q })}</p>
-      <Empty title={library.nothing_called({ q })}
-        action={<span className="art-acts">
-          {nearest !== null && <Button kind="pri" onClick={() => { onOpen(nearest); }} testId={`${testId}.open`}>{library.open_it({ name: nearest.a.title })}</Button>}
-          <Button kind="ghost" onClick={onClear} testId={`${testId}.clear`}>{library.clear_search}</Button>
-        </span>}>
-        {library.looked_in}
-        {nearest !== null && ` ${library.closest({ name: nearest.a.title, folder: nearestFolder, v: nearest.a.version })}`}
-      </Empty>
     </div>
   );
 }

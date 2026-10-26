@@ -10,6 +10,11 @@
     "one": null,
     "text": "search"
   },
+  "ds.search_clear": {
+    "args": [],
+    "one": null,
+    "text": "clear the search"
+  },
   "ds.search_tip": {
     "args": [
       "key"

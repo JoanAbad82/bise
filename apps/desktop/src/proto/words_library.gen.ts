@@ -40,8 +40,6 @@ export const library = {
   all_projects: "all projects",
   /** the scope menu's foot: the typed way */
   scope_hint: (a: { example: string | number }): string => "type a name in the search: \"in:" + String(a.example) + "\"",
-  /** the recent cards' head under a project filter, `recent in ai-docs` */
-  recent_in: (a: { project: string | number }): string => "recent in " + String(a.project),
   /** the scope chip's × */
   scope_clear: (a: { project: string | number }): string => "show every project, not only " + String(a.project),
   /** the tiles' sort on all artifacts */
@@ -154,20 +152,16 @@ export const library = {
   found_where: "in all folders · ⏎ opens the first, esc clears",
   /** a group's more, `all 6 ›` */
   all_n: (a: { n: string | number }): string => "all " + String(a.n) + " ›",
-  /** the kind filter's first (in the window's bar), `all 17` */
+  /** the kind filter's first (in the toolbar above the list), `all 17` */
   all_kinds: "All",
   /** the kind filter, for VoiceOver */
   kinds_label: "kinds",
-  /** no result: the head */
-  nothing_found: (a: { q: string | number }): string => "nothing found for \"" + String(a.q) + "\"",
-  /** no result: the title */
-  nothing_called: (a: { q: string | number }): string => "nothing called \"" + String(a.q) + "\"",
-  /** no result: where it looked */
-  looked_in: "i looked in names, folders, agents and kinds.",
-  /** no result: the nearest, `the closest: bise pitch investisseurs, in launch, at v2.` */
-  closest: (a: { name: string | number; folder: string | number; v: string | number }): string => "the closest: " + String(a.name) + ", in " + String(a.folder) + ", at v" + String(a.v) + ".",
-  /** no result: open the nearest */
-  open_it: (a: { name: string | number }): string => "open " + String(a.name),
+  /** the toolbar's search field: its placeholder and VoiceOver name */
+  search_placeholder: "search artifacts",
+  /** the toolbar's one menu when the page is narrow (the kinds and the projects folded in it) */
+  filters: "Filters",
+  /** no result: the empty page's title, `nothing matches “dark”.` */
+  nothing_matches: (a: { q: string | number }): string => "nothing matches “" + String(a.q) + "”.",
   /** no result: clear the words */
   clear_search: "clear the search",
   /** a kind chip */

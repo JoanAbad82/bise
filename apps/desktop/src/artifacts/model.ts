@@ -86,6 +86,8 @@ export function dayWords(ms: number, now: number): string {
   if (dayOf(ms) === dayOf(now)) return 'today';
   if (dayOf(ms) === dayOf(now - 86_400_000)) return 'yesterday';
   const d = new Date(ms);
+  // past a year, the year in place of the day's name: '3 oct 2025' (designer m_45148)
+  if (now - ms > 365 * 86_400_000) return `${String(d.getDate())} ${MONTHS[d.getMonth()] ?? ''} ${String(d.getFullYear())}`;
   return `${DAYS[d.getDay()] ?? ''} ${String(d.getDate())} ${MONTHS[d.getMonth()] ?? ''}`;
 }
 

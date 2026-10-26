@@ -134,7 +134,7 @@ export function ArtifactGrid({ cards, cols, view, now, place, days = true, curso
     <>
     {/* the list's head stays out of the virtual rows: they are placed from the box's top */}
     {view === 'list' && <ListHead />}
-    <div ref={box} className={`art-grid ${view}`} role="listbox" aria-multiselectable="true" data-testid={testId} data-cols={across}
+    <div ref={box} className={`art-grid ${view}`} role="listbox" aria-multiselectable="true" data-testid={testId} data-cols={across} data-n={all.length}
       style={absolute ? { height: v.getTotalSize() } : undefined}>
       {shown.map((s) => {
         const r = rows[s.index];

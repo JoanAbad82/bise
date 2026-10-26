@@ -84,11 +84,26 @@ function mount(node: React.ReactNode, start: Route = { screen: 'artifacts', proj
 }
 
 describe('the page in bise fait mac (mockup 7, decision d2)', () => {
-  it('the kinds, the search and + in the bar; the lead with its vignette, no hero card', () => {
+  it("the kinds and the search in the toolbar above the list, the bar left alone (his m_44961); the lead with its vignette, no hero card", () => {
     mount(<ArtifactsScreen />);
-    const bar = screen.getByTestId('app.bar.slot');
+    expect(screen.getByTestId('app.bar.slot').childElementCount).toBe(0);
+    const bar = screen.getByTestId('artifacts.toolbar');
     expect(bar.querySelector('[data-testid="artifacts.kinds"]')).not.toBeNull();
+    expect(bar.querySelector('[data-testid="artifacts.projects"]')).not.toBeNull();
     expect(bar.querySelector('[data-testid="artifacts.search"]')).not.toBeNull();
+    // the toolbar sits over the list, under the banner
+    const list = screen.getByTestId('artifacts.grid');
+    expect(bar.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('artifacts.lead').compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // its '/' keycap until it has words, then × clears them
+    const field = screen.getByTestId<HTMLInputElement>('artifacts.search.input');
+    expect(field.placeholder).toBe(library.search_placeholder);
+    expect(screen.getByTestId('artifacts.search').querySelector('.b-kbd')?.textContent).toBe('/');
+    fireEvent.change(field, { target: { value: 'zzqx' } });
+    expect(screen.getByTestId('artifacts.search').querySelector('.b-kbd')).toBeNull();
+    expect(screen.getByTestId('artifacts.nothing').textContent).toContain(library.nothing_matches({ q: 'zzqx' }));
+    fireEvent.click(screen.getByTestId('artifacts.search.clear'));
+    expect(field.value).toBe('');
     expect(screen.getByTestId('artifacts.kinds.all').getAttribute('aria-selected')).toBe('true');
     expect(screen.queryByTestId('artifacts.hero')).toBeNull();
     expect(screen.getByTestId('artifacts.lead').textContent).toContain(library.say);
@@ -119,6 +134,34 @@ describe('the page in bise fait mac (mockup 7, decision d2)', () => {
     mount(<ArtifactsScreen />);
     expect(screen.getByTestId('artifacts.col')).toBeTruthy();
     expect(screen.queryByTestId('artifacts.lib')).toBeNull();
+  });
+});
+
+describe("'All' reaches every artifact (his m_44961: 'All 866' drew the newest 40 alone)", () => {
+  it('N artifacts in the store: the All count is N, the list holds N, End then ⏎ opens the oldest', () => {
+    window.localStorage.clear();
+    const N = 900;
+    const store = new Store(null);
+    store.apply({ ev: 'projects', projects: [{ project: 'shop-1', name: 'storefront', path: '/x/shop' }, { project: 'acme-2', name: 'acme', path: '/x/acme' }] });
+    // pages and files over 37 days, each its own card (no turn, so no stack), two projects; the
+    // oldest a PR (it opens as a route, the others in the panel)
+    const many = (from: number) => Array.from({ length: N / 2 }, (_, i) => {
+      const k = from + i;
+      return art(`a${String(k)}`, k === N - 1 ? 'pr' : k % 3 === 0 ? 'file' : 'page', { title: `piece ${String(k)}`, at_ms: NOW - k * 3_600_000 });
+    });
+    store.apply({ ev: 'artifacts', project: 'shop-1', items: many(0) });
+    store.apply({ ev: 'artifacts', project: 'acme-2', items: many(N / 2) });
+    const router = createRouter({ screen: 'artifacts', project: '' });
+    render(<StoreProvider store={store}><RouterContext.Provider value={router}><ArtifactsScreen /></RouterContext.Provider></StoreProvider>);
+    const all = screen.getByTestId('artifacts.kinds.all');
+    expect(all.textContent).toBe(`${library.all_kinds}${String(N)}`);
+    // what the list can show (virtualized: its rows drawn in view) is every one the tab counts
+    expect(screen.getByTestId('artifacts.grid').getAttribute('data-n')).toBe(String(N));
+    // and he reaches the last: End, then ⏎ opens the oldest
+    const scr = screen.getByTestId('artifacts.screen');
+    fireEvent.keyDown(scr, { key: 'End' });
+    fireEvent.keyDown(scr, { key: 'Enter' });
+    expect(router.get()).toEqual({ screen: 'artifacts', project: 'acme-2', id: `a${String(N - 1)}` });
   });
 });
 

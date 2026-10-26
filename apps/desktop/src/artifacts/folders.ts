@@ -393,39 +393,6 @@ export function groupByFolder(lib: Library, items: readonly Item[]): Group[] {
   return [...groups.values()];
 }
 
-/** The nearest artifact to words that found nothing: the most of its letters in order, else null. Pure. */
-export function nearestOf(items: readonly Item[], q: string): Item | null {
-  const want = q.toLowerCase().replace(/\s+/gu, ' ').trim();
-  if (want === '') return null;
-  let best: Item | null = null;
-  let bestScore = 0;
-  for (const it of items) {
-    const s = likeness(want, it.a.title.toLowerCase());
-    if (s > bestScore || (s === bestScore && best !== null && it.a.at_ms > best.a.at_ms)) {
-      best = it;
-      bestScore = s;
-    }
-  }
-  return bestScore >= 0.5 ? best : null;
-}
-
-/** How much of `want` the text holds: its words found whole count most, then shared letter pairs. 0..1. */
-function likeness(want: string, text: string): number {
-  const words = want.split(' ');
-  const whole = words.filter((x) => text.includes(x)).length / words.length;
-  const pairs = (s: string) => {
-    const out = new Set<string>();
-    for (let i = 0; i < s.length - 1; i++) out.add(s.slice(i, i + 2));
-    return out;
-  };
-  const a = pairs(want);
-  const b = pairs(text);
-  let shared = 0;
-  for (const p of a) if (b.has(p)) shared += 1;
-  const dice = a.size === 0 ? 0 : shared / a.size;
-  return Math.max(whole * 0.9 + dice * 0.1, dice * 0.8);
-}
-
 /** The project a typed 'in:ai' means: an exact id or name, else the one that starts so. Pure. */
 export function projectOfTyped(projects: readonly { project: string; name: string }[], typed: string): string | null {
   const t = typed.toLowerCase();

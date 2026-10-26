@@ -59,18 +59,27 @@ export interface BarSearchProps {
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
   /** the key that focuses it, shown at its right and in its tip: '/' */
   keys?: string;
+  /** its placeholder and VoiceOver name, when the page names what it searches ('search artifacts') */
+  placeholder?: string;
+  /** a × at its right end once it has words: clears them (`<testId>.clear`) */
+  onClear?: () => void;
   ref?: Ref<HTMLInputElement>;
   testId?: string;
 }
 
-/** the page's search in the bar: 200 × 28, r 8, --c-sunken, the icon 14, the key at its right */
-export function BarSearch({ value, onChange, onKeyDown, keys = "/", ref, testId }: BarSearchProps) {
+/** the page's search: 200 × 28, r 8, --c-sunken, the icon 14, the key at its right (× once it has words, with onClear) */
+export function BarSearch({ value, onChange, onKeyDown, keys = "/", placeholder = ds.search, onClear, ref, testId }: BarSearchProps) {
   return (
     <label className="b-barsearch" {...tipAttrs(ds.search_tip({ key: keys }))} data-testid={testId}>
       <AppIcon name="search" size={14} />
-      <input ref={ref} type="search" value={value} placeholder={ds.search} aria-label={ds.search} spellCheck={false}
+      <input ref={ref} type="search" value={value} placeholder={placeholder} aria-label={placeholder} spellCheck={false}
         onChange={onChange} onKeyDown={onKeyDown} data-testid={sub(testId, "input")} />
       {value === "" && <span className="b-kbd">{keys}</span>}
+      {value !== "" && onClear !== undefined && (
+        <button type="button" className="b-barsearch-x" aria-label={ds.search_clear} onClick={onClear} data-testid={sub(testId, "clear")}>
+          <AppIcon name="close" size={14} />
+        </button>
+      )}
     </label>
   );
 }

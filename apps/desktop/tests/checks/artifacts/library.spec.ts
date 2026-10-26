@@ -171,8 +171,8 @@ for (const theme of THEMES) {
         await id(page, 'artifacts.search.input').fill('dark');
         await expect(id(page, 'artifacts.results.head')).toContainText('"dark"');
         await shot('search');
-        await id(page, 'artifacts.search.input').fill('pitch v3');
-        await expect(id(page, 'artifacts.nothing')).toContainText('bise pitch investisseurs');
+        await id(page, 'artifacts.search.input').fill('zzqx');
+        await expect(id(page, 'artifacts.nothing')).toContainText(library.nothing_matches({ q: 'zzqx' }));
         await shot('nothing-found');
       } finally {
         await s.close();

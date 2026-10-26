@@ -3,7 +3,7 @@ import type { Artifact } from '@/proto';
 import { library } from '@/proto/words_library.gen';
 import {
   atOfPath, atPath, chipsOf, countsOf, countWords, coverOf, crumbOf, folderLine, groupByFolder, itemsAt, libraryFacts, libraryOf,
-  moveRows, nearestOf, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type Folder,
+  moveRows, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type Folder,
 } from './folders';
 import { cardRows, folderRows } from './Menus';
 import { moveKeys, walkOf } from './MovePicker';
@@ -157,12 +157,6 @@ describe('search across folders', () => {
 
   it('counts its kind chips, the most first', () => {
     expect(chipsOf(ITEMS)).toEqual([{ kind: 'files', n: 2 }, { kind: 'docs', n: 2 }, { kind: 'shots', n: 2 }, { kind: 'pages', n: 1 }].sort((x, y) => y.n - x.n || x.kind.localeCompare(y.kind)));
-  });
-
-  it('names the nearest when nothing is found', () => {
-    const pitch = [item('h', art('p', { title: 'bise pitch investisseurs' })), item('h', art('q', { title: 'budget famille' }))];
-    expect(nearestOf(pitch, 'pitch v3')?.a.title).toBe('bise pitch investisseurs');
-    expect(nearestOf(pitch, 'zzzz')).toBeNull();
   });
 
   it('takes a typed project by its id or name, or the one it starts', () => {

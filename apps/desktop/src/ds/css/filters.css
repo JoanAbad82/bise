@@ -14,3 +14,7 @@
 .b-barsearch input{flex:1;min-width:0;height:100%;margin:0;padding:0;border:0;outline:0;background:none;font:400 var(--f-ui);color:var(--c-text);-webkit-appearance:none;appearance:none}
 .b-barsearch input::placeholder{color:var(--c-text-3)}
 .b-barsearch input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+/* its × once it has words (onClear): text-3, text on hover, 8 from its right edge like the key */
+.b-barsearch-x{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--h-kbd);height:var(--h-kbd);padding:0;border:0;border-radius:var(--r-1);background:none;color:var(--c-text-3)}
+.b-barsearch-x:hover{color:var(--c-text);background:var(--c-hover)}
+.b-barsearch-x:focus-visible{outline:2px solid var(--c-focus);outline-offset:0}

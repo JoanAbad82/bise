@@ -49,8 +49,6 @@ crate::words! { library:
     all_projects = "all projects";
     /// the scope menu's foot: the typed way
     scope_hint(example) = "type a name in the search: \"in:{example}\"";
-    /// the recent cards' head under a project filter, `recent in ai-docs`
-    recent_in(project) = "recent in {project}";
     /// the scope chip's ×
     scope_clear(project) = "show every project, not only {project}";
 
@@ -177,20 +175,16 @@ crate::words! { library:
     found_where = "in all folders · ⏎ opens the first, esc clears";
     /// a group's more, `all 6 ›`
     all_n(n) = "all {n} ›";
-    /// the kind filter's first (in the window's bar), `all 17`
+    /// the kind filter's first (in the toolbar above the list), `all 17`
     all_kinds = "All";
     /// the kind filter, for VoiceOver
     kinds_label = "kinds";
-    /// no result: the head
-    nothing_found(q) = "nothing found for \"{q}\"";
-    /// no result: the title
-    nothing_called(q) = "nothing called \"{q}\"";
-    /// no result: where it looked
-    looked_in = "i looked in names, folders, agents and kinds.";
-    /// no result: the nearest, `the closest: bise pitch investisseurs, in launch, at v2.`
-    closest(name, folder, v) = "the closest: {name}, in {folder}, at v{v}.";
-    /// no result: open the nearest
-    open_it(name) = "open {name}";
+    /// the toolbar's search field: its placeholder and VoiceOver name
+    search_placeholder = "search artifacts";
+    /// the toolbar's one menu when the page is narrow (the kinds and the projects folded in it)
+    filters = "Filters";
+    /// no result: the empty page's title, `nothing matches “dark”.`
+    nothing_matches(q) = "nothing matches “{q}”.";
     /// no result: clear the words
     clear_search = "clear the search";
 

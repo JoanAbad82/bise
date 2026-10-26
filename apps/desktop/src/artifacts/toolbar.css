@@ -1,0 +1,17 @@
+/* src/artifacts · the toolbar above the list (Toolbar.tsx; designer's spec D m_44968, m_45148): one
+   row 32 high, 12 under the banner, 8 above the list, its edges the list's; sticky at the
+   scroller's top on the page's own ground, a 1 px --c-line under it only while stuck. The search
+   200 (160 under a 900 window), 28 high, r 8, --c-sunken with a 1 px --c-line; its '/' keycap goes
+   with the focus or words. */
+.art-toolbar{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:var(--s-2);box-sizing:border-box;height:var(--h-control);margin:var(--gap-block) 0 var(--s-2);background:var(--c-solid);box-shadow:0 1px 0 transparent;transition:box-shadow var(--d-fast) var(--ease-out)}
+.art-toolbar[data-stuck]{box-shadow:0 1px 0 var(--c-line)}
+.art-tb-l,.art-tb-r{display:flex;align-items:center;gap:var(--s-2);min-width:0}
+.art-tb-r{flex:none}
+.art-toolbar .art-views{margin-left:0}
+.art-toolbar .b-barsearch{box-shadow:inset 0 0 0 1px var(--c-line)}
+.art-toolbar .b-barsearch:focus-within{box-shadow:inset 0 0 0 1px var(--c-line),0 0 0 2px var(--c-focus)}
+.art-toolbar .b-barsearch:focus-within .b-kbd{display:none}
+@media (max-width:900px){.art-toolbar .b-barsearch{width:160px}}
+@media (prefers-reduced-motion:reduce){.art-toolbar{transition:none}}
+/* the archived ones: a faint row under the list (as the window's panel and the TUI) */
+.art-archived-row{display:flex;margin:var(--s-4) 0 0}

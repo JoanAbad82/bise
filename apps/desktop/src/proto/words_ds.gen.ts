@@ -10,4 +10,6 @@ export const ds = {
   search: "search",
   /** the same field's hover tip, with its key */
   search_tip: (a: { key: string | number }): string => "search · " + String(a.key),
+  /** the same field's × once it has words: its VoiceOver name */
+  search_clear: "clear the search",
 } as const;

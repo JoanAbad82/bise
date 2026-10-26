@@ -1,10 +1,10 @@
 // The artifacts screen, in folders (bise fait mac: page native-mac §6, mockup 7, decision d2;
 // artifacts-folders brief part 4, page artifacts-gallery v7; route artifacts[/<p>]): one library
-// for every project. The window's bar holds the place's name (its crumb), the kinds the place holds
-// (ds Filters), the search and + add (InBar). Under the bar the banner (ds PageBanner, the bims
-// filing desk as its vignette) scrolls away with the page; then the filters (the project scope,
-// Scope.tsx, or 'in:<project>' typed; the archived ones; cards or a list), and the place he is in:
-// all artifacts (the themes as big tiles, then recent, ds GroupLabels), recent, unfiled, a theme
+// for every project. The window's bar holds the place's name (its crumb) alone. Under the bar the
+// banner (ds PageBanner, the bims filing desk as its vignette) scrolls away with the page; then the
+// toolbar over the list (Toolbar.tsx, sticky: the kinds the place holds, the project scope or
+// 'in:<project>' typed; cards or a list, the search, + add), the place he is in, and the archived
+// ones' faint row under it: all artifacts (the themes as big tiles, then every artifact by day), recent, unfiled, a theme
 // (its task folders as small tiles, then its cards), a task's folder (its cards by day). The
 // library (Column.tsx) draws in the window's sidebar (ArtLibrary, library.tsx: this page publishes
 // its props there); with no sidebar library, in the page's 200 px column (under 900 px folded into
@@ -14,13 +14,12 @@
 // deletes (a dialog). Every move and folder edit has its undo (⌘Z, and the toast's). The grid, the
 // cards, the stacks and the list view are art-grid's (Grid.tsx, Sheet.tsx). Owner: art-folders.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { AppIcon, BarSearch, Button, Empty, FilterRow, Filters, GroupLabel, MoreButton, PageBanner, Press, sentenceCase, Sheet, tipAttrs, Toast, type EntityMenu } from '@/ds';
+import { Button, Empty, GroupLabel, MoreButton, PageBanner, Press, sentenceCase, Sheet, tipAttrs, Toast, type EntityMenu } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { library } from '@/proto/words_library.gen';
 import { useFolders, useProjects, useStore } from '@/store';
 import { DEPTH, useRouter } from '@/app/router';
 import { libraryExit } from '@/app/escape';
-import { InBar } from '@/app/barslot';
 import { publishColumn, useLibraryShown, type ColumnBits } from './library';
 import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
@@ -37,7 +36,7 @@ import { Thumb } from './thumbs';
 import { keyOf, revealPathOf, splitArchived, type Item } from './model';
 import {
   atOfPath, atPath, chipOf, chipsOf, countsOf, coverOf, crumbOf, folderLine, groupByFolder, inFolder, itemsAt, libraryFacts, libraryOf,
-  nameOf, nearestOf, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type At, type ChipKind, type Library,
+  nameOf, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type At, type ChipKind, type Library,
 } from './folders';
 import { FolderColumn, type Editing } from './Column';
 import { chipWord } from './folders';
@@ -45,8 +44,9 @@ import { FoldCrumb, useNarrow } from './Fold';
 import { sayCrumbSearch } from './crumb';
 import { MovePicker } from './MovePicker';
 import { atOf, CardMenu, FolderMenu, MergePicker, type CardAct, type FolderAct, type MenuAt } from './Menus';
-import { ProjectScope } from './Scope';
-import { NothingFound, SearchResults } from './Search';
+import { ProjectScope, scopeRows } from './Scope';
+import { SearchResults } from './Search';
+import { Toolbar } from './Toolbar';
 import { BigTile, FolderListRow, SmallTile } from './Tiles';
 import { cardDrag, FLASH_MS, TOAST_MS, useBrief, useDrop } from './drag';
 import { folderCmd, moveCmd, type FolderOp } from './ops';
@@ -172,12 +172,11 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
 
   const send = (cmd: object) => { store.command(cmd as never); };
   const edit = (op: FolderOp) => { send(folderCmd(op)); };
-  const tilesOnly = !searching && (atNow.at === 'all');
-  const gridItems = tilesOnly ? shown.slice(0, 40) : shown;
-  const { sel, setSel, ref, onKeyDown, move, cards, cols, cardOf } = useGridKeys({
-    items: gridItems,
+  // every one the kinds' count says, all artifacts too (his m_44961: 'All' showed the newest 40 alone)
+  const { sel, setSel, ref, onKeyDown, cards, cols, cardOf } = useGridKeys({
+    items: shown,
     view,
-    days: !tilesOnly && atNow.at !== 'recent',
+    days: atNow.at !== 'recent',
     keepAs: `artifacts.sel:${project}`,
     onOpen: (k) => { openCard(k); },
     onKey: (e, k) => rowKey(e, k === null ? undefined : itemOfKey(k), { onOpen: openIt, onLook: look, onPut: putIt }) || screenKey(e, k),
@@ -237,10 +236,6 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       return true;
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return false;
-    if (e.key === '/') {
-      searchRef.current?.focus();
-      return true;
-    }
     if (e.key === 'm') {
       const keys = keysToMove(sel);
       if (keys.length > 0) setOver({ k: 'move', keys, at: boxOf(keys[0] ?? '') });
@@ -303,23 +298,39 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     onDrop: (keys, id) => { moveTo(keys, id); },
   });
 
-  // the search has the keys: ⏎ opens the first result, ↑↓ give them back and move, esc clears
+  // '/' focuses the search when no field has the focus, wherever the focus is on the page
+  useEffect(() => {
+    const slash = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented || isField(e.target)) return;
+      const field = searchRef.current;
+      if (field === null) return;
+      e.preventDefault();
+      field.focus();
+    };
+    window.addEventListener('keydown', slash);
+    return () => { window.removeEventListener('keydown', slash); };
+  }, []);
+  // the search has the keys: ⏎ opens the first result, ↓ the first card, ↑ gives them back; esc
+  // clears its words, a second esc leaves it (designer's spec D)
   const searchKey = (e: KeyboardEvent<HTMLInputElement>) => {
     const back = () => {
       e.preventDefault();
       ref.current?.focus({ preventScroll: true });
     };
     if (e.key === 'Escape') {
-      setQ('');
-      back();
+      if (q !== '') {
+        e.preventDefault();
+        setQ('');
+      } else back();
     } else if (e.key === 'Enter') {
       const first = shown[0];
       if (searching && first !== undefined) openIt(first);
       back();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowDown') {
       back();
-      move(e.key === 'ArrowDown' ? 1 : -1);
-    }
+      setKeyed(true);
+      setSel(cards[0]?.key ?? null);
+    } else if (e.key === 'ArrowUp') back();
   };
   const doFolder = (id: string, act: FolderAct, at_: MenuAt) => {
     if (act === 'rename') setEditing({ kind: 'rename', id });
@@ -371,43 +382,36 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       onPick={onPick} onOpen={(c) => { openCard(c.key); }}
       onMenu={(key, p) => { setOver({ k: 'card', key, at: p }); }}
       dragOf={(key) => cardDrag(key, picked)}
-      scroller={() => document.querySelector<HTMLElement>('[data-testid="artifacts.scroll"]')} testId={testId} />
+      scroller={scrollEl} testId={testId} />
   );
+  const pickScope = (p: string) => { setScope(p); if (typedProject !== null) setQ(parsed.words.join(' ')); };
   const crumb = crumbOf(lib, atNow);
   // under 900 px the column folds into the crumb: the place's title opens it (page v7 'à 800 px')
   const fold = <FoldCrumb label={crumb.length === 0 ? sentenceCase(library.all_artifacts) : crumb.map((c) => c.name).join(' / ')} testId="artifacts.fold">{column}</FoldCrumb>;
   const current = atNow.at === 'folder' ? lib.byId.get(atNow.id) : undefined;
-  // the window's bar (mockup 7): the kinds the place holds (ds Filters: all, then each kind with its
-  // count), the search ('/'), + add files
+  // the toolbar above the list (his m_44961, designer's spec D): the kinds the place holds (all,
+  // then each kind with its count), the project scope; the cards/list switch, the search ('/'), +
   const kindsTotal = searching ? found.length : here.length;
-  const inBar = (
-    <InBar>
-      {stack === null && (searching || chips.length > 1) && (
-        <Filters label={library.kinds_label} on={chip ?? 'all'} testId="artifacts.kinds"
-          items={[{ id: 'all', label: <>{library.all_kinds}<span className="art-n">{kindsTotal}</span></> },
-            ...chips.map((c) => ({ id: c.kind, label: <>{chipWord(c.kind)}<span className="art-n">{c.n}</span></> }))]}
-          onPick={(id) => { setChip(id === 'all' ? null : (id as ChipKind)); }} />
-      )}
-      <BarSearch ref={searchRef} value={q} onChange={(e) => { setQ(e.currentTarget.value); setWhole(new Set()); }} onKeyDown={searchKey} testId="artifacts.search" />
-      <AddButton place={place_} testId="artifacts.add" />
-    </InBar>
+  const toolbar = stack === null && (
+    <Toolbar testId="artifacts.toolbar"
+      kinds={searching || chips.length > 1 ? [{ id: 'all', word: library.all_kinds, n: kindsTotal }, ...chips.map((c) => ({ id: c.kind, word: chipWord(c.kind), n: c.n }))] : null}
+      kind={chip ?? 'all'} onKind={(id) => { setChip(id === 'all' ? null : (id as ChipKind)); }}
+      scope={<ProjectScope all={base} project={eff} projectName={projectName} onPick={pickScope} testId="artifacts.projects" />}
+      projects={[{ project: '', name: sentenceCase(library.all_projects), n: base.length }, ...scopeRows(base)]} project={eff} onProject={pickScope}
+      view={view} onView={setView}
+      q={q} onQ={(e) => { setQ(e.currentTarget.value); setWhole(new Set()); }} onQKey={searchKey}
+      onClear={() => { setQ(''); searchRef.current?.focus(); }} searchRef={searchRef}
+      add={<AddButton place={place_} testId="artifacts.add" />}
+      scroller={scrollEl} />
   );
-  // under the lead (app-polish #4: menus left, the view's toggles right, one height): the project
-  // scope, the archived ones, cards or a list
-  const filters = stack === null && (
-    <FilterRow testId="artifacts.filters">
-      <ProjectScope all={base} project={eff} projectName={projectName} onPick={(p) => { setScope(p); if (typedProject !== null) setQ(parsed.words.join(' ')); }} testId="artifacts.projects" />
-      {archived.length > 0 && (
-        <Press look="art-toggle" aria-pressed={archivedOn} onClick={() => { setArchivedOn(!archivedOn); setPicked(new Set()); }} data-testid="artifacts.archived"
-          {...tipAttrs(library.archived_tip)}>
-          <AppIcon name="archive" size={14} />{library.archived_n({ n: archived.length })}
-        </Press>
-      )}
-      <span className="art-views">
-        <Press look="art-view" aria-pressed={view === 'grid'} aria-label={library.tip_cards} onClick={() => { setView('grid'); }} data-testid="artifacts.view.grid" {...tipAttrs(library.tip_cards)}><AppIcon name="grid" size={16} /></Press>
-        <Press look="art-view" aria-pressed={view === 'list'} aria-label={library.tip_list} onClick={() => { setView('list'); }} data-testid="artifacts.view.list" {...tipAttrs(library.tip_list)}><AppIcon name="list" size={16} /></Press>
-      </span>
-    </FilterRow>
+  // the archived ones: a faint row under the list, as the window's panel and the TUI (designer m_45148)
+  const archivedRow = stack === null && archived.length > 0 && (
+    <div className="art-archived-row">
+      <Press look="art-archived" aria-pressed={archivedOn} onClick={() => { setArchivedOn(!archivedOn); setPicked(new Set()); }} data-testid="artifacts.archived"
+        {...tipAttrs(library.archived_tip)}>
+        {library.archived_n({ n: archived.length })}
+      </Press>
+    </div>
   );
   // the place's folder: its '…' (the folder's own menu: rename, a folder inside, merge, delete)
   const folderMenu: EntityMenu | null = current === undefined ? null : {
@@ -426,9 +430,10 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     }
     if (searching) {
       if (found.length === 0) {
-        const near = nearestOf(scoped, parsed.words.join(' '));
-        const nf = near === null ? null : lib.folderOf(near);
-        return <NothingFound q={q} nearest={near} nearestFolder={nf === null ? library.unfiled : pathOf(lib, nf)} onOpen={openIt} onClear={() => { setQ(''); }} testId="artifacts.nothing" />;
+        return (
+          <Empty title={library.nothing_matches({ q: searchWords })} testId="artifacts.nothing"
+            action={<Button kind="ghost" onClick={() => { setQ(''); searchRef.current?.focus(); }} testId="artifacts.nothing.clear">{library.clear_search}</Button>} />
+        );
       }
       const groups = groupByFolder(lib, shown);
       return (
@@ -475,8 +480,8 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
               )}
             </>
           )}
-          <GroupLabel testId="artifacts.sect.recent">{eff === '' ? library.recent : library.recent_in({ project: projectName })}</GroupLabel>
-          {grid(cards, place, false, 'artifacts.grid')}
+          {/* every one, newest first, under its day's head (designer m_45148: no 'Recent' label) */}
+          {grid(cards, place, true, 'artifacts.grid')}
         </>
       );
     }
@@ -548,18 +553,18 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
         if (!keyed && (e.key.startsWith('Arrow') || e.key === 'j' || e.key === 'k' || e.key === 'Home' || e.key === 'End')) setKeyed(true);
         onKeyDown(e);
       }}>
-      {inBar}
       <div className="art-scroll" data-testid="artifacts.scroll">
         {/* the lead (designer's rule on #5): no card; the bims still stays beside it as a vignette */}
         {/* the banner (designer m_42762): a full-width page, its title 32 in, the filing desk right */}
         <PageBanner title={hero.artifacts_title} sentence={library.say} facts={libraryFacts(lib, scoped, projectName)}
           visual={<PageVignette page="artifacts" />} icon="artifacts" edge="page" gutter={gutter} testId="artifacts.lead" />
-        {filters}
         <div className={`art-lib${narrow || sideLib ? ' bare' : ''}`}>
           {!narrow && !sideLib && column}
           <div className="art-main">
+            {toolbar}
             {stackHead ?? head ?? bareHead}
             <AddDrop place={place_} testId="artifacts.drop">{body}</AddDrop>
+            {archivedRow}
           </div>
         </div>
       </div>
@@ -617,6 +622,13 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     </section>
   );
 }
+
+/** The page's one scroller (the grid's virtual rows and the toolbar's stick read it). */
+const scrollEl = (): HTMLElement | null => document.querySelector<HTMLElement>('[data-testid="artifacts.scroll"]');
+
+/** A field has the focus: '/' is a letter there. */
+const isField = (t: EventTarget | null): boolean =>
+  t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable);
 
 const toggled = (s: ReadonlySet<string>, k: string): Set<string> => {
   const n = new Set(s);
