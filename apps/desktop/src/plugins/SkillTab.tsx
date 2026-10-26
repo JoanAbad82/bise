@@ -98,12 +98,15 @@ export function SkillView({ p, s, read, ports, home = bise()?.home }: { p: Plugi
       else if (id === 'off') ports.setOn(false);
     });
   };
+  // the whole description: the row's, else the frontmatter's once the file came
+  const front = r !== null && 'text' in r && file === null ? readFront(r.text) : null;
+  const say = s.what ?? (front?.kind === 'ok' ? (front.keys.find((k) => k.key === 'description')?.value ?? '') : '');
   const facts = [titleOf(p), tagsOf(p)[0] ?? p.scope, locked ? pages.skill_always_on : s.on ? pages.skill_on : pages.skill_off, pages.skill_used_when];
   return (
     <div className="plg-skill" data-testid={tid}>
       <header className="plg-skill-head">
         <h1 className="plg-skill-name" data-testid={`${tid}.name`}>{s.name}</h1>
-        {s.what != null && s.what !== '' && <p className="plg-skill-say" data-testid={`${tid}.say`}>{s.what}</p>}
+        {say !== '' && <p className="plg-skill-say" data-testid={`${tid}.say`}>{say}</p>}
         <p className="plg-skill-facts" data-testid={`${tid}.facts`}>{facts.join(' · ')}</p>
         {path !== undefined && (
           <div className="plg-skill-acts">

@@ -61,13 +61,13 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
           {!installed(p) ? (
             p.action === 'connect' || p.action === 'set_up' ? (
               <Button kind="pri" onClick={() => { ports.send({ cmd: 'plugin_connect', ...at, id }); }} testId={`${tid}.connect`}>
-                {p.action === 'set_up' ? settings.plugins_set_up : settings.plugins_connect}
+                {sentenceCase(p.action === 'set_up' ? settings.plugins_set_up : settings.plugins_connect)}
               </Button>
             ) : null
           ) : c.kind === 'locked' ? (
             <span className="plg-dim">{settings.plugins_always_on}</span>
           ) : c.kind === 'set_up_cu' || (isComputer(p) && !p.on) ? (
-            <Button kind="pri" onClick={ports.setUpComputer} testId={`${tid}.set_up`}>{settings.plugins_set_up}</Button>
+            <Button kind="pri" onClick={ports.setUpComputer} testId={`${tid}.set_up`}>{sentenceCase(settings.plugins_set_up)}</Button>
           ) : (
             <>
               <span className="plg-dim">{p.on ? settings.plugins_on_everywhere : settings.plugins_off_everywhere}</span>
@@ -75,7 +75,7 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
             </>
           )}
           {ports.remove !== undefined && removable(p) && (
-            <Button kind="ghost" size="sm" onClick={() => { setAsking(true); }} testId={`${tid}.remove`}>{settings.plugins_remove}</Button>
+            <Button kind="ghost" size="sm" onClick={() => { setAsking(true); }} testId={`${tid}.remove`}>{sentenceCase(settings.plugins_remove)}</Button>
           )}
         </div>
       {asking && ports.remove !== undefined && (
@@ -201,7 +201,7 @@ function ServerRow({ x, owner, onSet, onLogin }: { x: PluginPart; owner: boolean
         </span>
         <span className="plg-row-end">
           {x.on && (x.login === 'needs' || x.login === 'pending') && (
-            <Button size="sm" state={x.login === 'pending' ? 'loading' : undefined} onClick={() => { onLogin(x.name); }} testId={`plugins.part.${x.id}.login`}>{settings.plugins_key_login}</Button>
+            <Button size="sm" state={x.login === 'pending' ? 'loading' : undefined} onClick={() => { onLogin(x.name); }} testId={`plugins.part.${x.id}.login`}>{sentenceCase(settings.plugins_key_login)}</Button>
           )}
           {x.on && x.login === 'in' && (
             <Button size="sm" kind="ghost" onClick={() => { /* log out: the TUI's /plugins logout */ }} testId={`plugins.part.${x.id}.logout`}>{settings.log_out}</Button>

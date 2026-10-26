@@ -9,7 +9,7 @@ import { Markdown } from "@/thread/Markdown";
 import "@/thread/thread.css";
 import {
   Act, Answered, Art, ArtName, Bar, BiseMark, Kiss, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Dropdown, Empty, Err,
-  Field, Fold, Group, Head, Help, HeroWait, IconButton, PageHero, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, PickerTrigger, Quote, Route, Row,
+  Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, PickerTrigger, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
   APP_ICONS, AppIcon, BannerWait, BarSearch, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageBanner, RowAction, type EntityMenu,
@@ -431,16 +431,6 @@ export const SECTIONS: Record<string, () => ReactNode> = {
         <div className="b-sheet-head"><h2 className="t">add a project</h2><p className="sub">a folder, a git repo. its main starts right away.</p></div>
         <div className="b-sheet-body"><Field defaultValue="~/code/shop" readOnly /></div>
         <div className="b-sheet-foot"><Button kind="ghost">cancel</Button><Button kind="pri">add 2 projects</Button></div>
-      </div>
-      {/* PageHero (designer's page-hero, the card): text-only until the bims stills exist, then with
-          its vignette (a placeholder still here); the dialog size, no card */}
-      <div className="g-row g-col" data-testid="ds.hero">
-        <PageHero name="inbox" sentence="what your agents wait on you for, from every project. answer here or in their thread; only what needs you gets in." facts={<><HeroWait>3 waiting</HeroWait> · the oldest 2 h ago</>} />
-        <PageHero name="scheduled" sentence="what runs on its own: a check every few minutes, a morning summary, a wait for a build to end." facts="4 running · next at 07:30" vignette={<div className="g-vig" />} />
-        <div className="b-sheet still"><div className="b-sheet-body">
-          <PageHero size="dialog" name="add a project" sentence="the folders bise works in. each one has its own main." vignette={<div className="g-vig" />} />
-          <Field defaultValue="~/code/shop" readOnly />
-        </div></div>
       </div>
     </>
   ),

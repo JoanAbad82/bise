@@ -6,7 +6,7 @@
 // the sheet's state drops them at its close), `cancel` sends `plugin_add_cancel`. Nothing runs
 // before his click. Owner: plug-desktop.
 import { useRef, useState } from 'react';
-import { Button, Caret, Field, PickerPop, Sheet, TextArea } from '@/ds';
+import { Button, Caret, Field, PickerPop, sentenceCase, Sheet, TextArea } from '@/ds';
 import type { AppCmd, ImportFrom, PluginPreview, PluginsSummary, SecretValue } from '@/proto';
 import { settings } from '@/proto/words.gen';
 import { itemsOf } from './model';
@@ -45,7 +45,7 @@ export function AddMenu({ summary, onPick }: { summary: PluginsSummary | null; o
     <>
       <Button ref={anchor} kind="pri" pressed={open} onClick={() => { setOpen(!open); }} testId="plugins.add">
         <span className="plg-add-words">
-          {settings.plugins_add}
+          {sentenceCase(settings.plugins_add)}
           <Caret />
         </span>
       </Button>

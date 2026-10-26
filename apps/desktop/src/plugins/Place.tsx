@@ -126,7 +126,7 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
             <div className="plg-kinds" role="group" data-testid="plugins.kinds">
               {KINDS.map((k) => (
                 <Chip key={k} onClick={() => { setKind(k); }} testId={`plugins.kind.${k}`} expanded={k === kind}>
-                  {kindWords(k)}
+                  {sentenceCase(kindWords(k))}
                   {k !== 'all' && <span className="plg-n">{counts[k]}</span>}
                 </Chip>
               ))}
@@ -226,23 +226,23 @@ export function PlaceRow({ h, project, onOpen, onSet, onConnect, onLogin, onSetU
         {c.kind === 'set_up_cu' && (
           <>
             <span className="plg-dim">{settings.plugins_not_set_up}</span>
-            <Button size="sm" onClick={onSetUp} testId={`${tid}.set_up`}>{settings.plugins_set_up}</Button>
+            <Button size="sm" onClick={onSetUp} testId={`${tid}.set_up`}>{sentenceCase(settings.plugins_set_up)}</Button>
           </>
         )}
         {c.kind === 'connect' && (
           <>
             <span className="plg-acc">{settings.plugins_expired}</span>
-            <Button size="sm" onClick={() => { onConnect(c.id); }} testId={`${tid}.connect`}>{settings.plugins_sign_in_again}</Button>
+            <Button size="sm" onClick={() => { onConnect(c.id); }} testId={`${tid}.connect`}>{sentenceCase(settings.plugins_sign_in_again)}</Button>
           </>
         )}
         {c.kind === 'log_in' && (
           <>
             <span className="plg-acc">{c.pending ? settings.plugins_login_waiting_short : settings.plugins_part_needs_login}</span>
-            <Button size="sm" state={c.pending ? 'loading' : undefined} onClick={() => { onLogin(c.name); }} testId={`${tid}.login`}>{settings.plugins_key_login}</Button>
+            <Button size="sm" state={c.pending ? 'loading' : undefined} onClick={() => { onLogin(c.name); }} testId={`${tid}.login`}>{sentenceCase(settings.plugins_key_login)}</Button>
           </>
         )}
         {c.kind === 'failed' && (
-          <Button size="sm" onClick={onOpen} testId={`${tid}.details`}>{settings.plugins_details}</Button>
+          <Button size="sm" onClick={onOpen} testId={`${tid}.details`}>{sentenceCase(settings.plugins_details)}</Button>
         )}
         {(c.kind === 'toggle' || c.kind === 'failed') && (
           <>
@@ -281,7 +281,7 @@ export function Band({ summary, browse, projectName, onConnect, onImport, onWork
     <div className="plg-band" data-testid="plugins.band">
       <div className="plg-band-top">
         <div className="plg-band-head">
-          <span className="plg-band-h">{settings.plugins_band_head}</span>
+          <span className="plg-band-h">{sentenceCase(settings.plugins_band_head)}</span>
           <span className="plg-dim">{settings.plugins_band_through}</span>
           <span className="plg-band-count" data-testid="plugins.band.count">{settings.plugins_band_count({ connected: summary.connected, total: summary.connectors })}</span>
         </div>
@@ -300,13 +300,13 @@ export function Band({ summary, browse, projectName, onConnect, onImport, onWork
                   <span className="plg-title" data-testid={`plugins.band.${id}.title`}>{title}</span>
                   {card.line !== '' && <span className="plg-dim">{card.line}</span>}
                 </span>
-                <Button size="sm" onClick={() => { onConnect(id); }} testId={`plugins.band.${id}.connect`}>{settings.plugins_connect}</Button>
+                <Button size="sm" onClick={() => { onConnect(id); }} testId={`plugins.band.${id}.connect`}>{sentenceCase(settings.plugins_connect)}</Button>
               </div>
             );
           })}
           {cells.more > 0 && (
             <div className="plg-card more">
-              <Button kind="ghost" onClick={onBrowse} testId="plugins.band.more">{settings.plugins_band_more({ n: cells.more })}</Button>
+              <Button kind="ghost" onClick={onBrowse} testId="plugins.band.more">{sentenceCase(settings.plugins_band_more({ n: cells.more }))}</Button>
             </div>
           )}
         </div>
@@ -314,19 +314,19 @@ export function Band({ summary, browse, projectName, onConnect, onImport, onWork
       {found !== null && imp !== undefined && (
         <div className="plg-band-line" data-testid="plugins.band.import">
           <span>{found}</span>
-          <Button size="sm" kind="ghost" onClick={onImport} testId="plugins.band.import.go">{settings.plugins_band_import({ n: imp.n })}</Button>
+          <Button size="sm" kind="ghost" onClick={onImport} testId="plugins.band.import.go">{sentenceCase(settings.plugins_band_import({ n: imp.n }))}</Button>
         </div>
       )}
       {ws !== undefined && (
         <div className="plg-band-line" data-testid="plugins.band.workspace">
           <span>{settings.plugins_band_workspace({ project: projectName ?? '', n: ws.n })}</span>
-          <Button size="sm" kind="ghost" onClick={onWorkspace} testId="plugins.band.workspace.see">{settings.plugins_band_see}</Button>
+          <Button size="sm" kind="ghost" onClick={onWorkspace} testId="plugins.band.workspace.see">{sentenceCase(settings.plugins_band_see)}</Button>
         </div>
       )}
       {market.map((m, i) => (
         <div key={i} className="plg-band-line" data-testid="plugins.band.market">
           <span>{marketWords(market, m)}</span>
-          <Button size="sm" kind="ghost" onClick={onBrowse} testId="plugins.band.market.browse">{settings.plugins_band_browse}</Button>
+          <Button size="sm" kind="ghost" onClick={onBrowse} testId="plugins.band.market.browse">{sentenceCase(settings.plugins_band_browse)}</Button>
         </div>
       ))}
     </div>
@@ -339,7 +339,7 @@ function Problem({ problem, onRefresh }: { problem: ConnectorsProblem; onRefresh
   return (
     <div className="plg-problem" data-testid="plugins.problem">
       <span>{words}</span>
-      {problem.kind === 'fetch' && <Button size="sm" kind="ghost" onClick={onRefresh} testId="plugins.refresh">{settings.plugins_refresh}</Button>}
+      {problem.kind === 'fetch' && <Button size="sm" kind="ghost" onClick={onRefresh} testId="plugins.refresh">{sentenceCase(settings.plugins_refresh)}</Button>}
     </div>
   );
 }
@@ -380,10 +380,10 @@ function BrowseList({ browse, q, project, onConnect, onOpen }: {
                   <span className="plg-row-end">
                     {p.action === 'connect' || p.action === 'set_up' ? (
                       <Button size="sm" state={p.login === 'pending' ? 'loading' : undefined} onClick={() => { onConnect(id); }} testId={`plugins.browse.row.${id}.connect`}>
-                        {p.action === 'set_up' ? settings.plugins_set_up : settings.plugins_connect}
+                        {sentenceCase(p.action === 'set_up' ? settings.plugins_set_up : settings.plugins_connect)}
                       </Button>
                     ) : (
-                      <Button size="sm" kind="ghost" onClick={() => { onOpen(id); }} testId={`plugins.browse.row.${id}.open`}>{settings.plugins_browse_add_one}</Button>
+                      <Button size="sm" kind="ghost" onClick={() => { onOpen(id); }} testId={`plugins.browse.row.${id}.open`}>{sentenceCase(settings.plugins_browse_add_one)}</Button>
                     )}
                   </span>
                 </div>

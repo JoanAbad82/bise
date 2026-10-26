@@ -1,5 +1,6 @@
-// The review (bar A.6): an agent's change, or one commit already on main,
-// file by file. Owner: amb-win. The old window's S7 rules, kept: a merged
+// The review (bar A.6): an agent's change, or one commit already on main (route commit), file by
+// file, under its own head (bise fait mac §9: no banner; its words through the catalog, the floating
+// composer's room at the foot). Owner: nm-pages-b (amb-win's before). The old window's S7 rules, kept: a merged
 // change or a commit from 'merged today' is read-only ('merged · e0f3df5
 // · 14:05', no merge, no ask for changes); a merge happens only by his
 // click on the agent's open merge card (the hub's one /answer path).
@@ -12,6 +13,7 @@ import { clock } from '@/thread/entry';
 import { useRouter } from '@/app/router';
 import { useKeptScroll } from '@/app/keep';
 import { MAIN } from '@/app/route';
+import { pages } from '@/proto/words_pages.gen';
 import { fileHead, headLine, linesOf, mergeCardOf, mergedSha, totals } from './model';
 import './review.css';
 
@@ -137,7 +139,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
 
   const done = mergedSha(diff, commit) !== undefined;
   const card = done ? undefined : mergeCardOf(cards, agent);
-  const title = commit === undefined ? agent : `commit ${commit.slice(0, 7)}`;
+  const title = commit === undefined ? agent : pages.review_commit({ sha: commit.slice(0, 7) });
   const line = headLine(diff, { commit, merged, clock });
 
   return (
@@ -156,7 +158,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
                 }}
                 testId="review.merge"
               >
-                merge into main
+                {pages.review_merge}
               </Button>
             )}
             <Button
@@ -166,7 +168,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
               }}
               testId="review.thread"
             >
-              thread
+              {pages.review_thread}
             </Button>
           </>
         }
@@ -176,7 +178,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
         {diff === null ? (
           <p className="rv-wait" data-testid="review.loading">{loadingWords(agent, commit)}</p>
         ) : diff.files.length === 0 ? (
-          <Empty title={commit === undefined ? 'no changes against main' : 'no changes in this commit'}>{diff.note ?? undefined}</Empty>
+          <Empty testId="review.none" title={commit === undefined ? pages.review_no_changes : pages.review_no_commit_changes}>{diff.note ?? undefined}</Empty>
         ) : (
           diff.files.map((f, i) => (
             <div key={f.path} className="rv-file">
@@ -199,8 +201,8 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
 
 /** What the review says while its diff comes: 'loading perf's changes…' (main is bise), a commit's. Pure. */
 export function loadingWords(agent: string, commit: string | undefined): string {
-  if (commit !== undefined) return `loading commit ${commit.slice(0, 7)}…`;
-  return `loading ${agent === MAIN ? 'bise' : agent}'s changes…`;
+  if (commit !== undefined) return pages.review_loading_commit({ sha: commit.slice(0, 7) });
+  return pages.review_loading({ agent: agent === MAIN ? 'bise' : agent });
 }
 
 /** Row `i` of the flat list is in the selection. */

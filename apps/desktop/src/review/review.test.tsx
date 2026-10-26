@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { pages } from '@/proto/words_pages.gen';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay } from '@/store';
@@ -125,8 +126,8 @@ describe('the window /commands (bar 2.1, A.2)', () => {
 describe('the review while its diff comes (designer m_15244: never a bare bar)', () => {
   it("says whose changes it loads, main as bise, a commit by its short sha", async () => {
     const { loadingWords } = await import('./ReviewScreen');
-    expect(loadingWords('perf', undefined)).toBe("loading perf's changes…");
-    expect(loadingWords('main', undefined)).toBe("loading bise's changes…");
-    expect(loadingWords('main', '155ffb0aa1')).toBe('loading commit 155ffb0…');
+    expect(loadingWords('perf', undefined)).toBe(pages.review_loading({ agent: 'perf' }));
+    expect(loadingWords('main', undefined)).toBe(pages.review_loading({ agent: 'bise' }));
+    expect(loadingWords('main', '155ffb0aa1')).toBe(pages.review_loading_commit({ sha: '155ffb0' }));
   });
 });

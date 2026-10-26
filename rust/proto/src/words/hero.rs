@@ -1,7 +1,8 @@
 //! The hero area's UI words (see [`super`]: the rules, how to read
-//! them): the permanent hero card at the top of each of the desktop's full
-//! pages (apps/desktop/src/ds/pagehero.tsx), its sentence (what the place
-//! is, in his words) and its facts line (live numbers). Words from
+//! them): the banner at the top of each of the desktop's full pages
+//! (apps/desktop/src/ds/banner.tsx PageBanner, designer m_42762), its title,
+//! its sentence (what the place is, in his words) and its facts line (live
+//! numbers). Words from
 //! designer's m_39021 (page page-hero, docs/brand/design-system.md
 //! 'dialogs and page heroes'); the settings sections' sentences are their
 //! `settings.page_*_sub`. Ages (`2 h`) and clock times stay TS fns.

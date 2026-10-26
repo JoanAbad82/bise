@@ -101,7 +101,7 @@ describe('the feature screen', () => {
     const v = render(wrap(<FeatureScreen project={P} name="gift-cards" />));
     expect(cmds).toContainEqual({ cmd: 'features', project: P });
     const text = v.getByTestId('feature.screen').textContent;
-    expect(text).toContain('ψ gift-cards');
+    expect(v.getByTestId('feature.screen').querySelector('.b-head')?.textContent).toContain('gift-cards');
     expect(text).toContain('gift-cards → main · 2 ahead · 1 behind · +42 −3');
     expect(v.getByTestId('feature.state').textContent).toContain('on trial · 4b825dc');
     expect(v.getByTestId('feature.tried').textContent).toContain('~/.bise/dev/versions/4b825dc/bise');

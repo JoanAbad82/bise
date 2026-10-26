@@ -1,14 +1,19 @@
-// One feature (bar A.6, amb-feed 5f436473): its branch and base, how far it
-// is from the trunk, its agents, its state (checked, a try building, on
-// trial), and try / merge / drop through its card (no typed command:
-// store.answer with the card's id, architect m_10203); the merge card's
-// drop asks once more, as the TUI does. Owner: amb-win.
+// One feature (bar A.6, amb-feed 5f436473; bise fait mac §9: its own head, no banner): its branch and
+// base, how far it is from the trunk, its state (checked, a try building, on trial), try / merge /
+// drop through its card (no typed command: store.answer with the card's id, architect m_10203; the
+// merge card's drop asks once more, as the TUI does), then its agents as ds ListRows under a ds
+// GroupLabel, each with its menu. The floating composer's room at the foot. Owner: nm-pages-b
+// (amb-win's before).
 import { useEffect, useState } from 'react';
-import { Button, Empty, Head, Row, SectionHead } from '@/ds';
+import { Button, Empty, GroupLabel, Head, ListRow, MoreButton } from '@/ds';
+import type { Agent } from '@/proto';
+import { pages } from '@/proto/words_pages.gen';
+import { useEntityMenu } from '@/app/menus/use';
+import { asksHim, StateMark } from '@/agents/AgentsScreen';
 import { useAgents, useCards, useFeatures, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { useKeptScroll } from '@/app/keep';
-import { dotOf, endOf } from '@/agents/model';
+import { endOf } from '@/agents/model';
 import { useNow } from '@/app/clock';
 import { cardOf, choicesOf, distance, dropAsk, stateWords } from './feature';
 import './review.css';
@@ -16,7 +21,6 @@ import './review.css';
 export function FeatureScreen({ project, name }: { project: string; name: string }) {
   useKeptScroll(`feature:${project}/${name}`, () => document.querySelector<HTMLElement>('[data-testid="feature.screen"] .rv-body'));
   const store = useStore();
-  const router = useRouter();
   const features = useFeatures(project);
   const cards = useCards(project);
   const agents = useAgents(project);
@@ -32,9 +36,9 @@ export function FeatureScreen({ project, name }: { project: string; name: string
   if (f === undefined) {
     return (
       <section className="rv-screen" data-testid="feature.screen" data-project={project} data-feature={name}>
-        <Head title={`ψ ${name}`} sub="feature" />
+        <Head title={name} sub={pages.feature_word} />
         <div className="rv-body">
-          <Empty title="no such feature">it was merged or dropped, or the list hasn't come yet</Empty>
+          <Empty testId="feature.none" title={pages.feature_none}>{pages.feature_none_why}</Empty>
         </div>
       </section>
     );
@@ -44,15 +48,15 @@ export function FeatureScreen({ project, name }: { project: string; name: string
   const mine = agents.filter((a) => f.agents.includes(a.name));
   return (
     <section className="rv-screen" data-testid="feature.screen" data-project={project} data-feature={name}>
-      <Head title={`ψ ${f.name}`} sub={`${f.branch} → ${f.base} · ${distance(f)}`} />
+      <Head title={f.name} sub={`${f.branch} → ${f.base} · ${distance(f)}`} />
       <div className="rv-body">
         <p className="rv-note" data-testid="feature.state" data-building={f.building} data-trial={f.trial} data-checked={f.checked}>
           {stateWords(f)}
-          {f.adopted === true ? ' · an existing branch' : ''}
+          {f.adopted === true ? ` · ${pages.feature_existing}` : ''}
         </p>
         {f.tried != null && (
           <p className="rv-note" data-testid="feature.tried">
-            tried {f.tried.sha} · run it: <code>{f.tried.run}</code>
+            {pages.feature_tried({ sha: f.tried.sha })} <code>{f.tried.run}</code>
           </p>
         )}
 
@@ -82,34 +86,31 @@ export function FeatureScreen({ project, name }: { project: string; name: string
         )}
         {card === undefined && f.card == null && (
           <p className="rv-note" data-testid="feature.nocard">
-            {f.trial ? 'on trial: main asks you to merge, keep working or drop it' : 'main asks you to try it when its agents are done'}
+            {f.trial ? pages.feature_on_trial : pages.feature_try_when}
           </p>
         )}
 
-        <SectionHead>agents</SectionHead>
-        {mine.length === 0 && (
-          <p className="rv-note" data-testid="feature.noagent">
-            no agent on it now
-          </p>
-        )}
-        {mine.map((a) => {
-          const end = endOf(a, now);
-          return (
-            <Row
-              key={a.name}
-              kind="ag"
-              name={a.name}
-              dot={dotOf(a.status)}
-              end={end.text}
-              needs={end.needs}
-              onClick={() => {
-                router.go({ screen: 'thread', project, agent: a.name });
-              }}
-              testId={`feature.agent.${a.name}`}
-            />
-          );
-        })}
+        <GroupLabel count={mine.length} testId="feature.agents">{pages.feature_agents}</GroupLabel>
+        {mine.length === 0 && <Empty testId="feature.noagent" title={pages.feature_no_agent} />}
+        {mine.map((a) => <AgentRow key={a.name} project={project} a={a} now={now} />)}
       </div>
     </section>
+  );
+}
+
+/** One agent of the feature (ds ListRow): its state mark, its name, its end; its '…' and a right click are its menu. */
+function AgentRow({ project, a, now }: { project: string; a: Agent; now: number }) {
+  const router = useRouter();
+  const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
+  const end = endOf(a, now);
+  const tid = `feature.agent.${a.name}`;
+  return (
+    <ListRow testId={tid} state={<StateMark a={a} />} title={a.name}
+      sub={<span className={asksHim(a) ? 'ag-end wait' : 'ag-end'}>{end.text}</span>}
+      onContextMenu={menu.onContextMenu}
+      end={<MoreButton menu={menu} testId={`${tid}.more`} />}
+      onClick={() => {
+        router.go({ screen: 'thread', project, agent: a.name });
+      }} />
   );
 }

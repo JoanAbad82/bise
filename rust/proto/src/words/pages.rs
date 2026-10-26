@@ -146,4 +146,40 @@ crate::words! { pages:
     skill_not_allowed = "bise reads only the skills of your plugins.";
     /// a skill from a hub that doesn't say where its file is
     skill_no_file = "this skill's file isn't known yet: update bise's hubs.";
+
+    // ---- an agent's change, a commit (route review, commit): its own head, no banner
+    /// the review's action: merges through the agent's merge card
+    review_merge = "Merge into main";
+    /// the review's action: back to the agent's thread
+    review_thread = "Thread";
+    /// a commit's head title
+    review_commit(sha) = "commit {sha}";
+    /// nothing differs from main
+    review_no_changes = "no changes against main";
+    /// a commit that changes nothing
+    review_no_commit_changes = "no changes in this commit";
+    /// while an agent's diff comes (main is bise)
+    review_loading(agent) = "loading {agent}'s changes…";
+    /// while a commit's diff comes
+    review_loading_commit(sha) = "loading commit {sha}…";
+
+    // ---- a feature (route feature)
+    /// the feature head's sub when it isn't known
+    feature_word = "feature";
+    /// no such feature: the empty state's title
+    feature_none = "no such feature";
+    /// no such feature: why
+    feature_none_why = "it was merged or dropped, or the list hasn't come yet";
+    /// a feature made from a branch that existed
+    feature_existing = "an existing branch";
+    /// the try it ran: its sha, then how to run it
+    feature_tried(sha) = "tried {sha} · run it:";
+    /// on trial, no card yet
+    feature_on_trial = "on trial: main asks you to merge, keep working or drop it";
+    /// not tried yet, no card
+    feature_try_when = "main asks you to try it when its agents are done";
+    /// its agents' group label
+    feature_agents = "Agents";
+    /// no agent works on it
+    feature_no_agent = "no agent on it now";
 }

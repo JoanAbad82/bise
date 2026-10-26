@@ -62,7 +62,6 @@
 .b-empty .say{margin:0;font:var(--t-15)/1.5 var(--font-ui);color:var(--c-text-2)}
 .b-empty .more{margin:0;font:var(--t-13)/var(--lh-ui) var(--font-ui);color:var(--c-text-3)}
 .b-empty .act{margin-top:var(--s-2)}
-.b-hero + .b-empty{margin-top:calc(var(--gap-page) - var(--s-6))}
 .b-err{display:flex;gap:var(--gap-inline);align-items:flex-start;padding:var(--s-2) var(--pad-control-x);border-radius:var(--r-2);background:var(--c-err-soft);color:var(--c-text);font-size:var(--t-13)}
 .b-err .m{color:var(--c-err);font-weight:700}
 /* a chip with onClick is a real button (designer m_18626): the chip's look, the ds ring */

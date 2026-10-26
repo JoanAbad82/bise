@@ -6,6 +6,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppCmd, Plugin, PluginsSummary } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
+import { sentenceCase } from '@/ds';
+import { settings } from '@/proto/words.gen';
 import { PlaceView } from './Place';
 import { PluginPage } from './PluginPage';
 import { AddSheet } from './Add';
@@ -71,7 +73,7 @@ describe('the plugins place', () => {
     expect(icon.textContent).toBe('G');
     expect(screen.getByTestId('plugins.band.mistral:google_calendar.title').textContent).toBe('Google Calendar');
     // the core's n is 6 for 5 ids: 5 cards and the 6th cell
-    expect(screen.getByTestId('plugins.band.more').textContent).toBe('browse 1 more');
+    expect(screen.getByTestId('plugins.band.more').textContent).toBe(sentenceCase(settings.plugins_band_more({ n: 1 })));
   });
 
   it("gives each row its one control: always on, set up, connect, log in, details + switch", () => {

@@ -34,8 +34,6 @@ html,body{margin:0;background:#777}
 .g-office-open>.b-picker{position:relative}
 .g-xfade{inset:0;width:100%;height:100%;border-radius:inherit;background:linear-gradient(160deg,#a8d5a2,#7fae6f);opacity:.5 !important}
 .g-tight{gap:var(--gap-tight)}
-/* a PageHero vignette's placeholder (the bims stills come later) */
-.g-vig{background:linear-gradient(160deg,#9fc5e8,#d9c7a3)}
 .g-agents-label{display:block;overflow:hidden;text-overflow:ellipsis}
 /* hover, still: office.css .bims-chip:hover's color */
 .g-hover .bims-chip{color:var(--c-text)}

@@ -99,8 +99,10 @@
 .plg-page { gap: var(--s-6); }
 .plg-page-col { display: flex; flex-direction: column; gap: var(--gap-page); }
 .plg-page-acts { display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
-.b-banner .vis > .plg-icon.head { width: calc(var(--s-16) + var(--s-8)); height: calc(var(--s-16) + var(--s-8)); }
-.b-banner .vis > .plg-icon.head .plg-obj { width: var(--s-16); height: var(--s-16); }
+/* the plugin's own object in the banner's box: transparent, no tile (the box is the frame rule's) */
+.b-banner .vis > .plg-icon.head { width: 100%; height: 100%; border-radius: 0; background: none; box-shadow: none; }
+.b-banner .vis > .plg-icon.head .plg-obj { width: auto; height: 100%; max-width: 100%; }
+.b-banner .vis > .plg-icon.head .plg-mono-letter { font: 600 var(--f-question); }
 .b-banner .title > .plg-tag { margin-left: var(--s-2); vertical-align: middle; }
 .plg-ask { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-2); background: var(--c-err-soft); font: var(--t-13) var(--font-ui); color: var(--c-text); }
 .plg-acts { display: flex; gap: var(--gap-inline); }

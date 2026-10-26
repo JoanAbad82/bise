@@ -55,6 +55,53 @@
     "one": null,
     "text": "done"
   },
+  "pages.feature_agents": {
+    "args": [],
+    "one": null,
+    "text": "Agents"
+  },
+  "pages.feature_existing": {
+    "args": [],
+    "one": null,
+    "text": "an existing branch"
+  },
+  "pages.feature_no_agent": {
+    "args": [],
+    "one": null,
+    "text": "no agent on it now"
+  },
+  "pages.feature_none": {
+    "args": [],
+    "one": null,
+    "text": "no such feature"
+  },
+  "pages.feature_none_why": {
+    "args": [],
+    "one": null,
+    "text": "it was merged or dropped, or the list hasn't come yet"
+  },
+  "pages.feature_on_trial": {
+    "args": [],
+    "one": null,
+    "text": "on trial: main asks you to merge, keep working or drop it"
+  },
+  "pages.feature_tried": {
+    "args": [
+      "sha"
+    ],
+    "one": null,
+    "text": "tried {sha} · run it:"
+  },
+  "pages.feature_try_when": {
+    "args": [],
+    "one": null,
+    "text": "main asks you to try it when its agents are done"
+  },
+  "pages.feature_word": {
+    "args": [],
+    "one": null,
+    "text": "feature"
+  },
   "pages.group_branches": {
     "args": [],
     "one": null,
@@ -124,6 +171,47 @@
     "args": [],
     "one": null,
     "text": "Pull requests"
+  },
+  "pages.review_commit": {
+    "args": [
+      "sha"
+    ],
+    "one": null,
+    "text": "commit {sha}"
+  },
+  "pages.review_loading": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "loading {agent}'s changes…"
+  },
+  "pages.review_loading_commit": {
+    "args": [
+      "sha"
+    ],
+    "one": null,
+    "text": "loading commit {sha}…"
+  },
+  "pages.review_merge": {
+    "args": [],
+    "one": null,
+    "text": "Merge into main"
+  },
+  "pages.review_no_changes": {
+    "args": [],
+    "one": null,
+    "text": "no changes against main"
+  },
+  "pages.review_no_commit_changes": {
+    "args": [],
+    "one": null,
+    "text": "no changes in this commit"
+  },
+  "pages.review_thread": {
+    "args": [],
+    "one": null,
+    "text": "Thread"
   },
   "pages.see_changes": {
     "args": [],

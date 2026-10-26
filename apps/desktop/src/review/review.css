@@ -24,8 +24,9 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  /* the rows' text on the page's column (--pad-page-x), their tint hung out --pad-row-x */
-  padding: var(--s-2) calc(var(--pad-page-x) - var(--pad-row-x)) var(--s-6);
+  /* the rows' text on the page's column (--pad-page-x), their tint hung out --pad-row-x; the
+     floating composer's room at its foot (--float-room) */
+  padding: var(--s-2) calc(var(--pad-page-x) - var(--pad-row-x)) var(--float-room);
 }
 
 /* the region that has the keys shows no ring: the key line says it (designer m_21379 (5)) */

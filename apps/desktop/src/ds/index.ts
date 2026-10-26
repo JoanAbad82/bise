@@ -28,7 +28,6 @@ export * from "./gust";
 export * from "./slide";
 export { textWidth } from "./hooks";
 export * from "./ring";
-export * from "./pagehero";
 export * from "./icons";
 export * from "./icons-app";
 export * from "./banner";
