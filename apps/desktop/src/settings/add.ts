@@ -6,6 +6,7 @@
 // it asked. Owner: amb-home.
 import type { Found, ProjectRow } from '@/proto';
 import { settings } from '@/proto/words.gen';
+import { tilde } from '@/app/barplaces';
 
 /** How long the sheet waits for the core before it says so. */
 export const WAIT_MS = 20_000;
@@ -85,9 +86,11 @@ export function addPaths(ticked: readonly string[], typed: string): string[] {
 }
 
 /** A found repo's dim line in shot 19: its folder, then 'git · today' (or its day). */
-export function foundSub(f: Found, now: number): string {
+export function foundSub(f: Found, now: number, home?: string): string {
   const day = 86_400_000;
   const d = Math.floor(now / day) - Math.floor(f.last_ms / day);
   const when = d <= 0 ? settings.age_today : d === 1 ? settings.age_yesterday : d < 30 ? settings.age_days({ n: d }) : new Date(f.last_ms).toISOString().slice(0, 10);
-  return f.git ? settings.found_sub_git({ path: f.path, when }) : settings.found_sub({ path: f.path, when });
+  // under his home, '~/code/shop' (designer m_45376)
+  const path = tilde(f.path, home);
+  return f.git ? settings.found_sub_git({ path, when }) : settings.found_sub({ path, when });
 }

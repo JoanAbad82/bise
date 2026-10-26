@@ -355,7 +355,7 @@ export const settings = {
   /** the add sheet: look in his folders again */
   add_rescan: "Look again",
   /** the add sheet's switch */
-  add_land: "main may land on main",
+  add_land: "bise may land on main",
   /** the add sheet's switch, on */
   add_land_on: "main commits to main once the tests pass, without asking you",
   /** the add sheet's switch, off */

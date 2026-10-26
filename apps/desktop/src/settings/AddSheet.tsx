@@ -2,7 +2,7 @@
 // a modal over the dimmed window, the same from settings › projects and from the sidebar's
 // '+ add a project' / ⌘N. Its head 'Add a project' and sub; the path Field and 'Choose…' (the
 // system's folder panel, window.bise.pickFolder); 'Found in your folders · 2', the repos found_scan
-// found, each with its Check; the Toggle 'main may land on main' (the repo's flow mode); the foot:
+// found, each with its Check; the Toggle 'bise may land on main' (the repo's flow mode; paths under his home as ~/code/shop); the foot:
 // Cancel, and the primary that says what it adds ('Add shop', 'Add 2 projects'). Chrome in sentence
 // case, bise's sentences lowercase (designer m_43052): the scan's words are states (the first
 // launch says them too), the head sentence-cases them, never in capitals.
@@ -17,6 +17,7 @@ import { Act, Button, Check, Field, Group, Sheet, sentenceCase } from '@/ds';
 import { useBroken, useCoreEvent, useFound, useProjects, type Ev } from '@/store';
 import { settings } from '@/proto/words.gen';
 import { addLabel, addPaths, addSay, foundSub, offers, scanSay } from './add';
+import { biseHome } from './picker';
 
 /** The clock, read only in the click handlers (when he looks again or adds). */
 const clock = (): number => Date.now();
@@ -27,6 +28,8 @@ export interface AddSheetProps {
   send: (cmd: AppCmd) => void;
   /** the system's folder panel (none: no 'choose…') */
   pickFolder?: (() => Promise<string | null>) | undefined;
+  /** his home folder, to say ~ (none: the bridge's) */
+  home?: string | undefined;
   /** the core added them: their rows (the sidebar's opener shows the first) */
   onAdded?: (rows: readonly ProjectRow[]) => void;
 }
@@ -72,7 +75,7 @@ interface Adding {
   err0: number;
 }
 
-function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
+function OpenSheet({ onClose, send, pickFolder, onAdded, home = biseHome() }: AddSheetProps) {
   const found = useFound();
   const projects = useProjects();
   const broken = useBroken();
@@ -195,7 +198,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
         items={list.map((f) => ({
           id: f.path,
           label: f.name,
-          sub: foundSub(f, now),
+          sub: foundSub(f, now, home),
           check: (
             <Check
               on={ticked.includes(f.path)}

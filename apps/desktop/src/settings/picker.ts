@@ -4,6 +4,11 @@
 // BISE_DESKTOP_TEST_PICK_FOLDER answers it without a dialog). No bridge: no port, no button.
 // Owner: amb-kit.
 
+/** His home folder as the bridge knows it (the found repos say ~/code/shop), else none. */
+export function biseHome(): string | undefined {
+  return (globalThis as { bise?: { home?: string } }).bise?.home;
+}
+
 /** The picker port when the shell has one, else nothing. */
 export function pickerPort(): { pickFolder?: () => Promise<string | null> } {
   const bise = (globalThis as { bise?: { pickFolder?: () => Promise<string | null> } }).bise;

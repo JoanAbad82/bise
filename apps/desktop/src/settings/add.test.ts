@@ -59,5 +59,9 @@ describe("the add sheet's waits never spin forever (ambient-lead m_18490)", () =
     expect(foundSub(f(now - 3_600_000), now)).toBe('/x/shop · git · today');
     expect(foundSub(f(now - 86_400_000), now)).toBe('/x/shop · git · yesterday');
     expect(foundSub(f(now - 5 * 86_400_000, false), now)).toBe('/x/shop · 5 days ago');
+    // under his home, '~/…' (designer m_45376); elsewhere, or no home known, the path as is
+    expect(foundSub(f(now - 3_600_000), now, '/x')).toBe('~/shop · git · today');
+    expect(foundSub(f(now - 3_600_000), now, '/y')).toBe('/x/shop · git · today');
+    expect(foundSub(f(now - 3_600_000), now, '/x/sh')).toBe('/x/shop · git · today');
   });
 });

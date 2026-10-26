@@ -256,6 +256,7 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
         }}
         send={ports.send}
         pickFolder={ports.pickFolder}
+        home={home}
       />
     </>
   );
