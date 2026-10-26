@@ -7,12 +7,12 @@
 // row's '…' and right click are its menu (useEntityMenu). The floating composer's room at the foot
 // (--float-room). Owner: nm-pages-b (amb-win's before).
 import { useEffect } from 'react';
-import { Dot, Empty, GroupLabel, ListRow, MoreButton, PageBanner } from '@/ds';
+import { AppIcon, Dot, Empty, GroupLabel, ListRow, MoreButton, PageBanner, tipAttrs } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { pages } from '@/proto/words_pages.gen';
 import type { Agent, Worktree } from '@/proto';
 import { useAgents, useProcesses, useStore, useWorktrees } from '@/store';
-import { isRunning, stateOf, urlWords, type Proc } from '@/running/model';
+import { isRunning, markOf, stateOf, urlWords, type Proc } from '@/running/model';
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { useRouter } from '@/app/router';
 import { useEntityMenu } from '@/app/menus/use';
@@ -110,12 +110,15 @@ function AgentRow({ project, a }: { project: string; a: Agent }) {
 function ServerRow({ project, s }: { project: string; s: Proc }) {
   const router = useRouter();
   const menu = useEntityMenu({ kind: 'process', project, agent: s.agent, id: s.id });
-  const u = urlWords(s, stateOf(s));
+  const st = stateOf(s);
+  const u = urlWords(s, st);
   const tid = `environments.server.${s.agent}.${s.id}`;
   return (
-    <ListRow testId={tid} tip={s.cmd} state={<Dot state="ok" tip={pages.server_up} />}
+    // the processes page's marks (designer m_43401): '∿' in text-3 while it runs, no green dot; its
+    // address with the 'open' line icon, never a text arrow
+    <ListRow testId={tid} tip={s.cmd} state={<span className="rv-wave" {...tipAttrs(pages.server_up)}>{markOf(st).glyph}</span>}
       title={s.name ?? s.cmd}
-      sub={<><span className="rv-mono">{s.cmd}</span>{u !== null && <>{' · '}<span className="rv-mono">{u.label}</span></>}</>}
+      sub={<><span className="rv-mono">{s.cmd}</span>{u !== null && <span className="rv-url">{' · '}<span className="rv-mono">{u.row}</span><AppIcon name="open" size={14} /></span>}</>}
       onContextMenu={menu.onContextMenu}
       end={<MoreButton menu={menu} testId={`${tid}.more`} />}
       onClick={() => {

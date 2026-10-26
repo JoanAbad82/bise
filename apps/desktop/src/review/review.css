@@ -11,12 +11,7 @@
   box-sizing: border-box;
 }
 /* the banner takes the page's width, 24 from its edges; the rest is the page's column */
-.rv-col {
-  max-width: var(--w-col);
-  margin-inline: auto;
-  padding-inline: var(--pad-page-x);
-  box-sizing: border-box;
-}
+.rv-col { margin-inline: var(--pad-page-x); }
 
 .rv-screen {
   display: flex;
@@ -89,6 +84,14 @@
 }
 
 /* a PR's number before its branch; its state's words in its tone (never the dot alone) */
+.rv-wave {
+  font: 400 var(--f-ui);
+  color: var(--c-text-3);
+}
+.rv-url > .b-app-icon {
+  margin-left: var(--s-1);
+  vertical-align: -2px;
+}
 .pr-num {
   margin-right: var(--s-2);
   font-variant-numeric: tabular-nums;

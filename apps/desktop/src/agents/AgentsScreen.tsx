@@ -8,7 +8,7 @@
 // here (Tune.tsx AgentSheet, sheet.ts), on its own field. The list keys (app/listkeys.ts), space
 // shows its feed in place. The floating composer's room at the foot (--float-room).
 // Owner: nm-pages-b (amb-win's before).
-import { memo, useState } from 'react';
+import { memo, useState, type KeyboardEvent } from 'react';
 import { Peek } from './Peek';
 import { AppIcon, BannerWait, Button, Dot, Empty, FilterRow, Filters, ListRow, MoreButton, PageBanner, tipAttrs } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
@@ -20,7 +20,7 @@ import type { Agent } from '@/proto';
 import { useAgents } from '@/store';
 import { useRouter } from '@/app/router';
 import { useNow } from '@/app/clock';
-import { useKeptScroll } from '@/app/keep';
+import { keep, useKeptScroll } from '@/app/keep';
 import { useListKeys } from '@/app/listkeys';
 import { useEntityMenu } from '@/app/menus/use';
 import { useEntityAction } from '@/app/menus/actions';
@@ -74,7 +74,10 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
   const shown = showArchived ? archived : live;
   const now = useNow();
   const liveNow = liveFacts(live);
-  const { sel, setSel, ref: section, onKeyDown } = useListKeys({
+  // the row tint only on a row he picked (a key, a click, or kept from before a reload), never the
+  // first row at load (ui-review's red on 7f2f936bf)
+  const [picked, setPicked] = useState(() => keep.view(`agents.sel:${project}`) !== undefined);
+  const { sel, setSel, ref: section, onKeyDown: listKeys } = useListKeys({
     order: shown.map((a) => a.name),
     keepAs: `agents.sel:${project}`,
     onOpen: (agent) => {
@@ -88,6 +91,10 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
       return true;
     },
   });
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    listKeys(e);
+    if (e.defaultPrevented) setPicked(true);
+  };
   const sheetOf = sheet === null ? undefined : agents.find((a) => a.name === sheet.agent && !a.archived);
   return (
     <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
@@ -129,9 +136,10 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
           ) : (
             <div className="ag-list" data-testid="agents.list">
               {shown.map((a) => (
-                <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} now={now}
+                <AgentItem key={a.name} project={project} a={a} sel={picked && sel === a.name} peek={peek === a.name} now={now}
                   onClick={() => {
                     setSel(a.name);
+                    setPicked(true);
                     router.go({ screen: 'thread', project, agent: a.name });
                   }} />
               ))}
