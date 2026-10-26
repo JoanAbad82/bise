@@ -35,6 +35,7 @@ import type { ThreadListHandle } from '@/thread/ThreadList';
 import { composer } from '@/proto/words.gen';
 import { floatTarget, type FloatTo } from './target';
 import { floatNext, type FloatEvent, type FloatState } from './state';
+import { useFloatFit } from './useFit';
 import './float.css';
 
 const NOOP = (): void => undefined;
@@ -98,6 +99,8 @@ function Float({ to: def, about }: { to: FloatTo; about?: FloatAbout }) {
     setState((s) => floatNext(s, ev));
   }, []);
   const root = useRef<HTMLDivElement>(null);
+  // grown, it fits its max height: his field gives way first, then the list, then the question (fit.ts)
+  useFloatFit(root, state);
   const [answering, setAnswering] = useState<Answering | null>(null);
   const onAnswer = useCallback((a: Answering | null) => {
     setAnswering(a);

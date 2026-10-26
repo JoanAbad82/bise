@@ -33,6 +33,10 @@
 .b-composer .in > .b-attach {
   flex: none;
 }
+/* '+ N more': only the floating composer's cut list shows it (float.css [data-attach-cut]) */
+.b-composer .b-attach-more {
+  display: none;
+}
 .b-composer .in .b-field {
   flex: 0 1 auto;
 }

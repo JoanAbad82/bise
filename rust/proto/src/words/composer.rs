@@ -378,6 +378,8 @@ crate::words! { composer:
     queue_images(n) = one "{n} image" | "{n} images";
     /// a desktop row's other attachments
     queue_attachments(n) = one "{n} attachment" | "{n} attachments";
+    /// the floating composer's attachment list cut to 2 rows to leave the open question its room
+    attach_more(n) = "+ {n} more";
     /// a desktop row's ⏎ button
     queue_send_now(who) = "send now: {who} reads it mid-turn";
     /// edit on a row with a draft in the composer (both apps)

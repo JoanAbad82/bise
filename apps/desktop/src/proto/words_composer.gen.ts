@@ -340,6 +340,8 @@ export const composer = {
   queue_images: (a: { n: number }): string => a.n === 1 ? String(a.n) + " image" : String(a.n) + " images",
   /** a desktop row's other attachments */
   queue_attachments: (a: { n: number }): string => a.n === 1 ? String(a.n) + " attachment" : String(a.n) + " attachments",
+  /** the floating composer's attachment list cut to 2 rows to leave the open question its room */
+  attach_more: (a: { n: string | number }): string => "+ " + String(a.n) + " more",
   /** a desktop row's ⏎ button */
   queue_send_now: (a: { who: string | number }): string => "send now: " + String(a.who) + " reads it mid-turn",
   /** edit on a row with a draft in the composer (both apps) */

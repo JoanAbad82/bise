@@ -57,6 +57,13 @@
     "one": null,
     "text": "attach files"
   },
+  "composer.attach_more": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "+ {n} more"
+  },
   "composer.attached": {
     "args": [
       "chips"

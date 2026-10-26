@@ -7,6 +7,10 @@
 import type { JSX } from "react";
 import { IconButton } from "@/ds";
 import { attachRow, type Chip } from "../message";
+import { composer } from "@/proto/words_composer.gen";
+
+/** The rows the floating composer keeps when it cuts the list (float/fit.ts ATTACH_CUT_ROWS). */
+const CUT_ROWS = 2;
 
 /** A quote row's click: the thread scrolls to the quoted words and flashes them (detail {from, text}). */
 export const QUOTE_SOURCE_EVENT = "bise:quote-source";
@@ -56,6 +60,9 @@ export function AttachList({ chips, lit, onLit, onRemove, onOpen, home, testId }
           </span>
         </div>
       ))}
+      {/* the floating composer cuts the list to 2 rows to leave an open question its room (float.css
+          [data-attach-cut], designer m_45666): this row says how many it hid; hidden anywhere else */}
+      {rows.length > CUT_ROWS && <div className="b-attach-more" data-testid={`${testId}.attach.more`}>{composer.attach_more({ n: rows.length - CUT_ROWS })}</div>}
     </div>
   );
 }
