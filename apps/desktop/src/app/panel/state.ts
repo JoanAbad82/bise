@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { useLeftWidth } from '@/app/frame-state';
-import { activate, closable, closeIn, closeOthers, moveIn, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, closable, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 
 const KEY = 'panel';
 
@@ -90,6 +90,28 @@ export function openWhat(what: TabWhat, instead?: string): void {
 /** '+' and ⌘T: a New tab (the launcher). */
 export function openLauncher(): void {
   openWhat(nextLauncher(state.tabs));
+}
+
+/**
+ * ⌘P and the launcher's Artifacts: the picker of the latest artifacts, in `instead` (the launcher
+ * it came from), else in the New tab in front, else in a new one.
+ */
+export function openArtifacts(instead?: string): void {
+  const at = instead ?? state.tabs.active;
+  const front = state.open ? state.tabs.list.find((t) => t.id === at) : undefined;
+  if (front?.what.kind === 'launcher') openWhat({ kind: 'launcher', n: front.what.n, artifacts: true }, front.id);
+  else openWhat(nextLauncher(state.tabs, true), instead);
+}
+
+/** The picker's esc on an empty field: the New tab `id` back on its Open list. */
+export function launcherHome(id: string): void {
+  const t = state.tabs.list.find((x) => x.id === id);
+  if (t?.what.kind === 'launcher') openWhat({ kind: 'launcher', n: t.what.n }, id);
+}
+
+/** ⌘L and the launcher's Browser: a browser tab, its address field focused (Browser.tsx). */
+export function openBrowser(instead?: string): void {
+  openWhat(nextBrowser(state.tabs), instead);
 }
 
 /** A new shell of `project` in a tab (the launcher's Terminal, a terminal's '+'). */

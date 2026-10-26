@@ -6,7 +6,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { projects, row } from '../../../tests/feature/inputs';
+import { ev, projects, row } from '../../../tests/feature/inputs';
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
@@ -28,6 +28,8 @@ function shell() {
   const store = new Store(port);
   store.setCore('up');
   store.apply(projects(row({ project: 'bise-home-00000000', name: 'bise', home: true }), row({ project: ACME, name: 'acme' })));
+  // the fixtures' agents: perf has a diff (3 files), so New tab shows Changes
+  store.apply(ev('agents', { project: ACME }));
   const router = createRouter({ screen: 'thread', project: ACME, agent: 'perf' });
   return render(
     <StoreProvider store={store}>
@@ -59,13 +61,13 @@ describe('the tabbed panel', () => {
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').style.width).toBe('0px');
   });
-  it("'+' opens New tab: search, Open's five rows with their keys, Recent", () => {
+  it("'+' opens New tab: search, Open's rows with their keys, Recent", () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     fireEvent.click(v.getByTestId('app.panel.add'));
     expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
     expect(v.getByTestId('app.panel.launcher.search')).toBeTruthy();
-    for (const k of ['files', 'terminal', 'side', 'changes', 'browser']) expect(v.getByTestId(`app.panel.launcher.${k}`)).toBeTruthy();
+    for (const k of ['artifacts', 'terminal', 'browser', 'office']) expect(v.getByTestId(`app.panel.launcher.${k}`)).toBeTruthy();
     expect(v.getByTestId('app.panel.launcher.terminal').textContent).toContain('⌃`');
     expect(v.getByTestId('app.panel.launcher.none')).toBeTruthy();
   });

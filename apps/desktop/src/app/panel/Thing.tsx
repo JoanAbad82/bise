@@ -1,5 +1,5 @@
 // src/app/panel · a thing in a tab (page native-mac §4 #2: « toute entité s'y ouvre »): an artifact
-// in the browser (Browser.tsx), an agent's thread (the side thread), its changes, a commit, a PR
+// in the browser (Browser.tsx), an agent's thread, its changes, a commit, a PR
 // (its project's pull requests), a process's output, a plugin's page, a scheduled task (the
 // scheduled list), a project's lead thread, a project's office. Each draws the screen it has in the
 // centre, in the panel's width. Owner: nm-panel.

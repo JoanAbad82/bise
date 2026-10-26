@@ -5,6 +5,11 @@
     "one": null,
     "text": "Back"
   },
+  "panel.addr_enter": {
+    "args": [],
+    "one": null,
+    "text": "Artifact name or URL"
+  },
   "panel.addr_forward": {
     "args": [],
     "one": null,
@@ -205,6 +210,11 @@
     "one": null,
     "text": "lands via PRs"
   },
+  "panel.launch_artifacts": {
+    "args": [],
+    "one": null,
+    "text": "Artifacts"
+  },
   "panel.launch_browser": {
     "args": [],
     "one": null,
@@ -215,11 +225,6 @@
     "one": null,
     "text": "Changes"
   },
-  "panel.launch_files": {
-    "args": [],
-    "one": null,
-    "text": "Files"
-  },
   "panel.launch_kind_by": {
     "args": [
       "kind",
@@ -227,6 +232,16 @@
     ],
     "one": null,
     "text": "{kind} · {who}"
+  },
+  "panel.launch_latest": {
+    "args": [],
+    "one": null,
+    "text": "Latest artifacts"
+  },
+  "panel.launch_no_artifact": {
+    "args": [],
+    "one": null,
+    "text": "no artifact yet"
   },
   "panel.launch_no_match": {
     "args": [],
@@ -238,10 +253,20 @@
     "one": null,
     "text": "nothing opened yet"
   },
+  "panel.launch_office": {
+    "args": [],
+    "one": null,
+    "text": "Office"
+  },
   "panel.launch_open": {
     "args": [],
     "one": null,
     "text": "Open"
+  },
+  "panel.launch_pick_search": {
+    "args": [],
+    "one": null,
+    "text": "Search artifacts"
   },
   "panel.launch_recent": {
     "args": [],
@@ -252,11 +277,6 @@
     "args": [],
     "one": null,
     "text": "Search artifacts, or enter a URL"
-  },
-  "panel.launch_side": {
-    "args": [],
-    "one": null,
-    "text": "Side thread"
   },
   "panel.launch_terminal": {
     "args": [],
@@ -627,6 +647,11 @@
     ],
     "one": null,
     "text": "New tab · {key}"
+  },
+  "panel.tab_browser": {
+    "args": [],
+    "one": null,
+    "text": "Browser"
   },
   "panel.tab_changes": {
     "args": [

@@ -6,14 +6,19 @@
 // end, Host.tsx, openWindow kind artifact) gives it a window of its own. The artifact no longer
 // replaces the thread in the centre
 // (ArtifactView's centre and column modes are gone, rule 7): the centre keeps the thread, the
-// maker's composer is the centre's. Owner: nm-panel.
-import { useEffect, useRef, useState } from 'react';
-import { AppIcon, IconButton, KindIcon, Press, iconKindOf, tipAttrs } from '@/ds';
+// maker's composer is the centre's. A browser tab with no page yet (the launcher's Browser, ⌘L:
+// BlankBrowser) has the same bar, its address a field, focused: an artifact's name lists what it
+// finds under it (↑/↓ the highlighted row, ⏎ opens it in this tab), a URL goes to his browser on ⏎
+// (no web page loads in the app: main/guard.ts), esc clears it, then closes the tab. Owner: nm-panel.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AppIcon, IconButton, Input, KindIcon, Press, iconKindOf, tipAttrs } from '@/ds';
 import { ds } from '@/proto/words_ds.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { ArtifactOpen, ArtifactVersions, useAllArtifacts } from '@/artifacts';
 import { useEntityMenu } from '@/app/menus/use';
-import { closeTabId } from './state';
+import { closeTabId, openWhat } from './state';
+import { launchEnter, launchMatches, stepAt } from './launch';
+import { PickRow } from './Launcher';
 import { isFrameEsc } from '@/app/ArtifactView';
 
 /** An artifact's tab: its address bar and its page. */
@@ -126,6 +131,91 @@ export function Browser({ project, id, tabId }: { project: string; id: string; t
             closeTabId(tabId);
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+/** A browser tab with no page yet: the bar, its address field focused, what his words find under it. */
+export function BlankBrowser({ tabId, shown }: { tabId: string; shown: boolean }) {
+  const arts = useAllArtifacts();
+  const [q, setQ] = useState('');
+  const [at, setAt] = useState(0);
+  const field = useRef<HTMLInputElement>(null);
+  const found = useMemo(() => launchMatches(arts, q), [arts, q]);
+  useEffect(() => {
+    if (shown) field.current?.focus();
+  }, [shown]);
+  const enter = () => {
+    const p = launchEnter(found, at, q);
+    if (p === undefined) return;
+    if ('artifact' in p) openWhat({ kind: 'thing', e: { kind: 'artifact', project: p.artifact.project, id: p.artifact.a.id } }, tabId);
+    else void (window as Partial<Window>).bise?.openExternal(p.url);
+  };
+  const optId = (i: number) => `${tabId}.opt.${String(i)}`;
+  return (
+    <div className="pn-browser" data-testid="app.panel.browser.blank">
+      <div className="pn-addr" data-testid="app.panel.addr">
+        <IconButton label={panel.addr_back} size="bar" disabled onClick={() => undefined} testId="app.panel.addr.back">
+          <AppIcon name="back" size={16} />
+        </IconButton>
+        <IconButton label={panel.addr_forward} size="bar" disabled onClick={() => undefined} testId="app.panel.addr.forward">
+          <AppIcon name="forward" size={16} />
+        </IconButton>
+        <label className="pn-url pn-url-field">
+          <AppIcon name="search" size={14} />
+          <Input
+            ref={field}
+            look="pn-url-in"
+            value={q}
+            placeholder={panel.addr_enter}
+            aria-label={panel.addr_enter}
+            role="combobox"
+            aria-expanded={q.trim() !== ''}
+            aria-controls={`${tabId}.list`}
+            aria-activedescendant={found[at] === undefined ? undefined : optId(at)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setAt(0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                enter();
+              } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                setAt((i) => stepAt(i, found.length, e.key === 'ArrowDown' ? 1 : -1));
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (q !== '') {
+                  setQ('');
+                  setAt(0);
+                } else closeTabId(tabId);
+              }
+            }}
+            data-testid="app.panel.addr.field"
+          />
+        </label>
+      </div>
+      <div className="pn-launch" role="listbox" id={`${tabId}.list`} aria-label={panel.addr_enter}>
+        {found.map((x, i) => (
+          <PickRow
+            key={`${x.project}/${x.a.id}`}
+            id={optId(i)}
+            on={i === at}
+            icon={<KindIcon kind={iconKindOf(x.a)} size={16} />}
+            title={x.a.title}
+            sub={panel.launch_kind_by({ kind: x.a.kind, who: x.a.agent })}
+            onPick={() => {
+              openWhat({ kind: 'thing', e: { kind: 'artifact', project: x.project, id: x.a.id } }, tabId);
+            }}
+            onHover={() => {
+              setAt(i);
+            }}
+            testId={`app.panel.browser.found.${x.project}/${x.a.id}`}
+          />
+        ))}
       </div>
     </div>
   );

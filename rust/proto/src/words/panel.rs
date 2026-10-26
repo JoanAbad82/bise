@@ -338,22 +338,34 @@ crate::words! { panel:
     launch_open = "Open";
     /// the launcher's second group: what he opened last
     launch_recent = "Recent";
-    /// an Open row: the project's folder in Finder
-    launch_files = "Files";
+    /// an Open row: the picker of the latest artifacts, in this tab
+    launch_artifacts = "Artifacts";
     /// an Open row: a new shell in a tab
     launch_terminal = "Terminal";
-    /// an Open row: the lead's thread beside the one in view
-    launch_side = "Side thread";
-    /// an Open row: the agent's changes in a tab
+    /// an Open row: the agent's changes in a tab (only when it has some)
     launch_changes = "Changes";
-    /// an Open row: the search field takes a URL
+    /// an Open row: a browser tab, its address field
     launch_browser = "Browser";
+    /// an Open row: the project's bims office in a tab
+    launch_office = "Office";
     /// Recent with nothing opened yet
     launch_none = "nothing opened yet";
     /// what the search found: nothing
     launch_no_match = "no artifact by that name";
     /// a recent artifact's line: its kind and who made it
     launch_kind_by(kind, who) = "{kind} · {who}";
+    /// the artifacts picker's field: its placeholder and VoiceOver name
+    launch_pick_search = "Search artifacts";
+    /// the artifacts picker's group: the newest first
+    launch_latest = "Latest artifacts";
+    /// the artifacts picker with no artifact at all
+    launch_no_artifact = "no artifact yet";
+
+    // ---- a browser tab with no page yet (the launcher's Browser, ⌘L)
+    /// its tab's title
+    tab_browser = "Browser";
+    /// its address field: placeholder and VoiceOver name
+    addr_enter = "Artifact name or URL";
 
     // ---- an artifact's tab, the browser (mockup 4)
     /// the address bar's back button

@@ -1,109 +1,168 @@
-// src/app/panel · New tab, the launcher (page native-mac mockup 3, §6 'lanceur'): padding 16, a search
-// 28 r 8 (artifacts by name, or an address), 'Open' (Files ⌘P, Terminal ⌃`, Side thread ⌥⌘S,
-// Changes ⌥⌘D, Browser ⌘L) in rows 40 r 8 (icon 16 + 12, kbd 20), 'Recent' in rows 48 with a 32
-// tile (what he opened in a tab last, newest first). A pick opens in this tab's place, as a
-// browser's new tab becomes the page. The rows act as their keys do (keys.ts doPanelKey).
-// Owner: nm-panel.
+// src/app/panel · New tab, the launcher (page native-mac mockup 3, §6 'lanceur', round 2 r2-launcher):
+// padding 16, a search 40 r 8 with its 1 px line (artifacts by name, or an address), 'Open'
+// (Artifacts ⌘P, Terminal ⌃`, Changes ⌥⌘D only when the agent in view has some, Browser ⌘L,
+// Office: the bims head) in rows 40 r 8 (icon 16 + 12, kbd 20), 'Recent' in rows
+// 48 with a 32 tile (what he opened in a tab last, newest first). Artifacts turns this tab into the
+// picker of the 10 newest artifacts (kind icon, name, kind · who, its age at the end; the field filters). In a
+// list ↑/↓ move the highlighted row (the first as he types), ⏎ opens it, esc clears the field, then
+// leaves the picker, then closes the tab. A pick opens in this tab's place, as a browser's new tab
+// becomes the page. The rows act as their keys do (keys.ts doPanelKey). Owner: nm-panel.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppIcon, Input, KindIcon, Kbd, Press, iconKindOf, type AppIconName } from '@/ds';
 import { panel } from '@/proto/words_panel.gen';
-import { useAllArtifacts } from '@/artifacts';
-import { useProjects } from '@/store';
+import { useAllArtifacts, whenOf } from '@/artifacts';
+import type { Item } from '@/artifacts/model';
+import { useAgents, useProjects, useStore } from '@/store';
 import { useRoute } from '@/app/router';
+import { projectOf } from '@/app/route';
+import { ThingPic } from '@/app/side3d/Bubbles';
+import { bubbleThing } from '@/app/side3d/objects';
 import { entityKey, type Entity } from '@/shared/entity';
-import { doPanelKey, LAUNCH_FOCUS, PANEL_KEYS, type PanelKey } from './keys';
-import { openWhat, usePanelState } from './state';
+import { agentInView, changesInView, doPanelKey, PANEL_KEYS, type PanelCtx } from './keys';
+import { closeTabId, launcherHome, openWhat, usePanelState } from './state';
 import { useTabLooks } from './look';
 import { tabOf } from './model';
-import { launchMatches, looksLikeUrl } from './launch';
+import { latestArtifacts, launchEnter, launchMatches, openRows, stepAt, type OpenRow } from './launch';
 
-const OPEN: readonly { readonly k: PanelKey | 'terminal'; readonly icon: AppIconName; readonly label: string; readonly keys: string }[] = [
-  { k: 'files', icon: 'file', label: panel.launch_files, keys: PANEL_KEYS.files },
-  { k: 'terminal', icon: 'terminal', label: panel.launch_terminal, keys: PANEL_KEYS.terminal },
-  { k: 'side', icon: 'side', label: panel.launch_side, keys: PANEL_KEYS.side },
-  { k: 'changes', icon: 'changes', label: panel.launch_changes, keys: PANEL_KEYS.changes },
-  { k: 'browser', icon: 'browser', label: panel.launch_browser, keys: PANEL_KEYS.browser },
-];
+/** Each Open row: its label, its icon, its key when it has one. */
+const ROW: Readonly<Record<OpenRow, { readonly label: string; readonly icon: AppIconName | 'head'; readonly keys?: string }>> = {
+  artifacts: { label: panel.launch_artifacts, icon: 'artifacts', keys: PANEL_KEYS.files },
+  terminal: { label: panel.launch_terminal, icon: 'terminal', keys: PANEL_KEYS.terminal },
+  changes: { label: panel.launch_changes, icon: 'changes', keys: PANEL_KEYS.changes },
+  browser: { label: panel.launch_browser, icon: 'browser', keys: PANEL_KEYS.browser },
+  // the bims head, the side's agents bubble's object (designer m_44218: 16, no key)
+  office: { label: panel.launch_office, icon: 'head' },
+};
 
-/** A New tab: search, Open, Recent. `tabId`: its own tab, which a pick replaces. */
-export function Launcher({ tabId, shown }: { tabId: string; shown: boolean }) {
+/** A New tab: search, Open, Recent; or its Artifacts picker. `tabId`: its own tab, which a pick replaces. */
+export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; shown: boolean; artifacts?: boolean }) {
   const route = useRoute();
+  const store = useStore();
   const projects = useProjects();
   const home = projects.find((p) => p.home)?.project;
   const recent = usePanelState().recent;
   const look = useTabLooks();
   const arts = useAllArtifacts();
+  // the agent in view's rows: its Changes row shows and hides with its diff
+  useAgents(agentInView(route)?.project ?? '');
   const [q, setQ] = useState('');
+  const [at, setAt] = useState(0);
+  const [now] = useState(() => Date.now());
   const field = useRef<HTMLInputElement>(null);
   const bise = (window as Partial<Window>).bise;
-  const ctx = {
-    route,
-    home,
-    openFolder: (p: string) => {
-      const path = projects.find((x) => x.project === p)?.path;
-      if (path !== undefined && path !== '') void bise?.openPath(path);
-    },
-  };
-  // ⌘L (Browser) and a fresh New tab: the field takes the keys
+  const ctx: PanelCtx = { route, home, agents: (p) => store.agents(p) };
+  const rows = openRows({ changes: changesInView(ctx) !== undefined, office: (projectOf(route) ?? home) !== undefined });
+  // a fresh New tab, or the picker it turned into: the field takes the keys
   useEffect(() => {
-    if (!shown) return;
-    field.current?.focus();
-    const on = () => {
-      field.current?.focus();
-    };
-    window.addEventListener(LAUNCH_FOCUS, on);
-    return () => {
-      window.removeEventListener(LAUNCH_FOCUS, on);
-    };
-  }, [shown]);
-  const found = useMemo(() => launchMatches(arts, q), [arts, q]);
+    if (shown) field.current?.focus();
+  }, [shown, artifacts]);
+  const found = useMemo(() => (artifacts ? latestArtifacts(arts, q) : launchMatches(arts, q)), [arts, q, artifacts]);
+  const listing = artifacts || q.trim() !== '';
   const pick = (e: Entity) => {
     openWhat({ kind: 'thing', e }, tabId);
   };
-  const enter = () => {
-    const first = found[0];
-    if (first !== undefined) pick({ kind: 'artifact', project: first.project, id: first.a.id });
-    else if (looksLikeUrl(q)) void bise?.openExternal(q.includes('://') ? q.trim() : `https://${q.trim()}`);
+  const open = (x: Item) => {
+    pick({ kind: 'artifact', project: x.project, id: x.a.id });
   };
+  const enter = () => {
+    const p = launchEnter(found, at, q);
+    if (p === undefined) return;
+    if ('artifact' in p) open(p.artifact);
+    else void bise?.openExternal(p.url);
+  };
+  const esc = () => {
+    if (q !== '') {
+      setQ('');
+      setAt(0);
+    } else if (artifacts) launcherHome(tabId);
+    else closeTabId(tabId);
+  };
+  const optId = (i: number) => `${tabId}.opt.${String(i)}`;
+  const label = artifacts ? panel.launch_pick_search : panel.launch_search;
   return (
-    <div className="pn-launch" data-testid="app.panel.launcher">
+    <div className="pn-launch" data-testid="app.panel.launcher" data-picker={artifacts || undefined}>
       <label className="pn-search">
-        <AppIcon name="search" size={14} />
+        <AppIcon name="search" size={16} />
         <Input
           ref={field}
           look="pn-search-in"
           value={q}
-          placeholder={panel.launch_search}
-          aria-label={panel.launch_search}
+          placeholder={label}
+          aria-label={label}
+          role="combobox"
+          aria-expanded={listing}
+          aria-controls={`${tabId}.list`}
+          aria-activedescendant={listing && found[at] !== undefined ? optId(at) : undefined}
           onChange={(e) => {
             setQ(e.target.value);
+            setAt(0);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
               enter();
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              setAt((i) => stepAt(i, found.length, e.key === 'ArrowDown' ? 1 : -1));
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              esc();
             }
           }}
           data-testid="app.panel.launcher.search"
         />
       </label>
-      {q.trim() === '' ? (
+      {listing ? (
+        <>
+          {artifacts && <h3 className="pn-lh">{panel.launch_latest}</h3>}
+          {found.length === 0 ? (
+            <p className="pn-none" data-testid="app.panel.launcher.nomatch">
+              {artifacts && q.trim() === '' ? panel.launch_no_artifact : panel.launch_no_match}
+            </p>
+          ) : (
+            <div role="listbox" id={`${tabId}.list`} aria-label={label} className="pn-found">
+              {found.map((x, i) => (
+                <PickRow
+                  key={`${x.project}/${x.a.id}`}
+                  id={optId(i)}
+                  on={i === at}
+                  icon={<KindIcon kind={iconKindOf(x.a)} size={16} />}
+                  title={x.a.title}
+                  sub={panel.launch_kind_by({ kind: x.a.kind, who: x.a.agent })}
+                  {...(artifacts ? { when: whenOf(x.a.at_ms, now) } : {})}
+                  onPick={() => {
+                    open(x);
+                  }}
+                  onHover={() => {
+                    setAt(i);
+                  }}
+                  testId={`app.panel.launcher.found.${x.project}/${x.a.id}`}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
         <>
           <h3 className="pn-lh">{panel.launch_open}</h3>
-          {OPEN.map((o) => (
-            <Press
-              key={o.k}
-              look="pn-li"
-              onClick={() => {
-                doPanelKey(o.k, ctx, tabId);
-              }}
-              data-testid={`app.panel.launcher.${o.k}`}
-            >
-              <AppIcon name={o.icon} size={16} />
-              <span className="pn-li-t">{o.label}</span>
-              <Kbd>{o.keys}</Kbd>
-            </Press>
-          ))}
+          {rows.map((k) => {
+            const r = ROW[k];
+            return (
+              <Press
+                key={k}
+                look="pn-li"
+                onClick={() => {
+                  doPanelKey(k, ctx, tabId);
+                }}
+                data-testid={`app.panel.launcher.${k}`}
+              >
+                {r.icon === 'head' ? <ThingPic thing={bubbleThing('agents')} px={16} tile="thread" className="pn-li-pic" /> : <AppIcon name={r.icon} size={16} />}
+                <span className="pn-li-t">{r.label}</span>
+                {r.keys !== undefined && <Kbd>{r.keys}</Kbd>}
+              </Press>
+            );
+          })}
           <h3 className="pn-lh">{panel.launch_recent}</h3>
           {recent.length === 0 ? (
             <p className="pn-none" data-testid="app.panel.launcher.none">
@@ -114,7 +173,7 @@ export function Launcher({ tabId, shown }: { tabId: string; shown: boolean }) {
               const l = look(tabOf({ kind: 'thing', e }));
               const sub = e.kind === 'artifact' ? arts.find((x) => x.project === e.project && x.a.id === e.id) : undefined;
               return (
-                <Recent
+                <PickRow
                   key={entityKey(e)}
                   icon={l.icon}
                   title={l.title}
@@ -128,36 +187,43 @@ export function Launcher({ tabId, shown }: { tabId: string; shown: boolean }) {
             })
           )}
         </>
-      ) : found.length === 0 ? (
-        <p className="pn-none" data-testid="app.panel.launcher.nomatch">
-          {panel.launch_no_match}
-        </p>
-      ) : (
-        found.map((x) => (
-          <Recent
-            key={`${x.project}/${x.a.id}`}
-            icon={<KindIcon kind={iconKindOf(x.a)} size={16} />}
-            title={x.a.title}
-            sub={panel.launch_kind_by({ kind: x.a.kind, who: x.a.agent })}
-            onPick={() => {
-              pick({ kind: 'artifact', project: x.project, id: x.a.id });
-            }}
-            testId={`app.panel.launcher.found.${x.project}/${x.a.id}`}
-          />
-        ))
       )}
     </div>
   );
 }
 
-function Recent({ icon, title, sub, onPick, testId }: { icon: ReactNode; title: string; sub: string; onPick: () => void; testId: string }) {
+/** A row with its 32 tile: Recent's, a found artifact's (an option: `on` the highlighted one). */
+export function PickRow({ icon, title, sub, when, onPick, onHover, testId, id, on }: {
+  icon: ReactNode;
+  title: string;
+  sub: string;
+  /** its age at the row's end (the Artifacts picker's) */
+  when?: string;
+  onPick: () => void;
+  onHover?: () => void;
+  testId: string;
+  /** a list's option: its id (the field's aria-activedescendant) */
+  id?: string;
+  on?: boolean;
+}) {
   return (
-    <Press look="pn-rec" onClick={onPick} data-testid={testId}>
+    <Press
+      look="pn-rec"
+      id={id}
+      role={id === undefined ? undefined : 'option'}
+      aria-selected={id === undefined ? undefined : on === true}
+      tabIndex={id === undefined ? undefined : -1}
+      data-on={on === true || undefined}
+      onClick={onPick}
+      onPointerMove={onHover}
+      data-testid={testId}
+    >
       <span className="pn-tile">{icon}</span>
       <span className="pn-rec-w">
         <span className="pn-rec-t">{title}</span>
         {sub !== '' && <span className="pn-rec-s">{sub}</span>}
       </span>
+      {when !== undefined && <span className="pn-rec-when">{when}</span>}
     </Press>
   );
 }

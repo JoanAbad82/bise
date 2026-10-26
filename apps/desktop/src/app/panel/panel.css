@@ -217,8 +217,10 @@
   outline-offset: -2px;
 }
 
-/* New tab, the launcher: padding 16; search 28 r 8; group titles 13/600 on 32, 16 above; rows 40
-   r 8 (--c-raised + a line, icon 16 + 12, kbd 20); Recent rows 48 with a 32 tile */
+/* New tab, the launcher: padding 16; search 40 r 8, a 1 px --c-line-strong line, its text 15/20
+   (designer m_44218: the field he types in first); group titles 13/600 on 32, 16 above; rows 40
+   r 8 (--c-raised + a line, icon 16 + 12, kbd 20); Recent and found rows 48 with a 32 tile, the
+   highlighted one (↑/↓) --c-hover, never the accent */
 .pn-launch {
   display: flex;
   flex-direction: column;
@@ -230,8 +232,9 @@
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  height: var(--h-control-sm);
+  height: var(--s-10);
   padding: 0 var(--s-3);
+  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-2);
   background: var(--c-sunken);
   color: var(--c-text-3);
@@ -247,7 +250,7 @@
   outline: 0;
   background: none;
   color: var(--c-text);
-  font: 400 var(--f-meta);
+  font: 400 var(--t-15) / var(--s-5) var(--font-ui);
 }
 .pn-search-in::placeholder {
   color: var(--c-text-3);
@@ -304,8 +307,27 @@
   color: var(--c-text);
   text-align: left;
 }
-.pn-rec:hover {
+.pn-rec:hover,
+.pn-rec[data-on] {
   background: var(--c-hover);
+}
+/* the bims head in Open's 16 icon column (designer m_44218) */
+.pn-li-pic {
+  flex: none;
+  width: var(--s-4);
+  height: var(--s-4);
+}
+.pn-rec-when {
+  flex: none;
+  margin-left: auto;
+  padding-right: var(--s-2);
+  color: var(--c-text-3);
+  font: 400 var(--f-meta);
+  font-variant-numeric: tabular-nums;
+}
+.pn-found {
+  display: flex;
+  flex-direction: column;
 }
 .pn-tile {
   flex: none;
@@ -373,6 +395,23 @@
 .pn-url:focus-visible {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
+}
+/* a browser tab with no page yet: the address is a field */
+.pn-url-field:focus-within {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+.pn-url-in {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--c-text);
+  font: 400 var(--f-ui);
+}
+.pn-url-in::placeholder {
+  color: var(--c-text-3);
 }
 .pn-url-t {
   flex: 1;

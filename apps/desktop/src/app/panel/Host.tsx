@@ -20,6 +20,7 @@ import { dropGoneTabs, panelToggle, resetWidth, setWidth, usePanelFit, usePanelS
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
+import { BlankBrowser } from './Browser';
 import { PanelTabs, SheetToggle } from './BarTabs';
 import './panel.css';
 
@@ -106,7 +107,9 @@ function Body({ tab, shown }: { tab: Tab; shown: boolean }) {
     case 'overview':
       return <Overview pinned={what.project} shown={shown} />;
     case 'launcher':
-      return <Launcher tabId={tab.id} shown={shown} />;
+      return <Launcher tabId={tab.id} shown={shown} artifacts={what.artifacts === true} />;
+    case 'browser':
+      return <BlankBrowser tabId={tab.id} shown={shown} />;
     case 'thing':
       return what.e.kind === 'tab' ? null : <ThingTab e={what.e} tabId={tab.id} />;
   }

@@ -1,12 +1,15 @@
 // src/app/panel · the panel's keys (page native-mac §4 #2, native-mac-qa §7 and §12): ⌘T New tab,
 // ⌘W closes the tab in front (only while the panel is open: else the window's), ⌘⇧] and ⌘⇧[ the
-// next and previous tab, and the launcher's rows: ⌘P Files, ⌥⌘S Side thread, ⌥⌘D Changes, ⌘L
-// Browser. ⌥⌘0 (the panel) and ⌃` (the terminal) keep their arms in app/keys.ts and
+// next and previous tab, and the launcher's rows: ⌘P Artifacts (the picker of the latest), ⌥⌘D
+// Changes (nothing when the agent in view has none), ⌘L Browser (a browser
+// tab). ⌥⌘0 (the panel) and ⌃` (the terminal) keep their arms in app/keys.ts and
 // terminal/model.ts. panelKeyOf decides, pure (app/keys.ts's one arm calls it); doPanelKey acts.
 // Owner: nm-panel.
 import type { KeyLike } from '@/app/keys';
-import { MAIN, projectOf, type Route } from '@/app/route';
-import { closeActive, openLauncher, openShell, openWhat, stepTab } from './state';
+import { projectOf, type Route } from '@/app/route';
+import type { Agent } from '@/proto';
+import { closeActive, openArtifacts, openBrowser, openLauncher, openShell, openWhat, stepTab } from './state';
+import { hasChanges, type OpenRow } from './launch';
 
 /** The keys the panel's tips and the launcher's rows name. */
 export const PANEL_KEYS = {
@@ -15,13 +18,12 @@ export const PANEL_KEYS = {
   add: '⌘T',
   files: '⌘P',
   terminal: '⌃`',
-  side: '⌥⌘S',
   changes: '⌥⌘D',
   browser: '⌘L',
 } as const;
 
 /** What a panel key does. */
-export type PanelKey = 'new-tab' | 'close-tab' | 'next-tab' | 'prev-tab' | 'files' | 'side' | 'changes' | 'browser';
+export type PanelKey = 'new-tab' | 'close-tab' | 'next-tab' | 'prev-tab' | 'files' | 'changes' | 'browser';
 
 /** The panel's key for `e`, if it is one; ⌘W, ⌘⇧[ and ⌘⇧] only while the panel is open. Pure. */
 export function panelKeyOf(e: KeyLike, open: boolean): PanelKey | undefined {
@@ -40,7 +42,6 @@ export function panelKeyOf(e: KeyLike, open: boolean): PanelKey | undefined {
     return undefined;
   }
   if (e.altKey && !e.shiftKey) {
-    if (e.code === 'KeyS') return 'side';
     if (e.code === 'KeyD') return 'changes';
   }
   return undefined;
@@ -51,22 +52,25 @@ export function agentInView(route: Route): { project: string; agent: string } | 
   return route.screen === 'thread' ? { project: route.project, agent: route.agent } : route.screen === 'review' ? { project: route.project, agent: route.agent } : undefined;
 }
 
-/** A window event the launcher listens to: focus its field (⌘L Browser, ⌘P Files with no folder). */
-export const LAUNCH_FOCUS = 'bise:launch-focus';
-
 export interface PanelCtx {
   readonly route: Route;
   /** bise's own project (the home hub), for a page with no project */
   readonly home: string | undefined;
-  /** his project's folder in Finder (window.bise.openPath) */
-  readonly openFolder: (project: string) => void;
+  /** a project's agents (the store's rows): whether the one in view has changes */
+  readonly agents: (project: string) => readonly Agent[];
+}
+
+/** The agent in view has changes to show: the launcher's Changes row and ⌥⌘D only then. Pure. */
+export function changesInView(c: PanelCtx): { project: string; agent: string } | undefined {
+  const a = agentInView(c.route);
+  return a !== undefined && hasChanges(c.agents(a.project), a.agent) ? a : undefined;
 }
 
 /**
  * Acts on a panel key (or a launcher row, which does the same), in the context of the route in
  * view. `instead`: the launcher tab the pick came from (it becomes what it opened).
  */
-export function doPanelKey(k: PanelKey | 'terminal', c: PanelCtx, instead?: string): void {
+export function doPanelKey(k: PanelKey | OpenRow, c: PanelCtx, instead?: string): void {
   const project = projectOf(c.route) ?? c.home;
   switch (k) {
     case 'new-tab':
@@ -85,25 +89,19 @@ export function doPanelKey(k: PanelKey | 'terminal', c: PanelCtx, instead?: stri
       if (project !== undefined) openShell(project, instead);
       return;
     case 'files':
-      if (project !== undefined) c.openFolder(project);
+    case 'artifacts':
+      openArtifacts(instead);
       return;
-    case 'side': {
-      // the lead's thread beside the one in view; on the lead's own, bise's
-      if (project === undefined) return;
-      const a = agentInView(c.route);
-      const side = a !== undefined && a.agent !== MAIN ? { project: a.project, agent: MAIN } : c.home !== undefined && c.home !== project ? { project: c.home, agent: MAIN } : undefined;
-      if (side !== undefined) openWhat({ kind: 'thing', e: { kind: 'agent', ...side } }, instead);
-      return;
-    }
     case 'changes': {
-      const a = agentInView(c.route);
+      const a = changesInView(c);
       if (a !== undefined) openWhat({ kind: 'thing', e: { kind: 'diff', project: a.project, agent: a.agent } }, instead);
       return;
     }
     case 'browser':
-      // the launcher's field takes the address: a New tab in front, its field focused
-      if (instead === undefined) openLauncher();
-      window.dispatchEvent(new Event(LAUNCH_FOCUS));
+      openBrowser(instead);
+      return;
+    case 'office':
+      if (project !== undefined) openWhat({ kind: 'thing', e: { kind: 'office', project } }, instead);
       return;
   }
 }

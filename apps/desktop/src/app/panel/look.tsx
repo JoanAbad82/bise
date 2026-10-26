@@ -32,6 +32,8 @@ function lookOf(tab: Tab, projects: ReturnType<typeof useProjects>, arts: Return
       return { title: panel.tab_overview, icon: null };
     case 'launcher':
       return { title: panel.tab_new, icon: <AppIcon name="browser" size={14} /> };
+    case 'browser':
+      return { title: panel.tab_browser, icon: <AppIcon name="browser" size={14} /> };
     case 'terminal':
       return {
         title: what.n === 0 ? panel.tab_terminal({ project: name }) : panel.tab_terminal_n({ n: what.n + 1, project: name }),

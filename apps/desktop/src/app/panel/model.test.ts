@@ -13,6 +13,8 @@ import {
   MAX_W,
   MIN_W,
   moveIn,
+  nextBrowser,
+  tabIdOf,
   nextLauncher,
   nextShell,
   openIn,
@@ -72,6 +74,10 @@ describe('the tab model: open', () => {
   it('New tabs and shells are numbered by the first free number', () => {
     const t = openIn(openIn(FIRST, nextLauncher(FIRST)), { kind: 'terminal', project: 'acme', n: 0 });
     expect(nextLauncher(t)).toEqual({ kind: 'launcher', n: 2 });
+    expect(nextLauncher(t, true)).toEqual({ kind: 'launcher', n: 2, artifacts: true });
+    expect(nextBrowser(t)).toEqual({ kind: 'browser', n: 1 });
+    expect(tabIdOf({ kind: 'browser', n: 1 })).toBe('web:1');
+    expect(widthOf({ kind: 'browser', n: 1 })).toBe('page');
     expect(nextShell(t, 'acme')).toBe(1);
     expect(nextShell(t, 'shop')).toBe(0);
   });
@@ -203,6 +209,7 @@ describe('Recent', () => {
 describe('the kept record (kept per window, read back after a reload)', () => {
   it('a record without Overview gets it back first (the home)', () => {
     expect(ids(parseKept({ tabs: { list: [{ what: { kind: 'launcher', n: 1 } }] } }).tabs)).toEqual(['overview', 'new:1']);
+    expect(parseKept({ tabs: { list: [{ what: { kind: 'launcher', n: 1, artifacts: true } }, { what: { kind: 'browser', n: 2 } }] } }).tabs.list.map((x) => x.what)).toEqual([{ kind: 'overview' }, { kind: 'launcher', n: 1, artifacts: true }, { kind: 'browser', n: 2 }]);
   });
   it('a broken or missing record reads folded, on Overview', () => {
     expect(parseKept(undefined)).toEqual(FOLDED);

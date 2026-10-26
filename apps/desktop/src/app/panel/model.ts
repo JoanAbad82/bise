@@ -10,8 +10,10 @@ import { entityKey, type Entity } from '@/shared/entity';
 export type TabWhat =
   /** what the right bar was: agents, archived, artifacts, scheduled, processes; of `project` when a card pinned it, else of the view */
   | { readonly kind: 'overview'; readonly project?: string }
-  /** New tab: the launcher (search, Open, Recent) */
-  | { readonly kind: 'launcher'; readonly n: number }
+  /** New tab: the launcher (search, Open, Recent); `artifacts`: its picker of the latest artifacts (⌘P) */
+  | { readonly kind: 'launcher'; readonly n: number; readonly artifacts?: true }
+  /** a browser tab with no page yet: its address field takes an artifact's name or a URL (⌘L) */
+  | { readonly kind: 'browser'; readonly n: number }
   /** a shell in a project's folder; n 0 is the project's first (the bottom panel's too) */
   | { readonly kind: 'terminal'; readonly project: string; readonly n: number }
   /** a thing he opened: an artifact, a PR, a commit, a diff, a process, a plugin, an agent's thread */
@@ -44,6 +46,8 @@ export function tabIdOf(what: TabWhat): string {
       return OVERVIEW.id;
     case 'launcher':
       return `new:${String(what.n)}`;
+    case 'browser':
+      return `web:${String(what.n)}`;
     case 'terminal':
       return `term:${what.project}#${String(what.n)}`;
     case 'thing':
@@ -77,11 +81,18 @@ export function openIn(t: Tabs, what: TabWhat, instead?: string): Tabs {
   return { list, active: tab.id };
 }
 
-/** The next free New tab's number. Pure. */
-export function nextLauncher(t: Tabs): TabWhat {
+/** The next free New tab; `artifacts`: on its picker of the latest artifacts (⌘P). Pure. */
+export function nextLauncher(t: Tabs, artifacts = false): TabWhat {
   let n = 1;
   while (t.list.some((x) => x.id === `new:${String(n)}`)) n += 1;
-  return { kind: 'launcher', n };
+  return artifacts ? { kind: 'launcher', n, artifacts: true } : { kind: 'launcher', n };
+}
+
+/** The next free browser tab (⌘L, the launcher's Browser). Pure. */
+export function nextBrowser(t: Tabs): TabWhat {
+  let n = 1;
+  while (t.list.some((x) => x.id === `web:${String(n)}`)) n += 1;
+  return { kind: 'browser', n };
 }
 
 /** The next free shell number of `project` (0 first). Pure. */
@@ -209,7 +220,7 @@ export const MAX_W = 640;
 /** Which width a tab asks: a shell's, a page's (an artifact, an office, a thread), or the rows'. Pure. */
 export function widthOf(what: TabWhat): WidthOf {
   if (what.kind === 'terminal') return 'shell';
-  if (what.kind === 'thing') return 'page';
+  if (what.kind === 'thing' || what.kind === 'browser') return 'page';
   return 'rows';
 }
 
@@ -311,7 +322,10 @@ function whatOf(x: unknown): TabWhat | undefined {
     case 'overview':
       return typeof x['project'] === 'string' && x['project'] !== '' ? { kind: 'overview', project: x['project'] } : { kind: 'overview' };
     case 'launcher':
-      return typeof x['n'] === 'number' ? { kind: 'launcher', n: x['n'] } : undefined;
+      if (typeof x['n'] !== 'number') return undefined;
+      return x['artifacts'] === true ? { kind: 'launcher', n: x['n'], artifacts: true } : { kind: 'launcher', n: x['n'] };
+    case 'browser':
+      return typeof x['n'] === 'number' ? { kind: 'browser', n: x['n'] } : undefined;
     case 'terminal':
       return typeof x['project'] === 'string' && x['project'] !== '' && typeof x['n'] === 'number' ? { kind: 'terminal', project: x['project'], n: x['n'] } : undefined;
     case 'thing': {

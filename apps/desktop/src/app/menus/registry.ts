@@ -5,8 +5,8 @@
 // that can't be done here is hidden, never dimmed; only an erase with no way back would be
 // destructive (none today: archive is undone by restore, designer m_42050). Every action is a typed
 // command the hub has (rename, stop, archive, unarchive, proc_stop, scheduled_stop) or a move of the
-// app's own (a tab, a window, the Finder, the clipboard, a pin): Schedule…, Fork and New side thread
-// stay hidden until the hub has them (native-lead m_42173). Shown or hidden comes from the rows'
+// app's own (a tab, a window, the Finder, the clipboard, a pin): Schedule… stays hidden until the
+// hub has it (native-lead m_42173); no Fork and no side thread (Gabriel m_44239: dropped). Shown or hidden comes from the rows'
 // typed fields (archived, status, main, changes, state, ended_ms), never from words. Pure; its
 // imports are relative: main's bundle reads it too (agentmenu.ts AGENT_MENU_IDLE), with no '@/' alias.
 // Owner: nm-menus.

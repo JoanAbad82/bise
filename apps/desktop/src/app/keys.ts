@@ -33,7 +33,7 @@ export type KeyAct =
   | { readonly frame: FrameAction }
   /** ⌘N: New agent in the project in view, else bise's own (newagent.tsx) */
   | { readonly newAgent: string }
-  /** the tabbed panel's keys (app/panel/keys.ts): ⌘T, ⌘W, ⌘⇧[ ], ⌘P, ⌘L, ⌥⌘S, ⌥⌘D */
+  /** the tabbed panel's keys (app/panel/keys.ts): ⌘T, ⌘W, ⌘⇧[ ], ⌘P, ⌘L, ⌥⌘D */
   | { readonly panel: PanelKey };
 
 export interface KeyLike {

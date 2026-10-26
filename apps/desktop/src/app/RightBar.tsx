@@ -2,8 +2,11 @@
 // v5 before): what happens in the place shown, as the terminal's panel: foldable sections in his
 // order, Agents (the hub's rank, ⌥N = the TUI's), Archived (folded until he opens it), Artifacts,
 // Scheduled (an alarm: agent-waiting-states A), Processes. It lives in the tabbed panel's Overview
-// tab (app/panel/Overview.tsx); the office moved to its own tab (app/panel/Office.tsx), the world
-// floats on the right side. On bise's thread the same sections cover every
+// tab (app/panel/Overview.tsx). The bims office is back above the Agents rows, as before bise fait
+// mac (r2-launcher #9): the head's cube shows or hides it (bims/view.ts), on bise's thread the town;
+// the Office tab (app/panel/Office.tsx) is the full place, this one a preview, and only the tab in
+// front of the panel draws, so the two never run a WebGL office at once; the world floats on the
+// right side. On bise's thread the same sections cover every
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
 // ARTIFACTS and SCHEDULED & WATCHING follow the thread in view (barscope.ts): a sub-agent's shows
@@ -13,7 +16,7 @@
 // section and per scope (his m_26894, barrows.ts pageRows).
 // Owner: nm-panel (bise fait mac; amb-win before). The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppIcon, Button, Dot, IconButton, KindIcon, MoreButton, Press, Ring, Slide, iconKindOf, tipAttrs, type AppIconName, type DotState } from '@/ds';
+import { AppIcon, Button, IconButton, KindIcon, MoreButton, Press, Ring, RowMark, Slide, iconKindOf, tipAttrs, type AppIconName } from '@/ds';
 import { markTip } from './tipwords';
 import { common } from '@/proto/words_common.gen';
 import { panel } from '@/proto/words_panel.gen';
@@ -24,7 +27,7 @@ import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { barProcs, isRunning, keyOf, stateOf, urlWords, useAllProcesses } from '@/running';
 import { running } from '@/proto/words_running.gen';
-import { useCards, useComputerLive, usePlaces, useProjects, useStore, type Store } from '@/store';
+import { useCards, useComputerLive, useGrowth, usePlaces, usePlugins, usePrefs, useProjects, useStore, type Store } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -41,6 +44,19 @@ import { FitWords } from './FitWords';
 import { useMenuOf } from './panel/menu';
 import { openTab } from './panel/tabs';
 import { DoneSign } from './Marks';
+import { BimsSwitch, Office } from '@/bims/Office';
+import { BimsToggle } from '@/bims/Cube';
+import { BimsFold } from '@/bims/Fold';
+import { parts as bimsParts } from '@/bims/feed';
+import { Town } from '@/bims/town/Town';
+import { townParts } from '@/bims/town/feed';
+import { useTownProjects } from '@/bims/town/useTown';
+import { mapOf, mapPrefKey } from '@/bims/maps/ids';
+import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
+import { useBimsView } from '@/bims/view';
+import { followOf } from '@/bims/focus';
+import { getPref, type Prefs } from '@/settings/prefs';
+import { useWelcoming } from '@/welcome/shown';
 
 /** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre');
  *  `byDefault` until he changes it (ARCHIVED starts folded: his ask, main m_23467). */
@@ -87,6 +103,7 @@ function Section({
   full,
   onAll,
   act,
+  office,
   say,
   children,
 }: {
@@ -105,8 +122,10 @@ function Section({
   /** the rows of its full list, when it shows a part ('Show all' stays while the full list has some) */
   full?: number;
   onAll: () => void;
-  /** a control in the head before its '…' (Artifacts' '+') */
+  /** a control in the head before its '…' (Artifacts' '+', Agents' cube) */
   act?: ReactNode;
+  /** Agents with the bims on: the office, above the rows */
+  office?: ReactNode;
   /** more items of its '…' before 'Show all' (Artifacts' 'Add a file…') */
   items?: readonly { readonly id: string; readonly label: string; readonly run: () => void }[];
   /** the section's own 'show N more' words (AGENTS': agentsMore) */
@@ -156,6 +175,7 @@ function Section({
           </div>
         </div>
       )}
+      {!shut && rows.length > 0 && office}
       {!shut && rows.length > 0 && (
         <div className="app-rb-rows">
           {shown.map(children)}
@@ -203,17 +223,36 @@ function Section({
   );
 }
 
+/** An agent's mark in the row's 16 state column (r2-launcher #8, r2-img7: no glowing ball). */
+export type AgentMark = 'works' | 'asks' | 'failed' | 'done' | 'none';
+
 /**
- * An agent's sign in the row's 14 icon slot (page native-mac §6, sidebar §3: a dot, never a glyph):
- * at work the breath, asking the accent dot, failed the error dot, done the ok one, the rest an
- * empty one; its words stay in the tip. Pure.
+ * An agent's mark, the pre-native-mac row glyph drawn as the ds line marks (RowMark, as the
+ * thread's): at work the sidebar's turning 3/4 arc, asking '?' in the accent, failed the alert,
+ * done the check in ink; idle or stopped nothing. Its words stay in the tip. Pure.
  */
-export function agentDot(g: string, working: boolean): DotState {
-  if (working) return 'wk';
-  if (g === '?') return 'nd';
-  if (g === '✗') return 'er';
-  if (g === '✓') return 'ok';
-  return 'off';
+export function agentMark(g: string, working: boolean): AgentMark {
+  if (working) return 'works';
+  if (g === '?') return 'asks';
+  if (g === '✗') return 'failed';
+  if (g === '✓') return 'done';
+  return 'none';
+}
+
+/** An agent's mark drawn (agentMark). */
+function AgentSign({ mark, testId }: { mark: AgentMark; testId: string }) {
+  switch (mark) {
+    case 'works':
+      return <span className="app-s-ring" data-testid={`${testId}.works`} />;
+    case 'asks':
+      return <RowMark icon="ask" tone="accent" />;
+    case 'failed':
+      return <RowMark icon="alert" tone="err" />;
+    case 'done':
+      return <RowMark icon="check" tone="plain" />;
+    case 'none':
+      return null;
+  }
 }
 
 /** An archived agent's end in the icon slot: done, failed, stopped. Pure. */
@@ -284,13 +323,13 @@ function Row({ r, onOpen, on, onOpenPr, onEnd, icon }: {
             // ⌥ held: the agent's number, the key he can press (held.ts)
             <span className="app-rb-key">{r.glyph}</span>
           ) : r.glyph === '✓' && r.agent !== undefined ? (
-            // it just finished: the kiss, ':*' lifts and fades into its dot (desktop-delight touch 1)
+            // it just finished: the kiss, ':*' lifts and fades into its check (desktop-delight touch 1)
             <>
               <DoneSign project={r.project} agent={r.agent} glyph="" testId={`${r.testId}.kiss`} />
-              <Dot state="ok" tip={r.tips?.glyph} />
+              <AgentSign mark="done" testId={`${r.testId}.sign`} />
             </>
           ) : (
-            <Dot state={agentDot(r.glyph, r.working === true)} tip={r.tips?.glyph} />
+            <AgentSign mark={agentMark(r.glyph, r.working === true)} testId={`${r.testId}.sign`} />
           )}
         </span>
         <span className={r.mono === true ? 'app-rb-name mono' : 'app-rb-name'}>{r.name}</span>
@@ -521,6 +560,21 @@ export function RightBar({ project, name }: { project: string; name: string }) {
   }, [askStore, all, project]);
   const places = usePlaces(project);
   const cards = useCards(project);
+  const growth = useGrowth(project);
+  // the office's map he picked with /bims for this project, his plugins' objects in it and his picks
+  const prefs = usePrefs() as Prefs | null;
+  const officeMap = mapOf(getPref(prefs, mapPrefKey(project)));
+  const plugins = usePlugins(all ? undefined : project);
+  useEffect(() => {
+    if (!all) askStore.command({ cmd: 'plugins', project });
+  }, [askStore, all, project]);
+  const picks = getPref(prefs, objectsPrefKey(project));
+  const officeObjs = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
+  const bims = useBimsView();
+  const office = bims.view === 'bims';
+  const welcomeHere = useWelcoming(project);
+  const townProjects = useTownProjects();
+  const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
   // the hub's rank as ⌥ numbers, held while ⌥ is (agents/model numbersOf): the rows' order and ⌥N (a project's only; bise's thread keeps start order)
@@ -593,6 +647,50 @@ export function RightBar({ project, name }: { project: string; name: string }) {
           onAll={() => {
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
           }}
+          act={
+            <>
+              <BimsSwitch view={bims} />
+              <BimsToggle view={bims} />
+            </>
+          }
+          office={
+            all ? (
+              <BimsFold open={office}>
+                <Town
+                  projects={townProjects}
+                  parts={townParts}
+                  onOpenProject={(p) => {
+                    router.go({ screen: 'thread', project: p, agent: MAIN });
+                  }}
+                  onOpenAgent={openAgent}
+                />
+              </BimsFold>
+            ) : (
+              // a new project's welcome shows the office in the thread: this one stays closed until it docks
+              <BimsFold open={office && !welcomeHere}>
+                <Office
+                  project={project}
+                  agents={officeAgents}
+                  cards={cards}
+                  places={places}
+                  objects={officeObjs}
+                  growth={growth}
+                  map={officeMap}
+                  parts={bimsParts}
+                  follow={office ? followOf(route, project, officeAgents) : null}
+                  onOpen={(agent) => {
+                    openAgent(project, agent);
+                  }}
+                  onOpenPlugin={(key) => {
+                    router.go({ screen: 'plugins', id: key });
+                  }}
+                  onPickMap={(m) => {
+                    store.command({ cmd: 'prefs_set', key: mapPrefKey(project), value: m });
+                  }}
+                />
+              </BimsFold>
+            )
+          }
         >
           {(r) =>
             r.kind === 'group' || r.kind === 'orphan' ? (
