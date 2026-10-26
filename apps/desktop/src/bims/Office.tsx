@@ -210,6 +210,7 @@ export function Office({
   onPickMap,
   pins = false,
   transparent = false,
+  cameraFrom = null,
   onState,
   snapRef,
 }: {
@@ -241,6 +242,8 @@ export function Office({
   pins?: boolean;
   /** the canvas clears to nothing: the page shows under the cube (the welcome in the thread's column) */
   transparent?: boolean;
+  /** another element that takes his camera's input as the office does (the right side's grown world, app/side3d/World.tsx): a pinch, two fingers, a drag while zoomed; null: none */
+  cameraFrom?: HTMLElement | null;
   /** its state as it changes: the welcome shows its pictures when the office can't draw */
   onState?: (s: OfficeState) => void;
   /** set while it draws: the office as drawn now onto a 2d canvas (the welcome's dock, renderer.copyTo) */
@@ -299,6 +302,8 @@ export function Office({
   const camRef = useRef<Cam>(FIT);
   const [fitted, setFitted] = useState(true);
   const applyCam = useRef<(c: Cam) => void>(() => undefined);
+  // the office's wheel (its loop's, set while the renderer lives): cameraFrom's wheel calls it too
+  const wheelRef = useRef<(e: WheelEvent) => void>(() => undefined);
   // the follow camera: his own pinch, drag, esc or '⤢ fit' (moveCam) stops it until he opens another agent
   const followRef = useRef<Follow>({ target: follow === null ? null : { name: follow }, at: 0 });
   const moveCam = useCallback((c: Cam) => {
@@ -623,6 +628,7 @@ export function Office({
       moveCam(c);
     };
     box.addEventListener('wheel', onWheel, { passive: false });
+    wheelRef.current = onWheel;
 
     // the window away: nothing runs; back: one frame, and the loop if it moves
     // the z's' CSS loop (zzz.ts) pauses on the same flag (architect m_28263)
@@ -692,6 +698,7 @@ export function Office({
       theme.disconnect();
       sized.disconnect();
       box.removeEventListener('wheel', onWheel);
+      wheelRef.current = () => undefined;
       kickRef.current = () => undefined;
       applyCam.current = () => undefined;
       pick.current = () => null;
@@ -741,6 +748,82 @@ export function Office({
         setHover(rowLit);
       }, HOVER_MS);
   }, [rowLit]);
+  /** a drag's start (a press while zoomed); the holder leaves out its buttons and pills */
+  const dragDown = (e: { readonly button: number; readonly pointerId: number; readonly clientX: number; readonly clientY: number }) => {
+    if (e.button !== 0 || atFit(camRef.current)) return;
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    dragged.current = false;
+  };
+  /** a drag's step past DRAG_PX: the view moves by the pointer's move (the holder's size), `el` keeps the pointer; false when no drag goes on */
+  const dragMove = (e: { readonly pointerId: number; readonly clientX: number; readonly clientY: number }, el: Element): boolean => {
+    const d = drag.current;
+    const box = holder.current;
+    if (d === null || d.id !== e.pointerId || box === null) return false;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.hypot(dx, dy) < DRAG_PX) return true;
+    if (!d.moved) {
+      d.moved = true;
+      el.setPointerCapture(e.pointerId);
+      setDragging(true);
+      pending.current = null;
+      clearTimeout(hoverTimer.current);
+      setHover(null);
+    }
+    d.x = e.clientX;
+    d.y = e.clientY;
+    const at = box.getBoundingClientRect();
+    moveCam(panBy(camRef.current, dx, dy, at.width, at.height));
+    return true;
+  };
+  const dragUp = () => {
+    if (drag.current?.moved === true) dragged.current = true;
+    drag.current = null;
+    setDragging(false);
+  };
+  // his camera from another element too (cameraFrom: the right side's grown world, its hit span
+  // over the island): the same wheel (a pinch zooms, two fingers move) and the same drag as on
+  // the office; a click that ended a drag goes no further (it never opens what is under it)
+  const camIn = useRef({ down: dragDown, move: dragMove, up: dragUp });
+  useLayoutEffect(() => {
+    camIn.current = { down: dragDown, move: dragMove, up: dragUp };
+  });
+  useEffect(() => {
+    const el = cameraFrom;
+    if (el == null) return;
+    const wheel = (e: WheelEvent) => {
+      wheelRef.current(e);
+    };
+    const down = (e: PointerEvent) => {
+      camIn.current.down(e);
+    };
+    const move = (e: PointerEvent) => {
+      camIn.current.move(e, el);
+    };
+    const up = () => {
+      camIn.current.up();
+    };
+    const click = (e: MouseEvent) => {
+      if (!dragged.current) return;
+      dragged.current = false;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    el.addEventListener('wheel', wheel, { passive: false });
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('click', click, true);
+    return () => {
+      el.removeEventListener('wheel', wheel);
+      el.removeEventListener('pointerdown', down);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      el.removeEventListener('click', click, true);
+    };
+  }, [cameraFrom]);
   const pickEvent = (e: { clientX: number; clientY: number }): string | null => {
     const box = holder.current;
     if (box === null) return null;
@@ -786,15 +869,10 @@ export function Office({
         moveCam(FIT);
       }}
       onPointerDown={(e) => {
-        if (e.button !== 0 || fitted || (e.target as Element).closest('button, .bims-pill') !== null) return;
-        drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-        dragged.current = false;
+        if ((e.target as Element).closest('button, .bims-pill') !== null) return;
+        dragDown(e);
       }}
-      onPointerUp={() => {
-        if (drag.current?.moved === true) dragged.current = true;
-        drag.current = null;
-        setDragging(false);
-      }}
+      onPointerUp={dragUp}
       onPointerCancel={() => {
         drag.current = null;
         setDragging(false);
@@ -804,25 +882,7 @@ export function Office({
         if (pickEvent(e) === null) moveCam(FIT);
       }}
       onPointerMove={(e) => {
-        const d = drag.current;
-        if (d !== null && d.id === e.pointerId) {
-          const dx = e.clientX - d.x;
-          const dy = e.clientY - d.y;
-          if (!d.moved && Math.hypot(dx, dy) < DRAG_PX) return;
-          if (!d.moved) {
-            d.moved = true;
-            e.currentTarget.setPointerCapture(e.pointerId);
-            setDragging(true);
-            pending.current = null;
-            clearTimeout(hoverTimer.current);
-            setHover(null);
-          }
-          d.x = e.clientX;
-          d.y = e.clientY;
-          const box = e.currentTarget.getBoundingClientRect();
-          moveCam(panBy(camRef.current, dx, dy, box.width, box.height));
-          return;
-        }
+        if (dragMove(e, e.currentTarget)) return;
         const name = pickEvent(e);
         setPointer(name !== null);
         if (name === pending.current) return;

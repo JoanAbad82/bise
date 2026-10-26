@@ -1,7 +1,9 @@
 // src/app/side3d · a bubble's card (page native-mac §7, mockups 12, 13, 15): 360 wide, 12 left of
-// the bubbles, aligned on its bubble and kept inside the window, r 16, glass (--c-overlay +
-// --glass), --e-3; a head of 32 (its name 13/600, what it counts text-3, then '+' and '▯' open as
-// a tab), its rows, a foot of 12 text-3 ('3 archived' · 'all agents ›'). Floats over the page with
+// the bubbles, its top on its bubble's and kept 24 inside the window, at most min(window − 48,
+// 560) high (layout cardTop, cardMaxH), r 16, glass (--c-overlay + --glass), --e-3; a head of 32
+// (its name 13/600, what it counts text-3, then '+' and '▯' open as a tab), its rows (they scroll
+// inside under a 24 fade when they overflow), one foot: a rule and a 32 row of 12 text-3 ('3
+// archived' · 'all agents ›'), the card's end (no padding under it). Floats over the page with
 // its whole shadow (SideHost is fixed at the shell's root: noClip). Its rows: SideRow, 48 high, a
 // 40 object, 12 between, a name and a line under it, a dot at the end. Esc and a click outside
 // close it (SideHost). Owner: nm-side.
@@ -43,14 +45,16 @@ export interface FlyoutProps {
   readonly foot: { readonly left: string; readonly right: string; readonly onRight: () => void } | null;
   /** its full page's link on its head ('all processes ›'), when its kinds each keep theirs on their head */
   readonly link?: { readonly text: string; readonly onClick: () => void };
-  /** its height at most (Host cardPlace: the room above the composer); none: its CSS cap */
-  readonly maxH?: number | undefined;
+  /** its height at most: the window's (layout cardMaxH, min(window − 48, 560)); its rows scroll inside */
+  readonly maxH: number;
+  /** its rows overflow: they scroll under a 24 fade at the bottom */
+  readonly scrolls?: boolean;
   readonly children: ReactNode;
 }
 
-export function Flyout({ id, name, says, add, onPin, top, foot, link, maxH, children }: FlyoutProps) {
+export function Flyout({ id, name, says, add, onPin, top, foot, link, maxH, scrolls = false, children }: FlyoutProps) {
   return (
-    <section className="s3-card" style={maxH === undefined ? { top } : { top, maxHeight: maxH }} role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
+    <section className="s3-card" style={{ top, maxHeight: maxH }} data-foot={foot !== null || undefined} role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
       <header className="s3-card-head">
         <b>{name}</b>
         {says !== '' && <span className="s3-card-says">{says}</span>}
@@ -64,7 +68,9 @@ export function Flyout({ id, name, says, add, onPin, top, foot, link, maxH, chil
           <HeadButton icon="panel" tip={side.pin_tab} onClick={onPin} testId={`app.flyout.${id}.pin`} />
         </span>
       </header>
-      <div className="s3-card-body">{children}</div>
+      <div className="s3-card-body" data-scrolls={scrolls || undefined}>
+        {children}
+      </div>
       {foot !== null && (
         <footer className="s3-card-foot">
           <span>{foot.left}</span>

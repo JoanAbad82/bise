@@ -511,3 +511,38 @@ describe('the map chip (brief bims-mapsel)', () => {
     expect(screen.queryByTestId('app.right.bims.map')).toBeNull();
   });
 });
+
+describe('his camera from another element (cameraFrom: the right side\'s grown world)', () => {
+  it('its pinch zooms and its drag moves the office\'s view as on the office; the click that ends a drag goes no further', async () => {
+    const r = fakeRenderer();
+    const from = document.createElement('span');
+    const clicked = vi.fn();
+    const outer = document.createElement('div');
+    outer.addEventListener('click', clicked);
+    outer.append(from);
+    document.body.append(outer);
+    render(<Office project="p1" agents={AGENTS} cards={[]} places={[]} parts={fakeParts(r).parts} onOpen={vi.fn()} cameraFrom={from} />);
+    await flush(2);
+    screen.getByTestId('app.right.bims').getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 120, width: 320, height: 120, x: 0, y: 0, toJSON: () => ({}) });
+    const cam = () => r.setCam.mock.calls.at(-1)?.[0] as { zoom: number; u: number; v: number } | undefined;
+    const pinch = wheel({ deltaY: -80, ctrlKey: true });
+    act(() => {
+      from.dispatchEvent(pinch);
+    });
+    expect(pinch.defaultPrevented).toBe(true);
+    expect(cam()?.zoom).toBeGreaterThan(1);
+    const before = cam() ?? { zoom: 0, u: 0, v: 0 };
+    from.setPointerCapture = vi.fn();
+    act(() => {
+      from.dispatchEvent(new PointerEvent('pointerdown', { button: 0, pointerId: 1, clientX: 10, clientY: 10, bubbles: true }));
+      from.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 40, clientY: 10, bubbles: true }));
+      from.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
+    });
+    expect(cam()?.u).toBeLessThan(before.u);
+    from.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(clicked).not.toHaveBeenCalled();
+    from.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(clicked).toHaveBeenCalledTimes(1);
+    outer.remove();
+  });
+});

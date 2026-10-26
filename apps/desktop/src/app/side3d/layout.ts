@@ -61,3 +61,24 @@ export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, pane
   const w = Math.max(0, room - BUBBLE_BAND - MIN_LEFT);
   return { colLeft: sideW + MIN_LEFT, colW: w, world: 'bubble', gutter: BUBBLE_BAND, side: true };
 };
+
+/** a card's room from the window's top and bottom edges (r2-side, Gabriel m_44190) */
+export const CARD_MARGIN = 24;
+/** a card's height at most, however tall the window */
+export const CARD_MAX = 560;
+
+/** A card's height at most in a window `winH` tall: 24 above and under, 560 at most. Pure. */
+export const cardMaxH = (winH: number): number => Math.max(0, Math.min(winH - 2 * CARD_MARGIN, CARD_MAX));
+
+/**
+ * A card's top, px from the side's top (the side starts `sideTop` under the window's top): on its
+ * bubble's top (`bubbleTop`, side px); lifted only as much as its height `h` needs to end 24 above
+ * the window's bottom, never higher than 24 under the window's top. Its height never depends on
+ * its top (cardMaxH is the window's), so a measure of the drawn card gives the same top again: no
+ * measure → place → measure loop (the jitter of r2-side). Pure.
+ */
+export const cardTop = (sideTop: number, bubbleTop: number, h: number, winH: number): number => {
+  const shown = Math.min(h, cardMaxH(winH));
+  const lowest = winH - CARD_MARGIN - shown;
+  return Math.max(CARD_MARGIN, Math.min(sideTop + bubbleTop, lowest)) - sideTop;
+};

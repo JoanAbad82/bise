@@ -64,7 +64,8 @@
 .s3-world[data-big] .s3-world-isle {
   margin-left: 0;
 }
-/* the office takes no pointer and shows none of its own chrome here: the office tab has them */
+/* the office takes no pointer and shows none of its own chrome here: the office tab has them;
+   grown, the hit span's pinch and drag reach its camera (Office cameraFrom) */
 .s3-world-office,
 .s3-thumb {
   display: block;
@@ -227,14 +228,14 @@
   box-shadow: 0 0 0 2px var(--c-solid);
 }
 
-/* a card: 360 with its padding, 12 left of the bubbles (12 + 44 + 12), r 16, glass, --e-3; it stops
-   --float-room above the window's bottom (the composer's) and scrolls inside */
+/* a card: 360 with its padding, 12 left of the bubbles (12 + 44 + 12), r 16, glass, --e-3; its top
+   on its bubble's, kept 24 inside the window, at most min(window - 48, 560) high (Host sets both,
+   layout cardTop / cardMaxH); its rows scroll inside */
 .s3-card {
   position: absolute;
   box-sizing: border-box;
   right: calc(var(--s-3) + var(--bubble) + var(--s-3));
   width: var(--w-flyout);
-  max-height: calc(100vh - var(--h-bar) - var(--float-room) - var(--s-3));
   display: flex;
   flex-direction: column;
   padding: var(--s-2) var(--s-2) var(--s-3);
@@ -288,13 +289,25 @@
   min-height: 0;
   overflow-y: auto;
 }
+/* its rows overflow: a 24 fade at the bottom, and 24 of room under the last row so it scrolls
+   clear of the fade */
+.s3-card-body[data-scrolls] {
+  padding-bottom: var(--s-6);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-6)), transparent);
+}
+/* one foot, the card's end: a rule, then a 32 row; no card padding under it */
+.s3-card[data-foot] {
+  padding-bottom: 0;
+}
 .s3-card-foot {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--s-2);
+  min-height: var(--h-row);
   margin-top: var(--s-1);
-  padding: var(--s-2) var(--s-2) 0;
+  padding: 0 var(--s-2);
   border-top: 1px solid var(--c-line);
   font: var(--f-meta);
   color: var(--c-text-3);

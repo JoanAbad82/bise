@@ -8,8 +8,11 @@
 // folds back GRACE_MS after the pointer leaves; never under reduced motion. A click opens the office in a tab. The office lives
 // (its bims move) on its own loop, which already rests while the window is away (bims/room.ts);
 // SideHost unmounts the world while the right side is hidden. As a 5th bubble (no room, d3) the
-// same office draws at the bubble's 68 object. The office takes no pointer here: its labels, pills
-// and camera are the office tab's. Owner: nm-side.
+// same office draws at the bubble's 68 object. The office's labels and pills are the office tab's;
+// grown, its camera takes his input as the open map does (r2-side, Gabriel m_44190): a pinch
+// zooms, two fingers or a drag while zoomed move it, through the office's own handlers (Office
+// cameraFrom: the hit span over the island); the beats are off while it is grown, and folding
+// back gives the camera to the lead again. Owner: nm-side.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { Office } from '@/bims/Office';
@@ -179,7 +182,7 @@ function useLeadZoom(agents: readonly Agent[], map: MapId): number {
 }
 
 /** The project's office as the world draws it: its map, its plugins' objects, its growth; `shot`: its camera (camera.ts), none: the whole office. */
-function WorldOffice({ project, agents, cards, shot }: OfficeOf & { readonly shot?: Shot }) {
+function WorldOffice({ project, agents, cards, shot, cameraFrom = null }: OfficeOf & { readonly shot?: Shot; readonly cameraFrom?: HTMLElement | null }) {
   const places = usePlaces(project);
   const growth = useGrowth(project);
   const prefs = usePrefs() as Prefs | null;
@@ -189,7 +192,7 @@ function WorldOffice({ project, agents, cards, shot }: OfficeOf & { readonly sho
   const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
   return (
     <Office project={project} agents={agents} cards={cards} places={places} objects={objects} growth={growth} map={map}
-      parts={bimsParts} transparent onOpen={() => undefined} follow={shot?.follow ?? null} followZoom={shot?.zoom} />
+      parts={bimsParts} transparent onOpen={() => undefined} follow={shot?.follow ?? null} followZoom={shot?.zoom} cameraFrom={cameraFrom} />
   );
 }
 
@@ -262,15 +265,17 @@ export function World({ project, name, says, agents, cards, onOpen, frozen = fal
       ro.disconnect();
     };
   }, []);
+  // the hit span: grown, his pinch, two fingers and drag there move the office's camera
+  const [hit, setHit] = useState<HTMLSpanElement | null>(null);
   const label = side.world_open({ project: name });
   return (
     <Press look="s3-world" data-big={big || undefined} aria-label={label} {...tipAttrs(big ? undefined : label)}
       onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={onOpen} data-testid="app.world">
       {/* the one place that takes the pointer: the island's box as drawn, never the bubbles' column under it */}
-      <span className="s3-world-hit" style={hitBox(isleH, big)} data-testid="app.world.hit" />
+      <span ref={setHit} className="s3-world-hit" style={hitBox(isleH, big)} data-testid="app.world.hit" />
       <span ref={isle} className="s3-world-isle" style={{ '--s3-scale': String(big ? 1 : SMALL / BIG) } as CSSProperties}>
         <span className="s3-world-office" aria-hidden="true">
-          <WorldOffice project={project} agents={agents} cards={cards} shot={shot} />
+          <WorldOffice project={project} agents={agents} cards={cards} shot={shot} cameraFrom={big ? hit : null} />
         </span>
       </span>
       {beat !== undefined && !big && <BeatLabel agent={beat} cards={cards} mid={Math.round((isleH * SMALL) / BIG / 2)} />}

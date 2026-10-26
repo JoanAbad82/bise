@@ -1,6 +1,6 @@
 // sideLayout at the widths of plan §2 (1000, 1100, 1280, 1440, 1728, 1920), the panel open and closed.
 import { describe, expect, it } from 'vitest';
-import { BUBBLE_BAND, COL_W, MIN_LEFT, sideLayout, WORLD_BAND } from './layout';
+import { BUBBLE_BAND, CARD_MARGIN, CARD_MAX, cardMaxH, cardTop, COL_W, MIN_LEFT, sideLayout, WORLD_BAND } from './layout';
 
 /** rail 56 + sidebar 240 */
 const SIDE = 296;
@@ -69,5 +69,36 @@ describe('sideLayout, the panel open', () => {
   });
   it('1920 with a 640 panel: 720, centred', () => {
     expect(sideLayout(1920, SIDE, true, 640)).toMatchObject({ colW: COL_W, colLeft: SIDE + (1920 - SIDE - 640 - COL_W) / 2 });
+  });
+});
+
+describe('a card: its top on its bubble, inside the window (Gabriel m_44190)', () => {
+  // the side starts under the 52 bar; the agents bubble at 152, the processes one at 392
+  const BAR = 52;
+  it('its height at most: the window less 24 above and under, 560 at most', () => {
+    expect(cardMaxH(900)).toBe(CARD_MAX);
+    expect(cardMaxH(500)).toBe(500 - 2 * CARD_MARGIN);
+    expect(cardMaxH(30)).toBe(0);
+  });
+  it('a card that fits: its top is its bubble\'s', () => {
+    expect(cardTop(BAR, 152, 300, 900)).toBe(152);
+    expect(cardTop(BAR, 392, 200, 900)).toBe(392);
+  });
+  it('a card that would pass the bottom rises until it ends 24 above it, never above 24 under the window\'s top', () => {
+    // 52 + 392 + 500 = 944 > 876: it rises by 68
+    expect(cardTop(BAR, 392, 500, 900)).toBe(900 - CARD_MARGIN - 500 - BAR);
+    // taller than the window's cap: drawn at the cap, its top 24 under the window's top
+    expect(cardTop(BAR, 392, 2000, 600)).toBe(CARD_MARGIN - BAR);
+  });
+  it('a fixed point: the top from a card drawn at that top is the same top (no measure → place loop)', () => {
+    for (const winH of [500, 700, 900, 1200])
+      for (const bubble of [152, 232, 312, 392])
+        for (const content of [100, 300, 560, 900, 2000]) {
+          const drawn = Math.min(content, cardMaxH(winH));
+          const top = cardTop(BAR, bubble, content, winH);
+          expect(cardTop(BAR, bubble, drawn, winH)).toBe(top);
+          expect(BAR + top).toBeGreaterThanOrEqual(CARD_MARGIN);
+          expect(BAR + top + drawn).toBeLessThanOrEqual(winH - CARD_MARGIN);
+        }
   });
 });

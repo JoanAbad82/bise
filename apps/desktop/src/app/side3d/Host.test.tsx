@@ -3,6 +3,7 @@
 // card per bubble, an ask's option sent through the store's own pick, esc and ⌥⌘1 (the screen
 // action), nothing clipped on the way up (noClip), nothing while the panel is open.
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { Profiler } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@/proto';
 import type { CorePort } from '@/shared/api';
@@ -13,11 +14,18 @@ import { artifact, artifacts, card, ev, projects, row } from '../../../tests/fea
 import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
 import { keyAction } from '../keys';
-import { SideHost, bubbleTops, cardFloor, cardPlace } from './Host';
-import { hitBox } from './World';
+import { SideHost, bubbleTops } from './Host';
+import { CARD_MAX } from './layout';
+import { GRACE_MS, HOVER_MS, hitBox } from './World';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
-vi.mock('@/bims/Office', () => ({ Office: () => <canvas data-testid="office" /> }));
+const office = vi.hoisted(() => ({ cameraFrom: [] as (HTMLElement | null)[] }));
+vi.mock('@/bims/Office', () => ({
+  Office: ({ cameraFrom = null }: { cameraFrom?: HTMLElement | null }) => {
+    office.cameraFrom.push(cameraFrom);
+    return <canvas data-testid="office" />;
+  },
+}));
 vi.mock('./render', () => ({
   outfitSig: () => '',
   objectPng: () => {
@@ -44,7 +52,7 @@ const agent = (name: string, over: Partial<Agent> = {}): Agent => ({
   name, dir: name, main: false, status: 'idle', archived: false, title: 'speed', purpose: '', since_ms: 0, waits: 0, watching: [], ...over,
 });
 
-function side3d(winW = 1440) {
+function side3d(winW = 1440, onCommit?: () => void) {
   const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   (window as unknown as { bise: unknown }).bise = { notify: { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined } };
   // 1440 wide: the world small (sideLayout), the rail and the sidebar on the left
@@ -68,7 +76,9 @@ function side3d(winW = 1440) {
   const v = render(
     <StoreProvider store={store}>
       <RouterContext value={router}>
-        <SideHost />
+        <Profiler id="side" onRender={() => onCommit?.()}>
+          <SideHost />
+        </Profiler>
       </RouterContext>
     </StoreProvider>,
   );
@@ -161,21 +171,87 @@ describe('the right side, folded', () => {
     expect(big.clipPath).toContain('calc(100% - 68px) 112px');
   });
 
-  it('a card stops 12 above the composer on screen, else --float-room above the bottom', () => {
-    expect(cardFloor(document, 900)).toBe(816);
-    const c = document.createElement('div');
-    c.dataset['testid'] = 'composer';
-    c.getBoundingClientRect = () => ({ top: 773, height: 114, bottom: 887, left: 0, right: 0, width: 0, x: 0, y: 773, toJSON: () => ({}) });
-    document.body.append(c);
-    expect(cardFloor(document, 900)).toBe(761);
-    c.remove();
+  it('the agents card: one foot, the card\'s end (archived · all agents)', () => {
+    const { v } = side3d();
+    fireEvent.click(v.getByTestId('app.bubble.agents'));
+    const card = v.getByTestId('app.flyout.agents');
+    expect(card.querySelectorAll('footer')).toHaveLength(1);
+    expect(card.lastElementChild?.tagName).toBe('FOOTER');
+    expect(card.hasAttribute('data-foot')).toBe(true);
+    expect(card.querySelector('footer')?.textContent).toBe(`${side.archived({ n: 1 })}${side.all_agents}`);
   });
 
-  it('a card on a low bubble rises until it ends at the floor; taller than the room, it is capped and scrolls', () => {
-    // ⌥⌘4 at 1440 × 900: the processes bubble at 392 under a 52 bar, a 428 card, the composer at 770
-    expect(cardPlace(52, 380, 428, 758)).toEqual({ lift: 102, maxH: undefined });
-    expect(cardPlace(52, 140, 200, 758)).toEqual({ lift: 0, maxH: undefined });
-    expect(cardPlace(52, 380, 900, 758)).toEqual({ lift: 368, maxH: 694 });
+  it('a card\'s top is its bubble\'s; its height at most the window\'s (min(window − 48, 560))', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
+    const { v } = side3d();
+    fireEvent.click(v.getByTestId('app.bubble.processes'));
+    const card = v.getByTestId('app.flyout.processes');
+    expect(card.style.top).toBe(v.getByTestId('app.bubble.processes').style.top);
+    expect(card.style.maxHeight).toBe(`${String(CARD_MAX)}px`);
+  });
+
+  it('a card open stays put: its own resize with nothing changed makes no new render (the jitter, Gabriel m_44190)', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
+    // a card's rows 900 tall: drawn at its cap, as Chromium would
+    const was = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        if (!this.classList.contains('s3-card')) return 0;
+        const cap = parseFloat(this.style.maxHeight);
+        return Number.isNaN(cap) ? 900 : Math.min(900, cap);
+      },
+    });
+    const seen: ResizeObserverCallback[] = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(cb: ResizeObserverCallback) {
+        seen.push(cb);
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    });
+    try {
+      let commits = 0;
+      const { v } = side3d(1440, () => {
+        commits++;
+      });
+      fireEvent.click(v.getByTestId('app.bubble.processes'));
+      const card = v.getByTestId('app.flyout.processes');
+      const top = card.style.top;
+      // lifted so its 560 end 24 above the window's bottom: 900 - 24 - 560 under the window's top
+      expect(top).toBe(`${String(900 - 24 - CARD_MAX - (card.parentElement?.getBoundingClientRect().top ?? 0))}px`);
+      const after = commits;
+      act(() => {
+        for (let i = 0; i < 5; i++) for (const cb of seen) cb([], {} as ResizeObserver);
+      });
+      expect(commits).toBe(after);
+      expect(card.style.top).toBe(top);
+    } finally {
+      vi.unstubAllGlobals();
+      if (was !== undefined) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', was);
+    }
+  });
+
+  it('grown on hover, the world gives its hit span to the office as its camera\'s input (the open map\'s pinch and drag); folded, none', () => {
+    vi.useFakeTimers();
+    try {
+      const { v } = side3d();
+      const last = () => office.cameraFrom.at(-1);
+      expect(last()).toBeNull();
+      fireEvent.pointerEnter(v.getByTestId('app.world'));
+      act(() => {
+        vi.advanceTimersByTime(HOVER_MS);
+      });
+      expect(last()).toBe(v.getByTestId('app.world.hit'));
+      fireEvent.pointerLeave(v.getByTestId('app.world'));
+      act(() => {
+        vi.advanceTimersByTime(GRACE_MS);
+      });
+      expect(last()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('the bubbles under the world at 152, 80 apart, put whatever the world does; as a 5th bubble the world tops the stack', () => {
