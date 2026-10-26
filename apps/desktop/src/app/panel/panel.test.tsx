@@ -7,7 +7,7 @@ import { useLayoutEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { ev, projects, row } from '../../../tests/feature/inputs';
+import { artifact, artifacts, ev, projects, row } from '../../../tests/feature/inputs';
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
@@ -25,15 +25,16 @@ beforeEach(() => {
 });
 const ACME = 'acme-1a2b3c4d';
 
-function shell() {
+function shell(more: { events?: readonly unknown[]; bise?: Record<string, unknown> } = {}) {
   const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   const notify = { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined };
-  (window as unknown as { bise: unknown }).bise = { notify };
+  (window as unknown as { bise: unknown }).bise = { notify, ...more.bise };
   const store = new Store(port);
   store.setCore('up');
   store.apply(projects(row({ project: 'bise-home-00000000', name: 'bise', home: true }), row({ project: ACME, name: 'acme' })));
   // the fixtures' agents: perf has a diff (3 files), so New tab shows Changes
   store.apply(ev('agents', { project: ACME }));
+  for (const e of more.events ?? []) store.apply(e);
   const router = createRouter({ screen: 'thread', project: ACME, agent: 'perf' });
   return render(
     <StoreProvider store={store}>
@@ -227,5 +228,33 @@ describe('the tabbed panel', () => {
     });
     fireEvent.click(v.getByTestId('app.panel.thread'));
     expect(v.getByTestId('app.panel').hasAttribute('data-full')).toBe(false);
+  });
+  it("an html file's tab: ↗ opens the hub's served page his browser takes, never the bare path (his m_45830)", () => {
+    const opened: string[] = [];
+    const openExternal = (u: string) => {
+      opened.push(u);
+      return Promise.resolve(true);
+    };
+    // a file artifact as the hub sends it: url the copied file's path, frame_url its page on the pages server
+    const mocks = artifact({
+      id: 'mocks',
+      kind: 'page',
+      title: 'folded side · high-fi mocks',
+      version: 3,
+      url: '/Users/me/.bise/hubs/h/artifacts/mocks/v3/hifi-index.html',
+      frame_url: 'http://127.0.0.1:47123/a/mocks/view',
+    });
+    const bare = artifact({ id: 'bare', kind: 'page', url: '/Users/me/w/bare.html', frame_url: null });
+    const w = shell({ events: [artifacts(ACME, mocks, bare)], bise: { openExternal } });
+    act(() => {
+      openTab({ kind: 'artifact', project: ACME, id: 'mocks' });
+    });
+    fireEvent.click(w.getByTestId('app.panel.addr.out'));
+    expect(opened).toEqual(['http://127.0.0.1:47123/a/mocks/view']);
+    // a bare path from an older hub, no served page: ↗ is off (openExternal refuses a path)
+    act(() => {
+      openTab({ kind: 'artifact', project: ACME, id: 'bare' });
+    });
+    expect(w.getByTestId('app.panel.addr.out').hasAttribute('disabled')).toBe(true);
   });
 });
