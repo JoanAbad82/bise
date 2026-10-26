@@ -13,4 +13,5 @@ export { useAllArtifacts, useNewArtifacts } from './hooks';
 export { usePlaceCrumb } from './crumb';
 export { ArtLibrary } from './library';
 export { PageVignette, useBannerGutter, type VignettePage } from './hero/vignettes';
+export { LiveVignette } from './hero/Live';
 export * from './model';

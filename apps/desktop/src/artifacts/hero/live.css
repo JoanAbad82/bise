@@ -1,0 +1,14 @@
+/* src/artifacts/hero · a banner's live vignette (Live.tsx): the canvas fills the banner's visual box,
+   on transparent, no frame; the pointer reaches it (the box itself lets it through), the wheel
+   scrolls the page. Over it, the theme's still until the first frame is on screen. */
+.b-live{position:relative;width:100%;height:100%;pointer-events:auto}
+.b-live-canvas{display:block;width:100%;height:100%;outline:none}
+.b-live-wait{position:absolute;inset:0;pointer-events:none}
+.b-live-wait > img{display:block;width:100%;height:100%;object-fit:contain}
+.b-live-wait > .dark{display:none}
+[data-theme="dark"] .b-live-wait > .light{display:none}
+[data-theme="dark"] .b-live-wait > .dark{display:block}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .b-live-wait > .light{display:none}
+  :root:not([data-theme="light"]) .b-live-wait > .dark{display:block}
+}

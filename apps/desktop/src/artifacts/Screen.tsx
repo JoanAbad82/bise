@@ -50,7 +50,8 @@ import { Toolbar } from './Toolbar';
 import { BigTile, FolderListRow, SmallTile } from './Tiles';
 import { cardDrag, FLASH_MS, TOAST_MS, useBrief, useDrop } from './drag';
 import { folderCmd, moveCmd, type FolderOp } from './ops';
-import { PageVignette, useBannerGutter } from './hero/vignettes';
+import { useBannerGutter } from './hero/vignettes';
+import { LiveVignette } from './hero/Live';
 import './artifacts.css';
 import './folders.css';
 
@@ -554,7 +555,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
         {/* the lead (designer's rule on #5): no card; the bims still stays beside it as a vignette */}
         {/* the banner (designer m_42762): a full-width page, its title 32 in, the filing desk right */}
         <PageBanner title={hero.artifacts_title} sentence={library.say} facts={libraryFacts(lib, scoped, projectName)}
-          visual={<PageVignette page="artifacts" />} icon="artifacts" edge="page" gutter={gutter} testId="artifacts.lead" />
+          visual={<LiveVignette page="artifacts" />} icon="artifacts" edge="page" gutter={gutter} testId="artifacts.lead" />
         <div className={`art-lib${narrow || sideLib ? ' bare' : ''}`}>
           {!narrow && !sideLib && column}
           <div className="art-main">

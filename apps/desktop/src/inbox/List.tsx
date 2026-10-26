@@ -18,7 +18,7 @@ import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
 import { InBar } from '@/app/barslot';
 import { AppIcon, BannerWait, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, ListRow, PageBanner, Press, RowAction, RowMark, tipAttrs } from '@/ds';
-import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
+import { LiveVignette, useBannerGutter } from '@/artifacts';
 import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
@@ -157,7 +157,7 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
           if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) onEnd();
         }}>
       <PageBanner title={hero.inbox_title} sentence={hero.inbox_say} facts={<>{facts.wait !== undefined && <><BannerWait>{facts.wait}</BannerWait>{' · '}</>}{facts.rest}</>}
-        visual={<PageVignette page="inbox" />} icon="inbox" gutter={gutter} testId="inbox.lead" />
+        visual={<LiveVignette page="inbox" />} icon="inbox" gutter={gutter} testId="inbox.lead" />
       <FilterRow testId="inbox.filters">
         <Filters items={STATES.map((s) => ({ id: s, label: STATE_WORDS[s] }))} on={f.state} label={inbox.filter_label}
           onPick={(id) => { set({ state: id as StateFilter }); }} testId="inbox.state" />

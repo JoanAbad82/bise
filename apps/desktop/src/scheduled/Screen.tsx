@@ -8,7 +8,7 @@
 // The floating composer's room at the foot (--float-room). Owner: nm-pages-a (amb-mac's before).
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { AppIcon, BarSearch, Button, Empty, GroupLabel, ListRow, MoreButton, PageBanner, Press, sentenceCase } from '@/ds';
-import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
+import { LiveVignette, useBannerGutter } from '@/artifacts';
 import { shownName } from '@/agents/model';
 import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
@@ -128,7 +128,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
             floating composer's room (--float-room) */}
         <div className="sch-scroll" data-testid="scheduled.scroll">
         <PageBanner title={hero.scheduled_title} sentence={hero.scheduled_say} facts={heroFacts(list, now)}
-          visual={<PageVignette page="scheduled" />} icon="scheduled" gutter={cur ? 0 : gutter} testId="scheduled.lead" />
+          visual={<LiveVignette page="scheduled" />} icon="scheduled" gutter={cur ? 0 : gutter} testId="scheduled.lead" />
         {list.length > 0 && (
           // the page's search, in the window's bar (app-polish #4)
           <InBar>

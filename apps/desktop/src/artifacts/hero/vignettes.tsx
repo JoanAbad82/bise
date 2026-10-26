@@ -3,7 +3,9 @@
 // and the dark still (ds banner.css shows the theme's), each with its 1x and 2x (the screen's DPR
 // picks: srcSet). Their files: <page>-<light|dark>@<1x|2x>.webp, 360x176 at 1x; the artifacts
 // page's own still (440x264, one size). useBannerGutter: the room the right side keeps free, for
-// PageBanner's gutter. bims-plugins owns the images; nm-pages-a the code; nm-pages-b imports both.
+// PageBanner's gutter. Inbox, scheduled and artifacts show their scene live (Live.tsx, scene.ts),
+// this still under it until its first frame, under reduced motion and with no WebGL.
+// bims-plugins owns the images; nm-pages-a the code; nm-pages-b imports both.
 import { useSideLayout } from '@/app/side3d/place';
 import { useContext, useSyncExternalStore } from 'react';
 import { RouterContext } from '@/app/router';
