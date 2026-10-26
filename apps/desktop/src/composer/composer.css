@@ -292,6 +292,18 @@
 .b-composer .cmp-ctx .it.br {
   flex: 0 1 auto;
 }
+/* the addressee's state where 'local' was (his m_44719): main's breath or the ask mark, its words
+   text-3; the mark alone carries the accent when it waits on him */
+.b-composer .cmp-ctx .it.st {
+  color: var(--c-text-3);
+}
+/* 'to perf': his words go to an agent that is not main, its name in the accent as main's tab had
+   it (agent-target, designer m_28208; his ask m_44704); never on main's own composer */
+.b-composer .cmp-ctx .it.to {
+  flex: 0 1 auto;
+  color: var(--c-accent);
+  font-weight: 600;
+}
 /* 'lands on main' after the branch: a fact, text-3, the first to cut (designer m_43996) */
 .b-composer .cmp-ctx .it.lands {
   flex: 0 100 auto;

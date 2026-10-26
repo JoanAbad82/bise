@@ -292,10 +292,12 @@ export const inbox = {
   esc_instead: (a: { to: string | number }): string => "esc to " + String(a.to) + " instead",
   /** the empty composer while his words answer */
   answer_placeholder: (a: { who: string | number; key: string | number }): string => "your answer to " + String(a.who) + ", then " + String(a.key),
-  /** an item only options decide: his words go to its asker as a message */
+  /** an item only options decide: its options, or his free text closes it (his rule m_44704) */
   to_waits: (a: { who: string | number; waits: string | number }): string => "to " + String(a.who) + " · " + String(a.waits),
-  /** the empty composer then */
-  message_placeholder: (a: { who: string | number }): string => "write to " + String(a.who) + ", then ⏎",
+  /** the empty composer on a tool call's approval: his words refuse it, the reason its agent reads */
+  deny_placeholder: (a: { who: string | number }): string => "or say no to " + String(a.who) + " and why, then ⏎",
+  /** the empty composer on any other item only options decide: his words steer its agent, it closes */
+  steer_placeholder: (a: { who: string | number }): string => "or write to " + String(a.who) + " instead, then ⏎",
   /** the question closed under his words */
   to_closed: (a: { who: string | number }): string => "to " + String(a.who) + " · the question is closed",
   /** bise's own ask (notifications): only its options answer it */

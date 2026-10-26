@@ -209,7 +209,8 @@ function ToPicker({ to, name, onPick }: { to: FloatTo; name: string; onPick: (to
   }, [home, rows, agents, to.project]);
   return (
     <>
-      <PickerTrigger ref={trigger} extra="cmp-float-to" open={open} tip={composer.float_to_title} testId="composer.float.to"
+      {/* an agent that is not main: its name in the accent, as the docked strip's 'to perf' (his ask m_44704) */}
+      <PickerTrigger ref={trigger} extra={to.agent === MAIN ? 'cmp-float-to' : 'cmp-float-to other'} open={open} tip={composer.float_to_title} testId="composer.float.to"
         onClick={() => {
           setOpen((o) => !o);
         }}>

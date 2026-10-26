@@ -382,14 +382,10 @@ export const composer = {
   tab_worktree_on: (a: { branch: string | number }): string => "ψ worktree, on " + String(a.branch),
   /** the tab's place tip: his checkout */
   tab_own_folder: (a: { path: string | number }): string => "your own folder: " + String(a.path),
-  /** the strip's place: his own checkout */
-  ctx_local: "local",
-  /** the strip's place: a worktree */
-  ctx_worktree: "worktree",
-  /** the strip's place on the empty home: where main starts its agents */
-  ctx_new_worktree: "new worktree",
-  /** the tip of 'new worktree' on the empty home */
-  ctx_new_worktree_tip: "main starts its agents in a new worktree",
+  /** the strip, where 'local' was (his m_44719): the addressee's turn running, after main's breath, text-3 */
+  ctx_working: (a: { dur: string | number }): string => "working · " + String(a.dur),
+  /** the strip: something of the addressee's waits on him, after the ask mark in the accent */
+  ctx_waits: "waits for you",
   /** the tip of the strip's branch */
   ctx_branch_tip: (a: { branch: string | number }): string => "on branch " + String(a.branch),
   /** after the branch, text-3, when the project's flow is trunk: where its work lands (the hub's devflow::lands) */

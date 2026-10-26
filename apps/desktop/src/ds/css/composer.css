@@ -14,7 +14,7 @@
 .b-composer .tab.acc{box-shadow:inset 1px 1px 0 var(--c-accent),inset -1px 0 0 var(--c-accent)}
 .b-composer .tab.acc .lbl{color:var(--c-accent)}
 .b-composer .tab.acc .who{font-weight:600}
-/* his words go to an agent that is not main (agent-target, designer m_28208): since bise fait mac no accent at all (designer's rule: the accent only on what waits on him; ui-review L1 #1): the placeholder names the agent, the border's tip says it */
+/* his words go to an agent that is not main (agent-target, designer m_28208): the box stays plain (ui-review L1 #1); only the strip's 'to perf' is in the accent (his ask m_44704, composer/composer.css .it.to), the border's tip says it */
 /* only the 'to perf' label is accent: ψ and its folder stay text-3 (designer m_28237) */
 .b-composer .tab.acc.quiet [data-item="place"],.b-composer .tab.acc.quiet [data-item="place"] .g{color:var(--c-text-3)}
 .b-composer .tab.acc.quiet{background:linear-gradient(color-mix(in srgb,var(--c-text) 2%,transparent),color-mix(in srgb,var(--c-text) 2%,transparent)),var(--c-raised)}

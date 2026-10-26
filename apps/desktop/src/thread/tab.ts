@@ -1,7 +1,8 @@
 // The composer's context strip (bise fait mac, mockup 1; it replaced designer's composer-strip A tab):
-// the box's first row, where his words go: the project, the place (local or worktree, its path in
-// the tip) and the branch in mono, and on the right the context ring or the screen's own words.
-// Short, it drops whole items: the right end first, then the place, then the project; the branch
+// the box's first row, where his words go: the project, the addressee's state while it runs
+// (stripState: 'working · 3 min', 'waits for you'; nothing idle) and the branch in mono, and on the
+// right the context ring or the screen's own words.
+// Short, it drops whole items: the right end first, then the state, then the project; the branch
 // stays (stripFit). Answering a card: '↳ answering search · <question>' and 'esc to bise instead'
 // on the right; short, the question goes first, then that end; '↳ answering search' never goes
 // (answerFit). Which states make it pink (an item, words opening with another agent's @name, an
@@ -73,28 +74,44 @@ export function tabPlace(
 /** Which of the strip's items show. */
 export interface StripFit {
   readonly project: boolean;
-  readonly place: boolean;
+  /** the addressee's state while it runs ('working · 3 min', 'waits for you') */
+  readonly state: boolean;
   /** the right end: the context ring, or the screen's words */
   readonly end: boolean;
 }
 
 /**
  * The strip's items that fit in `avail` px, each whole or not at all: the right end goes first,
- * then the place, then the project; the branch always stays (its own css cut past that). `gap` is
+ * then the state, then the project; the branch always stays (its own css cut past that). `gap` is
  * the space between two items (16); a width of 0 is an item that isn't there. Pure.
  */
-export function stripFit(w: { avail: number; gap: number; project: number; place: number; branch: number; end: number }): StripFit {
+export function stripFit(w: { avail: number; gap: number; project: number; state: number; branch: number; end: number }): StripFit {
   const sum = (on: StripFit): number => {
-    const items = [on.project ? w.project : 0, on.place ? w.place : 0, w.branch, on.end ? w.end : 0].filter((x) => x > 0);
+    const items = [on.project ? w.project : 0, on.state ? w.state : 0, w.branch, on.end ? w.end : 0].filter((x) => x > 0);
     return items.reduce((n, x) => n + x, 0) + w.gap * Math.max(0, items.length - 1);
   };
   const tries: StripFit[] = [
-    { project: true, place: true, end: true },
-    { project: true, place: true, end: false },
-    { project: true, place: false, end: false },
+    { project: true, state: true, end: true },
+    { project: true, state: true, end: false },
+    { project: true, state: false, end: false },
   ];
   for (const t of tries) if (sum(t) <= w.avail) return t;
-  return { project: false, place: false, end: false };
+  return { project: false, state: false, end: false };
+}
+
+/** The addressee's state in the strip (his m_44719): it waits for him, or it works and for how long; null idle. */
+export type StripState = { readonly kind: 'waits' } | { readonly kind: 'working'; readonly ms: number };
+
+/**
+ * What the strip says of the agent his words go to, where 'local' was (his m_44719: the only
+ * option, so no control): something of its waits on him first, then its turn running (how long:
+ * the hub's turn_ms, else since its status changed); idle, stopped or unknown: nothing. Pure.
+ */
+export function stripState(a: { status: string; waits: number; since_ms: number; turn_ms?: number | null; waiting_on?: { who: string } | null } | undefined, now: number): StripState | null {
+  if (a === undefined) return null;
+  if (a.waits > 0 || a.waiting_on?.who === 'you') return { kind: 'waits' };
+  if (a.status === 'working') return { kind: 'working', ms: a.turn_ms ?? Math.max(0, now - a.since_ms) };
+  return null;
 }
 
 /**
@@ -165,7 +182,7 @@ export interface PinkState {
  * read only with no item and no artifact open: that agent's pink, bare, with `leadTip`. Pure.
  */
 export function pinkState(o: {
-  answer: { closed?: boolean; message?: boolean; tip?: string } | null;
+  answer: { closed?: boolean; free?: 'deny' | 'steer'; tip?: string } | null;
   /** the border's tip while his words open with another agent's `@name` (lead.ts); undefined: they don't */
   leadTip?: string | undefined;
   aboutPink: string | undefined;
@@ -175,7 +192,7 @@ export function pinkState(o: {
   otherTip: (agent: string) => string;
 }): PinkState {
   if (o.answer !== null) {
-    const pink = o.answer.closed !== true && o.answer.message !== true;
+    const pink = o.answer.closed !== true && o.answer.free === undefined;
     return { pink, tip: o.answer.tip, bare: true, whole: false, quiet: false };
   }
   if (o.leadTip !== undefined) return { pink: true, tip: o.leadTip, bare: true, whole: false, quiet: false };

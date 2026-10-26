@@ -275,29 +275,20 @@ export const ThreadComposer = memo(function ThreadComposer({
       // he attached, the hub's one /answer path (R41)
       // the card he answered was closed by the hub while he typed (card-draft-keep): his words go
       // to its asker as a plain message, then the block lets the card go
-      // an approval or a choice open: they go to its asker as a plain message, the item stays
-      if (answer !== null && (answer.closed === true || answer.message === true) && answer.asker !== undefined) {
-        store.send({ project: answer.project, agent: answer.asker, text: out.text, mode: 'now', ...(out.parts === undefined ? {} : { parts: out.parts }) });
-        if (answer.closed === true) {
+      // an open item: his free text answers it, refuses it or steers its agent, and it closes
+      // (cardActs, his rule m_44704); the hub's word on an answer comes back here (answerNoteOf)
+      if (answer !== null) {
+        for (const a of cardActs(answer, out, { project, agent })) {
+          if (a.act === 'send') store.send(a.send);
+          else {
+            if (a.do.i === 'answer') asked.current = { project: answer.project, text: out.text };
+            store.do(a.do);
+          }
+        }
+        if (answer.closed === true && answer.asker !== undefined) {
           sentClosed.current = true;
           leaveClosed();
         }
-        onSent();
-        return;
-      }
-      if (answer !== null) {
-        // msg-parts: his quotes and pastes go typed (the hub renders the model's text from them)
-        asked.current = { project: answer.project, text: out.text };
-        // inbox picks (3): this thread, so his row shows here too when the asker's thread is elsewhere
-        const from = answer.asker === undefined ? undefined : { at: { project, agent } };
-        store.do({
-          i: 'answer',
-          project: answer.project,
-          card: answer.card,
-          reply: out.text,
-          ...(out.parts !== undefined ? { parts: out.parts } : {}),
-          ...(from !== undefined ? { from } : {}),
-        });
         onSent();
         return;
       }
@@ -403,7 +394,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     router.go({ screen: 'thread', project: p, agent: MAIN });
   }, [router]);
   const stripProject = useMemo(() => strip ?? { id: project, onPick: goProject }, [strip, project, goProject]);
-  const tabEl = <ComposerTab words={tabWords} bare={bare || atTo !== null} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} project={stripProject} newPlace={placeOnly || home} testId="composer.ctx" />;
+  const tabEl = <ComposerTab words={tabWords} bare={bare || atTo !== null} to={ps.quiet && atTo === null} at={me} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} project={stripProject} newPlace={placeOnly || home} testId="composer.ctx" />;
   // the one notice at the strip's right (noticeOf): it goes at his first key in the frame (esc
   // too), at any send or command, a note also after LINE_MS; never outlives his next message,
   // never moves the composer (designer m_29135)
@@ -497,10 +488,35 @@ export interface CardAt {
   readonly asker?: string;
   /** the hub closed it while his words were typed: they go to `asker` as a plain message */
   readonly closed?: boolean;
-  /** an approval or a choice: his words go to `asker` as a plain message, never an answer */
-  readonly message?: boolean;
+  /** an item only its options decide (inbox/model.ts freeWords): his words refuse a tool call's
+   *  approval ('deny'), else steer `asker` ('steer'); either way the item closes */
+  readonly free?: 'deny' | 'steer';
   /** the pink border's tip ('your words answer search's question · esc writes to bise') */
   readonly tip?: string;
+}
+
+/** One thing his free text does to an open item: a message to an agent, or a gesture on the card. */
+export type FreeAct = { readonly act: 'send'; readonly send: SendIntent } | { readonly act: 'do'; readonly do: CardIntent };
+type SendIntent = Parameters<ReturnType<typeof useStore>['send']>[0];
+type CardIntent = Parameters<ReturnType<typeof useStore>['do']>[0];
+
+/**
+ * His words sent with item `a` open (his rule m_44704, the TUI's cards.rs submit): every item takes
+ * free text and closes. A question: his answer (the hub's one /answer path, R41; `here` his thread,
+ * so his row shows there too: inbox picks (3)). A tool call's approval: refused, his text the reason
+ * its agent reads (the hub's answer `deny: <why>`, which closes it). Any other item only its options
+ * decide: his text steers its asker ('now', as typed in its thread) and the item closes. One the hub
+ * closed while he typed: his words to its asker alone (card-draft-keep). Pure: the composer runs
+ * these through the store's one send and card paths.
+ */
+export function cardActs(a: CardAt, out: Outgoing, here: { project: string; agent: string }): readonly FreeAct[] {
+  const parts = out.parts === undefined ? {} : { parts: out.parts };
+  const steer = (to: string): FreeAct => ({ act: 'send', send: { project: a.project, agent: to, text: out.text, mode: 'now', ...parts } });
+  if (a.closed === true && a.asker !== undefined) return [steer(a.asker)];
+  if (a.free === 'deny') return [{ act: 'do', do: { i: 'answer', project: a.project, card: a.card, reply: `deny: ${out.text}`, ...parts } }];
+  if (a.free === 'steer' && a.asker !== undefined) return [steer(a.asker), { act: 'do', do: { i: 'close', project: a.project, card: a.card } }];
+  const from = a.asker === undefined ? {} : { from: { at: here } };
+  return [{ act: 'do', do: { i: 'answer', project: a.project, card: a.card, reply: out.text, ...parts, ...from } }];
 }
 
 /** The inbox block's 'where am i' on bise's own view (no project, no agent: 'esc to bise instead'). */
@@ -508,10 +524,10 @@ export const HERE_BISE = { project: null, agent: null } as const;
 
 /** The card his words answer while the block has one open (an approval: the card his words go
  *  to the asker of, as a message), else none. Pure. */
-export function answerOf(a: { project: string; card?: number; answer: number | null; asker?: string; closed?: boolean; message?: boolean; tip?: string } | null): CardAt | null {
+export function answerOf(a: { project: string; card?: number; answer: number | null; asker?: string; closed?: boolean; free?: 'deny' | 'steer'; tip?: string } | null): CardAt | null {
   if (a === null) return null;
-  // an approval or a choice open: his words go to its asker as a plain message (designer m_26683)
-  if (a.message === true && a.card !== undefined && a.asker !== undefined) return { project: a.project, card: a.card, asker: a.asker, message: true };
+  // an approval or a choice open: his free text refuses or steers, and closes it (his rule m_44704)
+  if (a.free !== undefined && a.card !== undefined && a.asker !== undefined) return { project: a.project, card: a.card, asker: a.asker, free: a.free };
   // closed by the hub while he typed: its draft key stays, his words go to the asker (card-draft-keep)
   if (a.closed === true && a.card !== undefined) return { project: a.project, card: a.card, closed: true, ...(a.asker === undefined ? {} : { asker: a.asker }) };
   if (a.answer === null) return null;

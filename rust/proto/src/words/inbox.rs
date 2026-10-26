@@ -310,10 +310,12 @@ crate::words! { inbox:
     esc_instead(to) = "esc to {to} instead";
     /// the empty composer while his words answer
     answer_placeholder(who, key) = "your answer to {who}, then {key}";
-    /// an item only options decide: his words go to its asker as a message
+    /// an item only options decide: its options, or his free text closes it (his rule m_44704)
     to_waits(who, waits) = "to {who} · {waits}";
-    /// the empty composer then
-    message_placeholder(who) = "write to {who}, then ⏎";
+    /// the empty composer on a tool call's approval: his words refuse it, the reason its agent reads
+    deny_placeholder(who) = "or say no to {who} and why, then ⏎";
+    /// the empty composer on any other item only options decide: his words steer its agent, it closes
+    steer_placeholder(who) = "or write to {who} instead, then ⏎";
     /// the question closed under his words
     to_closed(who) = "to {who} · the question is closed";
     /// bise's own ask (notifications): only its options answer it

@@ -8,8 +8,9 @@
 // click (openInbox({project, card})) opens that item IN PLACE (the block grows, nothing floats over
 // what he reads): its options, 1-9 pick, ←→ walk them, ⌘⏎ the one the keys are on, ⌘⌫ close, ↑↓ the
 // next item, esc folds. It tells the composer under it what his words do (onAnswer): a question takes
-// them as its answer ('↳ answering search · …', 'esc to perf instead'); an approval or a choice item
-// never (ambient m_8773: 'to perf · the merge waits for 1 or 2', his words go as a plain message).
+// them as its answer ('↳ answering search · …', 'esc to perf instead'); every other item takes free
+// text too and closes (his rule m_44704, model.ts freeWords): a tool call's approval is refused with
+// his text as the reason, any other item ('to perf · the merge waits for 1 or 2') steers its agent.
 // Owner: amb-home.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Card, ProjectRow } from '@/proto';
@@ -22,7 +23,7 @@ import { common } from '@/proto/words_common.gen';
 import { age, dotOf, folds, InboxCard, RefusedMark } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey } from './order';
-import { pickWaits, takesWords } from './model';
+import { freeWords, pickWaits, takesWords } from './model';
 import { withRefused, type InboxItem } from './listed';
 import { cardKeyOf, fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
 import { ArtWords } from './artWords';
@@ -56,8 +57,9 @@ export interface Answering {
   /** the hub closed the open card while his words were typed: they stay in its draft and go to
    *  `asker` as a plain message (card-draft-keep) */
   readonly closed?: boolean;
-  /** an approval or a choice is open: his words go to `asker` as a plain message (never an answer) */
-  readonly message?: boolean;
+  /** an item only its options decide is open (model.ts freeWords): his words refuse a tool call's
+   *  approval ('deny', the reason its agent reads), else steer `asker` ('steer'); either way it closes */
+  readonly free?: 'deny' | 'steer';
 }
 
 /** Where the block is: the screen's project and agent (none: bise's view, settings, review…). */
@@ -267,13 +269,16 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
     const end = other === null && who === to ? {} : { end: inbox.esc_instead({ to }) };
     return { project: c.project, card: c.id, label, ...end, answer: c.id, asker: c.agent, placeholder: inbox.answer_placeholder({ who, key: '⏎' }), tip: answerTip(who, to) };
   }
-  // an approval or a choice never takes his words (designer m_26683): typed, they go to its asker as
-  // a plain message, and the label says so ('to perf · the merge waits for 1 or 2'); esc names the
-  // screen's own addressee when it is someone else
+  // an approval or a choice: its options decide it, and his free text closes it too (his rule
+  // m_44704, freeWords): a tool call's approval refused with his text as the reason, any other item
+  // a steer to its asker; the label says what waits ('to perf · the merge waits for 1 or 2'), the
+  // field what his words do; esc names the screen's own addressee when it is someone else
   const waits = pickWaits(c) ?? inbox.waits_options;
   const asker = shownName(c.agent);
   const same = other === null && asker === to;
-  return { project: c.project, card: c.id, label: inbox.to_waits({ who: other ?? asker, waits }), ...(same ? {} : { end: inbox.esc_instead({ to }) }), answer: null, asker: c.agent, message: true, placeholder: inbox.message_placeholder({ who: asker }) };
+  const free = freeWords(c) === 'deny' ? 'deny' : 'steer';
+  const placeholder = free === 'deny' ? inbox.deny_placeholder({ who: asker }) : inbox.steer_placeholder({ who: asker });
+  return { project: c.project, card: c.id, label: inbox.to_waits({ who: other ?? asker, waits }), ...(same ? {} : { end: inbox.esc_instead({ to }) }), answer: null, asker: c.agent, free, placeholder };
 }
 
 /**

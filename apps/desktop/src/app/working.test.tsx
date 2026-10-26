@@ -15,6 +15,8 @@ import { StateMark } from '@/agents/AgentsScreen';
 import { WorkingMark } from './Marks';
 import { AgentEnd, ProjectEndView } from './Sidebar';
 import { AgentSign } from './RightBar';
+import { Store, StoreProvider } from '@/store';
+import { ComposerTab } from '@/thread/ComposerTab';
 
 afterEach(cleanup);
 
@@ -28,7 +30,7 @@ const SURFACES: readonly (readonly [string, () => ReactElement])[] = [
   ['panel overview: an agent row at work', () => <AgentSign mark="works" testId="t" />],
   ['agents and changes pages: a row at work', () => <StateMark a={working} />],
   ['prs page and changes: a dirty or running dot', () => <Dot state="wk" />],
-  ['composer strip (r3-composer): the target at work', () => <WorkingMark />],
+  ['composer strip (r3-composer): the target at work', () => <StoreProvider store={new Store(null)}><ComposerTab words={{ label: 'to perf' }} at={working} testId="t" /></StoreProvider>],
 ];
 
 describe('every working mark is the breath, never an arc', () => {

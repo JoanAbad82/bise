@@ -67,6 +67,18 @@ export function takesWords(c: Pick<Card, 'approval' | 'kind'>): boolean {
   return c.approval !== true && !CHOICE_KINDS.has(c.kind);
 }
 
+/**
+ * What his free text does to an open item (his rule m_44704: every item takes free text instead of
+ * an option, and it closes it): a question's answer; a tool call's approval ('confirm'): its
+ * refusal, his text the reason the agent reads (the hub's `deny: <why>`, the TUI's Enter::Deny);
+ * any other item (a merge, a try, an update, a sign-in, a batch): a steer to its agent, and the
+ * item closes. Pure.
+ */
+export function freeWords(c: Pick<Card, 'approval' | 'kind'>): 'answer' | 'deny' | 'steer' {
+  if (takesWords(c)) return 'answer';
+  return c.kind === 'confirm' ? 'deny' : 'steer';
+}
+
 /** '1', '1 or 2', '1 to 3': the digits that answer n options, in words. Pure. */
 export function digitWords(n: number): string {
   return n <= 1 ? '1' : n === 2 ? inbox.digits_two : inbox.digits_to({ n });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answerFit, answerHead, contextOf, folderName, pinkState, ringTip, stripFit, tabPlace, wordCut, worktreeName } from './tab';
+import { answerFit, answerHead, contextOf, folderName, pinkState, ringTip, stripFit, stripState, tabPlace, wordCut, worktreeName } from './tab';
 
 describe("the composer's one pink state (composer-target A, art-target, agent-target)", () => {
   const base = { answer: null, aboutPink: undefined, about: false, agent: 'perf', voiceTyping: false, otherTip: (a: string) => `to ${a}, not bise` };
@@ -16,7 +16,7 @@ describe("the composer's one pink state (composer-target A, art-target, agent-ta
   });
   it("an open item wins: a question pink with its tip, a closed one or an approval plain, the tab bare", () => {
     expect(pinkState({ ...base, answer: { tip: 'q' }, aboutPink: 'tip' })).toEqual({ pink: true, tip: 'q', bare: true, whole: false, quiet: false });
-    expect(pinkState({ ...base, answer: { message: true } })).toMatchObject({ pink: false, bare: true });
+    expect(pinkState({ ...base, answer: { free: 'deny' } })).toMatchObject({ pink: false, bare: true });
     expect(pinkState({ ...base, answer: { closed: true }, agent: 'main' })).toMatchObject({ pink: false, bare: true });
   });
   it("his words opening with another agent's @name (at-start): its pink, bare, from main's thread too", () => {
@@ -26,18 +26,28 @@ describe("the composer's one pink state (composer-target A, art-target, agent-ta
 });
 
 describe("the composer's context strip (bise fait mac, mockup 1)", () => {
-  const w = { gap: 16, project: 90, place: 80, branch: 120, end: 60 };
+  const w = { gap: 16, project: 90, state: 80, branch: 120, end: 60 };
   it('shows every item when they fit', () => {
-    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 60 + 3 * 16 })).toEqual({ project: true, place: true, end: true });
+    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 60 + 3 * 16 })).toEqual({ project: true, state: true, end: true });
   });
-  it('drops whole items: the right end first, then the place, then the project; the branch stays', () => {
-    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 60 + 3 * 16 - 1 })).toEqual({ project: true, place: true, end: false });
-    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 2 * 16 - 1 })).toEqual({ project: true, place: false, end: false });
-    expect(stripFit({ ...w, avail: 90 + 120 + 16 - 1 })).toEqual({ project: false, place: false, end: false });
-    expect(stripFit({ ...w, avail: 10 })).toEqual({ project: false, place: false, end: false });
+  it('drops whole items: the right end first, then the state, then the project; the branch stays', () => {
+    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 60 + 3 * 16 - 1 })).toEqual({ project: true, state: true, end: false });
+    expect(stripFit({ ...w, avail: 90 + 80 + 120 + 2 * 16 - 1 })).toEqual({ project: true, state: false, end: false });
+    expect(stripFit({ ...w, avail: 90 + 120 + 16 - 1 })).toEqual({ project: false, state: false, end: false });
+    expect(stripFit({ ...w, avail: 10 })).toEqual({ project: false, state: false, end: false });
   });
   it('an item that is not there takes no room and no gap', () => {
-    expect(stripFit({ gap: 16, project: 0, place: 80, branch: 120, end: 60, avail: 80 + 120 + 60 + 2 * 16 })).toEqual({ project: true, place: true, end: true });
+    expect(stripFit({ gap: 16, project: 0, state: 80, branch: 120, end: 60, avail: 80 + 120 + 60 + 2 * 16 })).toEqual({ project: true, state: true, end: true });
+  });
+  it("the addressee's state (his m_44719): waits on him first, then its turn's length; idle says nothing", () => {
+    const a = { status: 'working', waits: 0, since_ms: 1_000, turn_ms: 180_000 };
+    expect(stripState(a, 9_000)).toEqual({ kind: 'working', ms: 180_000 });
+    expect(stripState({ ...a, turn_ms: null }, 9_000)).toEqual({ kind: 'working', ms: 8_000 });
+    expect(stripState({ ...a, waits: 1 }, 9_000)).toEqual({ kind: 'waits' });
+    expect(stripState({ ...a, status: 'idle', waiting_on: { who: 'you' } }, 9_000)).toEqual({ kind: 'waits' });
+    expect(stripState({ ...a, status: 'idle' }, 9_000)).toBeNull();
+    expect(stripState({ ...a, status: 'stopped' }, 9_000)).toBeNull();
+    expect(stripState(undefined, 9_000)).toBeNull();
   });
   it("says where it works by its folder's name: a worktree after the ψ, his checkout bare, nothing for bise's own main (his m_24782)", () => {
     const t = (p: string) => p.replace('/Users/g', '~');

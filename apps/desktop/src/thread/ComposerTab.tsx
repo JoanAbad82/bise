@@ -5,16 +5,20 @@
 // nothing to pick (native-lead m_42159: a picker only where a real choice exists). On the right
 // the context ring, or the screen's own words ('esc to bise instead', the approvals flash). His
 // words answering a card (or another agent's @name, an open artifact): the label alone in the
-// accent, '↳ answering search · …' (answerFit). Items that don't fit go whole (tab.ts stripFit),
+// accent, '↳ answering search · …' (answerFit). His words to an agent that is not main: 'to perf'
+// first, in the accent, always kept (his ask m_44704). Items that don't fit go whole (tab.ts stripFit),
 // measured on a resize or new words, never per keystroke (the composer is memoised). Owner:
 // nm-composer.
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Agent } from '@/proto';
-import { AppIcon, PickerPop, PickerTrigger, Ring, tipAttrs } from '@/ds';
+import { AppIcon, PickerPop, PickerTrigger, Ring, RowMark, tipAttrs } from '@/ds';
 import { useFlow, usePlaces, useProjects } from '@/store';
 import { placeOf as placeOfAgent, tilde, worktreeParts } from '@/app/barplaces';
+import { WorkingMark } from '@/app/Marks';
+import { useNow } from '@/app/clock';
 import { composer } from '../proto/words.gen';
-import { answerFit, contextOf, RING_CLEAR_PCT, ringTip, stripFit, tabPlace, type StripFit, type TabPlace, type TabWords } from './tab';
+import { answerFit, contextOf, RING_CLEAR_PCT, ringTip, stripFit, stripState, tabPlace, type StripFit, type TabPlace, type TabWords } from './tab';
+import { waitLen } from './wake';
 
 /** his home folder, for '~/…' in the tips (main's window.bise.home) */
 const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
@@ -47,7 +51,7 @@ export interface StripProject {
   readonly onPick?: ((project: string) => void) | undefined;
 }
 
-const ALL: StripFit = { project: true, place: true, end: true };
+const ALL: StripFit = { project: true, state: true, end: true };
 /** The room a notice at the strip's right keeps at least (Composer's NoticeLine cuts its words to the rest). */
 const NOTICE_ROOM = 160;
 
@@ -145,8 +149,10 @@ function ProjectItem({ project, shown, testId }: { project: StripProject; shown:
   );
 }
 
-export function ComposerTab({ words, mark, end, project, bare = false, newPlace = false, testId }: {
+export function ComposerTab({ words, mark, end, project, bare = false, newPlace = false, to = false, at, testId }: {
   words: TabWords;
+  /** his words go to an agent that is not main (pinkState's quiet): the label first, in the accent */
+  to?: boolean;
   /** after the label's first part (bare): the addressee's working gust */
   mark?: ReactNode;
   /** the right end instead of the context ring */
@@ -155,11 +161,16 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   project?: StripProject | undefined;
   /** the label alone (answering, an @name, an open artifact): no project, place or branch */
   bare?: boolean;
-  /** the empty home: the place is 'new worktree' (main starts agents in one) */
+  /** the empty home: the branch is the project's own (main starts its worktrees from it) */
   newPlace?: boolean;
+  /** the addressee's row: its state while it runs (tab.ts stripState); none or idle: nothing said */
+  at?: Agent | undefined;
   testId: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
+  // the strip's own minute clock: 'working · 3 min' moves, the memoised field above never redraws
+  const now = useNow();
+  const state = bare ? null : stripState(at, now);
   // the empty home: the project's own branch (where main starts its worktrees from)
   const projectBranch = useProjects().find((p) => p.project === project?.id)?.branch ?? undefined;
   const flow = useFlow(project?.id ?? '');
@@ -171,7 +182,7 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   const context = words.context ?? '';
   const ring = contextOf(context);
   const place = words.place;
-  const key = `${words.label}|${place?.name ?? '-'}|${place?.branch ?? ''}|${project?.id ?? ''}|${context}|${end === undefined ? '' : 'end'}|${bare ? 'b' : ''}`;
+  const key = `${words.label}|${place?.name ?? '-'}|${place?.branch ?? ''}|${project?.id ?? ''}|${context}|${end === undefined ? '' : 'end'}|${bare ? 'b' : ''}|${to ? 't' : ''}`;
   useLayoutEffect(() => {
     const host = ref.current?.closest<HTMLElement>('.head');
     if (host == null) return;
@@ -198,9 +209,11 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
         return;
       }
       setEndIn(true);
-      const w = { project: nat(q('[data-item="project"]')), place: nat(q('[data-item="place"]')), branch: nat(q('[data-item="branch"]')), end: nat(q('[data-item="end"]')) };
-      const next = stripFit({ avail: inner, gap, ...w });
-      setFit((f) => (f.project === next.project && f.place === next.place && f.end === next.end ? f : next));
+      const w = { project: nat(q('[data-item="project"]')), state: nat(q('[data-item="state"]')), branch: nat(q('[data-item="branch"]')), end: nat(q('[data-item="end"]')) };
+      // 'to perf' always stays: the rest fits in what it leaves
+      const toEl = q('[data-item="to"]');
+      const next = stripFit({ avail: inner - (toEl === null ? 0 : nat(toEl) + gap), gap, ...w });
+      setFit((f) => (f.project === next.project && f.state === next.state && f.end === next.end ? f : next));
       // the label is only drawn bare; a plain strip never cuts one
       setCut((c) => (c === null ? c : null));
     };
@@ -211,7 +224,7 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
     return () => {
       ro.disconnect();
     };
-  }, [key, words.label, words.whole, bare]);
+  }, [key, words.label, words.whole, bare, to]);
   const endEl =
     end !== undefined ? (
       <span className={endIn && fit.end ? 'end' : 'end gone'} data-item="end" data-testid={`${testId}.end`} aria-hidden={!(endIn && fit.end) || undefined}>
@@ -245,12 +258,20 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   const lands = flow === 'trunk' && branch !== undefined ? composer.ctx_lands({ branch: projectBranch ?? 'main' }) : null;
   return (
     <span ref={ref} className="cmp-ctx" data-testid={testId}>
+      {/* his words go to an agent that is not main: 'to perf' first, in the accent, as main's tab
+          had it (agent-target, designer m_28208; his ask m_44704: clear at a glance) */}
+      {to && (
+        <span className="it to" data-item="to" data-testid={`${testId}.to`}>
+          <span className="nm">{words.label}</span>
+        </span>
+      )}
       {project !== undefined && <ProjectItem project={project} shown={fit.project} testId={testId} />}
-      {(newPlace || place !== undefined) && (
-        <span className={fit.place ? 'it' : 'it gone'} data-item="place" data-testid={`${testId}.place`}
-          {...tipAttrs(newPlace ? composer.ctx_new_worktree_tip : place?.tip)} aria-hidden={!fit.place || undefined}>
-          <AppIcon name="place" size={14} />
-          <span className="nm">{newPlace ? composer.ctx_new_worktree : place?.worktree === true ? composer.ctx_worktree : composer.ctx_local}</span>
+      {/* where 'local' was (his m_44719: the only option, no control): the addressee's state while
+          it runs, main's breath and how long, or the ask mark in the accent; nothing when idle */}
+      {state !== null && (
+        <span className={fit.state ? 'it st' : 'it st gone'} data-item="state" data-state={state.kind} data-testid={`${testId}.state`} aria-hidden={!fit.state || undefined}>
+          {state.kind === 'working' ? <WorkingMark testId={`${testId}.state.mark`} /> : <RowMark icon="ask" tone="accent" label={composer.ctx_waits} />}
+          <span className="nm">{state.kind === 'working' ? composer.ctx_working({ dur: waitLen(state.ms) }) : composer.ctx_waits}</span>
         </span>
       )}
       {branch !== undefined && (

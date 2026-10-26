@@ -182,6 +182,13 @@
     "one": null,
     "text": "yesterday"
   },
+  "inbox.deny_placeholder": {
+    "args": [
+      "who"
+    ],
+    "one": null,
+    "text": "or say no to {who} and why, then ⏎"
+  },
   "inbox.detail_asked": {
     "args": [
       "agent",
@@ -503,13 +510,6 @@
     "one": null,
     "text": "{agent} asked: {question}"
   },
-  "inbox.message_placeholder": {
-    "args": [
-      "who"
-    ],
-    "one": null,
-    "text": "write to {who}, then ⏎"
-  },
   "inbox.more_files": {
     "args": [
       "n"
@@ -770,6 +770,13 @@
     "args": [],
     "one": null,
     "text": "Withdrawn"
+  },
+  "inbox.steer_placeholder": {
+    "args": [
+      "who"
+    ],
+    "one": null,
+    "text": "or write to {who} instead, then ⏎"
   },
   "inbox.the_branch": {
     "args": [],

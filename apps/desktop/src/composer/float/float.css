@@ -74,6 +74,11 @@
   font: inherit;
   color: inherit;
 }
+/* 'to perf ⌄': his words go to an agent that is not main, in the accent (his ask m_44704) */
+.cmp-float .hd .cmp-float-to.other {
+  color: var(--c-accent);
+  font-weight: 600;
+}
 /* an inbox item open here: its label; in the accent only while his words answer its question (an
    approval waits for its buttons: his words go as a plain message) */
 .cmp-float .hd .cmp-float-ans {
