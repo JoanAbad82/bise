@@ -60,7 +60,7 @@ export function useAddPlace(project: string): AddPlace | null {
 }
 
 /** '+ add' in a list's head: the picker, then each picked file to the place. Hidden without the bridge's picker. */
-export function AddButton({ place, testId, labeled = false }: { place: AddPlace | null; testId: string; labeled?: boolean }) {
+export function AddButton({ place, testId, labeled = false, tip: tipOwn }: { place: AddPlace | null; testId: string; labeled?: boolean; tip?: string }) {
   const store = useStore();
   const pick = bridge()?.pickFiles;
   const onClick = useCallback(() => {
@@ -70,7 +70,8 @@ export function AddButton({ place, testId, labeled = false }: { place: AddPlace 
     });
   }, [place, pick, store]);
   if (pick === undefined) return null;
-  const tip = place === null ? library.add_files : addTitle(place);
+  // its own tip when the page gives one (the artifacts toolbar's), else where the files go
+  const tip = tipOwn ?? (place === null ? library.add_files : addTitle(place));
   // the empty state's action, in words; in the window's bar, the + alone (mockup 7) with its tip
   return labeled ? (
     <Button kind="ghost" size="sm" disabled={place === null} onClick={onClick} testId={testId}>{library.add_files}</Button>

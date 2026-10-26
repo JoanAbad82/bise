@@ -17,7 +17,7 @@ import type { ArtLink } from '@/proto/rows';
 import { aboutOf, aboutWords } from './about';
 import { inbox } from '@/proto/words_inbox.gen';
 import { common } from '@/proto/words_common.gen';
-import { Act, ArtChip, Kbd, tipAttrs } from '@/ds';
+import { Act, ArtChip, Kbd, RowMark, tipAttrs, type AppIconName } from '@/ds';
 import { refusedLine, useStore } from '@/store';
 import type { InboxItem } from './listed';
 import { cardKey } from './order';
@@ -135,8 +135,8 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
       }
     >
       <div className="ic-h">
-        <span className="ic-g" data-tone={glyph.tone} aria-hidden="true" data-testid={`${id}.g`}>
-          {glyph.g}
+        <span className="ic-g" data-testid={`${id}.g`}>
+          <RowMark icon={glyph.icon} tone={glyph.tone} label={glyph.label} />
         </span>
         <b>{titleOf(card)}</b>
         {home !== true && <span className="ic-p" data-testid={`${id}.project`}>{`· ${where}`}</span>}
@@ -282,12 +282,12 @@ export function idTip(id: number): string | undefined {
   return id < 0 ? undefined : inbox.card_id_tip({ id });
 }
 
-/** The card head's glyph, its row's mark (model markOf; designer m_45259): '?' in the accent for
- * anything that asks him, an approval too (its words say it, never a '!'); '✗' in err for a failure
- * that asks nothing; '✓' for a report that asks nothing else. Pure. */
-export function glyphOf(c: CardRow): { readonly g: string; readonly tone: 'acc' | 'err' | 'ok' } {
+/** The card head's mark, its row's in one form (model markOf; designer m_45259, m_45334): the
+ * circled ? icon in the accent for anything that asks him, an approval too (its words say it, never
+ * a '!'); ✗ in err for a failure that asks nothing; ✓ in ok for a report that asks nothing else. Pure. */
+export function glyphOf(c: CardRow): { readonly icon: AppIconName; readonly tone: 'accent' | 'err' | 'ok'; readonly label: string } {
   const m = markOf(c);
-  return m === 'ask' ? { g: '?', tone: 'acc' } : m === 'fail' ? { g: '✗', tone: 'err' } : { g: '✓', tone: 'ok' };
+  return m === 'ask' ? { icon: 'ask', tone: 'accent', label: 'question' } : m === 'fail' ? { icon: 'close', tone: 'err', label: 'failed' } : { icon: 'check', tone: 'ok', label: 'done' };
 }
 
 /** A long question's first lines (bar I8): more than FOLD_AT lines show

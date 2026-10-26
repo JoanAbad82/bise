@@ -77,16 +77,19 @@ describe("the card head: one mark, no id (designer m_45259, m_45255)", () => {
       </StoreProvider>,
     );
 
-  it("an approval reads '?' in the accent as its row does, never '!'", () => {
+  const mark = () => screen.getByTestId('h.g').querySelector('.b-rowmark');
+
+  it("an approval reads the circled ? icon in the accent, the rows' own form, never '!' (designer m_45334)", () => {
     head({ ...card, kind: 'confirm', approval: true });
-    expect(screen.getByTestId('h.g').textContent).toBe('?');
-    expect(screen.getByTestId('h.g').dataset['tone']).toBe('acc');
+    expect(mark()?.getAttribute('data-icon')).toBe('ask');
+    expect(mark()?.getAttribute('data-tone')).toBe('accent');
+    expect(screen.getByTestId('h.g').textContent).toBe('');
   });
 
   it('a failure that asks nothing reads ✗ in err', () => {
     head({ ...card, kind: 'failed', options: [] });
-    expect(screen.getByTestId('h.g').textContent).toBe('✗');
-    expect(screen.getByTestId('h.g').dataset['tone']).toBe('err');
+    expect(mark()?.getAttribute('data-icon')).toBe('close');
+    expect(mark()?.getAttribute('data-tone')).toBe('err');
   });
 
   it("the age alone, the hub's number in its tip only", () => {

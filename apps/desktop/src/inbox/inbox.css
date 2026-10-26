@@ -45,10 +45,8 @@
    cap is back (qa-native 9108fdae: the 16 lines were in the DOM, the card stayed 396 px) */
 .ic.whole { max-height: calc(100vh - 260px); }
 .ic-h { display: flex; align-items: baseline; gap: var(--gap-inline); min-width: 0; font-size: var(--t-12); color: var(--c-text-2); flex: none; }
-.ic-g { flex: none; font: 600 12px var(--font-mono); color: var(--c-accent); }
-/* its row's mark (model markOf, designer m_45259): a failure that asks nothing in err, a report in ok */
-.ic-g[data-tone='err'] { color: var(--c-err); }
-.ic-g[data-tone='ok'] { color: var(--c-ok); }
+/* its row's mark in the same form, the ds RowMark icon (model markOf, designer m_45259, m_45334) */
+.ic-g { flex: none; display: inline-flex; align-self: center; }
 .ic-h b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--c-text); }
 .ic-p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ic-k { flex: none; margin-left: auto; color: var(--c-text-3); }
