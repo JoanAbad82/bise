@@ -76,13 +76,18 @@ const fit = (page: Page, p: Place): Promise<Fit> =>
     };
   }, p);
 
-/** The app on the fixture world, its window at w x h. */
-async function open(p: Place, w: number, h: number): Promise<Session> {
-  const s = await launchDesktop({ core: new FakeCore(world()), route: p.route, env: { BISE_DESKTOP_TEST_CLIPBOARD: path.join(FIXTURES, '200-lines.txt') } });
+/** The window's content at w x h. */
+async function resize(s: Session, w: number, h: number): Promise<void> {
   await s.app.evaluate(({ BrowserWindow }, size) => {
     BrowserWindow.getAllWindows().find((b) => b.webContents.getURL().includes('surface=window'))?.setContentSize(size.w, size.h);
   }, { w, h });
   await expect.poll(() => s.page.evaluate(() => [window.innerWidth, window.innerHeight]), { timeout: 5000 }).toEqual([w, h]);
+}
+
+/** The app on the fixture world, its window at w x h. */
+async function open(p: Place, w: number, h: number): Promise<Session> {
+  const s = await launchDesktop({ core: new FakeCore(world()), route: p.route, env: { BISE_DESKTOP_TEST_CLIPBOARD: path.join(FIXTURES, '200-lines.txt') } });
+  await resize(s, w, h);
   return s;
 }
 
@@ -135,6 +140,19 @@ for (const [p, w, h, pastes] of CASES) {
         expect.soft(f.plus !== null && f.send !== null && Math.abs(f.plus.top - f.send.top) < 8 && f.plus.top >= f.fieldBottom && f.plus.right < f.send.left, "'+' and send on one row under his words, '+' at the left").toBe(true);
         expect.soft(f.field.client, 'his field keeps 4 lines at least').toBeGreaterThanOrEqual(4 * 22 - 1);
         expect.soft(f.more, "the list cut to 2 rows says how many it hid").toBe(pastes > 2 ? `+ ${String(pastes - 2)} more` : null);
+        // designer m_45779: the inbox's other lines fold at 720 and come back as soon as there is
+        // room, when the window grows or when his draft empties (a send empties it)
+        const head = page.locator(`${p.root} .inbox-block .strip-title`);
+        const shown = (): Promise<number> => head.evaluate((e) => (e as HTMLElement).offsetHeight);
+        expect.soft(await shown(), "at 720 the inbox's head is folded").toBe(0);
+        await resize(s, w, 1100);
+        await expect.poll(shown, { timeout: 3000, message: "the window grows: the inbox's head is back" }).toBeGreaterThan(0);
+        await resize(s, w, h);
+        await expect.poll(shown, { timeout: 3000, message: 'back at 720: folded again' }).toBe(0);
+        await field.click();
+        await page.keyboard.press('Meta+A');
+        await page.keyboard.press('Backspace');
+        await expect.poll(shown, { timeout: 3000, message: "his draft emptied: the inbox's head is back" }).toBeGreaterThan(0);
       }
     } finally {
       await s.close();
