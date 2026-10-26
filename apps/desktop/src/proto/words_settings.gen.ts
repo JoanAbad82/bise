@@ -338,8 +338,8 @@ export const settings = {
   project_rename: "rename",
   /** a project's remove, asked once */
   project_remove_ask: (a: { name: string | number }): string => "remove " + String(a.name) + " from bise? its folder and its git history stay.",
-  /** the add button; the add sheet's head */
-  add_project: "add a project",
+  /** the add sheet's head (chrome: sentence case, designer m_43052) */
+  add_project: "Add a project",
   /** the projects page's add button, under the list (designer m_41841) */
   add_project_more: "Add a project…",
   /** a project row's ⋯: its name in words (aria-label, tip) */
@@ -347,13 +347,13 @@ export const settings = {
   /** the add sheet's line under its head */
   add_sub: "a folder, a git repo. its main starts right away.",
   /** the add sheet's cancel */
-  add_cancel: "cancel",
+  add_cancel: "Cancel",
   /** the add sheet's path field */
   add_path: "a folder's path",
   /** the add sheet's folder panel */
-  add_choose: "choose…",
+  add_choose: "Choose…",
   /** the add sheet: look in his folders again */
-  add_rescan: "look again",
+  add_rescan: "Look again",
   /** the add sheet's switch */
   add_land: "main may land on main",
   /** the add sheet's switch, on */
@@ -373,11 +373,11 @@ export const settings = {
   /** the scan under way */
   scan_looking: "looking in your folders…",
   /** the add button, nothing to add */
-  add: "add",
+  add: "Add",
   /** the add button, one project */
-  add_one: (a: { name: string | number }): string => "add " + String(a.name),
+  add_one: (a: { name: string | number }): string => "Add " + String(a.name),
   /** the add button, projects */
-  add_many: (a: { n: string | number }): string => "add " + String(a.n) + " projects",
+  add_many: (a: { n: string | number }): string => "Add " + String(a.n) + " projects",
   /** the add refused */
   add_failed: (a: { names: string | number; why: string | number }): string => "▲ couldn't add " + String(a.names) + ": " + String(a.why),
   /** the core didn't answer the add */

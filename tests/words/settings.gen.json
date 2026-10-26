@@ -3,7 +3,7 @@
   "settings.add": {
     "args": [],
     "one": null,
-    "text": "add"
+    "text": "Add"
   },
   "settings.add_broken": {
     "args": [
@@ -15,12 +15,12 @@
   "settings.add_cancel": {
     "args": [],
     "one": null,
-    "text": "cancel"
+    "text": "Cancel"
   },
   "settings.add_choose": {
     "args": [],
     "one": null,
-    "text": "choose…"
+    "text": "Choose…"
   },
   "settings.add_failed": {
     "args": [
@@ -50,7 +50,7 @@
       "n"
     ],
     "one": null,
-    "text": "add {n} projects"
+    "text": "Add {n} projects"
   },
   "settings.add_no_answer": {
     "args": [
@@ -65,7 +65,7 @@
       "name"
     ],
     "one": null,
-    "text": "add {name}"
+    "text": "Add {name}"
   },
   "settings.add_path": {
     "args": [],
@@ -75,7 +75,7 @@
   "settings.add_project": {
     "args": [],
     "one": null,
-    "text": "add a project"
+    "text": "Add a project"
   },
   "settings.add_project_more": {
     "args": [],
@@ -85,7 +85,7 @@
   "settings.add_rescan": {
     "args": [],
     "one": null,
-    "text": "look again"
+    "text": "Look again"
   },
   "settings.add_sub": {
     "args": [],
@@ -1489,6 +1489,11 @@
     "one": null,
     "text": "open the item's folded lines"
   },
+  "settings.key_panel": {
+    "args": [],
+    "one": null,
+    "text": "show / hide the panel"
+  },
   "settings.key_paste": {
     "args": [],
     "one": null,
@@ -1553,6 +1558,11 @@
     "args": [],
     "one": null,
     "text": "settings"
+  },
+  "settings.key_sidebar": {
+    "args": [],
+    "one": null,
+    "text": "show / hide the sidebar"
   },
   "settings.key_skill": {
     "args": [],

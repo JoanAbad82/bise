@@ -5,6 +5,11 @@
     "one": null,
     "text": "Add files"
   },
+  "library.add_tip": {
+    "args": [],
+    "one": null,
+    "text": "add files… · or drop them on the list"
+  },
   "library.all_artifacts": {
     "args": [],
     "one": null,

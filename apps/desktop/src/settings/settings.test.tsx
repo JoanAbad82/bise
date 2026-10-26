@@ -250,6 +250,20 @@ describe('Settings', () => {
     ]);
   });
 
+  it('the add sheet: its chrome in sentence case, the scan head never in capitals (designer m_43052, ui-review m_45318)', () => {
+    view('projects', ports(), {}, storeWith());
+    fireEvent.click(screen.getByTestId('settings.project.add'));
+    const sheet = screen.getByTestId('settings.add');
+    expect(sheet.textContent).toContain('Add a project');
+    expect(screen.getByTestId('settings.add.cancel').textContent).toBe('Cancel');
+    expect(screen.getByTestId('settings.add.go').textContent).toMatch(/^Add\b/u);
+    // a state's words, sentence-cased as the head: 'Looking in your folders…', 'Found in your folders · 2'
+    const head = screen.getByTestId('settings.add.scan').textContent;
+    expect(head.charAt(0)).toBe(head.charAt(0).toUpperCase());
+    expect(head).not.toBe(head.toUpperCase());
+    expect(screen.getByTestId('settings.add.scan').className).toBe('settings-add-scan');
+  });
+
   it('keys: every row of the table shows, no key twice in a section', () => {
     view('keys');
     for (const s of KEY_SECTIONS) {

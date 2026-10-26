@@ -23,9 +23,10 @@ describe("the add sheet's waits never spin forever (ambient-lead m_18490)", () =
   });
 
   it('the primary says what it adds', () => {
-    expect(addLabel([])).toBe('add');
-    expect(addLabel(['/Users/camille/code/shop/'])).toBe('add shop');
-    expect(addLabel(['/a/x', '/a/y'])).toBe('add 2 projects');
+    // a button: sentence case (designer m_43052)
+    expect(addLabel([])).toBe('Add');
+    expect(addLabel(['/Users/camille/code/shop/'])).toBe('Add shop');
+    expect(addLabel(['/a/x', '/a/y'])).toBe('Add 2 projects');
   });
 
   it("an added path is its row: the same path, or a new row with the folder's name (the core's canonical path)", () => {

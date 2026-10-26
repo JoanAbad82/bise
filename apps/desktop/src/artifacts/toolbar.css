@@ -20,5 +20,8 @@
 .art-scroll > .b-banner{margin-bottom:var(--gap-block)}
 /* every line of the list on the cards' left edge: the no-match Empty too (designer m_45293) */
 .art-main .b-empty{padding-inline:0}
+/* under 900 the library's crumb leads the row: its words on the list's edge at rest, its hover tint
+   bleeding left (designer m_45342) */
+.art-toolbar .art-fold-crumb{margin-left:calc(var(--s-2) * -1)}
 /* the archived ones: a faint row under the list (as the window's panel and the TUI) */
 .art-archived-row{display:flex;margin:var(--s-4) 0 0}

@@ -2,7 +2,7 @@
 // 'desktop app / agent view ▾' opens a popover with the same rows and keys (the column itself, as
 // its child). A press outside or esc closes it; going somewhere closes it too. Owner: art-folders.
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Press, tipAttrs } from '@/ds';
+import { Caret, Press, tipAttrs } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 
 /** Below this window width the column folds into the crumb. */
@@ -52,7 +52,7 @@ export function FoldCrumb({ label, children, testId }: { label: string; children
   return (
     <span ref={box} className="art-fold">
       <Press look="art-fold-crumb" aria-expanded={open} onClick={() => { setOpen(!open); }} data-testid={testId} {...tipAttrs(library.tip_crumb)}>
-        {label} <span className="caret" aria-hidden="true">▾</span>
+        {label} <span className="caret"><Caret /></span>
       </Press>
       {open && (
         <span className="art-fold-pop" data-testid={`${testId}.pop`}>

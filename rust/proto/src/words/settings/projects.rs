@@ -20,8 +20,8 @@ crate::words! { settings:
     project_rename = "rename";
     /// a project's remove, asked once
     project_remove_ask(name) = "remove {name} from bise? its folder and its git history stay.";
-    /// the add button; the add sheet's head
-    add_project = "add a project";
+    /// the add sheet's head (chrome: sentence case, designer m_43052)
+    add_project = "Add a project";
     /// the projects page's add button, under the list (designer m_41841)
     add_project_more = "Add a project…";
     /// a project row's ⋯: its name in words (aria-label, tip)
@@ -30,13 +30,13 @@ crate::words! { settings:
     /// the add sheet's line under its head
     add_sub = "a folder, a git repo. its main starts right away.";
     /// the add sheet's cancel
-    add_cancel = "cancel";
+    add_cancel = "Cancel";
     /// the add sheet's path field
     add_path = "a folder's path";
     /// the add sheet's folder panel
-    add_choose = "choose…";
+    add_choose = "Choose…";
     /// the add sheet: look in his folders again
-    add_rescan = "look again";
+    add_rescan = "Look again";
     /// the add sheet's switch
     add_land = "main may land on main";
     /// the add sheet's switch, on
@@ -56,11 +56,11 @@ crate::words! { settings:
     /// the scan under way
     scan_looking = "looking in your folders…";
     /// the add button, nothing to add
-    add = "add";
+    add = "Add";
     /// the add button, one project
-    add_one(name) = "add {name}";
+    add_one(name) = "Add {name}";
     /// the add button, projects
-    add_many(n) = "add {n} projects";
+    add_many(n) = "Add {n} projects";
     /// the add refused
     add_failed(names, why) = "▲ couldn't add {names}: {why}";
     /// the core didn't answer the add

@@ -1,9 +1,11 @@
 // The add-a-project sheet (designer's signed S11 v2 shot 19, ambient-lead m_18490): the ds Sheet,
 // a modal over the dimmed window, the same from settings › projects and from the sidebar's
-// '+ add a project' / ⌘N. Its head 'add a project' and sub; the path Field and 'choose…' (the
-// system's folder panel, window.bise.pickFolder); FOUND IN YOUR FOLDERS, the repos found_scan
+// '+ add a project' / ⌘N. Its head 'Add a project' and sub; the path Field and 'Choose…' (the
+// system's folder panel, window.bise.pickFolder); 'Found in your folders · 2', the repos found_scan
 // found, each with its Check; the Toggle 'main may land on main' (the repo's flow mode); the foot:
-// cancel, and the primary that says what it adds ('add shop', 'add 2 projects').
+// Cancel, and the primary that says what it adds ('Add shop', 'Add 2 projects'). Chrome in sentence
+// case, bise's sentences lowercase (designer m_43052): the scan's words are states (the first
+// launch says them too), the head sentence-cases them, never in capitals.
 // Neither wait spins forever (his real-home try: the scan never ended, add did nothing): the scan's
 // head counts the seconds, then says what it found, the core's refusal, its broken state, or that
 // it didn't answer, with 'look again'; add says 'adding shop…', then closes once the project is in
@@ -11,7 +13,7 @@
 // add.ts's (pure). Every change is the core's (project_add, found_scan). Owner: amb-home.
 import { useCallback, useEffect, useState } from 'react';
 import type { AppCmd, ProjectRow } from '@/proto';
-import { Act, Button, Check, Field, Group, Sheet } from '@/ds';
+import { Act, Button, Check, Field, Group, Sheet, sentenceCase } from '@/ds';
 import { useBroken, useCoreEvent, useFound, useProjects, type Ev } from '@/store';
 import { settings } from '@/proto/words.gen';
 import { addLabel, addPaths, addSay, foundSub, offers, scanSay } from './add';
@@ -124,7 +126,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
 
   const scanHead = (
     <span className="settings-add-scan" data-testid="settings.add.scan" data-state={said.kind}>
-      <span className={said.kind === 'failed' ? 'err' : undefined}>{said.text}</span>
+      <span className={said.kind === 'failed' ? 'err' : undefined}>{said.kind === 'failed' ? said.text : sentenceCase(said.text)}</span>
       {said.kind === 'failed' && (
         <Act onClick={again} testId="settings.add.rescan">
           {settings.add_rescan}

@@ -181,6 +181,8 @@ crate::words! { library:
     search_placeholder = "search artifacts";
     /// the toolbar's one menu when the page is narrow (the kinds and the projects folded in it)
     filters = "Filters";
+    /// the toolbar's + : its tip (designer m_45148)
+    add_tip = "add files… · or drop them on the list";
     /// no result: the empty page's title, `nothing matches “dark”.`
     nothing_matches(q) = "nothing matches “{q}”.";
     /// no result: clear the words

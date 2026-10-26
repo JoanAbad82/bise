@@ -400,7 +400,7 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       view={view} onView={setView}
       q={q} onQ={(e) => { setQ(e.currentTarget.value); }} onQKey={searchKey}
       onClear={() => { setQ(''); searchRef.current?.focus(); }} searchRef={searchRef}
-      add={<AddButton place={place_} testId="artifacts.add" />}
+      add={<AddButton place={place_} tip={library.add_tip} testId="artifacts.add" />}
       scroller={scrollEl} />
   );
   // the archived ones: a faint row under the list, as the window's panel and the TUI (designer m_45148)
