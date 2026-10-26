@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { Plugin, PluginPart, PluginsSummary } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
 import { settings } from '@/proto/words.gen';
-import { badgeOf, bandCells, bandWords, controlOf, gives, groupsOf, hitOf, kindCounts, lineOf, newKey, removable, sideOf, waitsWords } from './model';
+import { badgeOf, bandCells, bandWords, controlOf, gives, groupsOf, hitOf, kindCounts, leadOf, lineOf, newKey, removable, sideOf, waitsWords } from './model';
 import { isNew, markSeen, seenKey, type SeenStore } from './seen';
 
 const row = (id: string, more: Partial<Plugin> = {}): Plugin => ({ id, name: id, kind: 'plugin', scope: 'user', title: id, state: 'loaded', on: true, ...more });
@@ -137,5 +137,15 @@ describe('the summary', () => {
     expect(bandCells(2, 2)).toEqual({ shown: 2, more: 0 });
     expect(bandCells(1, 1)).toEqual({ shown: 1, more: 0 });
     expect(bandCells(0, 0)).toEqual({ shown: 0, more: 0 });
+  });
+});
+
+describe('a lead', () => {
+  it('ends with a period, but not after a path or an address (designer m_44086)', () => {
+    expect(leadOf("bise's own skills")).toBe("bise's own skills.");
+    expect(leadOf('done already.')).toBe('done already.');
+    expect(leadOf('')).toBe('');
+    expect(leadOf('linear from ~/.agents/plugins/linear')).toBe('linear from ~/.agents/plugins/linear');
+    expect(leadOf('served by mcp.linear.app')).toBe('served by mcp.linear.app');
   });
 });

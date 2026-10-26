@@ -307,8 +307,11 @@ export function foundWords(x: PluginSuggest | undefined): string | null {
 }
 
 /** A lead as a sentence: ends with its period ('bise's own skills' → 'bise's own skills.'; designer
- *  m_43933: every lead ends with one); '' stays ''. Pure. */
+ *  m_43933: every lead ends with one), but not after a path or an address ('~/.agents/plugins/linear',
+ *  'mcp.linear.app': a period would read as part of it; designer m_44086); '' stays ''. Pure. */
 export function leadOf(s: string): string {
   const t = s.trimEnd();
-  return t === '' || /[.!?…:]$/u.test(t) ? t : `${t}.`;
+  const last = t.split(/\s/u).at(-1) ?? '';
+  const pathy = last.includes('/') || last.startsWith('~') || /^[\w-]+(\.[\w-]+)+$/u.test(last);
+  return t === '' || pathy || /[.!?…:]$/u.test(t) ? t : `${t}.`;
 }

@@ -69,7 +69,7 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
         // never a lone badge in the box's corner (designer m_44023 #4)
         facts={<span data-testid={`${tid}.facts`}>
           {[gives(p), c.kind === 'locked' ? settings.plugins_always_on : '', off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}
-          {badge === '?' && <>{' · '}<BannerWait>?</BannerWait>{` ${settings.plugins_part_needs_login}`}</>}
+          {badge === '?' && <>{' · '}<BannerWait><AppIcon name="ask" size={14} /></BannerWait>{` ${settings.plugins_part_needs_login}`}</>}
           {badge === '✗' && <>{' · '}<span className="plg-err">{`✗ ${settings.plugins_badge_failed}`}</span></>}
         </span>}
         visual={<PluginIcon row={p} size="head" {...(project === undefined ? {} : { project })} {...(isComputer(p) ? { lit: true } : {})} />} />
@@ -211,7 +211,8 @@ function ServerRow({ x, owner, onSet, onLogin }: { x: PluginPart; owner: boolean
   return (
     <>
       <div className={`plg-row part${x.on ? '' : ' off'}`} data-testid={`plugins.part.${x.id}`}>
-        <span className="plg-lead">≡</span>
+        {/* no text glyph as its mark (ui-review m_44085): its lead column stays, empty */}
+        <span className="plg-lead" aria-hidden="true" />
         <span className="plg-row-words">
           <span className="plg-row-name"><span className="plg-title">{x.name}</span>{x.what != null && <span className="plg-dim">{x.what}</span>}</span>
           {x.error != null ? (
