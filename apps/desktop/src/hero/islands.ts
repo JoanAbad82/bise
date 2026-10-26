@@ -58,7 +58,7 @@ export interface LiveIsland {
   play(done: () => void): void;
   /** drawn built, its held pose (played already, reduced motion) */
   hold(): void;
-  /** on screen or not: off screen nothing is drawn */
+  /** on screen or not: off screen nothing is drawn, and an entry still playing ends built (its `done` said) */
   setOn(on: boolean): void;
   /** the pointer over its box at (x, y) css px; the first one is the hover's start */
   point(x: number, y: number): void;
@@ -228,6 +228,21 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
       g.scale.set(d.s, d.s * d.sy, d.s);
     });
     setShadow(l, shadowAt(ms, l.cells));
+  }
+
+  /**
+   * Its held pose now, and its entry's `done` said: an entry is only stepped on screen, so one
+   * scrolled away (or held) before its gag ends would never say it, and the page's queue (one entry
+   * at a time) would wait on it for good: every other island empty (Gabriel m_45995).
+   */
+  function rest(l: Live): void {
+    l.mode = 'rest';
+    l.blinkAt = performance.now() + 7000 + Math.random() * 2000;
+    built(l);
+    l.dirty = true;
+    const d = l.done;
+    l.done = null;
+    d?.();
   }
 
   /** built: what rose is what holds (the cubes stay, no other slab) */
@@ -475,14 +490,13 @@ export function mountIslands(o: { readonly reduced: boolean; readonly probe?: bo
           kick();
         },
         hold() {
-          l.mode = 'rest';
-          l.blinkAt = performance.now() + 7000 + Math.random() * 2000;
-          built(l);
-          l.dirty = true;
+          rest(l);
           kick();
         },
         setOn(on) {
           l.on = on;
+          // its entry off screen: it ends here, built, and the next island's may start
+          if (!on && l.mode === 'entry' && !l.still) rest(l);
           if (on) { l.dirty = true; last = performance.now(); kick(); }
         },
         point(x, y) {
