@@ -6,7 +6,7 @@
 // delay for all three, so a quick ⌘K, ⌥1 or ctrl+r never flashes them; release, any other key, a
 // click, a scroll or the window losing focus hides them all at once, no fade. One listener for the
 // window (a store), however many rows read it. Owner: amb-win.
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 /** How long the modifier is held alone before its keys show: the terminal app's delay for its ctrl
  *  hints (rust/tui/src/ctrlhint.rs:43, DELAY 150 ms; his ask main m_22199), one for ⌘, ⌥ and ctrl. */
@@ -48,6 +48,9 @@ let held: Mod | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 const listeners = new Set<() => void>();
 
+/** each hold's number: a long hold (useModHeldFor) is this hold's, never a past one's */
+let holds = 0;
+
 const set = (h: Mod | null): void => {
   if (h === held) return;
   held = h;
@@ -67,6 +70,7 @@ const onKey = (e: KeyboardEvent): void => {
     clearTimeout(timer);
     set(null);
     armed = step.arm;
+    holds += 1;
     timer = setTimeout(() => {
       timer = undefined;
       set(armed);
@@ -110,4 +114,25 @@ export function useHeld(): Mod | null {
 /** True while `mod` has been held alone for HINT_HOLD_MS. */
 export function useModHeld(mod: Mod): boolean {
   return useHeld() === mod;
+}
+
+/** True while `mod` has been held alone for `ms` (at least HINT_HOLD_MS): the same hold, so any
+ *  other key, its release, a click, a scroll or the window losing focus ends it at once; the
+ *  folded side's cards (page folded-side v9: ⌥ alone 300 ms, ⌥ is a typing key on a French
+ *  keyboard). */
+export function useModHeldFor(mod: Mod, ms: number): boolean {
+  const on = useModHeld(mod);
+  // the hold that has lasted `ms`, by its number: a new hold starts short again
+  const [longHold, setLongHold] = useState(-1);
+  const hold = on ? holds : -1;
+  useEffect(() => {
+    if (hold < 0) return;
+    const t = setTimeout(() => {
+      setLongHold(hold);
+    }, Math.max(0, ms - HINT_HOLD_MS));
+    return () => {
+      clearTimeout(t);
+    };
+  }, [hold, ms]);
+  return hold >= 0 && longHold === hold;
 }

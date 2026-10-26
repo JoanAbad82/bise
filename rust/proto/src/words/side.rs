@@ -88,4 +88,35 @@ crate::words! { side:
     world_open(project) = "open {project}'s office in a tab";
     /// the world's legend's '↗', its tip
     world_open_tip = "open the office in a tab";
+    /// a coin's card (⌥ held alone, or a hover; page folded-side v9), the
+    /// agents coin's first line: the one agent that asks him, in the accent
+    card_asks_one(agent) = "{agent} asks you";
+    /// the agents coin's card: two or more agents ask him ('perf, api-auth
+    /// and i18n ask you')
+    card_asks_many(names, last) = "{names} and {last} ask you";
+    /// the agents coin's card: past three askers, the rest as a count
+    card_more(n) = "{n} more";
+    /// the agents coin's card: the one agent that failed, in red
+    card_failed_one(agent) = "{agent} failed";
+    /// the agents coin's card: two or more agents failed, in red
+    card_failed(n) = "{n} failed";
+    /// the agents coin's card when nothing works, asks or failed
+    card_quiet = "all quiet";
+    /// the agents coin's card, quiet: the last agent that finished
+    card_finished(agent, ago) = "{agent} finished {ago} ago";
+    /// the artifacts coin's card: the new ones made today
+    card_new_today(n) = "{n} new today";
+    /// the artifacts coin's card: how many in all
+    card_in_all(n) = "{n} in all";
+    /// the artifacts coin's card, nothing new today: the newest one's age
+    card_last(ago) = "last {ago} ago";
+    /// the scheduled coin's card: the next timer within the hour
+    card_due_in(what, ago) = "{what} in {ago}";
+    /// the scheduled coin's card: the next timer later than that ('nightly
+    /// gate at 07:30', 'at tomorrow 07:30' reads 'tomorrow 07:30')
+    card_due_at(what, at) = "{what} at {at}";
+    /// the scheduled coin's card: nothing scheduled, no watch
+    card_no_scheduled = "nothing scheduled";
+    /// the processes coin's card: nothing running
+    card_no_processes = "nothing running";
 }

@@ -84,4 +84,32 @@ export const side = {
   world_open: (a: { project: string | number }): string => "open " + String(a.project) + "'s office in a tab",
   /** the world's legend's '↗', its tip */
   world_open_tip: "open the office in a tab",
+  /** a coin's card (⌥ held alone, or a hover; page folded-side v9), the agents coin's first line: the one agent that asks him, in the accent */
+  card_asks_one: (a: { agent: string | number }): string => String(a.agent) + " asks you",
+  /** the agents coin's card: two or more agents ask him ('perf, api-auth and i18n ask you') */
+  card_asks_many: (a: { names: string | number; last: string | number }): string => String(a.names) + " and " + String(a.last) + " ask you",
+  /** the agents coin's card: past three askers, the rest as a count */
+  card_more: (a: { n: string | number }): string => String(a.n) + " more",
+  /** the agents coin's card: the one agent that failed, in red */
+  card_failed_one: (a: { agent: string | number }): string => String(a.agent) + " failed",
+  /** the agents coin's card: two or more agents failed, in red */
+  card_failed: (a: { n: string | number }): string => String(a.n) + " failed",
+  /** the agents coin's card when nothing works, asks or failed */
+  card_quiet: "all quiet",
+  /** the agents coin's card, quiet: the last agent that finished */
+  card_finished: (a: { agent: string | number; ago: string | number }): string => String(a.agent) + " finished " + String(a.ago) + " ago",
+  /** the artifacts coin's card: the new ones made today */
+  card_new_today: (a: { n: string | number }): string => String(a.n) + " new today",
+  /** the artifacts coin's card: how many in all */
+  card_in_all: (a: { n: string | number }): string => String(a.n) + " in all",
+  /** the artifacts coin's card, nothing new today: the newest one's age */
+  card_last: (a: { ago: string | number }): string => "last " + String(a.ago) + " ago",
+  /** the scheduled coin's card: the next timer within the hour */
+  card_due_in: (a: { what: string | number; ago: string | number }): string => String(a.what) + " in " + String(a.ago),
+  /** the scheduled coin's card: the next timer later than that ('nightly gate at 07:30', 'at tomorrow 07:30' reads 'tomorrow 07:30') */
+  card_due_at: (a: { what: string | number; at: string | number }): string => String(a.what) + " at " + String(a.at),
+  /** the scheduled coin's card: nothing scheduled, no watch */
+  card_no_scheduled: "nothing scheduled",
+  /** the processes coin's card: nothing running */
+  card_no_processes: "nothing running",
 } as const;

@@ -55,6 +55,8 @@ export interface BubbleProps {
   readonly pic?: ReactNode;
   /** ⌥ held: its key ('⌥1'), shown in the count's pill; none: the count */
   readonly hint?: string | undefined;
+  /** its card is its tip (page folded-side v9): no ds tip, the pointer's rest and leave told to Host */
+  readonly onHover?: ((on: boolean) => void) | undefined;
 }
 
 /** The pill on a coin's rim lower-left: ⌥ held, the key in place of the count; else the count, none at 0 unless `always` ('0' then is `zero`: text-3). Pure. */
@@ -75,12 +77,14 @@ function useBadge(n: number): { readonly n: number; readonly out: boolean } {
   return { n: n > 0 ? n : kept, out: n <= 0 };
 }
 
-export function Bubble({ id, count, badge = 0, tip, open, top, onClick, pic, hint }: BubbleProps) {
+export function Bubble({ id, count, badge = 0, tip, open, top, onClick, pic, hint, onHover }: BubbleProps) {
   const pill = id === 'world' ? null : pillOf(id, count, hint);
   const top2 = useBadge(badge);
   return (
     <Press look="s3-bubble" style={{ top }} aria-label={tip} aria-expanded={id === 'world' ? undefined : open}
-      aria-haspopup={id === 'world' ? undefined : 'dialog'} data-open={open || undefined} {...tipAttrs(tip)} onClick={onClick}
+      aria-haspopup={id === 'world' ? undefined : 'dialog'} data-open={open || undefined} {...(onHover === undefined ? tipAttrs(tip) : {})} onClick={onClick}
+      onPointerEnter={onHover === undefined ? undefined : () => { onHover(true); }}
+      onPointerLeave={onHover === undefined ? undefined : () => { onHover(false); }}
       data-testid={`app.bubble.${id}`}>
       <span className="s3-obj" style={{ left: OBJ.left, top: OBJ.top, width: OBJ.size, height: OBJ.size }}>
         {pic ?? (id === 'world' ? null : <ThingPic thing={bubbleThing(id)} px={OBJ.size} tile={TILE[id]} />)}

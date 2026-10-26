@@ -90,6 +90,102 @@
     "one": null,
     "text": "{name} · {says}"
   },
+  "side.card_asks_many": {
+    "args": [
+      "names",
+      "last"
+    ],
+    "one": null,
+    "text": "{names} and {last} ask you"
+  },
+  "side.card_asks_one": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "{agent} asks you"
+  },
+  "side.card_due_at": {
+    "args": [
+      "what",
+      "at"
+    ],
+    "one": null,
+    "text": "{what} at {at}"
+  },
+  "side.card_due_in": {
+    "args": [
+      "what",
+      "ago"
+    ],
+    "one": null,
+    "text": "{what} in {ago}"
+  },
+  "side.card_failed": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} failed"
+  },
+  "side.card_failed_one": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "{agent} failed"
+  },
+  "side.card_finished": {
+    "args": [
+      "agent",
+      "ago"
+    ],
+    "one": null,
+    "text": "{agent} finished {ago} ago"
+  },
+  "side.card_in_all": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} in all"
+  },
+  "side.card_last": {
+    "args": [
+      "ago"
+    ],
+    "one": null,
+    "text": "last {ago} ago"
+  },
+  "side.card_more": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} more"
+  },
+  "side.card_new_today": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} new today"
+  },
+  "side.card_no_processes": {
+    "args": [],
+    "one": null,
+    "text": "nothing running"
+  },
+  "side.card_no_scheduled": {
+    "args": [],
+    "one": null,
+    "text": "nothing scheduled"
+  },
+  "side.card_quiet": {
+    "args": [],
+    "one": null,
+    "text": "all quiet"
+  },
   "side.in_projects": {
     "args": [
       "n",

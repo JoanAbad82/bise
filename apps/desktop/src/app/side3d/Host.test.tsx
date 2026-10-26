@@ -14,6 +14,7 @@ import { artifact, artifacts, card, ev, projects, row } from '../../../tests/fea
 import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
 import { HINT_HOLD_MS } from '../held';
+import { CARD_HOLD_MS, CARD_HOVER_MS } from './Cards';
 import { keyAction } from '../keys';
 import { SideHost, bubbleTops } from './Host';
 import { CARD_MAX, cardMaxH } from './layout';
@@ -102,7 +103,8 @@ describe('the right side, folded', () => {
   it('the world and the four bubbles, each with its tip; the counts, none at 0; the agents\' two pills: active at the bottom, what waits for him on top in the accent (designer m_44986)', () => {
     const { v } = side3d();
     expect(v.getByTestId('app.world')).toBeTruthy();
-    for (const b of ['agents', 'artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.bubble.${b}`).getAttribute('data-tip')).toBeTruthy();
+    // each says what it counts to VoiceOver; its card is its tip (folded-side v9)
+    for (const b of ['agents', 'artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.bubble.${b}`).getAttribute('aria-label')).toBeTruthy();
     // 2 working (1 of them asks): 2 active, plain; the project's inbox (1) on top, the accent
     expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('2');
     expect(v.getByTestId('app.bubble.agents.count').hasAttribute('data-accent')).toBe(false);
@@ -210,7 +212,7 @@ describe('the right side, folded', () => {
     }
   });
 
-  it('⌥ held: each bubble shows its key in its count\'s place, top to bottom; gone at release (designer m_44292, m_44373)', () => {
+  it('⌥ held alone 300 ms: each bubble shows its key in its count\'s place and its card, all four; gone at release (designer m_44292, m_44373; folded-side v9)', () => {
     vi.useFakeTimers();
     try {
       const { v } = side3d();
@@ -218,7 +220,21 @@ describe('the right side, folded', () => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
         vi.advanceTimersByTime(HINT_HOLD_MS);
       });
+      act(() => {
+        vi.advanceTimersByTime(CARD_HOLD_MS - HINT_HOLD_MS - 1);
+      });
+      // not yet: the hints' 150 ms is not the cards' 300
+      expect(v.queryByTestId('app.bubble.agents.key')).toBeNull();
+      expect(v.queryByTestId('app.bubble.agents.card')).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
       expect(['agents', 'artifacts', 'scheduled', 'processes'].map((b) => v.getByTestId(`app.bubble.${b}.key`).textContent)).toEqual(['⌥1', '⌥2', '⌥3', '⌥4']);
+      for (const b of ['agents', 'artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.bubble.${b}.card`)).toBeTruthy();
+      // the agents card: perf asks him, in the accent; 2 working under it
+      const agents = v.getByTestId('app.bubble.agents.card');
+      expect(agents.querySelector('[data-tone="acc"]')?.textContent).toBe(side.card_asks_one({ agent: 'perf' }));
+      expect(agents.textContent).toContain(side.working({ n: 2 }));
       expect(v.queryByTestId('app.bubble.agents.count')).toBeNull();
       // the top accent pill stays while ⌥ is held
       expect(v.getByTestId('app.bubble.agents.badge').textContent).toBe('1');
@@ -226,7 +242,103 @@ describe('the right side, folded', () => {
         window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
       });
       expect(v.queryByTestId('app.bubble.agents.key')).toBeNull();
+      expect(v.queryByTestId('app.bubble.agents.card')).toBeNull();
       expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('2');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // the law of the ⌥-alone hold (folded-side v9): ⌥ is a typing key ({ } [ ] | on a French
+  // keyboard), so ⌥ with any other key never shows a card, however long it is held after
+  it('⌥ with another key never shows the cards: ⌥[ , ⌥⇧, ⌥⌘, a key typed mid-hold', () => {
+    vi.useFakeTimers();
+    try {
+      const { v } = side3d();
+      const none = () => {
+        expect(v.container.querySelector('.s3-tcard')).toBeNull();
+        expect(v.queryByTestId('app.bubble.agents.key')).toBeNull();
+      };
+      const press = (...keys: KeyboardEventInit[]) => {
+        act(() => {
+          for (const k of keys) window.dispatchEvent(new KeyboardEvent('keydown', k));
+          vi.advanceTimersByTime(HINT_HOLD_MS);
+        });
+        act(() => {
+          vi.advanceTimersByTime(CARD_HOLD_MS * 4);
+        });
+        none();
+        act(() => {
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }));
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' }));
+        });
+      };
+      // ⌥ then a character: { on a French keyboard (⌥( )
+      press({ key: 'Alt', altKey: true }, { key: '{', code: 'Digit5', altKey: true });
+      // ⌥ down while another modifier is held, or one joins it
+      press({ key: 'Shift', shiftKey: true }, { key: 'Alt', altKey: true, shiftKey: true });
+      press({ key: 'Alt', altKey: true }, { key: 'Shift', altKey: true, shiftKey: true });
+      press({ key: 'Alt', altKey: true }, { key: 'Meta', altKey: true, metaKey: true });
+      // a key typed mid-hold, after 200 ms: the hold ends, nothing shows after
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
+        vi.advanceTimersByTime(200);
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: '[', altKey: true }));
+      });
+      act(() => {
+        vi.advanceTimersByTime(CARD_HOLD_MS * 4);
+      });
+      none();
+      // shown, then a key: gone at once
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
+        vi.advanceTimersByTime(HINT_HOLD_MS);
+      });
+      act(() => {
+        vi.advanceTimersByTime(CARD_HOLD_MS - HINT_HOLD_MS);
+      });
+      expect(v.getByTestId('app.bubble.agents.card')).toBeTruthy();
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: '|', altKey: true }));
+      });
+      none();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a hover 400 ms shows that coin\'s card alone, information only; gone on leave; nothing at rest; a click opens the float, no card over it', () => {
+    vi.useFakeTimers();
+    try {
+      const { v } = side3d();
+      expect(v.container.querySelector('.s3-tcard')).toBeNull();
+      // the card is the coin's tip: no ds tip on the coin
+      expect(v.getByTestId('app.bubble.scheduled').hasAttribute('data-tip')).toBe(false);
+      fireEvent.pointerEnter(v.getByTestId('app.bubble.scheduled'));
+      act(() => {
+        vi.advanceTimersByTime(CARD_HOVER_MS - 1);
+      });
+      expect(v.queryByTestId('app.bubble.scheduled.card')).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(v.getByTestId('app.bubble.scheduled.card').textContent).toContain(side.card_no_scheduled);
+      expect(v.container.querySelectorAll('.s3-tcard')).toHaveLength(1);
+      // no key on a hover: they are ⌥'s
+      expect(v.queryByTestId('app.bubble.scheduled.key')).toBeNull();
+      fireEvent.pointerLeave(v.getByTestId('app.bubble.scheduled'));
+      expect(v.queryByTestId('app.bubble.scheduled.card')).toBeNull();
+      // the artifacts card: the newest's name as its chip
+      fireEvent.pointerEnter(v.getByTestId('app.bubble.artifacts'));
+      act(() => {
+        vi.advanceTimersByTime(CARD_HOVER_MS);
+      });
+      expect(v.getByTestId('app.bubble.artifacts.card').querySelector('.b-artchip')).toBeTruthy();
+      fireEvent.click(v.getByTestId('app.bubble.artifacts'));
+      expect(v.getByTestId('app.flyout.artifacts')).toBeTruthy();
+      expect(v.container.querySelector('.s3-tcard')).toBeNull();
     } finally {
       vi.useRealTimers();
     }

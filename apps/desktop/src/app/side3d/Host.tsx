@@ -25,7 +25,9 @@ import { useNowFor } from '../clock';
 import { useRoute, useRouter } from '../router';
 import { MAIN, projectOf } from '../route';
 import { useMenuAction } from '../menu';
-import { useModHeld } from '../held';
+import { useModHeldFor } from '../held';
+import { CARD_HOLD_MS, CARD_HOVER_MS, CoinCardView } from './Cards';
+import { coinCard, type CardFacts } from './coincard';
 import { inRank, agentCounts, bubbleBadge, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type Counts } from './model';
 import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
@@ -209,8 +211,28 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
   useMenuAction('side-4', () => {
     byKey('processes');
   });
-  // ⌥ held alone: each bubble shows its key (held.ts; keys.ts gives ⌥1-4 to the folded side)
-  const alt = useModHeld('Alt');
+  // ⌥ held alone 300 ms: each coin shows its key and its card, all four at once (held.ts; keys.ts
+  // gives ⌥1-4 to the folded side; page folded-side v9); any other key or the release hides them
+  const alt = useModHeldFor('Alt', CARD_HOLD_MS);
+  // a hover 400 ms: that coin's card alone, gone on leave (its tip, information only)
+  const [hover, setHover] = useState<BubbleId | null>(null);
+  const hoverT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onHover = (b: BubbleId) => (on: boolean) => {
+    clearTimeout(hoverT.current);
+    if (!on) {
+      setHover(null);
+      return;
+    }
+    hoverT.current = setTimeout(() => {
+      setHover(b);
+    }, CARD_HOVER_MS);
+  };
+  useEffect(() => () => {
+    clearTimeout(hoverT.current);
+  }, []);
+  const facts: CardFacts = { live, counts, artifacts, tasks, procs, watching: watching.map((a) => a.name), now };
+  // no card over an open float: it is the coin's whole say
+  const carded: readonly BubbleId[] = open !== null ? [] : alt ? BUBBLES : hover !== null ? [hover] : [];
   // esc closes the open card and gives the focus back to its bubble, ↑ ↓ walk its rows (the
   // focus ring), ⏎ opens the focused one (its button's own); a click outside closes it
   useEffect(() => {
@@ -390,10 +412,13 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
       )}
       {BUBBLES.map((b) => (
         <Bubble key={b} id={b} count={bubbleCount(b, counts)} badge={bubbleBadge(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]}
-          hint={alt ? bubbleKey(b) : undefined} onClick={() => {
+          hint={alt ? bubbleKey(b) : undefined} onHover={onHover(b)} onClick={() => {
+          clearTimeout(hoverT.current);
+          setHover(null);
           toggle(b);
         }} />
       ))}
+      {carded.map((b) => <CoinCardView key={b} id={b} card={coinCard(b, facts)} top={tops.bubbles[b]} />)}
       {open !== null && (
         <Float id={open} name={bubbleName(open)} top={tops.bubbles[open]} maxH={maxH} moving={leaving !== null} frameRef={frame}>
           <FloatLayer key={open} c={floatOf(open)} scrolls={fit.scrolls} />
