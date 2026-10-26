@@ -13,7 +13,7 @@
 // always (keys.ts; r2-side 6, designer m_44292). Each has its tip and VoiceOver name ('Agents · 3
 // active · 2 waiting for you'). The world folded into one (d3) is a 5th, on top, the same. Owner:
 // nm-side; the coin: r3-bubbles; the two pills and the placing: m-bubbles.
-import { useState, type ReactNode } from 'react';
+import { useState, type DragEvent, type ReactNode } from 'react';
 import { AppIcon, Press, tipAttrs, type AppIconName } from '@/ds';
 import { side } from '@/proto/words_side.gen';
 import { useThingPng } from './cache';
@@ -57,6 +57,8 @@ export interface BubbleProps {
   readonly hint?: string | undefined;
   /** its card is its tip (page folded-side v9): no ds tip, the pointer's rest and leave told to Host */
   readonly onHover?: ((on: boolean) => void) | undefined;
+  /** a drop of files on it (the artifacts coin adds them, folded-side v9) */
+  readonly drop?: { readonly onDragOver?: (e: DragEvent) => void; readonly onDrop: (e: DragEvent) => void } | undefined;
 }
 
 /** The pill on a coin's rim lower-left: ⌥ held, the key in place of the count; else the count, none at 0 unless `always` ('0' then is `zero`: text-3). Pure. */
@@ -77,7 +79,7 @@ function useBadge(n: number): { readonly n: number; readonly out: boolean } {
   return { n: n > 0 ? n : kept, out: n <= 0 };
 }
 
-export function Bubble({ id, count, badge = 0, tip, open, top, onClick, pic, hint, onHover }: BubbleProps) {
+export function Bubble({ id, count, badge = 0, tip, open, top, onClick, pic, hint, onHover, drop }: BubbleProps) {
   const pill = id === 'world' ? null : pillOf(id, count, hint);
   const top2 = useBadge(badge);
   return (
@@ -85,6 +87,7 @@ export function Bubble({ id, count, badge = 0, tip, open, top, onClick, pic, hin
       aria-haspopup={id === 'world' ? undefined : 'dialog'} data-open={open || undefined} {...(onHover === undefined ? tipAttrs(tip) : {})} onClick={onClick}
       onPointerEnter={onHover === undefined ? undefined : () => { onHover(true); }}
       onPointerLeave={onHover === undefined ? undefined : () => { onHover(false); }}
+      onDragOver={drop?.onDragOver} onDrop={drop?.onDrop}
       data-testid={`app.bubble.${id}`}>
       <span className="s3-obj" style={{ left: OBJ.left, top: OBJ.top, width: OBJ.size, height: OBJ.size }}>
         {pic ?? (id === 'world' ? null : <ThingPic thing={bubbleThing(id)} px={OBJ.size} tile={TILE[id]} />)}

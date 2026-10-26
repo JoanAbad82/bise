@@ -46,11 +46,12 @@ import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './plac
 import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
 import { newAgent, openOverview, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
 import { acrossSays, busyProjects, useListed } from './lists';
+import { barScope, inScope, scopeWords } from '../barscope';
 import { alarms } from '@/thread/wake';
 import type { Agent } from '@/proto';
 import { useAgents, useCards, useProjects, useStore } from '@/store';
 import { useAllArtifacts } from '@/artifacts';
-import { AddButton, useAddPlace } from '@/artifacts/Drops';
+import { AddButton, useAddDropOn, useAddPlace } from '@/artifacts/Drops';
 import { useAllScheduled } from '@/scheduled';
 import { isRunning, useAllProcesses } from '@/running';
 import { side } from '@/proto/words_side.gen';
@@ -164,7 +165,11 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   const ownLive = useMemo(() => inRank(own), [own]);
   const listed = useListed(scope, home);
   const { agents, live } = listed;
-  const artifacts = useAllArtifacts(scope);
+  // on a sub-agent's thread the artifacts float lists what it made, with its scope line (the Overview's, barscope.ts)
+  const bar = barScope(route, scope);
+  const artScope = scopeWords(bar, 'artifacts', name);
+  const allArtifacts = useAllArtifacts(scope);
+  const artifacts = bar.level === 'agent' ? allArtifacts.filter((it) => inScope(bar, it.a.agent)) : allArtifacts;
   const tasks = useAllScheduled(scope);
   const procs = useAllProcesses(scope);
   // the processes are asked once here, as the old right bar did; the hub sends them again on each change
@@ -367,6 +372,8 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
     router.go({ screen: 'thread', project: p, agent });
   };
   const addPlace = useAddPlace(project);
+  // a drop of files on the artifacts coin adds them there, as on the list (folded-side v9)
+  const artDrop = useAddDropOn(addPlace);
   const says = [side.at_desks({ n: live.length }), counts.asks > 0 ? side.asks({ n: counts.asks }) : ''].filter((s) => s !== '').join(' · ');
   // the agents float: the Overview's AGENTS and ARCHIVED rows (folded-side v9: A's floats take Overview's rows)
   const ov = useAgentRows(scope, alt);
@@ -426,9 +433,10 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
         return {
           id: b, name: bubbleName(b), says: saysOf(b),
           add: <AddButton place={addPlace} testId="app.flyout.artifacts.add" />,
+          ...(artScope === null ? {} : { scope: { words: artScope.words, tip: artScope.tip } }),
           onPin: () => { openOverview('artifacts'); },
           foot: { left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project: scope }); } }] },
-          rows: artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />),
+          rows: artifacts.length === 0 ? <Empty>{artScope?.empty ?? side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />),
         };
       case 'scheduled':
         return {
@@ -475,7 +483,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       )}
       {!mini && BUBBLES.map((b) => (
         <Bubble key={b} id={b} count={bubbleCount(b, counts)} badge={bubbleBadge(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]}
-          hint={caps ? bubbleKey(b) : undefined} onHover={onHover(b)} onClick={() => {
+          hint={caps ? bubbleKey(b) : undefined} onHover={onHover(b)} drop={b === 'artifacts' ? artDrop : undefined} onClick={() => {
           clearTimeout(hoverT.current);
           setHover(null);
           toggle(b);

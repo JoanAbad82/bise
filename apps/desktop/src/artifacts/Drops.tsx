@@ -83,9 +83,9 @@ export function AddButton({ place, testId, labeled = false, tip: tipOwn }: { pla
 }
 
 /** An artifacts list that takes a drop: its children, and the dashed zone over them while he drags files. */
-export function AddDrop({ place, testId, children }: { place: AddPlace | null; testId: string; children: ReactNode }) {
+/** A drop of files that adds them to `place`'s artifacts: its dragover and drop (none without a place). The artifacts lists' and the folded side's artifacts coin's (folded-side v9: a drop on the coin adds files). */
+export function useAddDropOn(place: AddPlace | null): { onDragOver?: (e: DragEvent) => void; onDrop: (e: DragEvent) => void } {
   const store = useStore();
-  const drag = useFileDrag();
   const onDrop = (e: DragEvent) => {
     if (place === null || !carriesFiles(e.dataTransfer.types)) return;
     e.preventDefault();
@@ -93,6 +93,12 @@ export function AddDrop({ place, testId, children }: { place: AddPlace | null; t
     e.stopPropagation();
     for (const p of pathsOf(e)) store.addArtifact(place.project, place.agent, p);
   };
+  return place === null ? { onDrop } : { onDragOver: over, onDrop };
+}
+
+export function AddDrop({ place, testId, children }: { place: AddPlace | null; testId: string; children: ReactNode }) {
+  const drag = useFileDrag();
+  const { onDrop } = useAddDropOn(place);
   // a zone under SHORT_ZONE_PX (the right bar's ARTIFACTS): what is under it hides whole, only the
   // words show (designer m_24293); measured when the zone appears
   const [short, setShort] = useState(false);

@@ -1223,3 +1223,10 @@
   display: flex;
   gap: var(--s-2);
 }
+
+/* a float's scope line under its head, on a sub-agent's thread ('by perf', the Overview's): t-12 text-3 */
+.s3-card-scope {
+  padding: 0 var(--s-2) var(--s-1);
+  font: 400 var(--f-meta);
+  color: var(--c-text-3);
+}

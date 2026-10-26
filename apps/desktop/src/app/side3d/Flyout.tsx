@@ -56,6 +56,8 @@ export interface FloatContent {
   /** its foot: what it says on the left ('3 archived'), or a fold there (the agents' '▸ 3 archived'); its full page's link on the right */
   readonly foot: { readonly left: string; readonly fold?: ReactNode; readonly links: readonly FootLink[] };
   readonly rows: ReactNode;
+  /** a line under its head: its scope on a sub-agent's thread ('by perf', the Overview's, folded-side v9) */
+  readonly scope?: { readonly words: string; readonly tip: string };
 }
 
 /**
@@ -76,6 +78,11 @@ export function FloatLayer({ c, scrolls = false, leaving = false }: { c: FloatCo
           <HeadButton icon="panel" tip={side.pin_tab} onClick={c.onPin} testId={`app.flyout.${id}.pin`} />
         </span>
       </header>
+      {c.scope !== undefined && (
+        <div className="s3-card-scope" {...tipAttrs(c.scope.tip)} data-testid={`app.flyout.${id}.scope`}>
+          {c.scope.words}
+        </div>
+      )}
       <div className="s3-card-body" data-scrolls={scrolls || undefined}>
         {c.rows}
       </div>
