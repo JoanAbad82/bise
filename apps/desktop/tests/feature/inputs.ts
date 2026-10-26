@@ -41,12 +41,13 @@ export function card(over: Partial<Card> & Pick<Card, 'project' | 'id'>): Card {
   return { ...CARD, ...over };
 }
 
-/** The fixtures' first project row that has cards (the ProjectRow every default comes from). */
+/** The fixtures' first project row that has cards (the ProjectRow every default comes from), without
+ * its pulse: a default row is a hub that sends none yet; a test that wants one gives it. */
 const ROW: ProjectRow = (() => {
   for (const e of core_ev) {
     if (e.ev !== 'projects') continue;
     const r = e.projects.find((p) => p.cards !== undefined);
-    if (r !== undefined) return r;
+    if (r !== undefined) return { ...r, pulse: null };
   }
   throw new Error('rust/proto/fixtures has no projects row with cards');
 })();
