@@ -78,6 +78,11 @@
 .settings-update-why .settings-update-err { color: var(--c-err); }
 .settings-sha { font-family: var(--font-mono); }
 .settings-update-acts { display: inline-flex; gap: var(--s-2); flex: none; }
+/* 'up to date' with the line icon check before it, never a ✓ glyph (ui-review m_43805) */
+.settings-update .b-gi .l span.settings-update-ok { display: inline-flex; align-items: center; gap: var(--s-1); }
+/* a role's name (the core's word) as a row title: its first letter up, the rest as the core says */
+.b-gi .l span.settings-role-n { font-size: inherit; line-height: inherit; color: inherit; }
+.b-gi .l span.settings-role-n::first-letter { text-transform: uppercase; }
 /* the test app's row: nothing to act on, so its title in text-2 and its sub in text-3 (designer m_24597) */
 .settings-update.is-test .b-gi .l span.settings-update-t { color: var(--c-text-2); }
 .settings-update.is-test .b-gi .l > span:not(.settings-update-t) { color: var(--c-text-3); }

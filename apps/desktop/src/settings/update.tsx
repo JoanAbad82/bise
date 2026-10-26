@@ -9,7 +9,7 @@
 // updateRow is the pure part. Owner: amb-home.
 import { Fragment, useState, type ReactNode } from 'react';
 import type { AppRefusal, AppSwapResult, AppUpdate } from '@/shared/api';
-import { Button, Group } from '@/ds';
+import { AppIcon, Button, Group } from '@/ds';
 import { settings } from '@/proto/words.gen';
 
 /** A template's words with a node in each hole (a sha drawn as Sha): the holes are filled with marks, then the marks give way to the nodes. */
@@ -133,7 +133,12 @@ export function UpdateGroup({ update, ports }: { update: AppUpdate | null; ports
       );
       break;
     case 'current':
-      label = settings.update_current;
+      label = (
+        <span className="settings-update-ok">
+          <AppIcon name="check" size={14} />
+          {settings.update_current}
+        </span>
+      );
       sub = row.live !== null ? withNodes(settings.update_current_sub, { live: <Sha sha={row.live} /> }) : settings.update_newest;
       break;
     case 'restarting':

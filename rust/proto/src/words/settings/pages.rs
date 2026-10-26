@@ -71,11 +71,11 @@ crate::words! { settings:
     /// general: the theme row's line
     theme_sub = "light, dark, or as macOS";
     /// a theme: as macOS
-    theme_system = "system";
+    theme_system = "System";
     /// a theme: light
-    theme_light = "light";
+    theme_light = "Light";
     /// a theme: dark
-    theme_dark = "dark";
+    theme_dark = "Dark";
 
     /// voice: hold fn
     voice_fn_hold = "Hold fn to talk";
@@ -90,7 +90,7 @@ crate::words! { settings:
     /// voice: the language row's line
     voice_language_sub = "the language of your voice";
     /// a voice language: let the model guess
-    lang_auto = "auto";
+    lang_auto = "Auto";
     /// a voice language: English
     lang_en = "English";
     /// a voice language: French

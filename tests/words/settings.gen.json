@@ -154,6 +154,11 @@
     "one": null,
     "text": "an API key"
   },
+  "settings.api_key_row": {
+    "args": [],
+    "one": null,
+    "text": "An API key"
+  },
   "settings.api_key_sub": {
     "args": [],
     "one": null,
@@ -1325,12 +1330,12 @@
   "settings.key_add": {
     "args": [],
     "one": null,
-    "text": "add a key"
+    "text": "Add a key"
   },
   "settings.key_added": {
     "args": [],
     "one": null,
-    "text": "✓ added"
+    "text": "added"
   },
   "settings.key_artifacts": {
     "args": [],
@@ -1609,7 +1614,7 @@
   "settings.lang_auto": {
     "args": [],
     "one": null,
-    "text": "auto"
+    "text": "Auto"
   },
   "settings.lang_en": {
     "args": [],
@@ -4499,7 +4504,7 @@
   "settings.signed_in": {
     "args": [],
     "one": null,
-    "text": "✓ signed in"
+    "text": "signed in"
   },
   "settings.signin_denied": {
     "args": [],
@@ -4581,7 +4586,7 @@
   "settings.theme_dark": {
     "args": [],
     "one": null,
-    "text": "dark"
+    "text": "Dark"
   },
   "settings.theme_label": {
     "args": [],
@@ -4591,7 +4596,7 @@
   "settings.theme_light": {
     "args": [],
     "one": null,
-    "text": "light"
+    "text": "Light"
   },
   "settings.theme_row": {
     "args": [],
@@ -4606,7 +4611,7 @@
   "settings.theme_system": {
     "args": [],
     "one": null,
-    "text": "system"
+    "text": "System"
   },
   "settings.tour_card": {
     "args": [
@@ -4719,7 +4724,7 @@
   "settings.update_current": {
     "args": [],
     "one": null,
-    "text": "✓ up to date"
+    "text": "up to date"
   },
   "settings.update_current_sub": {
     "args": [

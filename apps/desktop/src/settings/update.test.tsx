@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { AppSwapResult, AppUpdate } from '@/shared/api';
 import { UpdateGroup, refusalLine, updateRow, type UpdatePorts } from './update';
+import { settings } from '@/proto/words.gen';
 
 afterEach(cleanup);
 
@@ -101,7 +102,9 @@ describe('UpdateGroup', () => {
   });
   it('up to date: no button', () => {
     render(<UpdateGroup update={current} ports={ports({ ok: true })} />);
-    expect(text('settings.update.label')).toBe('✓ up to date');
+    // the line icon check before the words, never a ✓ glyph (ui-review m_43805)
+    expect(text('settings.update.label')).toBe(settings.update_current);
+    expect(screen.getByTestId('settings.update.label').querySelector('svg[data-icon="check"]')).not.toBeNull();
     expect(text('settings.update.row')).toContain('you run 3f9a2c1, the newest build');
     expect(screen.queryByRole('button')).toBeNull();
   });

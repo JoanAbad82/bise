@@ -18,21 +18,23 @@ crate::words! { settings:
     /// a subscription's line: not signed in
     sign_in_browser = "sign in with your browser";
     /// a subscription's chip: signed in
-    signed_in = "✓ signed in";
+    signed_in = "signed in";
     /// a subscription's button: expired
     sign_in_again = "sign in again";
     /// a subscription's button; the setup check's act for a model
     sign_in = "sign in";
-    /// the key row
+    /// the terminal onboarding's pay step: the key option (a list in bise's lowercase)
     api_key = "an API key";
+    /// settings › models: the key row's title (a row title, sentence case; ui-review m_43805)
+    api_key_row = "An API key";
     /// the key row's line, no key yet
     api_key_sub = "Anthropic, OpenAI, Mistral…";
     /// the key row's chip: a key is set
-    key_added = "✓ added";
+    key_added = "added";
     /// the key row's remove
     key_remove = "remove";
     /// the key row's button
-    key_add = "add a key";
+    key_add = "Add a key";
     /// a model waits for its provider's setup
     model_needs(model, provider) = "{model} needs {provider}: sign in or add its key here, then it's set.";
     /// a sign-in under way: copy its link

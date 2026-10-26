@@ -45,3 +45,5 @@
 .b-swin .b-toggle{width:var(--s-8);height:var(--h-kbd);border-radius:var(--r-pill)}
 .b-swin .b-toggle>i{width:var(--s-4);height:var(--s-4)}
 .b-swin .b-btn{height:var(--h-control-sm)}
+/* a note under a card: 12 under it, aligned with the label's words (ui-review m_43805) */
+.b-swin .b-group+.b-help{margin-top:var(--s-3);padding:0 var(--s-3)}

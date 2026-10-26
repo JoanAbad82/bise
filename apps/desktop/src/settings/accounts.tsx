@@ -5,7 +5,7 @@
 // Owner: amb-home.
 import { useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
-import { Act, Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
+import { Act, AppIcon, Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
 import { common, settings } from '@/proto/words.gen';
 import { failedWords, keyField, type ProviderCheck, type Sent } from './keycheck';
 
@@ -89,7 +89,10 @@ export function Accounts({ accounts, send, check = null, want = null, signin = n
           : settings.sign_in_browser,
     control:
       a.state === 'signed_in' ? (
-        <Chip tone="ok" testId={`settings.account.${a.id}.ok`}>{settings.signed_in}</Chip>
+        <Chip tone="ok" testId={`settings.account.${a.id}.ok`}>
+          <AppIcon name="check" size={14} />
+          {settings.signed_in}
+        </Chip>
       ) : (
         <Button
           state={busy.includes(a.id) ? 'loading' : undefined}
@@ -106,11 +109,14 @@ export function Accounts({ accounts, send, check = null, want = null, signin = n
   const firstKey = wantKey ?? keys[0];
   items.push({
     id: 'key',
-    label: settings.api_key,
+    label: settings.api_key_row,
     sub: key ? `${key.label}${key.who != null ? ` · ${key.who}` : ''}` : settings.api_key_sub,
     control: key ? (
       <span className="settings-row-acts">
-        <Chip tone="ok">{settings.key_added}</Chip>
+        <Chip tone="ok">
+          <AppIcon name="check" size={14} />
+          {settings.key_added}
+        </Chip>
         <Button kind="ghost" onClick={() => { send({ cmd: 'key_remove', id: key.id }); }} testId={`settings.key.${key.id}.remove`}>
           {settings.key_remove}
         </Button>

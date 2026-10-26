@@ -49,7 +49,7 @@ crate::words! { settings:
     /// update: restart to update
     update_restart = "restart to update";
     /// update: up to date
-    update_current = "✓ up to date";
+    update_current = "up to date";
     /// update: up to date, the build he runs
     update_current_sub(live) = "you run {live}, the newest build";
     /// update: up to date, no sha known
