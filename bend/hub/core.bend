@@ -3422,9 +3422,11 @@ def boot.each(-o: S.St, names: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
 # the daemon started: spawn every live agent. An older journal's cards
 # that are not the user's (done, blocked, failed, overlap: the agents'
 # traffic, main's since BISE-299) close first; their reports and notes
-# are in main's thread already
+# are in main's thread already. A retired hub item (the update offer,
+# now the status line: update-flow) closes first with its own word
 def boot(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
-  +cx2 = close_ids(o, CK.legacy_cards(S.St.cards(st(o, cx))), cx, "moved to main's inbox")
+  +cx1 = close_ids(o, CK.retired_cards(S.St.cards(st(o, cx))), cx, "moved to the status line")
+  +cx2 = close_ids(o, CK.legacy_cards(S.St.cards(st(o, cx1))), cx1, "moved to main's inbox")
   boot.each(o, M.live_names(st(o, cx2)), cx2)
 
 # the asked message, still with no reply watch and no reply, of an active

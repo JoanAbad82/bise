@@ -8,7 +8,7 @@ import type { InboxRecord, StateFilter } from './inbox';
 import type { Completion, CompletionAsk, LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
-import type { Agent, ApprovalMode, ApprovalRule, ArchivedAgent, Artifact, ArtifactMoved, Card, CheckerKind, DevServer, Feature, FlowMode, Folder, FolderOp, Growth, LibraryProject, Merged, Model, Page, Place, Pr, Proc, Pulse, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
+import type { Agent, ApprovalMode, ApprovalRule, ArchivedAgent, Artifact, ArtifactMoved, BiseUpdate, Card, CheckerKind, DevServer, Feature, FlowMode, Folder, FolderOp, Growth, LibraryProject, Merged, Model, Page, Place, Pr, Proc, Pulse, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
 import type { Entry, FindHit } from './thread';
 
 export type JobState = "running" | "done" | "failed";
@@ -89,7 +89,7 @@ key?: number | null, } | { "ev": "followed_end", project: string, agent: string,
 /**
  * the messages held so far (queued for an agent, not delivered)
  */
-held?: number, } | { "ev": "switch", project: string, switch?: SwitchRow | null, } | { "ev": "growth", project: string, growth: Growth, } | { "ev": "pulse", project: string, pulse: Pulse, } | { "ev": "usage", project: string, counting?: boolean, 
+held?: number, } | { "ev": "switch", project: string, switch?: SwitchRow | null, } | { "ev": "growth", project: string, growth: Growth, } | { "ev": "pulse", project: string, pulse: Pulse, } | { "ev": "bise_update", project: string, update: BiseUpdate | null, } | { "ev": "usage", project: string, counting?: boolean, 
 /**
  * boxed: HubEv stays small (hub::size)
  */
@@ -235,7 +235,7 @@ folder?: string | null, } | { "cmd": "artifacts_move", project: string, ids: Arr
  * the undo slot is the caller's (the desktop core's move across
  * projects records it whole): the hub leaves it
  */
-keep_undo?: boolean, } | { "cmd": "artifacts_folders", project: string, op: FolderOp, } | { "cmd": "artifacts_library", project: string, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
+keep_undo?: boolean, } | { "cmd": "artifacts_folders", project: string, op: FolderOp, } | { "cmd": "artifacts_library", project: string, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "bise_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
 
 /**
  * draft: the kind of an [`HubEv::Error`], one enum for every typed

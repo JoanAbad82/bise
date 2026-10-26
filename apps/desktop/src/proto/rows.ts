@@ -1320,3 +1320,39 @@ export type News = { at_ms: number, what: NewsWhat, };
  * What the news is. `at_ms` is past for all but `scheduled` (its next run).
  */
 export type NewsWhat = { "kind": "failed", agent: string, } | { "kind": "landed", agent: string, sha: string, target: string, } | { "kind": "artifact", id: string, title: string, } | { "kind": "scheduled", id: string, name: string, } | { "kind": "unknown" };
+
+/**
+ * Where an update is.
+ */
+export type BiseUpdateState = "ready" | "installing" | "updating" | "failed" | "unknown";
+
+/**
+ * A release to update to, and where that is.
+ */
+export type BiseUpdate = { 
+/**
+ * the release's id, and its name as he reads it (`v2026.10.3`)
+ */
+id: string, version: string, 
+/**
+ * what's new, 0 to 5 plain lines
+ */
+notes?: Array<string>, 
+/**
+ * its release page
+ */
+url?: string, 
+/**
+ * the version this hub runs, as he reads it (the machine's line: the
+ * first project's)
+ */
+running: string, state: BiseUpdateState, 
+/**
+ * failed: why, one line
+ */
+why?: string, 
+/**
+ * the machine's line only: the projects not on it yet (updating),
+ * or the one whose switch failed (their names)
+ */
+waiting?: Array<string>, };

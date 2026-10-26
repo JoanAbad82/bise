@@ -61,6 +61,16 @@ pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
 pub const KEEP_DAYS: &str = "shots_keep_days";
 pub const KEEP_DAYS_DEFAULT: u64 = 7;
 
+/// `auto_update`: bise updates itself when a release is out, at a quiet
+/// moment (update-flow; settings › update, `/update auto on|off`). Off
+/// unless he turned it on.
+pub const AUTO_UPDATE: &str = "auto_update";
+
+/// Whether bise updates itself, from `prefs.json`'s object.
+pub fn auto_update(prefs: Option<&Value>) -> bool {
+    prefs.and_then(|p| p.get(AUTO_UPDATE)).and_then(Value::as_bool).unwrap_or(false)
+}
+
 /// The image store's retention in days, from `prefs.json`'s object: his
 /// number when it is one of at least 1, else the default.
 pub fn keep_days(prefs: Option<&Value>) -> u64 {
@@ -69,7 +79,7 @@ pub fn keep_days(prefs: Option<&Value>) -> u64 {
 
 /// The top keys of `prefs.json` the window may set (`prefs_set`,
 /// architect m_9130): anything else is refused, never written.
-pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims"];
+pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims", AUTO_UPDATE];
 
 /// `bims.map.<hub id>`: the office's map he picked for that project (the
 /// desktop's /bims, architect m_28589). Only that path, the id with
@@ -109,7 +119,7 @@ pub const DESKTOP_HINTS: &[&str] = &["fn_perms"];
 /// The type a typed key keeps (a wrong one is refused).
 fn typed(key: &str, v: &Value) -> Result<(), String> {
     let ok = match key {
-        "onboarded" => v.is_boolean(),
+        "onboarded" | AUTO_UPDATE => v.is_boolean(),
         "theme" => v.as_str().is_some_and(|t| ["auto", "light", "dark", "system"].contains(&t)),
         "shots_keep_days" => v.as_u64().is_some(),
         // the desktop app's update channel (release::DesktopChannel)

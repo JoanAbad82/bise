@@ -7,6 +7,7 @@ use crate::core::{ClientId, Input};
 use bise_home::release::{root_kind, Install, RootKind};
 use crate::model::MAIN;
 use bise_proto::core::Feed;
+use bise_proto::hub::HubEv;
 use crate::paths::Paths;
 use crate::util::clip;
 use serde_json::{json, Value};
@@ -178,11 +179,6 @@ fn release_every() -> std::time::Duration {
     std::time::Duration::from_secs(s)
 }
 
-/// update-card `2 later`: no item again for release `id`, in any project.
-pub(super) fn update_later(id: &str) {
-    let _ = bise_home::release_offer::write_later(&bise_home::Home::from_env(), Some(id));
-}
-
 /// The last non-empty line of a command's output, without its
 /// `bise update: ` prefix.
 fn last_line(out: &str) -> String {
@@ -264,20 +260,21 @@ impl ReleaseLook {
     }
 
     /// The machine's files, planned for this hub (`release_offer::plan`).
-    fn check(&self, home: &bise_home::Home, asked: Option<ClientId>, error: Option<String>) -> crate::core::update_card::ReleaseCheck {
+    fn check(&self, home: &bise_home::Home, asked: Option<ClientId>, error: Option<String>) -> crate::core::release_line::ReleaseCheck {
         use bise_home::release_offer as offer;
         let manifest = std::fs::read_to_string(home.release_manifest()).ok();
         let latest = manifest.as_deref().and_then(|m| offer::latest_of(m, &self.page));
         let newer = manifest.as_deref().is_some_and(|m| manifest_newer(m, &self.running_id, &self.running_built));
-        let (later, go, installing, failed) = (offer::read_later(home), offer::read_go(home), offer::installing(home), my_failed(&self.paths));
+        let (go, installing, failed) = (offer::read_go(home), offer::installing(home), my_failed(&self.paths));
+        let prefs = std::fs::read_to_string(home.prefs_file()).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
         let facts = offer::Facts {
             latest: latest.as_ref(),
             newer,
-            later: later.as_deref(),
             go: go.as_ref(),
             installing: installing.as_deref(),
             my_id: &self.running_id,
             my_failed: failed.as_ref(),
+            auto: bise_home::prefs::auto_update(prefs.as_ref()),
         };
         let plan = offer::plan(&facts);
         // the names of the releases seen, so the item can say which one
@@ -289,7 +286,7 @@ impl ReleaseLook {
             names.insert(l.id.clone(), json!(l.version));
             let _ = std::fs::write(&names_path, Value::Object(names.clone()).to_string());
         }
-        crate::core::update_card::ReleaseCheck {
+        crate::core::release_line::ReleaseCheck {
             running: running_name(latest.as_ref(), &self.running_id, &names),
             running_id: self.running_id.clone(),
             offer: plan,
@@ -810,7 +807,7 @@ impl Shell {
     /// thread, given to the hub as `Input::Release`: every 30 s on the
     /// tick (`asked` None; the channel itself fetched at most once an
     /// hour for the whole machine), or now for `/update` (it fetches,
-    /// forgets `later` and answers that client). Only an installed bise:
+    /// updates to a newer release and answers that client). Only an installed bise:
     /// never bise's source tree; the tick never with `BISE_NO_UPDATE=1`.
     pub(super) fn release_check(&mut self, asked: Option<ClientId>) {
         let Some(look) = self.release_look() else {
@@ -829,12 +826,15 @@ impl Shell {
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let home = bise_home::Home::from_env();
-            if asked.is_some() {
-                let _ = bise_home::release_offer::write_later(&home, None);
-            }
             let error = look.fetch(&home, asked.is_some());
             let _ = tx.send(Msg::input(Input::Release(look.check(&home, asked, error))));
         });
+    }
+
+    /// update-flow: what this hub says of a newer bise (hub_state's
+    /// `bise_update`; a change goes out as `Effect::BiseUpdate`).
+    pub(super) fn bise_update_ev(&self) -> HubEv {
+        HubEv::BiseUpdate { project: self.project(), update: self.hub.release_row() }
     }
 
     /// What a look at the offer needs from this hub, None when it is not
@@ -993,10 +993,10 @@ impl Shell {
     /// every hub still older switches to it, one at a time
     /// ([`Self::release_switch`]). Never blocks the hub; the answer is
     /// `Input::Updated`.
-    pub(super) fn update_to(&mut self, card: u64, id: String, version: String) {
+    pub(super) fn update_to(&mut self, id: String, version: String) {
         let Some(look) = self.release_look() else {
             let res = Err("this bise is not an installed one".into());
-            return self.step(Input::Updated { card, version, res });
+            return self.step(Input::Updated { version, res });
         };
         let tx = self.tx.clone();
         std::thread::spawn(move || {
@@ -1024,7 +1024,7 @@ impl Shell {
                 log_line(&look.paths, &format!("update-flow: {} installed, every hub switches to it", id));
                 offer::write_go(&home, &offer::Go { id: id.clone(), at: offer::now_ms() }).map_err(|e| format!("update-go: {}", e))
             })();
-            let _ = tx.send(Msg::input(Input::Updated { card, version, res }));
+            let _ = tx.send(Msg::input(Input::Updated { version, res }));
             let _ = tx.send(Msg::input(Input::Release(look.check(&home, None, None))));
         });
     }

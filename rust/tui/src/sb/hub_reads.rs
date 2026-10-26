@@ -207,6 +207,7 @@ fn apply(app: &mut App, n: &Notification) {
         HubEv::Processes { items, .. } => crate::running_screen::listed(app, items),
         HubEv::ProcOut { agent, id, at, data, .. } => crate::running_screen::output(app, agent, id, *at, data),
         HubEv::Update(u) => release::update_event(app, u),
+        HubEv::BiseUpdate { update, .. } => app.sb.bise_update = update.clone(),
         _ => {}
     }
 }

@@ -81,6 +81,11 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         built: Option<String>,
     },
+    /// update-flow: his click on the status pill's `update`: the core
+    /// sends `bise/update` to a connected hub (the machine installs the
+    /// release once, every project switches to it); answered before the
+    /// window swaps its own app
+    BiseUpdate {},
     /// the plugins of `project`'s workspace (none: bise's home): `plugins`
     Plugins {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -507,6 +512,7 @@ impl AppCmd {
         "found_scan",
         "away_back",
         "app_version",
+        "bise_update",
         "plugins",
         "plugin_set",
         "plugin_connect",

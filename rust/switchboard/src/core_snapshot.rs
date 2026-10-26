@@ -63,11 +63,10 @@ impl Hub {
     }
 
     /// The cards whose answer the hub carries out now (inbox-reappear,
-    /// architect m_44978): a PR's merge (merge.rs), an update
-    /// (update_card.rs), a feature's merge, try or drop (core_feature.rs).
-    /// The one owner of `CardRow::running`.
+    /// architect m_44978): a PR's merge (merge.rs), a feature's merge,
+    /// try or drop (core_feature.rs). The one owner of `CardRow::running`.
     pub fn running_cards(&self) -> BTreeSet<u64> {
-        self.merges.running().chain(self.updates.running()).chain(self.feature_answers.values().copied()).collect()
+        self.merges.running().chain(self.feature_answers.values().copied()).collect()
     }
 
     /// An open card as the views see it: its words and what the hub adds.
@@ -82,14 +81,11 @@ impl Hub {
             age_ms: now.saturating_sub(c.created_ms),
             note: match c.kind.as_str() {
                 "merge" => self.merge_note(c),
-                update_card::KIND => self.update_note(c),
                 signin_card::KIND => self.signin_note(),
                 _ => self.card_note(c),
             },
             // expired-ux: the agents that wait for the sign-in
             waiting: (c.kind == signin_card::KIND).then(|| self.signin_waiting()),
-            // update-card: the release page its `3` opens
-            link: if c.kind == update_card::KIND { self.update_link(c) } else { None },
             place: c.place.clone(),
             pr: c.pr,
             ..CardRow::default()

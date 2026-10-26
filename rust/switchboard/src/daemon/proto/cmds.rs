@@ -425,6 +425,9 @@ impl Shell {
             HubCmd::VersionRollback { .. } => self.proto_version(id, &tag, Version::Rollback, None),
             HubCmd::VersionRestart { to, .. } => self.proto_version(id, &tag, Version::Restart(to.unwrap_or_default()), None),
             HubCmd::VersionUpdate { .. } => self.proto_version(id, &tag, Version::Update, None),
+            // update-flow: his click on the pill or the line (a client
+            // socket's only: agents have no op for it)
+            HubCmd::BiseUpdate { .. } => self.step_typed(id, &tag, Input::UpdateNow),
             // `/release-bise`'s start (release.rs): a plan's answer comes
             // from its thread (release_event), a run's steps go to all
             HubCmd::ReleasePlan { dry, .. } => {

@@ -566,7 +566,7 @@ law card_confirm_now_is_words:
 law card_confirm_no_thanks_is_words:
   {HA.confirm_ok("No thanks") == False{} : Bool}
 
-# LAW: a hub item (merge, feature_*, update, signin) takes only one of its
+# LAW: a hub item (merge, feature_*, signin) takes only one of its
 # options' numbers: other words are refused, the item stays open, main is
 # not woken.
 law card_choice_words_refused:

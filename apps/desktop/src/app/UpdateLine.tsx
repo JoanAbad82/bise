@@ -7,8 +7,9 @@
 // Owner: amb-win.
 import { useEffect, useRef, useState } from 'react';
 import type { BiseApi, UpdateState } from '@/shared/api';
-import type { UpdateEv } from '@/proto';
-import { useHubUpdate, useProjects, useStore } from '@/store';
+import type { BiseUpdate, UpdateEv } from '@/proto';
+import { settings } from '@/proto/words.gen';
+import { useBiseUpdate, useHubUpdate, useProjects, useStore } from '@/store';
 import { ShaWords } from './ReloadLine';
 import { useRoute } from './router';
 import { formatRoute } from './route';
@@ -142,5 +143,125 @@ export function useHubUpdateLine(): StatusPart | null {
           ),
         }
       : {}),
+  };
+}
+
+/**
+ * update-flow (Gabriel's pick A on page update-flow-forms, designer m_45087): a newer bise for the
+ * machine (the core's fold of every project's hub/bise_update) in the one status pill, never an
+ * inbox card. Pure: the pill's words, its action and its popover lines; `done` the version it just
+ * reached (4 s of '✓ updated to …').
+ */
+export function biseUpdateLine(
+  u: BiseUpdate | null,
+  done: string | null,
+): { tone: StatusPart['tone']; state: string; words: string; short: string; act: string | null; lines: readonly string[] } | null {
+  if (u === null || u.state === 'unknown') {
+    if (done === null) return null;
+    const words = `✓ ${settings.bise_updated({ version: done })}`;
+    return { tone: 'done', state: 'done', words, short: words, act: null, lines: [] };
+  }
+  const version = u.version;
+  switch (u.state) {
+    case 'ready':
+      return {
+        tone: 'quiet',
+        state: 'ready',
+        words: settings.bise_ready({ version }),
+        short: 'update ready',
+        act: settings.bise_update,
+        lines: [settings.bise_update_tip, ...(u.notes ?? []).slice(0, 3), settings.bise_update_notes],
+      };
+    case 'installing':
+    case 'updating': {
+      const left = u.waiting?.length ?? 0;
+      return {
+        tone: 'running',
+        state: 'updating',
+        words: settings.bise_updating({ version }),
+        short: 'updating…',
+        act: null,
+        lines: left > 0 ? [u.waiting?.join(', ') ?? '', settings.bise_updating_left({ n: left })] : [],
+      };
+    }
+    case 'failed':
+      return {
+        tone: 'err',
+        state: 'failed',
+        words: `▲ ${settings.bise_update_failed({ version })}`,
+        short: "▲ couldn't update",
+        act: settings.bise_update_again,
+        lines: [...(u.why ? [u.why] : []), settings.bise_update_unchanged({ running: u.running })],
+      };
+  }
+}
+
+/** How long '✓ updated to …' stays (designer m_45087). */
+const DONE_MS = 4000;
+
+/**
+ * The bise update as a candidate for the one status pill. His click asks the core (one hub
+ * installs, the machine's flock dedupes, every project switches in turn); once the core's line
+ * moves past 'ready' (its ack), the app's own update, when one is ready, installs and reopens the
+ * window on the screen he is on.
+ */
+export function useBiseUpdateLine(): StatusPart | null {
+  const u = useBiseUpdate();
+  const store = useStore();
+  const app = useUpdate();
+  const route = useRoute();
+  const [asked, setAsked] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const was = useRef<BiseUpdate | null>(null);
+  // updating then gone: '✓ updated to …' for 4 s
+  useEffect(() => {
+    const before = was.current;
+    was.current = u;
+    if (u === null && before !== null && before.state !== 'ready' && before.state !== 'failed') {
+      setDone(before.version);
+      setAsked(false);
+      const t = window.setTimeout(() => {
+        setDone(null);
+      }, DONE_MS);
+      return () => {
+        window.clearTimeout(t);
+      };
+    }
+    if (u?.state === 'failed') setAsked(false);
+    return undefined;
+  }, [u]);
+  // the core took it (its line left 'ready'): the app's own update goes with it
+  const moved = u !== null && (u.state === 'installing' || u.state === 'updating');
+  const appReady = app.state === 'ready';
+  const installed = useRef(false);
+  useEffect(() => {
+    if (!asked || !moved || !appReady || installed.current) return;
+    installed.current = true;
+    void bise()?.update.install(formatRoute(route));
+  }, [asked, moved, appReady, route]);
+  const line = biseUpdateLine(u, done);
+  if (line === null) return null;
+  const go = () => {
+    setAsked(true);
+    store.command({ cmd: 'bise_update' });
+  };
+  const waiting = asked && u?.state === 'ready';
+  return {
+    rank: line.tone === 'err' ? RANK.failed : line.tone === 'running' ? RANK.running : line.tone === 'done' ? RANK.done : RANK.ready,
+    testId: 'app.bise',
+    state: line.state,
+    tone: line.tone,
+    words: line.words,
+    short: line.short,
+    ...(line.lines.length > 0
+      ? {
+          more: (
+            <div className="app-core-last" data-testid="app.bise.tip">
+              {line.lines.join('\n')}
+            </div>
+          ),
+        }
+      : {}),
+    ...(line.act === null ? {} : { acts: [{ id: 'update', text: line.act, onClick: go, disabled: waiting }] }),
   };
 }

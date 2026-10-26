@@ -48,8 +48,8 @@ pub(crate) fn ambient_reply(kind: &str, agent: &str, text: &str, d: usize) -> Op
     (!ambient_local(kind, d)).then(|| d.to_string())
 }
 
-/// Digit `d` of a `kind` card is one the box acts on itself (a PR or
-/// release page to open, the feature drop's second ask).
+/// Digit `d` of a `kind` card is one the box acts on itself (a PR page
+/// to open, the feature drop's second ask).
 pub(crate) fn ambient_local(kind: &str, d: usize) -> bool {
-    matches!((kind, d), ("merge", 2) | ("update", 3) | ("feature_merge", 3))
+    matches!((kind, d), ("merge", 2) | ("feature_merge", 3))
 }

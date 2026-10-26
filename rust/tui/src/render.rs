@@ -906,7 +906,7 @@ fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<
     let body = card.body();
     let (kind, name, body) = (card.kind.as_str(), card.agent.as_str(), body.as_str());
     // bise's own items (opened for main): bise asks, not main
-    let name = if matches!(kind, "signin" | "update") { "bise" } else { name };
+    let name = if kind == "signin" { "bise" } else { name };
     match kind {
         "done" => {
             let check = Style::default().fg(accent());

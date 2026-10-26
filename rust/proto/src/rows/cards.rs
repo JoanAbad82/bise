@@ -61,13 +61,13 @@ pub enum OptAct {
 }
 
 /// Option `n` of a card of `kind`, done by the client and never sent:
-/// a merge's `2 open it on GitHub` (pr-design §6.3: the item stays), an
-/// update's `3 release notes ↗`, a sign-in's `1 sign in again`. `link`:
-/// the page that kind opens (a merge: its PR, [`pr_link`] or the place's
-/// box; an update: the card's link). None: the option answers the card.
+/// a merge's `2 open it on GitHub` (pr-design §6.3: the item stays), a
+/// sign-in's `1 sign in again`. `link`: the page that kind opens (a
+/// merge: its PR, [`pr_link`] or the place's box). None: the option
+/// answers the card.
 pub fn opt_act(kind: &str, n: u32, link: Option<&str>) -> Option<OptAct> {
     match (kind, n) {
-        ("merge", 2) | ("update", 3) => Some(OptAct::link(link)),
+        ("merge", 2) => Some(OptAct::link(link)),
         ("signin", 1) => Some(OptAct::SignIn),
         _ => None,
     }

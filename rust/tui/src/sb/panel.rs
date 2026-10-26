@@ -906,9 +906,7 @@ fn card_row(c: &Card, n: usize, num_style: Style, w: usize, bg: Option<Color>) -
     let lead = num.width() + g.width() + 1;
     let room = w.saturating_sub(lead + 1);
     let first = c.text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
-    // update-card: bise's own news, `bise  v0.0.2 is out`
     let (who, first) = match c.kind.as_str() {
-        "update" => (words::panel::bise, first.strip_prefix("bise ").unwrap_or(first)),
         // expired-ux: bise's own item, not an agent's
         "signin" => (words::panel::bise, first),
         _ => (c.agent.as_str(), first),

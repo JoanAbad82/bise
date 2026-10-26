@@ -194,6 +194,13 @@ impl Shell {
         self.rpc_out(id, ev, true);
     }
 
+    /// A typed event for every typed connection (update-flow's
+    /// `bise_update`).
+    pub(super) fn proto_note_all(&mut self, ev: &HubEv) {
+        let ids: Vec<ClientId> = self.proto.conns.keys().copied().collect();
+        self.proto_note(&ids, ev);
+    }
+
     /// Steps sb-core for typed command `cmd` of connection `id`: its
     /// notice to that connection (a route that ended, ...) comes back as
     /// `error {cmd, text}`, so a command that does nothing says why.

@@ -223,6 +223,26 @@
     "one": null,
     "text": "everything runs, no notification"
   },
+  "settings.auto_update": {
+    "args": [],
+    "one": null,
+    "text": "Update automatically"
+  },
+  "settings.auto_update_off": {
+    "args": [],
+    "one": null,
+    "text": "bise asks before it updates"
+  },
+  "settings.auto_update_on": {
+    "args": [],
+    "one": null,
+    "text": "bise updates by itself now"
+  },
+  "settings.auto_update_sub": {
+    "args": [],
+    "one": null,
+    "text": "when a new bise is out, it updates at a quiet moment. your agents keep working."
+  },
   "settings.bar_back": {
     "args": [],
     "one": null,
@@ -329,6 +349,68 @@
     "args": [],
     "one": null,
     "text": "⏎ replaces it   esc keeps the old one"
+  },
+  "settings.bise_ready": {
+    "args": [
+      "version"
+    ],
+    "one": null,
+    "text": "bise {version} is ready"
+  },
+  "settings.bise_update": {
+    "args": [],
+    "one": null,
+    "text": "update"
+  },
+  "settings.bise_update_again": {
+    "args": [],
+    "one": null,
+    "text": "try again"
+  },
+  "settings.bise_update_failed": {
+    "args": [
+      "version"
+    ],
+    "one": null,
+    "text": "couldn't update to {version}"
+  },
+  "settings.bise_update_notes": {
+    "args": [],
+    "one": null,
+    "text": "all notes in Settings › update"
+  },
+  "settings.bise_update_tip": {
+    "args": [],
+    "one": null,
+    "text": "your agents keep working, your drafts stay, and the window reopens where you are."
+  },
+  "settings.bise_update_unchanged": {
+    "args": [
+      "running"
+    ],
+    "one": null,
+    "text": "you're still on {running}. nothing changed."
+  },
+  "settings.bise_updated": {
+    "args": [
+      "version"
+    ],
+    "one": null,
+    "text": "updated to {version}"
+  },
+  "settings.bise_updating": {
+    "args": [
+      "version"
+    ],
+    "one": null,
+    "text": "updating to {version}… your agents keep working"
+  },
+  "settings.bise_updating_left": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} to go"
   },
   "settings.cancel": {
     "args": [],
@@ -4758,6 +4840,27 @@
     "args": [],
     "one": null,
     "text": "your team"
+  },
+  "settings.tui_bise_failed": {
+    "args": [
+      "version"
+    ],
+    "one": null,
+    "text": "▲ couldn't update to {version} · /update tries again"
+  },
+  "settings.tui_bise_ready": {
+    "args": [
+      "version"
+    ],
+    "one": null,
+    "text": "{version} ready · /update"
+  },
+  "settings.tui_bise_updating": {
+    "args": [
+      "version"
+    ],
+    "one": null,
+    "text": "updating to {version}… agents keep working"
   },
   "settings.update_again": {
     "args": [],

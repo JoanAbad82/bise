@@ -271,6 +271,9 @@ pub(super) struct Sb {
     /// `/update` building HEAD in the dev build (dev-update): its short
     /// hash, since when (the header's item when no release runs).
     updating: Option<(String, std::time::Instant)>,
+    /// A newer bise, as the hub sees it (update-flow, `bise_update`):
+    /// the header's line when nothing else runs.
+    bise_update: Option<bise_proto::rows::BiseUpdate>,
     /// `D` on an agent asks first (book §16): the agent to drop on `y`.
     drop_ask: Option<String>,
     /// The feeds out of view where lines arrived since their last visit.
@@ -646,6 +649,24 @@ pub(super) fn background_events(app: &App) -> usize {
     app.sb.views.values().map(|v| v.events.len()).sum()
 }
 
+/// update-flow: `/update auto on|off` sets the user's `Update
+/// automatically` (prefs `auto_update`, the hubs read it at their next
+/// look); its answer in the catalog's words. No on/off: what it is now.
+fn auto_update(typed: &str) -> String {
+    use bise_proto::words::settings;
+    let home = bise_home::Home::from_env();
+    let slot = bise_home::prefs::Slot::key(home.prefs_file(), bise_home::prefs::AUTO_UPDATE);
+    let on = match typed.split_whitespace().nth(2) {
+        Some("on") => true,
+        Some("off") => false,
+        _ => slot.get().and_then(|v| v.as_bool()).unwrap_or(false),
+    };
+    if let Err(e) = slot.set(serde_json::Value::Bool(on)) {
+        return format!("couldn't save it: {e}");
+    }
+    (if on { settings::auto_update_on } else { settings::auto_update_off }).to_string()
+}
+
 /// The hub is back (a new connection, `hello` sent): it replays every
 /// feed, so the feeds start empty again. The focus and the drafts stay.
 fn hub_reconnected(app: &mut App) {
@@ -893,6 +914,9 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         // the hub's version/* methods; one parse with the hub's slash
         // (bise_proto::slash::version). /update: the release channel now
         // (update-card's new-release item)
+        // update-flow: `/update auto on|off`, the user's setting (prefs
+        // `auto_update`, the same as Settings › update's toggle)
+        "/update" if typed.split_whitespace().nth(1) == Some("auto") => out.push(Ev::Info(auto_update(&typed))),
         "/restart" | "/update" | "/version" => {
             if let Some((method, params, then)) = bise_proto::slash::version(&typed).as_ref().map(versions::method) {
                 sb.call(method, params, then);

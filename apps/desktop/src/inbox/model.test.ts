@@ -159,7 +159,7 @@ describe('which items his words answer (ambient m_8773, the TUI and hub choice_k
   it('a question takes words; an approval and every choice item only their options', () => {
     expect(takesWords({ kind: 'question' })).toBe(true);
     expect(takesWords({ kind: 'question', approval: true })).toBe(false);
-    for (const kind of ['merge', 'feature_try', 'feature_merge', 'update', 'signin']) expect(takesWords({ kind }), kind).toBe(false);
+    for (const kind of ['merge', 'feature_try', 'feature_merge', 'signin']) expect(takesWords({ kind }), kind).toBe(false);
   });
   it("a docked item only options decide says what it waits for; a question says nothing", () => {
     expect(pickWaits({ kind: 'merge', options: two })).toBe('the merge waits for 1 or 2');

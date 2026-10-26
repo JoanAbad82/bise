@@ -393,6 +393,14 @@ pub enum HubEv {
     /// the project's pulse (the H1 sidebar, rows::pulse): at hello, then
     /// at most once a minute and only when it changed
     Pulse { project: Project, pulse: crate::rows::Pulse },
+    /// a newer bise to update to, as this hub sees it (update-flow,
+    /// rows::bise_update): at hello and when it changes; None: nothing
+    /// to show (on it, or no release known)
+    BiseUpdate {
+        project: Project,
+        #[serde(default)]
+        update: Option<crate::rows::BiseUpdate>,
+    },
     /// what the project's model calls cost (`usage/read`, an answer only:
     /// never pushed). `counting`: the hub is still reading the
     /// transcripts (its first read): the sums are not complete yet, ask
@@ -505,7 +513,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "pulse", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "pulse", "bise_update", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -935,6 +943,10 @@ pub enum HubCmd {
     /// `/update`: look for a new release now (bise's source tree: build
     /// its HEAD); its words come as a `notice`
     VersionUpdate { project: Project },
+    /// update now (update-flow): install the release the machine offers
+    /// (`bise_update`'s) and switch every project to it, one at a time.
+    /// His click only: a client socket's, never an agent's op (issue 16)
+    BiseUpdate { project: Project },
     /// `/release-bise` (dev build only): what it would release (`release`
     /// answers, state "plan" or "error"); `dry`: a dry run's plan
     ReleasePlan {
@@ -976,7 +988,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "artifacts_move", "artifacts_folders", "artifacts_library", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "artifacts_move", "artifacts_folders", "artifacts_library", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "bise_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -1057,6 +1069,7 @@ impl HubCmd {
             | HubCmd::VersionRollback { project }
             | HubCmd::VersionRestart { project, .. }
             | HubCmd::VersionUpdate { project }
+            | HubCmd::BiseUpdate { project }
             | HubCmd::ReleasePlan { project, .. }
             | HubCmd::ReleaseRun { project, .. }
             | HubCmd::StopHub { project, .. }

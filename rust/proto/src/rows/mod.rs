@@ -5,6 +5,7 @@
 
 mod agents;
 mod approvals;
+mod bise_update;
 mod doing;
 mod artifacts;
 mod growth;
@@ -20,6 +21,7 @@ mod usage;
 
 pub use agents::*;
 pub use approvals::*;
+pub use bise_update::*;
 pub use doing::*;
 pub use growth::*;
 pub use artifacts::*;

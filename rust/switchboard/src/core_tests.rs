@@ -3105,19 +3105,15 @@ mod prs {
 
     /// A look at the machine's offer (bise_home::release_offer), this hub
     /// running 4.
-    fn offer(id: &str, state: bise_home::release_offer::State) -> Input {
-        use bise_home::release_offer::{Latest, Offer, State};
-        use crate::core::update_card::ReleaseCheck;
+    fn offer(state: bise_home::release_offer::State, switch_me: bool, install_me: bool) -> Input {
+        use bise_home::release_offer::{Latest, Offer};
+        use crate::core::release_line::ReleaseCheck;
         Input::Release(ReleaseCheck {
             offer: Some(Offer {
-                release: Latest {
-                    id: id.into(),
-                    version: format!("2026.10.2-{}", id),
-                    notes: vec!["the inbox keeps your place".into(), "/update from any thread".into()],
-                    url: format!("https://github.com/o/r/releases/tag/v2026.10.2-{}", id),
-                },
-                switch_me: state == State::Updating,
+                release: Latest { id: "6".into(), version: "2026.10.2-6".into(), notes: vec!["one update".into()], url: String::new() },
                 state,
+                switch_me,
+                install_me,
             }),
             running_id: "4".into(),
             running: "2026.10.2-4".into(),
@@ -3126,131 +3122,81 @@ mod prs {
         })
     }
 
-    fn release(id: &str, newer: bool, later: Option<&str>) -> Input {
-        use bise_home::release_offer::State;
-        offer(
-            id,
-            match (newer, later == Some(id)) {
-                (false, _) => State::UpToDate,
-                (true, true) => State::Later,
-                (true, false) => State::Ready,
-            },
-        )
+    fn row_of(fx: &[Effect]) -> Option<Option<bise_proto::rows::BiseUpdateState>> {
+        fx.iter().find_map(|e| match e {
+            Effect::BiseUpdate { update } => Some(update.as_ref().map(|u| u.state.clone())),
+            _ => None,
+        })
     }
 
-    fn update_cards(t: &T) -> Vec<Card> {
-        t.hub.st.open_cards().filter(|c| c.kind == "update").cloned().collect()
-    }
-
+    /// update-flow: a newer bise is a line the clients show, never an
+    /// inbox card; `update now` installs it once; the machine says when
+    /// this hub switches.
     #[test]
-    fn the_new_release_item() {
+    fn a_newer_bise_is_a_line_and_update_now_installs_it_once() {
+        use bise_home::release_offer::State;
+        use bise_proto::rows::BiseUpdateState as S;
         let mut t = T::new();
-        // the running version is the latest: no item
-        t.go(release("4", false, None));
-        assert!(update_cards(&t).is_empty());
-        // a newer one: one item, the user's, quiet
-        t.go(release("5", true, None));
-        let cs = update_cards(&t);
-        assert_eq!(cs.len(), 1, "{:?}", t.hub.st.cards);
-        let c = &cs[0];
-        assert_eq!(c.place.as_deref(), Some("release:5"));
-        assert_eq!(
-            c.text,
-            "bise v2026.10.2-5 is out\nthe inbox keeps your place\n/update from any thread\nyou're on v2026.10.2-4\n\n1. update now · your agents keep running\n2. later\n3. release notes ↗"
-        );
-        let snap = t.hub.snapshot(2_000);
-        let sc = snap.card_of("update").unwrap();
-        assert_eq!(sc.link.as_deref(), Some("https://github.com/o/r/releases/tag/v2026.10.2-5"));
-        // the next check: still one
-        t.go(release("5", true, None));
-        assert_eq!(update_cards(&t).iter().map(|c| c.id).collect::<Vec<_>>(), [c.id]);
-        // `3`: the TUI opened the page, the item stays
-        t.user(MAIN, &format!("/answer {} 3", c.id));
-        assert_eq!(update_cards(&t).len(), 1);
-        // `2 later`: closed, kept by the daemon, not asked again for 5
-        let fx = t.user(MAIN, &format!("/answer {} 2", c.id));
-        assert!(fx.iter().any(|e| matches!(e, Effect::UpdateLater { id } if id == "5")), "{:?}", fx);
-        assert_eq!(closed_as(&t, c.id).as_deref(), Some("later"));
-        t.go(release("5", true, Some("5")));
-        assert!(update_cards(&t).is_empty());
-        // a check that read the daemon's file before `later` was written
-        t.go(release("5", true, None));
-        assert!(update_cards(&t).is_empty());
-        // the next release asks again
-        t.go(release("6", true, Some("5")));
-        let id = update_cards(&t)[0].id;
-        // `1`: the daemon updates; the item stays, `updating…`; twice: once
-        let fx = t.user(MAIN, &format!("/answer {} 1", id));
-        assert!(fx.iter().any(|e| matches!(e, Effect::Update { id: r, version, .. } if r == "6" && version == "v2026.10.2-6")), "{:?}", fx);
-        let fx = t.user(MAIN, &format!("/answer {} 1", id));
-        assert!(!fx.iter().any(|e| matches!(e, Effect::Update { .. })));
-        let note = |t: &mut T| t.hub.snapshot(3_000).card_of("update").map(|x| x.note.clone());
-        assert_eq!(note(&mut t), Some(Some("updating to v2026.10.2-6…".to_string())));
-        // failed: closed, main told, the running version stays
-        let fx = t.go(Input::Updated { card: id, version: "v2026.10.2-6".into(), res: Err("cannot download the release.".into()) });
-        assert!(
-            has_line(&fx, MAIN, "couldn't update to v2026.10.2-6, you're still on v2026.10.2-4: cannot download the release"),
-            "{:?}",
-            fx
-        );
-        assert_eq!(closed_as(&t, id).as_deref(), Some("update failed"));
-        // asked again at the next check; `1` works: main told, the item
-        // stays until the new hub runs it
-        t.go(release("6", true, None));
-        let id = update_cards(&t)[0].id;
-        t.user(MAIN, &format!("/answer {} 1", id));
-        let fx = t.go(Input::Updated { card: id, version: "v2026.10.2-6".into(), res: Ok(()) });
-        assert!(
-            has_line(&fx, MAIN, "installed v2026.10.2-6. every project switches to it, one at a time; your agents keep running."),
-            "{:?}",
-            fx
-        );
-        assert_eq!(update_cards(&t).len(), 1);
-        // the machine says this hub switches: the daemon is asked, the
-        // item stays, `updating…`
-        let fx = t.go(offer("6", bise_home::release_offer::State::Updating));
+        let fx = t.go(offer(State::Ready, false, false));
+        assert_eq!(row_of(&fx), Some(Some(S::Ready)));
+        assert!(t.hub.st.open_cards().all(|c| c.kind != "update"), "never a card");
+        // the same look again: nothing new to send
+        assert_eq!(row_of(&t.go(offer(State::Ready, false, false))), None);
+        // his click: installed once, the line says so at once
+        let fx = t.go(Input::UpdateNow);
+        assert!(fx.iter().any(|e| matches!(e, Effect::Update { id, version } if id == "6" && version == "v2026.10.2-6")), "{:?}", fx);
+        assert!(!t.go(Input::UpdateNow).iter().any(|e| matches!(e, Effect::Update { .. })), "a second click: nothing");
+        assert_eq!(t.hub.release_row().map(|r| r.state), Some(S::Installing));
+        let fx = t.go(Input::Updated { version: "v2026.10.2-6".into(), res: Ok(()) });
+        assert!(has_line(&fx, MAIN, "installed v2026.10.2-6. every project switches to it, one at a time; your agents keep working."), "{:?}", fx);
+        // the machine: this hub switches
+        let fx = t.go(offer(State::Updating, true, false));
+        assert_eq!(row_of(&fx), Some(Some(S::Updating)));
         assert!(fx.iter().any(|e| matches!(e, Effect::ReleaseSwitch { id } if id == "6")), "{:?}", fx);
-        assert_eq!(update_cards(&t).iter().map(|c| c.id).collect::<Vec<_>>(), [id]);
-        // the new hub runs 6: the item closes
-        let mut now = release("6", false, None);
-        if let Input::Release(c) = &mut now {
-            c.running_id = "6".into();
-        }
-        t.go(now);
-        assert!(update_cards(&t).is_empty());
-        assert_eq!(closed_as(&t, id).as_deref(), Some("updated"));
+        // on it: nothing to show
+        assert_eq!(row_of(&t.go(offer(State::UpToDate, false, false))), Some(None));
+        // a failed install: main's thread says why, the line is ready again
+        t.go(offer(State::Ready, false, false));
+        t.go(Input::UpdateNow);
+        let fx = t.go(Input::Updated { version: "v2026.10.2-6".into(), res: Err("cannot download the release.".into()) });
+        assert!(has_line(&fx, MAIN, "couldn't update to v2026.10.2-6, you're still on v2026.10.2-4: cannot download the release"), "{:?}", fx);
+        assert_eq!(t.hub.release_row().map(|r| r.state), Some(S::Ready));
+        // Update automatically: the offer's install_me installs it
+        let fx = t.go(offer(State::Ready, false, true));
+        assert!(fx.iter().any(|e| matches!(e, Effect::Update { .. })), "{:?}", fx);
     }
 
-    /// update-flow: the offer is the machine's. `1` or `later` in another
-    /// project reaches this hub's item at its next look, and an old item
-    /// left open (a hub that was down) closes at the first look.
+    /// update-flow: an older journal's open update card closes once at
+    /// boot, `moved to the status line` (sb-core's retired kind); the next
+    /// boot closes nothing.
     #[test]
-    fn the_update_item_follows_the_machine() {
-        use bise_home::release_offer::State;
+    fn an_old_update_card_closes_once_at_boot() {
+        // an older bise's journal: an open `update` item (written here as
+        // a hub item, then its kind made the old one)
         let mut t = T::new();
-        t.go(release("5", true, None));
-        let id = update_cards(&t)[0].id;
-        // `update now` in another project: installing, then updating here
-        t.go(offer("5", State::Installing));
-        let note = |t: &mut T| t.hub.snapshot(3_000).card_of("update").and_then(|x| x.note.clone());
-        assert_eq!(note(&mut t).as_deref(), Some("updating to v2026.10.2-5…"));
-        let fx = t.go(offer("5", State::Installing));
-        assert!(!fx.iter().any(|e| matches!(e, Effect::ReleaseSwitch { .. })), "installing: no switch yet");
-        // this hub's switch rolled back: closed once, never asked again
-        t.go(offer("5", State::Failed { why: "the hub died".into() }));
-        assert_eq!(closed_as(&t, id).as_deref(), Some("update failed"));
-        let fx = t.go(offer("5", State::Failed { why: "the hub died".into() }));
-        assert!(update_cards(&t).is_empty() && !fx.iter().any(|e| matches!(e, Effect::ReleaseSwitch { .. })));
-        // a newer release: asked again; `later` said elsewhere closes it here
-        t.go(release("6", true, None));
-        let id = update_cards(&t)[0].id;
-        t.go(release("6", true, Some("6")));
-        assert_eq!(closed_as(&t, id).as_deref(), Some("later"));
-        // a stale item from a release this hub never saw: the first look closes it
-        t.go(release("7", true, None));
-        let id = update_cards(&t)[0].id;
-        t.go(release("7", false, None));
-        assert_eq!(closed_as(&t, id).as_deref(), Some("up to date"));
+        let mut fx = Fx::default();
+        let item = super::merge::HubItem { kind: "merge", agent: MAIN, text: "bise v2026.10.2-6 is out", place: "release:6", pr: None };
+        let id = t.hub.open_card(&mut fx, &mut t.env, item).expect("the old card");
+        let opened = fx.into_iter().filter_map(|e| match e {
+            Effect::Journal(ev) => Some(ev),
+            _ => None,
+        });
+        let all: Vec<Value> = t.journal.borrow().iter().cloned().chain(opened).collect();
+        let journal: Vec<Value> = all.iter().map(|ev| serde_json::from_str(&ev.to_string().replace("\"merge\"", "\"update\"")).unwrap()).collect();
+        let mut h = Hub::new("/w");
+        assert!(h.replay(&journal).is_empty(), "an old update card still replays");
+        assert!(
+            h.st.cards.values().any(|c| c.id == id && c.kind == "update"),
+            "{:?} / {:?}",
+            h.st.cards.values().map(|c| (c.id, c.kind.clone())).collect::<Vec<_>>(),
+            journal.iter().filter(|e| e.to_string().contains("update")).collect::<Vec<_>>()
+        );
+        let fx = h.handle(Input::Boot, &mut FakeEnv::new());
+        assert!(h.st.cards.values().all(|c| c.id != id), "closed at boot");
+        assert!(format!("{:?}", fx).contains("moved to the status line"), "{:?}", fx);
+        // the next boot finds none open: nothing closes again
+        let fx = h.handle(Input::Boot, &mut FakeEnv::new());
+        assert!(!format!("{:?}", fx).contains("moved to the status line"), "{:?}", fx);
     }
 
     #[test]
@@ -4135,7 +4081,7 @@ fn sb_core_and_the_gate_agree_on_a_confirm_answer() {
 // amb-core's next commit (sb-core keeps yes/no words there); add it then.
 #[test]
 fn approval_kinds_agree_with_proto() {
-    for kind in ["question", "drop", "confirm", "merge", "feature_try", "feature_merge", "update", "signin"] {
+    for kind in ["question", "drop", "confirm", "merge", "feature_try", "feature_merge", "signin"] {
         let mut t = T::new();
         let id = open_card(&mut t, kind, "go on?\n\n1. yes\n2. no");
         t.user(MAIN, &format!("/answer {} some typed words", id));
@@ -4213,7 +4159,7 @@ fn a_typed_rename_model_and_effort_take_the_tuis_paths() {
 /// and through a typed client's step (the window's slash).
 #[test]
 fn close_closes_every_kind_of_card() {
-    for kind in ["question", "merge", "feature_try", "feature_merge", "update", "signin"] {
+    for kind in ["question", "merge", "feature_try", "feature_merge", "signin"] {
         for typed in [false, true] {
             let mut t = T::new();
             let id = open_card(&mut t, kind, "merge checkout into main?\n\n1. merge\n2. keep working\n3. drop the branch");

@@ -7,8 +7,6 @@
 //! - `latest.json`: the channel's manifest (`bise update --manifest`,
 //!   fetched at most once per period for the whole machine:
 //!   [`Home::release_stamp`] + a flock on it, [`try_lock`]);
-//! - `update-later`: the release the user said `later` to
-//!   ([`write_later`]; `/update` clears it);
 //! - `update-go`: `{id, at}`, written by the hub that got `update now`,
 //!   ONLY once `bise update` installed that release ([`write_go`]): then
 //!   every hub on an older version switches to it, one at a time;
@@ -63,13 +61,14 @@ pub struct Facts<'a> {
     /// the latest release replaces this hub's version (another id, not
     /// older: `release::is_update`)
     pub newer: bool,
-    pub later: Option<&'a str>,
     pub go: Option<&'a Go>,
     /// the id a hub is installing now (the install lock held)
     pub installing: Option<&'a str>,
     /// this hub's version id
     pub my_id: &'a str,
     pub my_failed: Option<&'a Failed>,
+    /// he turned on `Update automatically` (prefs `auto_update`)
+    pub auto: bool,
 }
 
 /// Where the offer is.
@@ -83,8 +82,6 @@ pub enum State {
     Updating,
     /// this hub's switch to it rolled back: not tried again
     Failed { why: String },
-    /// the user said later to this release
-    Later,
     /// this hub runs it, or nothing newer
     UpToDate,
 }
@@ -97,6 +94,9 @@ pub struct Offer {
     /// this hub should switch to `release` now (the shell checks the
     /// switch lock and the running turns)
     pub switch_me: bool,
+    /// `Update automatically` is on and the release is ready: install it
+    /// as `update now` would (the install flock: one hub does it)
+    pub install_me: bool,
 }
 
 impl Offer {
@@ -110,7 +110,10 @@ impl Offer {
 /// whether it switches. Pure; every hub runs it on the same files.
 pub fn plan(f: &Facts) -> Option<Offer> {
     let l = f.latest?;
-    let offer = |state: State, switch_me: bool| Some(Offer { release: l.clone(), state, switch_me });
+    let offer = |state: State, switch_me: bool| {
+        let install_me = f.auto && state == State::Ready;
+        Some(Offer { release: l.clone(), state, switch_me, install_me })
+    };
     if l.id == f.my_id || !f.newer {
         return offer(State::UpToDate, false);
     }
@@ -123,9 +126,6 @@ pub fn plan(f: &Facts) -> Option<Offer> {
     }
     if f.installing == Some(l.id.as_str()) {
         return offer(State::Installing, false);
-    }
-    if f.later == Some(l.id.as_str()) {
-        return offer(State::Later, false);
     }
     offer(State::Ready, false)
 }
@@ -173,11 +173,6 @@ impl crate::Home {
         self.cache_dir().join("update-go")
     }
 
-    /// `update-later`: the release the user said later to (one id).
-    pub fn update_later(&self) -> PathBuf {
-        self.cache_dir().join("update-later")
-    }
-
     /// `update-install`: flocked by the hub installing a release.
     pub fn update_install(&self) -> PathBuf {
         self.cache_dir().join("update-install")
@@ -217,23 +212,19 @@ pub fn write_go(home: &crate::Home, go: &Go) -> std::io::Result<()> {
     write_atomic(&home.update_go(), &json!({"id": go.id, "at": go.at}).to_string())
 }
 
-pub fn read_later(home: &crate::Home) -> Option<String> {
-    std::fs::read_to_string(home.update_later()).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
-}
-
-/// `later` to release `id` (None: `/update` asks again).
-pub fn write_later(home: &crate::Home, id: Option<&str>) -> std::io::Result<()> {
-    match id {
-        Some(id) => write_atomic(&home.update_later(), id),
-        None => match std::fs::remove_file(home.update_later()) {
-            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
-            _ => Ok(()),
-        },
-    }
-}
-
 /// An exclusive flock, held until dropped (or its holder dies).
 pub struct Lock(std::fs::File);
+
+impl Drop for Lock {
+    /// Unlock before the close: a child forked meanwhile (any thread's
+    /// Command, between its fork and its exec) holds a copy of the
+    /// descriptor, and a plain close would leave the lock held by it.
+    fn drop(&mut self) {
+        use std::os::unix::io::AsRawFd;
+        // SAFETY: flock on the descriptor this Lock owns
+        unsafe { libc::flock(self.0.as_raw_fd(), libc::LOCK_UN) };
+    }
+}
 
 impl Lock {
     /// Say what the holder does (the install lock: the id).

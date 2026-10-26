@@ -32,7 +32,7 @@ import type {
   UpdateEv,
 } from "@/proto";
 import type { CoreState } from "@/shared/api";
-import type { Proc } from "@/proto";
+import type { BiseUpdate, Proc } from "@/proto";
 import {
   type Away,
   type BranchesList,
@@ -355,6 +355,11 @@ export class StoreReads extends StoreBase {
   /** Why this core can start no hub (CoreEv broken: its runtime is missing); null: it can. */
   broken(): string | null {
     return this.slice<string | null>("broken", null);
+  }
+
+  /** update-flow: a newer bise for the machine (the core's fold of every hub's); none: null */
+  biseUpdate(): BiseUpdate | null {
+    return this.slice<BiseUpdate | null>("bise_update", null);
   }
 
   /** N1: where his keys and sign-ins are (the core's keychain event); none yet: null */

@@ -75,6 +75,10 @@ export const TAGS = {
   signing: true,
   provider_check: true,
   app_update: true,
+  // update-flow: a newer bise for the machine (the status pill's), folded by the core
+  machine_update: true,
+  // a project's own line (hub/bise_update): the core folds it into machine_update
+  bise_update: true,
   hub_refused: true,
   index: true,
   setup_first: true,

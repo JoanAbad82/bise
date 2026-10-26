@@ -4,13 +4,13 @@ Two throwaway projects, each with its own hub, both from version dir A of a thro
 (this tree's bise, the runtime linked: version_skew_e2e's version_dir). The machine's cache
 (BISE_HOME/cache) names release B as the latest; no fetch (the check's stamp is fresh).
 
-  1. both hubs offer B: one update item each, `bise … is out`;
-  2. `later` said once (update-later): both items close as `later` at the next look;
-  3. `update now` installed (update-go = B, B's dir is there): both hubs switch to B, one at a
-     time (the machine's switch lock, held through each probation: their probations never
-     overlap), and neither switch is a failure; the items close as `updated`;
-  4. a bad release C (its bise exits at once): `update now` for C: each hub tries it once, its
-     probation rolls back to B, and it never tries C again (no retry loop).
+  1. both hubs say B is ready on their release row (hub/bise_update, the status line's), and
+     no hub opens an update card;
+  2. `bise/update` on ONE hub (his click; B's dir is there, so no download): both hubs switch
+     to B, one at a time (the machine's switch lock, held through each probation: their
+     probations never overlap), neither switch is a failure, and both rows are gone;
+  3. a bad release C (its bise exits at once): `bise/update` for C: each hub tries it once,
+     its probation rolls back to B, and it never tries C again (no retry loop).
 
 Looks every 2 s (BISE_RELEASE_LOOK_SECS), probation 6 s (BISE_PROBATION_SECS).
 
@@ -115,8 +115,21 @@ class Hubs:
                 p.kill()
 
 
+def offer(c):
+    """The hub's release row (hub/bise_update, its latest), or None."""
+    with c.lock:
+        return (c.hub.get("hub/bise_update") or {}).get("update")
+
+
 def update_items(c):
+    """Update cards: none any more (the row is the status line's)."""
     return [x for x in c.cards() if x.get("kind") == "update"]
+
+
+def update_now(c):
+    """His click on `update` (the desktop core's, the TUI's /update): bise/update on one hub."""
+    r = c.rpc("bise/update", {"project": c.project()})
+    check("error" not in r, "bise/update refused: %r" % r)
 
 
 def main():
@@ -125,21 +138,15 @@ def main():
     try:
         dirs = M.start()
         cs = [M.client(d) for d in dirs]
-        # 1. both offer B, one item each
+        # 1. both say B is ready on their row, no card
         for c in cs:
-            items = c.wait(lambda c=c: update_items(c) or None, 30, "the update item")
-            check(len(items) == 1, "one update item per hub: %r" % items)
-        print("ok   1: both hubs offer %s, one item each" % B, flush=True)
+            row = c.wait(lambda c=c: offer(c), 30, "the release row")
+            check(row.get("id") == B and row.get("state") == "ready", "B ready: %r" % row)
+            check(not update_items(c), "no update card: %r" % update_items(c))
+        print("ok   1: both hubs say %s is ready on hub/bise_update, no card" % B, flush=True)
 
-        # 2. later once: both close
-        write(os.path.join(M.cache, "update-later"), B)
-        for c in cs:
-            c.wait(lambda c=c: not update_items(c), 20, "the item closed after later")
-        print("ok   2: later in one place closes both items", flush=True)
-
-        # 3. update now (installed): both switch, in turn, no failure
-        os.remove(os.path.join(M.cache, "update-later"))
-        write(os.path.join(M.cache, "update-go"), json.dumps({"id": B, "at": int(time.time() * 1000)}))
+        # 2. update now on ONE hub (installed): both switch, in turn, no failure
+        update_now(cs[0])
         both = []
 
         def on_b():
@@ -156,16 +163,18 @@ def main():
             check("failed" not in st, "a waiting turn is not a failed switch: %r" % st)
         cs = [M.client(d) for d in dirs]
         for c in cs:
-            c.wait(lambda c=c: not update_items(c), 20, "no update item on %s" % B)
-        print("ok   3: update now: both hubs switched to %s in turn, no failure" % B, flush=True)
+            c.wait(lambda c=c: "hub/bise_update" in c.hub and offer(c) is None, 20, "no release row on %s" % B)
+        print("ok   2: update now in one project: both hubs switched to %s in turn, no failure" % B, flush=True)
 
-        # 4. a bad release: tried once per hub, rolled back, never again
+        # 3. a bad release: tried once per hub, rolled back, never again
         bad = version_dir(M.prefix, C)
         os.remove(os.path.join(bad, "bise"))
         write(os.path.join(bad, "bise"), "#!/bin/sh\nexit 3\n")
         os.chmod(os.path.join(bad, "bise"), 0o755)
         manifest(M.cache, C, "2026.10.9-2")
-        write(os.path.join(M.cache, "update-go"), json.dumps({"id": C, "at": int(time.time() * 1000)}))
+        c = cs[0]
+        c.wait(lambda: (offer(c) or {}).get("id") == C, 30, "the row says %s" % C)
+        update_now(c)
 
         def failed_on_c(d):
             try:
@@ -179,7 +188,7 @@ def main():
         # several looks (every 2 s): no hub tries C again, both stay on B
         wait.holds(lambda: [M.log(d).count("update-flow: switching to") for d in dirs] == tries
                    and all(M.root(d) == B for d in dirs), 15, "no retry of %s, both on %s" % (C, B), poll=0.5)
-        print("ok   4: a bad release fails once per hub, no retry", flush=True)
+        print("ok   3: a bad release fails once per hub, no retry", flush=True)
     finally:
         M.close()
         E.close()

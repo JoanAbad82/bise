@@ -124,6 +124,9 @@ pub const METHODS: &[MethodRow] = &[
     m("version/restart", "version_restart", None),
     // its words come as hub/notice (the release check answers later)
     m("version/update", "version_update", None),
+    // update now (update-flow): his click on the status pill or line;
+    // client sockets only (issue 16), never an agent's op
+    m("bise/update", "bise_update", None),
     m("release/plan", "release_plan", Some("release")),
     // its steps go to every client as `release/progress`
     m("release/run", "release_run", None),
@@ -231,6 +234,8 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/growth", "growth", Scope::Hub),
     // the H1 sidebar: the project's pulse (rows::pulse)
     n("hub/pulse", "pulse", Scope::Hub),
+    // a newer bise, as this hub sees it (rows::bise_update, update-flow)
+    n("hub/bise_update", "bise_update", Scope::Hub),
     n("job/end", "job_end", Scope::Hub),
     n("job/followedEnd", "followed_end", Scope::Hub),
     // les bims: a message sent, a report made (no body, no text)

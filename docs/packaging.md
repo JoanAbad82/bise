@@ -461,15 +461,23 @@ downloaded once by hand.
   GET, one hub at a time under a flock; `BISE_RELEASE_CHECK_SECS`; off
   with `BISE_NO_UPDATE=1`; never in bise's source tree). The offer is the
   machine's (update-flow, `bise_home::release_offer`): every hub plans it
-  from the same files every 30 s. For a newer release each hub opens ONE
-  quiet inbox item: `bise vX.Y.Z is out`, the lines, `you're on v…`, then
-  `1 update now` (installs it once, then every project switches to it one
-  at a time, probation, agents kept), `2 later` (not again for this
-  release, in any project), `3 release notes ↗`. A project whose switch
-  rolled back doesn't retry that release. `/update` checks now. No notes:
-  the item has no body. (The item becomes a status line next: page
-  update-flow-forms.) The desktop app's own updater is separate: it swaps
-  the app, never the hubs.
+  from the same files every 30 s. A newer release is never an inbox item
+  (page update-flow-forms, Gabriel's pick A): each hub says it on
+  `hub/bise_update` (rows::BiseUpdate: ready, installing, updating,
+  failed), the desktop core folds every project's into the machine's
+  one line (`core/machine_update`) and the window draws it in its status
+  pill: `bise vX.Y.Z is ready · update`, the notes in its popover. His
+  click (`core/bise_update`, then `hub/bise_update` to one hub; a
+  client-socket method, never an agent's) installs it once, then every
+  project switches to it one at a time (probation, agents kept), and the
+  app's own update installs with it and reopens the window where he is.
+  The TUI says it in its status line (`vX.Y.Z ready · /update`). A
+  project whose switch rolled back doesn't retry that release.
+  `/update auto on` (Settings › general, `Update automatically`, prefs
+  `auto_update`, off by default) installs a ready release by itself.
+  `/update` checks now. Item cards of kind `update` from older hubs close
+  once at boot ("moved to the status line"). The desktop app's own
+  updater still swaps the app alone when no newer bise waits.
 - **Private repo**: a plain download of an asset answers 404. install.sh
   and `bise update` (the daily check, `/restart latest`) then ask
   `gh release download` (the GitHub CLI, `gh auth login`), else the API

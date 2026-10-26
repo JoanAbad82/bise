@@ -719,7 +719,6 @@ mod tests {
         let snap = Snapshot {
             cards: vec![
                 CardRow { pr: Some(384), place: Some("p1".into()), ..card(384, "merge", "pattern-error-dx", "#384 is ready to merge\nP2 errors\ngithub.com/gvergnaud/ts-pattern/pull/384\n\n1. squash and merge\n2. open it on GitHub\n3. not yet") },
-                CardRow { link: Some("https://bise.dev/notes".into()), ..card(5, "update", "main", "bise 1.2 is out\n\n1. update now\n2. later\n3. release notes") },
                 card(6, "signin", "main", "sign in again?\n\n1. sign in again\n2. later"),
                 card(7, "question", "docs", "where?\n1. here\n2. there"),
             ],
@@ -729,7 +728,6 @@ mod tests {
         let acts = |id: u64| his.iter().find(|c| c.id == id).unwrap().options.iter().map(|o| o.act.clone()).collect::<Vec<_>>();
         let pr = Some(OptAct::link(Some("https://github.com/gvergnaud/ts-pattern/pull/384")));
         assert_eq!(acts(384), vec![None, pr, None]);
-        assert_eq!(acts(5), vec![None, None, Some(OptAct::link(Some("https://bise.dev/notes")))]);
         assert_eq!(acts(6), vec![Some(OptAct::SignIn), None]);
         assert_eq!(acts(7), vec![None, None]);
         // the row's act is the rule's for every kind and option (the TUI asks the same fn)

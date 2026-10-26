@@ -223,16 +223,14 @@ pub enum Input {
     /// A land in line on a feature asks where its agent lands now
     /// (`feature::onto`): the daemon answers from the state on its loop.
     Onto { agent: String, reply: std::sync::mpsc::Sender<Option<String>> },
-    /// update-card: a check of the release channel (the daemon's, at
-    /// the start and every hour, or `/update`).
-    Release(update_card::ReleaseCheck),
+    /// update-flow: a look at the machine's release offer (the daemon's,
+    /// every 30 s, or `/update`).
+    Release(release_line::ReleaseCheck),
     /// expired-ux: the ChatGPT sign-in is back (the daemon reads
     /// auth.json): the `signin` item closes, its agents go on.
     SignedIn,
     /// bise's message to `to` (sb-core's IHubMsg): a land whose sb was gone (daemon/land.rs).
     HubMsg { to: String, text: String },
-    /// update-card: the end of `1` on an update item (`Effect::Update`):
-    /// Ok, the switch started; Err, why it failed (nothing changed).
     /// desktop S2, a project hub: bise's message (`xin` on hub.sock) from
     /// bise's hub `hub`; `token` answers the caller (ack or error).
     XIn {
@@ -304,11 +302,15 @@ pub enum Input {
         focus: String,
         cmd: UserCmd,
     },
+    /// update-flow: the end of `update now` (`Effect::Update`): Ok, the
+    /// release is installed; Err, why it failed (nothing changed).
     Updated {
-        card: u64,
         version: String,
         res: Result<(), String>,
     },
+    /// update-flow: `update now` (his click: `bise/update`): the release
+    /// the machine offers, installed once, every project switched to it
+    UpdateNow,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -478,17 +480,18 @@ pub enum Effect {
         /// The feature's agents (live), each with its worktree.
         agents: Vec<(String, String)>,
     },
-    /// update-card: the user's `1` on an update item: the daemon installs
-    /// release `id` (`bise update` when needed), switches onto it, and
-    /// answers with `Input::Updated` (`version`: its name, for the words).
+    /// update-flow: `update now`: the daemon installs release `id` once
+    /// for the machine (`bise update` when needed), then writes
+    /// `update-go`, and answers with `Input::Updated` (`version`: its
+    /// name, for the words).
     Update {
-        card: u64,
         id: String,
         version: String,
     },
-    /// update-card: `2 later`: the daemon keeps the id, no item again for it.
-    UpdateLater {
-        id: String,
+    /// update-flow: what the clients show changed (`hub/bise_update`, the
+    /// TUI's status line); None: nothing to show.
+    BiseUpdate {
+        update: Option<bise_proto::rows::BiseUpdate>,
     },
     /// update-flow: the machine's `update now` is installed and this hub
     /// still runs an older version: the daemon switches it to release
@@ -669,8 +672,8 @@ pub struct Hub {
     /// pr-merge (pr-design §6.3): the ready-to-merge items' runtime side
     /// (merge.rs).
     merges: merge::Merges,
-    /// update-card: the new-release item's runtime side (update_card.rs).
-    updates: update_card::Updates,
+    /// update-flow: a newer bise, this hub's side (release_line.rs).
+    updates: release_line::Updates,
     /// expired-ux: the agents waiting for the ChatGPT sign-in
     /// (signin_card.rs).
     signin: signin_card::SignIn,
@@ -813,7 +816,7 @@ impl Hub {
             pr_news: Default::default(),
             pr_bots: Vec::new(),
             merges: merge::Merges::default(),
-            updates: update_card::Updates::default(),
+            updates: release_line::Updates::default(),
             signin: signin_card::SignIn::default(),
             dirty: false,
             link,
@@ -1530,10 +1533,11 @@ impl Hub {
             Input::PageCard { agents, kind, text, key } => self.core(&mut fx, env, None, In::PageCard(ci::PageCard { agents, kind, text, key })),
             Input::AnswerPos { card, agent, pos } => self.core(&mut fx, env, None, In::AnswerPos(ci::AnswerPos { card, agent, pos })),
             Input::Merged { card, place, number, res } => self.merged(&mut fx, env, card, &place, number, res),
-            Input::Release(c) => self.release_in(&mut fx, env, c),
+            Input::Release(c) => self.release_in(&mut fx, c),
+            Input::UpdateNow => self.update_now(&mut fx),
             Input::SignedIn => self.signed_in(&mut fx, env),
             Input::HubMsg { to, text } => self.core(&mut fx, env, None, In::HubMsg(ci::HubMsg { to, text })),
-            Input::Updated { card, version, res } => self.updated(&mut fx, env, card, &version, res),
+            Input::Updated { version, res } => self.updated(&mut fx, &version, res),
             Input::XIn { token, hub, xid, kind, text, name, parts } => {
                 self.core(&mut fx, env, None, In::XIn(ci::XIn { token, hub, xid, kind, text, name, parts }))
             }
@@ -1997,8 +2001,8 @@ pub use feature::FeatureDone;
 #[path = "merge.rs"]
 mod merge;
 
-#[path = "update_card.rs"]
-pub mod update_card;
+#[path = "release_line.rs"]
+pub mod release_line;
 
 #[path = "signin_card.rs"]
 pub mod signin_card;

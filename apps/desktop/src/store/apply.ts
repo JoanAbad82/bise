@@ -117,6 +117,9 @@ export function applyTyped(s: Store, ev: Ev): void {
       // les bims: how much the project has done (the office's stages read it), at hello and on change
       s.put(`growth:${ev.project}`, ev.growth);
       return;
+    case "bise_update":
+      // update-flow: a project's own line; the window draws the core's fold (machine_update)
+      return;
     case "pulse":
       // the H1 sidebar's pulse: the core folds a held hub's hub/pulse into its ProjectRow.pulse and
       // sends the rows again (core/hubs.rs emit_rows), so the sidebar reads it from useProjects;
@@ -368,6 +371,10 @@ export function applyTyped(s: Store, ev: Ev): void {
     case "keychain":
       // N1: where his keys and sign-ins are kept, and the last /keychain move's lines
       s.put("keychain", ev);
+      return;
+    case "machine_update":
+      // update-flow: a newer bise for the machine (every project's, folded by the core)
+      s.put("bise_update", ev.update ?? null);
       return;
     case "hub_refused":
       // a project's hub refused this core: its words until he retries

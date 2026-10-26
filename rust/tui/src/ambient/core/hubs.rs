@@ -124,11 +124,13 @@ struct Conn {
     down: Option<String>,
     /// its hub's last `hub/pulse` (the row's `pulse` while it is held)
     pulse: Option<bise_proto::rows::Pulse>,
+    /// update-flow: its hub's last `hub/bise_update` (None: on it)
+    bise_update: Option<bise_proto::rows::BiseUpdate>,
 }
 
 impl Conn {
     fn new(hub: Hub, until: Option<Instant>) -> Conn {
-        Conn { hub, welcomed: false, rows: None, archived: Default::default(), pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default(), down: None, pulse: None }
+        Conn { hub, welcomed: false, rows: None, archived: Default::default(), pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default(), down: None, pulse: None, bise_update: None }
     }
 
     /// One window command (a `HubCmd`'s JSON) to its hub, as a request
@@ -188,6 +190,8 @@ pub(super) struct Hubs {
     /// (`processes_all`): a lease the screen renews, so no hold outlives
     /// its screen, its window or this core (architect m_38378)
     lists: Option<Instant>,
+    /// update-flow: the machine's line the window last got (`bise_update`)
+    bise_sent: Option<Option<bise_proto::rows::BiseUpdate>>,
 }
 
 /// How long the running screen's hold lasts after its window last said
@@ -854,6 +858,11 @@ impl Core {
                 c.pulse = Some(pulse);
                 self.emit_projects();
             }
+            // update-flow: the machine's one line, folded over every hub
+            HubEv::BiseUpdate { update, .. } => {
+                c.bise_update = update;
+                self.emit_bise_update();
+            }
             _ => {}
         }
         if let Some(t) = for_voice {
@@ -898,6 +907,32 @@ impl Core {
         self.hubs.git = self.hubs.rows.iter().map(|r| (r.id.clone(), (p.facts.git)(&r.path))).collect();
         self.hold();
         self.emit_rows();
+    }
+
+    /// update-flow: `machine_update`, the machine's line folded over every
+    /// held hub's (rows::bise_update::machine, the projects by name), when
+    /// it changed.
+    pub(super) fn emit_bise_update(&mut self) {
+        let rows = &self.hubs.rows;
+        let name = |id: &str| rows.iter().find(|r| r.id == id).map_or_else(|| id.to_string(), |r| r.name.clone());
+        let hubs: Vec<(String, Option<bise_proto::rows::BiseUpdate>)> =
+            self.hubs.conns.iter().map(|(id, c)| (name(id), c.bise_update.clone())).collect();
+        let now = bise_proto::rows::machine(&hubs);
+        if self.hubs.bise_sent.as_ref() == Some(&now) {
+            return;
+        }
+        self.hubs.bise_sent = Some(now.clone());
+        self.emit(json!({"ev": "machine_update", "update": now}));
+    }
+
+    /// update-flow: his click on the pill's `update` (`bise_update`): to
+    /// one connected hub (the machine installs it once; the install flock
+    /// dedupes a second); false when none is connected.
+    pub(super) fn bise_update_now(&mut self) -> bool {
+        let project = self.hubs.conns.iter().find(|(_, c)| c.rpc.ready).map(|(id, _)| id.clone());
+        let Some(project) = project else { return false };
+        let cmd = json!({"cmd": "bise_update", "project": project});
+        self.hubs.conns.get_mut(&project).is_some_and(|c| c.send(&cmd, None))
     }
 
     /// `projects` when the rows changed.

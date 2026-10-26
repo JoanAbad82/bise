@@ -440,7 +440,7 @@ impl super::Sb {
 /// `choice_kind`): a digit answers them (the hub acts, then closes the
 /// item); typed words go to main.
 pub(super) fn choice_kind(kind: &str) -> bool {
-    matches!(kind, "merge" | "feature_try" | "feature_merge" | "update" | "signin")
+    matches!(kind, "merge" | "feature_try" | "feature_merge" | "signin")
 }
 
 /// A hub item, as the hub writes it: its head line (`#409 is ready to
@@ -475,16 +475,6 @@ fn choice_shape(c: &Card) -> Shape {
                 l.replace('−', minus)
             }));
         }
-    } else if c.kind == "update" {
-        // update-card (designer): the notes are text, the running version
-        // (the last line) is dim; no link line, `3` opens it
-        let rest: Vec<&str> = rest.iter().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
-        if let Some((on, notes)) = rest.split_last() {
-            if !notes.is_empty() {
-                parts.push(Part::Text(notes.join("\n")));
-            }
-            parts.push(Part::Evidence(on.to_string()));
-        }
     } else {
         parts.push(Part::Text(rest.join("\n").trim().to_string()));
     }
@@ -493,12 +483,6 @@ fn choice_shape(c: &Card) -> Shape {
     }
     let options: Vec<String> = if theme::ascii_mode() { options.iter().map(|o| o.replace('↗', "->")).collect() } else { options };
     let short = short_labels(&options);
-    if c.kind == "update" {
-        // the hub's own news, not an agent's: the head alone
-        // the row: `bise · v0.0.2 is out`
-        let summary = head.strip_prefix("bise ").unwrap_or(&head).to_string();
-        return Shape::plain(head.clone(), "bise".into(), summary, parts, options, short, Enter::Answer);
-    }
     if c.kind == "signin" {
         // expired-ux: bise's own item too, the head alone
         return Shape::plain(head.clone(), "bise".into(), head, parts, options, short, Enter::Answer);

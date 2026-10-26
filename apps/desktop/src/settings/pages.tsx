@@ -136,6 +136,8 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
             ports={ports.dist}
           />
         )}
+        {/* update-flow (Gabriel's pick, designer m_45087): bise's own updates, off by default */}
+        <Group testId="settings.general.bise" items={[tg('auto_update', settings.auto_update, settings.auto_update_sub, false)]} />
         </>
       );
     }

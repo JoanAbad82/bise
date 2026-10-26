@@ -263,6 +263,14 @@ pub enum CoreEv {
     /// signature, and swaps itself only on his click. Sent once per
     /// version, never for the same build or an older one
     AppUpdate { version: String, url: String, sha256: String },
+    /// update-flow: a newer bise for the machine, folded from every
+    /// project's `hub/bise_update` (rows::bise_update::machine): the
+    /// status pill's; None: nothing to show. Sent when it changes. Its own
+    /// tag: a CoreEv never shares one with a HubEv (app_rpc's law)
+    MachineUpdate {
+        #[serde(default)]
+        update: Option<crate::rows::BiseUpdate>,
+    },
     /// a project's hub refused this core's connection (its words): the
     /// core never reconnects to it until he retries (`hub_retry`) or a
     /// new core starts; commands to it get error {kind: hub_refused}
@@ -419,7 +427,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "browse", "plugin_preview", "plugins_summary", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "library_folders", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "send_answered", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "browse", "plugin_preview", "plugins_summary", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "library_folders", "app_update", "machine_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "send_answered", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

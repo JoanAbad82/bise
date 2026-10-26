@@ -6,7 +6,7 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, PluginPreview, PluginsSummary, ProjectRow, RoleRow, ScheduledTask, Worktree, Folder } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import type { Proc } from '@/proto';
+import type { BiseUpdate, Proc } from '@/proto';
 import { keep } from '@/app/keep';
 import type { AnsweredFrom } from './answered';
 import type { AnswerJump } from './store';
@@ -82,6 +82,8 @@ function useSlice<T>(key: string, read: (s: Store) => T): T {
 export const useProjects = (): readonly ProjectRow[] => useSlice('projects', (s) => s.projects());
 /** Why this core can start no hub (its runtime is missing); null: it can. */
 export const useBroken = (): string | null => useSlice('broken', (s) => s.broken());
+/** update-flow: a newer bise for the machine (the status pill's); none: null */
+export const useBiseUpdate = (): BiseUpdate | null => useSlice('bise_update', (s) => s.biseUpdate());
 export const useAgents = (project: string): readonly Agent[] => useSlice(`agents:${project}`, (s) => s.agents(project));
 /** A project's open cards: its `projects` row's, the one copy every view and count reads. */
 export const useCards = (project: string): readonly Card[] => useSlice('projects', (s) => s.cards(project));

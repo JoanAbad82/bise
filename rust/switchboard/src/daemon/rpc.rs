@@ -278,7 +278,7 @@ impl Shell {
         let pages = self.pages_ev(&snap);
         let growth = self.growth_ev(&snap);
         let pulse = self.pulse_ev();
-        let mut evs = vec![agents, cards, jobs, arts, self.features_ev(), self.prs_ev(), self.scheduled_ev(), self.models_ev(), appr, self.flow_ev(), self.paused_ev(), self.switch_ev(), pages, growth, pulse];
+        let mut evs = vec![agents, cards, jobs, arts, self.features_ev(), self.prs_ev(), self.scheduled_ev(), self.models_ev(), appr, self.flow_ev(), self.paused_ev(), self.switch_ev(), pages, growth, pulse, self.bise_update_ev()];
         // the versions (`dev`: the terminal's /release-bise, the /version
         // picker), as the older hello's burst carried them
         if let Some(v) = self.typed_of(&self.version_items()) {
@@ -518,6 +518,7 @@ mod tests {
             ("pages", "pages_ev"),
             ("growth", "growth_ev"),
             ("pulse", "pulse_ev"),
+            ("bise_update", "bise_update_ev"),
             ("versions", "version_items"),
             ("release", "in_progress"),
             ("update", "in_progress"),

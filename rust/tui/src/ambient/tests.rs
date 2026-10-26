@@ -34,7 +34,7 @@ use fake_hub::HubEnd;
 
 /// The hub's `user_kind` (switchboard::model), as main.rs hands it in.
 fn user_kind(kind: &str) -> bool {
-    matches!(kind, "question" | "drop" | "confirm" | "merge" | "feature_try" | "feature_merge" | "update")
+    matches!(kind, "question" | "drop" | "confirm" | "merge" | "feature_try" | "feature_merge")
 }
 
 struct T {

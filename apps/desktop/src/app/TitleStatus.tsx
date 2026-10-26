@@ -12,7 +12,7 @@ import { Act, IconButton, Press, cx } from '@/ds';
 import { Breath } from '@/working/Signs';
 import { useCoreLine } from './CoreLine';
 import { useReloadLine } from './ReloadLine';
-import { useHubUpdateLine, useUpdateLine } from './UpdateLine';
+import { useBiseUpdateLine, useHubUpdateLine, useUpdateLine } from './UpdateLine';
 import { worst, type StatusPart } from './status';
 import './status.css';
 
@@ -22,8 +22,10 @@ export function useStatus(): StatusPart | null {
   const reload = useReloadLine();
   const update = useUpdateLine();
   const hubUpdate = useHubUpdateLine();
-  // the order breaks a tie (designer: core down > failed > update > reload > done)
-  return worst([core, hubUpdate, update, reload]);
+  const biseUpdate = useBiseUpdateLine();
+  // the order breaks a tie (designer: core down > failed > update > reload > done); a newer bise
+  // for the machine says the app's own update too (its click installs both), so it goes first
+  return worst([core, hubUpdate, biseUpdate, update, reload]);
 }
 
 /** The pill amb-win's title-bar slot draws; nothing while bise does nothing by itself. */

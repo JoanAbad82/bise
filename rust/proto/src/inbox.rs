@@ -64,7 +64,7 @@ impl InboxKind {
             "question" => InboxKind::Question,
             "drop" => InboxKind::Drop,
             "confirm" => InboxKind::Confirm,
-            "merge" | "feature_try" | "feature_merge" | "update" | "signin" => InboxKind::Item,
+            "merge" | "feature_try" | "feature_merge" | "signin" => InboxKind::Item,
             _ => InboxKind::Unknown,
         }
     }

@@ -11,7 +11,21 @@ import ./lazy.bend as LZ
 # `card_open`): the user's digit goes back to Rust (`card_choice`), which
 # acts and closes the item; typed words go to main
 def choice_kind(+k: String) -> Bool:
-  String.eq(k, "merge") || String.eq(k, "feature_try") || String.eq(k, "feature_merge") || String.eq(k, "update") || String.eq(k, "signin")
+  String.eq(k, "merge") || String.eq(k, "feature_try") || String.eq(k, "feature_merge") || String.eq(k, "signin")
+
+# a retired hub item kind: `update` (the update offer is the status
+# line's now, update-flow); an older journal's open one closes at boot
+def retired_kind(+k: String) -> Bool:
+  String.eq(k, "update")
+
+# the ids of the open cards of a retired kind
+def retired_cards(xs: List<&2, S.Card>) -> List<&2, Nat>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = retired_cards(t)
+      Bool.pick(List<&2, Nat>, retired_kind(S.Card.kind(h)), S.Card.id(h) <> rest, rest)
 
 # a page's own card (plan-ok): a plan an agent proposes, or a page's
 # question or drawn pick (notif-artifact), asked by that agent (core.bend

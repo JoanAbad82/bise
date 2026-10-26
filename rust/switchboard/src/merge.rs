@@ -158,7 +158,6 @@ impl Hub {
         // one arm per kind
         match kind.as_str() {
             "merge" => self.merge_choice(fx, env, card, place, pr, &choice),
-            update_card::KIND => self.update_choice(fx, env, card, place, &choice),
             // dev-flow §5.1: a feature's try and merge items
             k @ (crate::feature::TRY | crate::feature::MERGE) => self.feature_choice(fx, card, k, place.as_deref(), &choice),
             _ => {}

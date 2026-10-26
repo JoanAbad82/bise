@@ -410,6 +410,14 @@ impl Core {
                 self.app_version(id, built);
                 return;
             }
+            // update-flow: his click on the pill's `update`, to one hub
+            AppCmd::BiseUpdate {} => {
+                let res = match self.bise_update_now() {
+                    true => Ok(()),
+                    false => Err("no project's bise is running to update it".to_string()),
+                };
+                ("bise_update", res)
+            }
             AppCmd::FoundScan { dir } => {
                 let dir = dir.filter(|d| !d.trim().is_empty()).map(PathBuf::from).unwrap_or_else(|| p.home_dir.clone());
                 (p.scan)(dir, s.tx.clone());

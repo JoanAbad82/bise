@@ -121,4 +121,39 @@ crate::words! { settings:
     dist_beta = "beta builds";
     /// dist update: the beta row's line
     dist_beta_sub = "new builds a few days early. turning it off keeps your build until stable passes it.";
+
+    /// a newer bise (update-flow, designer m_45087): the status pill
+    bise_ready(version) = "bise {version} is ready";
+    /// a newer bise: the pill's action (never "restart": nothing stops)
+    bise_update = "update";
+    /// a newer bise: the pill's tip, what an update keeps
+    bise_update_tip = "your agents keep working, your drafts stay, and the window reopens where you are.";
+    /// a newer bise: the tip's last line
+    bise_update_notes = "all notes in Settings › update";
+    /// a newer bise: while it updates
+    bise_updating(version) = "updating to {version}… your agents keep working";
+    /// a newer bise: the projects still to switch
+    bise_updating_left(n) = "{n} to go";
+    /// a newer bise: done, a few seconds
+    bise_updated(version) = "updated to {version}";
+    /// a newer bise: a project's switch rolled back
+    bise_update_failed(version) = "couldn't update to {version}";
+    /// a newer bise: failed's action
+    bise_update_again = "try again";
+    /// a newer bise: failed's tip after the reason
+    bise_update_unchanged(running) = "you're still on {running}. nothing changed.";
+    /// the terminal's status line: ready
+    tui_bise_ready(version) = "{version} ready · /update";
+    /// the terminal's status line: updating
+    tui_bise_updating(version) = "updating to {version}… agents keep working";
+    /// the terminal's status line: failed
+    tui_bise_failed(version) = "▲ couldn't update to {version} · /update tries again";
+    /// the setting: its label
+    auto_update = "Update automatically";
+    /// the setting: its line
+    auto_update_sub = "when a new bise is out, it updates at a quiet moment. your agents keep working.";
+    /// `/update auto on`'s answer
+    auto_update_on = "bise updates by itself now";
+    /// `/update auto off`'s answer
+    auto_update_off = "bise asks before it updates";
 }

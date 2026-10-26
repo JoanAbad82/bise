@@ -178,11 +178,40 @@ pub(super) fn header_item(sb: &Sb, gust: &[Span<'static>]) -> Vec<Span<'static>>
     let text = match (&sb.release, &sb.updating) {
         (Some((tag, since)), _) => format!(" releasing {} · {}", tag, took(since.elapsed().as_secs())),
         (None, Some((rev, since))) => format!(" building {} · {}", rev, took(since.elapsed().as_secs())),
-        (None, None) => return Vec::new(),
+        (None, None) => return bise_update_item(sb.bise_update.as_ref(), gust),
     };
     let mut out: Vec<Span<'static>> = gust.to_vec();
     out.push(Span::styled(text, Style::default().fg(dim())));
     out
+}
+
+/// update-flow: a newer bise in the header (designer m_45087), when no
+/// release or build runs: `v… ready · /update` dim with `/update` in
+/// text; updating with the gust; failed with `▲` in err. Nothing when on
+/// it.
+pub(super) fn bise_update_item(u: Option<&bise_proto::rows::BiseUpdate>, gust: &[Span<'static>]) -> Vec<Span<'static>> {
+    use bise_proto::rows::BiseUpdateState as S;
+    use bise_proto::words::settings;
+    let Some(u) = u else { return Vec::new() };
+    let dim_s = Style::default().fg(dim());
+    match u.state {
+        S::Ready => {
+            let line = settings::tui_bise_ready(&u.version);
+            let (head, cmd) = line.split_once("/update").map_or((line.as_str(), ""), |(h, _)| (h, "/update"));
+            vec![Span::styled(format!(" {head}"), dim_s), Span::raw(cmd.to_string())]
+        }
+        S::Installing | S::Updating => {
+            let mut out: Vec<Span<'static>> = gust.to_vec();
+            out.push(Span::styled(format!(" {}", settings::tui_bise_updating(&u.version)), dim_s));
+            out
+        }
+        S::Failed => {
+            let line = settings::tui_bise_failed(&u.version);
+            let rest = line.trim_start_matches('▲').trim_start().to_string();
+            vec![Span::styled(" ▲ ", Style::default().fg(error())), Span::styled(rest, dim_s)]
+        }
+        S::Unknown => Vec::new(),
+    }
 }
 
 #[cfg(test)]

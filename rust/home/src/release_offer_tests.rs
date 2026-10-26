@@ -30,19 +30,11 @@ fn a_newer_release_is_ready_and_nothing_switches() {
 }
 
 #[test]
-fn later_hides_it_until_a_newer_release() {
-    let l = latest("5");
-    assert_eq!(state(&Facts { later: Some("5"), ..facts(&l, "4") }), (State::Later, false));
-    let next = latest("6");
-    assert_eq!(state(&Facts { later: Some("5"), ..facts(&next, "4") }), (State::Ready, false));
-}
-
-#[test]
 fn an_install_running_anywhere_is_installing_everywhere() {
     let l = latest("5");
     assert_eq!(state(&Facts { installing: Some("5"), ..facts(&l, "4") }), (State::Installing, false));
-    // even after later: someone asked for it
-    assert_eq!(state(&Facts { installing: Some("5"), later: Some("5"), ..facts(&l, "4") }), (State::Installing, false));
+    // an install of an older release is not this one's
+    assert_eq!(state(&Facts { installing: Some("3"), ..facts(&l, "4") }), (State::Ready, false));
 }
 
 #[test]
@@ -50,8 +42,6 @@ fn go_switches_every_hub_still_older_and_none_on_it() {
     let l = latest("5");
     let go = Go { id: "5".into(), at: 100 };
     assert_eq!(state(&Facts { go: Some(&go), ..facts(&l, "4") }), (State::Updating, true));
-    // later in another project doesn't stop an update asked for
-    assert_eq!(state(&Facts { go: Some(&go), later: Some("5"), ..facts(&l, "4") }), (State::Updating, true));
     // on it: nothing to show, no switch
     assert_eq!(state(&Facts { go: Some(&go), ..facts(&l, "5") }), (State::UpToDate, false));
     // a go for an older release is stale: the newer one is ready
@@ -77,9 +67,9 @@ fn a_failed_switch_is_not_retried_until_a_new_go_or_a_newer_release() {
 #[test]
 fn only_ready_installing_and_updating_show() {
     let l = latest("5");
-    let shown = |s: State| Offer { release: l.clone(), state: s, switch_me: false }.shown();
+    let shown = |s: State| Offer { release: l.clone(), state: s, switch_me: false, install_me: false }.shown();
     assert!(shown(State::Ready) && shown(State::Installing) && shown(State::Updating));
-    assert!(!shown(State::Later) && !shown(State::UpToDate) && !shown(State::Failed { why: String::new() }));
+    assert!(!shown(State::UpToDate) && !shown(State::Failed { why: String::new() }));
 }
 
 #[test]
@@ -101,16 +91,11 @@ fn home() -> (crate::Home, PathBuf) {
 }
 
 #[test]
-fn go_and_later_round_trip_and_later_clears() {
+fn go_round_trips() {
     let (h, dir) = home();
     assert_eq!(read_go(&h), None);
     write_go(&h, &Go { id: "5".into(), at: 7 }).unwrap();
     assert_eq!(read_go(&h), Some(Go { id: "5".into(), at: 7 }));
-    write_later(&h, Some("5")).unwrap();
-    assert_eq!(read_later(&h).as_deref(), Some("5"));
-    write_later(&h, None).unwrap();
-    write_later(&h, None).unwrap();
-    assert_eq!(read_later(&h), None);
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -142,4 +127,20 @@ fn a_lock_is_one_holders_and_freed_when_its_holder_dies() {
     drop(l);
     assert_eq!(installing(&h), None);
     let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn auto_installs_a_ready_release_and_never_a_failed_one() {
+    let l = latest("5");
+    let auto = |f: Facts| plan(&Facts { auto: true, ..f }).map(|o| (o.state, o.install_me)).unwrap();
+    assert_eq!(auto(facts(&l, "4")), (State::Ready, true));
+    // installing, updating, failed, up to date: nothing to install
+    assert_eq!(auto(Facts { installing: Some("5"), ..facts(&l, "4") }), (State::Installing, false));
+    let go = Go { id: "5".into(), at: 100 };
+    assert_eq!(auto(Facts { go: Some(&go), ..facts(&l, "4") }), (State::Updating, false));
+    let failed = Failed { id: "5".into(), at: 200, why: "the hub died".into() };
+    assert!(!auto(Facts { go: Some(&go), my_failed: Some(&failed), ..facts(&l, "4") }).1);
+    assert_eq!(auto(facts(&l, "5")), (State::UpToDate, false));
+    // off: never
+    assert!(!plan(&facts(&l, "4")).unwrap().install_me);
 }
