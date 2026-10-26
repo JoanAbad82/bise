@@ -6,7 +6,7 @@
 // width dragged re-renders the panel and the bar's tabs, never the shell or the composer. Every
 // door in: openTab (tabs.ts), the bar's ▯ and ⌥⌘B (⌥⌘0) (panelToggle), ⌃` (openShell), the
 // launcher's picks. Owner: nm-panel; the per-project scope panel-scope.
-import { useEffect, useLayoutEffect, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { useRoute } from '@/app/router';
 import { useProjects } from '@/store';
@@ -14,7 +14,7 @@ import { useLeftWidth } from '@/app/frame-state';
 import { iconKindOf } from '@/ds';
 import { useAllArtifacts } from '@/artifacts';
 import { armHandoff } from '@/composer/handoff';
-import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, pushRecent, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 import { isFlat, parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf, type PanelRec } from './scope';
 
 const KEY = 'panel';
@@ -22,7 +22,8 @@ const KEY = 'panel';
 /** The kept record as it was read; a flat one (from before the scope) waits for the first project in front. */
 let kept: unknown = keep.view(KEY);
 let rec: PanelRec = parseRec(kept);
-let state: PanelKept = viewOf(rec);
+// TODO(panel-scope): a flat record shows as it was until the first project takes it
+let state: PanelKept = isFlat(kept) ? parseKept(kept) : viewOf(rec);
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -55,6 +56,32 @@ export function panelScope(project: string): void {
   state = viewOf(rec);
   keep.setView(KEY, rec);
   emit();
+}
+
+/** The project whose panel is in front ('' before the first). */
+export function panelAt(): string {
+  return rec.at;
+}
+
+/**
+ * The panel just became another project's (Host.tsx data-snap): true for the frame of the switch,
+ * so its width snaps instead of easing from the other project's (ui-review m_45602).
+ */
+export function useScopeSnap(): boolean {
+  usePanelState();
+  const at = rec.at;
+  const [shown, setShown] = useState(at);
+  const snap = shown !== at;
+  useEffect(() => {
+    if (!snap) return;
+    const id = requestAnimationFrame(() => {
+      setShown(at);
+    });
+    return () => {
+      cancelAnimationFrame(id);
+    };
+  }, [snap, at]);
+  return snap;
 }
 
 /** The projects rows came: the panels of projects no longer in them go (never on an empty list). */
@@ -100,7 +127,7 @@ export const panelState = {
   reset(raw?: unknown): void {
     kept = raw;
     rec = parseRec(raw);
-    state = viewOf(rec);
+    state = isFlat(raw) ? parseKept(raw) : viewOf(rec);
     before.clear();
     emit();
   },

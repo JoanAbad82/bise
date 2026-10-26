@@ -20,7 +20,7 @@ import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
 import { backFromFull, MAX_W, MIN_W, pastFull, SHARE_MAX, SHARE_MIN, type Tab } from './model';
 import { useLeftWidth } from '@/app/frame-state';
-import { dropGoneArtTabs, dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setFull, setFullPreview, setWidth, useFrontArtKind, usePanelFit, usePanelFull, usePanelState } from './state';
+import { dropGoneArtTabs, dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setFull, setFullPreview, setWidth, useFrontArtKind, usePanelFit, usePanelFull, usePanelState, useScopeSnap } from './state';
 import { PANEL_FULL_KEY } from './keys';
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
@@ -42,6 +42,7 @@ export function PanelHost() {
   const art = front?.what.kind === 'thing' && front.what.e.kind === 'artifact' ? front.what.e : undefined;
   const artKind = useFrontArtKind();
   const full = usePanelFull();
+  const snap = useScopeSnap();
   const window_ = art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />;
   return (
     <aside
@@ -52,6 +53,7 @@ export function PanelHost() {
       data-drag={dragging || undefined}
       data-over={over || undefined}
       data-full={full || undefined}
+      data-snap={snap || undefined}
       aria-label={panel.panel_label}
       inert={!s.open}
       style={{ width: s.open && !over ? width : 0 }}

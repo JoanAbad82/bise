@@ -136,7 +136,7 @@ describe('the tabbed panel', () => {
     fireEvent.pointerDown(document.body);
     expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
   });
-  it("each project its own panel (his m_45500): a switch shows that project's tabs, never a frame of the other's", () => {
+  it("each project its own panel (his m_45500): a switch shows that project's tabs, never a frame of the other's", async () => {
     const BETA = 'beta-5e6f7a8b';
     const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
     (window as unknown as { bise: unknown }).bise = { notify: { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined } };
@@ -192,6 +192,12 @@ describe('the tabbed panel', () => {
     expect(v.getByTestId(`app.panel.tab.pr:${ACME}/6`).getAttribute('aria-selected')).toBe('true');
     expect(v.queryByTestId(`app.panel.tab.pr:${BETA}/9`)).toBeNull();
     expect(drawn.every((d) => !d.includes(BETA))).toBe(true);
+    // its width snaps for the frame of the switch (ui-review m_45602), the ease back after it
+    expect(v.getByTestId('app.panel').hasAttribute('data-snap')).toBe(true);
+    await act(async () => {
+      await new Promise((ok) => requestAnimationFrame(ok));
+    });
+    expect(v.getByTestId('app.panel').hasAttribute('data-snap')).toBe(false);
     r.unmount();
   });
   it('a wide window: no sheet, no ▯ in the panel', () => {

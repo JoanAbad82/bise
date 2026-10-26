@@ -23,6 +23,11 @@
 .pn[data-drag] {
   transition: none;
 }
+/* another project's panel (panel-scope, ui-review m_45602): it snaps to its width, never eases
+   from the other project's; the ease stays for his drags, open and fold */
+.pn[data-snap] {
+  transition: none;
+}
 /* no room for 320 beside a 560 thread (1100 with a sidebar): a sheet over the thread, from the
    window's right edge, raised; the thread keeps its width under it (ui-review m_42619 #3) */
 .pn[data-over] {
