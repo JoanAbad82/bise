@@ -471,7 +471,7 @@ mod open_tests {
         let (question, options) = question("#384 is ready\n1. squash and merge\n2. open it on GitHub\n3. not yet");
         let card = Card {
             id: 1, project: "p".into(), kind: "merge".into(), agent: "a".into(), question, options, urgent: false, since_ms: 0, page: None, artifact: None,
-            approval: false, rank: None, waiting: None, text: String::new(), note: None, place: None, pr: None, link: Some("https://x.test/pull/1".into()),
+            approval: false, rank: None, waiting: None, text: String::new(), note: None, place: None, pr: None, link: Some("https://x.test/pull/1".into()), release: None,
             for_msg: None, batch: None, running: false,
         };
         let acts = |c: Card| c.options.into_iter().map(|o| o.act).collect::<Vec<_>>();
