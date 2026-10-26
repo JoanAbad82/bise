@@ -755,6 +755,45 @@ fn an_answer_says_one_line_in_the_thread() {
     assert!(matches!(app.events.last(), Some(Ev::Info(t)) if t == "→ you → @docs : thanks"));
 }
 
+/// update-dot (designer m_46058): the new-release card, bise's own: the
+/// head as the title, `bise · v… is ready` in the strip; opened, the
+/// safe line, the changelog's first 12 lines then `▸ N more lines`, then
+/// `you're on v… · full notes on GitHub ↗` (the link); `1` and `2` go
+/// to the hub.
+#[test]
+fn the_new_release_card_shows_its_changelog() {
+    let (mut app, mut hub) = app_with_hub();
+    let text = "bise v2026.10.2-5 is ready\n\n1. update now · your agents keep running\n2. later";
+    let url = "https://github.com/gvergnaud/bise/releases/tag/v2026.10.2-5";
+    let notes: Vec<String> = std::iter::once("## Fixes".to_string()).chain((1..=14).map(|i| format!("- fix {i}"))).collect();
+    let release = bise_proto::rows::ReleaseNotes { version: "v2026.10.2-5".into(), running: "v2026.10.2-4".into(), notes: notes.join("\n\n") };
+    app.sb.cards = vec![Card { place: Some("release:bbb".into()), link: Some(url.into()), release: Some(release.clone()), ..card(21, "update", "main", text) }];
+    let s = shape(&app.sb.cards[0]);
+    assert_eq!((s.title.as_str(), s.who.as_str(), s.summary.as_str()), ("bise v2026.10.2-5 is ready", "bise", "v2026.10.2-5 is ready"));
+    assert_eq!(s.options, ["update now · your agents keep running", "later"]);
+    let texts: Vec<String> = s
+        .parts
+        .iter()
+        .map(|p| match p {
+            Part::Text(t) => format!("T:{t}"),
+            Part::Evidence(t) => format!("E:{t}"),
+            _ => "?".into(),
+        })
+        .collect();
+    assert_eq!(texts[0], format!("T:{}", bise_proto::words::settings::bise_update_tip));
+    let shown: Vec<&str> = notes.iter().take(CHANGELOG_ROWS).map(String::as_str).collect();
+    assert_eq!(texts[1], format!("T:{}", shown.join("\n")), "12 lines, the blank ones out");
+    assert_eq!(texts[2], "E:▸ 3 more lines");
+    assert_eq!(texts[3], format!("E:you're on v2026.10.2-4 · [full notes on GitHub ↗]({url})"));
+    // no notes: says so
+    let bare = Card { release: Some(bise_proto::rows::ReleaseNotes { notes: String::new(), ..release }), ..card(22, "update", "main", text) };
+    assert!(matches!(shape(&bare).parts.get(1), Some(Part::Evidence(t)) if t == "no notes for this release."));
+    // 1 goes to the hub (it installs, the card closes there)
+    open(&mut app);
+    assert!(key(&mut app, KeyCode::Char('1'), KeyModifiers::NONE));
+    assert_eq!(sent(&mut hub), vec!["/answer 21 1"]);
+}
+
 /// pr-design §6.3: the ready-to-merge item, as the hub writes it. Its
 /// head line is the title, the facts dim; a digit answers with the digit
 /// (the hub merges, or files it); `2` opens the PR here and leaves it.

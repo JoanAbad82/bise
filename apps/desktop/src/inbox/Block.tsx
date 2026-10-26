@@ -23,6 +23,8 @@ import { common } from '@/proto/words_common.gen';
 import { age, dotOf, folds, InboxCard, RefusedMark } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey } from './order';
+import { isUpdate } from '@/shared/update';
+import { askedBiseUpdate } from '@/app/UpdateLine';
 import { freeWords, markOf, pickWaits, takesWords } from './model';
 import { withRefused, type InboxItem } from './listed';
 import { cardKeyOf, fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
@@ -263,7 +265,8 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
   const to = here.agent === null ? 'bise' : shownName(here.agent);
   // the permission ask is bise's own, never the hub's: only its two options answer it
   if (isNotify(c)) return { project: c.project, card: c.id, label: inbox.notify_waits({ to }), answer: null };
-  const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : null;
+  // the update card is bise's own (update-dot): never another project's
+  const other = here.project !== null && here.project !== c.project && !isUpdate(c) ? `${shownName(c.agent)} · ${pname ?? c.project}` : null;
   if (takesWords(c)) {
     // composer-target A (designer m_26531): '↳ answering search · <question>' (the tab cuts it after
     // a whole word), 'esc to bise instead', the field names who gets his words, the border's tip
@@ -293,7 +296,7 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
  */
 export function closedAnswering(c: Card, here: Here, pname?: string): Answering {
   const to = here.agent === null ? 'bise' : shownName(here.agent);
-  const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : shownName(c.agent);
+  const other = here.project !== null && here.project !== c.project && !isUpdate(c) ? `${shownName(c.agent)} · ${pname ?? c.project}` : shownName(c.agent);
   return { project: c.project, card: c.id, label: inbox.to_closed({ who: other }), end: inbox.esc_instead({ to }), answer: null, asker: c.agent, closed: true };
 }
 
@@ -611,6 +614,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
     // hub's row says (a drafts card's '1 review' opens its page beside the thread, a merge's '2 open
     // it on GitHub' its PR, a sign-in's '1' the app's own sign-in) sends nothing and the card stays;
     // else his answer, with where he is (inbox picks 3). The block folds only when it answered.
+    // '1 update now' on the update card: the app's own update goes with the machine's (UpdateLine.tsx)
+    if (isUpdate(c) && n === 1) askedBiseUpdate();
     const { answered } = store.do({ i: 'pick', project: c.project, card: c.id, n, from: { at: answerAt(here, home) } });
     if (answered) leave();
   };
@@ -822,7 +827,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
             <div key={cardKey(c)} className="inbox-block-open" data-testid={`inbox.block.open.${String(n)}`} data-answering={(told?.answer != null && told.closed !== true) || undefined}>
               <InboxCard
                 card={c}
-                project={projectWord(row, c.project)}
+                // the update card is bise's own (update-dot), wherever it came from: no project
+                {...(isUpdate(c) ? { home: true } : { project: projectWord(row, c.project) })}
                 now={now}
                 on={on}
                 full={whole === cardKey(c)}
@@ -889,7 +895,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
             end={
               <>
                 {/* the age alone: no ids in the UI (designer m_43892) */}
-                {scoped ? age(now - c.since_ms) : `${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
+                {scoped || isUpdate(c) ? age(now - c.since_ms) : `${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
               </>
             }
             onClick={() => {

@@ -518,14 +518,16 @@ export const settings = {
   dist_beta: "beta builds",
   /** dist update: the beta row's line */
   dist_beta_sub: "new builds a few days early. turning it off keeps your build until stable passes it.",
-  /** a newer bise (update-flow, designer m_45087): the status pill */
-  bise_ready: (a: { version: string | number }): string => "bise " + String(a.version) + " is ready",
-  /** a newer bise: the pill's action (never "restart": nothing stops) */
-  bise_update: "update",
-  /** a newer bise: the pill's tip, what an update keeps */
-  bise_update_tip: "your agents keep working, your drafts stay, and the window reopens where you are.",
-  /** a newer bise: the tip's last line */
-  bise_update_notes: "all notes in Settings › update",
+  /** a newer bise's inbox card, opened (update-dot, designer m_46058): what an update keeps, over its changelog */
+  bise_update_tip: "safe to update at any time: your agents keep working, your drafts stay, and the window reopens where you are.",
+  /** the card's changelog when the release has none */
+  bise_update_no_notes: "no notes for this release.",
+  /** the terminal's card: the changelog's lines past its 12 rows */
+  bise_update_more: (a: { n: string | number }): string => "▸ " + String(a.n) + " more lines",
+  /** the card's last line: the version he runs */
+  bise_update_on: (a: { running: string | number }): string => "you're on " + String(a.running),
+  /** the card's last line: the release page */
+  bise_update_full_notes: "full notes on GitHub ↗",
   /** a newer bise: while it updates */
   bise_updating: (a: { version: string | number }): string => "updating to " + String(a.version) + "… your agents keep working",
   /** a newer bise: the projects still to switch */
@@ -538,8 +540,6 @@ export const settings = {
   bise_update_again: "try again",
   /** a newer bise: failed's tip after the reason */
   bise_update_unchanged: (a: { running: string | number }): string => "you're still on " + String(a.running) + ". nothing changed.",
-  /** the terminal's status line: ready */
-  tui_bise_ready: (a: { version: string | number }): string => String(a.version) + " ready · /update",
   /** the terminal's status line: updating */
   tui_bise_updating: (a: { version: string | number }): string => "updating to " + String(a.version) + "… agents keep working",
   /** the terminal's status line: failed */

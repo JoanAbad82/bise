@@ -61,9 +61,12 @@ pub(crate) struct Card {
     /// place's PR.
     pub(super) place: Option<String>,
     pub(super) pr: Option<u64>,
-    /// update-card: the release page an update item's `3` opens (the
-    /// hub's snapshot).
+    /// the update card's release page (its changelog's full notes link;
+    /// the hub's snapshot).
     pub(super) link: Option<String>,
+    /// the update card's release and changelog (update-dot: the hub's
+    /// snapshot, typed, never parsed from its text)
+    pub(super) release: Option<bise_proto::rows::ReleaseNotes>,
     /// dev-flow §5.1: a feature's merge item asks once more before its
     /// `3 drop the branch` (`drop computer-use? 14 commits go.`); the
     /// TUI's, kept across snapshots by `Sb::feature_drop_ask`.
@@ -119,6 +122,7 @@ impl Default for Card {
             place: None,
             pr: None,
             link: None,
+            release: None,
             asking: false,
             waiting: Vec::new(),
             acts: Vec::new(),
@@ -440,7 +444,7 @@ impl super::Sb {
 /// `choice_kind`): a digit answers them (the hub acts, then closes the
 /// item); typed words go to main.
 pub(super) fn choice_kind(kind: &str) -> bool {
-    matches!(kind, "merge" | "feature_try" | "feature_merge" | "signin")
+    matches!(kind, "merge" | "feature_try" | "feature_merge" | "update" | "signin")
 }
 
 /// A hub item, as the hub writes it: its head line (`#409 is ready to
@@ -475,6 +479,8 @@ fn choice_shape(c: &Card) -> Shape {
                 l.replace('−', minus)
             }));
         }
+    } else if c.kind == "update" {
+        parts.extend(update_parts(c));
     } else {
         parts.push(Part::Text(rest.join("\n").trim().to_string()));
     }
@@ -483,11 +489,43 @@ fn choice_shape(c: &Card) -> Shape {
     }
     let options: Vec<String> = if theme::ascii_mode() { options.iter().map(|o| o.replace('↗', "->")).collect() } else { options };
     let short = short_labels(&options);
+    if c.kind == "update" {
+        // update-dot: bise's own news, not an agent's: `bise · v… is ready`
+        let summary = head.strip_prefix("bise ").unwrap_or(&head).to_string();
+        return Shape::plain(head.clone(), "bise".into(), summary, parts, options, short, Enter::Answer);
+    }
     if c.kind == "signin" {
         // expired-ux: bise's own item too, the head alone
         return Shape::plain(head.clone(), "bise".into(), head, parts, options, short, Enter::Answer);
     }
     Shape::plain(format!("{}: {}", c.agent, head), c.agent.clone(), head, parts, options, short, Enter::Answer)
+}
+
+/// The changelog's most rows in the opened card (designer m_46058).
+pub(super) const CHANGELOG_ROWS: usize = 12;
+
+/// The update card's body (update-dot, designer m_46058): the safe line,
+/// the release's changelog (its first [`CHANGELOG_ROWS`] lines, then `▸ N
+/// more lines`), then `you're on v… · full notes on GitHub ↗` dim; no
+/// notes: `no notes for this release.`
+fn update_parts(c: &Card) -> Vec<Part> {
+    use bise_proto::words::settings;
+    let mut parts = vec![Part::Text(settings::bise_update_tip.to_string())];
+    let Some(r) = c.release.as_ref() else { return parts };
+    let lines: Vec<&str> = r.notes.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).collect();
+    if lines.is_empty() {
+        parts.push(Part::Evidence(settings::bise_update_no_notes.to_string()));
+    } else {
+        parts.push(Part::Text(lines.iter().take(CHANGELOG_ROWS).copied().collect::<Vec<_>>().join("\n")));
+        if lines.len() > CHANGELOG_ROWS {
+            parts.push(Part::Evidence(settings::bise_update_more(lines.len() - CHANGELOG_ROWS)));
+        }
+    }
+    let notes = settings::bise_update_full_notes;
+    let notes = if theme::ascii_mode() { notes.replace('↗', "->") } else { notes.to_string() };
+    let link = c.link.as_deref().map_or(notes.clone(), |url| format!("[{notes}]({url})"));
+    parts.push(Part::Evidence(format!("{} · {link}", settings::bise_update_on(&r.running))));
+    parts
 }
 
 /// A feature merge item after `3 drop the branch` (designer, d4172e6):

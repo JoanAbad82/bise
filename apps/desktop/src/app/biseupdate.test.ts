@@ -1,4 +1,4 @@
-// update-flow (Gabriel's pick A, designer m_45087): a newer bise is the status pill's, never a card.
+// update-flow (designer m_45087), update-dot (m_46058): a newer bise is an inbox card; the pill says it runs.
 import { describe, expect, it } from 'vitest';
 import type { BiseUpdate } from '@/proto';
 import { biseUpdateLine } from './UpdateLine';
@@ -6,12 +6,8 @@ import { biseUpdateLine } from './UpdateLine';
 const u = (over: Partial<BiseUpdate>): BiseUpdate => ({ id: 'r3', version: 'v2026.10.3', running: 'v2026.10.2', state: 'ready', ...over });
 
 describe('the bise update line', () => {
-  it('ready: quiet words, `update`, the tip, at most 3 notes, then where the rest is', () => {
-    const l = biseUpdateLine(u({ notes: ['a', 'b', 'c', 'd'] }), null);
-    expect(l?.tone).toBe('quiet');
-    expect(l?.words).toBe('bise v2026.10.3 is ready');
-    expect(l?.act).toBe('update');
-    expect(l?.lines).toEqual(['your agents keep working, your drafts stay, and the window reopens where you are.', 'a', 'b', 'c', 'all notes in Settings › update']);
+  it('ready: nothing in the pill, the inbox card asks (update-dot, designer m_46058)', () => {
+    expect(biseUpdateLine(u({ notes: ['a'] }), null)).toBeNull();
   });
   it('installing and updating run, with no action; the projects left are named', () => {
     for (const state of ['installing', 'updating'] as const) {

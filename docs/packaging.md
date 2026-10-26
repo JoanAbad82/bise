@@ -461,22 +461,29 @@ downloaded once by hand.
   GET, one hub at a time under a flock; `BISE_RELEASE_CHECK_SECS`; off
   with `BISE_NO_UPDATE=1`; never in bise's source tree). The offer is the
   machine's (update-flow, `bise_home::release_offer`): every hub plans it
-  from the same files every 30 s. A newer release is never an inbox item
-  (page update-flow-forms, Gabriel's pick A): each hub says it on
-  `hub/bise_update` (rows::BiseUpdate: ready, installing, updating,
-  failed), the desktop core folds every project's into the machine's
-  one line (`core/machine_update`) and the window draws it in its status
-  pill: `bise vX.Y.Z is ready · update`, the notes in its popover. His
-  click (`core/bise_update`, then `hub/bise_update` to one hub; a
-  client-socket method, never an agent's) installs it once, then every
-  project switches to it one at a time (probation, agents kept), and the
-  app's own update installs with it and reopens the window where he is.
-  The TUI says it in its status line (`vX.Y.Z ready · /update`). A
-  project whose switch rolled back doesn't retry that release.
-  `/update auto on` (Settings › general, `Update automatically`, prefs
-  `auto_update`, off by default) installs a ready release by itself.
-  `/update` checks now. Item cards of kind `update` from older hubs close
-  once at boot ("moved to the status line"). The desktop app's own
+  from the same files every 30 s. A newer release is ONE inbox card
+  for the machine (update-dot, Gabriel m_46040, architect m_46059): each
+  hub opens its own `update` card for it (place `release:<id>`, its
+  changelog typed on the card: `Card.release`, the manifest's notes cut
+  at 16 KB, and `Card.link` the release page) and the window lists one
+  of them (bise's own when the home hub has one; grouped by that place
+  for the list, the badge and the notifications: `shared/update.ts`).
+  `1 update now · your agents keep running` answers that one hub: it
+  installs the release once, its card closes at once (`updating`), then
+  every project switches to it one at a time (probation, agents kept),
+  and the app's own update installs with it and reopens the window where
+  he is. `2 later` writes `update-later`: no card for that release
+  again, in any project. Each hub closes its own card when the machine's
+  offer leaves ready (`updating`, `later`, `update failed`, `updated`),
+  so an answer anywhere clears every card within 30 s. While it runs,
+  each hub says it on `hub/bise_update` (rows::BiseUpdate: installing,
+  updating, failed); the desktop core folds every project's into the
+  machine's one line (`core/machine_update`), drawn in the window's
+  status pill and the TUI's status line. A project whose switch rolled
+  back doesn't retry that release. `/update auto on` (Settings ›
+  general, `Update automatically`, prefs `auto_update`, off by default)
+  installs a ready release by itself. `/update` forgets `later`, checks
+  now and opens the card. The desktop app's own
   updater still swaps the app alone when no newer bise waits.
 - **Private repo**: a plain download of an asset answers 404. install.sh
   and `bise update` (the daily check, `/restart latest`) then ask

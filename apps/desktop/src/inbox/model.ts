@@ -59,7 +59,7 @@ export function current(list: readonly Card[], s: InboxState): Card | undefined 
 
 /** The hub's items with numbered options about a place (the TUI's and the hub's choice_kind): a
  *  digit answers them; typed words go to main, never as their answer. */
-const CHOICE_KINDS: ReadonlySet<string> = new Set(['merge', 'feature_try', 'feature_merge', 'signin']);
+const CHOICE_KINDS: ReadonlySet<string> = new Set(['merge', 'feature_try', 'feature_merge', 'update', 'signin']);
 
 /** Words answer it (a question), not only its options: never an approval or a choice item, which
  *  only 1/2 (a click, ⌘⏎) decides (ambient m_8773: a typed line never merges anything). */

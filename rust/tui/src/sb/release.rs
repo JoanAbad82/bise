@@ -186,8 +186,8 @@ pub(super) fn header_item(sb: &Sb, gust: &[Span<'static>]) -> Vec<Span<'static>>
 }
 
 /// update-flow: a newer bise in the header (designer m_45087), when no
-/// release or build runs: `v… ready · /update` dim with `/update` in
-/// text; updating with the gust; failed with `▲` in err. Nothing when on
+/// release or build runs: updating with the gust; failed with `▲` in
+/// err. Nothing when ready (its inbox card asks, designer m_46058) or on
 /// it.
 pub(super) fn bise_update_item(u: Option<&bise_proto::rows::BiseUpdate>, gust: &[Span<'static>]) -> Vec<Span<'static>> {
     use bise_proto::rows::BiseUpdateState as S;
@@ -195,11 +195,6 @@ pub(super) fn bise_update_item(u: Option<&bise_proto::rows::BiseUpdate>, gust: &
     let Some(u) = u else { return Vec::new() };
     let dim_s = Style::default().fg(dim());
     match u.state {
-        S::Ready => {
-            let line = settings::tui_bise_ready(&u.version);
-            let (head, cmd) = line.split_once("/update").map_or((line.as_str(), ""), |(h, _)| (h, "/update"));
-            vec![Span::styled(format!(" {head}"), dim_s), Span::raw(cmd.to_string())]
-        }
         S::Installing | S::Updating => {
             let mut out: Vec<Span<'static>> = gust.to_vec();
             out.push(Span::styled(format!(" {}", settings::tui_bise_updating(&u.version)), dim_s));
@@ -210,7 +205,7 @@ pub(super) fn bise_update_item(u: Option<&bise_proto::rows::BiseUpdate>, gust: &
             let rest = line.trim_start_matches('▲').trim_start().to_string();
             vec![Span::styled(" ▲ ", Style::default().fg(error())), Span::styled(rest, dim_s)]
         }
-        S::Unknown => Vec::new(),
+        S::Ready | S::Unknown => Vec::new(),
     }
 }
 

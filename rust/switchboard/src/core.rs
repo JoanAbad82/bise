@@ -488,6 +488,11 @@ pub enum Effect {
         id: String,
         version: String,
     },
+    /// update-dot: the update card's `2 later`: the daemon writes
+    /// `update-later`, no card for release `id` again in any project.
+    UpdateLater {
+        id: String,
+    },
     /// update-flow: what the clients show changed (`hub/bise_update`, the
     /// TUI's status line); None: nothing to show.
     BiseUpdate {
@@ -1533,7 +1538,7 @@ impl Hub {
             Input::PageCard { agents, kind, text, key } => self.core(&mut fx, env, None, In::PageCard(ci::PageCard { agents, kind, text, key })),
             Input::AnswerPos { card, agent, pos } => self.core(&mut fx, env, None, In::AnswerPos(ci::AnswerPos { card, agent, pos })),
             Input::Merged { card, place, number, res } => self.merged(&mut fx, env, card, &place, number, res),
-            Input::Release(c) => self.release_in(&mut fx, c),
+            Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::UpdateNow => self.update_now(&mut fx),
             Input::SignedIn => self.signed_in(&mut fx, env),
             Input::HubMsg { to, text } => self.core(&mut fx, env, None, In::HubMsg(ci::HubMsg { to, text })),

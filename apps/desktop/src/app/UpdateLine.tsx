@@ -5,7 +5,7 @@
 // didn't start right, 'go back' to the previous one. Downloading and failed say nothing to him
 // (failed's why is for the log). HubUpdateLine: bise's own /update build (the hub's update event).
 // Owner: amb-win.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { BiseApi, UpdateState } from '@/shared/api';
 import type { BiseUpdate, UpdateEv } from '@/proto';
 import { settings } from '@/proto/words.gen';
@@ -147,10 +147,11 @@ export function useHubUpdateLine(): StatusPart | null {
 }
 
 /**
- * update-flow (Gabriel's pick A on page update-flow-forms, designer m_45087): a newer bise for the
- * machine (the core's fold of every project's hub/bise_update) in the one status pill, never an
- * inbox card. Pure: the pill's words, its action and its popover lines; `done` the version it just
- * reached (4 s of '✓ updated to …').
+ * update-flow (designer m_45087), update-dot (Gabriel m_46040, designer m_46058): a newer bise for
+ * the machine (the core's fold of every project's hub/bise_update) in the one status pill once it
+ * runs; ready, it is the inbox's update card (inbox/Release.tsx), never the pill. Pure: the pill's
+ * words, its action and its popover lines; `done` the version it just reached (4 s of '✓ updated
+ * to …').
  */
 export function biseUpdateLine(
   u: BiseUpdate | null,
@@ -164,14 +165,8 @@ export function biseUpdateLine(
   const version = u.version;
   switch (u.state) {
     case 'ready':
-      return {
-        tone: 'quiet',
-        state: 'ready',
-        words: settings.bise_ready({ version }),
-        short: 'update ready',
-        act: settings.bise_update,
-        lines: [settings.bise_update_tip, ...(u.notes ?? []).slice(0, 3), settings.bise_update_notes],
-      };
+      // the inbox's update card asks (designer m_46058)
+      return null;
     case 'installing':
     case 'updating': {
       const left = u.waiting?.length ?? 0;
@@ -199,18 +194,43 @@ export function biseUpdateLine(
 /** How long '✓ updated to …' stays (designer m_45087). */
 const DONE_MS = 4000;
 
+/** He answered '1 update now' on the update card in this window (inbox/Block.tsx): the app's own
+ *  update goes with the machine's once its line moves past ready. Cleared when it ends. */
+let askedNow = false;
+const askedSubs = new Set<() => void>();
+const setAskedNow = (v: boolean): void => {
+  if (askedNow === v) return;
+  askedNow = v;
+  for (const f of askedSubs) f();
+};
+export const askedBiseUpdate = (): void => {
+  setAskedNow(true);
+};
+function useAskedNow(): boolean {
+  return useSyncExternalStore(
+    (f) => {
+      askedSubs.add(f);
+      return () => {
+        askedSubs.delete(f);
+      };
+    },
+    () => askedNow,
+  );
+}
+
 /**
- * The bise update as a candidate for the one status pill. His click asks the core (one hub
- * installs, the machine's flock dedupes, every project switches in turn); once the core's line
- * moves past 'ready' (its ack), the app's own update, when one is ready, installs and reopens the
- * window on the screen he is on.
+ * The bise update as a candidate for the one status pill, once it runs (his '1' on the update
+ * card: one hub installs, the machine's flock dedupes, every project switches in turn); once the
+ * core's line moves past 'ready', the app's own update, when one is ready, installs and reopens the
+ * window on the screen he is on. Failed: 'try again' asks the core again.
  */
 export function useBiseUpdateLine(): StatusPart | null {
   const u = useBiseUpdate();
   const store = useStore();
   const app = useUpdate();
   const route = useRoute();
-  const [asked, setAsked] = useState(false);
+  const asked = useAskedNow();
+  const setAsked = setAskedNow;
   const [done, setDone] = useState<string | null>(null);
   const was = useRef<BiseUpdate | null>(null);
   // updating then gone: '✓ updated to …' for 4 s
@@ -245,7 +265,6 @@ export function useBiseUpdateLine(): StatusPart | null {
     setAsked(true);
     store.command({ cmd: 'bise_update' });
   };
-  const waiting = asked && u?.state === 'ready';
   return {
     rank: line.tone === 'err' ? RANK.failed : line.tone === 'running' ? RANK.running : line.tone === 'done' ? RANK.done : RANK.ready,
     testId: 'app.bise',
@@ -271,6 +290,6 @@ export function useBiseUpdateLine(): StatusPart | null {
           ),
         }
       : {}),
-    ...(line.act === null ? {} : { acts: [{ id: 'update', text: line.act, onClick: go, disabled: waiting }] }),
+    ...(line.act === null ? {} : { acts: [{ id: 'update', text: line.act, onClick: go }] }),
   };
 }

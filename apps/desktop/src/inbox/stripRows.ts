@@ -78,7 +78,9 @@ export function rowWords(c: Card): RowWords {
   const note = (c.note ?? '').replace(/\s+/gu, ' ').trim();
   const nl = String.fromCharCode(10);
   if (c.kind !== 'approval') {
-    const what = c.question.split(nl).map((l) => l.trim()).find((l) => l !== '') ?? '';
+    const first = c.question.split(nl).map((l) => l.trim()).find((l) => l !== '') ?? '';
+    // a newer bise (update-dot, designer m_46058): bise asks 'v2026.10.3 is ready'
+    const what = c.kind === 'update' ? first.replace(/^bise /u, '') : first;
     return { who, cmd: false, what, note };
   }
   // an approval: the command (or a patch) up to the first blank line, then its reason

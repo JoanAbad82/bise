@@ -11,6 +11,7 @@
 // ⌘I's open item); the capsule's card keeps its glass (surface 'glass') with
 // the same rows. No list, no keys: the mounting screen owns them. A clicked
 // row shows picked for PICKED_MS, then picks. Owner: amb-home.
+import { ReleaseBody } from './Release';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import type { ArtLink } from '@/proto/rows';
@@ -148,6 +149,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
       <div className="ic-q" data-testid={`${id}.q`}>
         {full === false && card.kind !== 'plan' ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <Question card={card} id={id} />}
       </div>
+      <ReleaseBody card={card} id={id} />
       {about != null && <PageChip about={about} open={acts.openPage} id={id} />}
       {card.options.length > 0 && (
         <div className="ic-opts" role="listbox" data-testid={`${id}.opt`}>

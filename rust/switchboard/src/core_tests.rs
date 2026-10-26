@@ -3110,7 +3110,7 @@ mod prs {
         use crate::core::release_line::ReleaseCheck;
         Input::Release(ReleaseCheck {
             offer: Some(Offer {
-                release: Latest { id: "6".into(), version: "2026.10.2-6".into(), notes: vec!["one update".into()], url: String::new() },
+                release: Latest { id: "6".into(), version: "2026.10.2-6".into(), notes: vec!["one update".into()], url: "https://x.dev/v6".into(), changelog: "## Fixes\n- one update".into() },
                 state,
                 switch_me,
                 install_me,
@@ -3129,74 +3129,90 @@ mod prs {
         })
     }
 
-    /// update-flow: a newer bise is a line the clients show, never an
-    /// inbox card; `update now` installs it once; the machine says when
-    /// this hub switches.
+    fn update_cards(t: &T) -> Vec<Card> {
+        t.hub.st.open_cards().filter(|c| c.kind == "update").cloned().collect()
+    }
+
+    /// update-dot (Gabriel m_46040, architect m_46059): a newer bise is
+    /// ONE inbox card in this hub, its changelog typed on the card; `1`
+    /// installs it once and the card closes at once; the line still says
+    /// the install and the switch.
     #[test]
-    fn a_newer_bise_is_a_line_and_update_now_installs_it_once() {
+    fn a_newer_bise_is_a_card_with_its_changelog_and_1_installs_it_once() {
         use bise_home::release_offer::State;
         use bise_proto::rows::BiseUpdateState as S;
         let mut t = T::new();
         let fx = t.go(offer(State::Ready, false, false));
         assert_eq!(row_of(&fx), Some(Some(S::Ready)));
-        assert!(t.hub.st.open_cards().all(|c| c.kind != "update"), "never a card");
-        // the same look again: nothing new to send
+        let cards = update_cards(&t);
+        assert_eq!(cards.len(), 1, "one card");
+        assert_eq!(cards[0].place.as_deref(), Some("release:6"));
+        assert_eq!(cards[0].text, "bise v2026.10.2-6 is ready\n\n1. update now · your agents keep running\n2. later");
+        // the same look again: nothing new, still one card
         assert_eq!(row_of(&t.go(offer(State::Ready, false, false))), None);
-        // his click: installed once, the line says so at once
-        let fx = t.go(Input::UpdateNow);
+        assert_eq!(update_cards(&t).len(), 1);
+        // the view carries its release and changelog, typed, and the notes link
+        let row = t.hub.snapshot(0).cards.into_iter().find(|c| c.kind == "update").expect("its row");
+        let rel = row.release.expect("its release");
+        assert_eq!((rel.version.as_str(), rel.running.as_str(), rel.notes.as_str()), ("v2026.10.2-6", "v2026.10.2-4", "## Fixes\n- one update"));
+        assert_eq!(row.link.as_deref(), Some("https://x.dev/v6"));
+        // his 1: installed once, the card closes at once, the line says so
+        let id = cards[0].id;
+        let fx = t.user(MAIN, &format!("/answer {} 1", id));
         assert!(fx.iter().any(|e| matches!(e, Effect::Update { id, version } if id == "6" && version == "v2026.10.2-6")), "{:?}", fx);
-        assert!(!t.go(Input::UpdateNow).iter().any(|e| matches!(e, Effect::Update { .. })), "a second click: nothing");
+        assert_eq!(closed_as(&t, id).as_deref(), Some("updating"));
         assert_eq!(t.hub.release_row().map(|r| r.state), Some(S::Installing));
+        assert!(!t.go(Input::UpdateNow).iter().any(|e| matches!(e, Effect::Update { .. })), "a second ask: nothing");
         let fx = t.go(Input::Updated { version: "v2026.10.2-6".into(), res: Ok(()) });
         assert!(has_line(&fx, MAIN, "installed v2026.10.2-6. every project switches to it, one at a time; your agents keep working."), "{:?}", fx);
-        // the machine: this hub switches
+        // the machine: this hub switches, no card again
         let fx = t.go(offer(State::Updating, true, false));
         assert_eq!(row_of(&fx), Some(Some(S::Updating)));
         assert!(fx.iter().any(|e| matches!(e, Effect::ReleaseSwitch { id } if id == "6")), "{:?}", fx);
-        // on it: nothing to show
+        assert!(update_cards(&t).is_empty());
         assert_eq!(row_of(&t.go(offer(State::UpToDate, false, false))), Some(None));
-        // a failed install: main's thread says why, the line is ready again
-        t.go(offer(State::Ready, false, false));
-        t.go(Input::UpdateNow);
-        let fx = t.go(Input::Updated { version: "v2026.10.2-6".into(), res: Err("cannot download the release.".into()) });
-        assert!(has_line(&fx, MAIN, "couldn't update to v2026.10.2-6, you're still on v2026.10.2-4: cannot download the release"), "{:?}", fx);
-        assert_eq!(t.hub.release_row().map(|r| r.state), Some(S::Ready));
         // Update automatically: the offer's install_me installs it
         let fx = t.go(offer(State::Ready, false, true));
         assert!(fx.iter().any(|e| matches!(e, Effect::Update { .. })), "{:?}", fx);
     }
 
-    /// update-flow: an older journal's open update card closes once at
-    /// boot, `moved to the status line` (sb-core's retired kind); the next
-    /// boot closes nothing.
+    /// update-dot (architect m_46059): every hub reads the same machine
+    /// files, so an answer in another project closes this hub's own card
+    /// at its next look, once, with its word.
     #[test]
-    fn an_old_update_card_closes_once_at_boot() {
-        // an older bise's journal: an open `update` item (written here as
-        // a hub item, then its kind made the old one)
+    fn another_hubs_answer_closes_this_hubs_card_once() {
+        use bise_home::release_offer::State;
+        for (state, word) in [
+            (State::Installing, "updating"),
+            (State::Updating, "updating"),
+            (State::Later, "later"),
+            (State::Failed { why: "the hub died".into() }, "update failed"),
+        ] {
+            let mut t = T::new();
+            t.go(offer(State::Ready, false, false));
+            let id = update_cards(&t)[0].id;
+            t.go(offer(state.clone(), false, false));
+            assert!(update_cards(&t).is_empty(), "{state:?}");
+            assert_eq!(closed_as(&t, id).as_deref(), Some(word), "{state:?}");
+            let n = t.journal.borrow().iter().filter(|j| j["type"] == "card_closed").count();
+            t.go(offer(state.clone(), false, false));
+            assert_eq!(t.journal.borrow().iter().filter(|j| j["type"] == "card_closed").count(), n, "closed once: {state:?}");
+        }
+    }
+
+    /// update-dot: `2 later` closes the card and says so to the machine
+    /// (`update-later`); a look that read the files before it opens none.
+    #[test]
+    fn later_closes_the_card_for_that_release_everywhere() {
+        use bise_home::release_offer::State;
         let mut t = T::new();
-        let mut fx = Fx::default();
-        let item = super::merge::HubItem { kind: "merge", agent: MAIN, text: "bise v2026.10.2-6 is out", place: "release:6", pr: None };
-        let id = t.hub.open_card(&mut fx, &mut t.env, item).expect("the old card");
-        let opened = fx.into_iter().filter_map(|e| match e {
-            Effect::Journal(ev) => Some(ev),
-            _ => None,
-        });
-        let all: Vec<Value> = t.journal.borrow().iter().cloned().chain(opened).collect();
-        let journal: Vec<Value> = all.iter().map(|ev| serde_json::from_str(&ev.to_string().replace("\"merge\"", "\"update\"")).unwrap()).collect();
-        let mut h = Hub::new("/w");
-        assert!(h.replay(&journal).is_empty(), "an old update card still replays");
-        assert!(
-            h.st.cards.values().any(|c| c.id == id && c.kind == "update"),
-            "{:?} / {:?}",
-            h.st.cards.values().map(|c| (c.id, c.kind.clone())).collect::<Vec<_>>(),
-            journal.iter().filter(|e| e.to_string().contains("update")).collect::<Vec<_>>()
-        );
-        let fx = h.handle(Input::Boot, &mut FakeEnv::new());
-        assert!(h.st.cards.values().all(|c| c.id != id), "closed at boot");
-        assert!(format!("{:?}", fx).contains("moved to the status line"), "{:?}", fx);
-        // the next boot finds none open: nothing closes again
-        let fx = h.handle(Input::Boot, &mut FakeEnv::new());
-        assert!(!format!("{:?}", fx).contains("moved to the status line"), "{:?}", fx);
+        t.go(offer(State::Ready, false, false));
+        let id = update_cards(&t)[0].id;
+        let fx = t.user(MAIN, &format!("/answer {} 2", id));
+        assert!(fx.iter().any(|e| matches!(e, Effect::UpdateLater { id } if id == "6")), "{:?}", fx);
+        assert_eq!(closed_as(&t, id).as_deref(), Some("later"));
+        t.go(offer(State::Ready, false, false));
+        assert!(update_cards(&t).is_empty(), "not again before the file is read");
     }
 
     #[test]

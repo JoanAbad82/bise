@@ -125,8 +125,10 @@ pub struct CardRow {
     /// expired-ux: the agents that wait for the sign-in (⏎ in their
     /// thread signs in); a sign-in card only
     pub waiting: Option<Vec<String>>,
-    /// update-card: the release page its `3` opens
+    /// the update card's release page (its changelog's full notes link)
     pub link: Option<String>,
+    /// the update card's release and changelog (release_line.rs)
+    pub release: Option<bise_proto::rows::ReleaseNotes>,
     /// a hub item's place and PR (pr-merge): the TUI ties it to the
     /// place's box and opens its link
     pub place: Option<String>,

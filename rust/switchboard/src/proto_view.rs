@@ -402,6 +402,7 @@ pub fn cards(snap: &Snapshot, project: &str, now: u64, user_kind: fn(&str) -> bo
                 place: c.place.as_deref().and_then(some),
                 pr: c.pr,
                 link: c.link.as_deref().and_then(some),
+                release: c.release.clone(),
                 for_msg: c.for_msg,
                 // a drafts batch's fields (daemon/page_cards.rs snapshot_card_links)
                 batch: c.batch.clone(),

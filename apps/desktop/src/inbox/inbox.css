@@ -54,6 +54,23 @@
 .ic-q { flex: 0 1000 auto; margin: var(--gap-tight) 0 var(--gap-block); min-height: 0; overflow-y: auto; font: 15px/1.45 var(--font-read); white-space: pre-wrap; overflow-wrap: anywhere; }
 /* a plan's card: what it does, under its question (plan-ok, designer m_26765) */
 .ic-qd { margin: calc(var(--s-1) * 1.5) 0 0; color: var(--c-text-2); }
+/* the update card's release (update-dot, designer m_46058): the safe line text-2; the changelog
+   (headings t-13/600 ink, items text-2, 4 apart) at most 240 high, then it scrolls with 16 px
+   fades; its last line t-12 text-3 with the release page's link */
+.ic-rel { flex: none; display: flex; flex-direction: column; gap: var(--s-2); margin: 0 0 var(--gap-block); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.ic-rel p { margin: 0; }
+.ic-rel-notes { max-height: 240px; overflow-y: auto; }
+.ic-rel-notes[data-top] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
+.ic-rel-notes[data-end] { -webkit-mask-image: linear-gradient(to top, transparent, black var(--s-4)); mask-image: linear-gradient(to top, transparent, black var(--s-4)); }
+.ic-rel-notes[data-top][data-end] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4), black calc(100% - var(--s-4)), transparent); mask-image: linear-gradient(to bottom, transparent, black var(--s-4), black calc(100% - var(--s-4)), transparent); }
+.ic-rel-notes :is(h1, h2, h3, h4) { margin: var(--s-2) 0 var(--s-1); font: 600 var(--t-13) var(--font-ui); color: var(--c-text); }
+.ic-rel-notes :is(h1, h2, h3, h4):first-child { margin-top: 0; }
+.ic-rel-notes :is(ul, ol) { display: flex; flex-direction: column; gap: var(--s-1); margin: 0; padding-left: var(--s-4); }
+.ic-rel-notes p { margin: 0 0 var(--s-1); }
+.ic-rel-none, .ic-rel-foot { color: var(--c-text-3); }
+.ic-rel-foot { font-size: var(--t-12); }
+.ic-rel-foot a { color: inherit; text-underline-offset: 2px; }
+.ic-rel-foot a:hover { color: var(--c-text-2); }
 .ic-opts { display: flex; flex-direction: column; gap: var(--gap-tight); flex: 0 1 auto; min-height: 0; overflow-y: auto; }
 .ic-opt { flex: none; }
 .ic-opt {

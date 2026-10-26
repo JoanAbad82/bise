@@ -350,18 +350,6 @@
     "one": null,
     "text": "⏎ replaces it   esc keeps the old one"
   },
-  "settings.bise_ready": {
-    "args": [
-      "version"
-    ],
-    "one": null,
-    "text": "bise {version} is ready"
-  },
-  "settings.bise_update": {
-    "args": [],
-    "one": null,
-    "text": "update"
-  },
   "settings.bise_update_again": {
     "args": [],
     "one": null,
@@ -374,15 +362,34 @@
     "one": null,
     "text": "couldn't update to {version}"
   },
-  "settings.bise_update_notes": {
+  "settings.bise_update_full_notes": {
     "args": [],
     "one": null,
-    "text": "all notes in Settings › update"
+    "text": "full notes on GitHub ↗"
+  },
+  "settings.bise_update_more": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "▸ {n} more lines"
+  },
+  "settings.bise_update_no_notes": {
+    "args": [],
+    "one": null,
+    "text": "no notes for this release."
+  },
+  "settings.bise_update_on": {
+    "args": [
+      "running"
+    ],
+    "one": null,
+    "text": "you're on {running}"
   },
   "settings.bise_update_tip": {
     "args": [],
     "one": null,
-    "text": "your agents keep working, your drafts stay, and the window reopens where you are."
+    "text": "safe to update at any time: your agents keep working, your drafts stay, and the window reopens where you are."
   },
   "settings.bise_update_unchanged": {
     "args": [
@@ -4867,13 +4874,6 @@
     ],
     "one": null,
     "text": "▲ couldn't update to {version} · /update tries again"
-  },
-  "settings.tui_bise_ready": {
-    "args": [
-      "version"
-    ],
-    "one": null,
-    "text": "{version} ready · /update"
   },
   "settings.tui_bise_updating": {
     "args": [

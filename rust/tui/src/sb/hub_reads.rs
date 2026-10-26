@@ -436,6 +436,7 @@ pub(crate) mod rows_for_tests {
             place: None,
             pr: None,
             link: None,
+            release: None,
             for_msg: None,
             batch: None,
             running: false,

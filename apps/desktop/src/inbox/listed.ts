@@ -1,22 +1,29 @@
 // What the inbox lists (fast-try p4 slice 1b, architect m_29799/m_29832): every project's open
 // items in the hub's order (each card's rank, order.ts), the ones he answered or closed in this
 // window left out (the store's acted set, store/acted.ts), each with the refusal of his act on it
-// here (store/refused.ts), the words its card says. Pure: no React, never the '@/store' index; it
+// here (store/refused.ts), the words its card says. A newer bise is ONE card for the machine
+// (update-dot, shared/update.ts): every hub's update card of a release lists as one. Pure: no React, never the '@/store' index; it
 // imports store/acted.ts and store/refused.ts directly, both pure (the store's machine imports this
 // file: the block, the waiting count and the feature tests read the inbox through the store).
 // Owner: amb-home.
 import type { Card, ProjectRow } from '@/proto';
 import { actedKeys, type Acted } from '@/store/acted';
 import { refusedOf, type Refused } from '@/store/refused';
+import { oneUpdate } from '@/shared/update';
 import { withConfirmOptions } from './model';
 import { cardKey, sortCards } from './order';
 
 /** One item as a view draws it: the hub's card and the refusal of his answer or close of it here, or null. */
 export type InboxItem = Card & { readonly refused: Refused | null };
 
-/** Every project's open items, in the inbox's order (the hub's rank), the ones acted on here left out. Pure. */
+/** bise's own hub (the home project's row); '' when the rows hold none. */
+export const homeOf = (rows: readonly ProjectRow[]): string => rows.find((r) => r.home)?.project ?? '';
+
+/** Every project's open items, in the inbox's order (the hub's rank), the ones acted on here left
+ *  out, a release's update cards as one (bise's own when the home hub has one). Pure. */
 export function blockList(rows: readonly ProjectRow[], gone: ReadonlySet<string>): Card[] {
-  return sortCards(rows.flatMap((r) => (r.cards ?? []).map(withConfirmOptions))).filter((c) => !gone.has(cardKey(c)));
+  const open = sortCards(rows.flatMap((r) => (r.cards ?? []).map(withConfirmOptions))).filter((c) => !gone.has(cardKey(c)));
+  return oneUpdate(open, homeOf(rows));
 }
 
 /**

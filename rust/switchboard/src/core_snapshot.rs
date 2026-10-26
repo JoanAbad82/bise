@@ -71,7 +71,11 @@ impl Hub {
 
     /// An open card as the views see it: its words and what the hub adds.
     fn card_row(&self, c: &Card, now: u64, running: &BTreeSet<u64>) -> CardRow {
+        // update-dot: the update card's release, changelog and notes link
+        let (release, link) = if c.kind == release_line::KIND { self.update_release(c) } else { (None, None) };
         CardRow {
+            release,
+            link,
             running: running.contains(&c.id),
             id: c.id,
             kind: c.kind.clone(),

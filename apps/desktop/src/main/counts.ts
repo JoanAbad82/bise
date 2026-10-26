@@ -7,7 +7,10 @@
 // A project's open cards: its hub's own `cards` event once one came (the
 // store's rule, src/store/store.ts), else its `projects` row's cards, else
 // the row's `waits`. Working: the rows' `working`, summed. Plus bise's own notifications ask while
-// the inbox lists it (the window says so, ask()): one inbox, one number (designer m_25690).
+// the inbox lists it (the window says so, ask()): one inbox, one number (designer m_25690). A
+// newer bise is one card for the machine (update-dot): every hub's update card of a release counts
+// once between them (shared/update.ts countOnce).
+import { countOnce } from '../shared/update';
 
 export interface Counts {
   readonly waiting: number;
@@ -15,13 +18,15 @@ export interface Counts {
 }
 
 interface Row {
-  readonly cards: number;
+  /** its open cards (the row's), or null: only its `waits` count is known */
+  readonly cards: readonly unknown[] | null;
+  readonly waits: number;
   readonly working: number;
 }
 
 export class CountKeeper {
   private rows = new Map<string, Row>();
-  private readonly hubCards = new Map<string, number>();
+  private readonly hubCards = new Map<string, readonly unknown[]>();
   private last: Counts = { waiting: 0, working: 0 };
   private asks = false;
 
@@ -39,13 +44,12 @@ export class CountKeeper {
         if (typeof r !== 'object' || r === null) continue;
         const o = r as Record<string, unknown>;
         if (typeof o['project'] !== 'string') continue;
-        const cards = Array.isArray(o['cards']) ? o['cards'].length : num(o['waits']);
-        rows.set(o['project'], { cards, working: num(o['working']) });
+        rows.set(o['project'], { cards: Array.isArray(o['cards']) ? (o['cards'] as unknown[]) : null, waits: num(o['waits']), working: num(o['working']) });
       }
       this.rows = rows;
     } else if (ev['ev'] === 'cards' && typeof ev['project'] === 'string' && Array.isArray(ev['cards'])) {
       // his cards and bise's own (`others`: a drop asking him...), as the inbox lists them
-      this.hubCards.set(ev['project'], ev['cards'].length + (Array.isArray(ev['others']) ? ev['others'].length : 0));
+      this.hubCards.set(ev['project'], [...(ev['cards'] as unknown[]), ...(Array.isArray(ev['others']) ? (ev['others'] as unknown[]) : [])]);
     } else {
       return null;
     }
@@ -64,14 +68,18 @@ export class CountKeeper {
   }
 
   private count(): Counts {
-    let waiting = 0;
+    let waits = 0;
     let working = 0;
+    const lists: (readonly unknown[])[] = [];
     for (const [p, r] of this.rows) {
-      waiting += this.hubCards.get(p) ?? r.cards;
+      const cards = this.hubCards.get(p) ?? r.cards;
+      if (cards === null) waits += r.waits;
+      else lists.push(cards);
       working += r.working;
     }
     // a hub's cards for a project the rows don't list yet (the home, early)
-    for (const [p, n] of this.hubCards) if (!this.rows.has(p)) waiting += n;
+    for (const [p, cards] of this.hubCards) if (!this.rows.has(p)) lists.push(cards);
+    let waiting = waits + countOnce(lists);
     if (this.asks) waiting += 1;
     return { waiting, working };
   }

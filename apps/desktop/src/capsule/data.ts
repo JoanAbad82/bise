@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Agent, Card, ProjectRow } from '@/proto';
 import { sortCards } from '@/inbox/order';
+import { oneUpdate } from '@/shared/update';
 import { threadKey, useProjects, useStore, useThreadOrder } from '@/store';
 import type { SpotCard, SpotData, SpotFront } from '@/spotlight';
 import { previewLines, type PreviewLine } from '@/spotlight/preview';
@@ -47,11 +48,12 @@ export function toSpotData(
 
 /**
  * Every project's cards in the window's inbox order (the hub's rank, then the oldest: sortCards),
- * each with its project word as the block says it: 'bise' for the home's (one-inbox 3, amb-home).
+ * each with its project word as the block says it: 'bise' for the home's (one-inbox 3, amb-home);
+ * a release's update cards as one, bise's own (update-dot, shared/update.ts).
  */
 function cardsInOrder(mine: readonly ProjectRow[], cardsOf: (project: string) => readonly Card[]): SpotCard[] {
   const all = mine.flatMap((p) => cardsOf(p.project).map((c) => ({ ...c, project: p.project, pname: p.home ? 'bise' : p.name })));
-  return sortCards(all).map((c) => ({ id: `${c.project}.${String(c.id)}`, card: c.id, agent: c.agent, project: c.project, text: c.question, kind: cardKind(c), pname: c.pname }));
+  return oneUpdate(sortCards(all), mine.find((p) => p.home)?.project ?? '').map((c) => ({ id: `${c.project}.${String(c.id)}`, card: c.id, agent: c.agent, project: c.project, text: c.question, kind: cardKind(c), pname: c.pname }));
 }
 
 /** How many of a thread's newest entries the selected agent's preview reads (its last actions). */

@@ -269,9 +269,15 @@ pub struct Card {
     /// the number of the PR it is about
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pr: Option<u64>,
-    /// the page its link opens (the update card's release page)
+    /// the page its link opens (the update card's release page: its
+    /// changelog's `full notes on GitHub ↗`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<String>,
+    /// the `update` card only (update-dot, architect m_46059): the
+    /// release it offers and its changelog, typed, never parsed from its
+    /// text
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release: Option<ReleaseNotes>,
     /// the message it answers (`sb card --for`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub for_msg: Option<u64>,
@@ -284,6 +290,19 @@ pub struct Card {
     /// ends. A client keeps it as answered meanwhile (inbox-reappear)
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub running: bool,
+}
+
+/// The update card's release (update-dot): the version it installs, the
+/// one he runs, and the release's notes as written (markdown, cut at
+/// 16 KB by `bise_home::release_offer`; "" when it has none).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ReleaseNotes {
+    pub version: String,
+    #[serde(default)]
+    pub running: String,
+    #[serde(default)]
+    pub notes: String,
 }
 
 /// A drafts-batch card's fields (the hub's pages/drafts.rs `info`, amb-web

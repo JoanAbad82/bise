@@ -179,6 +179,12 @@ fn release_every() -> std::time::Duration {
     std::time::Duration::from_secs(s)
 }
 
+/// The update card's `2 later`: no card again for release `id`, in any
+/// project (every hub's own card closes at its next look).
+pub(super) fn update_later(id: &str) {
+    let _ = bise_home::release_offer::write_later(&bise_home::Home::from_env(), Some(id));
+}
+
 /// The last non-empty line of a command's output, without its
 /// `bise update: ` prefix.
 fn last_line(out: &str) -> String {
@@ -265,11 +271,12 @@ impl ReleaseLook {
         let manifest = std::fs::read_to_string(home.release_manifest()).ok();
         let latest = manifest.as_deref().and_then(|m| offer::latest_of(m, &self.page));
         let newer = manifest.as_deref().is_some_and(|m| manifest_newer(m, &self.running_id, &self.running_built));
-        let (go, installing, failed) = (offer::read_go(home), offer::installing(home), my_failed(&self.paths));
+        let (later, go, installing, failed) = (offer::read_later(home), offer::read_go(home), offer::installing(home), my_failed(&self.paths));
         let prefs = std::fs::read_to_string(home.prefs_file()).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
         let facts = offer::Facts {
             latest: latest.as_ref(),
             newer,
+            later: later.as_deref(),
             go: go.as_ref(),
             installing: installing.as_deref(),
             my_id: &self.running_id,
@@ -807,7 +814,7 @@ impl Shell {
     /// thread, given to the hub as `Input::Release`: every 30 s on the
     /// tick (`asked` None; the channel itself fetched at most once an
     /// hour for the whole machine), or now for `/update` (it fetches,
-    /// updates to a newer release and answers that client). Only an installed bise:
+    /// forgets `later` and opens the card in that client). Only an installed bise:
     /// never bise's source tree; the tick never with `BISE_NO_UPDATE=1`.
     pub(super) fn release_check(&mut self, asked: Option<ClientId>) {
         let Some(look) = self.release_look() else {
@@ -826,6 +833,9 @@ impl Shell {
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let home = bise_home::Home::from_env();
+            if asked.is_some() {
+                let _ = bise_home::release_offer::write_later(&home, None);
+            }
             let error = look.fetch(&home, asked.is_some());
             let _ = tx.send(Msg::input(Input::Release(look.check(&home, asked, error))));
         });

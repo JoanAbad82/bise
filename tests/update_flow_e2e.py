@@ -1,12 +1,13 @@
-"""One update for the machine, two projects (update-flow, architect m_45050 §7, m_45106).
+"""One update for the machine, two projects (update-flow, architect m_45050 §7, m_45106;
+update-dot, architect m_46059).
 
 Two throwaway projects, each with its own hub, both from version dir A of a throwaway install
 (this tree's bise, the runtime linked: version_skew_e2e's version_dir). The machine's cache
 (BISE_HOME/cache) names release B as the latest; no fetch (the check's stamp is fresh).
 
-  1. both hubs say B is ready on their release row (hub/bise_update, the status line's), and
-     no hub opens an update card;
-  2. `bise/update` on ONE hub (his click; B's dir is there, so no download): both hubs switch
+  1. both hubs say B is ready on their release row (hub/bise_update), and each opens ONE update
+     card for B (place release:B, its changelog on the card; the window shows one of them);
+  2. `1` on ONE hub's card (his answer; B's dir is there, so no download): both hubs switch
      to B, one at a time (the machine's switch lock, held through each probation: their
      probations never overlap), neither switch is a failure, and both rows are gone;
   3. a bad release C (its bise exits at once): `bise/update` for C: each hub tries it once,
@@ -122,14 +123,15 @@ def offer(c):
 
 
 def update_items(c):
-    """Update cards: none any more (the row is the status line's)."""
+    """This hub's open update cards."""
     return [x for x in c.cards() if x.get("kind") == "update"]
 
 
 def update_now(c):
-    """His click on `update` (the desktop core's, the TUI's /update): bise/update on one hub."""
-    r = c.rpc("bise/update", {"project": c.project()})
-    check("error" not in r, "bise/update refused: %r" % r)
+    """His `1 update now` on this hub's update card (the window answers that one hub)."""
+    cards = c.wait(lambda: update_items(c), 30, "the update card")
+    r = c.answer(cards[0]["id"], "1")
+    check("error" not in r, "card/answer refused: %r" % r)
 
 
 def main():
@@ -138,12 +140,14 @@ def main():
     try:
         dirs = M.start()
         cs = [M.client(d) for d in dirs]
-        # 1. both say B is ready on their row, no card
+        # 1. both say B is ready on their row, each with one card for B
         for c in cs:
             row = c.wait(lambda c=c: offer(c), 30, "the release row")
             check(row.get("id") == B and row.get("state") == "ready", "B ready: %r" % row)
-            check(not update_items(c), "no update card: %r" % update_items(c))
-        print("ok   1: both hubs say %s is ready on hub/bise_update, no card" % B, flush=True)
+            items = c.wait(lambda c=c: update_items(c), 30, "the update card")
+            check(len(items) == 1 and items[0].get("place") == "release:" + B, "one card for %s: %r" % (B, items))
+            check((items[0].get("release") or {}).get("version"), "its release on the card: %r" % items[0])
+        print("ok   1: both hubs say %s is ready, one update card each" % B, flush=True)
 
         # 2. update now on ONE hub (installed): both switch, in turn, no failure
         update_now(cs[0])
@@ -163,7 +167,7 @@ def main():
             check("failed" not in st, "a waiting turn is not a failed switch: %r" % st)
         cs = [M.client(d) for d in dirs]
         for c in cs:
-            c.wait(lambda c=c: "hub/bise_update" in c.hub and offer(c) is None, 20, "no release row on %s" % B)
+            c.wait(lambda c=c: "hub/bise_update" in c.hub and offer(c) is None and not update_items(c), 20, "no release row nor card on %s" % B)
         print("ok   2: update now in one project: both hubs switched to %s in turn, no failure" % B, flush=True)
 
         # 3. a bad release: tried once per hub, rolled back, never again

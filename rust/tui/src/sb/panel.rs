@@ -907,6 +907,8 @@ fn card_row(c: &Card, n: usize, num_style: Style, w: usize, bg: Option<Color>) -
     let room = w.saturating_sub(lead + 1);
     let first = c.text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
     let (who, first) = match c.kind.as_str() {
+        // update-dot: bise's own news, `bise  v0.0.2 is ready`
+        "update" => (words::panel::bise, first.strip_prefix("bise ").unwrap_or(first)),
         // expired-ux: bise's own item, not an agent's
         "signin" => (words::panel::bise, first),
         _ => (c.agent.as_str(), first),
@@ -1588,6 +1590,7 @@ mod tests {
             place: None,
             pr: None,
             link: None,
+            release: None,
             asking: false,
             waiting: Vec::new(),
             acts: Vec::new(),

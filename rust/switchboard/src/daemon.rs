@@ -983,6 +983,7 @@ impl Shell {
             Effect::Merge { card, place, number, head, method } => self.merge_pr(card, place, number, head, method),
             Effect::Feature { token, op, name, agents } => self.feature(token, op, name, agents),
             Effect::Update { id, version } => self.update_to(id, version),
+            Effect::UpdateLater { id } => versions::update_later(&id),
             Effect::BiseUpdate { update } => self.proto_note_all(&HubEv::BiseUpdate { project: self.project(), update }),
             Effect::ReleaseSwitch { id } => self.release_switch(&id),
             Effect::XDeliver { xid, project, kind, text, context, parts } => self.xdeliver(xid, project, kind, text, context, parts),

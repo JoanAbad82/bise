@@ -4,7 +4,8 @@
 // offers its choices and a reply (plan.noteOf); a choice or a reply answers through the core like a
 // pick in the window ({cmd:'answer'}, the core unchanged); a click opens the window on the inbox; a
 // card answered anywhere takes its notification away. An answer that can't reach the core says so
-// in one more notification.
+// in one more notification. A newer bise is one card for the machine (update-dot): a release's
+// update cards knock once between every hub (shared/update.ts knockOnce).
 //
 // Test mode never posts: each step is a NOTIFY_LINE on stdout, and the harness plays his side
 // through two main-process globals: __biseTestFocused (whether a bise window has the keys) and
@@ -16,6 +17,7 @@ import { join } from 'node:path';
 import { BrowserWindow, Notification, shell } from 'electron';
 import { NOTIFY_LINE, type NotifyAuth } from '../../shared/api';
 import type { Card } from '../../proto';
+import { knockOnce } from '../../shared/update';
 import { Arrivals, bundleIdOf, cardRoute, effectOf, knocks, ncPrefsOf, noteOf, testNote, WORDS, type Gesture, type Lang, type Note, type Place } from './plan';
 
 export type NotifyDeps = {
@@ -50,6 +52,8 @@ export class Notifier {
   private readonly fromRows = new Arrivals();
   private readonly fromCards = new Arrivals();
   private readonly withCards = new Set<string>();
+  /** the releases whose update card knocked already (one notification for the machine) */
+  private readonly knocked = new Set<string>();
   private readonly places = new Map<string, Place>();
   private readonly shown = new Map<string, { note: Note; n: Notification | null }>();
 
@@ -147,7 +151,9 @@ export class Notifier {
     // a card leaves when its project's own list drops it (its row's when it has no cards event)
     if (from === 'cards' || !this.withCards.has(project)) for (const k of gone) this.close(k);
     if (fresh.length === 0 || !knocks(this.focused())) return;
-    for (const c of fresh) this.post(noteOf({ ...c, project }, this.places.get(project), this.d.lang, this.quiet));
+    const { post, keys } = knockOnce(fresh, this.knocked);
+    for (const k of keys) this.knocked.add(k);
+    for (const c of post) this.post(noteOf({ ...c, project }, this.places.get(project), this.d.lang, this.quiet));
   }
 
   private line(o: unknown): void {

@@ -81,6 +81,7 @@ fn mock() -> App {
         place: None,
         pr: None,
         link: None,
+        release: None,
         asking: false,
         waiting: Vec::new(),
         acts: Vec::new(),

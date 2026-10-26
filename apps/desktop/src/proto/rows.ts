@@ -348,9 +348,16 @@ place?: string | null,
  */
 pr?: number | null, 
 /**
- * the page its link opens (the update card's release page)
+ * the page its link opens (the update card's release page: its
+ * changelog's `full notes on GitHub ↗`)
  */
 link?: string | null, 
+/**
+ * the `update` card only (update-dot, architect m_46059): the
+ * release it offers and its changelog, typed, never parsed from its
+ * text
+ */
+release?: ReleaseNotes | null, 
 /**
  * the message it answers (`sb card --for`)
  */
@@ -375,6 +382,13 @@ running?: boolean, };
  * actions to close (none when it has none).
  */
 export type CardBatch = { count: number, title: string, what: string, names: Array<string>, topics: Array<string>, line: string, actions?: string | null, };
+
+/**
+ * The update card's release (update-dot): the version it installs, the
+ * one he runs, and the release's notes as written (markdown, cut at
+ * 16 KB by `bise_home::release_offer`; "" when it has none).
+ */
+export type ReleaseNotes = { version: string, running: string, notes: string, };
 
 /**
  * A commit that reached the project's trunk today (the changes tab's

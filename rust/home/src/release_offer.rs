@@ -7,6 +7,9 @@
 //! - `latest.json`: the channel's manifest (`bise update --manifest`,
 //!   fetched at most once per period for the whole machine:
 //!   [`Home::release_stamp`] + a flock on it, [`try_lock`]);
+//! - `update-later`: the release the user said `later` to on its inbox
+//!   card ([`write_later`]; `/update` clears it): every hub's card for it
+//!   closes;
 //! - `update-go`: `{id, at}`, written by the hub that got `update now`,
 //!   ONLY once `bise update` installed that release ([`write_go`]): then
 //!   every hub on an older version switches to it, one at a time;
@@ -36,6 +39,9 @@ pub struct Latest {
     pub notes: Vec<String>,
     /// its release page
     pub url: String,
+    /// its whole notes as the manifest wrote them (markdown), cut at
+    /// [`CHANGELOG_MAX`] bytes: the update card's changelog
+    pub changelog: String,
 }
 
 /// `update now`, for the machine: switch every hub to `id`.
@@ -61,6 +67,7 @@ pub struct Facts<'a> {
     /// the latest release replaces this hub's version (another id, not
     /// older: `release::is_update`)
     pub newer: bool,
+    pub later: Option<&'a str>,
     pub go: Option<&'a Go>,
     /// the id a hub is installing now (the install lock held)
     pub installing: Option<&'a str>,
@@ -82,6 +89,8 @@ pub enum State {
     Updating,
     /// this hub's switch to it rolled back: not tried again
     Failed { why: String },
+    /// the user said later to this release
+    Later,
     /// this hub runs it, or nothing newer
     UpToDate,
 }
@@ -127,6 +136,9 @@ pub fn plan(f: &Facts) -> Option<Offer> {
     if f.installing == Some(l.id.as_str()) {
         return offer(State::Installing, false);
     }
+    if f.later == Some(l.id.as_str()) {
+        return offer(State::Later, false);
+    }
     offer(State::Ready, false)
 }
 
@@ -142,6 +154,7 @@ pub fn latest_of(manifest: &str, page: &str) -> Option<Latest> {
         Some(Value::String(t)) => t.lines().map(String::from).collect(),
         _ => Vec::new(),
     };
+    let changelog = cut_bytes(notes.join("\n").trim(), CHANGELOG_MAX);
     let notes = notes
         .iter()
         .map(|l| l.trim().trim_start_matches(['-', '*', '•']).trim())
@@ -151,12 +164,29 @@ pub fn latest_of(manifest: &str, page: &str) -> Option<Latest> {
         .collect();
     let tag = s("tag").unwrap_or_else(|| if version == id { id.clone() } else { format!("v{}", version) });
     let url = if page.is_empty() { String::new() } else { format!("{}{}", page, tag) };
-    Some(Latest { id, version, notes, url })
+    Some(Latest { id, version, notes, url, changelog })
 }
 
 /// Most lines of notes, and their width.
 const NOTES_MAX: usize = 5;
 const NOTE_WIDTH: usize = 120;
+/// The changelog's most bytes (architect m_46059: 16 KB).
+pub const CHANGELOG_MAX: usize = 16 * 1024;
+
+/// `s` cut to at most `max` bytes at a line's end (else a char's), `…`
+/// after a cut.
+fn cut_bytes(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_string();
+    }
+    let mut end = max.saturating_sub('…'.len_utf8());
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    let head = &s[..end];
+    let head = head.rfind('\n').map_or(head, |i| &head[..i]);
+    format!("{}…", head.trim_end())
+}
 
 fn clip(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
@@ -171,6 +201,11 @@ impl crate::Home {
     /// `update-go`: `{id, at}`, the machine's `update now` ([`write_go`]).
     pub fn update_go(&self) -> PathBuf {
         self.cache_dir().join("update-go")
+    }
+
+    /// `update-later`: the release the user said later to (one id).
+    pub fn update_later(&self) -> PathBuf {
+        self.cache_dir().join("update-later")
     }
 
     /// `update-install`: flocked by the hub installing a release.
@@ -210,6 +245,21 @@ pub fn read_go(home: &crate::Home) -> Option<Go> {
 /// `update now` for the machine, once `id` is installed.
 pub fn write_go(home: &crate::Home, go: &Go) -> std::io::Result<()> {
     write_atomic(&home.update_go(), &json!({"id": go.id, "at": go.at}).to_string())
+}
+
+pub fn read_later(home: &crate::Home) -> Option<String> {
+    std::fs::read_to_string(home.update_later()).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+/// `later` to release `id` (None: `/update` asks again).
+pub fn write_later(home: &crate::Home, id: Option<&str>) -> std::io::Result<()> {
+    match id {
+        Some(id) => write_atomic(&home.update_later(), id),
+        None => match std::fs::remove_file(home.update_later()) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        },
+    }
 }
 
 /// An exclusive flock, held until dropped (or its holder dies).
