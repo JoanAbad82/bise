@@ -113,6 +113,13 @@ pub struct HubItem<'a> {
     pub pr: Option<u64>,
 }
 
+impl Merges {
+    /// The items whose `1` runs (`gh pr merge`): `Hub::running_cards`.
+    pub(crate) fn running(&self) -> impl Iterator<Item = u64> + '_ {
+        self.running.iter().copied()
+    }
+}
+
 /// The hub's side of the item (runtime: a restart adopts the open items
 /// at the forge's first answer).
 #[derive(Debug, Default)]
@@ -153,7 +160,7 @@ impl Hub {
             "merge" => self.merge_choice(fx, env, card, place, pr, &choice),
             update_card::KIND => self.update_choice(fx, env, card, place, &choice),
             // dev-flow §5.1: a feature's try and merge items
-            k @ (crate::feature::TRY | crate::feature::MERGE) => self.feature_choice(fx, k, place.as_deref(), &choice),
+            k @ (crate::feature::TRY | crate::feature::MERGE) => self.feature_choice(fx, card, k, place.as_deref(), &choice),
             _ => {}
         }
     }

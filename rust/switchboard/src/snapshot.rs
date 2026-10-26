@@ -139,6 +139,8 @@ pub struct CardRow {
     pub opens: BTreeMap<u32, OptAct>,
     pub batch: Option<CardBatch>,
     pub pick: Option<Pick>,
+    /// the hub carries out his answer to it now (`Hub::running_cards`)
+    pub running: bool,
 }
 
 #[cfg(test)]

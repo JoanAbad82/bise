@@ -279,6 +279,11 @@ pub struct Card {
     /// fields for the capsule's words; none on any other card
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub batch: Option<CardBatch>,
+    /// the hub is carrying out his answer to this card now (a merge, a
+    /// try build, an update); the card closes or changes when that job
+    /// ends. A client keeps it as answered meanwhile (inbox-reappear)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub running: bool,
 }
 
 /// A drafts-batch card's fields (the hub's pages/drafts.rs `info`, amb-web
@@ -448,7 +453,7 @@ mod open_tests {
         let card = Card {
             id: 1, project: "p".into(), kind: "merge".into(), agent: "a".into(), question, options, urgent: false, since_ms: 0, page: None, artifact: None,
             approval: false, rank: None, waiting: None, text: String::new(), note: None, place: None, pr: None, link: Some("https://x.test/pull/1".into()),
-            for_msg: None, batch: None,
+            for_msg: None, batch: None, running: false,
         };
         let acts = |c: Card| c.options.into_iter().map(|o| o.act).collect::<Vec<_>>();
         assert_eq!(acts(card.clone().with_acts(&BTreeMap::new())), vec![None, Some(OptAct::link(Some("https://x.test/pull/1"))), None]);

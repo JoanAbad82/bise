@@ -159,6 +159,13 @@ pub struct Updates {
     later: BTreeSet<String>,
 }
 
+impl Updates {
+    /// The items whose `1` runs (the update): `Hub::running_cards`.
+    pub(crate) fn running(&self) -> impl Iterator<Item = u64> + '_ {
+        self.running.iter().copied()
+    }
+}
+
 impl Hub {
     /// A check of the release channel (the daemon's, or `/update`).
     pub(super) fn release_in(&mut self, fx: &mut Fx, env: &mut dyn Env, c: ReleaseCheck) {

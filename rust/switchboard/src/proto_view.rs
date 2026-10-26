@@ -405,6 +405,8 @@ pub fn cards(snap: &Snapshot, project: &str, now: u64, user_kind: fn(&str) -> bo
                 for_msg: c.for_msg,
                 // a drafts batch's fields (daemon/page_cards.rs snapshot_card_links)
                 batch: c.batch.clone(),
+                // his answer runs (a merge, a try, an update): still answered
+                running: c.running,
                 text: c.text.clone(),
                 kind,
             }

@@ -176,3 +176,49 @@ fn land_feature_and_flow_say_not_in_a_repo_without_git() {
     let (_, fx) = t.req(MAIN, AgentReq::Land { here: true, message: "x".into(), add: Vec::new() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Land { .. })));
 }
+
+/// inbox-reappear (his #780): a feature item he answered with a step
+/// (merge, try, drop) says `running` while that step runs, so no client
+/// shows it to him again meanwhile; a land or an agent's sync on the same
+/// feature is not his answer; the step's end (done, or the shell's
+/// refusal: a busy feature) ends it, and the item it opens runs nothing.
+#[test]
+fn a_feature_item_runs_his_answer_until_its_step_ends() {
+    let mut t = T::new();
+    let place = crate::feature::place_id("cu");
+    let open = |t: &mut T, kind: &str| {
+        let text = "merge cu into main?\nyou tried abc: x\n3 commits.\n\n1. merge\n2. keep working\n3. drop the branch";
+        let open = ci::CardOpen { kind: kind.into(), agent: MAIN.into(), text: text.into(), place: Some(place.clone()), pr: None };
+        t.hub.core(&mut Vec::new(), &mut t.env, None, In::CardOpen(open));
+        *t.hub.st.cards.keys().max().unwrap()
+    };
+    let running = |t: &mut T, id: u64| t.hub.snapshot(0).cards.iter().find(|c| c.id == id).map(|c| c.running);
+    let id = open(&mut t, "feature_merge");
+    assert_eq!(running(&mut t, id), Some(false), "not answered yet");
+    // an agent's own step on the feature (a sync, a land's turn): not his answer
+    t.go(Input::Feature(FeatureDone { name: "cu".into(), ..FeatureDone::default() }));
+    assert_eq!(running(&mut t, id), Some(false));
+    // `2 keep working` runs no step of his
+    t.user(MAIN, &format!("/answer {} 2", id));
+    assert_eq!(running(&mut t, id), Some(false), "keep working");
+    let fx = t.user(MAIN, &format!("/answer {} 1", id));
+    assert!(fx.iter().any(|e| matches!(e, Effect::Feature { op, .. } if op == "merge")), "{fx:?}");
+    assert_eq!(running(&mut t, id), Some(true), "his merge runs");
+    let rows = crate::proto_view::cards(&t.hub.snapshot(0), "p", 0, |_| true).0;
+    assert!(rows.iter().any(|c| c.id == id && c.running), "the wire says it: {rows:?}");
+    // another feature's step ends: still his merge
+    t.go(Input::Feature(FeatureDone { name: "other".into(), ..FeatureDone::default() }));
+    assert_eq!(running(&mut t, id), Some(true));
+    // it fails (or the shell refused it: busy): the item it opens again runs nothing
+    let why = crate::feature::refused_line("merge", "the rebase of cu on main failed");
+    t.go(Input::Feature(FeatureDone { name: "cu".into(), refused: Some(why), ..FeatureDone::default() }));
+    assert_eq!(running(&mut t, id), None, "closed");
+    let again = *t.hub.st.cards.keys().max().unwrap();
+    assert_eq!(running(&mut t, again), Some(false));
+    // a try: running until its step ends with the merge item
+    let try_id = open(&mut t, "feature_try");
+    t.user(MAIN, &format!("/answer {} 1", try_id));
+    assert_eq!(running(&mut t, try_id), Some(true), "its try builds");
+    t.go(Input::Feature(FeatureDone { name: "cu".into(), close: Some("replaced".into()), ..FeatureDone::default() }));
+    assert!(t.hub.running_cards().is_empty(), "nothing runs");
+}

@@ -55,6 +55,8 @@ impl Hub {
     /// (a retire: sb-core decides who and tells them), main's feed told.
     pub(super) fn feature_done(&mut self, fx: &mut Fx, env: &mut dyn Env, d: FeatureDone) {
         let place = crate::feature::place_id(&d.name);
+        // his answer's step (if any) ended: its card runs no more
+        self.feature_answers.remove(&d.name);
         if d.open.is_some() || d.close.is_some() {
             let open: Vec<u64> = self
                 .st
@@ -114,8 +116,10 @@ impl Hub {
     /// yet; `feature_merge` 1 merge / 2 keep working / 3 drop the branch
     /// (the TUI asked "drop it?" once more before sending 3). The card
     /// stays open until the step ends (`feature_done` closes or replaces
-    /// it). A number out of range: nothing.
-    pub(super) fn feature_choice(&mut self, fx: &mut Fx, kind: &str, place: Option<&str>, choice: &str) {
+    /// it). A number out of range: nothing. A merge, a try or a drop runs
+    /// his answer: `card` is running until that step's `Input::Feature`
+    /// (inbox-reappear: no client shows it again meanwhile).
+    pub(super) fn feature_choice(&mut self, fx: &mut Fx, card: u64, kind: &str, place: Option<&str>, choice: &str) {
         let Some(name) = place.and_then(crate::feature::of_place) else { return };
         let op = match (kind, choice.trim()) {
             (crate::feature::TRY, "1") => "try",
@@ -126,6 +130,11 @@ impl Hub {
             (crate::feature::MERGE, "3") => "drop",
             _ => return,
         };
+        // the step always comes back as one Input::Feature (its end, or
+        // the shell's refusal: a busy feature), which ends it
+        if matches!(op, "merge" | "try" | "drop") {
+            self.feature_answers.insert(name.to_string(), card);
+        }
         let agents = self.feature_agents(name);
         fx.push(Effect::Feature { token: None, op: op.into(), name: name.into(), agents });
     }

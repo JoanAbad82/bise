@@ -639,6 +639,10 @@ pub struct Hub {
     /// build builds or is on trial (the `Δ`). Runtime only.
     pub feature_lids: BTreeMap<String, String>,
     pub trying: BTreeSet<String>,
+    /// inbox-reappear: his answer's feature step running, by feature: the
+    /// card he answered (feature_choice's merge, try, drop), until its
+    /// `Input::Feature` ends it. Runtime only (`running_cards`).
+    feature_answers: BTreeMap<String, u64>,
     /// pr-hub (pr-design §7-§10), runtime but `known`: what the journal
     /// says of each place's PR (its number; `pr_*` lines, read back by
     /// `replay`); `pr_lids`: the held line of a worktree with no PR yet
@@ -794,6 +798,7 @@ impl Hub {
             flow: None,
             feature_lids: BTreeMap::new(),
             trying: BTreeSet::new(),
+            feature_answers: BTreeMap::new(),
             pr_known: BTreeMap::new(),
             pr_lids: BTreeMap::new(),
             pr_ok_ms: BTreeMap::new(),

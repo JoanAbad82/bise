@@ -50,7 +50,8 @@ impl Hub {
 
     /// The snapshot around its agent rows: the cards, the places, the flow.
     fn snapshot_with(&self, agents: Vec<AgentRow>, now: u64) -> Snapshot {
-        let cards = self.st.open_cards().map(|c| self.card_row(c, now)).collect();
+        let running = self.running_cards();
+        let cards = self.st.open_cards().map(|c| self.card_row(c, now, &running)).collect();
         let places = crate::place::places(&self.st, &self.prs);
         let (mut lids, stale) = self.pr_views(now);
         // a feature's lid: the land queue's (`landing`) wins
@@ -61,9 +62,18 @@ impl Hub {
         Snapshot { agents, cards, places, flow: self.flow, ..Snapshot::default() }
     }
 
+    /// The cards whose answer the hub carries out now (inbox-reappear,
+    /// architect m_44978): a PR's merge (merge.rs), an update
+    /// (update_card.rs), a feature's merge, try or drop (core_feature.rs).
+    /// The one owner of `CardRow::running`.
+    pub fn running_cards(&self) -> BTreeSet<u64> {
+        self.merges.running().chain(self.updates.running()).chain(self.feature_answers.values().copied()).collect()
+    }
+
     /// An open card as the views see it: its words and what the hub adds.
-    fn card_row(&self, c: &Card, now: u64) -> CardRow {
+    fn card_row(&self, c: &Card, now: u64, running: &BTreeSet<u64>) -> CardRow {
         CardRow {
+            running: running.contains(&c.id),
             id: c.id,
             kind: c.kind.clone(),
             agent: c.agent.clone(),

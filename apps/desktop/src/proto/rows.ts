@@ -359,7 +359,13 @@ for_msg?: number | null,
  * a page's drafts batched in one card (docs/ambient-pages.md): its
  * fields for the capsule's words; none on any other card
  */
-batch?: CardBatch | null, };
+batch?: CardBatch | null, 
+/**
+ * the hub is carrying out his answer to this card now (a merge, a
+ * try build, an update); the card closes or changes when that job
+ * ends. A client keeps it as answered meanwhile (inbox-reappear)
+ */
+running?: boolean, };
 
 /**
  * A drafts-batch card's fields (the hub's pages/drafts.rs `info`, amb-web
