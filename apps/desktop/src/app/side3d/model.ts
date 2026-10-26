@@ -85,13 +85,13 @@ export function bubbleName(b: BubbleId): string {
   return { agents: side.agents, artifacts: side.artifacts, scheduled: side.scheduled, processes: side.processes }[b];
 }
 
-/** What a bubble's card head says after its name ('3 working · 1 asks'); '' when nothing. Pure. */
+/** What a bubble's card head says after its name ('3 working · 1 waiting for you', the catalog's word: designer m_45759); '' when nothing. Pure. */
 export function bubbleSays(b: BubbleId, c: Counts): string {
   const parts: string[] = [];
   switch (b) {
     case 'agents':
       if (c.working > 0) parts.push(side.working({ n: c.working }));
-      if (c.asks > 0) parts.push(side.asks({ n: c.asks }));
+      if (c.asks > 0) parts.push(side.waiting_you({ n: c.asks }));
       break;
     case 'artifacts':
       if (c.newArtifacts > 0) parts.push(side.new_count({ n: c.newArtifacts }));
