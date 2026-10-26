@@ -593,8 +593,8 @@ export function RightBar({ project, name }: { project: string; name: string }) {
   const scope = barScope(route, project);
   // whose list ARTIFACTS and SCHEDULED show: the pages he opened past a cap are kept per scope
   const inView = scope.level === 'agent' ? `${project}/${scope.agent}` : project;
-  const allMade = artifactRows(artifacts, now);
-  const allLater = [...scheduledRows(tasks, now), ...watchRows(agents, now, all)];
+  const allMade = artifactRows(artifacts, now, all);
+  const allLater = [...scheduledRows(tasks, now, all), ...watchRows(agents, now, all)];
   const made = scope.level === 'agent' ? artifactRows(artifacts.filter((it) => inScope(scope, it.a.agent)), now) : allMade;
   const later =
     scope.level === 'agent'

@@ -36,7 +36,7 @@ import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, sideShows } from './layout';
 import { newAgent, openOverview, openTab, panelProject, useLeftWidth, usePanelBox } from './ports';
-import { useListed } from './lists';
+import { acrossSays, busyProjects, useListed } from './lists';
 import { alarms } from '@/thread/wake';
 import type { Agent } from '@/proto';
 import { useAgents, useCards, useProjects, useStore } from '@/store';
@@ -315,43 +315,61 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
   const says = [side.at_desks({ n: live.length }), counts.asks > 0 ? side.asks({ n: counts.asks }) : ''].filter((s) => s !== '').join(' · ');
   const archived = agents.filter((a) => a.archived).length;
   const running = procs.filter((x) => isRunning(x.p));
+  // bise's own lists every project's (designer m_45706): each row says its project ('acme › perf'),
+  // each head counts across them ('6 working in 3 projects'); in a project, neither
+  const nameOf = (p: string) => rows.find((r) => r.project === p)?.name || p;
+  const groupOf = (p: string): string | undefined => (all ? nameOf(p) : undefined);
+  const across = (b: BubbleId): number => {
+    if (!all) return 1;
+    switch (b) {
+      case 'agents':
+        return busyProjects(listed);
+      case 'artifacts':
+        return new Set(artifacts.map((x) => x.project)).size;
+      case 'scheduled':
+        return new Set([...tasks.map((x) => x.project), ...watching.map(projectOfAgent)]).size;
+      case 'processes':
+        return new Set(running.map((x) => x.project)).size;
+    }
+  };
+  const saysOf = (b: BubbleId) => acrossSays(bubbleSays(b, counts), across(b));
   /** each bubble's float: its head, rows and foot (designer m_44975: one per bubble) */
   const floatOf = (b: BubbleId): FloatContent => {
     switch (b) {
       case 'agents':
         return {
-          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          id: b, name: bubbleName(b), says: saysOf(b),
           add: <HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />,
           onPin: () => { openOverview('agents'); },
           foot: { left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go(all ? { screen: 'bise' } : { screen: 'agents', project }); } }] },
-          rows: live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => <AgentLine key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} cards={cards} at={at} onOpen={openAgentIn(projectOfAgent(a))} />),
+          rows: live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => <AgentLine key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} cards={cards} at={at} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />),
         };
       case 'artifacts':
         return {
-          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          id: b, name: bubbleName(b), says: saysOf(b),
           add: <AddButton place={addPlace} testId="app.flyout.artifacts.add" />,
           onPin: () => { openOverview('artifacts'); },
           foot: { left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project: scope }); } }] },
-          rows: artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} />),
+          rows: artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />),
         };
       case 'scheduled':
         return {
-          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          id: b, name: bubbleName(b), says: saysOf(b),
           onPin: () => { openOverview('processes'); },
           foot: { left: '', links: [{ text: side.all_scheduled, testId: 'app.flyout.scheduled.all', onClick: () => { router.go({ screen: 'scheduled' }); } }] },
           rows: tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
             <>
-              {tasks.slice(0, ROWS).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} />)}
-              {watching.map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} />)}
+              {tasks.slice(0, ROWS).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} />)}
+              {watching.map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />)}
             </>
           ),
         };
       case 'processes':
         return {
-          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          id: b, name: bubbleName(b), says: saysOf(b),
           onPin: () => { openOverview('processes'); },
           foot: { left: '', links: [{ text: side.all_processes, testId: 'app.flyout.processes.all', onClick: () => { router.go(all ? { screen: 'running' } : { screen: 'running', scope: { project } }); } }] },
-          rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} />),
+          rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} />),
         };
     }
   };

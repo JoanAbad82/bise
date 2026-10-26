@@ -17,6 +17,7 @@ import { askInbox } from '../inboxAsk';
 import { useEntityMenu } from '../menus/use';
 import { askButtons, pickIntent, speechOf, speechWord, type Speech } from './model';
 import { ThingPic } from './Bubbles';
+import { groupParts } from './lists';
 
 /** a head in the card, css px */
 export const HEAD_PX = 40;
@@ -86,11 +87,14 @@ export interface AgentLineProps {
   /** where an answer is made from (the thread in view) */
   readonly at: AnswerAt | null;
   readonly onOpen: (agent: string) => void;
+  /** its project's name on bise's own screen (designer m_45706: 'acme › perf'); none in a project */
+  readonly group?: string;
 }
 
 /** One agent: its bubble, then its head and its name. */
-export function AgentLine({ project, a, cards, at, onOpen }: AgentLineProps) {
+export function AgentLine({ project, a, cards, at, onOpen, group }: AgentLineProps) {
   const s = speechOf(a, cards);
+  const g = groupParts(group, shownName(a.name));
   const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
   const open = () => {
     onOpen(a.name);
@@ -101,7 +105,7 @@ export function AgentLine({ project, a, cards, at, onOpen }: AgentLineProps) {
       <Press look="s3-agent-who" aria-label={shownName(a.name)} onClick={open} data-row=""
         {...tipAttrs(`${shownName(a.name)} · ${speechWord(s)}`)}>
         <Head project={project} a={a} asks={s.k === 'asks'} />
-        <span className="s3-agent-name" data-testid={`app.flyout.agents.${project}.${a.name}.name`}>{shownName(a.name)}</span>
+        <span className="s3-agent-name" data-testid={`app.flyout.agents.${project}.${a.name}.name`}>{g.project !== '' && <span className="s3-group">{g.project}</span>}{g.name}</span>
       </Press>
     </div>
   );

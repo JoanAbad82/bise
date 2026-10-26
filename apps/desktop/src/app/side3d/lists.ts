@@ -7,7 +7,9 @@
 import { useSyncExternalStore } from 'react';
 import type { Agent, Card } from '@/proto';
 import { useStore, type Store } from '@/store';
-import { inRank } from './model';
+import { running } from '@/proto/words_running.gen';
+import { side } from '@/proto/words_side.gen';
+import { agentCounts, inRank } from './model';
 
 /** What the side lists of its scope. */
 export interface Listed {
@@ -40,17 +42,60 @@ export function scopeIds(scope: string, projects: readonly string[], home: strin
   return [...projects.filter((p) => p === home), ...projects.filter((p) => p !== home)];
 }
 
-/** The scope's lists from its projects' parts, in that order. Pure. */
-export function listedOf(parts: readonly ProjectPart[]): Listed {
+/**
+ * The scope's lists from its projects' parts, in that order. `home` (bise's own): of the mains, only
+ * the home's lists, as the Overview's agents (barrows agentRows): every project's own main is its
+ * thread. Pure.
+ */
+export function listedOf(parts: readonly ProjectPart[], home?: string): Listed {
   const projectOf = new Map<Agent, string>();
   for (const p of parts) for (const a of p.agents) projectOf.set(a, p.project);
   return {
     agents: parts.flatMap((p) => p.agents),
-    live: parts.flatMap((p) => inRank(p.agents)),
+    live: parts.flatMap((p) => inRank(p.agents).filter((a) => home === undefined || !a.main || p.project === home)),
     projectOf,
     cards: parts.flatMap((p) => p.cards),
     waits: parts.reduce((n, p) => n + p.waits, 0),
   };
+}
+
+/**
+ * A row's project on bise's own screen (designer m_45706), as the bar's processes say it: 'acme ›
+ * perf', the project's part apart so it shows in text-3. `group` undefined (a project's own
+ * lists): the name alone. Pure.
+ */
+export function groupParts(group: string | undefined, name: string): { readonly project: string; readonly name: string } {
+  if (group === undefined) return { project: '', name };
+  const mark = '\u0000';
+  const w = running.group({ project: mark, agent: name });
+  const at = w.indexOf(mark);
+  return { project: w.slice(0, at) + group + w.slice(at + mark.length, w.length - name.length), name };
+}
+
+/** A row's sub line's owner: 'perf', on bise's own 'acme › perf'. Pure. */
+export function groupWords(group: string | undefined, name: string): string {
+  return group === undefined ? name : running.group({ project: group, agent: name });
+}
+
+/**
+ * A float head's words across projects (designer m_45706): '6 working in 3 projects' when its rows
+ * come from more than one; as they were from one. Pure.
+ */
+export function acrossSays(says: string, projects: number): string {
+  return says === '' || projects < 2 ? says : side.in_projects({ n: says, p: projects });
+}
+
+/** The projects whose agents count in the agents head (working, waiting or asking). Pure. */
+export function busyProjects(listed: Listed): number {
+  const by = new Map<string, Agent[]>();
+  for (const a of listed.agents) {
+    const p = listed.projectOf.get(a) ?? '';
+    by.set(p, [...(by.get(p) ?? []), a]);
+  }
+  return [...by.values()].filter((as) => {
+    const c = agentCounts(as);
+    return c.active > 0 || c.asks > 0 || c.working > 0;
+  }).length;
 }
 
 const last = new Map<string, { from: readonly unknown[]; listed: Listed }>();
@@ -82,7 +127,7 @@ function snapshot(store: Store, scope: string, home: string): Listed {
   const key = `${scope}\u0000${home}`;
   const was = last.get(key);
   if (was !== undefined && was.from.length === from.length && was.from.every((x, i) => x === from[i])) return was.listed;
-  const listed = listedOf(parts);
+  const listed = listedOf(parts, scope === '' ? home : undefined);
   last.set(key, { from, listed });
   return listed;
 }

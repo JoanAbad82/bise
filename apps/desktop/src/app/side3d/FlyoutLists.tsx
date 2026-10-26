@@ -20,6 +20,7 @@ import { side } from '@/proto/words_side.gen';
 import { useEntityMenu } from '../menus/use';
 import { ThingPic } from './Bubbles';
 import { SideRow } from './Flyout';
+import { groupParts, groupWords } from './lists';
 import { artifactObj, laterObj, procObj } from './objects';
 import { openTab } from './ports';
 
@@ -28,7 +29,8 @@ export const ROW_PX = 40;
 
 const CHIP: Record<ReturnType<typeof kindOf>, AppIconName> = { pr: 'branch', page: 'file', file: 'file', shots: 'artifacts' };
 
-export function ArtifactRow({ it, now }: { it: Item; now: number }) {
+/** `group`: its project's name on bise's own screen (designer m_45706: 'acme › perf'), on each row here. */
+export function ArtifactRow({ it, now, group }: { it: Item; now: number; group?: string }) {
   const a = it.a;
   const menu = useEntityMenu({ kind: 'artifact', project: it.project, id: a.id });
   // ⌘⏎ with the pointer on the row: its head's first button (artifacts/front.ts rowPrimary)
@@ -44,7 +46,7 @@ export function ArtifactRow({ it, now }: { it: Item; now: number }) {
           <span className="b-artchip-title">{a.title}</span>
         </span>
       }
-      sub={`${a.kind} · ${a.agent}`}
+      sub={`${a.kind} · ${groupWords(group, a.agent)}`}
       end={
         <>
           {a.new && <span className="s3-dot" data-tone="acc" {...tipAttrs(side.new_tip)} />}
@@ -62,10 +64,10 @@ export function ArtifactRow({ it, now }: { it: Item; now: number }) {
 }
 
 /** where a process listens, its age: 'perf · localhost:5173 · 2 h' */
-function procSub(p: Proc, now: number): string {
+function procSub(p: Proc, now: number, group?: string): string {
   const s = stateOf(p);
   const where = urlWords(p, s)?.row ?? portWords(p, s);
-  return [p.agent, where, ago(p.started_ms, now)].filter((x) => x !== '').join(' · ');
+  return [groupWords(group, p.agent), where, ago(p.started_ms, now)].filter((x) => x !== '').join(' · ');
 }
 
 /** a process's command as he typed it ('python3 -m http.server 47977'), never the system's process name; its program by name, a 'cd <its folder> &&' gone (running/model rowCmd) */
@@ -74,7 +76,7 @@ export function typed(p: Pick<Proc, 'cmd' | 'cwd'>): string {
   return c.args === '' ? c.prog : `${c.prog} ${c.args}`;
 }
 
-export function ProcRow({ x, now }: { x: ProcItem; now: number }) {
+export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: string }) {
   const p = x.p;
   const menu = useEntityMenu({ kind: 'process', project: x.project, agent: p.agent, id: p.id });
   const on = isRunning(p);
@@ -82,7 +84,7 @@ export function ProcRow({ x, now }: { x: ProcItem; now: number }) {
     <SideRow
       pic={<ThingPic thing={{ obj: procObj(p) }} px={ROW_PX} tile="terminal" />}
       title={<span className="s3-cmd">{typed(p)}</span>}
-      sub={procSub(p, now)}
+      sub={procSub(p, now, group)}
       end={on ? <span className="s3-wave" {...tipAttrs(side.running_tip)} data-testid={`app.flyout.processes.${x.project}.${p.agent}.${p.id}.runs`}>{markOf(stateOf(p)).glyph}</span> : undefined}
       label={p.cmd}
       tip={p.cmd}
@@ -95,13 +97,13 @@ export function ProcRow({ x, now }: { x: ProcItem; now: number }) {
   );
 }
 
-export function TaskRow({ x, now }: { x: Task; now: number }) {
+export function TaskRow({ x, now, group }: { x: Task; now: number; group?: string }) {
   const menu = useEntityMenu({ kind: 'scheduled', project: x.project, id: x.t.id });
   return (
     <SideRow
       pic={<ThingPic thing={{ obj: laterObj('timer') }} px={ROW_PX} tile="scheduled" />}
       title={asks(x.t)}
-      sub={[x.t.agent, howOften(x.t), nextWords(x.t, now)].join(' · ')}
+      sub={[groupWords(group, x.t.agent), howOften(x.t), nextWords(x.t, now)].join(' · ')}
       label={asks(x.t)}
       tip={x.t.words}
       onClick={() => {
@@ -114,15 +116,16 @@ export function TaskRow({ x, now }: { x: Task; now: number }) {
 }
 
 /** An agent's watches (sb wake): its telescope rows, each opening the agent. */
-export function WatchRows({ project, a, now, onOpen }: { project: string; a: Agent; now: number; onOpen: (agent: string) => void }) {
+export function WatchRows({ project, a, now, onOpen, group }: { project: string; a: Agent; now: number; onOpen: (agent: string) => void; group?: string }) {
   const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
+  const g = groupParts(group, a.name);
   return (
     <>
       {alarms(a, now).map((al) => (
         <SideRow
           key={al.id}
           pic={<ThingPic thing={{ obj: laterObj('watch') }} px={ROW_PX} tile="scheduled" />}
-          title={a.name}
+          title={g.project === '' ? a.name : <><span className="s3-group">{g.project}</span>{g.name}</>}
           sub={[al.note, al.end === '' ? '' : panel.until({ at: al.end })].filter((s) => s !== '').join(' · ')}
           label={al.title}
           tip={al.title}

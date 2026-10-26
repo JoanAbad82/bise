@@ -322,8 +322,8 @@ const hm = (ms: number) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-/** ARTIFACTS: newest first, its kind's glyph, 'new' in ink, else when (today's time, else its age). Pure. */
-export function artifactRows(items: readonly Item[], now: number): BarRow[] {
+/** ARTIFACTS: newest first, its kind's glyph, 'new' in ink, else when (today's time, else its age); `all` (bise's thread): its project under it. Pure. */
+export function artifactRows(items: readonly Item[], now: number, all = false): BarRow[] {
   return items
     .filter((it) => it.a.archived_at == null)
     .slice()
@@ -335,7 +335,8 @@ export function artifactRows(items: readonly Item[], now: number): BarRow[] {
       glyph: glyphOf(it.a.kind),
       tone: 'dim',
       name: it.a.title,
-      sub: '',
+      // on bise's thread its project, as an agent's row says it (designer m_45706)
+      sub: all ? it.projectName : '',
       leaves: leaves(it.a),
       end: it.a.new ? panel.new_chip : now - it.a.at_ms < 86_400_000 ? hm(it.a.at_ms) : shortAge(now - it.a.at_ms),
       endTone: it.a.new ? 'ink' : 'dim',
@@ -346,15 +347,15 @@ export function artifactRows(items: readonly Item[], now: number): BarRow[] {
     }));
 }
 
-/** SCHEDULED: ◷, its name (else its words), how often, its next run. Pure. */
-export function scheduledRows(tasks: readonly Task[], now: number): BarRow[] {
+/** SCHEDULED: ◷, its name (else its words), how often, its next run; `all` (bise's thread): its project first. Pure. */
+export function scheduledRows(tasks: readonly Task[], now: number, all = false): BarRow[] {
   return tasks.map((x) => ({
     key: `s:${x.project}/${String(x.t.id)}`,
     project: x.project,
     glyph: '◷',
     tone: 'dim',
     name: x.t.name != null && x.t.name !== '' ? x.t.name : (x.t.words.split('\n')[0] ?? ''),
-    sub: howOften(x.t),
+    sub: all ? [x.projectName, howOften(x.t)].join(' · ') : howOften(x.t),
     // cut on a whole word, '…' glued to it ('every day…', designer m_25211), as an alarm's note
     fit: true,
     end: nextWords(x.t, now),
@@ -416,7 +417,7 @@ export function watchRows(agents: readonly ProjAgent[], now: number, all: boolea
         glyph: '◌',
         tone: 'dim' as const,
         name: x.a.name,
-        sub: al.note,
+        sub: all ? [x.projectName, al.note].filter((w) => w !== '').join(' · ') : al.note,
         fit: true,
         end: al.end === '' ? '' : panel.until({ at: al.end }),
         endTone: 'dim' as const,

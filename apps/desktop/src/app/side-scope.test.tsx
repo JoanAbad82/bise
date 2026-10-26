@@ -14,7 +14,9 @@ import type { Route } from './route';
 import { panelProject } from './side';
 import { Overview } from './panel/Overview';
 import { SideHost } from './side3d/Host';
-import { listedOf, scopeIds } from './side3d/lists';
+import { acrossSays, groupParts, listedOf, scopeIds } from './side3d/lists';
+import { running } from '@/proto/words_running.gen';
+import { side } from '@/proto/words_side.gen';
 import { openOverview } from './panel/tabs';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw
@@ -141,6 +143,36 @@ describe('the right side is the project in front (his m_45581)', () => {
     for (const w of ['wake perf', 'wake writer']) expect(floatText(v, 'scheduled')).toContain(w);
     for (const w of ['run perf', 'run writer']) expect(floatText(v, 'processes')).toContain(w);
     for (const w of ['perf', 'writer', 'perf notes', 'writer notes']) expect(overviewText(v)).toContain(w);
+  });
+
+  it("on bise's own, each float row says its project ('acme › perf', the project apart for text-3) and each head counts across projects (designer m_45706)", () => {
+    expect(groupParts('acme', 'perf')).toEqual({ project: running.group({ project: 'acme', agent: '' }), name: 'perf' });
+    expect(groupParts(undefined, 'perf')).toEqual({ project: '', name: 'perf' });
+    expect(acrossSays(side.working({ n: 6 }), 3)).toBe(side.in_projects({ n: side.working({ n: 6 }), p: 3 }));
+    expect(acrossSays(side.working({ n: 6 }), 1)).toBe(side.working({ n: 6 }));
+    const { v } = world({ screen: 'bise' });
+    fireEvent.click(v.getByTestId('app.bubble.agents'));
+    expect(v.getByTestId(`app.flyout.agents.${HARNESS}.perf.name`).textContent).toBe(running.group({ project: 'harness', agent: 'perf' }));
+    expect(v.getByTestId(`app.flyout.agents.${HARNESS}.perf.name`).querySelector('.s3-group')?.textContent).toBe(running.group({ project: 'harness', agent: '' }));
+    expect(v.getByTestId('app.flyout.agents').textContent).toContain(side.in_projects({ n: side.working({ n: 2 }), p: 2 }));
+    // of the mains only the home's, as the Overview's agents: a project's main is its own thread
+    expect(v.queryByTestId(`app.flyout.agents.${HARNESS}.main`)).toBeNull();
+    expect(v.queryByTestId(`app.flyout.agents.${DOCS}.main`)).toBeNull();
+    // the Overview's artifacts say their project too (ui-review m_45717)
+    expect(v.getByTestId(`app.right.artifact.${DOCS}.writer-notes`).textContent).toContain('ai docs');
+    expect(floatText(v, 'artifacts')).toContain(running.group({ project: 'ai docs', agent: 'writer' }));
+    expect(floatText(v, 'scheduled')).toContain(running.group({ project: 'harness', agent: 'perf' }));
+    expect(floatText(v, 'processes')).toContain(running.group({ project: 'ai docs', agent: 'writer' }));
+  });
+
+  it('in a project, rows and heads say no project', () => {
+    const { v } = world(inHarness);
+    fireEvent.click(v.getByTestId('app.bubble.agents'));
+    expect(v.getByTestId(`app.flyout.agents.${HARNESS}.perf.name`).textContent).toBe('perf');
+    expect(v.getByTestId(`app.flyout.agents.${HARNESS}.main`)).toBeTruthy();
+    expect(v.getByTestId(`app.right.artifact.${HARNESS}.perf-notes`).textContent).not.toContain('harness');
+    expect(v.getByTestId('app.flyout.agents').textContent).not.toContain(side.in_projects({ n: side.working({ n: 1 }), p: 1 }));
+    expect(floatText(v, 'artifacts')).not.toContain(running.group({ project: 'harness', agent: 'perf' }));
   });
 
   it("a card's ▯ opens the Overview of the view: the next project's shows its own, never the pinned one's", () => {
