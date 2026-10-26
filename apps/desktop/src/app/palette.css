@@ -1,8 +1,9 @@
 /* ⌘K, one search (designer's signed block s-k, desktop-screens v7): a 640 px panel --s-12 under
-   the bar, centred, over a 45 % scrim of the window's ground. Bise fait mac (ui-review z, page
-   native-mac §6): drawn to the menus' rules, as a floating thing: glass (--c-overlay + --glass),
-   r 10, e-2; rows 28 at r 6 with a 16 icon 8 before the words; keys and meta text-3 on the right;
-   the arrow on its controls. Same behaviour. Owner: nm-menus. */
+   the titlebar, centred, r 14, e-3, over a 45 % scrim of the window's ground. On the spacing grid
+   (designer's p/desktop-spacing): every text of the panel starts 16 px in. Bise fait mac
+   (r2-palette, Gabriel m_44243): main's look kept as is, opaque, its glyphs and its 32 rows; only
+   the text sizes on native-mac's scale (the field and the empty state's sign at 15) and the
+   cursor left to ds/css/base.css. Owner: amb-web. */
 .app-palette {
   position: fixed;
   inset: 0;
@@ -22,12 +23,13 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: var(--r-menu);
-  background: var(--c-overlay);
-  backdrop-filter: var(--glass);
-  box-shadow: var(--e-2);
+  border-radius: 14px;
+  /* opaque: the thread under it never shows through the rows */
+  background: linear-gradient(var(--c-raised), var(--c-raised)), var(--c-solid);
+  box-shadow: var(--e-3);
   color: var(--c-text);
-  font: var(--f-ui);
+  font-family: var(--font-ui);
+  font-size: 13px;
 }
 
 .app-k-field {
@@ -35,11 +37,10 @@
   align-items: center;
   gap: var(--gap-inline);
   padding: var(--s-3) var(--s-4);
-  font: var(--f-lead);
-  border-bottom: 1px solid var(--c-line);
+  font-size: 15px;
+  border-bottom: 1px solid color-mix(in srgb, var(--c-text) 8%, transparent);
 }
-.app-k-field > svg {
-  flex: none;
+.app-k-field > span {
   color: var(--c-text-3);
 }
 .app-k-field input {
@@ -69,7 +70,8 @@
   border-radius: var(--r-pill);
   background: none;
   color: var(--c-text-2);
-  font: var(--f-meta);
+  font: inherit;
+  font-size: 12px;
 }
 .app-k-scopes .app-k-scope:hover {
   background: var(--c-hover);
@@ -83,15 +85,15 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--s-1);
+  padding: var(--s-1) var(--pad-list) var(--s-2);
 }
 
 .app-k-head {
   display: flex;
   align-items: center;
-  padding: var(--s-2) var(--pad-row-x) var(--gap-tight);
-  font: var(--f-meta);
-  font-weight: 500;
+  padding: var(--s-3) var(--pad-row-x) var(--gap-tight);
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--c-text-3);
 }
 .app-k-head .sp {
@@ -103,19 +105,20 @@
 
 .app-k-row {
   display: grid;
-  grid-template-columns: var(--w-state) minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--gap-inline);
-  height: var(--h-row-tight);
+  height: var(--h-row);
   padding: 0 var(--pad-row-x);
-  border-radius: var(--r-1);
+  border-radius: 8px;
 }
 .app-k-row.on {
-  background: var(--c-active);
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
 }
 .app-k-row .g {
   display: flex;
   justify-content: center;
+  font-family: var(--font-mono);
   color: var(--c-text-2);
 }
 .app-k-row .g.acc {
@@ -166,7 +169,7 @@
   align-items: center;
   gap: var(--s-3);
   white-space: nowrap;
-  font: var(--f-meta);
+  font-size: 12px;
   color: var(--c-text-3);
 }
 .app-k-row .rt .hint {
@@ -186,13 +189,15 @@
   text-align: center;
   color: var(--c-text-2);
 }
-.app-k-empty > svg {
-  color: var(--c-text-3);
-}
 .app-k-empty p {
   max-width: 440px;
   margin: 0;
   line-height: 1.5;
+}
+.app-k-empty .big {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--c-text-3);
 }
 .app-k-ask {
   display: inline-flex;
@@ -223,17 +228,10 @@
   vertical-align: top;
 }
 
-.app-k-keys .kp,
-.app-k-row .rt .hint .kp {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-1);
-}
-
 .app-k-keys {
   padding: var(--s-2) var(--s-4);
-  border-top: 1px solid var(--c-line);
-  font: var(--f-meta);
+  border-top: 1px solid color-mix(in srgb, var(--c-text) 8%, transparent);
+  font-size: 11.5px;
   color: var(--c-text-3);
   white-space: pre;
   overflow: hidden;

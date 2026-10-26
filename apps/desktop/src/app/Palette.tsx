@@ -6,8 +6,8 @@
 // ⌘⏎ restores an archived agent then opens it; one or two words that name nothing, or a sentence:
 // ⏎ asks bise (a sentence: 'ask bise' is the first row, what it names one row down, main m_12973,
 // the spotlight's rule from src/search's asksBise); esc closes. Its own field: the composer keeps its draft.
-// Bise fait mac (ui-review z): drawn to the native menus' rules (palette.css), its glyphs nm-ds's
-// line icons; the same behaviour. Owner: nm-menus.
+// Bise fait mac keeps main's palette whole (r2-palette, Gabriel m_44243): its glyphs, its rows,
+// no chips. Owner: amb-web (lead m_11864), in amb-win's shell.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
 import { caretAtEnd, keep, useKeptText } from '@/app/keep';
@@ -23,7 +23,7 @@ import { appPages } from './pages';
 import { MAIN, parseRoute } from './route';
 import { useRoute, useRouter } from './router';
 import './palette.css';
-import { AppIcon, ArtName, Input, Kbd, Press, type AppIconName } from '@/ds';
+import { Input, Press } from '@/ds';
 
 /** The kept view bit: ⌘K open (lead m_11997, keep.ts: an open panel, no age). */
 const OPEN_KEY = 'palette.open';
@@ -63,8 +63,7 @@ export function keyLine(l: SearchList, at: Hit | undefined, scope: Scope): strin
 }
 
 /** Key pairs ('⏎ open   esc close') drawn with the TUI's 3-space gap (about 1.2em, designer
- * m_11923): each gap is its own span, so the text still reads with its 3 spaces; each pair's key
- * in the ds kbd (native-mac §6, ui-review m_42540), its words after it. */
+ * m_11923): each gap is its own span, so the text still reads with its 3 spaces. */
 function Pairs({ text }: { text: string }): ReactNode {
   const parts = text.split(/ {3}/);
   const out: ReactNode[] = [];
@@ -75,40 +74,10 @@ function Pairs({ text }: { text: string }): ReactNode {
           {'   '}
         </span>,
       );
-    const at = p.indexOf(' ');
-    out.push(
-      at > 0 ? (
-        <span className="kp" key={`p${i}`}>
-          <Kbd>{p.slice(0, at)}</Kbd>
-          {p.slice(at)}
-        </span>
-      ) : (
-        <span key={`p${i}`}>{p}</span>
-      ),
-    );
+    out.push(<span key={`p${i}`}>{p}</span>);
   });
   return out;
 }
-
-/** search's mark of a browser-only artifact in its dim words (search/data.ts): drawn as the 'open' icon. */
-const BROWSER_MARK = '↗';
-
-/** A hit's line icon (nm-ds's family, native-mac §6: no text glyph as an icon), from its kind and the sign search gives it; the globe only for a link or a PR (browser-only, ui-review m_42633), a page is the file. Pure. */
-export function iconOf(h: Pick<Hit, 'kind' | 'glyph' | 'tone' | 'archived' | 'detail'>): AppIconName {
-  if (h.tone === 'pearl' || h.tone === 'bise') return 'folder';
-  if (h.archived) return 'archive';
-  const by: Record<string, AppIconName> =
-    h.kind === 'agent'
-      ? { '?': 'inbox', '✓': 'check', '✗': 'close', '–': 'archive' }
-      : h.kind === 'artifact'
-        ? { '⇡': 'branch', '◫': 'grid', '▤': 'file', '↗': h.detail === BROWSER_MARK ? 'browser' : 'file' }
-        : h.kind === 'scheduled'
-          ? {}
-          : { '↗': 'artifacts', '?': 'inbox', '#': 'inbox', '◷': 'scheduled', '⊞': 'plugins', '∿': 'terminal', '⚙': 'settings', '·': 'list' };
-  const fallback: AppIconName = h.kind === 'agent' ? 'thread' : h.kind === 'scheduled' ? 'scheduled' : h.kind === 'artifact' ? 'artifacts' : 'right';
-  return by[h.glyph] ?? fallback;
-}
-
 
 /** The events that change what the search reads. */
 const READS = new Set<Ev['ev']>(['agents', 'artifacts', 'cards', 'projects', 'scheduled']);
@@ -248,7 +217,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     >
       <div className="app-k" onKeyDown={onKey} role="dialog" aria-label="search">
         <label className="app-k-field">
-          <AppIcon name="search" size={16} />
+          <span aria-hidden>⌕</span>
           <Input
             ref={field}
             value={q}
@@ -291,7 +260,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
           )}
           {list.mode === 'none' && (
             <div className="app-k-empty" data-testid="app.palette.none">
-              <AppIcon name="search" size={18} />
+              <span className="big" aria-hidden>
+                ⌕
+              </span>
               <p>{PW.none(q.trim())}</p>
               <Press look="app-k-ask" onClick={ask} data-testid="app.palette.ask">
                 {PW.ask(q.trim())} <kbd>⏎</kbd>
@@ -344,27 +315,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
                     }}
                     data-testid={`app.palette.item.${String(n)}`}
                   >
-                    <span className={`g ${h.tone === 'bise' ? 'acc' : h.tone}`} aria-hidden data-testid={h.tone === 'bise' ? `app.palette.item.${String(n)}.pink` : undefined}>
-                      <AppIcon name={iconOf(h)} size={16} />
+                    <span className={`g ${h.tone}`} aria-hidden>
+                      {h.tone === 'pearl' ? <i className="app-k-pearl" /> : h.tone === 'bise' ? <i className="app-k-pearl bise" data-testid={`app.palette.item.${String(n)}.pink`} /> : h.glyph}
                     </span>
                     <span className="nm">
                       {h.parent !== undefined && <span className="up">{h.parent} › </span>}
-                      {/* an artifact's title is its chip, accent on its tint (designer m_42681, taste rule 13) */}
-                      {h.kind === 'artifact' ? (
-                        <ArtName testId={`app.palette.item.${String(n)}.chip`}>
-                          <Marked text={h.name} q={q} />
-                        </ArtName>
-                      ) : (
-                        <Marked text={h.name} q={q} />
-                      )}
+                      <Marked text={h.name} q={q} />
                       {h.of !== undefined && <span className="up"> · {h.of}</span>}
-                      {h.detail === BROWSER_MARK ? (
-                        <span className="d">
-                          <AppIcon name="open" size={14} />
-                        </span>
-                      ) : (
-                        h.detail !== '' && <span className="d">{h.detail}</span>
-                      )}
+                      {h.detail !== '' && <span className="d">{h.detail}</span>}
                     </span>
                     <span className="rt">
                       {h.where !== '' && <span className="pj">{h.where}</span>}
