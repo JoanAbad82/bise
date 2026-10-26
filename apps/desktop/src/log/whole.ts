@@ -75,8 +75,8 @@ export interface WholeApi {
 export function useWhole(project: string, agent: string): WholeApi {
   const store = useStore();
   // the wholes now (his click decides whether to ask from them, not from the last render)
-  const cur = useRef<Wholes>(new Map());
-  const [ws, setWs] = useState<Wholes>(cur.current);
+  const [ws, setWs] = useState<Wholes>(() => new Map());
+  const cur = useRef<Wholes>(ws);
   const put = useCallback((w: Wholes) => {
     cur.current = w;
     setWs(w);

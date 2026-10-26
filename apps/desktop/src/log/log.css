@@ -178,7 +178,8 @@
   color: var(--c-text-3);
 }
 
-/* under a body the hub cut at 4 KB (debug-more): 'cut at 4 KB · show more', then 'show less' */
+/* under a body the hub cut at 4 KB (debug-more): 'cut at 4 KB · show more', then 'show less';
+   the button in ink at 500, never pink (designer m_46079: pink only marks what waits on him) */
 .lg-cut {
   display: flex;
   align-items: baseline;
@@ -189,7 +190,8 @@
   border: 0;
   background: none;
   font: inherit;
-  color: var(--c-accent);
+  font-weight: 500;
+  color: var(--c-ink);
   cursor: pointer;
 }
 .lg-more:hover {
