@@ -629,6 +629,25 @@ fn away_back_sums_up_every_project_since_he_left() {
 }
 
 #[test]
+fn a_held_hubs_pulse_rides_its_row() {
+    // the H1 sidebar (m-projects): a held hub's own hub/pulse replaces its
+    // row's pulse and the rows go again; a project not held keeps its
+    // view.json's (the window reads only the rows)
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    let pulse = json!({"from_ms": 10, "busy_ms": [0, 3600000, 0], "last_ms": 99, "said_at": [98], "news": {"at_ms": 97, "what": {"kind": "landed", "agent": "perf", "sha": "abc", "target": "main"}}});
+    w.end("shop").say(json!({"ev": "pulse", "project": "shop", "pulse": pulse}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["pulse"]["last_ms"] == 99));
+    let p = t.take().into_iter().rfind(|v| v["ev"] == "projects").unwrap();
+    assert_eq!(p["projects"][1]["pulse"], pulse, "held: its hub's own pulse");
+    assert_eq!(p["projects"][2]["pulse"]["last_ms"], 2, "not held: its view.json's");
+}
+
+#[test]
 fn the_rows_carry_the_open_cards_of_every_project() {
     // lead m_8769 (b): bise's "waiting for you" answers an unheld
     // project's cards from its row: a held hub's own cards, else its

@@ -83,36 +83,55 @@ pub enum EntryKind {
 
 impl EntryKind {
     /// An entry written for him in main's thread (rows::Pulse's
-    /// `said_at`, "unread"): main's words, another agent's, bise's
-    /// notices and news; never his own, nor the work under them (tools,
-    /// thinking, compaction). The one rule (architect m_44825): every
-    /// kind is decided here, no wildcard, so a new kind must be.
+    /// `said_at`, "unread"), by the thread's tiers (designer m_45206):
+    /// main's answers to him, his cards, pages and reports, the news
+    /// (landed, a PR, an artifact, a failed turn), and his own words that
+    /// didn't arrive (he must know). Never his own words or answers, the
+    /// work under them (tools, thinking, compaction), the agents talking
+    /// to each other (from_agent, answered for him), nor the ignorable
+    /// tier (notices, wakes, scheduled runs). The one rule (architect
+    /// m_44825): every kind is decided here, no wildcard, so a new kind
+    /// must be.
     pub fn for_him(self) -> bool {
         match self {
             EntryKind::Agent
-            | EntryKind::FromAgent
             | EntryKind::Card
             | EntryKind::Page
             | EntryKind::Report
-            | EntryKind::Notice
             | EntryKind::Landed
+            | EntryKind::Pr
             | EntryKind::Artifact
-            | EntryKind::Answered
             | EntryKind::TurnFailed
-            | EntryKind::Wake
-            | EntryKind::Scheduled => true,
+            | EntryKind::NotDelivered => true,
             EntryKind::You
+            | EntryKind::FromAgent
             | EntryKind::Tools
             | EntryKind::Stopped
             | EntryKind::ToAgent
             | EntryKind::Thinking
             | EntryKind::Compacting
             | EntryKind::Compacted
-            | EntryKind::NotDelivered
-            | EntryKind::Pr
+            | EntryKind::Notice
+            | EntryKind::Answered
             | EntryKind::Approval
+            | EntryKind::Wake
+            | EntryKind::Scheduled
             | EntryKind::Unknown => false,
         }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn unread_is_what_is_for_him_by_the_tiers() {
+    // designer m_45206: news and his undelivered words count; the agents'
+    // talk, his own answers and the ignorable tier don't
+    use EntryKind as K;
+    for k in [K::Agent, K::Card, K::Page, K::Report, K::Landed, K::Pr, K::Artifact, K::TurnFailed, K::NotDelivered] {
+        assert!(k.for_him(), "{k:?} is for him");
+    }
+    for k in [K::You, K::FromAgent, K::Answered, K::Notice, K::Wake, K::Scheduled, K::Approval] {
+        assert!(!k.for_him(), "{k:?} is not");
     }
 }
 
