@@ -12,6 +12,30 @@
   flex: 1;
   min-width: 0;
 }
+/* a frame its place bounds (the thread's column, thread.css) shrinks down to its field, which
+   scrolls: the head and the row keep their height, the line and its words take what is left
+   (his m_45466: the words went under the window) */
+.b-composer .box > .head,
+.b-composer .box > .row {
+  flex: none;
+}
+.b-composer .box > .line {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.b-composer .box > .line > .in {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* the attachment list keeps its whole rows (4 at most, then it scrolls): never a row cut in half */
+.b-composer .in > .b-attach {
+  flex: none;
+}
+.b-composer .in .b-field {
+  flex: 0 1 auto;
+}
 /* one frame (ambient m_10689): the box is the frame, the field inside it is borderless (not the
    design system's .b-field input frame) */
 .b-composer .in .b-field {

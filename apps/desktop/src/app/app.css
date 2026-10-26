@@ -15,9 +15,12 @@ body:has(.app-shell) {
    220 ms), the screen, the panel (PanelHost: its own width). The bar and the rail are transparent
    on the window's vibrancy (--p-bg 30%); the sidebar --p-raised 82% with a 12 top-left corner; the
    screen opaque. */
+/* clip, not hidden: a hidden box still scrolls from code, and a caret's scroll-into-view in a
+   screen taller than the window scrolled the whole frame up, the bar out of the window (his
+   m_45466: the composer answering a card) */
 .app-shell {
   height: 100vh;
-  overflow: hidden;
+  overflow: clip;
 }
 .app-frame {
   height: 100%;

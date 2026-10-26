@@ -376,6 +376,21 @@ body:has(.th-screen > .art-give) .s3-side {
   padding-right: 0;
   /* the list's end carries the room above the to-line (designer m_19359) */
   padding-top: 0;
+  /* the column's bottom block: it grows up into the list's room, and once the column is full it
+     shrinks (its box, then its field, which scrolls: composer.css), never past the window's bottom
+     (his m_45466: answering with 2 attachments and a long text, it went under the window and the
+     caret's scroll pushed the bar out). Its strips and tab keep their height. */
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.th-screen .b-composer > * {
+  flex: none;
+}
+.th-screen .b-composer > .box {
+  flex: 0 1 auto;
+  min-height: 0;
 }
 .th-row + .th-row[data-head='true'],
 .th-day + .th-row,

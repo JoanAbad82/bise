@@ -13,6 +13,8 @@
   flex-direction: column;
   width: var(--float-w);
   max-width: calc(100vw - var(--s-12));
+  /* it grows up from the bottom to its max height in every state, never over the window's top */
+  max-height: var(--float-max-h);
   border-radius: var(--r-5);
   background: var(--c-overlay);
   backdrop-filter: var(--glass);
@@ -217,6 +219,12 @@
   border-radius: 0;
   background: none;
   box-shadow: inset 0 -1px 0 var(--c-line);
+  /* the float stops at its max height (.cmp-float): the item gives its room first and scrolls,
+     the head and his words keep theirs (his m_45466: answering with a long text, the float grew
+     over the window's top) */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 /* its open item lies flat too (ui-review m_42926): no card's fill, radius or frame in the glass; a
    question that takes his words keeps the 2 px accent rail on its left */

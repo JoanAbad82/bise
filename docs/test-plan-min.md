@@ -177,6 +177,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `composer/strip` | DELETE | visual only: a pixel look, no logic (LOST, min-tests, main m_37200) |
 | `composer/subword` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/type-anywhere` | TRANSFORM | renderer on a scripted core: no process seam |
+| `composer/grow` | KEEP | real Chromium layout and a real caret scroll-into-view in the Electron frame: the docked and floating composer grow up and scroll inside, the frame never scrolls (his m_45466; happy-dom has no layout) |
 | `composer/typing` | KEEP | real key events into the composer: caret, no flicker (no cheaper place sees real Chromium input) |
 | `ds/contrast` | TRANSFORM | renderer on a scripted core: no process seam |
 | `ds/slash-search` | TRANSFORM | renderer on a scripted core: no process seam |
