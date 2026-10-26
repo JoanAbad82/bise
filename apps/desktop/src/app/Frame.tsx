@@ -22,6 +22,7 @@ import { formatRoute, MAIN, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
+import { useEscLayer } from "./escape";
 import { BarTabs } from "./panel/BarTabs";
 import { BarSlot, barGroundDoubleClick, TitleSlot } from "./barslot";
 import { frameLeft, useLeft } from "./frame-state";
@@ -135,18 +136,8 @@ export function Over({
   /** an artifact's maker thread sliding over the page under 1000 px (78% of the width) */
   thread?: boolean;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      onClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [onClose]);
+  // its esc in esc's one order (app/escape.ts, 2)
+  useEscLayer("over", true, onClose);
   return (
     <>
       <div className={`app-scrim ${side}`} onClick={onClose} data-testid="app.scrim" />

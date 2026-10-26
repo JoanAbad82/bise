@@ -117,6 +117,22 @@ export function closeIn(t: Tabs, id: string): Tabs {
   return { list, active: next.id };
 }
 
+/** What was in front before a tab came to the front (esc on an artifact goes back to it, app/escape.ts). */
+export interface Before {
+  readonly open: boolean;
+  readonly active: string;
+}
+
+/**
+ * Esc on the tab `id` (r3-escape, designer m_44693): it closes and the panel goes back to how it
+ * was before the tab came, the tab then in front if it is still there, folded if it was. Pure.
+ */
+export function closeBack(t: Tabs, id: string, before: Before | undefined): { readonly tabs: Tabs; readonly open: boolean } {
+  const tabs = closeIn(t, id);
+  if (before === undefined) return { tabs, open: true };
+  return { tabs: activate(tabs, before.active), open: before.open };
+}
+
 /** Every tab but `id` and Overview closed (a tab's menu: Close others). Pure. */
 export function closeOthers(t: Tabs, id: string): Tabs {
   const keep = t.list.find((x) => x.id === id);

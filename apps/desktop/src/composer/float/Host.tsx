@@ -18,6 +18,7 @@ import { shownName } from '@/agents/model';
 import { threadKey, useAgents, useProjects, useStore, useThreadOrder } from '@/store';
 import { MAIN } from '@/app/route';
 import { useRoute } from '@/app/router';
+import { useEscLayer } from '@/app/escape';
 import { useSideLayout } from '@/app/side3d/place';
 import { answerOf, HERE_BISE, ThreadComposer } from '@/thread/ThreadComposer';
 import { usageLine } from '@/thread/head';
@@ -99,21 +100,9 @@ function Float({ to: def }: { to: FloatTo }) {
     };
   }, [state, go]);
   // esc while the focus is outside it (an item's card closed by its own esc, a click on the page):
-  // the float folds, never the page behind (esc-up.ts); inside, its own onKeyDown does it, after
-  // the field's lists; an open item takes its own esc first (the inbox block's)
-  useEffect(() => {
-    if (state === 'rest' || answering !== null) return;
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || root.current?.contains(e.target as Node) === true) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      fold('esc');
-    };
-    window.addEventListener('keydown', key, true);
-    return () => {
-      window.removeEventListener('keydown', key, true);
-    };
-  }, [state, answering, fold]);
+  // the float folds, never the page behind, after an artifact in front and the sheet (esc's one
+  // order, app/escape.ts 9); inside, its own onKeyDown does it, after the field's lists
+  useEscLayer('float', state !== 'rest' && answering === null, onEscape);
   // the mini thread: the addressee's rows; none yet, one line and the float holds only it
   const tkey = threadKey(project, agent);
   const order = useThreadOrder(tkey);

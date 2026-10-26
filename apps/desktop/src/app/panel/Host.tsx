@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react';
 import { AppIcon, IconButton } from '@/ds';
 import { formatRoute } from '@/app/route';
+import { useEscLayer } from '@/app/escape';
 import { panel } from '@/proto/words_panel.gen';
 import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
@@ -61,23 +62,19 @@ export function PanelHost() {
 
 /**
  * A sheet over the thread folds on esc or a click outside it (ui-review m_42642), besides its ▯:
- * the click still does what it does there. An esc a thing inside took (defaultPrevented) stays its own.
+ * the click still does what it does there. Its esc comes in esc's one order (app/escape.ts, 8).
  */
 function useSheetOut(on: boolean, box: RefObject<HTMLElement | null>): void {
+  useEscLayer('sheet', on, panelToggle);
   useEffect(() => {
     if (!on) return;
     const down = (e: PointerEvent) => {
       const el = box.current;
       if (el !== null && e.target instanceof Node && !el.contains(e.target)) panelToggle();
     };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented) panelToggle();
-    };
     document.addEventListener('pointerdown', down, true);
-    window.addEventListener('keydown', key);
     return () => {
       document.removeEventListener('pointerdown', down, true);
-      window.removeEventListener('keydown', key);
     };
   }, [on, box]);
 }

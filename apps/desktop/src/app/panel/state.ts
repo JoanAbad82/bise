@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { useLeftWidth } from '@/app/frame-state';
-import { activate, closable, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 
 const KEY = 'panel';
 
@@ -82,6 +82,7 @@ export function panelToggle(): void {
 export function openWhat(what: TabWhat, instead?: string): void {
   const recent = what.kind === 'thing' ? pushRecent(state.recent, what.e) : state.recent;
   const tabs = openIn(state.tabs, what, instead);
+  if (!state.open || tabs.active !== state.tabs.active) before.set(tabs.active, { open: state.open, active: state.tabs.active });
   // a page newly opened may widen the panel once (widenFor); an open one coming to the front doesn't
   const isNew = !state.tabs.list.some((t) => t.id === tabs.active);
   set({ ...state, open: true, tabs, recent, width: isNew ? widenFor(state, what) : state.width });
@@ -131,6 +132,16 @@ export function toggleShell(project: string): void {
 
 export function closeTabId(id: string): void {
   setTabs(closeIn(state.tabs, id));
+}
+
+/** What was in front when each tab came by openWhat (model.ts Before); a reload forgets it. */
+const before = new Map<string, Before>();
+
+/** Esc on the tab `id`: it closes, the panel as it was before it came (model.ts closeBack, app/escape.ts). */
+export function closeTabBack(id: string): void {
+  const b = closeBack(state.tabs, id, before.get(id));
+  before.delete(id);
+  set({ ...state, tabs: b.tabs, open: b.open });
 }
 
 export function closeOthersId(id: string): void {

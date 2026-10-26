@@ -20,6 +20,7 @@ import { closeTabId, openWhat } from './state';
 import { launchEnter, launchMatches, stepAt } from './launch';
 import { PickRow } from './Launcher';
 import { isFrameEsc } from '@/app/ArtifactView';
+import { closeArtifactTab } from '@/app/escape';
 
 /** An artifact's tab: its address bar and its page. */
 export function Browser({ project, id, tabId }: { project: string; id: string; tabId: string }) {
@@ -40,12 +41,13 @@ export function Browser({ project, id, tabId }: { project: string; id: string; t
     const n = Math.min(a.version, Math.max(1, shown + d));
     setVersion(n === a.version ? undefined : n);
   };
-  // an esc the page didn't use (its frame forwards it, guard.ts ESC_FORWARD): the tab closes, as ✕
+  // an esc the page didn't use (its frame forwards it, guard.ts ESC_FORWARD): the tab closes as on
+  // the window's esc, back where he was (app/escape.ts 7)
   useEffect(() => {
     const on = (e: MessageEvent) => {
       if (!isFrameEsc(e.data)) return;
       const mine = document.querySelector<HTMLIFrameElement>(`[data-testid="app.panel.browser"][data-artifact="${CSS.escape(id)}"] iframe.art-paper`);
-      if (mine !== null && mine.contentWindow === e.source) closeTabId(tabId);
+      if (mine !== null && mine.contentWindow === e.source) closeArtifactTab(tabId);
     };
     window.addEventListener('message', on);
     return () => {

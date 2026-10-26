@@ -1,9 +1,10 @@
 // Esc goes up the hierarchy, and the window's other ways back (designer's
 // desktop-history; amb-win's seam m_19808). Owner: amb-web.
 //
-// Esc keeps every meaning it has first: a menu, a sheet, ⌘K, the find bar,
-// a dictation, a composer with words, an inbox card open in place, the right
-// bar over the window, an open artifact. Each of those takes the esc
+// Esc keeps every meaning it has first, in esc's one order (escape.ts: a
+// menu, a sheet, ⌘K, the sidebar slid over, the find bar, an inbox card open
+// in place, the float, a zoomed image, an open artifact, the panel's sheet,
+// then a dictation, a composer with words). Each of those takes the esc
 // (preventDefault, or stops it). Only an esc NOBODY took goes up: an agent
 // → its project's main → bise; a list or a tool screen → the place before.
 // Going up is a go(): ‹ brings him back.
@@ -19,6 +20,7 @@
 import { useEffect } from "react";
 import { escapeIsFree } from "@/composer/escape";
 import { escGoesBack } from "@/thread/answerlink";
+import { useEscape } from "./escape";
 import { homeOf, upOf } from "./route";
 import type { Router } from "./router";
 
@@ -87,6 +89,8 @@ export function escTarget(
 
 /** Esc up, ⌘[ ⌘] and the mouse's side buttons (3 back, 4 forward), mounted once in the shell. */
 export function useHistoryWays(router: Router): void {
+  // esc's one order (escape.ts): an artifact's esc goes back on this router
+  useEscape(router);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const onEsc = (e: KeyboardEvent) => {

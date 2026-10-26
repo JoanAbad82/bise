@@ -12,6 +12,11 @@ export function claimZoomKeys(toFit: () => void): () => void {
   };
 }
 
+/** An image is zoomed now (app/escape.ts's order: its esc is back to fit, before the artifact closes). */
+export function isZoomed(): boolean {
+  return zoomed !== null;
+}
+
 /** esc or ⌘0 while an image is zoomed: back to fit, true (the caller stops the key). */
 export function takeZoomKey(e: Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>): boolean {
   if (zoomed === null) return false;
