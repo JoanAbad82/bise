@@ -12,7 +12,9 @@
 //! messages (the model, its params, the tools). Every text is redacted
 //! and a base64 image is a line ("image png · 120 KB"), after the split.
 //! Each row also carries its parts ([`groups`]): whose and what its
-//! tokens are, for `/debug`'s charts.
+//! tokens are, for `/debug`'s charts. Each block is cut to TOOL_TEXT_CAP
+//! once the rows are built; [`block`] reads one of the same rows whole
+//! (his 'show more', `HubCmd::LogBody`).
 
 use crate::history::{call_view, first_line, pretty_json, short_bytes, Body};
 use crate::Redactor;
@@ -211,10 +213,21 @@ pub fn rebuild(s: &Split) -> String {
 
 // ---- drawing ----
 
+/// A body whole, redacted: the rows are cut once, at the end ([`capped`]).
 fn cut(kind: LogBodyKind, lang: Option<&str>, text: &str, red: &Redactor) -> LogBody {
-    let t = red.text(text);
-    let o = crate::tool_output::cut_to(&t, TOOL_TEXT_CAP);
-    LogBody { kind, lang: lang.map(str::to_string), text: o.text, cut: o.cut }
+    LogBody { kind, lang: lang.map(str::to_string), text: red.text(text), cut: false }
+}
+
+/// Every block of `rows` cut to `max` bytes (`cut` then).
+fn capped(mut rows: Vec<CompRow>, max: usize) -> Vec<CompRow> {
+    for b in rows.iter_mut().flat_map(|r| r.blocks.iter_mut()) {
+        if b.body.text.len() > max {
+            let o = crate::tool_output::cut_to(&b.body.text, max);
+            b.body.text = o.text;
+            b.body.cut = o.cut;
+        }
+    }
+    rows
 }
 
 fn md(label: Option<&str>, text: &str, red: &Redactor) -> CompBlock {
@@ -441,8 +454,28 @@ fn head_row(s: &Split, red: &Redactor) -> CompRow {
     CompRow { n: 0, role: "request".into(), head, blocks, bytes, tokens: bytes.div_ceil(4), parts: Vec::new() }
 }
 
-/// The rows of a body: the head, the system prompt, the messages.
+/// The rows of a body: the head, the system prompt, the messages; each
+/// block cut to [`TOOL_TEXT_CAP`].
 pub fn rows(s: &Split, red: &Redactor) -> Vec<CompRow> {
+    capped(whole_rows(s, red), TOOL_TEXT_CAP)
+}
+
+/// The rows of each slice as its raw bytes; each block cut to
+/// [`TOOL_TEXT_CAP`].
+pub fn raw_rows(s: &Split, red: &Redactor) -> Vec<CompRow> {
+    capped(whole_raw_rows(s, red), TOOL_TEXT_CAP)
+}
+
+/// Block `block` of row `row` (its `n`) of [`rows`] (`raw`: of
+/// [`raw_rows`]), the same list built the same way, cut to `max` bytes
+/// instead (`/debug`'s 'show more'); none: no such block.
+pub fn block(s: &Split, red: &Redactor, raw: bool, row: u64, block: usize, max: usize) -> Option<crate::tool_output::Out> {
+    let rows = if raw { whole_raw_rows(s, red) } else { whole_rows(s, red) };
+    let b = rows.into_iter().find(|r| r.n == row)?.blocks.into_iter().nth(block)?;
+    Some(crate::tool_output::cut_to(&b.body.text, max))
+}
+
+fn whole_rows(s: &Split, red: &Redactor) -> Vec<CompRow> {
     let mut out = vec![head_row(s, red)];
     for x in s.slices.iter().filter(|x| x.n > 0) {
         out.push(match x.part {
@@ -470,7 +503,7 @@ fn with_parts(mut rows: Vec<CompRow>, s: &Split, red: &Redactor) -> Vec<CompRow>
 
 /// The rows of each slice as its raw bytes (`r`: the JSON sent, as is),
 /// redacted, long base64 strings as a word.
-pub fn raw_rows(s: &Split, red: &Redactor) -> Vec<CompRow> {
+fn whole_raw_rows(s: &Split, red: &Redactor) -> Vec<CompRow> {
     let mut out: Vec<CompRow> = Vec::new();
     for x in &s.slices {
         let text = if x.raw.len() > 4000 {

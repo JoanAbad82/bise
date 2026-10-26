@@ -100,4 +100,16 @@ crate::words! { debug:
     key_clear = "clear filter";
     /// v in the foot
     key_charts = "hide the charts";
+
+    // ---- a body the hub cut (debug-more: 'show more' reads it whole)
+    /// under a body cut at the page's cap
+    cut_at = "cut at 4 KB";
+    /// the button that reads a cut body whole
+    show_more = "show more";
+    /// the button that folds a whole body back to its cut
+    show_less = "show less";
+    /// while the whole body is read
+    reading_whole = "reading the whole text…";
+    /// a whole body still cut at the hub's 1 MB cap
+    whole_cut(shown, total) = "{shown} of {total} shown";
 }

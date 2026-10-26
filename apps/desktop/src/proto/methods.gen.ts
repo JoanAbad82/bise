@@ -30,6 +30,7 @@ export const METHODS = {
   "tool/output": { cmd: "tool_out", result: "tool_out" },
   "log/read": { cmd: "log", result: "log" },
   "log/completion": { cmd: "completion", result: "completion" },
+  "log/body": { cmd: "log_body", result: "log_body" },
   "turn/unqueue": { cmd: "queued_take", result: "queued_taken" },
   "turn/steerQueued": { cmd: "queued_steer", result: null },
   "worktrees/list": { cmd: "worktrees", result: "worktrees" },

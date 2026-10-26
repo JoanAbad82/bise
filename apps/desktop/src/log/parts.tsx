@@ -1,9 +1,13 @@
 // /debug's shared bits (designer debug-views v3): the key line's keys, the find field with its
-// count, and the screen's keys on window. Both tabs (LogScreen.tsx's history, Completion.tsx)
+// count, the foot of a cut body (show more / show less, whole.ts), and the screen's keys on
+// window. Both tabs (LogScreen.tsx's history, Completion.tsx)
 // use them. Owner: debug-cmd.
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
-import { Input } from "@/ds";
-import { findCount } from "./model";
+import type { BodyOf, LogBody } from "@/proto";
+import { Input, Press } from "@/ds";
+import { debug } from "@/proto/words_debug.gen";
+import { bytesOf, findCount, shortBytes } from "./model";
+import { keyOf, type WholeApi } from "./whole";
 
 export function K({
   k,
@@ -44,6 +48,46 @@ export function useScreenKeys(
       window.removeEventListener("keydown", h, true);
     };
   }, [root]);
+}
+
+/**
+ * Under a body the hub cut at 4 KB (debug-more): 'cut at 4 KB · show more'; reading it whole;
+ * shown whole: 'show less' (and '1.0 MB of 3.2 MB shown' when the hub cut it again at its cap); a
+ * failed read: the hub's words and show more again. Nothing under a whole body.
+ */
+export function CutFoot({ of, body, whole, id }: { of: BodyOf; body: LogBody; whole: WholeApi; id: string }) {
+  if (body.cut !== true) return null;
+  const w = whole.ws.get(keyOf(of));
+  const button = (less: boolean) => (
+    <Press
+      look="lg-more"
+      data-testid={`${id}.${less ? "less" : "more"}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (less) whole.less(of);
+        else whole.more(of);
+      }}
+    >
+      {less ? debug.show_less : debug.show_more}
+    </Press>
+  );
+  return (
+    <div className="lg-cut" data-testid={`${id}.cut`}>
+      {w?.state === "reading" ? (
+        <span className="meta">{debug.reading_whole}</span>
+      ) : w?.state === "shown" ? (
+        <>
+          {w.cut && <span className="meta">{debug.whole_cut({ shown: shortBytes(bytesOf(w.text)), total: shortBytes(w.total) })}</span>}
+          {button(true)}
+        </>
+      ) : (
+        <>
+          <span className="meta">{w?.state === "error" ? w.text : debug.cut_at}</span>
+          {button(false)}
+        </>
+      )}
+    </div>
+  );
 }
 
 /** The find field ('⌕ hero', '3 of 27'): ⏎ next, ⇧⏎ previous, esc closes. */

@@ -64,6 +64,37 @@ pub struct LogBody {
     pub cut: bool,
 }
 
+/// The most of one body `log_body` sends (his 'show more' on a body cut
+/// at [`crate::thread::TOOL_TEXT_CAP`]): past it, cut again, `total` says
+/// how much there is.
+pub const WHOLE_CAP: usize = 1024 * 1024;
+
+/// `HubCmd::LogBody`: which cut body he wants whole.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "of", rename_all = "snake_case")]
+pub enum BodyOf {
+    /// a `/debug history` row: its `pos`
+    Row { pos: u64 },
+    /// a `/debug completion` block: block `block` of row `row` of the
+    /// request in ring slot `slot`, shown as it was (`provider`, `raw`:
+    /// the ask's); `req`: the request's id, so a slot written over since
+    /// answers an error, never another request's body
+    Block {
+        slot: u64,
+        req: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        provider: Option<String>,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        raw: bool,
+        row: u64,
+        block: u64,
+    },
+    #[serde(other)]
+    Unknown,
+}
+
 /// One row of `/log`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

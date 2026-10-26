@@ -191,3 +191,8 @@ bytes: number, rows: Array<CompRow>, slots: Array<CompSlot>,
  * with `find`: the `n` of every row that holds it
  */
 hits?: Array<number>, };
+
+/**
+ * `HubCmd::LogBody`: which cut body he wants whole.
+ */
+export type BodyOf = { "of": "row", pos: number, } | { "of": "block", slot: number, req: number, provider?: string, raw?: boolean, row: number, block: number, } | { "of": "unknown" };

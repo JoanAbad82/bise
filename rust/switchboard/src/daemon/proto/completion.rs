@@ -5,7 +5,9 @@
 //! provider: the same request as that provider's family would get it,
 //! made by the agent's own runtime (`repl-live` in render mode,
 //! BISE_RENDER: Pv.request_body, no call, no key), never by an encoder
-//! here. Pure but [`render`], the one process it runs.
+//! here. A block cut at 4 KB reads whole on his 'show more' ([`block`]:
+//! the same slot, provider and raw, never another request's body). Pure
+//! but [`render`], the one process it runs.
 
 use bise_proto::log::{CompRow, CompSlot, Completion, CompletionAsk};
 use bise_session::{completion, reqlog, Redactor};
@@ -74,18 +76,7 @@ pub(super) fn answer(
 ) -> Result<Completion, String> {
     let slots = reqlog::slots(req_dir);
     let s = pick(&slots, ask.slot)?;
-    let sent = s.meta().map(|m| m.model.clone()).ok_or("this request is being written: open it again in a moment")?;
-    let (body, shown_as) = match ask.provider.as_deref().filter(|p| !p.trim().is_empty()) {
-        Some(p) => {
-            let model = model_for(p, models)?;
-            if model == sent || (!p.contains('/') && provider_of(&sent) == p.trim()) {
-                (reqlog::body(s, store)?, None)
-            } else {
-                (reqlog::expand(&render(&s.wire, &model)?, store)?, Some(model))
-            }
-        }
-        None => (reqlog::body(s, store)?, None),
-    };
+    let (body, shown_as) = body_of(s, ask.provider.as_deref(), store, models, render)?;
     let split = completion::split(&body)?;
     let rows = if ask.raw { completion::raw_rows(&split, redact) } else { completion::rows(&split, redact) };
     let hits = ask.find.as_deref().map(|f| hits(&rows, f));
@@ -100,6 +91,63 @@ pub(super) fn answer(
         slots: slots.iter().map(slot_row).collect(),
         hits,
     })
+}
+
+/// Slot `s`'s body as sent, or as `provider`'s family would get it (the
+/// model it was rendered for, then).
+fn body_of(
+    s: &reqlog::Slot,
+    provider: Option<&str>,
+    store: &Path,
+    models: &[String],
+    render: &dyn Fn(&Path, &str) -> Result<String, String>,
+) -> Result<(String, Option<String>), String> {
+    let sent = s.meta().map(|m| m.model.clone()).ok_or("this request is being written: open it again in a moment")?;
+    Ok(match provider.filter(|p| !p.trim().is_empty()) {
+        Some(p) => {
+            let model = model_for(p, models)?;
+            if model == sent || (!p.contains('/') && provider_of(&sent) == p.trim()) {
+                (reqlog::body(s, store)?, None)
+            } else {
+                (reqlog::expand(&render(&s.wire, &model)?, store)?, Some(model))
+            }
+        }
+        None => (reqlog::body(s, store)?, None),
+    })
+}
+
+/// What a 'show more' names in the ring (`BodyOf::Block`'s fields).
+pub(super) struct BlockAsk<'a> {
+    pub slot: u64,
+    pub req: u64,
+    pub provider: Option<&'a str>,
+    pub raw: bool,
+    pub row: u64,
+    pub block: u64,
+}
+
+/// The words when the slot holds another request now (the ring's
+/// oldest written over since he opened it).
+pub(super) const GONE: &str = "this request is gone from the ring: a newer one took its slot";
+
+/// One block of the rows [`answer`] drew for the same slot, provider and
+/// raw (`bise_session::completion::block`: the same list), whole up to
+/// `max` bytes: `(text, cut, total)`; the slot written over since: [`GONE`].
+pub(super) fn block(
+    ask: &BlockAsk,
+    req_dir: &Path,
+    store: &Path,
+    models: &[String],
+    render: &dyn Fn(&Path, &str) -> Result<String, String>,
+    redact: &Redactor,
+    max: usize,
+) -> Result<(String, bool, u64), String> {
+    let slots = reqlog::slots(req_dir);
+    let s = slots.iter().find(|s| s.n as u64 == ask.slot && s.meta().is_some_and(|m| m.req == ask.req)).ok_or(GONE)?;
+    let (body, _) = body_of(s, ask.provider, store, models, render)?;
+    let split = completion::split(&body)?;
+    let o = completion::block(&split, redact, ask.raw, ask.row, ask.block as usize, max).ok_or_else(|| format!("no block {} in row {}", ask.block, ask.row))?;
+    Ok((o.text, o.cut, o.total as u64))
 }
 
 /// The longest a render may take (a body of a few MB in Bend).
@@ -205,6 +253,37 @@ mod tests {
         assert_eq!(rendered.borrow()[0], (d.join("2.wire"), "oai/gpt-x".to_string()));
         assert!(answer(&ask(Some("nowhere")), &d, &d, &models, &render, &red).is_err());
         assert_eq!(c.slots.len(), 1);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Law (debug-more, architect m_45986): a block's whole text is the
+    /// block of the list `answer` drew (raw and rendered), uncut up to the
+    /// cap and cut past it; a slot holding another request since: gone.
+    #[test]
+    fn a_blocks_whole_text_is_the_drawn_blocks_or_gone() {
+        let d = std::env::temp_dir().join(format!("sb-comp-whole-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let long = "ab ".repeat(4000);
+        let body = format!(r#"{{"model":"claude-x","system":"s","messages":[{{"role":"user","content":"{long}"}}]}}"#);
+        put(&d, 2, 7, "fake/claude-x", &body);
+        let red = Redactor::new(Vec::new());
+        let models = vec!["fake/claude-x".to_string(), "oai/gpt-x".to_string()];
+        let rendered = format!(r#"{{"model":"gpt-x","messages":[{{"role":"system","content":"s"}},{{"role":"user","content":"{long}"}}]}}"#);
+        let render = |_: &Path, _: &str| Ok(rendered.clone());
+        for (provider, raw) in [(None, false), (None, true), (Some("oai"), false)] {
+            let ask = CompletionAsk { project: "p".into(), agent: "perf".into(), slot: Some(2), provider: provider.map(str::to_string), raw, find: None };
+            let drawn = answer(&ask, &d, &d, &models, &render, &red).unwrap();
+            let (row, i, b) = drawn.rows.iter().find_map(|r| r.blocks.iter().position(|b| b.body.cut).map(|i| (r.n, i, &r.blocks[i]))).expect("a cut block");
+            let at = |max| block(&BlockAsk { slot: 2, req: 7, provider, raw, row, block: i as u64 }, &d, &d, &models, &render, &red, max);
+            let (text, cut, total) = at(bise_proto::log::WHOLE_CAP).unwrap();
+            assert!(!cut && text.len() as u64 == total && text.starts_with(&b.body.text) && text.len() > b.body.text.len(), "{provider:?} {raw}");
+            assert!(text.contains(long.trim_end()), "{provider:?} {raw}: the whole message");
+            let (small, cut, total2) = at(5000).unwrap();
+            assert_eq!((small.len(), cut, total2), (5000, true, total), "{provider:?} {raw}");
+        }
+        let gone = block(&BlockAsk { slot: 2, req: 6, provider: None, raw: false, row: 0, block: 0 }, &d, &d, &models, &render, &red, 10);
+        assert_eq!(gone.unwrap_err(), GONE);
         let _ = std::fs::remove_dir_all(&d);
     }
 

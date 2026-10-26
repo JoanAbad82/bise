@@ -2,7 +2,9 @@
 //! of an agent's raw session. The rows are `bise_session::history`'s, the
 //! TUI's `/log` builder (every text field redacted inside it); here they
 //! only become wire rows ([`items`], bodies cut to TOOL_TEXT_CAP) and a
-//! page (`bise_proto::log::page`: rows and bytes capped).
+//! page (`bise_proto::log::page`: rows and bytes capped). A cut body
+//! reads whole on his 'show more' ([`whole`], `HubCmd::LogBody`, up to
+//! `WHOLE_CAP`).
 
 use bise_proto::log::{LogBody, LogBodyKind, LogItem, LogRole, LOG_PAGE_BYTES, LOG_PAGE_ITEMS};
 use bise_proto::thread::TOOL_TEXT_CAP;
@@ -88,6 +90,23 @@ pub(super) fn answer(dir: &Path, blobs: &Path, redact: &Redactor, before: Option
     Ok((items(&rows, c.log()), more, hits))
 }
 
+/// The body of the row at `pos` in the session log in `dir`, redacted,
+/// cut to `max` bytes ('show more' on a body [`items`] cut; debug-more):
+/// `(text, cut, total)`, or why there is none.
+pub(super) fn whole(dir: &Path, blobs: &Path, redact: &Redactor, pos: u64, max: usize) -> Result<(String, bool, u64), String> {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+    let mut all = CACHES.lock().unwrap_or_else(|e| e.into_inner());
+    let c = all.get(dir, blobs, redact, now).map_err(|e| format!("no session log: {e}"))?;
+    body_at(&c.page(redact, Some(pos + 1), 1, 0).0, pos, max)
+}
+
+/// The body of the row at `pos` among `rows`, cut to `max` bytes.
+fn body_at(rows: &[Item], pos: u64, max: usize) -> Result<(String, bool, u64), String> {
+    let it = rows.iter().find(|r| r.pos == pos).ok_or_else(|| format!("no row {pos} in the session log"))?;
+    let o = cut_to(it.body.text(), max);
+    Ok((o.text, o.cut, o.total as u64))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +166,41 @@ mod tests {
         assert_eq!((p, more), (wire.clone(), false));
         assert_eq!(hits, Some(vec![wire.last().unwrap().pos]));
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// a session whose one bash call printed `out`
+    fn printed(dir: &Path, out: &str) {
+        let line = |seq: u64, typ: &str, data: serde_json::Value| json!({"seq": seq, "at": "2026-10-02T14:02:00.000Z", "turn": 1, "type": typ, "v": 1, "data": data}).to_string();
+        let lines = [
+            json!({"seq": 1, "at": "2026-10-02T14:02:00.000Z", "type": "session_start", "v": 1, "data": {"session": "s-1", "format": 1, "created_by": "bise", "cwd": "/w"}}).to_string(),
+            line(2, "turn_started", json!({"cause": "user"})),
+            line(3, "assistant_message", json!({"req": 1, "model": "m", "parts": [], "calls": [{"id": "call_1", "name": "bash", "args": "cargo test"}]})),
+            line(4, "tool_result", json!({"call": "call_1", "ok": true, "content": [{"kind": "text", "text": out}], "exit": 0})),
+            line(5, "turn_ended", json!({"outcome": "done"})),
+        ];
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join("events.jsonl"), lines.join("\n") + "\n").unwrap();
+    }
+
+    /// Law (debug-more, architect m_45981): a row whose body the page
+    /// cut at TOOL_TEXT_CAP reads whole through `whole`, the session log's
+    /// own text; past WHOLE_CAP cut again, with the whole size.
+    #[test]
+    fn a_cut_rows_body_reads_whole_up_to_the_whole_cap() {
+        use bise_proto::log::WHOLE_CAP;
+        let redact = Redactor::new(Vec::new());
+        for (name, out, max) in [("10k", "x".repeat(10_000), WHOLE_CAP), ("3m", "y".repeat(3 * 1024 * 1024), WHOLE_CAP)] {
+            let tmp = std::env::temp_dir().join(format!("sb-log-whole-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&tmp);
+            printed(&tmp, &out);
+            let (page, _, _) = answer(&tmp, &tmp, &redact, None, None).unwrap();
+            let row = page.iter().find(|i| i.body.as_ref().is_some_and(|b| b.cut)).expect("the page cuts the output");
+            let (text, cut, total) = whole(&tmp, &tmp, &redact, row.pos, max).unwrap();
+            assert_eq!(total, out.len() as u64, "{name}");
+            assert_eq!(cut, out.len() > max, "{name}");
+            assert_eq!(text, out[..out.len().min(max)], "{name}");
+            assert!(whole(&tmp, &tmp, &redact, row.pos + 1_000_000, max).is_err(), "no such row");
+            let _ = std::fs::remove_dir_all(&tmp);
+        }
     }
 }

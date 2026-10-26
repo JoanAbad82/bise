@@ -13,6 +13,7 @@ use super::super::page_cards::Page;
 use super::super::processes::Ask;
 use super::*;
 use bise_proto::hub::SendOpts;
+use bise_proto::log::{BodyOf, WHOLE_CAP};
 use bise_proto::slash::Version;
 use bise_proto::thread::Line;
 use crate::proto_view::slash::Slash;
@@ -297,6 +298,40 @@ impl Shell {
                     let project = ask.project.clone();
                     let v = match super::completion::answer(&ask, &req_dir, &home.images_dir(), &models, &render, &redact) {
                         Ok(c) => HubEv::Completion(Box::new(c)).to_value(),
+                        Err(text) => HubEv::Error { project: Some(project), cmd: Some(tag), text, cid: None, reason: None, kind: None }.to_value(),
+                    };
+                    let _ = tx.send(Msg::Typed { to: super::super::rpc::Typed::Answer(id), v });
+                });
+            }
+            // /debug's 'show more' (debug-more): one cut body whole, from
+            // the session log (a history row) or the ring (a completion
+            // block); read on a thread, to this client only (issue 16)
+            HubCmd::LogBody { project, agent, of } => {
+                let Some(dir) = self.dir_of(&agent) else { return self.proto_error(id, &tag, &format!("no agent {agent}")) };
+                let adir = self.opts.paths.agent_dir(&dir);
+                let ring = (adir.join("requests"), self.opts.repl_bin.clone(), self.opts.app_root.clone(), self.opts.spawn_env.map(|f| f()).unwrap_or_default());
+                let models: Vec<String> = match &of {
+                    BodyOf::Block { provider: Some(_), .. } => bise_catalog::picks::picks(self.setup(), &|_| true).into_iter().map(|p| p.value).filter(|v| v.contains('/')).collect(),
+                    _ => Vec::new(),
+                };
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let home = bise_home::Home::from_env();
+                    let redact = bise_session::Redactor::from_home(&home.auth_file(), &home.env_files());
+                    let got = match &of {
+                        BodyOf::Row { pos } => super::super::session_log::session_of(&adir)
+                            .ok_or_else(|| format!("{agent} has no session log yet"))
+                            .and_then(|s| super::log::whole(&home.sessions_dir().join(s), &home.blobs_dir(), &redact, *pos, WHOLE_CAP)),
+                        BodyOf::Block { slot, req, provider, raw, row, block } => {
+                            let (req_dir, repl, root, keys) = &ring;
+                            let render = |wire: &std::path::Path, model: &str| super::completion::render(repl, root, wire, model, keys);
+                            let ask = super::completion::BlockAsk { slot: *slot, req: *req, provider: provider.as_deref(), raw: *raw, row: *row, block: *block };
+                            super::completion::block(&ask, req_dir, &home.images_dir(), &models, &render, &redact, WHOLE_CAP)
+                        }
+                        BodyOf::Unknown => Err("this bise can't read that body: update bise".into()),
+                    };
+                    let v = match got {
+                        Ok((text, cut, total)) => HubEv::LogBody { project, agent, of, text, cut, total }.to_value(),
                         Err(text) => HubEv::Error { project: Some(project), cmd: Some(tag), text, cid: None, reason: None, kind: None }.to_value(),
                     };
                     let _ = tx.send(Msg::Typed { to: super::super::rpc::Typed::Answer(id), v });

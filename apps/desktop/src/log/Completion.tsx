@@ -7,11 +7,12 @@
 // JSON or text as it is. [ ] step through the ring, r shows each row's raw JSON as sent.
 // At the right (above under a pane of 880), the charts of its tokens (Charts.tsx, debug-viz): a
 // click on a bar or a bin filters the list (a chip per filter, ⌫ clears, esc goes up one level), a
-// click on a message's bar opens it; v hides them.
+// click on a message's bar opens it; v hides them. A block the hub cut at 4 KB has 'show more'
+// under it (whole.ts: that block of this slot, as asked, whole from the hub).
 // Owner: debug-cmd (the charts: debug-viz).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import type { CompBlock, CompRow, Completion as Comp } from "@/proto";
+import type { BodyOf, CompBlock, CompRow, Completion as Comp } from "@/proto";
 import { Press } from "@/ds";
 import { useCoreEvent, useStore } from "@/store";
 import type { Ev } from "@/store/store";
@@ -30,7 +31,11 @@ import {
   stepHit,
   tokensWord,
 } from "./model";
-import { FindLine, K, useScreenKeys } from "./parts";
+import { CutFoot, FindLine, K, useScreenKeys } from "./parts";
+import { drawn, useWhole, type WholeApi } from "./whole";
+
+/** The request a block's 'show more' names: the one drawn, as it was asked. */
+type BlockAsk = Omit<Extract<BodyOf, { of: "block" }>, "of" | "row" | "block">;
 import { Charts, selWords } from "./Charts";
 import { filterRows, kTokens, sameSel, total, type Filter, type Node } from "./viz";
 import { debug } from "@/proto/words_debug.gen";
@@ -50,6 +55,7 @@ export function Completion({
 }) {
   const store = useStore();
   const router = useRouter();
+  const whole = useWhole(project, agent);
   const [comp, setComp] = useState<Comp | null>(null);
   const [state, setState] = useState<"loading" | "ready" | { error: string }>(
     "loading",
@@ -343,6 +349,8 @@ export function Completion({
               setCursor(r.n);
               toggle(r.n);
             }}
+            ask={comp === null ? undefined : { slot: comp.slot.slot, req: comp.slot.req, ...(provider === undefined ? {} : { provider }), ...(raw ? { raw } : {}) }}
+            whole={whole}
           />
         ))}
       </div>
@@ -398,6 +406,8 @@ function CRow({
   at,
   hit,
   onToggle,
+  ask,
+  whole,
 }: {
   row: CompRow;
   rule: boolean;
@@ -405,6 +415,9 @@ function CRow({
   at: boolean;
   hit: boolean;
   onToggle: () => void;
+  /** the request shown, as asked (a block's 'show more' names it) */
+  ask: BlockAsk | undefined;
+  whole: WholeApi;
 }) {
   const id = `comp.row.${String(row.n)}`;
   return (
@@ -426,7 +439,13 @@ function CRow({
         {open ? (
           <div className="lg-b" data-testid={`${id}.body`}>
             {row.blocks.map((b, i) => (
-              <Block key={i} b={b} id={`${id}.b${String(i)}`} />
+              <Block
+                key={i}
+                b={b}
+                id={`${id}.b${String(i)}`}
+                of={ask === undefined ? undefined : { of: "block", ...ask, row: row.n, block: i }}
+                whole={whole}
+              />
             ))}
           </div>
         ) : (
@@ -440,7 +459,9 @@ function CRow({
 }
 
 /** A block as its kind draws: bash a command box, code highlighted, markdown, JSON, text. */
-function Block({ b, id }: { b: CompBlock; id: string }) {
+function Block({ b: sent, id, of, whole }: { b: CompBlock; id: string; of: BodyOf | undefined; whole: WholeApi }) {
+  // the block as he reads it: whole once he asked for it (show more)
+  const b = of === undefined ? sent : { ...sent, body: drawn(whole.ws, of, sent.body) };
   const v = compBlockView(b);
   return (
     <div className="lg-blk" data-testid={id} data-view={v}>
@@ -462,7 +483,11 @@ function Block({ b, id }: { b: CompBlock; id: string }) {
           <Code text={b.body.text} lang={b.body.lang ?? "text"} />
         </pre>
       )}
-      {b.body.cut === true && <div className="meta">cut at 4 KB</div>}
+      {of === undefined ? (
+        sent.body.cut === true && <div className="meta">{debug.cut_at}</div>
+      ) : (
+        <CutFoot of={of} body={sent.body} whole={whole} id={id} />
+      )}
     </div>
   );
 }

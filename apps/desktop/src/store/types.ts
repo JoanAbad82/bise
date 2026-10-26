@@ -38,6 +38,8 @@ export const TAGS = {
   log: true,
   // the answer to completion (log/completion): a request of the agent's ring, /debug completion
   completion: true,
+  // the answer to log_body (log/body): a cut /debug body whole, its `of` echoed (log/whole.ts)
+  log_body: true,
   diff: true,
   route: true,
   route_done: true,

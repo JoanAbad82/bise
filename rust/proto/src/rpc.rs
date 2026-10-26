@@ -78,6 +78,8 @@ pub const METHODS: &[MethodRow] = &[
     m("log/read", "log", Some("log")),
     // /debug completion: a request of the agent's ring, as rows
     m("log/completion", "completion", Some("completion")),
+    // /debug's 'show more': one cut body whole (debug-more)
+    m("log/body", "log_body", Some("log_body")),
     // his queued message taken back (the window's "edit · drop")
     m("turn/unqueue", "queued_take", Some("queued_taken")),
     // his queued message said now (the window's "send now"): sb-core

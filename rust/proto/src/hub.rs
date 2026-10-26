@@ -256,6 +256,19 @@ pub enum HubEv {
     /// family would get it (the runtime's own render, no call made);
     /// `slots`: every request the ring keeps, oldest first
     Completion(Box<crate::log::Completion>),
+    /// a `/debug` body whole (the answer to `log_body`, this connection
+    /// only): `of` echoed (the window swaps the body of that row only),
+    /// `text` redacted and cut at [`crate::log::WHOLE_CAP`] (`cut`),
+    /// `total` the whole body's bytes ('1 MB of 3.2 MB shown')
+    LogBody {
+        project: Project,
+        agent: String,
+        of: crate::log::BodyOf,
+        text: String,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        cut: bool,
+        total: u64,
+    },
     /// an agent's change (the answer to `diff`): its checkout or branch
     /// vs `base`; `head` its branch (none: the shared folder)
     Diff {
@@ -513,7 +526,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "pulse", "bise_update", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "log_body", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "pulse", "bise_update", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -729,6 +742,11 @@ pub enum HubCmd {
     /// provider of the catalog) would get it; `raw`: each row its bytes
     /// as sent; `find`: the hits. The user's authority, a client's only
     Completion(Box<crate::log::CompletionAsk>),
+    /// `/debug`'s 'show more': the body `of` names, whole (up to
+    /// [`crate::log::WHOLE_CAP`]), read from the session log or the
+    /// request ring; `log_body` answers this connection. The user's
+    /// authority, a client's only (issue 16)
+    LogBody { project: Project, agent: String, of: crate::log::BodyOf },
     /// his queued message `id` (an `Agent.queued` row) taken back before
     /// its turn ends (the window's "edit · drop"): `queued_taken` answers
     /// this connection with its words, or an error says why (delivered,
@@ -988,7 +1006,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "artifacts_move", "artifacts_folders", "artifacts_library", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "bise_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "log_body", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "artifacts_move", "artifacts_folders", "artifacts_library", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "bise_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -1077,6 +1095,7 @@ impl HubCmd {
             | HubCmd::Diff { project, .. }
             | HubCmd::ToolOut { project, .. }
             | HubCmd::Log { project, .. }
+            | HubCmd::LogBody { project, .. }
             | HubCmd::QueuedTake { project, .. }
             | HubCmd::QueuedSteer { project, .. } => project,
             HubCmd::Completion(c) => &c.project,

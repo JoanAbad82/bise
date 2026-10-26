@@ -13,6 +13,11 @@
     "one": null,
     "text": "all"
   },
+  "debug.cut_at": {
+    "args": [],
+    "one": null,
+    "text": "cut at 4 KB"
+  },
   "debug.filtered": {
     "args": [
       "shown",
@@ -127,6 +132,11 @@
     "one": null,
     "text": "no chart for this request: its hub is older"
   },
+  "debug.reading_whole": {
+    "args": [],
+    "one": null,
+    "text": "reading the whole text…"
+  },
   "debug.role_assistant": {
     "args": [],
     "one": null,
@@ -161,6 +171,16 @@
     "args": [],
     "one": null,
     "text": "per message since the compaction"
+  },
+  "debug.show_less": {
+    "args": [],
+    "one": null,
+    "text": "show less"
+  },
+  "debug.show_more": {
+    "args": [],
+    "one": null,
+    "text": "show more"
   },
   "debug.sizes_axis": {
     "args": [],
@@ -246,5 +266,13 @@
     "args": [],
     "one": null,
     "text": "where the tokens go"
+  },
+  "debug.whole_cut": {
+    "args": [
+      "shown",
+      "total"
+    ],
+    "one": null,
+    "text": "{shown} of {total} shown"
   }
 }

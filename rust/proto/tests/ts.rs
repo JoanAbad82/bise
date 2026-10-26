@@ -84,7 +84,8 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
             log::CompPart,
             log::CompSlot,
             log::CompletionAsk,
-            log::Completion
+            log::Completion,
+            log::BodyOf
         ),
         module!(cfg, "ops": ops::BranchRow, ops::VersionItem, ops::ReleaseEv, ops::UpdateEv),
         module!(cfg, "inbox": inbox::InboxState, inbox::InboxKind, inbox::Where, inbox::AnswerAt, inbox::InboxRecord, inbox::StateFilter, inbox::HistoryParams, inbox::InboxPage),

@@ -178,6 +178,24 @@
   color: var(--c-text-3);
 }
 
+/* under a body the hub cut at 4 KB (debug-more): 'cut at 4 KB · show more', then 'show less' */
+.lg-cut {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+.lg-more {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--c-accent);
+  cursor: pointer;
+}
+.lg-more:hover {
+  text-decoration: underline;
+}
+
 .lg-prose {
   max-width: 680px;
   font: 400 var(--t-14) / var(--lh-read) var(--font-read);

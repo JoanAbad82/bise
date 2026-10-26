@@ -7,7 +7,8 @@
 // holds the words: '3 of 27', n N (⌘G ⇧⌘G) go to the next one and read the pages up to it.
 // One header row per entry ('#seq  time  label  head … size'), its body under it on a rail in
 // the kind's colour (prose in the thread's sans at 680, tools in the code box), folds past 6
-// lines ('▸ 34 lines · 2.1 KB'), turns and compactions as rules. Keys: ⌘F or / find, f filter,
+// lines ('▸ 34 lines · 2.1 KB'), turns and compactions as rules. A body the hub cut at 4 KB has
+// 'show more' under it: the whole text from the hub (whole.ts), 'show less' folds it back. Keys: ⌘F or / find, f filter,
 // g G top / bottom, ↑↓ j k move, space open, ⌘O open all, r reload, ⌘] or tab completion, esc
 // back. Owners: amb-web, debug-cmd.
 import {
@@ -29,7 +30,8 @@ import { Markdown } from "@/thread/Markdown";
 import { Code } from "@/thread/Code";
 import { rangesIn } from "@/thread/findranges";
 import { Completion } from "./Completion";
-import { FindLine, K, useScreenKeys } from "./parts";
+import { CutFoot, FindLine, K, useScreenKeys } from "./parts";
+import { drawn, useWhole, type WholeApi } from "./whole";
 import {
   codeText,
   editDiff,
@@ -130,6 +132,7 @@ function History({
 }) {
   const store = useStore();
   const router = useRouter();
+  const whole = useWhole(project, agent);
   const [rows, setRows] = useState<readonly Row[]>([]);
   const [more, setMore] = useState(false);
   const [state, setState] = useState<"loading" | "ready" | { error: string }>(
@@ -532,6 +535,7 @@ function History({
               hit={hitSet.has(r.key)}
               onToggle={toggle}
               onPick={pick}
+              whole={whole}
             />
           ),
         )}
@@ -597,6 +601,7 @@ function Entry({
   hit,
   onToggle,
   onPick,
+  whole,
 }: {
   row: Row;
   agent: string;
@@ -605,10 +610,14 @@ function Entry({
   hit: boolean;
   onToggle: (key: number) => void;
   onPick: (key: number) => void;
+  whole: WholeApi;
 }) {
-  const { it, key } = row;
+  const { it: sent, key } = row;
+  // the row as he reads it: its body whole once he asked for it (show more)
+  const of = { of: "row", pos: sent.pos } as const;
+  const it = sent.body === undefined ? sent : { ...sent, body: drawn(whole.ws, of, sent.body) };
   const kind = kindOf(it);
-  const size = sizeOf(it);
+  const size = sizeOf(sent);
   const diff = editDiff(it);
   const id = `log.row.${String(key)}`;
   return (
@@ -654,7 +663,7 @@ function Entry({
             ) : (
               <Edit it={it} diff={diff} id={id} />
             )}
-            {it.body.cut === true && <div className="meta">cut at 4 KB</div>}
+            {sent.body !== undefined && <CutFoot of={of} body={sent.body} whole={whole} id={id} />}
           </div>
         ) : (
           <Press
