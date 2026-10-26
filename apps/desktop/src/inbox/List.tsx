@@ -17,7 +17,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
 import { InBar } from '@/app/barslot';
-import { AppIcon, BannerWait, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, ListRow, PageBanner, Press, RowAction } from '@/ds';
+import { AppIcon, BannerWait, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, ListRow, PageBanner, Press, RowAction, RowMark } from '@/ds';
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
@@ -217,15 +217,16 @@ export function InboxView({ cards, records, onEnd, names, projects, ports, nextO
   );
 }
 
-/** A waiting row: '?' in the accent, the asker then the question, 'project · age · #id'; the chosen
+/** A waiting row: the ask line icon in the accent (ds RowMark, never a '?' character), the asker then
+ *  the question, 'project · age' alone (no '#id', as the inbox block; ui-review m_44137); the chosen
  *  one shows its 'answer' (⏎), which opens it above the composer as ⌘I. */
 function WaitLine({ w, on, end, onPick, onAnswer }: { w: WaitRow; on: boolean; end: string; onPick: () => void; onAnswer: () => void }) {
   return (
     <div className="ip-row" data-row={w.key}>
       <ListRow on={on} testId={`inbox.row.${w.key}`} tip={inbox.row_tip_wait}
-        state={<span className="ip-ask">{w.glyph}</span>}
+        state={<RowMark icon="ask" tone="accent" label={w.glyph === '¶' ? inbox.row_mark_page : inbox.row_mark_question} />}
         title={<><span className="ip-who">{w.title}</span><span className="ip-q">{w.question}</span></>}
-        sub={<>{end}<CardId id={w.card.id} testId={`inbox.row.${w.key}.id`} /></>}
+        sub={end}
         end={on ? <RowAction onClick={onAnswer} tip={inbox.row_tip_wait} testId={`inbox.row.${w.key}.answer`}>{inbox.key_answer}</RowAction> : undefined}
         onClick={onPick} />
     </div>

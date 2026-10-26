@@ -16,7 +16,6 @@
 .ip-who { margin-right: var(--s-2); font-weight: 600; }
 .ip-q { color: var(--c-text); }
 /* '?' waits on him: the accent's one use on a row */
-.ip-ask { color: var(--c-accent); }
 /* withdrawn: dim, the reason on its second line */
 .ip-row.gone .ip-who, .ip-row.gone .ip-q { color: var(--c-text-3); }
 .ip-answer { height: var(--h-control-sm); }

@@ -69,6 +69,10 @@ crate::words! { inbox:
     group_waiting = "Waiting for you";
     /// the desktop's tip on a waiting row: what ⏎ does
     row_tip_wait = "⏎ answer";
+    /// the desktop's waiting row: its mark's name for VoiceOver (the ask line icon)
+    row_mark_question = "a question for you";
+    /// the desktop's waiting row on a page's block: its mark's name for VoiceOver
+    row_mark_page = "a question on a page";
     /// the desktop's tip on a past row: what ⏎ and ⌘⏎ do
     row_tip_past = "⏎ open · ⌘⏎ go to your answer";
     /// the desktop screen with nothing at all

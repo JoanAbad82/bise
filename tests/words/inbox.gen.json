@@ -704,6 +704,16 @@
     "one": null,
     "text": "restart to update"
   },
+  "inbox.row_mark_page": {
+    "args": [],
+    "one": null,
+    "text": "a question on a page"
+  },
+  "inbox.row_mark_question": {
+    "args": [],
+    "one": null,
+    "text": "a question for you"
+  },
   "inbox.row_tip_past": {
     "args": [],
     "one": null,
