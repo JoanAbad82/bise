@@ -84,12 +84,16 @@ describe('settings, a route of the main window', () => {
     const side = screen.getByTestId('app.sidebar');
     expect(within(side).getByTestId('settings.nav')).toBeTruthy();
     expect(within(side).queryByTestId('app.side.list')).toBeNull();
+    // the nav alone (designer m_44447): no New agent, no Search on this route
+    expect(within(side).queryByTestId('app.side.new')).toBeNull();
+    expect(within(side).queryByTestId('app.side.search')).toBeNull();
     act(() => {
       router.go({ screen: 'inbox' });
     });
     view.rerender(ui());
     expect(within(screen.getByTestId('app.sidebar')).queryByTestId('settings.nav')).toBeNull();
     expect(within(screen.getByTestId('app.sidebar')).getByTestId('app.side.list')).toBeTruthy();
+    expect(within(screen.getByTestId('app.sidebar')).getByTestId('app.side.search')).toBeTruthy();
   });
 
   it('a page of the nav replaces the page in view: back still leaves settings', () => {

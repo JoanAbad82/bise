@@ -23,7 +23,11 @@
    groups: a label 12/16 in text-3 (padding 0 12 8), a box r 10 with a hairline, rows 44 at least
    (padding 8 12), switches 32 x 20, buttons 28; groups 20 apart. The accent never marks the
    selected page. */
-.b-snav .b-lrow{flex:none;height:var(--h-row-tight);padding:0;border-radius:var(--r-1)}
+/* the sidebar's head leaves on settings: the nav starts 8 down, the back row 8 above General; a
+   page's tint inset 8 each side, r 6, like the frame sidebar's selected rows (designer m_44447) */
+.b-snav{padding-top:var(--s-2)}
+.b-snav>.app-s-row.back{margin-bottom:var(--s-2)}
+.b-snav .b-lrow{flex:none;height:var(--h-row-tight);margin:0 var(--s-2);padding:0;border-radius:var(--r-1)}
 .b-snav .b-lrow>.body{gap:var(--s-2);padding:0 var(--s-2);border-radius:var(--r-1)}
 .b-snav .b-lrow .state{width:var(--h-kbd)}
 .b-snav-tile{flex:none;display:inline-flex;align-items:center;justify-content:center;width:var(--h-kbd);height:var(--h-kbd);border-radius:5px;background:var(--c-sunken);color:var(--c-text-2)}

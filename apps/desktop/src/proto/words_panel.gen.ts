@@ -265,7 +265,7 @@ export const panel = {
   /** the crumb of an agent's /debug (its history, its requests) */
   crumb_debug: "debug",
   /** the crumb of settings */
-  crumb_settings: "settings",
+  crumb_settings: "Settings",
   /** the crumb of an unknown route */
   crumb_not_found: "not found",
   /** the crumb of the lab */

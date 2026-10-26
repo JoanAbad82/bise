@@ -130,19 +130,22 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const here = projectOf(route) ?? home;
   return (
     <aside className="app-side" data-testid="app.sidebar" data-library={library || undefined}>
-      <div className="app-s-head">
-        <Row
-          kind="top"
-          icon="rename"
-          name={frame.new_agent}
-          end={<kbd>⌘N</kbd>}
-          onClick={() => {
-            if (here !== undefined) newAgent(here);
-          }}
-          testId="app.side.new"
-        />
-        <Row kind="top" icon="search" name={frame.search} end={<kbd>⌘K</kbd>} onClick={onSearch} testId="app.side.search" />
-      </div>
+      {/* on settings the sidebar is the settings nav alone (designer m_44447) */}
+      {route.screen !== 'settings' && (
+        <div className="app-s-head">
+          <Row
+            kind="top"
+            icon="rename"
+            name={frame.new_agent}
+            end={<kbd>⌘N</kbd>}
+            onClick={() => {
+              if (here !== undefined) newAgent(here);
+            }}
+            testId="app.side.new"
+          />
+          <Row kind="top" icon="search" name={frame.search} end={<kbd>⌘K</kbd>} onClick={onSearch} testId="app.side.search" />
+        </div>
+      )}
       {/* the swap is a crossfade (app.css .app-s-swap): a new key fades the other list in */}
       <div className="app-s-swap" key={library ? 'library' : route.screen === 'settings' ? 'settings' : 'projects'}>
         {library ? <LibraryList /> : route.screen === 'settings' ? <SettingsNav /> : <ProjectList />}
