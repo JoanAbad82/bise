@@ -121,6 +121,33 @@ describe("acted: the cards he answered or closed, one owner", () => {
     expect(s.acted()).toEqual([]);
   });
 
+  it("inbox-reappear (his #780): a card whose answer the hub carries out (running) stays answered until the hub closes it", () => {
+    // his 'merge native-mac into main?': he picks merge, the hub keeps the item open while the merge runs
+    let now = 1_000;
+    const merging = (ids: number[], running: boolean): ProjectRow =>
+      ({ project: "harness", name: "harness", cards: ids.map((i) => ({ ...card("harness", i), kind: "feature_merge", ...(running ? { running: true } : {}) })) }) as unknown as ProjectRow;
+    const s = new Store({ send: () => undefined }, { now: () => now });
+    s.apply({ ev: "projects", projects: [merging([780], false)] });
+    s.do({ i: "answer", project: "harness", card: 780, reply: "1" });
+    // the step's rows (running), then the hub's answer: still his answered card
+    s.apply({ ev: "projects", projects: [merging([780], true)] });
+    s.apply({ ev: "card_answered", project: "harness", card: 780, answer: null });
+    expect(s.acted().map((a) => a.key)).toEqual(["harness-780"]);
+    // minutes into the merge, past ACTED_STALE_MS
+    now += ACTED_STALE_MS * 5;
+    s.apply({ ev: "projects", projects: [merging([780], true)] });
+    expect(s.acted().map((a) => a.key)).toEqual(["harness-780"]);
+    // the merge ends: the hub closes it, the entry goes
+    s.apply({ ev: "projects", projects: [merging([], false)] });
+    expect(s.acted()).toEqual([]);
+    // the pure rules: running keeps it; listed and not running stays the ghost-badge rule (shown again)
+    const a = actedAdd([], "harness", 780, 0);
+    expect(actedAnswered(a, "harness", 780, [merging([780], true)])).toBe(a);
+    expect(actedAnswered(a, "harness", 780, [merging([780], false)])).toEqual([]);
+    expect(actedPrune(a, [merging([780], true)], ACTED_STALE_MS + 1)).toBe(a);
+    expect(actedPrune(a, [merging([780], false)], ACTED_STALE_MS + 1)).toEqual([]);
+  });
+
   it("ghost-badge: a set kept by an older build no longer hides a card the hub still lists", () => {
     const keep = keepOf();
     keep.write("acted", [{ key: "ai-docs-19", project: "ai-docs", card: 19, at_ms: 1_000 }]);

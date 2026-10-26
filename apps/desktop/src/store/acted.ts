@@ -2,7 +2,8 @@
 // #384 came back on a project switch). One owner: the Store sets an entry in answer() and close(),
 // whichever view he acted from (the inbox block, a thread's strip, the capsule, a review), and
 // a project's rows take it out (once that project's row is loaded and no longer lists the card),
-// the hub's answer to that request while its rows still list the card (it kept it open: actedAnswered),
+// the hub's answer to that request while its rows still list the card and not `running` (it kept it
+// open: actedAnswered; `running`: it carries out his answer, the card stays his answered one),
 // or the error to that very request (the window-local 'card_refused', architect m_23524: the card
 // shows again). Every view reads the same set (useActed), so a remount, a project switch or a reload (the
 // set is kept with his asides) never shows a card he answered while the hub drops it. The hub
@@ -39,16 +40,20 @@ export function actedAdd(list: readonly Acted[], project: string, card: number, 
  * (the hub closed it). A project not in the rows, or whose row has no cards field yet (not loaded:
  * a reload, a hub starting), keeps its entries. An entry older than ACTED_STALE_MS whose loaded
  * row still lists the card goes too: the hub answers in milliseconds, so the hub kept it open and
- * its answer never came here (a window reloaded before it, a set kept by an older build). The same
- * list back when nothing went (the slice's reference holds). Pure.
+ * its answer never came here (a window reloaded before it, a set kept by an older build); unless
+ * the row says `running` (the hub carries out his answer, minutes for a merge). The same list back
+ * when nothing went (the slice's reference holds). Pure.
  */
 export function actedPrune(list: readonly Acted[], rows: readonly Pick<ProjectRow, "project" | "cards">[], nowMs: number): readonly Acted[] {
   if (list.length === 0) return list;
-  const open = new Map(rows.flatMap((r) => (r.cards == null ? [] : [[r.project, new Set(r.cards.map((c) => c.id))] as const])));
+  const open = new Map(rows.flatMap((r) => (r.cards == null ? [] : [[r.project, new Map(r.cards.map((c) => [c.id, c.running === true]))] as const])));
   const next = list.filter((a) => {
-    const listed = open.get(a.project)?.has(a.card);
-    if (listed === undefined) return true;
-    return listed && nowMs - a.at_ms < ACTED_STALE_MS;
+    const cards = open.get(a.project);
+    if (cards === undefined) return true;
+    const running = cards.get(a.card);
+    if (running === undefined) return false;
+    // inbox-reappear: the hub carries out his answer (a merge, a try build, an update): his still
+    return running || nowMs - a.at_ms < ACTED_STALE_MS;
   });
   return next.length === list.length ? list : next;
 }
@@ -59,13 +64,15 @@ export function actedPrune(list: readonly Acted[], rows: readonly Pick<ProjectRo
  * request, the core emits the rows on them). A loaded row that still lists the card: the hub kept
  * it open (a drafts card's '1. review' or his words on it, an older hub's no-op), so the entry goes
  * and the card is his again in every view. The ghost it fixes: the sidebar counted the card from
- * the rows while every inbox hid it, until a relaunch. Pure.
+ * the rows while every inbox hid it, until a relaunch. A row that lists it `running` (the hub
+ * carries out his answer: a merge, a try build, an update) keeps the entry until the hub closes the
+ * card (inbox-reappear, his #780: the merge question came back while it ran). Pure.
  */
 export function actedAnswered(list: readonly Acted[], project: string, card: number, rows: readonly Pick<ProjectRow, "project" | "cards">[]): readonly Acted[] {
   const key = actedKey(project, card);
   if (!list.some((a) => a.key === key)) return list;
-  const open = rows.find((r) => r.project === project)?.cards?.some((c) => c.id === card) ?? false;
-  return open ? list.filter((a) => a.key !== key) : list;
+  const row = rows.find((r) => r.project === project)?.cards?.find((c) => c.id === card);
+  return row !== undefined && row.running !== true ? list.filter((a) => a.key !== key) : list;
 }
 
 /** The keys, for a view's filter. Pure. */
