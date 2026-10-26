@@ -3,7 +3,10 @@
 // (Flyout*). Mounted at the shell's root by App.tsx, position fixed under the window's bar,
 // outside .app-main and .app-screen, so no parent's overflow clips the world's or an object's
 // shadow (plan §2; ds/noclip.ts checks it). It computes the window's sideLayout (place.ts: at a
-// resize's end, a sidebar or panel fold) and hides while the tabbed panel is open or on a page
+// resize's end, a sidebar or panel fold): the coins at the window's edge, between the thread and
+// the open panel (the side's right on the panel's left edge), or as minis portalled into the
+// header's or the sheet's tab row's CoinSlot (Minis.tsx; their float under the header, folded-side
+// v9); ⌥ held alone 300 ms or a hover 400 ms shows the coins' cards (Cards.tsx). It hides on a page
 // that is no project's (layout sideShows: the inbox, scheduled, plugins, artifacts...; the world's
 // office unmounted: no loop while hidden). The project is the route's (bise's home on a page with
 // none): the world and the acts (+ new agent, + add) are its; the floats list the Overview's
@@ -21,6 +24,7 @@
 // window. Under every palette, sheet and menu
 // (z 15: over the composer's 10, under the palette's 20). Owner: nm-side.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNowFor } from '../clock';
 import { useRoute, useRouter } from '../router';
 import { MAIN, projectOf } from '../route';
@@ -28,16 +32,17 @@ import { useMenuAction } from '../menu';
 import { useModHeldFor } from '../held';
 import { CARD_HOLD_MS, CARD_HOVER_MS, CoinCardView } from './Cards';
 import { coinCard, type CardFacts } from './coincard';
-import { inRank, agentCounts, bubbleBadge, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type Counts } from './model';
+import { inRank, agentCounts, bubbleBadge, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type BubbleCount, type Counts } from './model';
+import { Minis } from './Minis';
 import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
 import { noGrow, World, WorldThumb } from './World';
 import { Empty, Float, FloatLayer, HeadButton, type FloatContent } from './Flyout';
 import { AgentLine } from './FlyoutAgents';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
-import { onResizeEnd, useLayoutDriver, useSideLayout } from './place';
-import { CARD_MAX, cardMaxH, sideShows } from './layout';
-import { newAgent, openOverview, openTab, panelProject, useLeftWidth, usePanelBox } from './ports';
+import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
+import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
+import { newAgent, openOverview, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
 import { acrossSays, busyProjects, useListed } from './lists';
 import { alarms } from '@/thread/wake';
 import type { Agent } from '@/proto';
@@ -48,6 +53,12 @@ import { useAllScheduled } from '@/scheduled';
 import { isRunning, useAllProcesses } from '@/running';
 import { side } from '@/proto/words_side.gen';
 import './side3d.css';
+
+/** a float's right edge from the side's right edge: 12 + the 44 coin + 12 (side3d.css .s3-card) */
+const CARD_RIGHT = 68;
+/** a mini's float: its top 8 under the header, whichever mini */
+const MINI_TOP = 8;
+const MINI_TOPS = { world: null, bubbles: { agents: MINI_TOP, artifacts: MINI_TOP, scheduled: MINI_TOP, processes: MINI_TOP } } as const;
 
 /** the world's top and right, px */
 const EDGE = 12;
@@ -122,21 +133,23 @@ function useWinW(): number {
 export function SideHost() {
   const winW = useWinW();
   const leftW = useLeftWidth();
-  const panel = usePanelBox();
+  const box = usePanelBox();
+  const art = useFrontArtKind();
+  const panel: PanelIn = { ...box, threadMin: art === undefined ? THREAD_KEEPS.rows : THREAD_KEEPS.artifact };
   const route = useRoute();
   useLayoutDriver(winW, leftW, panel, sideShows(route));
   const layout = useSideLayout();
   const rows = useProjects();
   const home = rows.find((p) => p.home)?.project ?? '';
   const project = projectOf(route) ?? home;
-  if (!layout.side || project === '') return null;
+  if (layout.coins === 'none' || project === '') return null;
   // whose items it lists: the Overview's scope (a project's own; bise's own every project's)
   const scope = panelProject(route, home, rows.filter((p) => !p.home).length) ?? project;
-  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} />;
+  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} at={layout.coins} right={layout.right} />;
 }
 
-/** `project`: where its acts go (the world, + new agent, + add); `scope`: whose items it lists ('' every project's). */
-function Side({ project, scope, home, world }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble' }) {
+/** `project`: where its acts go (the world, + new agent, + add); `scope`: whose items it lists ('' every project's); `at`: where the coins are, `right` their column's distance from the window's right edge. */
+function Side({ project, scope, home, world, at: coinsAt, right }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble'; at: CoinsAt; right: number }) {
   const router = useRouter();
   const route = useRoute();
   const store = useStore();
@@ -171,7 +184,12 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
     inbox: listed.waits,
   };
   const [open, setOpen] = useState<BubbleId | null>(null);
-  const tops = bubbleTops(world === 'bubble' ? 'bubble' : 'small');
+  // no room beside the thread: the coins are minis in the thread's header or the sheet's tab row,
+  // their floats under the header (folded-side v9)
+  const slotAt = coinsAt === 'header' || coinsAt === 'tabs' ? coinsAt : null;
+  const slot = useCoinSlot(slotAt);
+  const mini = slotAt !== null;
+  const tops = mini ? MINI_TOPS : bubbleTops(world === 'bubble' ? 'bubble' : 'small');
   // the one float (designer m_44990): from one bubble to another its frame moves (its place now,
   // read mid-move too, kept in `from`) and the bubble it leaves crossfades out (`leaving`)
   const root = useRef<HTMLDivElement | null>(null);
@@ -232,7 +250,16 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
   }, []);
   const facts: CardFacts = { live, counts, artifacts, tasks, procs, watching: watching.map((a) => a.name), now };
   // no card over an open float: it is the coin's whole say
-  const carded: readonly BubbleId[] = open !== null ? [] : alt ? BUBBLES : hover !== null ? [hover] : [];
+  const carded: readonly BubbleId[] = open !== null || mini ? [] : alt ? BUBBLES : hover !== null ? [hover] : [];
+  const miniCounts = Object.fromEntries(BUBBLES.map((b) => [b, bubbleCount(b, counts)])) as Record<BubbleId, BubbleCount>;
+  const miniTips = Object.fromEntries(BUBBLES.map((b) => [b, bubbleTip(b, counts)])) as Record<BubbleId, string>;
+  // a mini's float hangs under the header, its right edge on the minis' (the side's right moved
+  // there: a float stands CARD_RIGHT left of the side's right edge)
+  const anchor = () => {
+    const el = root.current;
+    if (el === null || slot === null) return;
+    el.style.right = `${String(Math.max(0, window.innerWidth - slot.getBoundingClientRect().right - CARD_RIGHT))}px`;
+  };
   // esc closes the open card and gives the focus back to its bubble, ↑ ↓ walk its rows (the
   // focus ring), ⏎ opens the focused one (its button's own); a click outside closes it
   useEffect(() => {
@@ -250,12 +277,13 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
       if (e.key !== 'Escape') return;
       e.stopPropagation();
       setOpen(null);
-      root.current?.querySelector<HTMLElement>(`[data-testid="app.bubble.${open}"]`)?.focus();
+      (slot ?? root.current)?.querySelector<HTMLElement>(`[data-testid="app.${slot !== null ? 'mini' : 'bubble'}.${open}"]`)?.focus();
     };
     const down = (e: PointerEvent) => {
       // the pointer in the card: its rows' focus is the pointer's again (no ring on a clicked row)
       frame.current?.removeAttribute('data-kb');
-      if (root.current !== null && e.target instanceof Node && root.current.contains(e.target)) return;
+      // in the side, or on a mini in the header (its own click toggles the float)
+      if (e.target instanceof Node && (root.current?.contains(e.target) === true || slot?.contains(e.target) === true)) return;
       setOpen(null);
     };
     // opened by its key: its first row focused, its ring shown at once (data-kb: a focus() after a
@@ -271,7 +299,7 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
       window.removeEventListener('keydown', key, true);
       window.removeEventListener('pointerdown', down, true);
     };
-  }, [open]);
+  }, [open, slot]);
   // a card's top is always its bubble's, its height at most the room under it less 16
   // (cardMaxH: nothing measured, it never moves nor runs past the window); its rows scroll inside
   // under a 16 fade, set once they overflow (a measure that finds the same sets nothing)
@@ -396,21 +424,28 @@ function Side({ project, scope, home, world }: { project: string; scope: string;
     }
   };
   return (
-    <div className="s3-side" ref={root} data-world={world} data-testid="app.side">
-      {world !== 'bubble' && (
+    <div className="s3-side" ref={root} data-world={world} data-at={coinsAt} style={coinsAt === 'between' ? { right } : undefined} data-testid="app.side">
+      {mini && slot !== null && createPortal(
+        <Minis counts={miniCounts} badge={bubbleBadge('agents', counts)} tips={miniTips} open={open} keys={alt ? bubbleKey : null} onClick={(b) => {
+          anchor();
+          toggle(b);
+        }} />,
+        slot,
+      )}
+      {!mini && world !== 'bubble' && (
         <div className="s3-world-at" style={{ top: EDGE, right: EDGE }}>
           <World project={project} name={name} says={says} agents={ownLive} cards={ownCards} frozen={open !== null} onOpen={() => {
             openTab({ kind: 'office', project });
           }} />
         </div>
       )}
-      {tops.world !== null && (
+      {!mini && tops.world !== null && (
         <Bubble id="world" count={null} tip={WORLD_NAME} open={false} top={tops.world}
           pic={<WorldThumb project={project} agents={ownLive} cards={ownCards} />} onClick={() => {
             openTab({ kind: 'office', project });
           }} />
       )}
-      {BUBBLES.map((b) => (
+      {!mini && BUBBLES.map((b) => (
         <Bubble key={b} id={b} count={bubbleCount(b, counts)} badge={bubbleBadge(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]}
           hint={alt ? bubbleKey(b) : undefined} onHover={onHover(b)} onClick={() => {
           clearTimeout(hoverT.current);

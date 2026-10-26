@@ -2,9 +2,12 @@
 // window's width (plan native-mac-plan v4 §2, decision d3). The column is centred when both sides
 // leave the world's band (148 + 12 + 12 = 172); else it slides left (24 from the sidebar at
 // least); else the world folds into a 5th bubble and the band drops to 92 (68 + 12 + 12); last,
-// the column narrows. The tabbed panel open, or a route that is no project's (sideShows: the inbox,
-// scheduled, processes, plugins, settings, every artifacts screen...): the right side hides, the
-// column is centred in what is left. Recomputed at the end of a resize or a fold only (place.ts).
+// the column narrows. The tabbed panel open (folded-side v9, the width rule): the coins stay
+// between the thread and the panel (a 68 band, the world a 5th coin) while the window holds them,
+// else they go in the thread's header as minis, and over a sheet or a full-width panel in its tab
+// row (CoinsAt); the column is then centred in what is left. A route that is no project's
+// (sideShows: the inbox, scheduled, processes, plugins, settings, every artifacts screen...): no
+// coins anywhere. Recomputed at the end of a resize or a fold only (place.ts).
 // Pure: widths in, places out; nm-thread and nm-composer read it through place.ts. Owner: nm-side.
 
 import type { Route } from '../route';
@@ -57,8 +60,30 @@ export interface SideLayout {
   readonly world: WorldSize;
   /** the band the right side keeps free at the window's right edge (172, or 92 with the world as a bubble; 0 when the panel is open) */
   readonly gutter: number;
-  /** the world and the bubbles show (false while the tabbed panel is open) */
+  /** the world and the bubbles show at the right of the thread (at the window's edge, or between the thread and the panel) */
   readonly side: boolean;
+  /** where the coins are (folded-side v9): at the window's edge, between the thread and the panel,
+   *  in the thread's header (no room beside it), in the sheet's tab row (the panel over the thread), or nowhere */
+  readonly coins: CoinsAt;
+  /** the coins' column from the window's right edge, px: 0 at the edge, the panel's width between */
+  readonly right: number;
+}
+
+/** Where the coins are (folded-side v9, Gabriel's pick). */
+export type CoinsAt = 'edge' | 'between' | 'header' | 'tabs' | 'none';
+
+/** The coins' band between the thread and the panel: 12 + the 44 coin + 12 (the world a 5th coin there) */
+export const BETWEEN_BAND = 68;
+/** What the thread keeps beside the panel, from panel/model.ts: THREAD_MIN beside rows or a shell, ART_THREAD_MIN beside an artifact */
+export const THREAD_KEEPS = { rows: 560, artifact: 400 } as const;
+
+/** The tabbed panel as the layout reads it: open beside the thread at `width`, over it as a sheet, or full width; `threadMin` what the thread keeps beside it. */
+export interface PanelIn {
+  readonly open: boolean;
+  readonly width: number;
+  readonly over: boolean;
+  readonly full: boolean;
+  readonly threadMin: number;
 }
 
 /** --w-col: the column at most */
@@ -85,20 +110,34 @@ function fit(room: number, band: number): { left: number; w: number } | null {
 /**
  * The layout for a window `winW` wide, a sidebar (with the rail) `sideW` wide, the tabbed panel
  * open or not (`panelW` its width, --w-panel when its owner did not say), the route showing the
- * side or not (`shows`, sideShows: off, the column is centred in the whole room, no band). Pure.
+ * side or not (`shows`, sideShows: off, the column is centred in the whole room, no band), and how
+ * the open panel stands (`beside`: a sheet over the thread, full width, what the thread keeps).
+ * The panel open (folded-side v9, the width rule): the coins stay between the thread and the panel
+ * (the world a 5th coin, the panel's left edge their right) while the window holds the left, the
+ * thread's least, their 68 band and the panel; under that they go in the thread's header in place
+ * of its status line; a sheet or a full-width panel covers the thread: the coins go in its tab row.
+ * Pure.
  */
-export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, panelW: number = PANEL_W, shows = true): SideLayout => {
+export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, panelW: number = PANEL_W, shows = true, beside: Omit<PanelIn, 'open' | 'width'> = { over: false, full: false, threadMin: THREAD_KEEPS.rows }): SideLayout => {
   const room = Math.max(0, winW - sideW - (panelOpen ? panelW : 0));
-  if (panelOpen || !shows) {
+  const centred = (coins: CoinsAt): SideLayout => {
     const w = Math.min(COL_W, Math.max(0, room - 2 * MIN_LEFT));
-    return { colLeft: sideW + (room - w) / 2, colW: w, world: 'small', gutter: 0, side: false };
+    return { colLeft: sideW + (room - w) / 2, colW: w, world: 'small', gutter: 0, side: false, coins, right: 0 };
+  };
+  if (!shows) return centred('none');
+  if (panelOpen) {
+    if (beside.over || beside.full) return centred('tabs');
+    if (winW < sideW + beside.threadMin + BETWEEN_BAND + panelW) return centred('header');
+    const at = fit(room, BETWEEN_BAND) ?? { left: MIN_LEFT, w: Math.max(0, room - BETWEEN_BAND - MIN_LEFT) };
+    return { colLeft: sideW + at.left, colW: at.w, world: 'bubble', gutter: BETWEEN_BAND, side: true, coins: 'between', right: panelW };
   }
+  const edge = (l: { left: number; w: number }, world: WorldSize, gutter: number): SideLayout =>
+    ({ colLeft: sideW + l.left, colW: l.w, world, gutter, side: true, coins: 'edge', right: 0 });
   const small = fit(room, WORLD_BAND);
-  if (small !== null) return { colLeft: sideW + small.left, colW: small.w, world: 'small', gutter: WORLD_BAND, side: true };
+  if (small !== null) return edge(small, 'small', WORLD_BAND);
   const bubble = fit(room, BUBBLE_BAND);
-  if (bubble !== null) return { colLeft: sideW + bubble.left, colW: bubble.w, world: 'bubble', gutter: BUBBLE_BAND, side: true };
-  const w = Math.max(0, room - BUBBLE_BAND - MIN_LEFT);
-  return { colLeft: sideW + MIN_LEFT, colW: w, world: 'bubble', gutter: BUBBLE_BAND, side: true };
+  if (bubble !== null) return edge(bubble, 'bubble', BUBBLE_BAND);
+  return edge({ left: MIN_LEFT, w: Math.max(0, room - BUBBLE_BAND - MIN_LEFT) }, 'bubble', BUBBLE_BAND);
 };
 
 /** the room a card keeps above the window's bottom (designer m_44499) */

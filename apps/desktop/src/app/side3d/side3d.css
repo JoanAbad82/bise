@@ -929,3 +929,81 @@
   padding: 0 var(--s-1);
   font: 400 var(--t-13)/16px var(--font-ui);
 }
+
+/* the coins as minis (folded-side v9; Minis.tsx): no room beside the thread, they go in the
+   thread's header (the status slot, right-aligned, 12 after TitleStatus's pill, 12 before ⋯/▯) or
+   the sheet's tab row; 8 apart; each its object at 16 on a 20 plate, its count after it (t-12 mono
+   text-3), the agents' accent count a pill; the open one on --c-active. They never shrink: the
+   crumb's fact, then the pill's short form, then the crumb's name give way first (designer m_45616) */
+.s3-minis-slot {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+.s3-minis-slot:empty {
+  display: none;
+}
+.app-title-status > .s3-minis-slot {
+  flex: none;
+  max-width: none;
+  margin-left: var(--s-3);
+}
+.s3-minis {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-right: var(--s-3);
+  -webkit-app-region: no-drag;
+}
+.s3-mini {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s-1);
+  height: 24px;
+  padding: 0 var(--s-1);
+  border-radius: var(--r-2);
+}
+.s3-mini:hover,
+.s3-mini[data-open] {
+  background: var(--c-active);
+}
+.s3-mini:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+.s3-mini-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--c-raised);
+  border: 1px solid var(--c-line);
+}
+.s3-mini-plate img,
+.s3-mini-plate .s3-tile {
+  width: 16px;
+  height: 16px;
+}
+.s3-mini-n {
+  font: 400 var(--t-12)/16px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-3);
+}
+.s3-mini-n[data-key] {
+  color: var(--c-text-2);
+}
+.s3-mini-badge {
+  min-width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  padding: 0 var(--s-1);
+  border-radius: 8px;
+  background: var(--c-accent);
+  color: var(--p-bg);
+  font: 600 var(--t-11)/16px var(--font-mono);
+  text-align: center;
+}

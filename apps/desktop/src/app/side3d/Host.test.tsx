@@ -15,6 +15,7 @@ import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
 import { HINT_HOLD_MS } from '../held';
 import { CARD_HOLD_MS, CARD_HOVER_MS } from './Cards';
+import { CoinSlot } from './Minis';
 import { keyAction } from '../keys';
 import { SideHost, bubbleTops } from './Host';
 import { CARD_MAX, cardMaxH } from './layout';
@@ -49,15 +50,19 @@ vi.mock('./render', () => ({
     throw new Error('no WebGL');
   },
 }));
-const panel = vi.hoisted(() => ({ open: false }));
+const panel = vi.hoisted(() => ({ open: false, width: 384, over: false, full: false }));
 vi.mock('./ports', async (orig) => ({
   ...(await orig<typeof import('./ports')>()),
-  usePanelBox: () => ({ open: panel.open, width: panel.open ? 384 : 0 }),
+  usePanelBox: () => ({ open: panel.open, width: panel.open && !panel.over ? panel.width : 0, over: panel.open && panel.over, full: panel.open && panel.full }),
+  useFrontArtKind: () => undefined,
 }));
 
 afterEach(() => {
   cleanup();
   panel.open = false;
+  panel.width = 384;
+  panel.over = false;
+  panel.full = false;
 });
 
 const HOME = 'bise-home-00000000';
@@ -398,10 +403,61 @@ describe('the right side, folded', () => {
     expect(v.getByTestId('app.world')).toBeTruthy();
   });
 
-  it('the tabbed panel open: no world, no bubbles', () => {
+  it('the panel open beside the thread with room: the coins between, the panel\'s left edge their right, the world a 5th coin (folded-side v9)', () => {
     panel.open = true;
     const { v } = side3d();
-    expect(v.queryByTestId('app.side')).toBeNull();
+    const s = v.getByTestId('app.side');
+    expect(s.getAttribute('data-at')).toBe('between');
+    expect(s.style.right).toBe('384px');
+    expect(v.getByTestId('app.bubble.world')).toBeTruthy();
+    expect(v.queryByTestId('app.world')).toBeNull();
+    expect(v.getByTestId('app.bubble.agents')).toBeTruthy();
+  });
+
+  it('no room beside the thread: the coins are minis in the header\'s slot, the bubbles gone; a click on one opens its float under the header, a second closes it; ⌥ shows their keys, never the cards', () => {
+    vi.useFakeTimers();
+    try {
+      panel.open = true;
+      panel.width = 900;
+      const { v } = side3d(1440);
+      const slot = render(<CoinSlot at="header" />);
+      expect(v.getByTestId('app.side').getAttribute('data-at')).toBe('header');
+      expect(v.queryByTestId('app.bubble.agents')).toBeNull();
+      const minis = slot.getByTestId('app.coins.header');
+      expect([...minis.querySelectorAll('[data-testid^="app.mini."][aria-haspopup]')].map((e) => e.getAttribute('data-testid'))).toEqual(['app.mini.agents', 'app.mini.artifacts', 'app.mini.scheduled', 'app.mini.processes']);
+      expect(slot.getByTestId('app.mini.agents.n').textContent).toBe('2');
+      expect(slot.getByTestId('app.mini.agents.badge').textContent).toBe('1');
+      fireEvent.click(slot.getByTestId('app.mini.agents'));
+      expect(v.getByTestId('app.flyout.agents')).toBeTruthy();
+      expect(slot.getByTestId('app.mini.agents').hasAttribute('data-open')).toBe(true);
+      fireEvent.pointerDown(slot.getByTestId('app.mini.agents'));
+      fireEvent.click(slot.getByTestId('app.mini.agents'));
+      expect(v.queryByTestId('app.flyout.agents')).toBeNull();
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
+        vi.advanceTimersByTime(HINT_HOLD_MS);
+      });
+      act(() => {
+        vi.advanceTimersByTime(CARD_HOLD_MS);
+      });
+      expect(slot.getByTestId('app.mini.scheduled.n').textContent).toBe('⌥3');
+      expect(document.querySelector('.s3-tcard')).toBeNull();
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a sheet over the thread: the minis go in its tab row', () => {
+    panel.open = true;
+    panel.over = true;
+    const { v } = side3d(1000);
+    const slot = render(<><CoinSlot at="header" /><CoinSlot at="tabs" /></>);
+    expect(v.getByTestId('app.side').getAttribute('data-at')).toBe('tabs');
+    expect(slot.getByTestId('app.coins.tabs').querySelector('[data-testid="app.mini.agents"]')).toBeTruthy();
+    expect(slot.getByTestId('app.coins.header').children).toHaveLength(0);
   });
 
   it('the world takes the pointer on its island only: grown, never on the bubbles\' column', () => {

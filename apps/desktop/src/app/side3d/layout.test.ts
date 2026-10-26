@@ -1,7 +1,7 @@
 // sideLayout at the widths of plan §2 (1000, 1100, 1280, 1440, 1728, 1920), the panel open and closed.
 import { describe, expect, it } from 'vitest';
 import type { Route } from '../route';
-import { BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, sideLayout, sideShows, WORLD_BAND } from './layout';
+import { BETWEEN_BAND, BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, sideLayout, sideShows, THREAD_KEEPS, WORLD_BAND } from './layout';
 
 /** rail 56 + sidebar 240 */
 const SIDE = 296;
@@ -56,20 +56,48 @@ describe('sideLayout, the panel folded', () => {
   });
 });
 
-describe('sideLayout, the panel open', () => {
-  it('the right side hides, the column centred between the sidebar and the panel', () => {
-    for (const w of [1000, 1100, 1280, 1440, 1728, 1920]) {
-      const l = sideLayout(w, SIDE, true, 384);
-      expect(l).toMatchObject({ side: false, gutter: 0 });
-      expect(l.colW).toBeLessThanOrEqual(COL_W);
-      expect(l.colLeft - SIDE).toBeCloseTo(w - 384 - l.colLeft - l.colW);
+describe('sideLayout, the panel open: the width rule (folded-side v9)', () => {
+  const beside = (threadMin: number) => ({ over: false, full: false, threadMin });
+  it('the coins between the thread and the panel while the window holds the left, the thread\'s least, their 68 and the panel; the world a 5th coin; the panel\'s left edge their right', () => {
+    // 1440, a terminal (480): 296 + 560 + 68 + 480 = 1404
+    const l = sideLayout(1440, SIDE, true, 480, true, beside(THREAD_KEEPS.rows));
+    expect(l).toMatchObject({ coins: 'between', side: true, world: 'bubble', gutter: BETWEEN_BAND, right: 480 });
+    expect(1440 - 480 - l.colLeft - l.colW).toBeGreaterThanOrEqual(BETWEEN_BAND);
+    // 1728, an artifact (950): 296 + 400 + 68 + 950 = 1714
+    expect(sideLayout(1728, SIDE, true, 950, true, beside(THREAD_KEEPS.artifact))).toMatchObject({ coins: 'between', right: 950 });
+  });
+  it('the table: each width gives its row', () => {
+    // [window, panel, beside an artifact, where the coins go]
+    const rows: [number, number, boolean, string][] = [
+      [1728, 480, false, 'between'],
+      [1728, 950, true, 'between'],
+      [1440, 480, false, 'between'],
+      [1440, 744, true, 'header'],
+      [1308, 452, false, 'header'],
+      [1308, 612, true, 'header'],
+    ];
+    for (const [w, p, art, at] of rows) expect([w, p, art, sideLayout(w, SIDE, true, p, true, beside(art ? THREAD_KEEPS.artifact : THREAD_KEEPS.rows)).coins]).toEqual([w, p, art, at]);
+  });
+  it('the switch to the header is exactly where the band no longer fits: one px under, the header; the status line back at the limit', () => {
+    for (const [p, min] of [[384, THREAD_KEEPS.rows], [480, THREAD_KEEPS.rows], [700, THREAD_KEEPS.artifact]] as const) {
+      const limit = SIDE + min + BETWEEN_BAND + p;
+      expect(sideLayout(limit, SIDE, true, p, true, beside(min)).coins).toBe('between');
+      const under = sideLayout(limit - 1, SIDE, true, p, true, beside(min));
+      expect(under).toMatchObject({ coins: 'header', side: false, gutter: 0 });
+      // in the header, the column centred between the sidebar and the panel
+      expect(under.colLeft - SIDE).toBeCloseTo(limit - 1 - p - under.colLeft - under.colW);
     }
   });
-  it('1440 with a 384 panel: 760 of room, the column 712 with 24 each side', () => {
-    expect(sideLayout(1440, SIDE, true, 384)).toMatchObject({ colLeft: SIDE + MIN_LEFT, colW: 712 });
+  it('a sheet or a full-width panel covers the thread: the coins go in its tab row', () => {
+    expect(sideLayout(1100, SIDE, true, 384, true, { over: true, full: false, threadMin: 560 })).toMatchObject({ coins: 'tabs', side: false });
+    expect(sideLayout(1920, SIDE, true, 1624, true, { over: false, full: true, threadMin: 560 })).toMatchObject({ coins: 'tabs', side: false });
   });
-  it('1920 with a 640 panel: 720, centred', () => {
-    expect(sideLayout(1920, SIDE, true, 640)).toMatchObject({ colW: COL_W, colLeft: SIDE + (1920 - SIDE - 640 - COL_W) / 2 });
+  it('a page that shows no side: no coins anywhere, panel or not', () => {
+    expect(sideLayout(1440, SIDE, false, undefined, false).coins).toBe('none');
+    expect(sideLayout(1440, SIDE, true, 480, false).coins).toBe('none');
+  });
+  it('the panel folded: the coins at the window\'s edge', () => {
+    for (const w of [1100, 1440, 1920]) expect(sideLayout(w, SIDE, false)).toMatchObject({ coins: 'edge', right: 0, side: true });
   });
 });
 

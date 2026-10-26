@@ -23,6 +23,7 @@ import { formatRoute, MAIN, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
+import { CoinSlot } from "./side3d/Minis";
 import { useEscLayer } from "./escape";
 import { BarTabs } from "./panel/BarTabs";
 import { BarSlot, barGroundDoubleClick, TitleSlot } from "./barslot";
@@ -397,6 +398,8 @@ export function Bar({ frame: state }: { frame: FrameState }) {
       </div>
       <StatusSlot>
         <TitleStatus />
+        {/* no room for the coins beside the thread: their minis, right-aligned, 12 after the pill (side3d Minis, folded-side v9, designer m_45616) */}
+        <CoinSlot at="header" />
       </StatusSlot>
       {/* the page's search and action (barslot.tsx: a page's <InBar>) */}
       <BarSlot />
