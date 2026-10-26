@@ -9,9 +9,12 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { reducedMotion } from '@/ds/hooks';
 import { usePrefs } from '@/store';
 import { themeOf } from '@/theme';
-import { PageVignette } from './vignettes';
+import { PageVignette, preloadStills } from './vignettes';
 import type { ScenePage } from './scene';
 import './live.css';
+
+// the three stills decoded at the app's start: the first visit's box shows one at once
+preloadStills(['inbox', 'scheduled', 'artifacts']);
 
 type SceneView = import('./scene').SceneView;
 

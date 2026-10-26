@@ -71,6 +71,23 @@ const STILLS: Readonly<Record<VignettePage, { light: Still; dark: Still }>> = {
 
 const srcSet = ([x1, x2]: Still): string => (x1 === x2 ? x1 : `${x1} 1x, ${x2} 2x`);
 
+/**
+ * Fetch and decode pages' stills ahead (both themes, the screen's DPR's size), so the first visit
+ * to a page never shows its banner's box empty while its still decodes (ui-review m_45947).
+ * Nothing where there is no Image (a worker); a decode that fails is left to the <img>.
+ */
+export function preloadStills(pages: readonly VignettePage[]): void {
+  if (typeof Image !== 'function') return;
+  for (const page of pages) {
+    for (const s of [STILLS[page].light, STILLS[page].dark]) {
+      const img = new Image();
+      img.srcset = srcSet(s);
+      img.src = s[0];
+      if (typeof img.decode === 'function') img.decode().catch(() => undefined);
+    }
+  }
+}
+
 /** A page's vignette for PageBanner's visual: its light and dark stills (the theme shows one). */
 export function PageVignette({ page }: { page: VignettePage }) {
   const s = STILLS[page];
