@@ -152,6 +152,21 @@ body:has(.app-shell) {
   font: 400 var(--f-ui);
   color: var(--c-text-2);
 }
+/* the subtitle's one fact on a thread (designer m_43892): its agent's state, text-3; what waits on
+   him leads with the ask icon in the accent (nm-thread's declared exception) */
+.app-bar-fact {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font: 400 var(--f-ui);
+  color: var(--c-text-3);
+  white-space: nowrap;
+  align-self: center;
+}
+.app-bar-fact[data-kind='waits'] .b-app-icon {
+  color: var(--c-accent);
+}
 .app-bar-go:hover {
   color: var(--c-text);
   text-decoration: underline;

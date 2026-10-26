@@ -33,7 +33,6 @@ import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
 import { answerTip } from '@/app/tipwords';
 import './inbox.css';
-import { CardId } from './CardId';
 import { aboutOf, openAct } from './about';
 import { inboxScope, inScope, othersWaiting } from './scope';
 import { useRouter } from '@/app/router';
@@ -860,8 +859,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
             }
             end={
               <>
+                {/* the age alone: no ids in the UI (designer m_43892) */}
                 {scoped ? age(now - c.since_ms) : `${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
-                <CardId id={c.id} testId={`inbox.block.row.${String(n)}.id`} />
               </>
             }
             onClick={() => {

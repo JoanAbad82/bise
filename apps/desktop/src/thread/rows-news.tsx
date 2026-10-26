@@ -233,7 +233,8 @@ export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <div className="th-wake" data-for={other ?? undefined} data-testid={`thread.wake.${String(e.pos)}`}>
       <div className="th-wake-head">
-        <RowMark icon={mark === '–' ? 'fold' : 'dot'} />
+        {/* a failed command ('rc 101') reads as one: the alert icon in err, not a 2 px dot (ui-review m_43900) */}
+        {mark === '–' ? <RowMark icon="fold" /> : parts.some((p) => p.err) ? <RowMark icon="alert" tone="err" label="error" /> : <RowMark icon="dot" />}
         {parts.map((p, i) => (
           <span key={i} className={p.err ? 'th-wake-err' : undefined} data-err={p.err || undefined}>
             {/* a flex item drops its leading space: the one before '·' is kept unbreakable */}

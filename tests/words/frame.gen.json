@@ -15,6 +15,18 @@
     "one": null,
     "text": "Back"
   },
+  "frame.bar_waits": {
+    "args": [],
+    "one": null,
+    "text": "waits for you"
+  },
+  "frame.bar_working": {
+    "args": [
+      "age"
+    ],
+    "one": null,
+    "text": "working · {age}"
+  },
   "frame.forward": {
     "args": [],
     "one": null,

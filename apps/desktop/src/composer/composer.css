@@ -433,9 +433,9 @@
   font: var(--f-meta);
   color: var(--c-text-2);
 }
+/* yolo is text-2 like the model: pink and red are only for what waits on him (designer m_43892) */
 .b-composer .cmp-menu.cmp-yolo {
   font-weight: 500;
-  color: var(--c-err);
 }
 .b-composer .cmp-model {
   margin-left: auto;

@@ -26,6 +26,10 @@ crate::words! { frame:
     places = "Places";
     /// a control's hover tip with its key ('inbox · ⌘I')
     tip_key(what, key) = "{what} · {key}";
+    /// the bar's subtitle fact on a thread: its agent works, its turn's age (designer m_43892)
+    bar_working(age) = "working · {age}";
+    /// the bar's subtitle fact on a thread: its agent waits on him (after the ask icon, in the accent)
+    bar_waits = "waits for you";
     /// the bar's sidebar button, its VoiceOver name while the sidebar shows
     hide_sidebar = "Hide sidebar";
     /// the same button while the sidebar is hidden

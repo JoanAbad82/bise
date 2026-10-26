@@ -874,23 +874,25 @@ button.th-turn-line:focus-visible {
   align-items: baseline;
   min-width: 0;
   color: var(--c-text-2);
-  font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
+  font: 400 var(--f-ui);
   white-space: nowrap;
 }
+/* its sign ($, ƒ, ±) and its time are mono; its words are sans 13 text-2 (designer m_22284, m_43892):
+   'running the tests', 'read a.rs'; the call's code is mono in its box when it opens */
 .th-tool-mark {
   flex: none;
-  margin-right: 1ch;
+  margin-right: var(--s-2);
   color: var(--c-text-3);
+  font: 400 var(--f-mono);
 }
 .th-tool-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* the model's description is words, not machine text (designer m_22284): sans 13 text-2; its sign,
-   its time and its box's code stay mono */
+/* the model's own description of the step: words, sans like every step's words (designer m_22284) */
 .th-tool-text.said {
-  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
+  font: 400 var(--f-ui);
 }
 .th-tool-time,
 .th-tool-count {
@@ -899,6 +901,7 @@ button.th-turn-line:focus-visible {
 .th-tool-time {
   margin-left: var(--s-3);
   color: var(--c-text-3);
+  font: 400 var(--f-mono);
 }
 /* an edit's line counts after its file, dim like the TUI's tool row (designer m_12065: '± Hero.tsx  +18 −6') */
 .th-tool-count {
@@ -913,9 +916,9 @@ button.th-turn-line:focus-visible {
 }
 .th-tool-err {
   overflow: hidden;
-  /* under the command's first letter: the width of '$ ' (designer m_14103) */
-  padding-left: 2ch;
-  font: var(--t-12) / 1.5 var(--font-mono);
+  /* under the words' first letter: the sign's column and its 8 (designer m_14103); the output mono */
+  padding-left: calc(1ch + var(--s-2));
+  font: 400 var(--f-mono);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -1097,6 +1100,15 @@ button.th-turn-line:focus-visible {
 }
 .th-wait-note {
   min-width: 0;
+}
+/* the agent it waits on: plain ink on the line's baseline, underlined on hover (a link, designer m_43892) */
+.th-wait-who {
+  color: var(--c-text);
+  text-decoration: none;
+}
+.th-wait-who:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 /* its number in the text's own font (QA §4: numbers in the text font), tabular */
 .th-wait-num {

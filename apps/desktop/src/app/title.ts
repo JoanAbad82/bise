@@ -7,6 +7,8 @@
 // Owner: nm-frame.
 import type { Route } from './route';
 import { crumbGoOf, crumbOf, type PlaceCrumb } from './side';
+import { frame } from '@/proto/words_frame.gen';
+import { shortAge } from '@/agents/model';
 
 /** One part of the subtitle: its words, and where a click goes (none: plain). */
 export interface SubPart {
@@ -29,6 +31,22 @@ export function barTitleOf(route: Route, name: (project: string) => string, plac
   const earlier = crumbGoOf(route, name, place).reverse();
   const sub: SubPart[] = [...(what === '' ? [] : [{ c: what }]), ...earlier.map((p) => (p.go === undefined ? { c: p.c } : { c: p.c, go: p.go }))];
   return { title, sub };
+}
+
+/** The subtitle's one fact on a thread (designer m_43892): what waits on him, else its work. */
+export type StateFact = { readonly kind: 'waits'; readonly text: string } | { readonly kind: 'working'; readonly text: string };
+
+/**
+ * The thread's agent's state as the bar's subtitle says it, from its typed row (never its words):
+ * it waits on him ('waits for you', the ask icon in the accent before it), else it works ('working
+ * · 3 min', its turn's age, text-3), else nothing: idle, done, archived say nothing, nor the branch
+ * (the composer's strip has it). Pure. nm-thread (a declared exception in nm-frame's file).
+ */
+export function stateFactOf(a: { readonly status: string; readonly waits: number; readonly since_ms: number; readonly turn_ms?: number | null; readonly archived: boolean; readonly waiting_on?: { readonly who: string } | null } | undefined, now: number): StateFact | null {
+  if (a === undefined || a.archived) return null;
+  if (a.waits > 0 || a.waiting_on?.who === 'you') return { kind: 'waits', text: frame.bar_waits };
+  if (a.status !== 'working') return null;
+  return { kind: 'working', text: frame.bar_working({ age: shortAge(now - (a.turn_ms ?? a.since_ms)) }) };
 }
 
 /** The window's title: the bar's title (macOS shows it in the Window menu and Mission Control). Pure. */

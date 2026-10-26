@@ -25,7 +25,8 @@ import { BarSlot, TitleSlot } from "./barslot";
 import { frameLeft, useLeft } from "./frame-state";
 import { SIDE, sideWidthOf, UNFOLD_PX } from "./resize";
 import { crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
-import { barTitleOf, windowTitleOf } from "./title";
+import { barTitleOf, stateFactOf, windowTitleOf, type StateFact } from "./title";
+import { useNow } from "./clock";
 import { panelToggle, usePanelBox } from "./panel/state";
 import { usePlaceCrumb } from "@/artifacts/crumb";
 
@@ -315,6 +316,15 @@ function useAgentTitle(route: Route): string {
   return agents.find((a) => a.name === route.agent)?.title ?? "";
 }
 
+/** The thread's agent's state, the subtitle's one fact (title.ts stateFactOf; designer m_43892, nm-thread's declared exception). */
+function useStateFact(route: Route): StateFact | null {
+  const project = route.screen === "thread" ? route.project : "";
+  const agents = useAgents(project);
+  const now = useNow();
+  if (route.screen !== "thread") return null;
+  return stateFactOf(agents.find((a) => a.name === route.agent), now);
+}
+
 export function Bar({ frame: state }: { frame: FrameState }) {
   const route = useRoute();
   const router = useRouter();
@@ -323,6 +333,7 @@ export function Bar({ frame: state }: { frame: FrameState }) {
   // the artifacts library's place after 'artifacts' (artifacts/crumb.ts)
   const place = usePlaceCrumb();
   const what = useAgentTitle(route);
+  const fact = useStateFact(route);
   const t = barTitleOf(route, name, place, what);
   // the window's title is what he looks at (title.ts): macOS's Window menu, Mission Control
   const winTitle = windowTitleOf(t);
@@ -376,6 +387,13 @@ export function Bar({ frame: state }: { frame: FrameState }) {
                 )}
               </span>
             ))}
+          </span>
+        )}
+        {/* the thread's agent's state, one fact: waits on him (the ask icon in the accent), else working, text-3 */}
+        {fact !== null && (
+          <span className="app-bar-fact" data-kind={fact.kind} data-testid="app.bar.title.fact">
+            {fact.kind === "waits" && <AppIcon name="ask" size={14} />}
+            {fact.text}
           </span>
         )}
       </div>

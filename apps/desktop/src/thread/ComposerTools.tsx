@@ -1,6 +1,7 @@
 // The composer box's tool row (bise fait mac, mockup 1: 40 high): what he changes about where his
 // words go. Left: '+' 28 (attach files, macOS's panel through window.bise.pickFiles) and the
-// approvals mode menu, 28 ('yolo' in --c-err while on: nothing asks before it acts); right, before
+// approvals mode menu, 28 ('yolo' in text-2 like the model: pink and red are only for what waits on
+// him, designer m_43892); right, before
 // the mic and send: the model and effort menu, 12 text-2 ('opus 5.5 · high ⌄'). Their pickers (ds
 // Picker, designer m_24786) open 8 px above the box, the mode's on its chip's left edge, the
 // model's on its right edge. Answering a card: '+' only (a model or a mode means nothing for an
