@@ -464,16 +464,19 @@
 
 /* ⌘F's bar: a compact panel over the list's top right, as a macOS find bar (his m_25471: it
    spanned the width). A 4 px frame (the menu's surface), the field, its count, then ↑ ↓ × touching
-   (icon buttons part by their own hover tint); the field gives room first in a narrow column */
+   (icon buttons part by their own hover tint); the field gives room first in a narrow column.
+   Inside the reading column, 12 in from its right edge (r2-palette, ui-review m_44465, designer
+   m_44467): the column ends at --th-col-x + --th-col + --pad-column, left of the bims' world band,
+   so the folded side never draws over its count and ↑ */
 .th-find {
   position: absolute;
   top: var(--s-2);
-  right: var(--s-4);
+  right: calc(100% - var(--th-col-x) - var(--th-col) - var(--pad-column) + var(--s-3));
   z-index: 3;
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
-  max-width: calc(100% - var(--s-8));
+  max-width: calc(var(--th-col) + 2 * var(--pad-column) - 2 * var(--s-3));
   padding: var(--s-1);
   border-radius: var(--r-3);
   background: var(--c-overlay);
