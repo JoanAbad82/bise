@@ -1,11 +1,11 @@
 // A project row's facts (Gabriel's H1, designer m_44783): the sentence's rule as a table (failed /
 // working + new artifacts / news / unread / waits / quiet), the pill or the age, the quiet row, the
-// week sliding for a stopped hub, the sparkline's points, and the fallback with no pulse.
+// week sliding for a stopped hub, its day bars and their tips, and the fallback with no pulse.
 import { describe, expect, it } from 'vitest';
 import type { News, ProjectRow, Pulse } from '@/proto';
 import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
-import { BUCKET_MS, BUCKETS, daysOf, projectFacts, since, sparkPoints, weekOf } from './projectfacts';
+import { BUCKET_MS, BUCKETS, daysOf, projectFacts, since, weekBars, weekOf, workWords } from './projectfacts';
 import { waitsTip, workingTip } from './tipwords';
 
 const H = 3_600_000;
@@ -113,11 +113,27 @@ describe('the week', () => {
     expect(weekOf(pulse(), NOW + 30 * BUCKET_MS)).toEqual(new Array<number>(BUCKETS).fill(0));
   });
 
-  it('the sparkline: left to right over 44, the busiest bucket at the top (1 in), an idle one at the bottom', () => {
-    const pts = sparkPoints([0, 5, 10]).split(' ');
-    expect(pts).toEqual(['0.0,11.0', '22.0,6.0', '44.0,1.0']);
-    expect(sparkPoints([0, 0])).toBe('0.0,11.0 44.0,11.0');
-    expect(sparkPoints(daysOf(week)).split(' ')).toHaveLength(7);
+  it('the bars (designer m_45992): 7 of 4 wide 2 apart in 40 x 12, the busiest day full height, a day with no work a 1 px stub, today the last', () => {
+    const now = new Date(2026, 9, 26, 12).getTime();
+    const bars = weekBars([0, 3 * H, 6 * H, 0, 0, 40 * 60_000, 2 * H + 10 * 60_000], now);
+    expect(bars.map((b) => b.x)).toEqual([0, 6, 12, 18, 24, 30, 36]);
+    expect(bars.map((b) => b.h)).toEqual([1, 6, 12, 1, 1, 2, 4]);
+    expect(bars.map((b) => b.today)).toEqual([false, false, false, false, false, false, true]);
+    // each bar's hover column: the bar and half of each gap beside it, the 40 covered once
+    expect(bars.map((b) => [b.hx, b.hw])).toEqual([[0, 5], [5, 6], [11, 6], [17, 6], [23, 6], [29, 6], [35, 5]]);
+    // its tip: the day (thread's day words), then its work
+    expect(bars[6]?.tip).toBe(projects.day_work({ day: 'today', work: '2 h 10 min' }));
+    expect(bars[5]?.tip).toBe(projects.day_work({ day: 'yesterday', work: '40 min' }));
+    expect(bars[2]?.tip).toBe(projects.day_work({ day: 'thu 22 oct', work: '6 h' }));
+    expect(bars[4]?.tip).toBe(projects.day_idle({ day: 'sat 24 oct' }));
+    expect(weekBars(new Array<number>(7).fill(0), now).map((b) => b.h)).toEqual([1, 1, 1, 1, 1, 1, 1]);
+  });
+
+  it("a day's work in words: minutes, then hours and minutes, a few seconds still a minute", () => {
+    expect(workWords(40 * 60_000)).toBe('40 min');
+    expect(workWords(3 * H)).toBe('3 h');
+    expect(workWords(2 * H + 10 * 60_000)).toBe('2 h 10 min');
+    expect(workWords(5_000)).toBe('1 min');
   });
 });
 

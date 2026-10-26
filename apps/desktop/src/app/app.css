@@ -403,21 +403,28 @@ body:has(.app-shell) {
 .app-s-say.err {
   color: var(--c-err);
 }
-/* the week: 44 x 12, a 1.2 stroke in text-3 at 80 %, no fill, no dot */
+/* the week (designer m_45992): 7 day bars, 4 wide 2 apart in 40 x 12, text-3 at 80 %, today's in
+   text-2; the row's hover wakes them to text-2, the bar under the pointer goes to ink (its tip shows
+   its day). Each bar's column (its rect) is its hover area, drawn transparent. No motion. */
 .app-s-week {
   flex: none;
-  width: calc(var(--s-10) + var(--s-1));
+  width: var(--s-10);
   height: var(--s-3);
-  overflow: visible;
 }
-.app-s-week polyline {
-  fill: none;
-  stroke: var(--c-text-3);
-  stroke-width: 1.2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+.app-s-day rect {
+  fill: transparent;
+}
+.app-s-day path {
+  fill: var(--c-text-3);
   opacity: 0.8;
-  vector-effect: non-scaling-stroke;
+}
+.app-s-day.today path,
+.app-s-row.project:hover .app-s-day path {
+  fill: var(--c-text-2);
+  opacity: 1;
+}
+.app-s-row.project:hover .app-s-day:hover path {
+  fill: var(--c-ink);
 }
 /* what waits on him: the accent pill, 16 high, the background's colour on it, tabular */
 .app-s-pill {

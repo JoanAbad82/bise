@@ -102,15 +102,21 @@ describe('the sidebar', () => {
 
   it("H1 with the hub's pulse: the age, a failure in the error colour, the week's sparkline", () => {
     const NOW = Date.now();
-    const pulse = { from_ms: NOW - 20 * 8 * 3_600_000, busy_ms: Array.from({ length: 21 }, (_, i) => i), last_ms: NOW - 40 * 60_000, news: { at_ms: NOW - 60_000, what: { kind: 'failed', agent: 'migrate' } }, counting: false };
+    const pulse = { from_ms: NOW - 20 * 8 * 3_600_000, busy_ms: Array.from({ length: 21 }, (_, i) => i * 60_000), last_ms: NOW - 40 * 60_000, news: { at_ms: NOW - 60_000, what: { kind: 'failed', agent: 'migrate' } }, counting: false };
     const { v } = frame({ screen: 'bise' }, [agent('main')], [], { pulse } as Partial<ProjectRow>);
     expect(v.getByTestId(`app.side.project.${ACME}.age`).textContent).toBe('40 min');
     const say = v.getByTestId(`app.side.project.${ACME}.say`);
     expect(say.textContent).toBe(projects.failed({ agent: 'migrate' }));
     expect(say.classList.contains('err')).toBe(true);
+    // the week: 7 day bars, its label read aloud, each bar its own tip over the row's (designer m_45992)
     const week = v.getByTestId(`app.side.project.${ACME}.week`);
-    expect(week.getAttribute('data-tip')).toBe(projects.week_tip);
-    expect(week.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(7);
+    expect(week.getAttribute('aria-label')).toBe(projects.week_tip);
+    expect(week.querySelectorAll('.app-s-day')).toHaveLength(7);
+    // busy_ms 0..20 min per 8 h: today's 3 buckets are 18+19+20 = 57 min
+    const today = v.getByTestId(`app.side.project.${ACME}.week.6`);
+    expect(today.classList.contains('today')).toBe(true);
+    expect(today.getAttribute('data-tip')).toBe(projects.day_work({ day: 'today', work: '57 min' }));
+    expect(v.getByTestId(`app.side.project.${ACME}.week.0`).getAttribute('data-tip')).toMatch(/· 3 min of agent work$/);
   });
 
   it("the hub's real pulse (the proto fixture's hub/pulse, folded into acme's row by the core): its new artifacts, its news in the tip, its age, 7 days", () => {
@@ -125,7 +131,7 @@ describe('the sidebar', () => {
       expect(v.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(
         ['acme', projects.new_artifacts({ n: 2 }), projects.unread({ n: 3 }), projects.landed({ agent: 'perf', target: 'main' }), projects.last_activity({ age: '3 h' })].join(' · '),
       );
-      expect(v.getByTestId(`app.side.project.${ACME}.week`).querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(7);
+      expect(v.getByTestId(`app.side.project.${ACME}.week`).querySelectorAll('.app-s-day')).toHaveLength(7);
     } finally {
       vi.useRealTimers();
     }

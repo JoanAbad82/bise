@@ -5,6 +5,21 @@
     "one": null,
     "text": "active now"
   },
+  "projects.day_idle": {
+    "args": [
+      "day"
+    ],
+    "one": null,
+    "text": "{day} · no agent work"
+  },
+  "projects.day_work": {
+    "args": [
+      "day",
+      "work"
+    ],
+    "one": null,
+    "text": "{day} · {work} of agent work"
+  },
   "projects.failed": {
     "args": [
       "agent"

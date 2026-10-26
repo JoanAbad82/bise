@@ -6,7 +6,7 @@
 // shortcuts) and 'Projects': one
 // row per project, a click opens it (its main), no agent under it (round 2, his r2-img11: the
 // agents live on the right side), as Gabriel's H1 (round 3, designer m_44783): its name and the
-// inbox pill or its age, one plain sentence and its week's sparkline, a quiet one on one line; ⌘
+// inbox pill or its age, one plain sentence and its week's day bars, a quiet one on one line; ⌘
 // held, its ⌘1-9 digit: siderows.ts and projectfacts.ts decide, this draws; the project in view is
 // marked seen (seen.ts). Its head stays, its list scrolls;
 // a right click on a pin or a project opens its menu (useEntityMenu, nm-menus'). On the artifacts
@@ -35,7 +35,7 @@ import { LiveBiseMark, WorkingMark } from './Marks';
 import { usePinned, type Pin } from './pins';
 import { addProject } from './addProject';
 import { pinRowOf, projectRowOf, projectsOf, type RowEnd } from './siderows';
-import { sparkPoints, type ProjectFacts } from './projectfacts';
+import { BAR_GAP, BAR_H, BAR_W, weekBars, type DayBar, type ProjectFacts } from './projectfacts';
 import { useMarkSeen, useSeen } from './seen';
 import { useNow } from './clock';
 import { projects } from '@/proto/words_projects.gen';
@@ -71,11 +71,30 @@ function CutName({ name }: { name: string }) {
   );
 }
 
-/** A project's week (H1): a 44 x 12 line of its agents' busy time over 7 days, no fill, no dot. */
-function Week({ week, testId }: { week: readonly number[]; testId: string }) {
+/** A bar's shape: bottom-aligned, its top corners rounded 1 (a stub of 1 px stays square). */
+function barPath(b: DayBar): string {
+  const y = BAR_H - b.h;
+  const r = b.h >= 2 ? 1 : 0;
+  return `M${String(b.x)} ${String(BAR_H)}V${String(y + r)}Q${String(b.x)} ${String(y)} ${String(b.x + r)} ${String(y)}H${String(b.x + BAR_W - r)}Q${String(b.x + BAR_W)} ${String(y)} ${String(b.x + BAR_W)} ${String(y + r)}V${String(BAR_H)}Z`;
+}
+
+/**
+ * A project's week (H1, designer m_45992): 7 day bars in 40 x 12, text-3, today's in text-2; the
+ * row's hover wakes them all to text-2, the bar under the pointer goes to ink and its tip (its day,
+ * its work) shows instead of the row's. Each bar's hover column is its full height and half of
+ * each gap beside it.
+ */
+function Week({ week, now, testId }: { week: readonly number[]; now: number; testId: string }) {
+  const bars = weekBars(week, now);
+  const width = bars.length * (BAR_W + BAR_GAP) - BAR_GAP;
   return (
-    <svg className="app-s-week" viewBox="0 0 44 12" preserveAspectRatio="none" role="img" aria-label={projects.week_tip} {...tipAttrs(projects.week_tip)} data-testid={testId}>
-      <polyline points={sparkPoints(week)} />
+    <svg className="app-s-week" viewBox={`0 0 ${String(width)} ${String(BAR_H)}`} role="img" aria-label={projects.week_tip} data-testid={testId}>
+      {bars.map((b, i) => (
+        <g key={i} className={`app-s-day${b.today ? ' today' : ''}`} {...tipAttrs(b.tip)} data-testid={`${testId}.${String(i)}`}>
+          <rect x={b.hx} y={0} width={b.hw} height={BAR_H} />
+          <path d={barPath(b)} />
+        </g>
+      ))}
     </svg>
   );
 }
@@ -102,10 +121,12 @@ function ProjectEnd({ facts, digit, testId }: { facts: ProjectFacts; digit: numb
  * then one plain sentence and its week; a quiet one is its name in text-2 and its age, one line.
  * No icon, no mark, no border: the words say it, the tip says it all.
  */
-function ProjectRowView({ name, facts, on, digit, onClick, onContextMenu, testId }: {
+function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, testId }: {
   name: string;
   facts: ProjectFacts;
   on: boolean;
+  /** the week's bars name their days from it */
+  now: number;
   digit: number | undefined;
   onClick: () => void;
   onContextMenu: (e: MouseEvent<HTMLElement>) => void;
@@ -131,7 +152,7 @@ function ProjectRowView({ name, facts, on, digit, onClick, onContextMenu, testId
           <span className={`app-s-say${facts.sentence.err ? ' err' : ''}`} data-testid={`${testId}.say`}>
             {facts.sentence.text}
           </span>
-          {facts.week !== null && <Week week={facts.week} testId={`${testId}.week`} />}
+          {facts.week !== null && <Week week={facts.week} now={now} testId={`${testId}.week`} />}
         </span>
       )}
     </Press>
@@ -397,6 +418,7 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now }: 
       facts={r.facts}
       on={r.on}
       digit={r.digit}
+      now={now}
       onClick={() => {
         router.go({ screen: 'thread', project: p.project, agent: MAIN });
       }}

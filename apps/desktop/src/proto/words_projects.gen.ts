@@ -22,8 +22,12 @@ export const projects = {
   last_activity: (a: { age: string | number }): string => "last activity " + String(a.age) + " ago",
   /** the row's tip, last, while one of its agents works */
   active_now: "active now",
-  /** the sparkline's tip */
+  /** the week's bars, read aloud (their label; each bar has its own tip) */
   week_tip: "its agents' work, last 7 days",
+  /** a day bar's tip in the row's week ('today · 2 h 10 min of agent work') */
+  day_work: (a: { day: string | number; work: string | number }): string => String(a.day) + " · " + String(a.work) + " of agent work",
+  /** a day bar's tip, a day its agents did not work ('sat 24 oct · no agent work') */
+  day_idle: (a: { day: string | number }): string => String(a.day) + " · no agent work",
   /** the inbox pill's tip ('2 in your inbox') */
   pill_tip: (a: { n: string | number }): string => String(a.n) + " in your inbox",
 } as const;

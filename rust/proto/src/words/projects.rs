@@ -27,8 +27,12 @@ crate::words! { projects:
     last_activity(age) = "last activity {age} ago";
     /// the row's tip, last, while one of its agents works
     active_now = "active now";
-    /// the sparkline's tip
+    /// the week's bars, read aloud (their label; each bar has its own tip)
     week_tip = "its agents' work, last 7 days";
+    /// a day bar's tip in the row's week ('today · 2 h 10 min of agent work')
+    day_work(day, work) = "{day} · {work} of agent work";
+    /// a day bar's tip, a day its agents did not work ('sat 24 oct · no agent work')
+    day_idle(day) = "{day} · no agent work";
     /// the inbox pill's tip ('2 in your inbox')
     pill_tip(n) = "{n} in your inbox";
 }

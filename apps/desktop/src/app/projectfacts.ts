@@ -1,12 +1,13 @@
 // A project row's facts in the sidebar (round 3, Gabriel's pick H1 on page sidebar-projects,
 // designer m_44783): line 1 its name and, at its right, the inbox pill (what waits on him) or the
-// age of its last activity; line 2 one plain sentence and its week's sparkline; a quiet project
+// age of its last activity; line 2 one plain sentence and its week's day bars (weekBars, designer
+// m_45992: Gabriel's m_45988, the trend as small bars, each with its day's tip); a quiet project
 // (nothing works, nothing waits, nothing new since he last looked) is one line, its age alone.
 // The one adapter between the hub's facts and the row (native-lead m_44796): the project's row,
 // its live agents' working count, the inbox's count, the hub's Pulse (architect m_44801: its
 // 7-day busy series, its last activity, its one last news, the week's artifacts and the entries
 // written for him) and when he last looked at it (`seen`). No pulse (a hub that does not send it
-// yet): the pill from the inbox, 'N working' from the agents, no age, no news, no sparkline.
+// yet): the pill from the inbox, 'N working' from the agents, no age, no news, no bars.
 // Nothing here decides what is news: the hub picks it (pulse::news); this only says it in words.
 // Pure: Sidebar.tsx draws it. Owner: r3-projects.
 import type { News, ProjectRow, Pulse } from '@/proto';
@@ -14,6 +15,7 @@ import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
 import { shortAge } from '@/agents/model';
 import { ahead } from '@/scheduled/model';
+import { dayLabel } from '@/thread/entry';
 import { waitsTip, workingTip } from './tipwords';
 
 /** The week: 21 buckets of 8 h. */
@@ -139,16 +141,53 @@ export function projectFacts(c: {
   };
 }
 
-/** The sparkline's points in a w x h box: the week's days left to right, straight segments, its busiest day at the top, 1 px in from each edge. Pure. */
-export function sparkPoints(week: readonly number[], width = 44, height = 12): string {
-  if (week.length === 0) return '';
-  const max = Math.max(...week);
-  const step = week.length > 1 ? width / (week.length - 1) : 0;
-  const pad = 1;
-  return week
-    .map((v, i) => {
-      const y = height - pad - (max > 0 ? (v / max) * (height - 2 * pad) : 0);
-      return `${(i * step).toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+/** The week's bars (designer m_45992): each 4 wide, 2 apart, 12 high at most; 7 of them make the 40 x 12 box. */
+export const BAR_W = 4;
+export const BAR_GAP = 2;
+export const BAR_H = 12;
+
+/** A day's bar in the row's week: its left, its height (bottom-aligned), its hover column, its tip. */
+export interface DayBar {
+  /** the bar's left in the box */
+  readonly x: number;
+  /** its height: the busiest day BAR_H, a day with no work a 1 px stub, any work at least 2 */
+  readonly h: number;
+  /** its hover column: the bar and half of each gap beside it (the box's edges cut it) */
+  readonly hx: number;
+  readonly hw: number;
+  /** the last one: today's */
+  readonly today: boolean;
+  /** 'today · 2 h 10 min of agent work', 'sat 24 oct · no agent work' */
+  readonly tip: string;
+}
+
+/** A day's agent work in words: '40 min', '3 h', '2 h 10 min'; any work at all is at least '1 min'. Pure. */
+export function workWords(ms: number): string {
+  const m = Math.max(1, Math.ceil(ms / 60_000));
+  if (m < 60) return `${String(m)} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 === 0 ? `${String(h)} h` : `${String(h)} h ${String(m % 60)} min`;
+}
+
+/**
+ * The week's days as bars, oldest first, today's last: heights scaled to its busiest day, each with
+ * its day (the thread's day words: 'today', 'yesterday', 'sat 24 oct') and its work as its tip. Pure.
+ */
+export function weekBars(week: readonly number[], now: number): DayBar[] {
+  const max = Math.max(0, ...week);
+  const step = BAR_W + BAR_GAP;
+  const width = week.length * step - BAR_GAP;
+  return week.map((v, i) => {
+    const x = i * step;
+    const hx = Math.max(0, x - BAR_GAP / 2);
+    const day = dayLabel(now - (week.length - 1 - i) * DAY, now);
+    return {
+      x,
+      h: v <= 0 || max <= 0 ? 1 : Math.max(2, Math.round((v / max) * BAR_H)),
+      hx,
+      hw: Math.min(width, x + BAR_W + BAR_GAP / 2) - hx,
+      today: i === week.length - 1,
+      tip: v > 0 ? projects.day_work({ day, work: workWords(v) }) : projects.day_idle({ day }),
+    };
+  });
 }
