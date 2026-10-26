@@ -42,8 +42,11 @@ describe('a SKILL.md frontmatter, pure', () => {
     expect(folds('short')).toBe(false);
     expect(folds('a\nb\nc')).toBe(true);
     expect(folds('x'.repeat(200))).toBe(true);
-    expect(midCut('/Users/g/.agents/plugins/docs/skills/docs/SKILL.md', '/Users/g', 24)).toBe('~/.agents/pl…cs/SKILL.md');
+    expect(midCut('/Users/g/.agents/plugins/docs/skills/docs/SKILL.md', '/Users/g', 24)).toBe('~/…/docs/SKILL.md');
     expect(midCut('/a/SKILL.md', undefined)).toBe('/a/SKILL.md');
+    // a home under /Users that isn't the window's (a check run's test home) still folds
+    expect(midCut('/Users/gabriel/bise/prompts/skills-all/bise-pages/SKILL.md', '/tmp/home', 24)).toBe('~/…/bise-pages/SKILL.md');
+    expect(midCut('/opt/x/y/z/w/SKILL.md', undefined, 12)).toBe('/opt/…/w/SKILL.md');
   });
 });
 

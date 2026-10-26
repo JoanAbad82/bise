@@ -1569,7 +1569,7 @@ export const settings = {
   /** sidebar tip: a plugin whose server failed */
   plugins_waits_error: (a: { name: string | number }): string => String(a.name) + " failed to start",
   /** place: under the title */
-  plugins_place_sub: "what your agents can use, in every project",
+  plugins_place_sub: "what your agents can use, in every project.",
   /** place: the head's counts */
   plugins_place_counts: (a: { on: string | number; off: string | number }): string => String(a.on) + " on · " + String(a.off) + " off",
   /** place: the head's waiting part, in the accent */
@@ -1716,8 +1716,8 @@ export const settings = {
   plugins_tools_unfold: (a: { n: number }): string => a.n === 1 ? "▾ " + String(a.n) + " tool" : "▾ " + String(a.n) + " tools",
   /** plugin page: a prompt to try, its tip (the window's: main is 'bise' there, designer m_41122) */
   plugins_try_tip: "puts it in bise's composer; you send it or change it",
-  /** plugin page: remove it */
-  plugins_remove: "remove",
+  /** plugin page: the bar's '⋯' item that removes it (asked once on the page) */
+  plugins_remove_menu: "Remove…",
   /** remove: the question */
   plugins_remove_confirm: (a: { name: string | number }): string => "remove " + String(a.name) + "? its saved secrets and logins go too.",
   /** remove: the confirm button */

@@ -10,6 +10,7 @@ import { sentenceCase } from '@/ds';
 import { settings } from '@/proto/words.gen';
 import { PlaceView } from './Place';
 import { PluginPage } from './PluginPage';
+import { BarSlot } from '@/app/barslot';
 import { AddSheet } from './Add';
 
 afterEach(cleanup);
@@ -153,25 +154,29 @@ describe('the add sheet', () => {
 });
 
 describe("a plugin's page", () => {
-  it('switches its parts, tries a line, removes his own after one confirm', () => {
+  it('switches its parts, tries a line, removes his own after one confirm (the bar\'s ⋯: Remove…)', async () => {
     const sent: AppCmd[] = [];
     const ports = { send: (c: AppCmd) => { sent.push(c); }, back: vi.fn(), tryIt: vi.fn(), setUpComputer: vi.fn(), remove: vi.fn() };
     const blender = { ...(ROWS[2] as Plugin), prompts: ['make a low-poly fox'], path: '/Users/x/.agents/plugins/blender' };
-    render(<PluginPage p={blender} ports={ports} />);
+    const popupMenu = vi.fn(() => Promise.resolve('remove'));
+    (window as unknown as { bise?: unknown }).bise = { popupMenu };
+    render(<><BarSlot /><PluginPage p={blender} ports={ports} /></>);
     fireEvent.click(screen.getByTestId('plugins.page.blender.try.0'));
     expect(ports.tryIt).toHaveBeenCalledWith('make a low-poly fox');
     fireEvent.click(screen.getByTestId('plugins.part.blender#skill:blender.toggle'));
     expect(sent).toEqual([{ cmd: 'plugin_set', name: 'blender#skill:blender', on: false }]);
-    fireEvent.click(screen.getByTestId('plugins.page.blender.remove'));
+    fireEvent.click(screen.getByTestId('plugins.page.blender.more'));
+    expect(popupMenu).toHaveBeenCalledWith([{ id: 'remove', label: settings.plugins_remove_menu }]);
     expect(ports.remove).not.toHaveBeenCalled();
-    expect(screen.getByTestId('plugins.page.blender.ask').textContent).toContain('remove blender? its saved secrets and logins go too.');
+    expect((await screen.findByTestId('plugins.page.blender.ask')).textContent).toContain('remove blender? its saved secrets and logins go too.');
     fireEvent.click(screen.getByTestId('plugins.page.blender.ask.yes'));
     expect(ports.remove).toHaveBeenCalledWith('blender');
+    delete (window as unknown as { bise?: unknown }).bise;
   });
 
   it('no remove on a built-in, nor before the core has plugin_remove', () => {
     render(<PluginPage p={row('docs', { scope: 'built-in' })} ports={{ send: () => {}, back: () => {}, tryIt: () => {}, setUpComputer: () => {}, remove: () => {} }} />);
-    expect(screen.queryByTestId('plugins.page.docs.remove')).toBeNull();
+    expect(screen.queryByTestId('plugins.page.docs.more')).toBeNull();
     cleanup();
     render(<PluginPage p={row('pay')} ports={{ send: () => {}, back: () => {}, tryIt: () => {}, setUpComputer: () => {} }} />);
     expect(screen.queryByTestId('plugins.page.pay.remove')).toBeNull();

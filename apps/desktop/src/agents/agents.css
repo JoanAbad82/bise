@@ -19,7 +19,6 @@
 .ag-what { color: var(--c-text-2); }
 .ag-end.wait { color: var(--c-accent); }
 /* the state column: '?' in the accent when it asks him, a line icon, or the status dot */
-.ag-ask { color: var(--c-accent); font-weight: 600; }
 .ag-mark { display: inline-flex; color: var(--c-text-3); }
 
 /* its feed in place (space), read only, under its row on the rows' text edge */

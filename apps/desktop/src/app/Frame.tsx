@@ -15,8 +15,8 @@ import {
 import { AppIcon, Kbd, PickerPop, Press, tipAttrs, type AppIconName } from "@/ds";
 import { frame } from "@/proto/words_frame.gen";
 import { useModHeld } from "./held";
-import { useAgents, usePlugins, useProjects } from "@/store";
-import { titleOf as pluginTitleOf } from "@/plugins/model";
+import { useAgents, useProjects } from "@/store";
+import { usePluginTitle } from "@/plugins/title";
 import { formatRoute, MAIN, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
@@ -25,7 +25,7 @@ import { BarTabs } from "./panel/BarTabs";
 import { BarSlot, TitleSlot } from "./barslot";
 import { frameLeft, useLeft } from "./frame-state";
 import { SIDE, sideWidthOf, UNFOLD_PX } from "./resize";
-import { crumbOf, NARROW_PX, PANEL_OPEN_PX, pluginCrumb } from "./side";
+import { crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
 import { barTitleOf, stateFactOf, windowTitleOf, type StateFact } from "./title";
 import { useNow } from "./clock";
 import { panelToggle, usePanelBox } from "./panel/state";
@@ -336,11 +336,8 @@ export function Bar({ frame: state }: { frame: FrameState }) {
   const what = useAgentTitle(route);
   const fact = useStateFact(route);
   // a plugin's page: its title in the bar ('Linear'), never its id (nm-pages-b, ui-review m_43947 #1)
-  const plugins = usePlugins();
-  const plugin = (id: string) => {
-    const p = plugins?.find((x) => x.id === id);
-    return p === undefined ? pluginCrumb(id) : pluginTitleOf(p);
-  };
+  // (installed or still in the browse lists: the same title as its banner, m_44027)
+  const plugin = usePluginTitle();
   const t = barTitleOf(route, name, place, what, plugin);
   // the window's title is what he looks at (title.ts): macOS's Window menu, Mission Control
   const winTitle = windowTitleOf(t);

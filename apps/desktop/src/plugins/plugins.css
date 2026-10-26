@@ -53,7 +53,7 @@
 .plg-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
 
 /* the kinds: the chosen one on the raised surface, its words full (#10) */
-.plg-kinds { display: flex; flex-wrap: wrap; gap: var(--gap-tight); }
+.plg-kinds { display: flex; flex-wrap: wrap; gap: var(--gap-tight); padding-inline: var(--s-3); } /* on the filters' text edge (designer m_44023 #1) */
 .plg-kinds .b-chip[aria-expanded="true"] { background: var(--c-raised); color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
 
 /* the list: group heads at the column's edge, a row's content at --pad-card-x (#12) */
@@ -72,7 +72,7 @@
 .plg-row-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0; }
 .plg-row-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
 .plg-title { font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.plg-tag { flex: none; padding: 0 var(--s-2); border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--c-line-strong); font: 400 var(--t-11)/var(--s-4) var(--font-ui); color: var(--c-text-2); }
+.plg-tag { flex: none; padding: 0 var(--s-2); border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--c-line-strong); font: 400 var(--t-12)/var(--s-4) var(--font-ui); color: var(--c-text-2); } /* the 11.5 type floor: t-12 (designer m_44023 #6) */
 .plg-row-what { font: var(--t-12) var(--font-ui); color: var(--c-text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .plg-row-what.err { color: var(--c-err); }
 .plg-row-end { flex: none; display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
@@ -101,8 +101,11 @@
 .plg-page-acts { display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
 /* the plugin's own object in the banner's box: transparent, no tile (the box is the frame rule's) */
 .b-banner .vis > .plg-icon.head { width: 100%; height: 100%; border-radius: 0; background: none; box-shadow: none; }
-/* its '?' / '✗' badge says what it means on hover, though the banner's box takes no pointer (ui-review m_43947) */
-.b-banner .vis .plg-badge { pointer-events: auto; }
+/* no badge in the banner's box: what waits on him is in its facts (designer m_44023 #4) */
+.b-banner .vis .plg-badge { display: none; }
+/* its switch: a row in a box, like its parts' */
+.plg-page-switch { flex: 1 1 auto; }
+.plg-err { color: var(--c-err); }
 .b-banner .vis > .plg-icon.head .plg-obj { width: auto; height: 100%; max-width: 100%; }
 .b-banner .vis > .plg-icon.head .plg-mono-letter { font: 600 var(--f-question); }
 .b-banner .title > .plg-tag { margin-left: var(--s-2); vertical-align: middle; }
@@ -155,8 +158,9 @@
 .plg-skill-toggle:hover { background: var(--c-hover); }
 .plg-skill-toggle[aria-pressed="true"] { background: var(--c-active); color: var(--c-text); }
 .plg-skill-body { font: var(--t-14)/1.6 var(--font-read); color: var(--c-text); }
-/* a code block keeps its lines: it scrolls sideways in the panel, never cut at its edge (ui-review m_43947 #5) */
-.plg-skill-body pre { overflow-x: auto; }
+/* a code block keeps its lines: it scrolls sideways inside its padding, its last 24 px fading out at
+   the right, never a hard cut at the panel's edge (ui-review m_43947 #5, designer m_44023 #3) */
+.plg-skill-body pre { overflow-x: auto; padding: var(--s-3) var(--s-6) var(--s-3) var(--s-3); border-radius: var(--r-2); mask-image: linear-gradient(to right, #000 calc(100% - var(--s-6)), transparent); }
 .plg-skill-back { display: inline-flex; align-items: center; gap: var(--s-1); align-self: flex-start; margin: 0; padding: 0; border: 0; background: none; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
 .plg-skill-md { display: flex; flex-direction: column; gap: var(--s-2); }
 .plg-skill-files { display: flex; flex-direction: column; }

@@ -93,7 +93,7 @@ export function EnvironmentsScreen({ project }: { project: string }) {
   );
 }
 
-/** One agent of a place: its status dot, its name, its branch (mono); a click opens its thread. */
+/** One agent of a place: its state mark, its name, its job ('profiling the hub'); a click opens its thread. */
 function AgentRow({ project, a }: { project: string; a: Agent }) {
   const router = useRouter();
   const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
@@ -101,7 +101,8 @@ function AgentRow({ project, a }: { project: string; a: Agent }) {
   return (
     <ListRow testId={tid} state={<StateMark a={a} />}
       title={a.main ? 'bise' : a.name}
-      {...(a.branch == null || a.branch === '' ? {} : { sub: <span className="rv-mono">{a.branch}</span> })}
+      // its job, never its branch: the group head above already says where it works (designer m_44023 #5)
+      {...(a.title === '' ? {} : { sub: a.title })}
       onContextMenu={menu.onContextMenu}
       end={<MoreButton menu={menu} testId={`${tid}.more`} />}
       onClick={() => {

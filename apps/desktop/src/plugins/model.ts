@@ -305,3 +305,10 @@ export function foundWords(x: PluginSuggest | undefined): string | null {
   if (x === undefined) return null;
   return settings.plugins_band_found({ n: x.n, list: (x.titles ?? []).join(', ') });
 }
+
+/** A lead as a sentence: ends with its period ('bise's own skills' → 'bise's own skills.'; designer
+ *  m_43933: every lead ends with one); '' stays ''. Pure. */
+export function leadOf(s: string): string {
+  const t = s.trimEnd();
+  return t === '' || /[.!?…:]$/u.test(t) ? t : `${t}.`;
+}

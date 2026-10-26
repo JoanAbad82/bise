@@ -10,7 +10,7 @@
 // Owner: nm-pages-b (amb-win's before).
 import { memo, useState, type KeyboardEvent } from 'react';
 import { Peek } from './Peek';
-import { AppIcon, BannerWait, Button, Dot, Empty, FilterRow, Filters, ListRow, MoreButton, PageBanner, tipAttrs } from '@/ds';
+import { AppIcon, BannerWait, Button, Dot, Empty, FilterRow, Filters, ListRow, MoreButton, PageBanner, RowMark, tipAttrs } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { pages } from '@/proto/words_pages.gen';
 import { panel } from '@/proto/words_panel.gen';
@@ -164,7 +164,8 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
  *  a check when done, the turning arc in text-3 while it works (app.css .app-s-ring, m_43568),
  *  nothing at rest, else its status dot (blocked, failed). */
 export function StateMark({ a }: { a: Agent }) {
-  if (asksHim(a)) return <span className="ag-ask" {...tipAttrs(pages.asks_you)}>?</span>;
+  // waits on him: the ask line icon in the accent, never a '?' character (ui-review m_44027, as the thread's rows)
+  if (asksHim(a)) return <span className="ag-mark ask" {...tipAttrs(pages.asks_you)}><RowMark icon="ask" tone="accent" label={pages.asks_you} /></span>;
   if (a.archived) return <span className="ag-mark" {...tipAttrs(a.status === 'done' ? pages.done : pages.stopped)}><AppIcon name={a.status === 'done' ? 'check' : 'stop'} size={14} /></span>;
   if (a.status === 'done' && a.waiting_on == null) return <span className="ag-mark" {...tipAttrs(pages.done)}><AppIcon name="check" size={14} /></span>;
   if (a.waiting_on?.who === 'agent') return <span className="ag-mark" {...tipAttrs(pages.waits_on_agent)}><AppIcon name="more" size={14} /></span>;

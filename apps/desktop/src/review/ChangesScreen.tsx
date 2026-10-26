@@ -10,7 +10,8 @@ import { AppIcon, Dot, Empty, GroupLabel, ListRow, MoreButton, PageBanner } from
 import { hero } from '@/proto/words_hero.gen';
 import { pages } from '@/proto/words_pages.gen';
 import type { Merged, Worktree } from '@/proto';
-import { useFeatures, useMerged, usePrs, useStore, useWorktrees } from '@/store';
+import { useAgents, useFeatures, useMerged, usePrs, useStore, useWorktrees } from '@/store';
+import { StateMark } from '@/agents/AgentsScreen';
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { distance, stateWords } from './feature';
 import { useRouter } from '@/app/router';
@@ -96,8 +97,11 @@ function BranchRow({ project, w }: { project: string; w: Worktree }) {
   const agent = w.agent ?? undefined;
   const menu = useEntityMenu(agent === undefined ? { kind: 'project', project } : { kind: 'diff', project, agent });
   const tid = `changes.branch.${agent ?? 'his'}`;
+  // an agent's branch shows its agent's state, the sidebar's marks (the turning arc while it works;
+  // designer m_44030: one mark per meaning, '∿' only for a process); his own, whether it has changes
+  const a = useAgents(project).find((x) => x.name === agent);
   return (
-    <ListRow testId={tid} state={<Dot state={w.dirty ? 'wk' : 'off'} />}
+    <ListRow testId={tid} state={a !== undefined ? <StateMark a={a} /> : <Dot state={w.dirty ? 'wk' : 'off'} />}
       title={<span className="rv-mono">{w.branch === '' ? pages.detached : w.branch}</span>}
       sub={`${agent ?? pages.yours} · ${branchEnd(w)}`}
       onContextMenu={agent === undefined ? undefined : menu.onContextMenu}

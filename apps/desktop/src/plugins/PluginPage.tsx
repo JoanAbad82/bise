@@ -6,14 +6,17 @@
 // his own folder has remove (one confirm, plug-tidy's `plugin_remove`). A row to add (browse) has
 // connect or + add in place of the switch. Every change is the core's. Owner: plug-desktop.
 import { useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { Button, GroupLabel, PageBanner, Press, sentenceCase, Toggle, tipAttrs } from '@/ds';
+import { AppIcon, BannerWait, Button, GroupLabel, IconButton, PageBanner, Press, sentenceCase, Toggle, tipAttrs } from '@/ds';
+import { InBar } from '@/app/barslot';
+import type { BiseApi, PopupItem } from '@/shared/api';
 import { useBannerGutter } from '@/artifacts/hero/vignettes';
 import { openTab } from '@/app/panel/tabs';
 import { usePanelState } from '@/app/panel/state';
 import { entityKey } from '@/shared/entity';
 import type { AppCmd, Plugin, PluginPart } from '@/proto';
 import { settings } from '@/proto/words.gen';
-import { controlOf, gives, installed, isComputer, removable, tagsOf, titleOf, toolsOf } from './model';
+import { badgeOf, controlOf, gives, installed, isComputer, leadOf, removable, tagsOf, titleOf, toolsOf } from './model';
+import { ds } from '@/proto/words_ds.gen';
 import { PluginIcon } from './PluginIcon';
 
 export interface PagePorts {
@@ -31,6 +34,8 @@ function whenWords(p: Plugin): string {
   return p.kind === 'skills' || (p.parts ?? []).some((x) => x.kind === 'skill') ? settings.plugins_next_turn : settings.plugins_next_call;
 }
 
+const bise = (): Partial<BiseApi> | undefined => (window as { bise?: Partial<BiseApi> }).bise;
+
 export function PluginPage({ p, project, ports }: { p: Plugin; project?: string; ports: PagePorts }) {
   const id = p.id === '' ? p.name : p.id;
   const at = project === undefined ? {} : { project };
@@ -45,6 +50,11 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
   const off = (p.parts ?? []).filter((x) => !x.on).length;
   const tid = `plugins.page.${id}`;
   const gutter = useBannerGutter();
+  const badge = badgeOf(p);
+  const more = () => {
+    const items: PopupItem[] = [{ id: 'remove', label: settings.plugins_remove_menu }];
+    void bise()?.popupMenu?.(items).then((x) => { if (x === 'remove') setAsking(true); });
+  };
   const kept = usePanelState();
   const openTabs = useMemo(() => new Set(kept.tabs.list.map((t) => t.id)), [kept]);
   return (
@@ -53,10 +63,22 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
           object in the box; its actions in the row under it (no button in a banner) */}
       <PageBanner edge="column" gutter={gutter} icon="plugins" testId={`${tid}.lead`}
         title={<>{titleOf(p)}{tagsOf(p).map((t) => <span key={t} className="plg-tag">{t}</span>)}</>}
-        sentence={p.what ?? ''}
+        sentence={leadOf(p.what ?? '')}
         // a built-in plugin says 'always on' in its facts, never alone in the actions' row (designer m_43933 #11)
-        facts={[gives(p), c.kind === 'locked' ? settings.plugins_always_on : '', off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}
+        // what waits on him joins them, its sign alone in the accent ('1 server · ? needs a login'),
+        // never a lone badge in the box's corner (designer m_44023 #4)
+        facts={<span data-testid={`${tid}.facts`}>
+          {[gives(p), c.kind === 'locked' ? settings.plugins_always_on : '', off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}
+          {badge === '?' && <>{' · '}<BannerWait>?</BannerWait>{` ${settings.plugins_part_needs_login}`}</>}
+          {badge === '✗' && <>{' · '}<span className="plg-err">{`✗ ${settings.plugins_badge_failed}`}</span></>}
+        </span>}
         visual={<PluginIcon row={p} size="head" {...(project === undefined ? {} : { project })} {...(isComputer(p) ? { lit: true } : {})} />} />
+      {/* its other actions in the window's bar: the page's '⋯' (Remove…, asked once below) */}
+      {ports.remove !== undefined && removable(p) && (
+        <InBar>
+          <IconButton label={ds.more_actions} onClick={more} testId={`${tid}.more`}><AppIcon name="more" size={16} /></IconButton>
+        </InBar>
+      )}
       <div className="plg-page-col">
         <div className="plg-page-acts" data-testid={`${tid}.acts`}>
           {!installed(p) ? (
@@ -68,13 +90,13 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
           ) : c.kind === 'locked' ? null : c.kind === 'set_up_cu' || (isComputer(p) && !p.on) ? (
             <Button kind="pri" onClick={ports.setUpComputer} testId={`${tid}.set_up`}>{sentenceCase(settings.plugins_set_up)}</Button>
           ) : (
-            <>
-              <span className="plg-dim">{p.on ? settings.plugins_on_everywhere : settings.plugins_off_everywhere}</span>
-              <Toggle on={p.on} label={titleOf(p)} onChange={(on) => { set(id, on); }} testId={`${tid}.toggle`} />
-            </>
-          )}
-          {ports.remove !== undefined && removable(p) && (
-            <Button kind="ghost" size="sm" onClick={() => { setAsking(true); }} testId={`${tid}.remove`}>{sentenceCase(settings.plugins_remove)}</Button>
+            // its switch, a row in a box like its parts' (designer m_44023 #4)
+            <div className="plg-list plg-page-switch">
+              <div className="plg-row">
+                <span className="plg-row-words"><span className="plg-title">{sentenceCase(p.on ? settings.plugins_on_everywhere : settings.plugins_off_everywhere)}</span></span>
+                <span className="plg-row-end"><Toggle on={p.on} label={titleOf(p)} onChange={(on) => { set(id, on); }} testId={`${tid}.toggle`} /></span>
+              </div>
+            </div>
           )}
         </div>
       {asking && ports.remove !== undefined && (

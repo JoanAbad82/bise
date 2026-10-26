@@ -72,8 +72,9 @@ describe("the pages' rows and labels", () => {
   it('agents: ListRows with their menu, the accent only on the one that asks him, the filter shows both lists', () => {
     const { wrap } = world();
     const v = render(wrap(<AgentsScreen project={P} />));
-    expect(v.getByTestId('agents.row.alerts').querySelector('.b-lrow .ag-ask')?.textContent).toBe('?');
-    expect(v.getByTestId('agents.row.perf').querySelector('.ag-ask')).toBeNull();
+    // the ask line icon in the accent, never a '?' character (ui-review m_44027)
+    expect(v.getByTestId('agents.row.alerts').querySelector('.b-lrow .b-rowmark[data-icon="ask"]')?.getAttribute('data-tone')).toBe('accent');
+    expect(v.getByTestId('agents.row.perf').querySelector('.b-rowmark[data-icon="ask"]')).toBeNull();
     for (const a of ['main', 'perf', 'alerts']) expect(v.getByTestId(`agents.more.${a}`).classList.contains('b-more')).toBe(true);
     expect(v.queryByTestId('agents.row.old')).toBeNull();
     expect(v.getByTestId('agents.filter.live').textContent).toBe(`${pages.agents_live}3`);

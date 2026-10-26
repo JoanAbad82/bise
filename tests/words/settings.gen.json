@@ -3110,7 +3110,7 @@
   "settings.plugins_place_sub": {
     "args": [],
     "one": null,
-    "text": "what your agents can use, in every project"
+    "text": "what your agents can use, in every project."
   },
   "settings.plugins_place_waits": {
     "args": [
@@ -3208,11 +3208,6 @@
     "one": null,
     "text": "Mistral's connectors read again"
   },
-  "settings.plugins_remove": {
-    "args": [],
-    "one": null,
-    "text": "remove"
-  },
   "settings.plugins_remove_ask": {
     "args": [
       "name"
@@ -3226,6 +3221,11 @@
     ],
     "one": null,
     "text": "remove {name}? its saved secrets and logins go too."
+  },
+  "settings.plugins_remove_menu": {
+    "args": [],
+    "one": null,
+    "text": "Remove…"
   },
   "settings.plugins_remove_no": {
     "args": [],

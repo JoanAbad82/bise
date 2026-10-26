@@ -22,12 +22,16 @@ import './plugins.css';
 
 const bise = (): Partial<BiseApi> | undefined => (window as { bise?: Partial<BiseApi> }).bise;
 
-/** A path cut in its middle to `n` characters ('~/.agents/…/docs/SKILL.md'), home folded. Pure. */
+/** A path as the head shows it: home folded to '~' (his, else any /Users/<name>: the window's home is
+ *  a test home in a check run, never /Users/<name> on screen; designer m_44023 #3); longer than `n`,
+ *  its first part, '…' and its last two ('~/…/bise-pages/SKILL.md'). The tip keeps it whole. Pure. */
 export function midCut(path: string, home: string | undefined, n = 48): string {
-  const p = home !== undefined && home !== '' && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+  const p = home !== undefined && home !== '' && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\/Users\/[^/]+(?=\/)/u, '~');
   if (p.length <= n) return p;
-  const head = Math.ceil((n - 1) / 2);
-  return `${p.slice(0, head)}…${p.slice(p.length - (n - 1 - head))}`;
+  const parts = p.split('/');
+  if (parts.length <= 3) return p;
+  const head = parts[0] === '' ? `/${parts[1] ?? ''}` : (parts[0] ?? '');
+  return `${head}/…/${parts.slice(-2).join('/')}`;
 }
 
 /** The skill `name` of plugin `plugin` in the rows, with its plugin row. Pure. */
