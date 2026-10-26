@@ -78,8 +78,11 @@ crate::words! { side:
     row_asks = "asks you";
     /// a row's state: another agent holds it (its line 2 says which)
     row_waits_agent = "waits for an agent";
-    /// a row's state: it waits on a command or an event it resumes on
-    row_waits(len) = "waits · {len}";
+    /// a row's state: it waits on a command or an event it resumes on (the
+    /// window's event-wake label, designer m_45847)
+    row_waits(len) = "waiting · {len}";
+    /// that state's tip: the command or event it waits for
+    row_waits_tip(what, len) = "waiting for {what} · {len}";
     /// a row's state: the hub says it waits, with nothing more
     row_waiting = "waiting";
     /// a row's state: at rest since then

@@ -293,12 +293,20 @@
       "len"
     ],
     "one": null,
-    "text": "waits · {len}"
+    "text": "waiting · {len}"
   },
   "side.row_waits_agent": {
     "args": [],
     "one": null,
     "text": "waits for an agent"
+  },
+  "side.row_waits_tip": {
+    "args": [
+      "what",
+      "len"
+    ],
+    "one": null,
+    "text": "waiting for {what} · {len}"
   },
   "side.row_wakes": {
     "args": [

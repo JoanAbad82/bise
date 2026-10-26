@@ -51,8 +51,11 @@ export function rowState(a: Agent, now: number, wake?: number): RowState {
       if (a.waiting_on?.who === 'agent') {
         return { g: '…', words: side.row_waits_agent, tone: 'wait', tip: p?.title ?? side.row_waits_agent, back: false, l2: side.waits_for({ agent: shownName(a.waiting_on.name) }) };
       }
+      // a command or an event it resumes on: 'waiting · 3 min', its tip names it (designer m_45847)
       const len = p?.len ?? '';
-      return { g: '…', words: len === '' ? side.row_waiting : side.row_waits({ len }), tone: 'wait', tip: p?.title ?? side.row_waiting, back: false };
+      const what = a.watching.filter((w) => w.resumes === true).sort((x, y) => x.since_ms - y.since_ms || x.id - y.id).at(0)?.what ?? '';
+      const words = len === '' ? side.row_waiting : side.row_waits({ len });
+      return { g: '…', words, tone: 'wait', tip: what !== '' && len !== '' ? side.row_waits_tip({ what, len }) : p?.title ?? words, back: false };
     }
     case '⋯':
       return { g: '…', words: side.row_waiting, tone: 'wait', tip: s.title, back: false };

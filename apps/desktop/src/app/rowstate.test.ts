@@ -24,6 +24,10 @@ describe("an agent row's state", () => {
     expect(s).toMatchObject({ g: '…', words: 'waits for an agent', tone: 'wait', l2: 'waits for connaissances-vente', back: false });
     expect(rowState(agent('rev', 'working', { waiting_on: { who: 'agent', name: 'main' } }), NOW).l2).toBe('waits for bise');
   });
+  it("a command it resumes on: … waiting and how long, its tip names the command (designer m_45847)", () => {
+    const s = rowState(agent('perf', 'idle', { watching: [{ id: 3, kind: 'bg', resumes: true, since_ms: NOW - 3 * 60_000, what: 'cargo test' }] }), NOW);
+    expect(s).toMatchObject({ g: '…', words: 'waiting · 3 min', tone: 'wait', tip: 'waiting for cargo test · 3 min', back: false });
+  });
   it('idle and done step back, with how long; failed in red, with what failed on line 2', () => {
     expect(rowState(agent('bise', 'idle'), NOW)).toMatchObject({ g: '', words: 'idle · 4 min', tone: 'rest', back: true });
     expect(rowState(agent('cad', 'done', { since_ms: NOW - 3_600_000 }), NOW)).toMatchObject({ g: '✓', words: 'done · 1 h', tone: 'rest', back: true });

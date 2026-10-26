@@ -72,8 +72,10 @@ export const side = {
   row_asks: "asks you",
   /** a row's state: another agent holds it (its line 2 says which) */
   row_waits_agent: "waits for an agent",
-  /** a row's state: it waits on a command or an event it resumes on */
-  row_waits: (a: { len: string | number }): string => "waits · " + String(a.len),
+  /** a row's state: it waits on a command or an event it resumes on (the window's event-wake label, designer m_45847) */
+  row_waits: (a: { len: string | number }): string => "waiting · " + String(a.len),
+  /** that state's tip: the command or event it waits for */
+  row_waits_tip: (a: { what: string | number; len: string | number }): string => "waiting for " + String(a.what) + " · " + String(a.len),
   /** a row's state: the hub says it waits, with nothing more */
   row_waiting: "waiting",
   /** a row's state: at rest since then */
