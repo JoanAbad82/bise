@@ -60,6 +60,12 @@ describe("the window's keys", () => {
     expect(keyAction(k('KeyA', { metaKey: true }), ctx())).toBeUndefined();
   });
 
+  it('⌘N New project, ⇧⌘N still a New agent in the project in view, bise\'s own on bise (round 3: no sidebar row for it, the key stays)', () => {
+    expect(keyAction(k('KeyN', { metaKey: true }), ctx())).toEqual({ newProject: true });
+    expect(keyAction(k('KeyN', { metaKey: true, shiftKey: true }), ctx())).toEqual({ newAgent: 'a' });
+    expect(keyAction(k('KeyN', { metaKey: true, shiftKey: true }), ctx({ route: { screen: 'bise' } }))).toEqual({ newAgent: 'h' });
+  });
+
   it('end and ⌥↑↓ only when no text is being typed', () => {
     expect(keyAction({ ...k('End'), key: 'End' }, ctx())).toEqual({ screen: 'to-end' });
     expect(keyAction({ ...k('End'), key: 'End' }, ctx({ typing: true }))).toBeUndefined();

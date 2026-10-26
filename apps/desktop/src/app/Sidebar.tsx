@@ -1,14 +1,15 @@
 // The sidebar (bise fait mac, page native-mac §6, mockup 1): beside the rail under the bar, 240
 // wide (200-320 by its border, kept: frame-state.ts), --p-raised 82% with a 12 top-left corner.
-// 'New project ⌘N' first (his m_44225: he rarely makes an agent by hand, he talks to main), then
-// 'New agent ⇧⌘N' and 'Search ⌘K'; then bise's own row (its ':*', what waits in all his projects,
-// ⌘0; as on main), 'Pinned' (pins.ts, his own shortcuts) and 'Projects': one
+// Its head, in his order (round 3, main m_44657): bise's own row (its ':*', what waits in all his
+// projects, ⌘0; as on main), 'Search ⌘K', 'New project ⌘N' (no New agent row: he talks to main;
+// ⇧⌘N stays in keys.ts, the File menu, the project menu and ⌘K). Then 'Pinned' (pins.ts, his own
+// shortcuts) and 'Projects': one
 // row per project, a click opens it (its main), no agent under it (round 2, his r2-img11: the
 // agents live on the right side), at its end one fact (what waits on him, else its agents at work)
 // and, ⌘ held, its ⌘1-9 digit: siderows.ts decides, this draws. Its head stays, its list scrolls;
 // a right click on a pin or a project opens its menu (useEntityMenu, nm-menus'). On the artifacts
 // library (decision d2) it shows '← Projects' and the library (artifacts' ArtLibrary) at the same
-// width, a 160 ms crossfade. Owner: r2-pointer this round (nm-frame's, archived).
+// width, a 160 ms crossfade. Owner: r3-sidebar this round (nm-frame's, archived).
 //
 // Each project row and each pin read their own project's agents (useAgents): an event re-renders
 // the row it touches, never the sidebar, and a thread's entries never do.
@@ -30,7 +31,6 @@ import { useKeptScroll } from './keep';
 import { useModHeld } from './held';
 import { LiveBiseMark } from './Marks';
 import { usePinned, type Pin } from './pins';
-import { newAgent } from './newagent';
 import { addProject } from './addProject';
 import { pinRowOf, projectRowOf, projectsOf, type ProjectEnd, type RowEnd } from './siderows';
 import { waitsTip, workingTip } from './tipwords';
@@ -133,15 +133,15 @@ function Label({ children, end, testId }: { children: string; end?: ReactNode; t
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const route = useRoute();
   const router = useRouter();
-  const home = useProjects().find((p) => p.home)?.project;
   // d2: the artifacts library takes the projects' place on artifacts, at the same width
   const library = route.screen === 'artifacts';
-  const here = projectOf(route) ?? home;
   return (
     <aside className="app-side" data-testid="app.sidebar" data-library={library || undefined}>
       {/* on settings the sidebar is the settings nav alone (designer m_44447) */}
       {route.screen !== 'settings' && (
         <div className="app-s-head">
+          <BiseRow />
+          <Row kind="top" icon="search" name={frame.search} end={<kbd>⌘K</kbd>} onClick={onSearch} testId="app.side.search" />
           <Row
             kind="top"
             icon="folderPlus"
@@ -152,17 +152,6 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
             }}
             testId="app.side.new-project"
           />
-          <Row
-            kind="top"
-            icon="rename"
-            name={frame.new_agent}
-            end={<kbd>⇧⌘N</kbd>}
-            onClick={() => {
-              if (here !== undefined) newAgent(here);
-            }}
-            testId="app.side.new"
-          />
-          <Row kind="top" icon="search" name={frame.search} end={<kbd>⌘K</kbd>} onClick={onSearch} testId="app.side.search" />
         </div>
       )}
       {/* the swap is a crossfade (app.css .app-s-swap): a new key fades the other list in */}
@@ -205,7 +194,6 @@ function ProjectList() {
   const here = projectOf(route);
   return (
     <div className="app-s-list" data-testid="app.side.list">
-      <BiseRow cmd={cmd} />
       {pins.length > 0 && <PinnedList pins={pins} />}
       <Label testId="app.side.label.projects" end={<AddProject />}>
         {frame.projects}
@@ -218,11 +206,12 @@ function ProjectList() {
 }
 
 /**
- * bise's own row above the projects, as on main (native-lead m_44419): its live ':*' mark, 'bise',
- * what waits on him in all his projects (the inbox's one number, in the accent); ⌘ held, ⌘0. It
- * opens bise's place; marked there and on bise's own main (the home project stays out of the list).
+ * bise's own row, the sidebar's first (his r3 order: bise, Search, New project): its live ':*' mark,
+ * 'bise', what waits on him in all his projects (the inbox's one number, in the accent); ⌘ held, ⌘0.
+ * It opens bise's place; marked there and on bise's own main (the home project stays out of the list).
  */
-function BiseRow({ cmd }: { cmd: boolean }) {
+function BiseRow() {
+  const cmd = useModHeld('Meta');
   const route = useRoute();
   const router = useRouter();
   const waits = useWaitingTotal();

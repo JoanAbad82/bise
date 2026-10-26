@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The frame of mockup 1, drawn from the store: the rail's places (the current one marked, inbox's
 // dot only while something waits), the sidebar's projects (round 2: one row each, no agent under
-// it, its one fact, ⌘ held its digit), New project ⌘N and New agent ⇧⌘N.
+// it, its one fact, ⌘ held its digit), its head bise, Search ⌘K, New project ⌘N (no New agent row).
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HINT_HOLD_MS } from './held';
@@ -13,7 +13,6 @@ import { createRouter, RouterContext } from './router';
 import type { Route } from './route';
 import { projectRowTip, Sidebar } from './Sidebar';
 import { SideRail } from './SideRail';
-import { NewAgentHost, useNewAgentAsked } from './newagent';
 import { askEntityAction } from './menus/actions';
 import { act } from '@testing-library/react';
 
@@ -24,10 +23,6 @@ const DOCS = 'docs-5e6f7a8b';
 
 const AGENT = (ev('agents').agents[0] ?? {}) as Agent;
 const agent = (name: string, o: Partial<Agent> = {}): Agent => ({ ...AGENT, name, main: name === 'main', status: 'idle', waits: 0, archived: false, ...o });
-
-function Asked() {
-  return <span data-testid="asked">{useNewAgentAsked() ?? ''}</span>;
-}
 
 function frame(route: Route, agents: Agent[], sent: unknown[] = [], acme: Partial<ProjectRow> = {}) {
   const port: CorePort = { send: (c) => { sent.push(c); }, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
@@ -42,8 +37,6 @@ function frame(route: Route, agents: Agent[], sent: unknown[] = [], acme: Partia
       <RouterContext value={router}>
         <SideRail />
         <Sidebar onSearch={() => undefined} />
-        <Asked />
-        <NewAgentHost />
       </RouterContext>
     </StoreProvider>,
   );
@@ -122,13 +115,10 @@ describe('the sidebar', () => {
     }
   });
 
-  it("bise's own row above Projects (native-lead m_44419): what waits in all his projects, ⌘0 held, opens bise; home stays out of the list", () => {
+  it("bise's own row (native-lead m_44419): what waits in all his projects, ⌘0 held, opens bise; home stays out of the list", () => {
     vi.useFakeTimers();
     try {
       const { v, router } = frame({ screen: 'thread', project: HOME, agent: 'main' }, [agent('main')], [], { cards: null as never, waits: 2 });
-      const list = v.getByTestId('app.side.list');
-      const order = [...list.querySelectorAll('[data-testid="app.side.bise"],[data-testid="app.side.label.projects"]')].map((e) => e.getAttribute('data-testid'));
-      expect(order).toEqual(['app.side.bise', 'app.side.label.projects']);
       expect(v.queryByTestId(`app.side.project.${HOME}`)).toBeNull();
       // on bise's own main: marked
       expect(v.getByTestId('app.side.bise').getAttribute('aria-current')).toBe('page');
@@ -150,16 +140,25 @@ describe('the sidebar', () => {
     }
   });
 
-  it('New project first (⌘N) opens the add-a-project way in; New agent (⇧⌘N) asks in the project in view', () => {
-    const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
-    const head = [...v.getByTestId('app.sidebar').querySelectorAll('.app-s-head [data-testid]')].map((e) => e.getAttribute('data-testid'));
-    expect(head).toEqual(['app.side.new-project', 'app.side.new', 'app.side.search']);
-    fireEvent.click(v.getByTestId('app.side.new'));
-    expect(v.getByTestId('asked').textContent).toBe(ACME);
-    // no sheet mounted in this test: settings › projects is the way in (addProject.ts)
-    fireEvent.click(v.getByTestId('app.side.new-project'));
-    expect(router.get()).toEqual({ screen: 'settings', page: 'projects' });
-  });
+  // light and dark (designer's shots): the same rows, the theme only paints them
+  for (const theme of ['light', 'dark'] as const) {
+    it(`${theme}: the head in his order (round 3, main m_44657): bise, Search, New project, no New agent row; then Projects`, () => {
+      document.documentElement.dataset.theme = theme;
+      const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+      const side = v.getByTestId('app.sidebar');
+      const head = [...side.querySelectorAll('.app-s-head > [data-testid]')].map((e) => e.getAttribute('data-testid'));
+      expect(head).toEqual(['app.side.bise', 'app.side.search', 'app.side.new-project']);
+      expect(v.queryByTestId('app.side.new')).toBeNull();
+      // the head stands over the list: bise is no longer a row of it, Projects follows the head
+      expect(v.getByTestId('app.side.list').querySelector('[data-testid="app.side.bise"]')).toBeNull();
+      const order = [...side.querySelectorAll('[data-testid="app.side.new-project"],[data-testid="app.side.label.projects"]')].map((e) => e.getAttribute('data-testid'));
+      expect(order).toEqual(['app.side.new-project', 'app.side.label.projects']);
+      // no sheet mounted in this test: settings › projects is the way in (addProject.ts)
+      fireEvent.click(v.getByTestId('app.side.new-project'));
+      expect(router.get()).toEqual({ screen: 'settings', page: 'projects' });
+      delete document.documentElement.dataset.theme;
+    });
+  }
 
   it("the menu's Rename takes the new name inline on the project's row", () => {
     const sent: unknown[] = [];
