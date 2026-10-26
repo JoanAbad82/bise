@@ -1042,6 +1042,12 @@
   outline: 2px solid var(--c-focus);
   outline-offset: 0;
 }
+/* the hidden thread's name: one line, cut at the end past the tab row's room */
+.pn-lead-n {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .pn-lead-m {
   display: inline-flex;
   align-items: center;
