@@ -424,7 +424,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
           // Overview's rows (folded-side v9, A's floats): the same as its AGENTS (app/agentrows.ts)
           rows: (
             <>
-              {ov.live.length === 0 ? <Empty>{side.no_agents}</Empty> : <FloatAgents live={ov.live} agents={ov.agents} cards={listed.cards} at={at} onOpen={openRow} onOpenPr={openPr} groupOf={groupOf} />}
+              {ov.live.length === 0 ? <Empty>{side.no_agents}</Empty> : <FloatAgents live={ov.live} agents={ov.agents} cards={listed.cards} at={at} onOpen={openRow} onOpenPr={openPr} groupOf={groupOf} onHandoff={() => { setOpen(null); }} />}
               {archivedOpen && ov.archived.length > 0 && <ArchivedRows rows={ov.archived} onOpen={openRow} />}
             </>
           ),

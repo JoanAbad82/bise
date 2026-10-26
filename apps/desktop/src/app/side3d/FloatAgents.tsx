@@ -43,10 +43,15 @@ export interface FloatAgentsProps {
   readonly onOpenPr: (r: BarRow) => void;
   /** a row's project's name on bise's own screen ('acme › perf', designer m_45706); none in a project */
   readonly groupOf?: (project: string) => string | undefined;
+  /** 'answer…' hands over to the composer: the float closes */
+  readonly onHandoff: () => void;
 }
 
+/** the composer's field, where 'answer…' puts his words */
+const COMPOSER_FIELD = '[data-testid="composer.field"]';
+
 /** The agents float's rows. */
-export function FloatAgents({ live, agents, cards, at, onOpen, onOpenPr, groupOf }: FloatAgentsProps) {
+export function FloatAgents({ live, agents, cards, at, onOpen, onOpenPr, groupOf, onHandoff }: FloatAgentsProps) {
   const byKey = new Map(agents.map((x) => [`${x.project}/${x.a.name}`, x.a]));
   return (
     <>
@@ -54,7 +59,7 @@ export function FloatAgents({ live, agents, cards, at, onOpen, onOpenPr, groupOf
         if (r.kind === 'group' || r.kind === 'orphan') return <HeadRow key={r.key} r={r} members={live.filter((m) => m.kind === 'agent' && m.group === r.group).length} onOpen={onOpen} onOpenPr={onOpenPr} />;
         const a = byKey.get(`${r.project}/${r.agent ?? ''}`);
         const card = sortCards(cards.filter((c) => c.agent === r.agent && c.project === r.project))[0];
-        return <AgentRow key={r.key} r={r} a={a} card={card} at={at} onOpen={onOpen} onOpenPr={onOpenPr} group={groupOf?.(r.project)} />;
+        return <AgentRow key={r.key} r={r} a={a} card={card} at={at} onOpen={onOpen} onOpenPr={onOpenPr} group={groupOf?.(r.project)} onHandoff={onHandoff} />;
       })}
     </>
   );
@@ -75,7 +80,7 @@ function Pr({ r, onOpenPr }: { r: BarRow; onOpenPr: (r: BarRow) => void }) {
   );
 }
 
-function AgentRow({ r, a, card, at, onOpen, onOpenPr, group }: { r: BarRow; a: Agent | undefined; card: Card | undefined; at: AnswerAt | null; onOpen: (r: BarRow) => void; onOpenPr: (r: BarRow) => void; group: string | undefined }) {
+function AgentRow({ r, a, card, at, onOpen, onOpenPr, group, onHandoff }: { r: BarRow; a: Agent | undefined; card: Card | undefined; at: AnswerAt | null; onOpen: (r: BarRow) => void; onOpenPr: (r: BarRow) => void; group: string | undefined; onHandoff: () => void }) {
   const g = groupParts(group, r.name);
   const store = useStore();
   const menu = useEntityMenu({ kind: 'agent', project: r.project, agent: r.agent ?? '' });
@@ -127,7 +132,13 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group }: { r: BarRow; a: A
           ))}
           {(
             <Press look="s3-arow-answer" onClick={() => {
+              // the float hands over to the composer (ui-review m_45821): it closes, the inbox opens on
+              // that card in place, and his words go to the composer's field at once
+              onHandoff();
               askInbox({ project: card.project, card: card.id });
+              requestAnimationFrame(() => {
+                document.querySelector<HTMLElement>(COMPOSER_FIELD)?.focus();
+              });
             }} data-testid={`${id}.answer`}>
               {side.answer}
             </Press>
