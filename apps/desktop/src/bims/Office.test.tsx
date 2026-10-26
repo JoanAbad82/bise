@@ -130,7 +130,8 @@ describe('a tab that fills its pane (fill)', () => {
 });
 
 describe('the toggle', () => {
-  it("no 'bims' pill in the head (the title bar's icon); 320 | wide only with the office on; kept", () => {
+  it("no 'bims' pill in the head (the title bar's icon); 320 | wide only with the office on (the default, r2-launcher #9); kept", () => {
+    bimsView.setView('list');
     const { rerender } = render(<BimsSwitch view={bimsView.get()} />);
     expect(screen.queryByTestId('app.right.agents.view.bims')).toBeNull();
     expect(screen.queryByTestId('app.right.agents.width.wide')).toBeNull();

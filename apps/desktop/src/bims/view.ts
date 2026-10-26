@@ -1,6 +1,6 @@
-// How the right bar shows its agents (page bims-office v7, bims m_27494): 'list' (the rows alone,
-// the default: the office is an easter egg he opens with the title bar's icon, Frame.tsx) or 'bims'
-// (the office above the rows: he keeps the list while the bims are open), and with bims
+// How Overview shows its agents (page bims-office v7, bims m_27494): 'bims' (the office above the
+// rows, the default since r2-launcher #9, designer m_44486: the map belongs at a project's Overview's
+// top) or 'list' (the rows alone, once he hid it with the head's 'the bims'), and with bims
 // on, the bar at 320 or 'wide'. Both kept per window (keep.ts, like the sections' folds), one
 // store for the window. The wide bar's column (panelColumn, usePanelColumn, wideMode) left with
 // the right bar (nm-panel's tabbed panel, native-mac). Owner: bims-wire.
@@ -19,9 +19,9 @@ export interface BimsView {
   readonly lost?: boolean;
 }
 
-/** A kept value read back: anything but 'bims' is the list (the default), anything but true is 320. Pure. */
+/** A kept value read back: anything but 'list' is the bims (the default), anything but true is 320. Pure. */
 export function viewOf(view: unknown, wide: unknown): BimsView {
-  return { view: view === 'bims' ? 'bims' : 'list', wide: wide === true };
+  return { view: view === 'list' ? 'list' : 'bims', wide: wide === true };
 }
 
 const listeners = new Set<() => void>();
@@ -33,7 +33,7 @@ function read(): BimsView {
 }
 
 function write(next: BimsView): void {
-  keep.setView(VIEW_KEY, next.view === 'bims' ? 'bims' : undefined);
+  keep.setView(VIEW_KEY, next.view === 'list' ? 'list' : undefined);
   keep.setView(WIDE_KEY, next.wide ? true : undefined);
   current = next;
   for (const l of [...listeners]) l();

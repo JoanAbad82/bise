@@ -218,8 +218,9 @@
 }
 
 /* New tab, the launcher: padding 16; search 40 r 8, a 1 px --c-line-strong line, its text 15/20
-   (designer m_44218: the field he types in first); group titles 13/600 on 32, 16 above; rows 40
-   r 8 (--c-raised + a line, icon 16 + 12, kbd 20); Recent and found rows 48 with a 32 tile, the
+   (designer m_44218: the field he types in first); group titles 13/600 on 32, 16 above; Open one
+   group box as settings' (r 10, a hairline, --c-raised; rows 40 with hairlines between, 12 inside,
+   icon 16 + 12, kbd 20 at the right: designer m_44486 #1); Recent and found rows 48 with a 32 tile, the
    highlighted one (↑/↓) --c-hover, never the accent */
 .pn-launch {
   display: flex;
@@ -264,21 +265,40 @@
   color: var(--c-text);
   font: 600 var(--f-ui);
 }
+.pn-open {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-menu);
+  background: var(--c-raised);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+}
 .pn-li {
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--s-3);
   height: var(--h-launcher-row);
-  margin: 0 0 var(--s-1);
+  margin: 0;
   padding: 0 var(--s-3);
   border: 0;
-  border-radius: var(--r-2);
-  background: var(--c-raised);
-  box-shadow: inset 0 0 0 1px var(--c-line);
+  border-radius: 0;
+  background: none;
   color: var(--c-text);
   font: 400 var(--f-ui);
   text-align: left;
+}
+.pn-li + .pn-li {
+  box-shadow: inset 0 1px 0 var(--c-line);
+}
+.pn-li:first-child {
+  border-radius: var(--r-menu) var(--r-menu) 0 0;
+}
+.pn-li:last-child {
+  border-radius: 0 0 var(--r-menu) var(--r-menu);
+}
+.pn-li:only-child {
+  border-radius: var(--r-menu);
 }
 .pn-li > svg {
   color: var(--c-text-2);
@@ -310,6 +330,20 @@
 .pn-rec:hover,
 .pn-rec[data-on] {
   background: var(--c-hover);
+}
+/* ↑/↓ moved the highlight: the row under a resting pointer drops its tint until the pointer moves
+   (macOS lists; ui-review m_44485 #1) */
+[data-keyed] > .pn-rec:hover:not([data-on]) {
+  background: none;
+}
+/* Agents' 'the bims' toggle in Overview: text-2, ink on hover; the accent is only for what waits
+   on him (designer m_44486 #5) */
+.app-rb .bims-cube {
+  color: var(--c-text-2);
+}
+.app-rb .bims-cube:hover,
+.app-rb .bims-cube[aria-pressed='true'] {
+  color: var(--c-text);
 }
 /* the bims head in Open's 16 icon column (designer m_44218) */
 .pn-li-pic {

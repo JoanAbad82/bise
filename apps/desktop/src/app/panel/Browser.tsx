@@ -141,6 +141,8 @@ export function BlankBrowser({ tabId, shown }: { tabId: string; shown: boolean }
   const arts = useAllArtifacts();
   const [q, setQ] = useState('');
   const [at, setAt] = useState(0);
+  // ↑/↓ moved the highlight: no hover tint under a resting pointer until it moves (as the launcher)
+  const [keyed, setKeyed] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const found = useMemo(() => launchMatches(arts, q), [arts, q]);
   useEffect(() => {
@@ -184,6 +186,7 @@ export function BlankBrowser({ tabId, shown }: { tabId: string; shown: boolean }
                 enter();
               } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
+                setKeyed(true);
                 setAt((i) => stepAt(i, found.length, e.key === 'ArrowDown' ? 1 : -1));
               } else if (e.key === 'Escape') {
                 e.preventDefault();
@@ -198,7 +201,16 @@ export function BlankBrowser({ tabId, shown }: { tabId: string; shown: boolean }
           />
         </label>
       </div>
-      <div className="pn-launch" role="listbox" id={`${tabId}.list`} aria-label={panel.addr_enter}>
+      <div
+        className="pn-launch"
+        role="listbox"
+        id={`${tabId}.list`}
+        aria-label={panel.addr_enter}
+        data-keyed={keyed || undefined}
+        onPointerMove={() => {
+          setKeyed(false);
+        }}
+      >
         {found.map((x, i) => (
           <PickRow
             key={`${x.project}/${x.a.id}`}

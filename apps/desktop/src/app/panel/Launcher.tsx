@@ -1,16 +1,19 @@
 // src/app/panel · New tab, the launcher (page native-mac mockup 3, §6 'lanceur', round 2 r2-launcher):
 // padding 16, a search 40 r 8 with its 1 px line (artifacts by name, or an address), 'Open'
 // (Artifacts ⌘P, Terminal ⌃`, Changes ⌥⌘D only when the agent in view has some, Browser ⌘L,
-// Office: the bims head) in rows 40 r 8 (icon 16 + 12, kbd 20), 'Recent' in rows
+// Office: the bims head) in one group box (r 10, a hairline, rows 40 with hairlines between, 12
+// inside, the kbd at the right), 'Recent' in rows
 // 48 with a 32 tile (what he opened in a tab last, newest first). Artifacts turns this tab into the
-// picker of the 10 newest artifacts (kind icon, name, kind · who, its age at the end; the field filters). In a
+// picker of the 10 newest artifacts (kind icon, name, kind · who, its age at the end, '22 d'; the field
+// filters). In a
 // list ↑/↓ move the highlighted row (the first as he types), ⏎ opens it, esc clears the field, then
 // leaves the picker, then closes the tab. A pick opens in this tab's place, as a browser's new tab
 // becomes the page. The rows act as their keys do (keys.ts doPanelKey). Owner: nm-panel.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppIcon, Input, KindIcon, Kbd, Press, iconKindOf, type AppIconName } from '@/ds';
 import { panel } from '@/proto/words_panel.gen';
-import { useAllArtifacts, whenOf } from '@/artifacts';
+import { useAllArtifacts } from '@/artifacts';
+import { ago } from '@/agents/model';
 import type { Item } from '@/artifacts/model';
 import { useAgents, useProjects, useStore } from '@/store';
 import { useRoute } from '@/app/router';
@@ -47,6 +50,8 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
   useAgents(agentInView(route)?.project ?? '');
   const [q, setQ] = useState('');
   const [at, setAt] = useState(0);
+  // ↑/↓ moved the highlight: the row under a resting pointer drops its hover tint until it moves (macOS lists)
+  const [keyed, setKeyed] = useState(false);
   const [now] = useState(() => Date.now());
   const field = useRef<HTMLInputElement>(null);
   const bise = (window as Partial<Window>).bise;
@@ -103,6 +108,7 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
               enter();
             } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
+              setKeyed(true);
               setAt((i) => stepAt(i, found.length, e.key === 'ArrowDown' ? 1 : -1));
             } else if (e.key === 'Escape') {
               e.preventDefault();
@@ -121,7 +127,16 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
               {artifacts && q.trim() === '' ? panel.launch_no_artifact : panel.launch_no_match}
             </p>
           ) : (
-            <div role="listbox" id={`${tabId}.list`} aria-label={label} className="pn-found">
+            <div
+              role="listbox"
+              id={`${tabId}.list`}
+              aria-label={label}
+              className="pn-found"
+              data-keyed={keyed || undefined}
+              onPointerMove={() => {
+                setKeyed(false);
+              }}
+            >
               {found.map((x, i) => (
                 <PickRow
                   key={`${x.project}/${x.a.id}`}
@@ -130,7 +145,7 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
                   icon={<KindIcon kind={iconKindOf(x.a)} size={16} />}
                   title={x.a.title}
                   sub={panel.launch_kind_by({ kind: x.a.kind, who: x.a.agent })}
-                  {...(artifacts ? { when: whenOf(x.a.at_ms, now) } : {})}
+                  {...(artifacts ? { when: ago(x.a.at_ms, now) } : {})}
                   onPick={() => {
                     open(x);
                   }}
@@ -146,6 +161,8 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
       ) : (
         <>
           <h3 className="pn-lh">{panel.launch_open}</h3>
+          {/* one group box, as settings' (designer m_44486 #1): rows 40 with hairlines between */}
+          <div className="pn-open" role="group" aria-label={panel.launch_open} data-testid="app.panel.launcher.open">
           {rows.map((k) => {
             const r = ROW[k];
             return (
@@ -163,6 +180,7 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
               </Press>
             );
           })}
+          </div>
           <h3 className="pn-lh">{panel.launch_recent}</h3>
           {recent.length === 0 ? (
             <p className="pn-none" data-testid="app.panel.launcher.none">
