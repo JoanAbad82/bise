@@ -227,7 +227,8 @@ export function libraryFacts(lib: Library, live: readonly Item[], projectName: s
   }
   const folders = projectName === '' ? lib.themes.length : used.size;
   const from = projectName === '' ? library.projects_n({ n: projects }) : projectName;
-  const parts = [library.count_from({ n: live.length, from, inside: library.in_folders({ n: folders }) })];
+  // nothing of it in a folder: no 'in 0 folders' (the column has folders, the page says unfiled)
+  const parts = [folders === 0 ? library.count_from_alone({ n: live.length, from }) : library.count_from({ n: live.length, from, inside: library.in_folders({ n: folders }) })];
   const fresh = live.filter((it) => it.a.new).length;
   if (fresh > 0) parts.push(hero.new_ones({ n: fresh }));
   const unfiled = live.filter((it) => lib.folderOf(it) === null).length;
@@ -242,7 +243,7 @@ export function folderLine(lib: Library, id: string, items: readonly Item[]): st
   const isTheme = (f.parent ?? null) === null;
   if (isTheme && (lib.tasks.get(id)?.length ?? 0) > 0) {
     const tasks = lib.tasks.get(id)?.length ?? 0;
-    const head = library.theme_count({ n: items.length, tasks });
+    const head = library.theme_count({ n: items.length, tasks: library.tasks_n({ n: tasks }) });
     return f.by === 'you' ? head : `${head} · ${library.theme_filed}`;
   }
   if (items.length === 0) return f.by === 'you' ? library.made_by_you : '';

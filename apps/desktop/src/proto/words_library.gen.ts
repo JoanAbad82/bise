@@ -8,6 +8,8 @@ export const library = {
   say: "what your agents made for you to look at.",
   /** facts: how many, from where, in how many folders: `893 from 6 projects, in 9 folders` */
   count_from: (a: { n: string | number; from: string | number; inside: string | number }): string => String(a.n) + " from " + String(a.from) + ", " + String(a.inside),
+  /** facts: how many and from where, none of it in a folder: `33 from ai-docs` */
+  count_from_alone: (a: { n: string | number; from: string | number }): string => String(a.n) + " from " + String(a.from),
   /** facts: the projects part, `6 projects` */
   projects_n: (a: { n: number }): string => a.n === 1 ? String(a.n) + " project" : String(a.n) + " projects",
   /** facts: the folders part, `in 9 folders` */
@@ -44,8 +46,10 @@ export const library = {
   scope_clear: (a: { project: string | number }): string => "show every project, not only " + String(a.project),
   /** the tiles' sort on all artifacts */
   recent_first: "recent first",
-  /** a theme's header, `412 artifacts from 15 tasks` */
-  theme_count: (a: { n: number; tasks: string | number }): string => a.n === 1 ? String(a.n) + " artifact from " + String(a.tasks) + " tasks" : String(a.n) + " artifacts from " + String(a.tasks) + " tasks",
+  /** a theme's header, `412 artifacts from 15 tasks` (`tasks`: tasks_n) */
+  theme_count: (a: { n: number; tasks: string | number }): string => a.n === 1 ? String(a.n) + " artifact from " + String(a.tasks) : String(a.n) + " artifacts from " + String(a.tasks),
+  /** a theme's header, its tasks part: `15 tasks`, `1 task` */
+  tasks_n: (a: { n: number }): string => a.n === 1 ? String(a.n) + " task" : String(a.n) + " tasks",
   /** a theme's header, how its folders came */
   theme_filed: "filed by main when each task started",
   /** a task folder's header, `amb-home's work` */

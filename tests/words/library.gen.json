@@ -93,6 +93,14 @@
     "one": null,
     "text": "{n} from {from}, {inside}"
   },
+  "library.count_from_alone": {
+    "args": [
+      "n",
+      "from"
+    ],
+    "one": null,
+    "text": "{n} from {from}"
+  },
   "library.crumb_root": {
     "args": [],
     "one": null,
@@ -546,13 +554,20 @@
     "one": null,
     "text": "sort them with main"
   },
+  "library.tasks_n": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} task",
+    "text": "{n} tasks"
+  },
   "library.theme_count": {
     "args": [
       "n",
       "tasks"
     ],
-    "one": "{n} artifact from {tasks} tasks",
-    "text": "{n} artifacts from {tasks} tasks"
+    "one": "{n} artifact from {tasks}",
+    "text": "{n} artifacts from {tasks}"
   },
   "library.theme_filed": {
     "args": [],

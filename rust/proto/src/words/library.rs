@@ -13,6 +13,8 @@ crate::words! { library:
     say = "what your agents made for you to look at.";
     /// facts: how many, from where, in how many folders: `893 from 6 projects, in 9 folders`
     count_from(n, from, inside) = "{n} from {from}, {inside}";
+    /// facts: how many and from where, none of it in a folder: `33 from ai-docs`
+    count_from_alone(n, from) = "{n} from {from}";
     /// facts: the projects part, `6 projects`
     projects_n(n) = one "{n} project" | "{n} projects";
     /// facts: the folders part, `in 9 folders`
@@ -55,8 +57,10 @@ crate::words! { library:
     // ---- tiles and headers
     /// the tiles' sort on all artifacts
     recent_first = "recent first";
-    /// a theme's header, `412 artifacts from 15 tasks`
-    theme_count(n, tasks) = one "{n} artifact from {tasks} tasks" | "{n} artifacts from {tasks} tasks";
+    /// a theme's header, `412 artifacts from 15 tasks` (`tasks`: tasks_n)
+    theme_count(n, tasks) = one "{n} artifact from {tasks}" | "{n} artifacts from {tasks}";
+    /// a theme's header, its tasks part: `15 tasks`, `1 task`
+    tasks_n(n) = one "{n} task" | "{n} tasks";
     /// a theme's header, how its folders came
     theme_filed = "filed by main when each task started";
     /// a task folder's header, `amb-home's work`

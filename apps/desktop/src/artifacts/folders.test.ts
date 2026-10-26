@@ -72,6 +72,20 @@ describe('the library', () => {
     expect(libraryFacts(lib, [], '')).toBe('nothing yet');
   });
 
+  it("never says 'in 0 folders' while folders exist: nothing filed, the facts leave the folders out (ui-review m_45919)", () => {
+    const loose = ITEMS.filter((it) => it.a.id === 'loose');
+    expect(libraryFacts(lib, loose, 'harness')).toBe(`${library.count_from_alone({ n: 1, from: 'harness' })} · ${library.unfiled_n({ n: 1 })}`);
+    expect(libraryFacts(libraryOf([], loose), loose, '')).toBe(`${library.count_from_alone({ n: 1, from: library.projects_n({ n: 1 }) })} · ${library.unfiled_n({ n: 1 })}`);
+  });
+
+  it("a theme's line says 1 task, not '1 tasks' (ui-review m_45919)", () => {
+    const docs: Folder = { id: 'f-docs', name: 'docs', by: 'main', named_by_you: false };
+    const pricing: Folder = { id: 'f-pricing', name: 'pricing', parent: 'f-docs', by: 'main', named_by_you: false };
+    const one = libraryOf([docs, pricing], []);
+    expect(folderLine(one, 'f-docs', [])).toBe(`${library.theme_count({ n: 0, tasks: library.tasks_n({ n: 1 }) })} · ${library.theme_filed}`);
+    expect(library.tasks_n({ n: 1 })).toBe('1 task');
+  });
+
   it('names paths, crumbs and the title bar', () => {
     expect(pathOf(lib, 'f-view')).toBe('desktop app / agent view');
     expect(crumbOf(lib, { at: 'folder', id: 'f-view' }).map((c) => c.name)).toEqual(['desktop app', 'agent view']);
