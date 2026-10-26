@@ -8,7 +8,7 @@
 // the whole words, the actions and ✕; under 160 px of room (the slot's data-narrow) only its sign
 // and short words show. Owner: amb-home.
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { Act, IconButton, Press, cx } from '@/ds';
+import { Act, IconButton, Press, cx, tipAttrs } from '@/ds';
 import { Breath } from '@/working/Signs';
 import { useCoreLine } from './CoreLine';
 import { useReloadLine } from './ReloadLine';
@@ -34,6 +34,9 @@ export function TitleStatus() {
   // a new candidate starts closed: its popover never carries over from another one
   return part === null ? null : <Pill key={part.testId} part={part} />;
 }
+
+/** The pill's words as one line for a tip: its whole words when they are text, else its short ones. Pure. */
+export const tipWords = (part: Pick<StatusPart, 'words' | 'short'>): string => (typeof part.words === 'string' ? part.words : part.short);
 
 /** When even the short words don't fit, the pill is its sign alone (the breath while running; designer m_21244). */
 const GLYPH = { done: '✓', quiet: '↑', err: '▲' } as const;
@@ -128,6 +131,8 @@ function Pill({ part }: { part: StatusPart }) {
     >
       <Press
         look="app-ts-open"
+        // its sign alone (tight): the tip and VoiceOver say what it is (a compact mark explains itself)
+        {...(tight ? { 'aria-label': tipWords(part), ...tipAttrs(tipWords(part)) } : {})}
         aria-expanded={open}
         onClick={() => {
           setOpen((o) => !o);
