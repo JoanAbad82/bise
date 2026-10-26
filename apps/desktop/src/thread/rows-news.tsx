@@ -261,11 +261,14 @@ export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 }
 
 /** A notice's mark by level (the TUI's: info dim, warn ▲, err ✗), as line icons (ui-review m_43792): the tone is said by the icon and words, never by color alone. */
-export const NOTICE_MARK = { info: 'dot', warn: 'alert', err: 'close', unknown: 'dot' } as const satisfies Record<string, AppIconName>;
+export const NOTICE_MARK = { info: null, warn: 'alert', err: 'close', unknown: null } as const satisfies Record<string, AppIconName | null>;
 
-/** A notice's mark, its level's icon and tone, named for VoiceOver. */
+/** A notice's mark, its level's icon and tone, named for VoiceOver. An info notice ('this repo lands on
+ *  main (trunk)') has no mark, its 16 column kept empty: a dot read as a stray '·' (ui-review m_43949). */
 export function NoticeMark({ level }: { level: keyof typeof NOTICE_MARK }) {
-  return <RowMark icon={NOTICE_MARK[level]} tone={level === 'err' ? 'err' : level === 'warn' ? 'plain' : 'dim'} label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'} />;
+  const icon = NOTICE_MARK[level];
+  if (icon === null) return <span className="b-rowmark" aria-hidden="true" />;
+  return <RowMark icon={icon} tone={level === 'err' ? 'err' : 'plain'} label={level === 'err' ? 'error' : 'warning'} />;
 }
 
 export function NoticeRow({ e, ctx, retries }: { e: Entry; ctx: RowCtx; retries?: readonly string[] | undefined }) {

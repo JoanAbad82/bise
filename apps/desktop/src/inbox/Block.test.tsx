@@ -81,10 +81,13 @@ describe('the inbox block (b2)', () => {
     expect(screen.queryByTestId('inbox.block.row.4')).toBeNull();
     const text = (n: number) => screen.getByTestId(`inbox.block.row.${String(n)}`).textContent;
     // the age alone at the row's end: no '#n' id in the UI (designer m_43892)
-    expect(text(1)).toBe('1!perfrun rm -rf target?1 min');
-    expect(text(2)).toBe('2?perfwhich bench? perf heard from main since1 min');
+    // the sign is its line icon, never a text glyph (ui-review m_43949): '!' alert, '?' ask
+    expect(text(1)).toBe('1perfrun rm -rf target?1 min');
+    expect(text(2)).toBe('2perfwhich bench? perf heard from main since1 min');
+    const icon = (n: number) => screen.getByTestId(`inbox.block.row.${String(n)}`).querySelector('.b-rowmark')?.getAttribute('data-icon');
+    expect([icon(1), icon(2), icon(3)]).toEqual(['alert', 'ask', 'alert']);
     // an approval's command: '$ ', its first line, how many lines it has (card_draw.rs box_row)
-    expect(text(3)).toBe('3!perf$ npm publish · 2 lines1 min');
+    expect(text(3)).toBe('3perf$ npm publish · 2 lines1 min');
     // '+ 2 more · ? perf · which port 13?' (more_row): the first of the hidden ones, its note left to its row
     expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 2 more · ? perf · which port 13?');
     fireEvent.click(screen.getByTestId('inbox.block.more'));

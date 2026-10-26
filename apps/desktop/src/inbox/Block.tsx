@@ -14,7 +14,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
-import { Act, Dot, Kbd, Row } from '@/ds';
+import { Act, Dot, Kbd, Row, RowMark } from '@/ds';
 import { actedKeys, useActed, useInboxItems, useProjects, useRefusedList, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
@@ -841,7 +841,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
             lead={
               <>
                 <span className="strip-n">{n}</span>
-                {sign !== null ? <span className={sign === '!' ? 'ib-sign acc' : 'ib-sign'}>{sign}</span> : <Dot state={dotOf(c)} />}
+                {/* the sign as its 14 line icon in the accent, never a text glyph (ui-review m_43949) */}
+                {sign !== null ? <RowMark icon={sign === '!' ? 'alert' : 'ask'} tone="accent" label={sign === '!' ? 'decide' : 'question'} /> : <Dot state={dotOf(c)} />}
               </>
             }
             name={
