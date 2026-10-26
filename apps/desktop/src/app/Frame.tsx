@@ -283,6 +283,8 @@ function StatusSlot({ children }: { children?: ReactNode }) {
     // what the fact takes, and the pill's long width, kept from when they were last shown whole
     let factRoom = 0;
     let pillFull = 0;
+    // the pill's short form, kept from when it last showed: its own room before the minis
+    let pillShort = 0;
     const read = () => {
       const factHidden = bar.dataset["give"] === "fact";
       const fact = bar.querySelector<HTMLElement>('[data-testid="app.bar.title.fact"]');
@@ -297,6 +299,11 @@ function StatusSlot({ children }: { children?: ReactNode }) {
       const g = giveWay({ slot: el.clientWidth - (factHidden ? factRoom : 0), fact: factRoom, pill: pillFull, minis: minisW });
       if (g.fact) bar.dataset["give"] = "fact";
       else delete bar.dataset["give"];
+      if (pill === null) pillShort = 0;
+      else if (el.dataset["narrow"] === "true") pillShort = pill.scrollWidth;
+      // with the minis here the slot never gets narrower than they and the pill's short form: the
+      // crumb's name cuts instead, last (a pill under the minis was ui-review m_45691's red)
+      el.style.minWidth = minisW > 0 ? `${String(Math.ceil(minisW + pillShort))}px` : "";
       setNarrow(g.narrow || (pill !== null && el.clientWidth - minisW < STATUS_NARROW_PX));
     };
     read();
@@ -304,7 +311,7 @@ function StatusSlot({ children }: { children?: ReactNode }) {
     ro.observe(el);
     // a pill or the minis come and go, the crumb's fact changes: read again
     const mo = new MutationObserver(read);
-    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    mo.observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-narrow"] });
     return () => {
       ro.disconnect();
       mo.disconnect();
