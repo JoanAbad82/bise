@@ -110,6 +110,7 @@
    sidebar button, ‹ ›: wider than the rail when the sidebar is hidden), by a margin, so neither its
    box nor its drag region covers them; the panel's own boxes let the press through there. Its body
    keeps the float's room at its foot (a page's native view never draws over the float). */
+.app-panelcol:has(> .pn[data-full]),
 .pn[data-full],
 .pn[data-full] > .pn-col {
   pointer-events: none;
