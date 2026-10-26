@@ -34,6 +34,9 @@ vi.mock('./render', () => ({
   headPng: () => {
     throw new Error('no WebGL');
   },
+  bubblePng: () => {
+    throw new Error('no WebGL');
+  },
 }));
 const panel = vi.hoisted(() => ({ open: false }));
 vi.mock('./ports', async (orig) => ({

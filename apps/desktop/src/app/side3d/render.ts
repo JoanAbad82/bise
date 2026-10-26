@@ -3,9 +3,13 @@
 // same offscreen view, the office's day sun, its contact shadow; read, never changed), and a bim's
 // head and shoulders through makeBim (the same bim as the world's: its outfit from its name, the
 // clay of the day), standing, turned to the camera, in the office's iso view under the same sun,
-// on a transparent ground. Each a PNG data URL `px` css px square drawn at 2x; cache.ts keeps them.
-// Throws when there is no WebGL (the caller draws the plain tile). Owner: nm-side.
-import { Box3, type Object3D } from 'three';
+// on a transparent ground; and a bubble's own object (bubble3d.ts) in the same view, light, sun
+// and contact shadow, fitted to one visual weight. Each a PNG data URL `px` css px square drawn at
+// 2x; cache.ts keeps them. Throws when there is no WebGL (the caller draws the plain tile).
+// Owner: nm-side; bubblePng: r2-objects.
+import { Box3, type BufferGeometry, type Material, Mesh, type Object3D, PlaneGeometry, ShadowMaterial } from 'three';
+import { bubbleModel, fitOf } from './bubble3d';
+import type { BubbleId } from './objects';
 import { iconOf } from '@/plugins/render';
 import type { ObjId } from '@/bims/render/objects/ids';
 import { makeBim } from '@/bims/render/bim';
@@ -101,4 +105,41 @@ export function headPng(name: string, main: boolean, px: number, night: boolean)
   v.scene.remove(bim.group);
   bim.dispose();
   return url;
+}
+
+/** how dark the bubble objects' contact shadow is on the transparent floor (plugins/render's) */
+const SHADOW = 0.22;
+
+/** A bubble's own object (bubble3d.ts), by day or by night: one visual weight in the square, its contact shadow under it. */
+export function bubblePng(b: BubbleId, px: number, night: boolean): string {
+  const v = theView();
+  lightOffice(v.hemi, v.sun, night ? NIGHT : DAY, { x0: -1, W: 2, D: 2 } as unknown as LightBox, STYLE);
+  v.sun.position.set(SUN.x, SUN.y, SUN.z);
+  v.sun.target.position.set(0, 0, 0);
+  const g = bubbleModel(b, night);
+  g.updateMatrixWorld(true);
+  const box = new Box3().setFromObject(g, true);
+  const floor = new Mesh(new PlaneGeometry(4, 4), new ShadowMaterial({ opacity: SHADOW }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0.001;
+  floor.receiveShadow = true;
+  v.scene.add(g, floor);
+  const fit = fitOf(box, px * 2);
+  v.renderer.setSize(fit.widthPx, fit.heightPx, false);
+  v.look(fit);
+  v.render();
+  const url = v.renderer.domElement.toDataURL('image/png');
+  v.scene.remove(g, floor);
+  disposeAll(g);
+  disposeAll(floor);
+  return url;
+}
+
+/** frees a drawn object's geometries and materials (made once per picture) */
+function disposeAll(o: Object3D): void {
+  o.traverse((n) => {
+    if (!(n instanceof Mesh)) return;
+    (n.geometry as BufferGeometry).dispose();
+    for (const m of Array.isArray(n.material) ? n.material : [n.material]) (m as Material).dispose();
+  });
 }

@@ -41,11 +41,8 @@ describe('the counts', () => {
 });
 
 describe('the object of each thing', () => {
-  it('the bubbles: bise\'s head, the easel, the hourglass, the rack', () => {
-    expect(bubbleThing('agents')).toEqual({ head: 'main', main: true });
-    expect(bubbleThing('artifacts')).toEqual({ obj: 'easel' });
-    expect(bubbleThing('scheduled')).toEqual({ obj: 'hourglass' });
-    expect(bubbleThing('processes')).toEqual({ obj: 'rack' });
+  it('the bubbles: each its own model (bubble3d.ts), never an office object or a head', () => {
+    for (const b of ['agents', 'artifacts', 'scheduled', 'processes'] as const) expect(bubbleThing(b)).toEqual({ bubble: b });
   });
   it('an artifact by its kind', () => {
     expect(['pr', 'page', 'deck', 'sheet', 'link', 'image', 'video', 'file'].map(artifactObj)).toEqual(['mailbox', 'lectern', 'blackboard', 'charts', 'globe', 'easel', 'crt', 'lectern']);

@@ -1,4 +1,4 @@
-// src/app/side3d · the right side's pictures, three-free: each object's and each bim head's PNG
+// src/app/side3d · the right side's pictures, three-free: each object's, each bubble's and each bim head's PNG
 // (render.ts, behind import('./render'): nothing of bims/render/ in the entry chunk, the build's
 // bims-budget checks it), drawn once per thing, size and theme and kept for the window's life;
 // asked a few per frame so opening a card never stalls. A head's key carries its outfit (render
@@ -15,6 +15,7 @@ type Render = typeof import('./render');
 export function thingKey(t: Thing, px: number, night: boolean, outfit: string): string {
   const lit = night ? 'night' : 'day';
   if ('obj' in t) return `obj:${t.obj}:${String(px)}:${lit}`;
+  if ('bubble' in t) return `bubble:${t.bubble}:${String(px)}:${lit}`;
   return `head:${t.main ? 'main' : t.head}:${outfit}:${String(px)}:${lit}`;
 }
 
@@ -33,7 +34,14 @@ let pumping = false;
 /** how long a frame may spend drawing, ms */
 const BUDGET_MS = 8;
 
-const outfitOf = (r: Render | null, t: Thing): string => (r === null || 'obj' in t ? '' : r.outfitSig(t.head, t.main));
+const outfitOf = (r: Render | null, t: Thing): string => (r === null || !('head' in t) ? '' : r.outfitSig(t.head, t.main));
+
+/** one thing's picture, through the loaded renderer */
+function draw(r: Render, t: Thing, px: number, night: boolean): string {
+  if ('obj' in t) return r.objectPng(t.obj, px);
+  if ('bubble' in t) return r.bubblePng(t.bubble, px, night);
+  return r.headPng(t.head, t.main, px, night);
+}
 
 function pump(r: Render): void {
   pumping = true;
@@ -45,7 +53,7 @@ function pump(r: Render): void {
       const key = thingKey(job.t, job.px, job.night, outfitOf(r, job.t));
       if (!drawn.has(key) && !dead && Date.now() >= pauseUntil) {
         try {
-          drawn.set(key, 'obj' in job.t ? r.objectPng(job.t.obj, job.px) : r.headPng(job.t.head, job.t.main, job.px, job.night));
+          drawn.set(key, draw(r, job.t, job.px, job.night));
         } catch {
           // the tile for now, never for good: the asker hears back after the pause and asks again
           pauseUntil = Date.now() + RETRY_MS;

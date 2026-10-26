@@ -1,6 +1,6 @@
 // src/app/side3d · the 3D object of each thing on the right side (page native-mac §7): one per
-// bubble (agents = bise's head, artifacts = the easel, scheduled = the hourglass, processes = the
-// server rack), then one per kind in the cards (PR mailbox, page lectern, deck blackboard, sheet
+// bubble (its own minimal model, bubble3d.ts: agents = a bust, artifacts = three fanned sheets,
+// scheduled = an hourglass, processes = a small laptop), then one per kind in the cards (PR mailbox, page lectern, deck blackboard, sheet
 // chart, link globe, image easel, video TV; dev server retro computer, debugger electronics bench,
 // any other process the rack; timer hourglass, watch telescope). Decided from typed state (the
 // hub's kind, a process's url and ports), never from words. Three-free: ids only (bims/render/objects
@@ -12,21 +12,12 @@ import type { Proc } from '@/proto';
 export const BUBBLES = ['agents', 'artifacts', 'scheduled', 'processes'] as const;
 export type BubbleId = (typeof BUBBLES)[number];
 
-/** What a bubble's object is: an object of the office, or a bim's head (agents: bise's own). */
-export type Thing = { readonly obj: ObjId } | { readonly head: string; readonly main: boolean };
+/** What a picture shows: an object of the office, a bim's head (an agent's card), or a bubble's own object (bubble3d.ts). */
+export type Thing = { readonly obj: ObjId } | { readonly head: string; readonly main: boolean } | { readonly bubble: BubbleId };
 
-/** Each bubble's object. Pure. */
+/** Each bubble's object: its own minimal model (bubble3d.ts: a bust, three sheets, an hourglass, a laptop). Pure. */
 export function bubbleThing(b: BubbleId): Thing {
-  switch (b) {
-    case 'agents':
-      return { head: 'main', main: true };
-    case 'artifacts':
-      return { obj: 'easel' };
-    case 'scheduled':
-      return { obj: 'hourglass' };
-    case 'processes':
-      return { obj: 'rack' };
-  }
+  return { bubble: b };
 }
 
 /** An artifact's object by the hub's kind (an open set: anything else is a file, the lectern's paper). Pure. */
