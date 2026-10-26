@@ -3,7 +3,8 @@
    browser's address bar, a shell's tab; then the Overview's sections (the right bar's rows, moved
    from app.css with it). Every size a 4 px step or a token. Owner: nm-panel. */
 
-/* the panel: its column the window's height, its top row in the transparent 52 bar, its body on
+/* the panel: its column the window's height (app.css .app-panelcol), its top row in the window's
+   one 52 bar (the same material, no band of its own: his m_44307), its body on
    --c-solid with a 1 px line on its left; its width animates in 220 ms (--d-base: 0 under reduce
    motion), its inside keeps the final width so nothing reflows; folded, hidden once it has shut */
 .pn {
@@ -28,10 +29,12 @@
   overflow: visible;
   z-index: 3;
 }
+/* the sheet starts under the bar: the bar is as with the panel folded (its ▯ at the window's edge) */
 .pn[data-over] > .pn-col {
   position: absolute;
-  top: 0;
+  top: var(--h-bar);
   right: 0;
+  height: calc(100% - var(--h-bar));
   border-left: 1px solid var(--c-line);
   background: var(--c-solid);
   /* its shadow falls on the thread to its left: it sits above it (designer m_43050 #4); no scrim */
@@ -81,10 +84,11 @@
 .pn-in > [hidden] {
   display: none;
 }
-/* its left border: a drag sets the width, a double click resets it */
+/* its left border, from under the bar (the bar's row drags the window): a drag sets the width, a
+   double click resets it */
 .pn-border {
   position: absolute;
-  top: 0;
+  top: var(--h-bar);
   bottom: 0;
   left: 0;
   width: var(--s-1);

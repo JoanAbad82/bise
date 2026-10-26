@@ -5,9 +5,18 @@
 // screen (App.tsx remounts the screen on each route). The slot drags the window like the bar;
 // what a page puts in it does not (app.css .app-barslot > *).
 // <InTitle>{node}</InTitle> (nm-thread m_43271) does the same for the bar's title: while mounted, its
-// node replaces the title's text (the thread's inline rename field); the subtitle stays. Owner: nm-frame.
-import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
+// node replaces the title's text (the thread's inline rename field); the subtitle stays.
+// barGroundDoubleClick: a double-click on the bar's own ground (the bar, and the panel's tab row in
+// the same row: one bar, his m_44307) zooms or minimises as his Mac says. Owner: nm-frame
+// (r2-titlebar this round).
+import { useEffect, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+
+/** A double-click on the bar's ground: zoom or minimise (window.bise.barDoubleClick); on a control it is the control's. */
+export function barGroundDoubleClick(e: MouseEvent<HTMLElement>): void {
+  if (e.target !== e.currentTarget && (e.target as HTMLElement).closest("button, a, input, [role='button'], [role='tab']") !== null) return;
+  (window as Partial<Window>).bise?.barDoubleClick();
+}
 
 /** One portal target in the bar: its element (null: no bar drawn, the onboarding's window) and how many fill it. */
 function slotStore() {

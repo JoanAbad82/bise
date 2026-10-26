@@ -1,6 +1,7 @@
-// The window's frame (bise fait mac, page native-mac §6, mockup 1): the bar over the whole width
-// (Bar: the lights' room, the sidebar button, ‹ ›, the title and its subtitle, the page's slot,
-// the panel's tabs and ▯ through <BarTabs/>, nm-panel's), the width classes (under 1000 px the
+// The window's frame (bise fait mac, page native-mac §6, mockup 1): one bar across the top (Bar:
+// the lights' room, the sidebar button, ‹ ›, the title and its subtitle, the page's slot, ▯ through
+// <BarTabs/>, nm-panel's; the open panel's tabs sit in the same row over its column, app.css),
+// the width classes (under 1000 px the
 // sidebar slides over the window with a 45% scrim, esc or a click outside closes it), and whether
 // the sidebar shows (its kept state: frame-state.ts; ⌘\ and the bar's button hide and show it in
 // 220 ms). The tabbed panel's state is app/panel/state.ts (nm-panel's). Owner: nm-frame.
@@ -22,7 +23,7 @@ import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
 import { BarTabs } from "./panel/BarTabs";
-import { BarSlot, TitleSlot } from "./barslot";
+import { BarSlot, barGroundDoubleClick, TitleSlot } from "./barslot";
 import { frameLeft, useLeft } from "./frame-state";
 import { SIDE, sideWidthOf, UNFOLD_PX } from "./resize";
 import { crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
@@ -300,14 +301,16 @@ function StatusSlot({ children }: { children?: ReactNode }) {
 }
 
 /**
- * The window's bar (bise fait mac, page native-mac §6, mockup 1): 52 high over the whole width,
- * transparent on the window's vibrancy (--p-bg 30%), no rule under it, the window's drag region
- * (a double-click zooms or minimises as his Mac says: window.bise.barDoubleClick). Its lead holds
- * macOS's lights' room (x 20, 12 each, 8 apart, then 24), the sidebar button and ‹ ›, over the rail
- * and the sidebar; then the title (13/600) and its subtitle (13/400 text-2, 8 after) from 16 left of
- * the content; the status pill; the page's slot (barslot.tsx); the panel's tabs and ▯ (BarTabs,
- * nm-panel's). Its buttons 28 × 28, the icons 16, 4 apart, no-drag. Full screen keeps the lights'
- * room: nothing moves.
+ * The window's bar (bise fait mac, page native-mac §6, mockup 1): 52 high over the rail, the sidebar
+ * and the screen, transparent on the window's vibrancy (--p-bg 30%), no rule under it, the window's
+ * drag region (a double-click zooms or minimises as his Mac says: barslot.tsx barGroundDoubleClick).
+ * With the panel beside the thread, the panel's tab row continues it over the panel's column, the
+ * same height and material: one bar (his m_44307); the bar's right group then ends on the thread's
+ * right edge, never over the tabs (app.css). Its lead holds macOS's lights' room (x 20, 12 each, 8
+ * apart, then 24), the sidebar button and ‹ ›, over the rail and the sidebar; then the title
+ * (13/600) and its subtitle (13/400 text-2, 8 after) from 16 left of the content; the status pill;
+ * the page's slot (barslot.tsx); ▯ (BarTabs, nm-panel's). Its buttons 28 × 28, the icons 16, 4
+ * apart, no-drag. Full screen keeps the lights' room: nothing moves.
  */
 /** The thread's agent's own title ('profiling the hub'), first in the bar's subtitle; '' elsewhere and on a project's main. */
 function useAgentTitle(route: Route): string {
@@ -349,11 +352,7 @@ export function Bar({ frame: state }: { frame: FrameState }) {
     <header
       className="app-bar"
       data-testid="app.bar"
-      onDoubleClick={(e) => {
-        // the bar's own ground only: a double-click on a control is the control's
-        if (e.target !== e.currentTarget && (e.target as HTMLElement).closest("button, a, input, [role='button'], [role='tab']") !== null) return;
-        (window as Partial<Window>).bise?.barDoubleClick();
-      }}
+      onDoubleClick={barGroundDoubleClick}
     >
       <div className="app-bar-lead" data-testid="app.bar.lead">
         <BarButton

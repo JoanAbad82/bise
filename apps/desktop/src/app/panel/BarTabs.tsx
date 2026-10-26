@@ -1,17 +1,18 @@
 // src/app/panel · the panel's tabs and its ▯ (page native-mac §6 and mockups 1-4). BarTabs: the ▯
 // at the end of the window's title bar (Frame.tsx mounts it, so nm-panel never edits Frame.tsx),
-// pressed while the panel is open; ⌥⌘0 does the same. PanelTabs: the tabs in the panel's own top
-// row, in the transparent 52 bar over the panel's column (mockup 3: from the panel's left + 12;
-// ui-review m_42482 #1): 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…';
+// pressed while the panel is open; ⌥⌘0 does the same. PanelTabs: the tabs in the panel's top row,
+// the window's one 52 bar over the panel's column (his m_44307: no band of its own; it drags and
+// double-clicks as the bar's ground; mockup 3: from the panel's left + 12; ui-review m_42482 #1): 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…';
 // × on the one in front and on hover, its slot kept so a tab never changes width (#4); Overview,
 // the home, has none; '+' 28 opens New tab. As many whole tabs as the row holds, six at most
 // (HIG), the rest behind an overflow button whose native menu lists them, none cut (#3); a drag
 // reorders; a right click is the tab's menu (nm-menus' useEntityMenu({ kind: 'tab', id })).
-// Owner: nm-panel.
+// Owner: nm-panel (r2-titlebar this round).
 import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { AppIcon, IconButton, Press, tipAttrs } from '@/ds';
 import { panel } from '@/proto/words_panel.gen';
 import { useEntityMenu } from '@/app/menus/use';
+import { barGroundDoubleClick } from '@/app/barslot';
 import { closable, fitTabs, shownOf, TAB_GAP, type Tab } from './model';
 import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanelState } from './state';
 import { useTabLooks, type TabLook } from './look';
@@ -83,7 +84,8 @@ export function PanelTabs({ start, end }: { start?: ReactNode; end?: ReactNode }
   const { shown, over } = shownOf(s.tabs, fit);
   const [drag, setDrag] = useState<string | null>(null);
   return (
-    <div className="pn-top" data-testid="app.panel.top">
+    // the bar's own row over the panel's column: its ground zooms on a double-click as the bar's
+    <div className="pn-top" data-testid="app.panel.top" onDoubleClick={barGroundDoubleClick}>
         {start}
         <div className="pn-measure" ref={measure} aria-hidden>
           {s.tabs.list.map((t) => {

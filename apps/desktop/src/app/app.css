@@ -62,16 +62,20 @@ body:has(.app-shell) {
   min-height: 0;
   background: var(--c-solid);
 }
+/* the panel's column runs the window's height: its tabs sit in the bar's row, on the same material
+   (one bar across the top, his m_44307); folded or a sheet it is 0 wide */
 .app-panelcol {
-  grid-row: 2;
+  grid-row: 1 / -1;
   grid-column: 4;
   min-height: 0;
   display: flex;
 }
-/* the bar: the whole width, the window's drag region; its controls are not */
+/* the bar: the rail, the sidebar and the screen's width, the window's drag region; its controls
+   are not. Its right group (the state line, the page's slot, ▯) ends on the screen's right edge:
+   the window's edge, or the panel's left edge while the panel is beside the thread */
 .app-bar {
   grid-row: 1;
-  grid-column: 1 / -1;
+  grid-column: 1 / 4;
   display: flex;
   align-items: center;
   min-width: 0;
