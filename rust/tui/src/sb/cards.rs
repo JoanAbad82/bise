@@ -512,7 +512,9 @@ fn update_parts(c: &Card) -> Vec<Part> {
     use bise_proto::words::settings;
     let mut parts = vec![Part::Text(settings::bise_update_tip.to_string())];
     let Some(r) = c.release.as_ref() else { return parts };
-    let lines: Vec<&str> = r.notes.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).collect();
+    // a markdown heading reads as its words (ui-review m_46111): `## Fixes` is `Fixes`
+    let lines: Vec<&str> =
+        r.notes.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).map(|l| l.trim_start_matches('#').trim_start()).collect();
     if lines.is_empty() {
         parts.push(Part::Evidence(settings::bise_update_no_notes.to_string()));
     } else {

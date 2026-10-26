@@ -781,7 +781,7 @@ fn the_new_release_card_shows_its_changelog() {
         })
         .collect();
     assert_eq!(texts[0], format!("T:{}", bise_proto::words::settings::bise_update_tip));
-    let shown: Vec<&str> = notes.iter().take(CHANGELOG_ROWS).map(String::as_str).collect();
+    let shown: Vec<&str> = notes.iter().take(CHANGELOG_ROWS).map(|l| l.trim_start_matches("## ")).collect();
     assert_eq!(texts[1], format!("T:{}", shown.join("\n")), "12 lines, the blank ones out");
     assert_eq!(texts[2], "E:▸ 3 more lines");
     assert_eq!(texts[3], format!("E:you're on v2026.10.2-4 · [full notes on GitHub ↗]({url})"));
