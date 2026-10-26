@@ -9,7 +9,7 @@ export const settings = {
   /** the nav's page: general */
   page_general: "General",
   /** general's hero sentence (designer m_39021) */
-  page_general_sub: "how bise starts, updates and looks.",
+  page_general_sub: "how bise looks, reaches you and updates.",
   /** the nav's page: setup */
   page_setup: "Setup",
   /** setup's hero sentence */
@@ -43,9 +43,9 @@ export const settings = {
   /** computer use's hero sentence */
   page_computer_sub: "your browser and your Mac apps, for your agents: set it up once, then see what they did.",
   /** the nav's page: keys */
-  page_keys: "Keys",
+  page_keys: "Shortcuts",
   /** keys' hero sentence */
-  page_keys_sub: "your keys and sign-ins. they stay on this Mac.",
+  page_keys_sub: "the keys that reach bise from any app, and in the window.",
   /** general: the macOS notifications row's label */
   notify_label: "macOS notifications",
   /** notifications never asked */
@@ -151,7 +151,7 @@ export const settings = {
   /** privacy: the images row (D14: every image of the store, designer m_23410) */
   privacy_shots: "Images",
   /** privacy: the images row's line */
-  privacy_shots_sub: "pasted, made by agents or taken with fn · deleted after",
+  privacy_shots_sub: "pasted, from agents or from fn",
   /** privacy: how long images are kept */
   days: (a: { n: number }): string => a.n === 1 ? String(a.n) + " day" : String(a.n) + " days",
   /** privacy: the excluded apps' group */
@@ -232,14 +232,18 @@ export const settings = {
   role_set_here: "set here",
   /** a role's model: from his environment */
   role_from_env: "from your environment",
-  /** a role's model: follows another role */
-  role_follows: (a: { role: string | number }): string => "follows " + String(a.role),
   /** a role's model: the default */
   role_default: "the default",
   /** a role's picker label */
   role_model: (a: { role: string | number }): string => String(a.role) + "'s model",
   /** a role's picker: back to the role it follows */
   role_as: (a: { role: string | number }): string => "as " + String(a.role),
+  /** settings › models: the main role's row title (in the window, main is called bise; designer m_43851) */
+  role_main_name: "bise",
+  /** settings › models: the main role's line */
+  role_main_about: "your lead in every project",
+  /** settings › models: the agents role's line */
+  role_agents_about: "the agents bise starts",
   /** a model whose provider needs its setup first */
   role_setup_first: (a: { provider: string | number }): string => String(a.provider) + ": set up first",
   /** the roles' group */
@@ -327,7 +331,7 @@ export const settings = {
   /** the add button; the add sheet's head */
   add_project: "add a project",
   /** the projects page's add button, under the list (designer m_41841) */
-  add_project_more: "add a project…",
+  add_project_more: "Add a project…",
   /** a project row's ⋯: its name in words (aria-label, tip) */
   project_menu: (a: { name: string | number }): string => String(a.name) + ": rename, move, remove",
   /** the add sheet's line under its head */

@@ -8,7 +8,7 @@ crate::words! { settings:
     /// the nav's page: general
     page_general = "General";
     /// general's hero sentence (designer m_39021)
-    page_general_sub = "how bise starts, updates and looks.";
+    page_general_sub = "how bise looks, reaches you and updates.";
     /// the nav's page: setup
     page_setup = "Setup";
     /// setup's hero sentence
@@ -42,9 +42,9 @@ crate::words! { settings:
     /// computer use's hero sentence
     page_computer_sub = "your browser and your Mac apps, for your agents: set it up once, then see what they did.";
     /// the nav's page: keys
-    page_keys = "Keys";
+    page_keys = "Shortcuts";
     /// keys' hero sentence
-    page_keys_sub = "your keys and sign-ins. they stay on this Mac.";
+    page_keys_sub = "the keys that reach bise from any app, and in the window.";
 
     /// general: the macOS notifications row's label
     notify_label = "macOS notifications";
@@ -154,7 +154,7 @@ crate::words! { settings:
     /// privacy: the images row (D14: every image of the store, designer m_23410)
     privacy_shots = "Images";
     /// privacy: the images row's line
-    privacy_shots_sub = "pasted, made by agents or taken with fn · deleted after";
+    privacy_shots_sub = "pasted, from agents or from fn";
     /// privacy: how long images are kept
     days(n) = one "{n} day" | "{n} days";
     /// privacy: the excluded apps' group

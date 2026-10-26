@@ -73,7 +73,8 @@ describe('the pages group (designer m_21505)', () => {
     expect(set[0]?.name).toBe('settings');
     expect(set.some((h) => h.parent === 'settings' && h.name === settings.page_setup)).toBe(true);
     const keys = group('keys')?.hits ?? [];
-    expect(keys[0]).toMatchObject({ name: settings.page_keys, parent: 'settings', open: { to: 'page', go: { route: 'settings/keys' } } });
+    // the keys page is Shortcuts now (designer m_43851): 'keys' still finds it by its id
+    expect(keys.find((h) => h.parent === 'settings')).toMatchObject({ name: settings.page_keys, parent: 'settings', open: { to: 'page', go: { route: 'settings/keys' } } });
     expect(keys.some((h) => h.name === 'help' && h.key === '⌘/')).toBe(true);
     expect(group('inbox')?.hits[0]).toMatchObject({ glyph: '#', key: '⌘I', open: { to: 'page', go: { inbox: true } } });
   });

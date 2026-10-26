@@ -406,11 +406,12 @@ describe('which model does what (V17) and a model with no key (L5)', () => {
     const p = ports();
     view('models', p, { roles: ROLES, models: MODELS, accounts: ACCOUNTS });
     const roles = screen.getByTestId('settings.roles');
-    expect(roles.textContent).toContain('your team lead · set here');
-    expect(roles.textContent).toContain('follows main');
+    // in the window main is called bise (designer m_43851): its row, agents' line and its fallback say so
+    expect(roles.textContent).toContain(`${settings.role_main_name}${settings.role_main_about} · set here`);
+    expect(roles.textContent).toContain(`${settings.role_agents_about} · ${settings.role_as({ role: settings.role_main_name })}`);
     expect(roles.textContent).toContain('from your environment');
     expect(screen.getByTestId('settings.role.main.model').textContent).toContain('opus 5.5');
-    expect(screen.getByTestId('settings.role.agents.model').textContent).toContain('as main');
+    expect(screen.getByTestId('settings.role.agents.model').textContent).toContain(settings.role_as({ role: settings.role_main_name }));
     expect(screen.getByTestId('settings.role.voice.model').textContent).toBe('mistral/voxtral-mini-latest');
     expect(screen.getByTestId('settings.role.main.effort.2').className).toContain('on');
     fireEvent.click(screen.getByTestId('settings.role.main.effort.3'));

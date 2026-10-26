@@ -89,10 +89,13 @@ export function Accounts({ accounts, send, check = null, want = null, signin = n
           : settings.sign_in_browser,
     control:
       a.state === 'signed_in' ? (
-        <Chip tone="ok" testId={`settings.account.${a.id}.ok`}>
-          <AppIcon name="check" size={14} />
-          {settings.signed_in}
-        </Chip>
+        // done: the line check in ink, its words in text-2, never green (designer m_43851)
+        <span className="settings-done">
+          <Chip testId={`settings.account.${a.id}.ok`}>
+            <AppIcon name="check" size={14} />
+            {settings.signed_in}
+          </Chip>
+        </span>
       ) : (
         <Button
           state={busy.includes(a.id) ? 'loading' : undefined}
@@ -113,10 +116,12 @@ export function Accounts({ accounts, send, check = null, want = null, signin = n
     sub: key ? `${key.label}${key.who != null ? ` · ${key.who}` : ''}` : settings.api_key_sub,
     control: key ? (
       <span className="settings-row-acts">
-        <Chip tone="ok">
-          <AppIcon name="check" size={14} />
-          {settings.key_added}
-        </Chip>
+        <span className="settings-done">
+          <Chip>
+            <AppIcon name="check" size={14} />
+            {settings.key_added}
+          </Chip>
+        </span>
         <Button kind="ghost" onClick={() => { send({ cmd: 'key_remove', id: key.id }); }} testId={`settings.key.${key.id}.remove`}>
           {settings.key_remove}
         </Button>

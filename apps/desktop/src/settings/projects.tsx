@@ -237,9 +237,9 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
       {/* a broken core says so in the window's top line (CoreLine), its one place (designer m_18973) */}
       {asked !== undefined && <Help testId="settings.projects.ask">{settings.project_remove_ask({ name: asked.name })}</Help>}
       <span className="sp-add">
+        {/* a 28 button under the box, like Add a key (designer m_43851) */}
         <Button
           size="sm"
-          kind="ghost"
           onClick={() => {
             setSheet(true);
           }}

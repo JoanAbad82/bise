@@ -172,5 +172,5 @@ const PAGE_ICON: Record<Page, AppIconName> = {
   approvals: 'shield',
   projects: 'folder',
   computer: 'cursor',
-  keys: 'key',
+  keys: 'keyboard',
 };

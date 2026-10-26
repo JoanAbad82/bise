@@ -2,12 +2,17 @@
    (ds/css/settings.css), the whole window, its sidebar and its page scrolling apart */
 .settings-window { height: 100vh; overflow: hidden; }
 .settings-row-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
-/* settings › projects (projects.tsx, designer m_41841): one 32 px row each, on the column, its fill
-   8 px past it as on every list; the name, then its folder short; at the right its ⌘N, then the ⋯
-   whose slot stays (shown on hover, focus or its menu open: nothing moves). A drag lifts the row
-   (--c-raised, --e-2) and a 2 px ink line marks where it lands. */
-.sp-list { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--pad-row-x)); }
-.sp-row { position: relative; display: flex; align-items: center; gap: var(--gap-inline); height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); outline: none; touch-action: none; user-select: none; }
+/* settings › projects (projects.tsx, designer m_41841, m_43851): the rows in a box like every
+   settings group (r 10, a hairline, rows 44 at 0 12, a hairline between them); the name, then its
+   folder short (~/acme); at the right its ⌘N, then the ⋯ whose slot stays (shown on hover, focus or
+   its menu open: nothing moves). 'Add a project…' is a 28 button 12 under the box. A drag lifts
+   the row (--c-raised, --e-2) and a 2 px ink line marks where it lands. */
+.sp-list { display: flex; flex-direction: column; border-radius: var(--r-menu); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.sp-row { box-sizing: border-box; position: relative; display: flex; align-items: center; gap: var(--gap-inline); min-height: var(--h-setting-row); padding: 0 var(--s-3); outline: none; touch-action: none; user-select: none; }
+.sp-row + .sp-row { border-top: 1px solid var(--c-line); }
+.sp-row:first-child { border-radius: var(--r-menu) var(--r-menu) 0 0; }
+.sp-row:last-child { border-radius: 0 0 var(--r-menu) var(--r-menu); }
+.sp-row:only-child { border-radius: var(--r-menu); }
 .sp-row:hover, .sp-row:focus-visible, .sp-row[data-menu] { background: var(--c-hover); }
 .sp-row:focus-visible { box-shadow: inset 0 0 0 1px var(--c-focus); }
 .sp-list[data-drag] .sp-row:not([data-lifted]) { background: none; }
@@ -29,7 +34,7 @@
 .sp-row:active { cursor: grabbing; }
 .sp-list[data-drag] .sp-more { visibility: hidden; }
 .sp-menu-err .b-picker-row { color: var(--c-err); }
-.sp-add { display: block; margin: var(--s-3) 0 0 calc(-1 * var(--pad-control-x-sm)); }
+.sp-add { display: block; margin: var(--s-3) 0 0; }
 /* the key field and its caption are one block: 4 between them, then the group gap before the next title (designer m_21395) */
 .settings-key { margin: var(--s-3) 0 var(--gap-section); max-width: 420px; }
 .settings-key .b-help { margin-top: var(--gap-tight); }

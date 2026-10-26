@@ -56,14 +56,18 @@ crate::words! { settings:
     role_set_here = "set here";
     /// a role's model: from his environment
     role_from_env = "from your environment";
-    /// a role's model: follows another role
-    role_follows(role) = "follows {role}";
     /// a role's model: the default
     role_default = "the default";
     /// a role's picker label
     role_model(role) = "{role}'s model";
     /// a role's picker: back to the role it follows
     role_as(role) = "as {role}";
+    /// settings › models: the main role's row title (in the window, main is called bise; designer m_43851)
+    role_main_name = "bise";
+    /// settings › models: the main role's line
+    role_main_about = "your lead in every project";
+    /// settings › models: the agents role's line
+    role_agents_about = "the agents bise starts";
     /// a model whose provider needs its setup first
     role_setup_first(provider) = "{provider}: set up first";
     /// the roles' group

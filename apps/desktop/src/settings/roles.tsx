@@ -8,11 +8,26 @@ import { Group, Help, Seg, Select, type GroupItem } from '@/ds';
 import { settings } from '@/proto/words.gen';
 import { modelRow } from './hold';
 
-/** Where a role's model comes from, in his words. */
+/**
+ * A role's name in the window, from its id (typed): main is called bise there (designer m_43851);
+ * the other roles keep the core's name. Pure.
+ */
+export function roleName(id: string, core: string): string {
+  return id === 'main' ? settings.role_main_name : core;
+}
+
+/** A role's line in the window, from its id: main's and agents' say who bise is; the others the core's. Pure. */
+export function roleAbout(r: RoleRow): string {
+  if (r.role === 'main') return settings.role_main_about;
+  if (r.role === 'agents') return settings.role_agents_about;
+  return r.about;
+}
+
+/** Where a role's model comes from, in his words ('as bise' when it follows main). */
 export function roleSource(r: RoleRow): string {
   if (r.source === 'config') return settings.role_set_here;
   if (r.source === 'env') return settings.role_from_env;
-  return r.follows != null && r.follows !== '' ? settings.role_follows({ role: r.follows }) : settings.role_default;
+  return r.follows != null && r.follows !== '' ? settings.role_as({ role: roleName(r.follows, r.follows) }) : settings.role_default;
 }
 
 /** The efforts a role can take: its model's (none: the model takes no effort). */
@@ -48,17 +63,17 @@ export function Roles({ roles, models, error = null, set }: RolesProps) {
     return {
       id: r.role,
       // the core's role name is a row title: sentence case on screen (ui-review m_43805), the word stays the core's
-      label: <span className="settings-role-n">{r.name}</span>,
-      sub: `${r.about} · ${roleSource(r)}`,
+      label: <span className="settings-role-n">{roleName(r.role, r.name)}</span>,
+      sub: `${roleAbout(r)} · ${roleSource(r)}`,
       control: (
         <span className="settings-row-acts">
           {chat ? (
             <span className="settings-pick">
               <Select
-                label={settings.role_model({ role: r.name })}
+                label={settings.role_model({ role: roleName(r.role, r.name) })}
                 value={r.source === 'default' ? FALLBACK : r.model}
                 options={[
-                  { value: FALLBACK, label: r.follows != null && r.follows !== '' ? settings.role_as({ role: r.follows }) : settings.role_default },
+                  { value: FALLBACK, label: r.follows != null && r.follows !== '' ? settings.role_as({ role: roleName(r.follows, r.follows) }) : settings.role_default },
                   ...(!known && r.source !== 'default' ? [{ value: r.model, label: r.model }] : []),
                   ...models
                     .filter((m) => m.alias_of == null || m.alias_of === '')

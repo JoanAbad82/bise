@@ -198,6 +198,8 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       signin={{ waiting, signing }}
       notify={notify}
       appUpdate={appUpdate}
+      // his home folder: projects' paths say ~/acme, never /Users/… (designer m_43851)
+      {...(bise?.home !== undefined ? { home: bise.home } : {})}
       dist={dist}
       ports={{
         ...(updateApi

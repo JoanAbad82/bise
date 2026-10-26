@@ -69,6 +69,8 @@ const PARTS = {
   // nm-thread (ui-review m_43792): a thread row's marks, for ▲ and ·
   alert: ["M10.3 4.2 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z", "M12 9v4", [12, 17, 1]],
   dot: [[12, 12, 1]],
+  // nm-settings: settings › Shortcuts (designer m_43851)
+  keyboard: ["M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z", "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"],
 } as const satisfies Record<string, readonly Part[]>;
 
 /** Every app icon's name. */

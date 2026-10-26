@@ -234,13 +234,8 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
     case 'computer':
       return <Computer cu={data.computerUse} send={ports.send} />;
     case 'keys':
-      // N1: where his keys and sign-ins are kept heads the keys page (designer m_17435: found under keys)
-      return (
-        <>
-          {data.keychain != null && <KeychainRow k={data.keychain} send={ports.send} />}
-          <KeyList />
-        </>
-      );
+      // Shortcuts: the keyboard's keys only (designer m_43851); his API keys and sign-ins are Models'
+      return <KeyList />;
   }
 }
 
@@ -339,7 +334,7 @@ function Privacy({ prefs, setPref, tg }: { prefs: Prefs | null; setPref: (key: s
             id: 'add',
             label: adding ? <AddApp onAdd={(id) => { flip(id); setAdding(false); }} onCancel={() => { setAdding(false); }} /> : settings.privacy_another_app,
             control: adding ? undefined : (
-              <Button kind="ghost" onClick={() => { setAdding(true); }} testId="settings.app.add">
+              <Button onClick={() => { setAdding(true); }} testId="settings.app.add">
                 {settings.privacy_add}
               </Button>
             ),
@@ -413,6 +408,8 @@ function Models({ data, ports }: { data: SettingsData; ports: SettingsPorts }) {
         {...(ports.copy ? { copy: ports.copy } : {})}
         {...(ports.cancelSignIn ? { cancelSignIn: ports.cancelSignIn } : {})}
       />
+      {/* N1: where his keys and sign-ins are kept, under them (designer m_43851: Keys became Shortcuts) */}
+      {data.keychain != null && <KeychainRow k={data.keychain} send={ports.send} />}
       <Roles
         roles={data.roles ?? []}
         models={models}

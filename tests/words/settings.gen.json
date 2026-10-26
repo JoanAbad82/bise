@@ -80,7 +80,7 @@
   "settings.add_project_more": {
     "args": [],
     "one": null,
-    "text": "add a project…"
+    "text": "Add a project…"
   },
   "settings.add_rescan": {
     "args": [],
@@ -2025,17 +2025,17 @@
   "settings.page_general_sub": {
     "args": [],
     "one": null,
-    "text": "how bise starts, updates and looks."
+    "text": "how bise looks, reaches you and updates."
   },
   "settings.page_keys": {
     "args": [],
     "one": null,
-    "text": "Keys"
+    "text": "Shortcuts"
   },
   "settings.page_keys_sub": {
     "args": [],
     "one": null,
-    "text": "your keys and sign-ins. they stay on this Mac."
+    "text": "the keys that reach bise from any app, and in the window."
   },
   "settings.page_models": {
     "args": [],
@@ -3620,7 +3620,7 @@
   "settings.privacy_shots_sub": {
     "args": [],
     "one": null,
-    "text": "pasted, made by agents or taken with fn · deleted after"
+    "text": "pasted, from agents or from fn"
   },
   "settings.privacy_url": {
     "args": [],
@@ -4070,6 +4070,11 @@
     "one": "{n} commit since {since}",
     "text": "{n} commits since {since}"
   },
+  "settings.role_agents_about": {
+    "args": [],
+    "one": null,
+    "text": "the agents bise starts"
+  },
   "settings.role_as": {
     "args": [
       "role"
@@ -4087,17 +4092,20 @@
     "one": null,
     "text": "the default"
   },
-  "settings.role_follows": {
-    "args": [
-      "role"
-    ],
-    "one": null,
-    "text": "follows {role}"
-  },
   "settings.role_from_env": {
     "args": [],
     "one": null,
     "text": "from your environment"
+  },
+  "settings.role_main_about": {
+    "args": [],
+    "one": null,
+    "text": "your lead in every project"
+  },
+  "settings.role_main_name": {
+    "args": [],
+    "one": null,
+    "text": "bise"
   },
   "settings.role_model": {
     "args": [
