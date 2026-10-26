@@ -613,6 +613,12 @@
 .th-stopped .b-marker {
   color: var(--c-text-2);
 }
+/* a mark inside a Marker's words ('stopped · 09:46', 'done · …'): the same 8 before the words as
+   every row's 16 mark column (designer m_43996) */
+.th-stopped .b-rowmark,
+.th-report-line .b-rowmark {
+  margin-right: var(--gap-inline);
+}
 /* batch 3a: the hub's news lines (landed, PR news, approvals, answered for him): a mark that
    says what it means, the words; tone by the mark and its words, never color alone */
 .th-news {
@@ -1742,6 +1748,11 @@ button.th-turn-line:focus-visible {
 }
 .th-sched-chev[data-open] {
   transform: rotate(90deg);
+}
+/* the chevron after the words inside the head's button ('next 14:22 ›'): the same gap as a flex
+   row's ('ran 1 command ›', 'went through ›'; designer m_43996) */
+.b-sched-head .th-sched-chev {
+  margin-left: var(--gap-inline);
 }
 /* an artifact made, a page shared (MadeChip): its pink chip, then its kind and version dim */
 .th-made {

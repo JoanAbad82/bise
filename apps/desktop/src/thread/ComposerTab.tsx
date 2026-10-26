@@ -11,7 +11,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Agent } from '@/proto';
 import { AppIcon, PickerPop, PickerTrigger, Ring, tipAttrs } from '@/ds';
-import { usePlaces, useProjects } from '@/store';
+import { useFlow, usePlaces, useProjects } from '@/store';
 import { placeOf as placeOfAgent, tilde, worktreeParts } from '@/app/barplaces';
 import { composer } from '../proto/words.gen';
 import { answerFit, contextOf, RING_CLEAR_PCT, ringTip, stripFit, tabPlace, type StripFit, type TabPlace, type TabWords } from './tab';
@@ -162,6 +162,7 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   const ref = useRef<HTMLSpanElement>(null);
   // the empty home: the project's own branch (where main starts its worktrees from)
   const projectBranch = useProjects().find((p) => p.project === project?.id)?.branch ?? undefined;
+  const flow = useFlow(project?.id ?? '');
   const [fit, setFit] = useState<StripFit>(ALL);
   // the label cut after a whole word when even alone it doesn't fit (designer m_24325); null: whole
   const [cut, setCut] = useState<string | null>(null);
@@ -239,6 +240,9 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
     );
   }
   const branch = newPlace ? projectBranch : place?.branch;
+  // a trunk project's fact, where the work lands, text-3 after the branch (designer m_43996): never
+  // a loose line between the thread and the dock
+  const lands = flow === 'trunk' && branch !== undefined ? composer.ctx_lands({ branch: projectBranch ?? 'main' }) : null;
   return (
     <span ref={ref} className="cmp-ctx" data-testid={testId}>
       {project !== undefined && <ProjectItem project={project} shown={fit.project} testId={testId} />}
@@ -253,6 +257,11 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
         <span className="it br" data-item="branch" data-testid={`${testId}.branch`} {...tipAttrs(composer.ctx_branch_tip({ branch }))}>
           <AppIcon name="branch" size={14} />
           <span className="nm mono">{branch}</span>
+        </span>
+      )}
+      {lands !== null && (
+        <span className="it lands" data-item="lands" data-testid={`${testId}.lands`}>
+          <span className="nm">{lands}</span>
         </span>
       )}
       {endEl}

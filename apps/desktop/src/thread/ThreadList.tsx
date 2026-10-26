@@ -155,6 +155,17 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
+/**
+ * A row opened while the list stuck to its end: how far to scroll down so what it opened comes into
+ * view (`toEnd`, the px left below the view) without the clicked row leaving the view's top
+ * (`rowTop`, its y in the view), and whether the list still sticks to its end (all of it fits). Pure.
+ */
+export function followOpened(rowTop: number, toEnd: number): { by: number; stuck: boolean } {
+  const room = Math.max(0, rowTop);
+  if (toEnd <= room) return { by: Math.max(0, toEnd), stuck: true };
+  return { by: room, stuck: false };
+}
+
 export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, ref, keepKey, holdPart, reactKey, onReading, onRead }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
@@ -176,7 +187,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
   tellRead.current = onRead;
   const told = useRef<string | undefined>(undefined);
   // click: held because he opened or closed a row (it keeps its y even at the end: never re-stuck)
-  const held = useRef<{ index: number; top: number; until: number; click?: boolean } | undefined>(undefined);
+  // end: the click came while the list stuck to its end (followOpened)
+  const held = useRef<{ index: number; top: number; until: number; click?: boolean; end?: boolean } | undefined>(undefined);
   const holdRef = useRef<() => void>(() => undefined);
   // his place written to keep.ts (keepPlace below, once `stick` exists)
   const placeRef = useRef<() => void>(() => undefined);
@@ -291,6 +303,18 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
     }
     const row = el.querySelector<HTMLElement>(`[data-item-index="${String(h.index)}"]`);
     if (row === null) return;
+    if (h.click === true && h.end === true) {
+      // opened at the thread's end (designer m_43996): what it opened comes into view, the list
+      // still at its end, never further than the clicked row at the view's top; taller than the
+      // view, he reads it from its row and the list no longer follows the end
+      const f = followOpened(partOf(row, holdPart).getBoundingClientRect().top - el.getBoundingClientRect().top, el.scrollHeight - el.clientHeight - el.scrollTop);
+      if (f.by >= 0.5) el.scrollTop += f.by;
+      if (!f.stuck && stick.current) {
+        stick.current = false;
+        setStuck(false);
+      }
+      return;
+    }
     const d = partOf(row, holdPart).getBoundingClientRect().top - h.top;
     if (Math.abs(d) < 0.5) return;
     el.scrollTop += d;
@@ -358,7 +382,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
         [...el.querySelectorAll<HTMLElement>('[data-item-index]')].find((x) => x.getBoundingClientRect().bottom > top) ??
         null;
       if (r === null) return;
-      held.current = { index: Number(r.dataset.itemIndex), top: partOf(r, holdPart).getBoundingClientRect().top, until: Date.now() + HOLD_MS, click: true };
+      held.current = { index: Number(r.dataset.itemIndex), top: partOf(r, holdPart).getBoundingClientRect().top, until: Date.now() + HOLD_MS, click: true, end: stick.current };
       keepHeld();
     },
     [holdPart, keepHeld],

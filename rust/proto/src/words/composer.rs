@@ -421,6 +421,8 @@ crate::words! { composer:
     ctx_new_worktree_tip = "main starts its agents in a new worktree";
     /// the tip of the strip's branch
     ctx_branch_tip(branch) = "on branch {branch}";
+    /// after the branch, text-3, when the project's flow is trunk: where its work lands (the hub's devflow::lands)
+    ctx_lands(branch) = "lands on {branch}";
     /// the tip of the strip's project when it is not a picker
     ctx_project_tip(path) = "the project's folder: {path}";
     /// the strip's project picker: its name and tip

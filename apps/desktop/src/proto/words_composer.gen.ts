@@ -378,6 +378,8 @@ export const composer = {
   ctx_new_worktree_tip: "main starts its agents in a new worktree",
   /** the tip of the strip's branch */
   ctx_branch_tip: (a: { branch: string | number }): string => "on branch " + String(a.branch),
+  /** after the branch, text-3, when the project's flow is trunk: where its work lands (the hub's devflow::lands) */
+  ctx_lands: (a: { branch: string | number }): string => "lands on " + String(a.branch),
   /** the tip of the strip's project when it is not a picker */
   ctx_project_tip: (a: { path: string | number }): string => "the project's folder: " + String(a.path),
   /** the strip's project picker: its name and tip */

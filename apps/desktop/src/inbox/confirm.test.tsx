@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { CoreCmd } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { HubNoteRow } from './confirm';
+import { HubNoteRow, isFlowNote } from './confirm';
 
 afterEach(cleanup);
 
@@ -28,9 +28,23 @@ describe('HubNoteRow', () => {
     const { store } = setup();
     expect(screen.queryByTestId('confirm.notice')).toBeNull();
     act(() => {
-      store.apply({ ev: 'notice', project: P, cmd: 'slash', text: 'flow: trunk' });
+      store.apply({ ev: 'notice', project: P, cmd: 'slash', text: '@x stays: nothing archived' });
     });
-    expect(screen.getByTestId('confirm.notice').textContent).toBe('flow: trunk');
+    expect(screen.getByTestId('confirm.notice').textContent).toBe('@x stays: nothing archived');
+  });
+
+  it("/flow's answer shows until the flow is known, then the composer's strip says it (designer m_43996)", () => {
+    const { store } = setup();
+    act(() => {
+      store.apply({ ev: 'notice', project: P, cmd: 'slash', text: 'flow: lands on main · straight to main' });
+    });
+    expect(screen.getByTestId('confirm.notice').textContent).toBe('flow: lands on main · straight to main');
+    act(() => {
+      store.apply({ ev: 'flow', project: P, flow: 'trunk' });
+    });
+    expect(screen.queryByTestId('confirm.notice')).toBeNull();
+    expect(isFlowNote('flow: lands via PRs · a PR per task')).toBe(true);
+    expect(isFlowNote('@x stays: nothing archived')).toBe(false);
   });
 
   describe('his /restart row (ambient-lead m_22833, his m_22835)', () => {

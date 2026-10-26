@@ -7,7 +7,7 @@ import { formatRoute } from '@/app/route';
 import { RouterContext } from '@/app/router';
 import { inbox } from '@/proto/words_inbox.gen';
 import { Act, Kbd } from '@/ds';
-import { useNotice, useStore, useVersions } from '@/store';
+import { useFlow, useNotice, useStore, useVersions } from '@/store';
 import { appBuild, appSwap, restartTail, tailWords, type AppBuild, type RestartTail } from './restart';
 import './inbox.css';
 
@@ -17,10 +17,19 @@ import './inbox.css';
  * (designer's desktop-notices page (1)): the thread's notice look, dim, no mark. ThreadScreen
  * mounts it after the working row (amb-win m_20575). A refused line is the composer's key line.
  */
+/** /flow's answer, the hub's devflow::show words ('flow: lands on main · …'). Pure. */
+export function isFlowNote(text: string): boolean {
+  return text.startsWith('flow: ');
+}
+
 export function HubNoteRow({ project }: { project: string }) {
   const notice = useNotice(project);
   const tail = useRestartTail(project, notice?.restart === true);
+  const flow = useFlow(project);
   if (notice === null || notice.level === 'error') return null;
+  // /flow's answer ('flow: lands on main · …', the hub's devflow::show): the composer's strip says
+  // where the work lands once the flow is known, never a loose line above the dock (designer m_43996)
+  if (isFlowNote(notice.text) && (flow === 'trunk' || flow === 'pr')) return null;
   // the hub is back (its hello): a restart's words are over; only a staged app still shows
   if (notice.back === true && tail?.kind !== 'staged') return null;
   const words = notice.back === true ? '' : notice.text;

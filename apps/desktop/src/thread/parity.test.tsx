@@ -393,6 +393,27 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(v.getByTestId('composer.ctx.context').dataset['tip']).toBe("17% of perf's context used · 42k tokens · compacts at 90%");
     expect(v.queryByTestId('thread.usage'), 'not in the head too').toBeNull();
   });
+
+  it("a trunk project's 'lands on main' sits in the composer's strip after the branch, never a loose line (designer m_43996)", () => {
+    const store = new Store(null);
+    act(() => {
+      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf', { branch: 'sb/perf', worktree: '/w/perf', mode: 'worktree' })] });
+    });
+    const v = render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
+      </StoreProvider>,
+    );
+    expect(v.queryByTestId('composer.ctx.lands'), 'the flow not known yet: nothing').toBeNull();
+    act(() => {
+      store.apply({ ev: 'flow', project: P, flow: 'trunk' });
+    });
+    expect(v.getByTestId('composer.ctx.lands').textContent).toBe('lands on main');
+    act(() => {
+      store.apply({ ev: 'flow', project: P, flow: 'pr' });
+    });
+    expect(v.queryByTestId('composer.ctx.lands')).toBeNull();
+  });
 });
 
 describe("a project's welcome in main's empty thread (page new-project-home, pick A); bise's own keeps the first run", () => {

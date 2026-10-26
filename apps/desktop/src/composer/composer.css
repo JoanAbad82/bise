@@ -289,6 +289,12 @@
 .b-composer .cmp-ctx .it.br {
   flex: 0 1 auto;
 }
+/* 'lands on main' after the branch: a fact, text-3, the first to cut (designer m_43996) */
+.b-composer .cmp-ctx .it.lands {
+  flex: 0 100 auto;
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
 .b-composer .cmp-ctx .nm {
   overflow: hidden;
   text-overflow: ellipsis;

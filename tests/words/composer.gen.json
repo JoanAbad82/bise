@@ -477,6 +477,13 @@
     "one": null,
     "text": "on branch {branch}"
   },
+  "composer.ctx_lands": {
+    "args": [
+      "branch"
+    ],
+    "one": null,
+    "text": "lands on {branch}"
+  },
   "composer.ctx_local": {
     "args": [],
     "one": null,
