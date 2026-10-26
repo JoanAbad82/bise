@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { News, ProjectRow, Pulse } from '@/proto';
 import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
-import { BUCKET_MS, BUCKETS, daysOf, projectFacts, since, weekBars, weekOf, workWords } from './projectfacts';
+import { BUCKET_MS, BUCKETS, daysBack, daysOf, projectFacts, since, weekBars, weekOf, workWords } from './projectfacts';
 import { waitsTip, workingTip } from './tipwords';
 
 const H = 3_600_000;
@@ -127,6 +127,18 @@ describe('the week', () => {
     expect(bars[2]?.tip).toBe(projects.day_work({ day: 'thu 22 oct', work: '6 h' }));
     expect(bars[4]?.tip).toBe(projects.day_idle({ day: 'sat 24 oct' }));
     expect(weekBars(new Array<number>(7).fill(0), now).map((b) => b.h)).toEqual([1, 1, 1, 1, 1, 1, 1]);
+  });
+
+  it("the bars name calendar days, never 24-h steps: summer time's 25-h day still has one 'yesterday' (ui-review m_46014)", () => {
+    // 26 oct 2026 23:00 in Paris, the day after summer time ends
+    const now = Date.UTC(2026, 9, 26, 22);
+    const days = weekBars(new Array<number>(7).fill(0), now, 'Europe/Paris').map((b) => b.tip);
+    expect(days).toEqual(['tue 20 oct', 'wed 21 oct', 'thu 22 oct', 'fri 23 oct', 'sat 24 oct', 'yesterday', 'today'].map((day) => projects.day_idle({ day })));
+    // and the day it starts, a 23-h day, early morning
+    const spring = weekBars(new Array<number>(7).fill(0), Date.UTC(2026, 2, 30, 0, 30), 'Europe/Paris').map((b) => b.tip);
+    expect(new Set(spring).size).toBe(7);
+    expect(spring[5]).toBe(projects.day_idle({ day: 'yesterday' }));
+    expect(daysBack(now, 1, 'Europe/Paris')).toBe(Date.UTC(2026, 9, 25, 11));
   });
 
   it("a day's work in words: minutes, then hours and minutes, a few seconds still a minute", () => {

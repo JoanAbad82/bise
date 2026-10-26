@@ -154,4 +154,26 @@ describe('TipLayer', () => {
     over(v.getByTestId('down'), v.getByTestId('up'));
     expect(tip()?.dataset.side).toBe('below');
   });
+
+  it("a mark that clears its outer one goes off the row, as the row's own tip, centred on itself (designer m_45992)", () => {
+    const v = render(
+      <div>
+        <span data-testid="row" {...tipAttrs('harness · 5 agents working')}>
+          <span data-testid="bar" {...tipAttrs('today · 48 min of agent work', undefined, undefined, 'outer')} />
+        </span>
+        <TipLayer />
+      </div>,
+    );
+    const rect = (left: number, top: number, width: number, height: number) => () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
+    v.getByTestId('row').getBoundingClientRect = rect(64, 184, 224, 52);
+    v.getByTestId('bar').getBoundingClientRect = rect(240, 211, 6, 12);
+    over(v.getByTestId('bar'));
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    // happy-dom has no layout: the tip is 0 x 0, so its top is the row's top less the 8 gap, its left the bar's middle
+    expect(tip()?.dataset.side).toBe('above');
+    expect(tip()?.style.top).toBe(`${String(184 - 8)}px`);
+    expect(tip()?.style.left).toBe('243px');
+  });
 });

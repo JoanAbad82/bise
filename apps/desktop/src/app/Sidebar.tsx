@@ -81,8 +81,8 @@ function barPath(b: DayBar): string {
 /**
  * A project's week (H1, designer m_45992): 7 day bars in 40 x 12, text-3, today's in text-2; the
  * row's hover wakes them all to text-2, the bar under the pointer goes to ink and its tip (its day,
- * its work) shows instead of the row's. Each bar's hover column is its full height and half of
- * each gap beside it.
+ * its work) shows instead of the row's, off the row as the row's own (clear 'outer', ui-review
+ * m_46014). Each bar's hover column is its full height and half of each gap beside it.
  */
 function Week({ week, now, testId }: { week: readonly number[]; now: number; testId: string }) {
   const bars = weekBars(week, now);
@@ -90,7 +90,7 @@ function Week({ week, now, testId }: { week: readonly number[]; now: number; tes
   return (
     <svg className="app-s-week" viewBox={`0 0 ${String(width)} ${String(BAR_H)}`} role="img" aria-label={projects.week_tip} data-testid={testId}>
       {bars.map((b, i) => (
-        <g key={i} className={`app-s-day${b.today ? ' today' : ''}`} {...tipAttrs(b.tip)} data-testid={`${testId}.${String(i)}`}>
+        <g key={i} className={`app-s-day${b.today ? ' today' : ''}`} {...tipAttrs(b.tip, undefined, undefined, 'outer')} data-testid={`${testId}.${String(i)}`}>
           <rect x={b.hx} y={0} width={b.hw} height={BAR_H} />
           <path d={barPath(b)} />
         </g>

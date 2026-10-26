@@ -1,6 +1,6 @@
 // src/ds · the hover tip's rules (tip.ts): where it goes, when it shows, its attributes.
 import { describe, expect, it } from 'vitest';
-import { placeTip, tipAttrs, tipWait, TIP_DELAY_MS } from './tip';
+import { clearBox, placeTip, tipAttrs, tipWait, TIP_DELAY_MS } from './tip';
 
 const VIEW = { width: 1400, height: 900 };
 
@@ -29,6 +29,15 @@ describe('the hover tip (designer m_24359)', () => {
     expect(placeTip({ left: 100, top: 870, width: 20, height: 16 }, { width: 120, height: 24 }, VIEW, 'below')).toEqual({ left: 50, top: 838, side: 'above' });
   });
 
+  it("a mark that clears its outer one (designer m_45992): the outer's top and height, its own left and width; above, 8 off the row", () => {
+    const bar = { left: 188, top: 211, width: 6, height: 12 };
+    const row = { left: 64, top: 184, width: 224, height: 52 };
+    expect(clearBox(bar, row)).toEqual({ left: 188, top: 184, width: 6, height: 52 });
+    expect(clearBox(bar, null)).toBe(bar);
+    const at = placeTip(clearBox(bar, row), { width: 179, height: 27 }, { width: 1440, height: 900 });
+    expect(at).toEqual({ left: 102, top: 184 - 8 - 27, side: 'above' });
+  });
+
   it('waits 400 ms cold, shows at once warm or on keyboard focus', () => {
     expect(tipWait(1000, 0, false)).toBe(TIP_DELAY_MS);
     expect(tipWait(1000, 1500, false)).toBe(0);
@@ -39,6 +48,7 @@ describe('the hover tip (designer m_24359)', () => {
     expect(tipAttrs('4 agents working')).toEqual({ 'data-tip': '4 agents working' });
     expect(tipAttrs('sidebar', '⌘\\')).toEqual({ 'data-tip': 'sidebar', 'data-tip-keys': '⌘\\' });
     expect(tipAttrs('the full option', undefined, 'below')).toEqual({ 'data-tip': 'the full option', 'data-tip-side': 'below' });
+    expect(tipAttrs('today · 2 h of agent work', undefined, undefined, 'outer')).toEqual({ 'data-tip': 'today · 2 h of agent work', 'data-tip-clear': 'outer' });
     expect(tipAttrs('')).toEqual({});
     expect(tipAttrs(undefined)).toEqual({});
   });

@@ -169,18 +169,37 @@ export function workWords(ms: number): string {
   return m % 60 === 0 ? `${String(h)} h` : `${String(h)} h ${String(m % 60)} min`;
 }
 
+const YMD = (tz: string | undefined) => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: tz });
+/** An instant's wall clock in `tz` (his zone when none), read as if it were UTC. */
+function wall(ms: number, tz: string | undefined): number {
+  const p = Object.fromEntries(YMD(tz).formatToParts(ms).map((x) => [x.type, Number(x.value)]));
+  return Date.UTC(p.year ?? 0, (p.month ?? 1) - 1, p.day ?? 1, p.hour ?? 0, p.minute ?? 0);
+}
+
+/**
+ * Noon of the calendar day `k` days before `now`'s, in `tz` (his zone when none): by calendar days,
+ * never k x 24 h, so a 25-h day (summer time's end) never names two bars 'yesterday' (ui-review
+ * m_46014). Pure.
+ */
+export function daysBack(now: number, k: number, tz?: string): number {
+  const w = new Date(wall(now, tz));
+  const noon = Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate() - k, 12);
+  // the instant whose wall clock is that noon: the zone's offset then, read at a first guess
+  return noon - (wall(noon, tz) - noon);
+}
+
 /**
  * The week's days as bars, oldest first, today's last: heights scaled to its busiest day, each with
  * its day (the thread's day words: 'today', 'yesterday', 'sat 24 oct') and its work as its tip. Pure.
  */
-export function weekBars(week: readonly number[], now: number): DayBar[] {
+export function weekBars(week: readonly number[], now: number, tz?: string): DayBar[] {
   const max = Math.max(0, ...week);
   const step = BAR_W + BAR_GAP;
   const width = week.length * step - BAR_GAP;
   return week.map((v, i) => {
     const x = i * step;
     const hx = Math.max(0, x - BAR_GAP / 2);
-    const day = dayLabel(now - (week.length - 1 - i) * DAY, now);
+    const day = dayLabel(daysBack(now, week.length - 1 - i, tz), now, tz);
     return {
       x,
       h: v <= 0 || max <= 0 ? 1 : Math.max(2, Math.round((v / max) * BAR_H)),

@@ -1,6 +1,6 @@
 // The hover tip, one for the whole window (designer m_24359, his 'every compact mark explains
 // itself': mark → tip → click opens the full thing). A mark says its words with the ds's
-// `tipAttrs('4 agents working')` (data-tip, data-tip-keys, data-tip-side); this one layer, mounted once at the
+// `tipAttrs('4 agents working')` (data-tip, data-tip-keys, data-tip-side, data-tip-clear); this one layer, mounted once at the
 // root, reads the pointer and the focus for the whole window and draws the ds's tip (.b-tip) in body.
 //
 // The tip is never interactive (pointer-events none): the pointer over it still hovers and clicks
@@ -10,7 +10,7 @@
 // Owner: amb-win.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { placeTip, tipWait, TIP_WARM_MS, type TipSide } from '@/ds';
+import { clearBox, placeTip, tipWait, TIP_WARM_MS, type TipSide } from '@/ds';
 
 /** The mark under an element: the closest one with words. */
 function markOf(t: EventTarget | null): HTMLElement | null {
@@ -32,6 +32,8 @@ interface Shown {
   readonly keys: string;
   /** the side it goes first: 'below' when the mark asks (data-tip-side), else above */
   readonly first: TipSide;
+  /** it clears its outer mark's box (data-tip-clear 'outer'), not only its own */
+  readonly clear: boolean;
   /** shown cold (after the delay): it fades in; a warm one is there at once */
   readonly fade: boolean;
 }
@@ -51,6 +53,7 @@ export function TipLayer({ testId = 'tip' }: { testId?: string }) {
       words: mark.dataset.tip ?? '',
       keys: mark.dataset.tipKeys ?? '',
       first: mark.dataset.tipSide === 'below' ? 'below' : 'above',
+      clear: mark.dataset.tipClear === 'outer',
       fade,
     });
     const stop = () => {
@@ -141,7 +144,10 @@ export function TipLayer({ testId = 'tip' }: { testId?: string }) {
     const el = tipRef.current;
     if (shown === null || el === null) return;
     const m = shown.mark.getBoundingClientRect();
-    const at = placeTip({ left: m.left, top: m.top, width: m.width, height: m.height }, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, shown.first);
+    // a small mark inside a row that is a mark itself may ask to clear that row (clearBox)
+    const o = shown.clear ? (shown.mark.parentElement?.closest<HTMLElement>('[data-tip]')?.getBoundingClientRect() ?? null) : null;
+    const box = clearBox({ left: m.left, top: m.top, width: m.width, height: m.height }, o === null ? null : { left: o.left, top: o.top, width: o.width, height: o.height });
+    const at = placeTip(box, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, shown.first);
     el.style.left = `${String(at.left)}px`;
     el.style.top = `${String(at.top)}px`;
     el.dataset.side = at.side;

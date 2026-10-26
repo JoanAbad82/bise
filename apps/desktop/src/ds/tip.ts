@@ -4,7 +4,9 @@
 // Where: 8 px from its mark, above it, below when there is no room above, clamped to the window
 // (8 px from its edges); centred on the mark. It never covers the mark's row: above or below, never
 // over. A mark may ask for below first (tipAttrs' side, designer m_45938: the agents float's ask
-// options, whose tip above covered the question they answer); above when below has no room.
+// options, whose tip above covered the question they answer); above when below has no room. A small
+// mark inside a row that is a mark itself may ask to clear the row (clearBox: the sidebar's day
+// bars, designer m_45992): its tip goes off the row, as the row's would, centred on the small mark.
 // When: 400 ms after the pointer rests on a mark; at once on keyboard focus; warm: for 1 s after a
 // tip closes (or while one shows), the next one shows at once, so moving along a row of marks
 // never blinks.
@@ -48,13 +50,29 @@ export function placeTip(mark: Box, tip: { width: number; height: number }, view
  * at its right when it has one, 'below' when it goes below first (placeTip); '' or none: no tip. The
  * app's TipLayer reads them. Pure.
  */
-export function tipAttrs(words: string | undefined, keys?: string, side?: 'below'): { 'data-tip'?: string; 'data-tip-keys'?: string; 'data-tip-side'?: 'below' } {
+export function tipAttrs(
+  words: string | undefined,
+  keys?: string,
+  side?: 'below',
+  clear?: 'outer',
+): { 'data-tip'?: string; 'data-tip-keys'?: string; 'data-tip-side'?: 'below'; 'data-tip-clear'?: 'outer' } {
   if (words === undefined || words === '') return {};
   return {
     'data-tip': words,
     ...(keys === undefined || keys === '' ? {} : { 'data-tip-keys': keys }),
     ...(side === undefined ? {} : { 'data-tip-side': side }),
+    ...(clear === undefined ? {} : { 'data-tip-clear': clear }),
   };
+}
+
+/**
+ * The box a tip clears: its mark's own, or for a mark that asks (tipAttrs' clear 'outer', a small
+ * mark inside a row that is a mark itself: the row's day bars, designer m_45992) its outer mark's
+ * top and height, so the tip goes where the row's own does and never covers the row, still centred
+ * on the small mark. No outer mark: its own. Pure.
+ */
+export function clearBox(mark: Box, outer: Box | null): Box {
+  return outer === null ? mark : { left: mark.left, width: mark.width, top: outer.top, height: outer.height };
 }
 
 /** How long before a mark's tip shows: at once while warm or on keyboard focus, else the delay. Pure. */
