@@ -340,9 +340,12 @@ function StatusSlot({ children }: { children?: ReactNode }) {
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
-    // a pill or the minis come and go, the crumb's fact changes: read again
+    ro.observe(bar);
+    // a pill or the minis come and go, the crumb or its fact changes: read again (the whole bar: the
+    // minis sit after the crumb, out of the slot, ui-review m_45884; read's own writes are styles
+    // and the bar's data-give / data-role, which this doesn't watch)
     const mo = new MutationObserver(read);
-    mo.observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-narrow"] });
+    mo.observe(bar, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-narrow"] });
     return () => {
       ro.disconnect();
       mo.disconnect();

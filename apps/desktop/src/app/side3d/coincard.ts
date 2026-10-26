@@ -3,7 +3,7 @@
 // held alone 300 ms shows all four (with their keys), a hover 400 ms one; at rest, none. Each line
 // is parts: plain (text-2 on line 1, text-3 on line 2), 'acc' (what waits, the accent at 600),
 // 'err' (a failure, --c-err), 'chip' (an artifact's name, its pink chip), 'mono' (a command), 'link'
-// (a port, ':5173 ↗'). From typed rows only, never from words. Pure. Owner: nm-side.
+// (a port, ':5173', no ↗ as in the float, ui-review m_45884). From typed rows only, never from words. Pure. Owner: nm-side.
 import type { Agent, Proc, ScheduledTask } from '@/proto';
 import { ago } from '@/agents/model';
 import { ahead, asks } from '@/scheduled/model';
@@ -106,7 +106,7 @@ function processesCard(f: CardFacts): Pick<CoinCard, 'l1' | 'l2'> {
   if (first === undefined) return { l1: [plain(side.card_no_processes)], l2: [] };
   const port = (first.ports ?? [])[0];
   return {
-    l1: [{ text: typed(first), tone: 'mono' }, ...(port === undefined ? [] : [{ text: `:${String(port)} ↗`, tone: 'link' as const }])],
+    l1: [{ text: typed(first), tone: 'mono' }, ...(port === undefined ? [] : [{ text: `:${String(port)}`, tone: 'link' as const }])],
     l2: [plain(bubbleSays('processes', f.counts))],
   };
 }

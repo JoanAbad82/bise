@@ -65,7 +65,7 @@ describe('the coins\' cards', () => {
 
   it('processes: the first listening command in mono with its port, then running · listening; quiet: nothing running', () => {
     const c = coinCard('processes', facts({ procs: [proc('node build.js', []), proc('pnpm dev', [5173])], counts: counts({ running: 2, listening: 1 }) }));
-    expect(c.l1).toEqual([{ text: 'pnpm dev', tone: 'mono' }, { text: ':5173 ↗', tone: 'link' }]);
+    expect(c.l1).toEqual([{ text: 'pnpm dev', tone: 'mono' }, { text: ':5173', tone: 'link' }]);
     expect(c.l2).toEqual([{ text: '2 running · 1 listening' }]);
     expect(cardWords(coinCard('processes', facts()))).toBe('Processes · nothing running');
   });
