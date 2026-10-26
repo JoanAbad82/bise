@@ -490,6 +490,26 @@ describe('the right side, folded', () => {
     expect(big.clipPath).toContain('calc(100% - 68px) 112px');
   });
 
+  it('a drop of files on the artifacts coin adds them to the project, as on the list (folded-side v9)', () => {
+    const { v, store } = side3d();
+    const sent = vi.spyOn(store, 'command');
+    const bise = (window as unknown as { bise: Record<string, unknown> }).bise;
+    bise['filePath'] = (f: File) => `/tmp/${f.name}`;
+    try {
+      const file = new File(['# notes'], 'notes.md', { type: 'text/markdown' });
+      const dataTransfer = { types: ['Files'], files: [file], dropEffect: 'none' };
+      fireEvent.dragOver(v.getByTestId('app.bubble.artifacts'), { dataTransfer });
+      fireEvent.drop(v.getByTestId('app.bubble.artifacts'), { dataTransfer });
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ cmd: 'artifacts_add', project: ACME, target: '/tmp/notes.md' }));
+      // the other coins take no drop
+      sent.mockClear();
+      fireEvent.drop(v.getByTestId('app.bubble.processes'), { dataTransfer });
+      expect(sent).not.toHaveBeenCalledWith(expect.objectContaining({ cmd: 'artifacts_add' }));
+    } finally {
+      delete bise['filePath'];
+    }
+  });
+
   it('the agents card: one foot, the card\'s end (the archived fold · all agents)', () => {
     const { v } = side3d();
     fireEvent.click(v.getByTestId('app.bubble.agents'));
