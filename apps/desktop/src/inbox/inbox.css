@@ -46,6 +46,9 @@
 .ic.whole { max-height: calc(100vh - 260px); }
 .ic-h { display: flex; align-items: baseline; gap: var(--gap-inline); min-width: 0; font-size: var(--t-12); color: var(--c-text-2); flex: none; }
 .ic-g { flex: none; font: 600 12px var(--font-mono); color: var(--c-accent); }
+/* its row's mark (model markOf, designer m_45259): a failure that asks nothing in err, a report in ok */
+.ic-g[data-tone='err'] { color: var(--c-err); }
+.ic-g[data-tone='ok'] { color: var(--c-ok); }
 .ic-h b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--c-text); }
 .ic-p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ic-k { flex: none; margin-left: auto; color: var(--c-text-3); }
@@ -147,7 +150,3 @@
 .ic-why { display: block; color: var(--c-text-2); font-size: var(--t-12); }
 .ic-opt.picked .ic-why { color: var(--c-on-ink); }
 .ic-mine { font-size: var(--t-12); color: var(--c-text-3); }
-
-/* a notification's number (notif-id, designer m_27855): mono, text-3, 12 px, never cut */
-.card-id { flex: none; white-space: nowrap; color: var(--c-text-3); }
-.card-id-n { font-family: var(--font-mono); font-size: 12px; }

@@ -16,12 +16,18 @@ export function carriesFiles(types: readonly string[] | DOMStringList | undefine
 
 /**
  * The thread's drop zone words: 'drop to give q3.xlsx to perf'. While he drags, Chromium tells how
- * many files but never their names: 'drop to give this file to perf', 'drop to give 3 files to
- * perf'. Pure.
+ * many files and their types but never their names: 'drop to give this file to perf', 'drop to
+ * give these 3 files to perf'; all images: 'this image', 'these 2 images' (designer m_45234). Pure.
  */
-export function giveWords(count: number, to: string, name?: string): string {
-  const what = name !== undefined && name !== '' ? name : count > 1 ? `${String(count)} files` : 'this file';
+export function giveWords(count: number, to: string, name?: string, images = false): string {
+  const noun = images ? 'image' : 'file';
+  const what = name !== undefined && name !== '' ? name : count > 1 ? `these ${String(count)} ${noun}s` : `this ${noun}`;
   return `drop to give ${what} to ${to}`;
+}
+
+/** Every dragged item is an image (its MIME type, all Chromium shows while he drags; none known: not one). Pure. */
+export function allImages(types: readonly (string | undefined)[]): boolean {
+  return types.length > 0 && types.every((t) => t?.startsWith('image/') === true);
 }
 
 /** Where the list's '+ add' and drop put a file: the project's main, else bise's own home's. */
@@ -56,37 +62,42 @@ export function droppedPaths(files: readonly File[], pathOf: (f: File) => string
   return files.map(pathOf).filter((p) => p !== '');
 }
 
-/** Files dragged over the window now, and how many (0: none; the zones hide). */
+/** Files dragged over the window now, how many (0: none; the zones hide), and whether all are images. */
 export interface FileDrag {
   readonly on: boolean;
   readonly count: number;
+  readonly images: boolean;
 }
+
+const NO_DRAG: FileDrag = { on: false, count: 0, images: false };
 
 /**
  * The drag's state, the window's: dragenter/dragleave counted (a drag over a child fires a leave
  * on its parent), reset by a drop, a dragend or leaving the window.
  */
 export function useFileDrag(): FileDrag {
-  const [drag, setDrag] = useState<FileDrag>({ on: false, count: 0 });
+  const [drag, setDrag] = useState<FileDrag>(NO_DRAG);
   useEffect(() => {
     let depth = 0;
     const enter = (e: DragEvent): void => {
       if (!carriesFiles(e.dataTransfer?.types)) return;
       depth += 1;
-      const count = e.dataTransfer?.items.length ?? 1;
-      setDrag((d) => (d.on && d.count === count ? d : { on: true, count }));
+      const items = Array.from(e.dataTransfer?.items ?? []);
+      const count = items.length > 0 ? items.length : 1;
+      const images = allImages(items.map((i) => i.type));
+      setDrag((d) => (d.on && d.count === count && d.images === images ? d : { on: true, count, images }));
     };
     const leave = (e: DragEvent): void => {
       if (!carriesFiles(e.dataTransfer?.types)) return;
       depth = Math.max(0, depth - 1);
       if (depth === 0 || e.relatedTarget === null) {
         depth = 0;
-        setDrag({ on: false, count: 0 });
+        setDrag(NO_DRAG);
       }
     };
     const end = (): void => {
       depth = 0;
-      setDrag({ on: false, count: 0 });
+      setDrag(NO_DRAG);
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragleave', leave);

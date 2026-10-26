@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectRow } from '@/proto';
-import { addDropWords, addPlace, addTitle, carriesFiles, droppedPaths, giveWords } from './give';
+import { addDropWords, addPlace, addTitle, allImages, carriesFiles, droppedPaths, giveWords } from './give';
 
 const row = (project: string, name: string, home = false): ProjectRow => ({ project, name, home }) as unknown as ProjectRow;
 const rows = [row('home-1', 'home', true), row('shop-1', 'storefront'), row('api-2', '')];
@@ -15,9 +15,18 @@ describe('give: a file dropped on a thread or a list (designer m_23868, m_23898)
 
   it("the thread's zone says whom it gives to; the name when known, else how many", () => {
     expect(giveWords(1, 'perf')).toBe('drop to give this file to perf');
-    expect(giveWords(3, 'perf')).toBe('drop to give 3 files to perf');
+    expect(giveWords(3, 'perf')).toBe('drop to give these 3 files to perf');
     expect(giveWords(1, 'perf', 'q3.xlsx')).toBe('drop to give q3.xlsx to perf');
     expect(giveWords(1, 'bise')).toBe('drop to give this file to bise');
+  });
+
+  it("all images, the zone says images: 'this image', 'these 2 images'; one other file, files (designer m_45234)", () => {
+    expect(giveWords(1, 'perf', undefined, true)).toBe('drop to give this image to perf');
+    expect(giveWords(2, 'perf', undefined, true)).toBe('drop to give these 2 images to perf');
+    expect(allImages(['image/png', 'image/jpeg'])).toBe(true);
+    expect(allImages(['image/png', 'application/pdf'])).toBe(false);
+    expect(allImages([''])).toBe(false);
+    expect(allImages([])).toBe(false);
   });
 
   it("the list adds to the picked project's main, or to bise's home with 'all projects'", () => {

@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Store, StoreProvider } from '@/store';
 import { AddButton, AddDrop, ThreadDrop, useAddPlace } from './Drops';
 import { LiveStrip } from './Open';
+import { giveWords } from './give';
 
 afterEach(() => {
   cleanup();
@@ -49,13 +50,28 @@ describe('giving files (designer m_23868, m_23898)', () => {
     act(() => {
       fireEvent.dragEnter(window, { dataTransfer: files(['q3.xlsx', 'deck.pptx']) });
     });
-    expect(screen.getByTestId('thread.give').textContent).toBe('drop to give 2 files to perf');
+    expect(screen.getByTestId('thread.give').textContent).toBe(giveWords(2, 'perf'));
     fireEvent.drop(screen.getByTestId('thread.give'), { dataTransfer: files(['q3.xlsx', 'deck.pptx']) });
     expect(added).toEqual([['shop-1', 'perf', '/u/me/q3.xlsx'], ['shop-1', 'perf', '/u/me/deck.pptx']]);
     // not stopped: the composer's window drop makes the same files its chips
     expect(onWindow).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('thread.give')).toBeNull();
     window.removeEventListener('drop', onWindow);
+  });
+
+  it("screenshots dragged: the zone says 'these 2 images'; one pdf among them, files (designer m_45234)", () => {
+    bridge();
+    const { store } = world();
+    render(<StoreProvider store={store}><ThreadDrop project="shop-1" agent="perf" to="perf" /></StoreProvider>);
+    const typed = (types: string[]) => ({ types: ['Files'], files: [], items: types.map((type) => ({ kind: 'file', type })), dropEffect: 'none' });
+    act(() => {
+      fireEvent.dragEnter(window, { dataTransfer: typed(['image/png', 'image/png']) });
+    });
+    expect(screen.getByTestId('thread.give').textContent).toBe(giveWords(2, 'perf', undefined, true));
+    act(() => {
+      fireEvent.dragEnter(window, { dataTransfer: typed(['image/png', 'application/pdf']) });
+    });
+    expect(screen.getByTestId('thread.give').textContent).toBe(giveWords(2, 'perf'));
   });
 
   it('a drag of words, not files, shows no zone', () => {

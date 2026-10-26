@@ -17,12 +17,12 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
 import { InBar } from '@/app/barslot';
-import { AppIcon, BannerWait, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, ListRow, PageBanner, Press, RowAction, RowMark } from '@/ds';
+import { AppIcon, BannerWait, BarSearch, Dropdown, Empty, FilterRow, Filters, GroupLabel, ListRow, PageBanner, Press, RowAction, RowMark, tipAttrs } from '@/ds';
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { hero } from '@/proto/words_hero.gen';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
-import { CardId } from './CardId';
+import { idTip } from './InboxCard';
 import { idOf } from './id';
 import { timeOf } from '@/artifacts/model';
 import { ALL, askersOf, closedMs, dayHead, heroFacts, jumpOf, jumpWords, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
@@ -244,7 +244,7 @@ function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; projec
       <ListRow on={on} testId={`inbox.row.${p.key}`} tip={inbox.row_tip_past}
         state={answered ? <AppIcon name="check" size={14} /> : <AppIcon name="fold" size={14} />}
         title={<><span className="ip-who">{shownName(r.asker)}</span><span className="ip-q">{r.question}</span></>}
-        sub={<><span data-testid={`inbox.row.${p.key}.said`}>{r.line2}</span>{` · ${project}`}{ms > 0 && ` · ${timeOf(ms)}`}<CardId id={r.card} testId={`inbox.row.${p.key}.id`} /></>}
+        sub={<><span data-testid={`inbox.row.${p.key}.said`}>{r.line2}</span>{` · ${project}`}{ms > 0 && <span data-testid={`inbox.row.${p.key}.when`} {...tipAttrs(idTip(r.card))}>{` · ${timeOf(ms)}`}</span>}</>}
         onClick={onClick} />
     </div>
   );

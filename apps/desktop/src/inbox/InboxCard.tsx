@@ -16,14 +16,13 @@ import type { Card as CardRow } from '@/proto';
 import type { ArtLink } from '@/proto/rows';
 import { aboutOf, aboutWords } from './about';
 import { inbox } from '@/proto/words_inbox.gen';
-import { CardId } from './CardId';
 import { common } from '@/proto/words_common.gen';
 import { Act, ArtChip, Kbd, tipAttrs } from '@/ds';
 import { refusedLine, useStore } from '@/store';
 import type { InboxItem } from './listed';
 import { cardKey } from './order';
 import { ArtWords } from './artWords';
-import { takesWords } from './model';
+import { markOf, takesWords } from './model';
 import { optTip } from './optAct';
 
 /** A clicked row stays picked (ink) this long before it leaves. */
@@ -117,6 +116,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
     if (on !== null) setDriving(true);
   }
   const where = project ?? card.project;
+  const glyph = glyphOf(card);
   // an option that opens an artifact says where it goes (designer m_24724, law 6)
   const store = useStore();
   const artTitle = (aid: string) => store.artifacts(card.project).find((a) => a.id === aid)?.title;
@@ -135,12 +135,15 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
       }
     >
       <div className="ic-h">
-        <span className="ic-g" aria-hidden="true">
-          {glyphOf(card)}
+        <span className="ic-g" data-tone={glyph.tone} aria-hidden="true" data-testid={`${id}.g`}>
+          {glyph.g}
         </span>
         <b>{titleOf(card)}</b>
         {home !== true && <span className="ic-p" data-testid={`${id}.project`}>{`· ${where}`}</span>}
-        <span className="ic-k">{closed ? inbox.closed_age({ age: age(now - card.since_ms) }) : age(now - card.since_ms)}<CardId id={card.id} testId={`${id}.id`} /></span>
+        {/* no ids in the UI: the age alone, the hub's number in its tip (designer m_45255) */}
+        <span className="ic-k" data-testid={`${id}.age`} {...tipAttrs(idTip(card.id))}>
+          {closed ? inbox.closed_age({ age: age(now - card.since_ms) }) : age(now - card.since_ms)}
+        </span>
       </div>
       <div className="ic-q" data-testid={`${id}.q`}>
         {full === false && card.kind !== 'plan' ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <Question card={card} id={id} />}
@@ -273,10 +276,18 @@ export function pickKeys(n: number): string {
   return n === 1 ? '1' : n === 2 ? '1 2' : `1–${String(n)}`;
 }
 
-/** '!' an approval or an item only its options decide (a merge, a try…); '?' the rest, an urgent
- * question too: a question is '?' in its row and its card head alike (designer m_15412, m_20053). */
-export function glyphOf(c: CardRow): string {
-  return c.approval === true || !takesWords(c) ? '!' : '?';
+/** No ids in the UI (designer m_45255): the hub's number ('#567', what sb notify prints, so he can
+ * find the one main names) lives in a tip; bise's own items (id -1) have none. Pure. */
+export function idTip(id: number): string | undefined {
+  return id < 0 ? undefined : inbox.card_id_tip({ id });
+}
+
+/** The card head's glyph, its row's mark (model markOf; designer m_45259): '?' in the accent for
+ * anything that asks him, an approval too (its words say it, never a '!'); '✗' in err for a failure
+ * that asks nothing; '✓' for a report that asks nothing else. Pure. */
+export function glyphOf(c: CardRow): { readonly g: string; readonly tone: 'acc' | 'err' | 'ok' } {
+  const m = markOf(c);
+  return m === 'ask' ? { g: '?', tone: 'acc' } : m === 'fail' ? { g: '✗', tone: 'err' } : { g: '✓', tone: 'ok' };
 }
 
 /** A long question's first lines (bar I8): more than FOLD_AT lines show

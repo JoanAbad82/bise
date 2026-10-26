@@ -23,7 +23,7 @@ import { common } from '@/proto/words_common.gen';
 import { age, dotOf, folds, InboxCard, RefusedMark } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey } from './order';
-import { freeWords, pickWaits, takesWords } from './model';
+import { freeWords, markOf, pickWaits, takesWords } from './model';
 import { withRefused, type InboxItem } from './listed';
 import { cardKeyOf, fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
 import { ArtWords } from './artWords';
@@ -322,17 +322,19 @@ export function headWords(list: readonly Pick<Card, 'project'>[]): string {
   return projects > 1 ? inbox.block_head_projects({ n: list.length, projects }) : common.count_waiting({ n: list.length });
 }
 
-/** An item's sign on its line: '?' a question, '!' what only its options decide, else its dot. */
-function signOf(c: Card): string | null {
-  if (c.kind === 'question' && c.approval !== true) return '?';
-  return takesWords(c) ? null : '!';
+/** An item's sign on its line (model markOf): '?' in the accent when it asks him, ✗ in err for a
+ *  failure that asks nothing, else its dot; its 14 line icon, never a text glyph (ui-review m_43949). */
+function SignMark({ c }: { c: Card }): ReactNode {
+  const m = markOf(c);
+  if (m === 'ask') return <RowMark icon="ask" tone="accent" label="question" />;
+  if (m === 'fail') return <RowMark icon="close" tone="err" label="failed" />;
+  return <Dot state={dotOf(c)} />;
 }
 
 /** The last line, the TUI's more_row: '+ 2 more · ? perf · which bench?' (`next`: the first of them),
  *  its sign drawn as the row's line icon, never a text glyph (ui-review m_43978; the TUI keeps its '?'). Pure. */
 export function moreWords(more: number, next: Card): ReactNode {
   const w = rowWords(next);
-  const sign = signOf(next);
   const what = w.what === '' ? '' : ` · ${w.cmd ? '$ ' : ''}${w.what}`;
   // the catalog's words with a slot where the sign goes: the words stay the catalog's, the icon sits in them
   const slot = '\u{E000}';
@@ -340,7 +342,7 @@ export function moreWords(more: number, next: Card): ReactNode {
   return (
     <>
       {before}
-      {sign !== null && <RowMark icon={sign === '!' ? 'alert' : 'ask'} tone="accent" label={sign === '!' ? 'decide' : 'question'} />}
+      {markOf(next) !== null && <SignMark c={next} />}
       {after}
     </>
   );
@@ -848,7 +850,6 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
           );
         }
         const w = rowWords(c);
-        const sign = signOf(c);
         return (
           // raw-controls (designer m_18343): the ds's Row as a button, never a bare button
           <Row
@@ -856,8 +857,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
             lead={
               <>
                 <span className="strip-n">{n}</span>
-                {/* the sign as its 14 line icon in the accent, never a text glyph (ui-review m_43949) */}
-                {sign !== null ? <RowMark icon={sign === '!' ? 'alert' : 'ask'} tone="accent" label={sign === '!' ? 'decide' : 'question'} /> : <Dot state={dotOf(c)} />}
+                <SignMark c={c} />
               </>
             }
             name={

@@ -49,7 +49,7 @@ export function ThreadDrop({ project, agent, to }: { project: string; agent: str
   };
   return (
     <div className="art-give" data-testid="thread.give" onDragOver={over} onDrop={onDrop}>
-      <span className="art-give-words">{giveWords(drag.count, to)}</span>
+      <span className="art-give-words">{giveWords(drag.count, to, undefined, drag.images)}</span>
     </div>
   );
 }

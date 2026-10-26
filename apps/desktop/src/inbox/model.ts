@@ -68,6 +68,19 @@ export function takesWords(c: Pick<Card, 'approval' | 'kind'>): boolean {
 }
 
 /**
+ * An item's one mark, its row's and its card head's alike (designer m_45259, m_45255): 'ask', a
+ * '?' in the accent, for anything that asks him (a question, an approval, a merge, a try, 'it
+ * failed: retry?'); 'fail', a ✗ in err, for a failure that only reports and asks nothing; null
+ * for a report that asks nothing else (done: its dot). No '!': an approval's words say it. Pure.
+ */
+export function markOf(c: Pick<Card, 'kind' | 'options'>): 'ask' | 'fail' | null {
+  const asks = c.options.length > 0;
+  if ((c.kind === 'failed' || c.kind === 'restart') && !asks) return 'fail';
+  if (c.kind === 'done' && !asks) return null;
+  return 'ask';
+}
+
+/**
  * What his free text does to an open item (his rule m_44704: every item takes free text instead of
  * an option, and it closes it): a question's answer; a tool call's approval ('confirm'): its
  * refusal, his text the reason the agent reads (the hub's `deny: <why>`, the TUI's Enter::Deny);

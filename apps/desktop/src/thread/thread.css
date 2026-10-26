@@ -263,6 +263,11 @@
 .th-screen:has(> .art-give) > :not(.art-give) {
   opacity: 0.2;
 }
+/* the side's world and bubbles (fixed at the shell's root, app/side3d) sit inside that zone and are
+   not where the file goes: the same .2 as the rows (designer m_45234) */
+body:has(.th-screen > .art-give) .s3-side {
+  opacity: 0.2;
+}
 .th-main {
   position: relative;
   display: flex;
