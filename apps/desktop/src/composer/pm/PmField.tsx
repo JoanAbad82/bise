@@ -70,6 +70,7 @@ import {
 import { emojiToken, typedEmoji } from "../emoji";
 import { typed } from "@/working/clock";
 import { Picker } from "../Picker";
+import { composer } from "../../proto/words.gen";
 import { fieldNodes, fitFailedIn } from "./schema";
 import { Colors } from "./colors";
 import { LeadMark, setLead } from "./leadmark";
@@ -457,10 +458,23 @@ export function PmField(p: PmFieldProps): JSX.Element {
     sel.key === tkey
       ? Math.min(sel.i, Math.max(0, rows.length - 1))
       : Math.max(0, leftIndex);
-  const live = useRef({ open, rows, index, trigger, tkey });
+  // a bare '@' or '$' with nothing to offer (bise's home: no agents, no skills): one text-3 line,
+  // never silence (designer m_44585: a key that opens nothing reads as broken); the next key or esc
+  // closes it, the '@' or '$' stays plain text
+  const none =
+    !open &&
+    trigger !== null &&
+    (trigger.kind === "at" || trigger.kind === "skill") &&
+    trigger.query === "" &&
+    rows.length === 0 &&
+    !waiting &&
+    dismissed !== `${trigger.kind}:${trigger.start}`
+      ? trigger.kind
+      : null;
+  const live = useRef({ open, rows, index, trigger, tkey, none: none !== null });
   const fileList = open && trigger.kind === "at";
   useEffect(() => {
-    live.current = { open, rows, index, trigger, tkey };
+    live.current = { open, rows, index, trigger, tkey, none: none !== null };
   });
   const setIndex = (i: number): void => {
     setSel({ key: live.current.tkey, i });
@@ -973,6 +987,9 @@ export function PmField(p: PmFieldProps): JSX.Element {
             view()?.focus();
           }}
         />
+      )}
+      {none !== null && (
+        <Picker rows={[]} index={0} testId={`${p.testId}.pick`} empty={none === "at" ? composer.pick_none_at : composer.pick_none_skill} onPick={() => undefined} />
       )}
     </>
   );

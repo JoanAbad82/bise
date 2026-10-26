@@ -10,6 +10,7 @@ import type { Store } from './drafts';
 import { NO_SOURCES } from './sources';
 import { PmField } from './pm/PmField';
 import { pickPlace } from './Picker';
+import { composer as words } from '../proto/words_composer.gen';
 
 afterEach(cleanup);
 
@@ -103,5 +104,58 @@ describe('the / @ $ lists', () => {
     expect(container.contains(list), 'not inside the composer').toBe(false);
     noClip(list);
     expect((list.parentElement as HTMLElement).style.position).toBe('fixed');
+  });
+
+  // ui-review m_44570: on the floating composer the list ran over its head ('to bise', ─)
+  it('in a frame marked data-pick-anchor (the floating glass) it floats from that frame, above its head', async () => {
+    const got: { a: ComposerActions | null } = { a: null };
+    const { getByTestId, container } = render(
+      <div data-pick-anchor>
+        <div className="box">
+          <PmField target="p/main" busy={false} sources={{ ...NO_SOURCES, commands: [{ name: 'model', desc: 'the model', args: false, ready: true }] }} store={memStore()} testId="composer"
+            placeholder="write to bise" send={() => undefined} queue={() => undefined} editNewest={() => false} command={() => undefined}
+            onCanSend={() => undefined} onStrip={() => undefined} onBar={() => undefined} onActions={(x) => (got.a = x)} />
+        </div>
+      </div>,
+    );
+    const rect = (top: number, bottom: number) => () => ({ top, bottom, left: 230, right: 870, width: 640, height: bottom - top, x: 230, y: top, toJSON: () => ({}) }) as DOMRect;
+    (container.querySelector('[data-pick-anchor]') as HTMLElement).getBoundingClientRect = rect(528, 616);
+    (container.querySelector('.box') as HTMLElement).getBoundingClientRect = rect(568, 616);
+    await act(async () => {
+      got.a?.insertText('/');
+      await Promise.resolve();
+    });
+    const pop = getByTestId('composer.pick').parentElement as HTMLElement;
+    expect(pop.style.bottom).toBe(`${String(window.innerHeight - 528 + 8)}px`);
+  });
+
+  // designer m_44585: a key that opens nothing reads as broken
+  it.each([
+    ['@', words.pick_none_at],
+    ['$', words.pick_none_skill],
+  ])("a bare '%s' with nothing to offer shows one text-3 line, no row; the next key closes it, the character stays text", async (key, line) => {
+    const got: { a: ComposerActions | null } = { a: null };
+    const { getByTestId, queryByTestId } = render(
+      <div className="box">
+        <PmField target="p/main" busy={false} sources={{ ...NO_SOURCES, files: () => Promise.resolve([]) }} store={memStore()} testId="composer"
+          placeholder="write to bise" send={() => undefined} queue={() => undefined} editNewest={() => false} command={() => undefined}
+          onCanSend={() => undefined} onStrip={() => undefined} onBar={() => undefined} onActions={(x) => (got.a = x)} />
+      </div>,
+    );
+    await act(async () => {
+      got.a?.insertText(key);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const list = getByTestId('composer.pick');
+    expect(list.textContent).toBe(line);
+    expect(list.querySelectorAll('[role="menuitem"]').length).toBe(0);
+    await act(async () => {
+      got.a?.insertText('x');
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(queryByTestId('composer.pick')).toBeNull();
+    expect(getByTestId('composer.field').textContent).toBe(`${key}x`);
   });
 });

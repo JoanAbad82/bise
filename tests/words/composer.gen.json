@@ -463,7 +463,7 @@
   "composer.cmd_scheduled": {
     "args": [],
     "one": null,
-    "text": "its timers"
+    "text": "its scheduled tasks"
   },
   "composer.cmd_switch": {
     "args": [],
@@ -859,6 +859,16 @@
     ],
     "one": null,
     "text": "{n} lines · {kb} kB"
+  },
+  "composer.pick_none_at": {
+    "args": [],
+    "one": null,
+    "text": "nothing to mention here yet"
+  },
+  "composer.pick_none_skill": {
+    "args": [],
+    "one": null,
+    "text": "no skills here"
   },
   "composer.placeholder_about": {
     "args": [

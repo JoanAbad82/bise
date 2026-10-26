@@ -34,8 +34,7 @@ export interface HeldCtx {
 export interface HeldState extends HeldCtx {
   readonly busy: boolean;
   readonly typing: boolean;
-  /** the composer has a mic (⌃R) and voice mode (⌃R ⌃R) */
-  readonly dictate: boolean;
+  /** voice mode (⌃R ⌃R) with the agent in view */
   readonly voice: boolean;
 }
 
@@ -57,7 +56,7 @@ export function heldPairs(mod: HeldMod, s: HeldState): readonly HeldPair[] {
       }
       if (s.fold !== null) p.push(one('⌃O', s.fold === 'expand' ? composer.bar_expand : composer.bar_collapse));
       if (s.code) p.push(one('⌃Y', composer.bar_copy_code));
-      if (s.dictate) p.push(one('⌃R', composer.bar_dictate));
+      // ⌃R dictate is the mic's own keycap while ⌃ is held: never a key twice (designer m_44571)
       if (s.voice) p.push({ caps: ['⌃R', '⌃R'], sep: ' ', word: composer.bar_voice_mode });
       p.push(one('⌃`', composer.bar_terminal));
       return p;

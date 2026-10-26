@@ -41,6 +41,8 @@ export interface KeyCtx {
     readonly rows: readonly Row[];
     readonly index: number;
     readonly trigger: Trigger | null;
+    /** the bare '@' or '$' with nothing to offer: its one line shows (esc closes it, nothing else) */
+    readonly none?: boolean;
   };
   readonly dictation: Dictation;
   readonly saved: { current: Saved };
@@ -255,7 +257,7 @@ export function fieldKey(c: KeyCtx, e: KeyboardEvent): boolean {
       return false;
     }
     case "Escape": {
-      if (l.open && l.trigger !== null) {
+      if ((l.open || l.none === true) && l.trigger !== null) {
         e.preventDefault();
         if (l.trigger.kind === "slash") {
           c.clear();

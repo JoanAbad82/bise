@@ -152,6 +152,10 @@ crate::words! { composer:
     bar_expand = "expand";
     /// held ctrl: ctrl+o closes everything open
     bar_collapse = "collapse";
+    /// the desktop's @ list with nothing in it (designer m_44585: one text-3 line, never silent)
+    pick_none_at = "nothing to mention here yet";
+    /// the desktop's $ list with no skill
+    pick_none_skill = "no skills here";
     /// the desktop's held ⌃ (the composer's row, designer m_44287): ⌃1 … ⌃9 open an inbox item
     held_open_item = "open an item";
     /// the desktop's held ⌃, an item open: ⌃N ⌃P walk the items
@@ -488,7 +492,7 @@ crate::words! { composer:
     /// the desktop's / list: /artifacts
     cmd_artifacts = "what its agents made";
     /// the desktop's / list: /scheduled
-    cmd_scheduled = "its timers";
+    cmd_scheduled = "its scheduled tasks";
     /// the desktop's / list: /bims (the office's map for this project)
     cmd_bims = "the bims' office: pick its map";
     /// a send refused: its text beside its parts isn't their text (a

@@ -458,6 +458,11 @@
   white-space: nowrap;
   animation: cmp-held-in 120ms var(--ease-out);
 }
+/* the list takes the row's whole middle (designer m_44571): the spacer gives way, so the room is
+   what lies between the left group and the right one, 12 from each (its 8 padding + the row's 4 gap) */
+.b-composer .box .row:has(> .cmp-held) > .sp {
+  display: none;
+}
 .b-composer .cmp-held-pair {
   flex: none;
   display: inline-flex;

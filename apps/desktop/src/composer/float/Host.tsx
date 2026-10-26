@@ -134,7 +134,8 @@ function Float({ to: def }: { to: FloatTo }) {
   const col = useSideLayout();
   const listRef = useRef<ThreadListHandle | null>(null);
   return (
-    <div ref={root} className="cmp-float" data-state={state} data-empty={(state === 'open' && (empty || loading)) || undefined} data-testid="composer.float" data-project={project} data-agent={agent}
+    // data-pick-anchor: the composer's / @ $ list floats from the whole glass, never over its head (ui-review m_44570)
+    <div ref={root} className="cmp-float" data-pick-anchor data-state={state} data-empty={(state === 'open' && (empty || loading)) || undefined} data-testid="composer.float" data-project={project} data-agent={agent}
       role="region" aria-label={composer.float_name} style={{ left: col.colLeft + col.colW / 2 }}
       onFocus={() => {
         go('focus');

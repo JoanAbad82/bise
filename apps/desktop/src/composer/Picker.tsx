@@ -66,12 +66,15 @@ export function pickerRow(r: Row, testId: string): PickerRow {
   }
 }
 
-export function Picker({ rows, index, testId, onPick }: { rows: readonly Row[]; index: number; testId: string; onPick: (i: number) => void }): JSX.Element {
+/** `empty`: no rows, its one text-3 line instead (a bare '@' or '$' with nothing to offer) */
+export function Picker({ rows, index, testId, onPick, empty }: { rows: readonly Row[]; index: number; testId: string; onPick: (i: number) => void; empty?: string }): JSX.Element {
   // where it is in the composer: its box (the frame's .box), measured from here
   const at = useRef<HTMLSpanElement>(null);
   const [place, setPlace] = useState<ReturnType<typeof pickPlace> | null>(null);
   useLayoutEffect(() => {
-    const box = at.current?.closest('.box') ?? at.current?.parentElement ?? null;
+    // the box it floats from: a frame around the composer that says so (the floating composer's
+    // glass, data-pick-anchor), else the composer's own box
+    const box = at.current?.closest('[data-pick-anchor]') ?? at.current?.closest('.box') ?? at.current?.parentElement ?? null;
     if (box === null) return;
     const measure = () => {
       const next = pickPlace(box.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight });
@@ -99,6 +102,7 @@ export function Picker({ rows, index, testId, onPick }: { rows: readonly Row[]; 
               if (i >= 0) onPick(i);
             }}
             maxHeight={place?.maxHeight}
+            empty={empty}
             inline
             testId={testId}
           />

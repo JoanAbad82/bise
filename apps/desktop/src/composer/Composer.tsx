@@ -150,7 +150,6 @@ export const Composer = memo(function Composer(
           ...held.ctx,
           busy,
           typing: field.typing,
-          dictate: sources.dictate !== undefined,
           voice: sources.voice !== undefined,
         });
 

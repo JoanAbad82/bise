@@ -2,13 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import { heldPairs, type HeldState } from './heldkeys';
 
-const NONE: HeldState = { fold: null, inbox: 0, itemOpen: false, code: false, agents: 0, thread: false, busy: false, typing: false, dictate: false, voice: false };
-const ALL: HeldState = { fold: 'expand', inbox: 3, itemOpen: true, code: true, agents: 12, thread: true, busy: true, typing: false, dictate: true, voice: true };
+const NONE: HeldState = { fold: null, inbox: 0, itemOpen: false, code: false, agents: 0, thread: false, busy: false, typing: false, voice: false };
+const ALL: HeldState = { fold: 'expand', inbox: 3, itemOpen: true, code: true, agents: 12, thread: true, busy: true, typing: false, voice: true };
 const read = (mod: Parameters<typeof heldPairs>[0], s: HeldState) => heldPairs(mod, s).map((p) => p.caps.join(p.sep === '…' ? ' … ' : ' '));
 
 describe('heldPairs', () => {
-  it('⌃: stop, the inbox items, the next item, the folds, copy code, dictate, voice mode, terminal, in that order', () => {
-    expect(read('Control', ALL)).toEqual(['⌃C', '⌃1 … ⌃3', '⌃N ⌃P', '⌃O', '⌃Y', '⌃R', '⌃R ⌃R', '⌃`']);
+  it('⌃: stop, the inbox items, the next item, the folds, copy code, voice mode, terminal, in that order; ⌃R alone is the mic’s own keycap, never listed twice', () => {
+    expect(read('Control', ALL)).toEqual(['⌃C', '⌃1 … ⌃3', '⌃N ⌃P', '⌃O', '⌃Y', '⌃R ⌃R', '⌃`']);
     expect(read('Control', NONE)).toEqual(['⌃`']);
     // one item: ⌃1 alone, no walk
     expect(read('Control', { ...NONE, inbox: 1, itemOpen: true })).toEqual(['⌃1', '⌃`']);

@@ -271,7 +271,8 @@ describe('the composer', () => {
     expect(getByTestId('composer.mic.hint').textContent).toBe('⌃R');
     expect(getByTestId('composer.mic').querySelector('svg')).toBeNull();
     const pairs = [...getByTestId('composer.held').querySelectorAll('[data-testid="composer.held.pair"]')].map((p) => p.textContent);
-    expect(pairs).toEqual([`⌃C${words.bar_stop}`, `⌃1…⌃2${words.held_open_item}`, `⌃R${words.bar_dictate}`, `⌃R⌃R${words.bar_voice_mode}`, `⌃\`${words.bar_terminal}`]);
+    // ⌃R is on the mic, never in the list too (designer m_44571)
+    expect(pairs).toEqual([`⌃C${words.bar_stop}`, `⌃1…⌃2${words.held_open_item}`, `⌃R⌃R${words.bar_voice_mode}`, `⌃\`${words.bar_terminal}`]);
     // ⌘ held: its own keys, the mic keeps its icon
     rerender(<Composer target="p/main" store={store} onSend={onSend} sources={sources} held={{ mod: 'Meta', ctx }} />);
     expect(queryByTestId('composer.mic.hint')).toBeNull();
