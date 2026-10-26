@@ -354,10 +354,10 @@ export function resetWidth(): void {
 export type OverviewSection = 'agents' | 'artifacts' | 'processes';
 let sectionAsk: OverviewSection | null = null;
 
-/** The Overview of `project` in front, scrolled to `section`. */
-export function openOverviewAt(project: string, section: OverviewSection): void {
+/** The Overview in front, scrolled to `section`. */
+export function openOverviewAt(section: OverviewSection): void {
   sectionAsk = section;
-  openWhat({ kind: 'overview', project });
+  openWhat({ kind: 'overview' });
 }
 
 /** The section asked, once: the Overview takes it and scrolls there. */

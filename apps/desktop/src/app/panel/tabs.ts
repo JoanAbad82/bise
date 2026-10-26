@@ -12,9 +12,9 @@ export function openTab(e: Entity): void {
   openWhat({ kind: 'thing', e });
 }
 
-/** The Overview of `project` in front, scrolled to `section` (a card's ▯ 'pin as a tab', nm-side). */
-export function openOverview(project: string, section: OverviewSection): void {
-  openOverviewAt(project, section);
+/** The Overview in front, scrolled to `section` (a card's ▯ 'pin as a tab', nm-side): of the view, as the card's. */
+export function openOverview(section: OverviewSection): void {
+  openOverviewAt(section);
 }
 
 /** A tab's menu: Close. */

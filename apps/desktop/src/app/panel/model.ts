@@ -8,8 +8,8 @@ import { entityKey, type Entity } from '@/shared/entity';
 
 /** What a tab shows. */
 export type TabWhat =
-  /** what the right bar was: agents, archived, artifacts, scheduled, processes; of `project` when a card pinned it, else of the view */
-  | { readonly kind: 'overview'; readonly project?: string }
+  /** what the right bar was: agents, archived, artifacts, scheduled, processes; always of the view (side.ts panelProject: a project's own, bise's every project's) */
+  | { readonly kind: 'overview' }
   /** New tab: the launcher (search, Open, Recent); `artifacts`: its picker of the latest artifacts (⌘P) */
   | { readonly kind: 'launcher'; readonly n: number; readonly artifacts?: true }
   /** a browser tab with no page yet: its address field takes an artifact's name or a URL (⌘L) */
@@ -69,8 +69,7 @@ export function openIn(t: Tabs, what: TabWhat, instead?: string): Tabs {
   const tab = tabOf(what);
   const has = t.list.some((x) => x.id === tab.id);
   if (has) {
-    // the launcher he picked an open thing from goes: it did its job; the open tab takes the new
-    // what (an Overview pinned to another project)
+    // the launcher he picked an open thing from goes: it did its job; the open tab takes the new what
     const list = (instead !== undefined && instead !== tab.id ? t.list.filter((x) => x.id !== instead) : t.list).map((x) => (x.id === tab.id ? tab : x));
     return { list, active: tab.id };
   }
@@ -421,7 +420,9 @@ function whatOf(x: unknown): TabWhat | undefined {
   if (!isObj(x)) return undefined;
   switch (x['kind']) {
     case 'overview':
-      return typeof x['project'] === 'string' && x['project'] !== '' ? { kind: 'overview', project: x['project'] } : { kind: 'overview' };
+      // a record from before kept the project a card pinned it to (stuck in every project, his
+      // m_45581): it reads as the Overview of the view
+      return { kind: 'overview' };
     case 'launcher':
       if (typeof x['n'] !== 'number') return undefined;
       return x['artifacts'] === true ? { kind: 'launcher', n: x['n'], artifacts: true } : { kind: 'launcher', n: x['n'] };

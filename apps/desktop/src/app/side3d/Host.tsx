@@ -6,7 +6,9 @@
 // resize's end, a sidebar or panel fold) and hides while the tabbed panel is open or on a page
 // that is no project's (layout sideShows: the inbox, scheduled, plugins, artifacts...; the world's
 // office unmounted: no loop while hidden). The project is the route's (bise's home on a page with
-// none). One float open at a time, one per bubble (designer m_44975): a bubble's click, ⌥1-⌥4
+// none): the world and the acts (+ new agent, + add) are its; the floats list the Overview's
+// scope (side.ts panelProject, lists.ts: that project's own, bise's own every project's, his
+// m_45581). One float open at a time, one per bubble (designer m_44975): a bubble's click, ⌥1-⌥4
 // (folded) or ⌥⌘1-⌥⌘4 (keys.ts) toggle it (by its key, its first row takes the focus); from one
 // bubble to another the same float moves to its new place and size in 240 ms, its content
 // crossfading (moveFrames, designer m_44990; reduced motion: a 120 ms fade in place); ⌥ held shows each bubble's key; ↑ ↓ walk the rows,
@@ -33,8 +35,10 @@ import { AgentLine } from './FlyoutAgents';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, sideShows } from './layout';
-import { newAgent, openOverview, openTab, useLeftWidth, usePanelBox } from './ports';
+import { newAgent, openOverview, openTab, panelProject, useLeftWidth, usePanelBox } from './ports';
+import { useListed } from './lists';
 import { alarms } from '@/thread/wake';
+import type { Agent } from '@/proto';
 import { useAgents, useCards, useProjects, useStore } from '@/store';
 import { useAllArtifacts } from '@/artifacts';
 import { AddButton, useAddPlace } from '@/artifacts/Drops';
@@ -124,27 +128,36 @@ export function SideHost() {
   const home = rows.find((p) => p.home)?.project ?? '';
   const project = projectOf(route) ?? home;
   if (!layout.side || project === '') return null;
-  return <Side key={project} project={project} home={home} world={layout.world} />;
+  // whose items it lists: the Overview's scope (a project's own; bise's own every project's)
+  const scope = panelProject(route, home, rows.filter((p) => !p.home).length) ?? project;
+  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} />;
 }
 
-function Side({ project, home, world }: { project: string; home: string; world: 'small' | 'big' | 'bubble' }) {
+/** `project`: where its acts go (the world, + new agent, + add); `scope`: whose items it lists ('' every project's). */
+function Side({ project, scope, home, world }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble' }) {
   const router = useRouter();
   const route = useRoute();
   const store = useStore();
   const rows = useProjects();
+  const all = scope === '';
   const name = rows.find((p) => p.project === project)?.name || project;
-  const agents = useAgents(project);
-  const cards = useCards(project);
-  const artifacts = useAllArtifacts(project);
-  const tasks = useAllScheduled(project);
-  const procs = useAllProcesses(project);
+  // the world is the project's office: its own agents and asks, whatever the lists' scope
+  const own = useAgents(project);
+  const ownCards = useCards(project);
+  const ownLive = useMemo(() => inRank(own), [own]);
+  const listed = useListed(scope, home);
+  const { agents, cards, live } = listed;
+  const artifacts = useAllArtifacts(scope);
+  const tasks = useAllScheduled(scope);
+  const procs = useAllProcesses(scope);
   // the processes are asked once here, as the old right bar did; the hub sends them again on each change
+  const asked = all ? rows.map((p) => p.project).join('\n') : scope;
   useEffect(() => {
-    store.command({ cmd: 'processes', project });
-  }, [store, project]);
+    for (const p of asked.split('\n')) if (p !== '') store.command({ cmd: 'processes', project: p });
+  }, [store, asked]);
   const now = useNowFor(() => false);
-  const live = useMemo(() => inRank(agents), [agents]);
   const watching = live.filter((a) => alarms(a, now).length > 0);
+  const projectOfAgent = (a: Agent) => listed.projectOf.get(a) ?? project;
   const counts: Counts = {
     ...agentCounts(agents),
     artifacts: artifacts.length,
@@ -153,7 +166,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     watches: live.reduce((n, a) => n + alarms(a, now).length, 0),
     running: procs.filter((x) => isRunning(x.p)).length,
     listening: procs.filter((x) => isRunning(x.p) && (x.p.ports ?? []).length > 0).length,
-    inbox: rows.find((p) => p.project === project)?.waits ?? 0,
+    inbox: listed.waits,
   };
   const [open, setOpen] = useState<BubbleId | null>(null);
   const tops = bubbleTops(world === 'bubble' ? 'bubble' : 'small');
@@ -294,8 +307,9 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   const maxH = fit.maxH ?? CARD_MAX;
   const here = route.screen === 'thread' ? { project: route.project, agent: route.agent } : { project: null, agent: null };
   const at = answerFrom(here, home);
-  const openAgent = (agent: string) => {
-    router.go({ screen: 'thread', project, agent });
+  // a row opens its agent in its own project (bise's own lists every project's)
+  const openAgentIn = (p: string) => (agent: string) => {
+    router.go({ screen: 'thread', project: p, agent });
   };
   const addPlace = useAddPlace(project);
   const says = [side.at_desks({ n: live.length }), counts.asks > 0 ? side.asks({ n: counts.asks }) : ''].filter((s) => s !== '').join(' · ');
@@ -308,36 +322,36 @@ function Side({ project, home, world }: { project: string; home: string; world: 
         return {
           id: b, name: bubbleName(b), says: bubbleSays(b, counts),
           add: <HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />,
-          onPin: () => { openOverview(project, 'agents'); },
-          foot: { left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go({ screen: 'agents', project }); } }] },
-          rows: live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => <AgentLine key={a.name} project={project} a={a} cards={cards} at={at} onOpen={openAgent} />),
+          onPin: () => { openOverview('agents'); },
+          foot: { left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go(all ? { screen: 'bise' } : { screen: 'agents', project }); } }] },
+          rows: live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => <AgentLine key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} cards={cards} at={at} onOpen={openAgentIn(projectOfAgent(a))} />),
         };
       case 'artifacts':
         return {
           id: b, name: bubbleName(b), says: bubbleSays(b, counts),
           add: <AddButton place={addPlace} testId="app.flyout.artifacts.add" />,
-          onPin: () => { openOverview(project, 'artifacts'); },
-          foot: { left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project }); } }] },
+          onPin: () => { openOverview('artifacts'); },
+          foot: { left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project: scope }); } }] },
           rows: artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} />),
         };
       case 'scheduled':
         return {
           id: b, name: bubbleName(b), says: bubbleSays(b, counts),
-          onPin: () => { openOverview(project, 'processes'); },
+          onPin: () => { openOverview('processes'); },
           foot: { left: '', links: [{ text: side.all_scheduled, testId: 'app.flyout.scheduled.all', onClick: () => { router.go({ screen: 'scheduled' }); } }] },
           rows: tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
             <>
-              {tasks.slice(0, ROWS).map((x) => <TaskRow key={x.t.id} x={x} now={now} />)}
-              {watching.map((a) => <WatchRows key={a.name} project={project} a={a} now={now} onOpen={openAgent} />)}
+              {tasks.slice(0, ROWS).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} />)}
+              {watching.map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} />)}
             </>
           ),
         };
       case 'processes':
         return {
           id: b, name: bubbleName(b), says: bubbleSays(b, counts),
-          onPin: () => { openOverview(project, 'processes'); },
-          foot: { left: '', links: [{ text: side.all_processes, testId: 'app.flyout.processes.all', onClick: () => { router.go({ screen: 'running', scope: { project } }); } }] },
-          rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.p.agent}/${x.p.id}`} x={x} now={now} />),
+          onPin: () => { openOverview('processes'); },
+          foot: { left: '', links: [{ text: side.all_processes, testId: 'app.flyout.processes.all', onClick: () => { router.go(all ? { screen: 'running' } : { screen: 'running', scope: { project } }); } }] },
+          rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} />),
         };
     }
   };
@@ -345,14 +359,14 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     <div className="s3-side" ref={root} data-world={world} data-testid="app.side">
       {world !== 'bubble' && (
         <div className="s3-world-at" style={{ top: EDGE, right: EDGE }}>
-          <World project={project} name={name} says={says} agents={live} cards={cards} frozen={open !== null} onOpen={() => {
+          <World project={project} name={name} says={says} agents={ownLive} cards={ownCards} frozen={open !== null} onOpen={() => {
             openTab({ kind: 'office', project });
           }} />
         </div>
       )}
       {tops.world !== null && (
         <Bubble id="world" count={null} tip={WORLD_NAME} open={false} top={tops.world}
-          pic={<WorldThumb project={project} agents={live} cards={cards} />} onClick={() => {
+          pic={<WorldThumb project={project} agents={ownLive} cards={ownCards} />} onClick={() => {
             openTab({ kind: 'office', project });
           }} />
       )}

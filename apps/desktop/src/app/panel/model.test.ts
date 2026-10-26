@@ -24,6 +24,7 @@ import {
   nextLauncher,
   nextShell,
   openIn,
+  OVERVIEW,
   parseKept,
   pushRecent,
   RECENT_MAX,
@@ -73,9 +74,12 @@ describe('the tab model: open', () => {
     expect(ids(t)).toEqual(['overview', 'artifact:acme/a']);
     expect(t.active).toBe('artifact:acme/a');
   });
-  it('an Overview pinned to a project keeps its one tab and takes the project', () => {
-    const t = openIn(FIRST, { kind: 'overview', project: 'shop' });
-    expect(t.list).toEqual([{ id: 'overview', what: { kind: 'overview', project: 'shop' } }]);
+  it("a card's ▯ brings the one Overview to the front, of no project but the view's (his m_45581)", () => {
+    const t = openIn(openIn(FIRST, art('a')), { kind: 'overview' });
+    expect(t.list).toEqual([OVERVIEW, { id: 'artifact:acme/a', what: art('a') }]);
+    expect(t.active).toBe('overview');
+    // a record from before kept a pinned project: it reads as the view's Overview
+    expect(parseKept({ tabs: { list: [{ what: { kind: 'overview', project: 'shop' } }] } }).tabs.list).toEqual([OVERVIEW]);
   });
   it('New tabs and shells are numbered by the first free number', () => {
     const t = openIn(openIn(FIRST, nextLauncher(FIRST)), { kind: 'terminal', project: 'acme', n: 0 });

@@ -118,7 +118,7 @@ function Body({ tab, shown }: { tab: Tab; shown: boolean }) {
   if (!shown) return null;
   switch (what.kind) {
     case 'overview':
-      return <Overview pinned={what.project} shown={shown} />;
+      return <Overview shown={shown} />;
     case 'launcher':
       return <Launcher tabId={tab.id} shown={shown} artifacts={what.artifacts === true} />;
     case 'browser':
