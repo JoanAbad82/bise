@@ -27,18 +27,15 @@ import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { barProcs, isRunning, keyOf, stateOf, urlWords, useAllProcesses } from '@/running';
 import { running } from '@/proto/words_running.gen';
-import { useCards, useComputerLive, useGrowth, usePlaces, usePlugins, usePrefs, useProjects, useStore, type Store } from '@/store';
-import { numbersOf } from '@/agents/model';
+import { useGrowth, usePlaces, usePlugins, usePrefs, useProjects, useStore, type Store } from '@/store';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
 import { MAIN } from './route';
-import { useNowFor } from './clock';
-import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
-import { useBarAgents } from './baragents';
-import { agentRows, agentsMore, archivedRows, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type MoreWords } from './barrows';
+import { useAgentRows } from './agentrows';
+import { agentsMore, artifactRows, pageRows, procRoots, procRows, scheduledRows, watchRows, type BarRow, type MoreWords } from './barrows';
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { useMenuOf } from './panel/menu';
@@ -478,18 +475,6 @@ function AddFile({ place }: { place: AddPlace | null }) {
   );
 }
 
-/** Each agent's next wake (its scheduled tasks' soonest run), '<project>/<agent>' -> ms. Pure. */
-export function wakesOf(tasks: readonly { project: string; t: { agent: string; next_ms?: number | null } }[]): Map<string, number> {
-  const soonest = new Map<string, number>();
-  for (const x of tasks) {
-    if (x.t.next_ms == null) continue;
-    const k = `${x.project}/${x.t.agent}`;
-    const was = soonest.get(k);
-    if (was === undefined || x.t.next_ms < was) soonest.set(k, x.t.next_ms);
-  }
-  return soonest;
-}
-
 /**
  * The tip under an agent's row: the demo tour's (L25: 'start' under the first demo agent, 'steer'
  * under the one that waits for him), else the first agent's one-time hint (S36). They lived under
@@ -545,9 +530,8 @@ export function RightBar({ project, name }: { project: string; name: string }) {
   const all = project === '';
   // back from an artifact (‹, esc, ✕): the bar as he left it, its scroll too (designer's desktop-history)
   useKeptScroll(`rb:${project}`, () => document.querySelector<HTMLElement>('[data-testid="app.panel"] .app-rb-body'));
-  const agents = useBarAgents(project);
-  // a live row's pause under a minute ends on seconds: the second clock while one does
-  const now = useNowFor((t) => agents.some((x) => !x.a.archived && pauseInSeconds(x.a, t)));
+  // AGENTS and ARCHIVED: the same rows as the folded side's agents float (agentrows.ts)
+  const { agents, live, archived, cards, now } = useAgentRows(project, alt);
   const artifacts = useAllArtifacts(all ? undefined : project);
   // where '+ add' and a drop on ARTIFACTS put a file: this project's main, bise's home on bise's own
   const addHere = useAddPlace(project);
@@ -559,7 +543,6 @@ export function RightBar({ project, name }: { project: string; name: string }) {
     if (!all) askStore.command({ cmd: 'processes', project });
   }, [askStore, all, project]);
   const places = usePlaces(project);
-  const cards = useCards(project);
   const growth = useGrowth(project);
   // the office's map he picked with /bims for this project, his plugins' objects in it and his picks
   const prefs = usePrefs() as Prefs | null;
@@ -575,20 +558,12 @@ export function RightBar({ project, name }: { project: string; name: string }) {
   const welcomeHere = useWelcoming(project);
   const townProjects = useTownProjects();
   const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
-  const computer = useComputerLive();
-  const wakes = useMemo(() => wakesOf(tasks), [tasks]);
-  // the hub's rank as ⌥ numbers, held while ⌥ is (agents/model numbersOf): the rows' order and ⌥N (a project's only; bise's thread keeps start order)
-  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a), alt);
-  // bise's home: on bise's thread, its main is AGENTS' first row
-  const home = useProjects().find((p) => p.home)?.project;
-  const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }), ...(home === undefined ? {} : { home }) });
   // a mark, an orphan PR, a head: the PR in the review screen (its agent's), an orphan its branch
   const openPr: OpenPr = (r) => {
     if (r.kind === 'orphan' && r.branch !== undefined) router.go({ screen: 'branch', project: r.project, branch: r.branch });
     else if (r.agent !== undefined) router.go({ screen: 'review', project: r.project, agent: r.agent });
   };
   const tipOf = useAgentTip(project, live, route);
-  const archived = archivedRows(agents, now, all);
   // ARTIFACTS and SCHEDULED & WATCHING follow the thread in view: a sub-agent's, only its own (barscope.ts)
   const scope = barScope(route, project);
   // whose list ARTIFACTS and SCHEDULED show: the pages he opened past a cap are kept per scope

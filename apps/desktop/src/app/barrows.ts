@@ -525,3 +525,15 @@ export function procRoots(projects: readonly { readonly project: string; readonl
   }
   return m;
 }
+
+/** Each agent's next wake (its scheduled tasks' soonest run), '<project>/<agent>' -> ms. Pure. */
+export function wakesOf(tasks: readonly { project: string; t: { agent: string; next_ms?: number | null } }[]): Map<string, number> {
+  const soonest = new Map<string, number>();
+  for (const x of tasks) {
+    if (x.t.next_ms == null) continue;
+    const k = `${x.project}/${x.t.agent}`;
+    const was = soonest.get(k);
+    if (was === undefined || x.t.next_ms < was) soonest.set(k, x.t.next_ms);
+  }
+  return soonest;
+}

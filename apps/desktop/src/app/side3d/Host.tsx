@@ -38,7 +38,9 @@ import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
 import { noGrow, World, WorldThumb } from './World';
 import { Empty, Float, FloatLayer, HeadButton, type FloatContent } from './Flyout';
-import { AgentLine } from './FlyoutAgents';
+import { ArchivedFold, FloatAgents } from './FloatAgents';
+import { useAgentRows } from '../agentrows';
+import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
@@ -161,7 +163,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   const ownCards = useCards(project);
   const ownLive = useMemo(() => inRank(own), [own]);
   const listed = useListed(scope, home);
-  const { agents, cards, live } = listed;
+  const { agents, live } = listed;
   const artifacts = useAllArtifacts(scope);
   const tasks = useAllScheduled(scope);
   const procs = useAllProcesses(scope);
@@ -363,7 +365,20 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   };
   const addPlace = useAddPlace(project);
   const says = [side.at_desks({ n: live.length }), counts.asks > 0 ? side.asks({ n: counts.asks }) : ''].filter((s) => s !== '').join(' · ');
-  const archived = agents.filter((a) => a.archived).length;
+  // the agents float: the Overview's AGENTS and ARCHIVED rows (folded-side v9: A's floats take Overview's rows)
+  const ov = useAgentRows(scope, alt);
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  // a row opens its agent (main's on bise's own: bise's view); a mark or a head its PR's review, an orphan its branch
+  const openRow = (r: BarRow) => {
+    if (all && r.main === true) router.go({ screen: 'bise' });
+    else if (r.kind === 'orphan' && r.branch !== undefined) router.go({ screen: 'branch', project: r.project, branch: r.branch });
+    else if (r.kind === 'group' && r.feature !== undefined) router.go({ screen: 'feature', project: r.project, name: r.feature });
+    else if (r.agent !== undefined) router.go({ screen: 'thread', project: r.project, agent: r.agent });
+  };
+  const openPr = (r: BarRow) => {
+    if (r.kind === 'orphan' && r.branch !== undefined) router.go({ screen: 'branch', project: r.project, branch: r.branch });
+    else if (r.agent !== undefined) router.go({ screen: 'review', project: r.project, agent: r.agent });
+  };
   const running = procs.filter((x) => isRunning(x.p));
   // bise's own lists every project's (designer m_45706): each row says its project ('acme › perf'),
   // each head counts across them ('6 working in 3 projects'); in a project, neither
@@ -391,8 +406,13 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
           id: b, name: bubbleName(b), says: saysOf(b),
           add: <HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />,
           onPin: () => { openOverview('agents'); },
-          foot: { left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go(all ? { screen: 'bise' } : { screen: 'agents', project }); } }] },
-          rows: live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => <AgentLine key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} cards={cards} at={at} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />),
+          foot: {
+            left: '',
+            fold: <ArchivedFold rows={ov.archived} open={archivedOpen} onToggle={() => { setArchivedOpen((o) => !o); }} onOpen={openRow} />,
+            links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go(all ? { screen: 'bise' } : { screen: 'agents', project }); } }],
+          },
+          // Overview's rows (folded-side v9, A's floats): the same as its AGENTS (app/agentrows.ts)
+          rows: ov.live.length === 0 ? <Empty>{side.no_agents}</Empty> : <FloatAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} onOpen={openRow} onOpenPr={openPr} groupOf={groupOf} />,
         };
       case 'artifacts':
         return {

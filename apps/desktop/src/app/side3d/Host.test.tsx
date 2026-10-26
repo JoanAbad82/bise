@@ -136,14 +136,21 @@ describe('the right side, folded', () => {
   it('the agents card: in the hub\'s rank, the asking one with its options; an option sends the inbox\'s pick from the thread in view', () => {
     const { v, does } = side3d();
     fireEvent.click(v.getByTestId('app.bubble.agents'));
-    const lines = [...v.getByTestId('app.flyout.agents').querySelectorAll('.s3-agent')].map((e) => e.getAttribute('data-testid'));
+    // Overview's rows (folded-side v9, A's floats): main first as bise, then by rank
+    const lines = [...v.getByTestId('app.flyout.agents').querySelectorAll('.s3-arow')].map((e) => e.getAttribute('data-testid'));
     expect(lines).toEqual([`app.flyout.agents.${ACME}.main`, `app.flyout.agents.${ACME}.perf`, `app.flyout.agents.${ACME}.docs`]);
-    expect(v.getByTestId(`app.flyout.agents.${ACME}.perf`).getAttribute('data-k')).toBe('asks');
-    expect(v.getByTestId(`app.flyout.agents.${ACME}.docs`).getAttribute('data-k')).toBe('thinks');
+    // perf asks him: its row on the accent, its card's question as its line, its options in one click
+    expect(v.getByTestId(`app.flyout.agents.${ACME}.perf`).hasAttribute('data-asks')).toBe(true);
+    expect(v.getByTestId(`app.flyout.agents.${ACME}.perf.role`).textContent).toBe('run rm -rf target?');
+    expect(v.getByTestId(`app.flyout.agents.${ACME}.docs`).hasAttribute('data-asks')).toBe(false);
     fireEvent.click(v.getByTestId(`app.flyout.agents.${ACME}.perf.opt.1`));
     expect(does).toHaveBeenCalledWith({ i: 'pick', project: ACME, card: 7, n: 1, from: { at: { project: ACME, agent: 'perf' } } });
     expect(v.getByTestId(`app.flyout.agents.${ACME}.perf.answer`).textContent).toBe(side.answer);
-    expect(v.getByTestId('app.flyout.agents').textContent).toContain(side.archived({ n: 1 }));
+    // ARCHIVED folded in its foot, open on a click
+    expect(v.getByTestId('app.flyout.agents.archived').textContent).toContain(side.archived({ n: 1 }));
+    expect(v.queryByTestId('app.flyout.agents.archived.rows')).toBeNull();
+    fireEvent.click(v.getByTestId('app.flyout.agents.archived'));
+    expect(v.getByTestId('app.flyout.agents.archived.rows').textContent).toContain('old');
   });
 
   it('the artifacts card: the new one with its dot; one card at a time; esc closes it', () => {
@@ -354,8 +361,9 @@ describe('the right side, folded', () => {
     act(() => {
       emitAction('side-1');
     });
-    const rows = [...v.getByTestId('app.flyout.agents').querySelectorAll<HTMLElement>('[data-row]')];
-    expect(rows).toHaveLength(3);
+    const rows = [...v.getByTestId('app.flyout.agents').querySelectorAll<HTMLElement>('.s3-card-body [data-row]')];
+    // Overview's rows: main, then the worktree perf and docs share (its ψ head), then theirs
+    expect(rows.map((r) => r.getAttribute('data-testid') ?? r.parentElement?.getAttribute('data-testid'))).toEqual([`app.flyout.agents.${ACME}.main`, 'app.flyout.agents.group.sb/dark', `app.flyout.agents.${ACME}.perf`, `app.flyout.agents.${ACME}.docs`]);
     expect(document.activeElement).toBe(rows[0]);
     // its ring at once, not only after the first ↓ (ui-review m_44435)
     expect(v.getByTestId('app.flyout.agents').hasAttribute('data-kb')).toBe(true);
@@ -363,10 +371,12 @@ describe('the right side, folded', () => {
     expect(document.activeElement).toBe(rows[1]);
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     fireEvent.keyDown(window, { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(rows[2]);
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    // kept in the card: the last row stays
+    expect(document.activeElement).toBe(rows[3]);
     fireEvent.keyDown(window, { key: 'ArrowUp' });
-    expect(document.activeElement).toBe(rows[1]);
-    expect(rows[1]?.tagName).toBe('BUTTON');
+    expect(document.activeElement).toBe(rows[2]);
+    expect(rows[2]?.tagName).toBe('BUTTON');
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(v.queryByTestId('app.flyout.agents')).toBeNull();
     expect(document.activeElement).toBe(v.getByTestId('app.bubble.agents'));
@@ -467,14 +477,14 @@ describe('the right side, folded', () => {
     expect(big.clipPath).toContain('calc(100% - 68px) 112px');
   });
 
-  it('the agents card: one foot, the card\'s end (archived · all agents)', () => {
+  it('the agents card: one foot, the card\'s end (the archived fold · all agents)', () => {
     const { v } = side3d();
     fireEvent.click(v.getByTestId('app.bubble.agents'));
     const card = v.getByTestId('app.flyout.agents');
     expect(card.querySelectorAll('footer')).toHaveLength(1);
     expect(card.querySelector('.s3-card-layer[data-now]')?.lastElementChild?.tagName).toBe('FOOTER');
     expect(card.hasAttribute('data-foot')).toBe(true);
-    expect(card.querySelector('footer')?.textContent).toBe(`${side.archived({ n: 1 })}${side.all_agents}`);
+    expect(card.querySelector('footer')?.textContent).toBe(`▸${side.archived({ n: 1 })}${side.all_agents}`);
   });
 
   it('a card\'s top is always its bubble\'s; its height at most the room under it less 16 (designer m_44499)', () => {

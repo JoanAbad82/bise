@@ -1007,3 +1007,188 @@
   font: 600 var(--t-11)/16px var(--font-mono);
   text-align: center;
 }
+
+/* the agents float with Overview's rows (folded-side v9, A's floats; FloatAgents.tsx): each agent
+   its 40 head, then line 1 (its mark 16, its name 13/600, the computer mark, then its time, its
+   ring with its % from 70 and its PR's number right-aligned, t-12 mono text-3) and line 2 (its now
+   line t-12 text-2, red when it failed). An ask: --c-accent-soft and the accent's rule, its two
+   options and 'answer…' under it. A ψ head: its branch text-2, 'N agents' text-3, its PR. */
+.s3-arow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  border-radius: var(--r-3);
+}
+.s3-arow[data-asks] {
+  background: var(--c-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--c-accent-line);
+}
+.s3-arow-open {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  width: 100%;
+  padding: var(--s-1);
+  border-radius: var(--r-2);
+  text-align: left;
+}
+.s3-arow-open:hover {
+  background: var(--c-hover);
+}
+.s3-arow[data-asks] .s3-arow-open:hover {
+  background: transparent;
+}
+.s3-arow-head {
+  flex: none;
+}
+.s3-arow-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: var(--s-1);
+}
+.s3-arow-l1 {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.s3-arow-sign {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+}
+.s3-arow-key {
+  font: 500 var(--t-11)/16px var(--font-mono);
+  color: var(--c-text-2);
+}
+.s3-arow-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--f-ui);
+  color: var(--c-text);
+}
+.s3-arow-cols {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+  font: 400 var(--t-12)/16px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-3);
+}
+.s3-arow-pct {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.s3-arow-pr {
+  padding: 0 var(--s-1);
+  border-radius: var(--r-1);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+  cursor: pointer;
+}
+.s3-arow-pr:hover {
+  color: var(--c-text);
+}
+.s3-arow-l2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: calc(16px + var(--s-1));
+  font: 400 var(--f-meta);
+  color: var(--c-text-2);
+}
+.s3-arow-l2[data-err] {
+  color: var(--c-err);
+}
+.s3-arow-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 0 var(--s-1) calc(var(--s-1) + 40px + var(--s-3) + 16px + var(--s-1));
+}
+.s3-arow-answer {
+  padding: 0 var(--s-2);
+  font: 500 var(--f-meta);
+  color: var(--c-text-2);
+}
+.s3-arow-answer:hover {
+  color: var(--c-text);
+}
+.s3-arow-group,
+.s3-arow-old {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: 28px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-2);
+  font: 400 var(--f-meta);
+  color: var(--c-text-2);
+  text-align: left;
+}
+.s3-arow-group:hover,
+.s3-arow-old:hover {
+  background: var(--c-hover);
+}
+.s3-arow-g {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  width: 16px;
+  color: var(--c-text-3);
+}
+.s3-arow-g.err {
+  color: var(--c-err);
+}
+.s3-arow-gname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.s3-arow-gn {
+  flex: none;
+  color: var(--c-text-3);
+}
+.s3-arow-time {
+  flex: none;
+  margin-left: auto;
+}
+.s3-arow-old .s3-arow-time {
+  font: 400 var(--t-12)/16px var(--font-mono);
+  color: var(--c-text-3);
+}
+/* the foot's fold: '▸ 3 archived', its rows under the float's rows */
+.s3-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--c-text-3);
+}
+.s3-fold:hover {
+  color: var(--c-text-2);
+}
+.s3-fold-tri {
+  display: inline-block;
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.s3-fold-tri[data-open] {
+  transform: rotate(90deg);
+}
+.s3-archived {
+  display: flex;
+  flex-direction: column;
+}

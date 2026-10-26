@@ -53,7 +53,8 @@ export interface FloatContent {
   /** the head's '▯': the same list as a tab of the panel */
   readonly onPin: () => void;
   /** its foot: what it says on the left ('3 archived'), its full page's link on the right ('all agents ›') */
-  readonly foot: { readonly left: string; readonly links: readonly FootLink[] };
+  /** its foot: what it says on the left ('3 archived'), or a fold there (the agents' '▸ 3 archived'); its full page's link on the right */
+  readonly foot: { readonly left: string; readonly fold?: ReactNode; readonly links: readonly FootLink[] };
   readonly rows: ReactNode;
 }
 
@@ -79,7 +80,7 @@ export function FloatLayer({ c, scrolls = false, leaving = false }: { c: FloatCo
         {c.rows}
       </div>
       <footer className="s3-card-foot">
-        <span>{c.foot.left}</span>
+        <span className="s3-card-foot-left">{c.foot.fold ?? c.foot.left}</span>
         <span className="s3-card-links">
           {c.foot.links.map((l) => (
             <SideLink key={l.testId} onClick={l.onClick} testId={l.testId}>
