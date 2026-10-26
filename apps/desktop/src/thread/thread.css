@@ -613,12 +613,6 @@
 .th-stopped .b-marker {
   color: var(--c-text-2);
 }
-/* the inbox's confirm line keeps a text mark of its own (inbox/confirm.tsx) */
-.th-notice-mark {
-  flex: none;
-  width: 1em;
-  text-align: center;
-}
 /* batch 3a: the hub's news lines (landed, PR news, approvals, answered for him): a mark that
    says what it means, the words; tone by the mark and its words, never color alone */
 .th-news {

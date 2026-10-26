@@ -11,7 +11,7 @@
 // them as its answer ('↳ answering search · …', 'esc to perf instead'); an approval or a choice item
 // never (ambient m_8773: 'to perf · the merge waits for 1 or 2', his words go as a plain message).
 // Owner: amb-home.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
 import { Act, Dot, Kbd, Row, RowMark } from '@/ds';
@@ -323,12 +323,22 @@ function signOf(c: Card): string | null {
   return takesWords(c) ? null : '!';
 }
 
-/** The last line, the TUI's more_row: '+ 2 more · ? perf · which bench?' (`next`: the first of them). Pure. */
-export function moreWords(more: number, next: Card): string {
+/** The last line, the TUI's more_row: '+ 2 more · ? perf · which bench?' (`next`: the first of them),
+ *  its sign drawn as the row's line icon, never a text glyph (ui-review m_43978; the TUI keeps its '?'). Pure. */
+export function moreWords(more: number, next: Card): ReactNode {
   const w = rowWords(next);
   const sign = signOf(next);
   const what = w.what === '' ? '' : ` · ${w.cmd ? '$ ' : ''}${w.what}`;
-  return inbox.more_row({ n: more, first: `${sign === null ? '' : `${sign} `}${shownName(w.who)}${what}` });
+  // the catalog's words with a slot where the sign goes: the words stay the catalog's, the icon sits in them
+  const slot = '\u{E000}';
+  const [before = '', after = ''] = inbox.more_row({ n: more, first: `${slot}${shownName(w.who)}${what}` }).split(slot);
+  return (
+    <>
+      {before}
+      {sign !== null && <RowMark icon={sign === '!' ? 'alert' : 'ask'} tone="accent" label={sign === '!' ? 'decide' : 'question'} />}
+      {after}
+    </>
+  );
 }
 
 /** A field he is typing in: its keys are his, not the block's. */

@@ -89,11 +89,13 @@ describe('the inbox block (b2)', () => {
     // an approval's command: '$ ', its first line, how many lines it has (card_draw.rs box_row)
     expect(text(3)).toBe('3perf$ npm publish · 2 lines1 min');
     // '+ 2 more · ? perf · which port 13?' (more_row): the first of the hidden ones, its note left to its row
-    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 2 more · ? perf · which port 13?');
+    // its '?' is the ask line icon, in the catalog's words (ui-review m_43978)
+    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 2 more · perf · which port 13?');
+    expect(screen.getByTestId('inbox.block.more').querySelector('.b-rowmark')?.getAttribute('data-icon')).toBe('ask');
     fireEvent.click(screen.getByTestId('inbox.block.more'));
     expect(screen.getByTestId('inbox.block.open.4')).toBeTruthy();
     // open further down: rows 1-3 stay, the open item where its number puts it, the last one folds
-    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 1 more · ? perf · which port 14?');
+    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 1 more · perf · which port 14?');
   });
 
   it('a question opens in place: its options, and the composer answers it; a digit picks, the line leaves', () => {

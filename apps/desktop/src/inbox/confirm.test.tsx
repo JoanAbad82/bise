@@ -30,7 +30,7 @@ describe('HubNoteRow', () => {
     act(() => {
       store.apply({ ev: 'notice', project: P, cmd: 'slash', text: 'flow: trunk' });
     });
-    expect(screen.getByTestId('confirm.notice').textContent).toBe('· flow: trunk');
+    expect(screen.getByTestId('confirm.notice').textContent).toBe('flow: trunk');
   });
 
   describe('his /restart row (ambient-lead m_22833, his m_22835)', () => {
@@ -66,7 +66,7 @@ describe('HubNoteRow', () => {
       const { sent, store } = setup();
       await restart(store, sent);
       const row = await screen.findByTestId('confirm.notice.app');
-      expect(screen.getByTestId('confirm.notice').textContent).toBe(`· ${HUB} · this app is e91f98d7, a newer one is ready ⏎ restart to update`);
+      expect(screen.getByTestId('confirm.notice').textContent).toBe(`${HUB} · this app is e91f98d7, a newer one is ready ⏎ restart to update`);
       expect(row.textContent).toBe(' · this app is e91f98d7, a newer one is ready');
       await act(async () => {
         fireEvent.click(screen.getByTestId('confirm.notice.swap'));
@@ -74,7 +74,7 @@ describe('HubNoteRow', () => {
       });
       expect(swap).toHaveBeenCalledTimes(1);
       hello(store);
-      expect(screen.getByTestId('confirm.notice').textContent).toBe('· this app is e91f98d7, a newer one is ready ⏎ restart to update');
+      expect(screen.getByTestId('confirm.notice').textContent).toBe('this app is e91f98d7, a newer one is ready ⏎ restart to update');
     });
 
     it('nothing staged, another version: it updates at the next try; the row goes once the hub is back', async () => {
@@ -82,7 +82,7 @@ describe('HubNoteRow', () => {
       const { sent, store } = setup();
       await restart(store, sent);
       await screen.findByTestId('confirm.notice.app');
-      expect(screen.getByTestId('confirm.notice').textContent).toBe(`· ${HUB} · this app is e91f98d7 · it updates at the next try`);
+      expect(screen.getByTestId('confirm.notice').textContent).toBe(`${HUB} · this app is e91f98d7 · it updates at the next try`);
       expect(screen.queryByTestId('confirm.notice.swap')).toBeNull();
       hello(store);
       expect(screen.queryByTestId('confirm.notice')).toBeNull();
@@ -95,7 +95,7 @@ describe('HubNoteRow', () => {
       await act(async () => {
         await Promise.resolve();
       });
-      expect(screen.getByTestId('confirm.notice').textContent).toBe(`· ${HUB}`);
+      expect(screen.getByTestId('confirm.notice').textContent).toBe(HUB);
       hello(store);
       expect(screen.queryByTestId('confirm.notice')).toBeNull();
     });

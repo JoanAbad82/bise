@@ -14,7 +14,7 @@ import './inbox.css';
 /**
  * The hub's last plain line to this window for the project (a typed command's result: /flow,
  * /help, a no's '@x stays: nothing archived', /restart's words) as ONE quiet row at the thread's end
- * (designer's desktop-notices page (1)): the thread's notice look, dim, its '·'. ThreadScreen
+ * (designer's desktop-notices page (1)): the thread's notice look, dim, no mark. ThreadScreen
  * mounts it after the working row (amb-win m_20575). A refused line is the composer's key line.
  */
 export function HubNoteRow({ project }: { project: string }) {
@@ -26,9 +26,8 @@ export function HubNoteRow({ project }: { project: string }) {
   const words = notice.back === true ? '' : notice.text;
   return (
     <div className="th-notice info th-hubnote" role="status" data-level="info" data-testid="confirm.notice" data-app={tail?.kind}>
-      <span className="th-notice-mark" aria-label="note">
-        ·
-      </span>{' '}
+      {/* an info line: no mark, its 16 column kept empty like the thread's info notice (ui-review m_43980) */}
+      <span className="b-rowmark" aria-hidden="true" />
       <span>
         {words}
         {tail !== null && (
