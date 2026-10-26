@@ -258,7 +258,8 @@ function hard(): Island {
   /** in the air `h` over the floor, the board kept under the feet, pitched `p` */
   const air = (u: number, h: number, p: number, o: Partial<Rig> = {}): Actor =>
     ride(u, { lift: h, board: { ...BOARD, rot: [p, 0, 0] }, armL: [0, 0, -1.35], armR: [0, 0, 1.35], legL: 0.8, legR: -0.5, ...o });
-  const crouch: Partial<Rig> = { y: DECK - 0.14, legL: 1.0, legR: -0.6, body: [0.15, SIDE, 0], head: [-0.15, AHEAD, 0] };
+  // its chin up 0.1 in the crouch, its head turned AHEAD: 0.15 put a long cut's curtain and the curls' low ring into a hoodie's hood (hair-clip.test.ts)
+  const crouch: Partial<Rig> = { y: DECK - 0.14, legL: 1.0, legR: -0.6, body: [0.15, SIDE, 0], head: [-0.1, AHEAD, 0] };
   const frames: Frame[] = [
     { bims: [ride(-0.4)] }, // 0 rolling in
     { bims: [ride(-0.27)] },

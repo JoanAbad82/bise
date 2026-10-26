@@ -34,9 +34,13 @@ export const FLAT = {
   /** where the ray looks, from the hips (z ahead): the back's lowest point, the heels' */
   back: -0.39,
   heels: -0.035,
-  /** the head's middle from the spot (z ahead), and how far over the bed its lowest point is: the pillow's place and height */
+  /**
+   * the head's middle from the spot (z ahead), and the pillow's height under it. The skull's lowest
+   * point lies 3.2-3.7 cm over the bed (it sinks 1.3-1.8 cm in the pillow) and a woman's hair 3-5 mm
+   * under it: at 0.06 cyclades' hair went 3.3 cm in, past nap.test.ts's TOUCH
+   */
   headZ: -0.69,
-  headUp: 0.06,
+  headUp: 0.05,
 } as const;
 
 /** the recline (sink, sling): its pivot this far under the bag's top (it sinks in, as the loft's bean bags always had it), over the cloth under its spot */
