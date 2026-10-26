@@ -29,7 +29,7 @@ import { MAIN, projectOf } from './route';
 import { useRoute, useRouter } from './router';
 import { useKeptScroll } from './keep';
 import { useModHeld } from './held';
-import { LiveBiseMark } from './Marks';
+import { LiveBiseMark, WorkingMark } from './Marks';
 import { usePinned, type Pin } from './pins';
 import { addProject } from './addProject';
 import { pinRowOf, projectRowOf, projectsOf, type ProjectEnd, type RowEnd } from './siderows';
@@ -66,14 +66,14 @@ function CutName({ name }: { name: string }) {
 }
 
 /** A project row's end (designer m_44271, the bubbles' grammar): the count in the accent when
- * something waits on him, else the ring and the count in text-3; ⌘ held, its digit in their place. */
-function ProjectEndView({ end, digit, testId }: { end: ProjectEnd; digit: number | undefined; testId: string }) {
+ * something waits on him, else main's breath and the count in text-3; ⌘ held, its digit in their place. */
+export function ProjectEndView({ end, digit, testId }: { end: ProjectEnd; digit: number | undefined; testId: string }) {
   if (digit !== undefined) return <kbd data-testid={`${testId}.digit`}>{`⌘${String(digit)}`}</kbd>;
   if (end === null) return null;
   if (end.kind === 'waits') return <span className="app-s-cnt waits" data-testid={`${testId}.waits`}>{end.n}</span>;
   return (
     <span className="app-s-cnt" data-testid={`${testId}.works`}>
-      <span className="app-s-ring" />
+      <WorkingMark pace="project" tip={workingTip(end.n)} testId={`${testId}.works.mark`} />
       {end.n}
     </span>
   );
@@ -85,10 +85,10 @@ export function projectRowTip(working: number, waits: number): string {
   return parts.length === 0 ? common.all_quiet : parts.join(' · ');
 }
 
-/** A pinned agent's end: the accent dot (it waits on him) or the ring (it works), each with its tip; nothing else. */
-function End({ end, testId }: { end: RowEnd; testId: string }) {
+/** A pinned agent's end: the accent dot (it waits on him) or main's breath (it works), each with its tip; nothing else. */
+export function AgentEnd({ end, testId }: { end: RowEnd; testId: string }) {
   if (end === 'waits') return <span className="app-s-dot" {...tipAttrs(panel.asks_you)} data-testid={`${testId}.waits`} />;
-  if (end === 'works') return <span className="app-s-ring" {...tipAttrs(panel.state_working)} data-testid={`${testId}.works`} />;
+  if (end === 'works') return <WorkingMark testId={`${testId}.works`} />;
   return null;
 }
 
@@ -349,7 +349,7 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd }: { p: Projec
   );
 });
 
-/** A pinned agent's row: his own shortcut to it (pins.ts); its end the dot or the ring. */
+/** A pinned agent's row: his own shortcut to it (pins.ts); its end the dot or the breath. */
 function PinRow({ project, name, main, on, end, stopped }: { project: string; name: string; main: boolean; on: boolean; end: RowEnd; stopped: boolean }) {
   const router = useRouter();
   const menu = useEntityMenu({ kind: 'agent', project, agent: name });
@@ -361,7 +361,7 @@ function PinRow({ project, name, main, on, end, stopped }: { project: string; na
       name={main ? panel.bise : name}
       on={on}
       stopped={stopped}
-      end={<End end={end} testId={id} />}
+      end={<AgentEnd end={end} testId={id} />}
       onClick={() => {
         router.go({ screen: 'thread', project, agent: main ? MAIN : name });
       }}

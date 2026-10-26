@@ -3,13 +3,14 @@
 // then 'Projects', one row per project in his order (Settings › Projects), no agent under it: the
 // agents of a project live on the right side. A project row's end says one fact, the bubbles'
 // grammar (designer m_44271): what waits on him (the count in the accent), else its agents at work
-// (the ring and the count), else nothing; with ⌘ held, its ⌘ digit instead (⌘1-9 opens it,
-// keys.ts). A pinned agent's row keeps the dot (it waits on him) or the ring (it works).
+// (main's breath and the count, Marks.tsx WorkingMark), else nothing; with ⌘ held, its ⌘ digit
+// instead (⌘1-9 opens it, keys.ts). A pinned agent's row keeps the dot (it waits on him) or the
+// breath (it works).
 // Pure: Sidebar.tsx draws them. Owner: r2-pointer (nm-frame's, archived).
 import type { Agent, ProjectRow } from '@/proto';
 import { liveOf } from '@/agents/model';
 
-/** A pinned agent's end: it waits on him (the accent dot), it works (the ring), or nothing. */
+/** A pinned agent's end: it waits on him (the accent dot), it works (the breath), or nothing. */
 export type RowEnd = 'waits' | 'works' | null;
 
 /** A project row's end: how many things wait on him, else how many of its agents work, else nothing. */
@@ -19,7 +20,7 @@ export type SideRow =
   | { readonly kind: 'project'; readonly p: ProjectRow; readonly on: boolean; readonly end: ProjectEnd; readonly working: number; readonly waits: number; readonly digit?: number }
   | { readonly kind: 'agent'; readonly project: string; readonly a: Agent; readonly on: boolean; readonly end: RowEnd; readonly stopped: boolean };
 
-/** An agent's end: the dot when it asks him (a card, or the hub says it waits on him), the ring at work. Pure. */
+/** An agent's end: the dot when it asks him (a card, or the hub says it waits on him), the breath at work. Pure. */
 export function endOf(a: Agent): RowEnd {
   if (a.waits > 0 || a.waiting_on?.who === 'you') return 'waits';
   if (a.status === 'working') return 'works';

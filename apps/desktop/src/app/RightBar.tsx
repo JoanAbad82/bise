@@ -43,7 +43,7 @@ import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from '.
 import { FitWords } from './FitWords';
 import { useMenuOf } from './panel/menu';
 import { openTab } from './panel/tabs';
-import { DoneSign } from './Marks';
+import { DoneSign, WorkingMark } from './Marks';
 import { BimsSwitch, Office } from '@/bims/Office';
 import { BimsToggle } from '@/bims/Cube';
 import { BimsFold } from '@/bims/Fold';
@@ -228,7 +228,7 @@ export type AgentMark = 'works' | 'asks' | 'failed' | 'done' | 'none';
 
 /**
  * An agent's mark, the pre-native-mac row glyph drawn as the ds line marks (RowMark, as the
- * thread's): at work the sidebar's turning 3/4 arc, asking '?' in the accent, failed the alert,
+ * thread's): at work main's breath (Marks.tsx WorkingMark, his m_44714), asking '?' in the accent, failed the alert,
  * done the check in ink; idle or stopped nothing. Its words stay in the tip. Pure.
  */
 export function agentMark(g: string, working: boolean): AgentMark {
@@ -240,10 +240,10 @@ export function agentMark(g: string, working: boolean): AgentMark {
 }
 
 /** An agent's mark drawn (agentMark). */
-function AgentSign({ mark, testId }: { mark: AgentMark; testId: string }) {
+export function AgentSign({ mark, testId }: { mark: AgentMark; testId: string }) {
   switch (mark) {
     case 'works':
-      return <span className="app-s-ring" data-testid={`${testId}.works`} />;
+      return <WorkingMark testId={`${testId}.works`} />;
     case 'asks':
       return <RowMark icon="ask" tone="accent" />;
     case 'failed':

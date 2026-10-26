@@ -377,36 +377,13 @@ body:has(.app-shell) {
   color: var(--c-accent);
   font-weight: 500;
 }
-/* what asks something, at a row's end: the accent dot 6 (it waits on him) or the ring 10 (it works) */
+/* what asks something, at a row's end: the accent dot 6 (it waits on him); at work, main's breath
+   (Marks.tsx WorkingMark, marks.css .mk-wk; his m_44714: never a turning arc) */
 .app-s-dot {
   width: calc(var(--s-1) + var(--s-1) / 2);
   height: calc(var(--s-1) + var(--s-1) / 2);
   border-radius: 50%;
   background: var(--c-accent);
-}
-.app-s-ring {
-  box-sizing: border-box;
-  width: calc(var(--s-2) + var(--s-1) / 2);
-  height: calc(var(--s-2) + var(--s-1) / 2);
-  border-radius: 50%;
-  border: 1.5px solid var(--c-text-3);
-  /* a 3/4 arc that turns, one turn per 1.2 s (designer m_43568: a full still ring reads 'off');
-     under reduced motion the arc stays, still */
-  border-top-color: transparent;
-  animation: app-s-turn 1.2s linear infinite;
-}
-@keyframes app-s-turn {
-  to {
-    transform: rotate(1turn);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .app-s-ring {
-    animation: none;
-  }
-}
-:root[data-reduce-motion] .app-s-ring {
-  animation: none;
 }
 .app-s-label {
   flex: none;

@@ -2,7 +2,9 @@
 // fed with what waits on him and whether bise works), a project's mark (the TUI's breath
 // '· ~ ∿ ≈ ∿ ~' while an agent works, his pick #9: working/Signs.tsx's MarkBreath on the window's
 // one clock, a still '∿' under reduced motion or out of focus; '?' when it asks him, '·' quiet), and
-// the done kiss (':*' lifts and fades, '✓' comes, 600 ms, once per finish). They replace the
+// the done kiss (':*' lifts and fades, '✓' comes, 600 ms, once per finish), and WorkingMark: every
+// row's 'at work' mark (sidebar, panel, agents and changes pages), the same breath, never an arc
+// (his m_44714). They replace the
 // pearl in the window; the pearl stays the capsule's. The kiss is CSS (marks.css), none under
 // reduced motion: the final state only. The states are marks.ts's. Owner: amb-win.
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
@@ -11,7 +13,8 @@ import { useProjects, useStore } from '@/store';
 import { BiseMark, tipAttrs } from '@/ds';
 import { biseMark, finished, KISS_HOLD_MS, KISS_MS, projectMark, type ProjectMarkKind } from './markstates';
 import { biseTip } from './tipwords';
-import { MarkBreath } from '@/working/Signs';
+import { Breath, MarkBreath } from '@/working/Signs';
+import { panel } from '@/proto/words_panel.gen';
 import './marks.css';
 
 // ---- the done kiss: who finished when, for the whole window
@@ -107,6 +110,19 @@ export function ProjectMark({ p, tip, testId }: { p: Pick<ProjectRow, 'project' 
   return (
     <span className={`mk mk-pj ${kind}`} {...tipAttrs(tip)} data-mark={at !== undefined ? 'kiss' : kind} data-testid={testId}>
       {at !== undefined ? <Kiss at={at} /> : kind === 'works' ? <MarkBreath /> : GLYPH[kind]}
+    </span>
+  );
+}
+
+/** The one 'at work' mark of a row (his m_44714: main's ASCII animation, never a turning arc): the
+ *  TUI's 1-cell breath '· ~ ∿ ≈ ∿ ~' on the window's one clock, still '∿' under reduced motion,
+ *  centred in a 16 px column; its tip and VoiceOver name `tip` (default 'working'). `pace`
+ *  'project': a project's calmer breath (MarkBreath, 220 ms, as main's sidebar project mark). */
+export function WorkingMark({ tip, pace = 'agent', testId }: { tip?: string | undefined; pace?: 'agent' | 'project'; testId?: string | undefined }) {
+  const word = tip ?? panel.state_working;
+  return (
+    <span className="mk mk-wk" role="img" aria-label={word} {...tipAttrs(word)} data-mark="working" data-testid={testId}>
+      {pace === 'project' ? <MarkBreath /> : <Breath />}
     </span>
   );
 }

@@ -28,6 +28,19 @@
   text-align: center;
 }
 
+/* ---- a row at work (WorkingMark, his m_44714): the breath, one 12 px mono cell centred in a 16
+   column (a row's state column), text-2 to ink by its frame (working.css) */
+.mk-wk {
+  flex: none;
+  width: var(--s-4);
+  height: var(--s-4);
+}
+.mk-wk .wk-sign {
+  font-size: var(--t-12);
+  line-height: 1;
+  text-align: center;
+}
+
 /* ---- the done kiss (touch 1): ':*' lifts 8 px, grows 1.2 and fades; '✓' fades in; 600 ms */
 .mk-kiss {
   position: relative;

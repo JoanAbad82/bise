@@ -88,8 +88,9 @@ describe('the sidebar', () => {
     expect(waits.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(projectRowTip(2, 1));
     cleanup();
     const works = frame({ screen: 'bise' }, working).v;
-    expect(works.getByTestId(`app.side.project.${ACME}.works`).textContent).toBe('2');
-    expect(works.getByTestId(`app.side.project.${ACME}.works`).querySelector('.app-s-ring')).not.toBeNull();
+    // the breath's one cell, then the count
+    expect(works.getByTestId(`app.side.project.${ACME}.works`).textContent).toMatch(/^.2$/u);
+    expect(works.getByTestId(`app.side.project.${ACME}.works.mark`).getAttribute('data-mark')).toBe('working');
     expect(works.queryByTestId(`app.side.project.${DOCS}.works`)).toBeNull();
     expect(works.queryByTestId(`app.side.project.${DOCS}.waits`)).toBeNull();
   });
