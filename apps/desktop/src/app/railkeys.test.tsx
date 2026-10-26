@@ -11,11 +11,10 @@ import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { At } from '@/artifacts/folders';
 import type { Agent, ProjectRow } from '@/proto';
-import type { CorePort, GoAction, MenuAction } from '@/shared/api';
+import type { CorePort, GoAction } from '@/shared/api';
 import { PLACE_KEYS } from '@/settings/keys';
 import { KEY_SECTIONS } from '@/settings/keys';
 import { Store, StoreProvider } from '@/store';
-import { menuTemplate } from '../main/menu';
 import { projects as projectsEv, row as rowOf } from '../../tests/feature/inputs';
 import { HINT_HOLD_MS } from './held';
 import { keyAction, type KeyCtx, type KeyLike } from './keys';
@@ -38,9 +37,6 @@ function keyOfGlyph(glyph: string): KeyLike {
   const code = /[A-Z]/.test(last) ? `Key${last}` : /[0-9]/.test(last) ? `Digit${last}` : last === ',' ? 'Comma' : last === '/' ? 'Slash' : '';
   return { key: last.toLowerCase(), code, metaKey: glyph.includes('⌘'), shiftKey: glyph.includes('⇧'), altKey: glyph.includes('⌥'), ctrlKey: glyph.includes('⌃') };
 }
-
-/** A glyph as Electron's accelerator ('⇧⌘A' → 'Shift+CmdOrCtrl+A'). */
-const accel = (glyph: string): string => `${glyph.includes('⇧') ? 'Shift+' : ''}CmdOrCtrl+${glyph.slice(-1)}`;
 
 describe('each rail place has its own key, and it opens what a click opens', () => {
   it('the rail: the glyph shown is the key that goes where the button goes', () => {
@@ -84,20 +80,13 @@ describe('each rail place has its own key, and it opens what a click opens', () 
 describe('the Go menu and the ⌘/ list name the same keys', () => {
   const GO: Record<GoAction, RailPlace> = { bise: 'bise', inboxPage: 'inbox', scheduled: 'scheduled', artifacts: 'artifacts', plugins: 'plugins' };
 
-  it("each Go item has its place's key and opens its route", () => {
-    const sent: MenuAction[] = [];
-    const items = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: (a) => sent.push(a) });
-    const go = items.find((i) => i.label === 'Go');
-    const sub = (go?.submenu ?? []) as { accelerator?: string; click?: () => void }[];
+  // the Go item's half (its accelerator is PLACE_KEYS' glyph and sends its action) is
+  // src/main/menu.test.ts's: src/main is the node project's, never imported from here
+  it("each Go item's action opens its place's route, the rail button's, and the rail's key is PLACE_KEYS'", () => {
     for (const [action, place] of Object.entries(GO) as [GoAction, RailPlace][]) {
-      const item = sub.find((i) => i.accelerator === accel(RAIL_KEYS[place]));
-      expect(item, action).toBeDefined();
-      sent.length = 0;
-      item?.click?.();
-      expect(sent).toEqual([action]);
-      expect(routeOfMenu(action)).toEqual(RAIL_GO[place]);
+      expect(routeOfMenu(action), action).toEqual(RAIL_GO[place]);
+      expect(RAIL_KEYS[place], place).toBe(PLACE_KEYS[place]);
     }
-    expect(sub.some((i) => i.accelerator === 'CmdOrCtrl+I'), '⌘I the block').toBe(true);
   });
 
   it('the ⌘/ list has a row for each place key', () => {

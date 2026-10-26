@@ -1,6 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { describe, expect, it } from 'vitest';
-import type { MenuAction } from '../shared/api';
+import type { GoAction, MenuAction } from '../shared/api';
+import { PLACE_KEYS } from '../settings/keys';
 import type { ClipOp } from './clipfence';
 import { externalUrl } from './external';
 import { menuTarget, menuTemplate } from './menu';
@@ -53,6 +54,22 @@ describe('the application menu (bar ⛔2)', () => {
       click?.();
     }
     expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent', 'sidebar', 'panel', 'panelFull', 'bise', 'inboxPage', 'scheduled', 'artifacts', 'plugins']);
+  });
+
+  it("each Go item has its rail place's key (settings/keys.ts PLACE_KEYS, the glyph the rail shows) and sends its action; ⌘I stays the inbox block (rail-keys)", () => {
+    const GO: Record<GoAction, keyof typeof PLACE_KEYS> = { bise: 'bise', inboxPage: 'inbox', scheduled: 'scheduled', artifacts: 'artifacts', plugins: 'plugins' };
+    const accel = (glyph: string): string => `${glyph.includes('⇧') ? 'Shift+' : ''}CmdOrCtrl+${glyph.slice(-1)}`;
+    const sent: MenuAction[] = [];
+    const go = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: (a) => sent.push(a) }).find((i) => i.label === menus.go_menu);
+    const sub = (Array.isArray(go?.submenu) ? go.submenu : []);
+    for (const [action, place] of Object.entries(GO) as [GoAction, keyof typeof PLACE_KEYS][]) {
+      const item = sub.find((i) => i.accelerator === accel(PLACE_KEYS[place]));
+      expect(item, action).toBeDefined();
+      sent.length = 0;
+      (item?.click as (() => void) | undefined)?.();
+      expect(sent).toEqual([action]);
+    }
+    expect(sub.some((i) => i.accelerator === 'CmdOrCtrl+I'), '⌘I the block').toBe(true);
   });
 
   it('settings once per platform, never twice', () => {
