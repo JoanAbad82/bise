@@ -94,7 +94,7 @@
   background: color-mix(in srgb, var(--c-text) 4%, transparent);
 }
 .art-give-words { pointer-events: none; padding: 0 var(--s-4); text-align: center; white-space: nowrap; font: 500 var(--t-14) var(--font-ui); color: var(--c-text-2); }
-:is(.th-main, .art-add-drop):has(> .art-give) > :not(.art-give) { opacity: 0.2; }
+.art-add-drop:has(> .art-give) > :not(.art-give) { opacity: 0.2; }
 /* a zone under 120 px (the right bar's ARTIFACTS, Drops.tsx SHORT_ZONE_PX): what is under it hides
    whole, its head too; only the words show, centred (designer m_24293) */
 .art-add-drop[data-short] > :not(.art-give) { opacity: 0; }

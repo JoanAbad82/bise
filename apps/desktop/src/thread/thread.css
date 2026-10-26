@@ -255,6 +255,14 @@
 
 /* the list's place: the list fills it; the first-run block over an empty list sits in its middle,
    on the column's axis (the composer's), both ways (his try d94b7996: bottom-left at x 0) */
+/* files dragged over the thread (his m_44892): ONE zone over the rows and the composer, the screen
+   its box only while it shows (nothing else moves); what is under it dims, as a list's zone */
+.th-screen:has(> .art-give) {
+  position: relative;
+}
+.th-screen:has(> .art-give) > :not(.art-give) {
+  opacity: 0.2;
+}
 .th-main {
   position: relative;
   display: flex;

@@ -34,7 +34,8 @@ function over(e: DragEvent): void {
 }
 
 /**
- * Over a thread's rows while he drags files: the dashed zone. A drop gives each file to `agent` as
+ * Over a thread, its rows and its composer (his m_44892), or the float, while he drags files: the
+ * dashed zone. A drop gives each file to `agent` as
  * an artifact by you; the drop goes on to the window, where the composer makes it a file chip (its
  * own window drop, composer/pm/paste.ts), so the agent gets the file in his next message too.
  */

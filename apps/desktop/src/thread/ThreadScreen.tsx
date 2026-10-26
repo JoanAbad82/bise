@@ -353,11 +353,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onReading={setReading} />
           {/* main's empty thread: the empty home (composer/home, bise fait mac), on a project's welcome */}
           {agent === MAIN && me?.archived !== true && <HomeSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
-          {/* files dragged over the window: 'drop to give this file to perf' over the rows, to the
-              composer's agent (designer's office-artifacts pick 4); an archived thread takes none */}
-          {(me?.archived !== true || artifact !== undefined) && (
-            <ThreadDrop project={project} agent={artifact?.agent ?? agent} to={bise ? 'bise' : shownName(artifact?.agent ?? agent)} />
-          )}
           {/* ⌘F: a compact bar over the list's top right (his m_25471) */}
           {findOpen && (
             <FindBar
@@ -436,6 +431,14 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           <span className="q-float" style={{ left: quote.pop.x, top: quote.pop.y }}>
             <QuotePop testId="thread.quote.pop" onAsk={quote.ask} onCopy={quote.copy} />
           </span>
+        )}
+        {/* files dragged over the window: 'drop to give this file to perf', ONE zone over the rows
+            AND the composer (his m_44892): the drop gives them to the composer's agent (designer's
+            office-artifacts pick 4) and goes on to the window, where the composer makes them its
+            chips once (paste.ts useDropAnywhere; over the zone the field never takes it); an
+            archived thread takes none */}
+        {(me?.archived !== true || artifact !== undefined) && (
+          <ThreadDrop project={project} agent={artifact?.agent ?? agent} to={bise ? 'bise' : shownName(artifact?.agent ?? agent)} />
         )}
       </section>
     </OpenArtifactContext>

@@ -68,6 +68,10 @@
   font: 500 var(--f-ui);
   color: var(--c-text);
 }
+/* files dragged over the window: the thread's zone over the whole float (his m_44892), what is under it dims */
+.cmp-float:has(> .art-give) > :not(.art-give) {
+  opacity: 0.2;
+}
 /* 'to bise ⌄': the ds PickerTrigger's chip in the head's 13/500 */
 .cmp-float .hd .cmp-float-to {
   min-width: 0;
@@ -90,6 +94,14 @@
 }
 .cmp-float .hd .cmp-float-ans.acc {
   color: var(--c-accent);
+}
+/* an item his words close without answering it: 'to perf' in the accent at 600, its rest text-3 (designer m_44890) */
+.cmp-float .hd .cmp-float-ans.to {
+  color: var(--c-text-3);
+}
+.cmp-float .hd .cmp-float-ans.to .who {
+  color: var(--c-accent);
+  font-weight: 600;
 }
 /* ─ and the grip: 28 square icon buttons, the 6% hover (their tips say what they do) */
 .cmp-float .hd .cmp-tool {

@@ -9,6 +9,7 @@ import type { Agent } from '@/proto';
 import { Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
 import { ThreadScreen } from './ThreadScreen';
+import { toAccent } from './ThreadComposer';
 
 vi.mock('@/composer', () => ({
   Composer: ({ head }: { head?: ReactNode }) => <div data-testid="composer">{head}</div>,
@@ -44,6 +45,16 @@ describe("the composer names an agent that is not main, in the accent (his ask m
     // the accent is the `.it.to` item's (composer.css): its class, the strip's first item
     expect(to.classList.contains('to')).toBe(true);
     expect(v.getByTestId('composer.ctx').firstElementChild).toBe(to);
+  });
+
+  it("an open item his words close ('to perf · the approval waits for 1 or 2'): 'to perf' in the accent too, never main's, never over a question's own pink (designer m_44890)", () => {
+    const item = { project: P, card: 10, asker: 'perf', free: 'deny' as const };
+    expect(toAccent({ pink: false, quiet: false }, null, item)).toBe(true);
+    expect(toAccent({ pink: false, quiet: false }, null, { ...item, asker: 'main' })).toBe(false);
+    expect(toAccent({ pink: true, quiet: false }, null, { project: P, card: 9, asker: 'perf' })).toBe(false);
+    expect(toAccent({ pink: true, quiet: true }, null, null)).toBe(true);
+    expect(toAccent({ pink: true, quiet: true }, 'docs', null)).toBe(false);
+    expect(toAccent({ pink: false, quiet: false }, null, null)).toBe(false);
   });
 
   it("main's own thread: no name in the strip, nothing in the accent", () => {

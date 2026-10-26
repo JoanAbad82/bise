@@ -151,7 +151,8 @@ function ProjectItem({ project, shown, testId }: { project: StripProject; shown:
 
 export function ComposerTab({ words, mark, end, project, bare = false, newPlace = false, to = false, at, testId }: {
   words: TabWords;
-  /** his words go to an agent that is not main (pinkState's quiet): the label first, in the accent */
+  /** his words go to an agent that is not main (pinkState's quiet, or an open item only its options
+   *  decide): 'to perf' first, in the accent; bare, the label's rest text-3 (designer m_44890) */
   to?: boolean;
   /** after the label's first part (bare): the addressee's working gust */
   mark?: ReactNode;
@@ -245,7 +246,7 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   if (bare) {
     return (
       <span ref={ref} className="cmp-ctx bare" data-testid={testId}>
-        <span className="lbl" data-item="label" data-testid={`${testId}.to`}>
+        <span className={to ? 'lbl to' : 'lbl'} data-item="label" data-testid={`${testId}.to`}>
           <MarkedLabel label={cut ?? words.label} mark={mark} />
         </span>
         {endEl}

@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppIcon, PickerPop, PickerTrigger, Press, tipAttrs } from '@/ds';
 import { InboxBlock, type Answering } from '@/inbox';
+import { ThreadDrop } from '@/artifacts/Drops';
 import { shownName } from '@/agents/model';
 import { threadKey, useAgents, useProjects, useStore, useThreadOrder } from '@/store';
 import { MAIN } from '@/app/route';
@@ -146,7 +147,11 @@ function Float({ to: def }: { to: FloatTo }) {
             <AppIcon name="fold" />
           </Press>
           {answering !== null ? (
-            <span className={answering.answer === null ? 'cmp-float-ans' : 'cmp-float-ans acc'} data-testid="composer.float.to">{answering.label}</span>
+            <span className={answering.answer !== null ? 'cmp-float-ans acc' : answering.asker !== undefined && answering.asker !== MAIN ? 'cmp-float-ans to' : 'cmp-float-ans'} data-testid="composer.float.to">
+              {/* 'to perf' in the accent, its rest text-3, as the docked strip (designer m_44890) */}
+              <span className="who">{answering.label.split(' · ')[0]}</span>
+              {answering.label.includes(' · ') && answering.label.slice(answering.label.indexOf(' · '))}
+            </span>
           ) : (
             <ToPicker to={to} name={name} onPick={setTo} />
           )}
@@ -162,6 +167,9 @@ function Float({ to: def }: { to: FloatTo }) {
       )}
       {/* an item opened here (^1-3, ⌘I): under the head, flat in the float, its answer buttons as the dock's (designer m_25639) */}
       <InboxBlock here={isHome && agent === MAIN ? HERE_BISE : { project, agent }} onAnswer={onAnswer} rest="open-only" />
+      {/* files dragged over the window: the thread's one zone over the whole float, its field too
+          (his m_44892): given to its addressee, then the composer's chips once (paste.ts) */}
+      <ThreadDrop project={project} agent={agent} to={name} />
       {state === 'open' &&
         (empty ? (
           <p className="body-empty" data-testid="composer.float.thread.empty">{composer.float_empty({ agent: name })}</p>
