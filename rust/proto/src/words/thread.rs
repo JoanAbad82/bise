@@ -337,23 +337,15 @@ crate::words! { thread:
     /// an answered card's link, in another thread
     open_in(thread) = "open it in {thread}";
 
+    // ---- a turn's fold (the desktop's thread, bise fait mac QA §4)
+    /// a finished turn's work, folded: `worked for 3m 10s`
+    worked_for(dur) = "worked for {dur}";
+    /// the turn at work, its work folded: `working for 42s`
+    working_for(dur) = "working for {dur}";
+
     // ---- the agent's head (the desktop)
-    /// its state chip: something waits on him
-    chip_waits = "? waiting for you";
-    /// its state chip: paused, how long
-    chip_paused(len) = "… waiting · {len}";
-    /// its state chip: its first seconds
-    chip_starting = "starting";
-    /// its state chip: working, just now
-    chip_working = "working";
-    /// its state chip: working, its turn's age
-    chip_working_for(age) = "working · {age}";
-    /// its state chip: done
-    chip_done = "✓ done";
-    /// its state chip: failed
-    chip_failed = "✗ failed";
-    /// its state chip: an archived maker
-    chip_archived = "archived";
+    /// the bar title's rename field, its VoiceOver name: `rename perf`
+    rename_field(agent) = "rename {agent}";
     /// its context gauge: `context 42k · 17%`
     head_context(words) = "context {words}";
     /// an empty thread: `checkout is starting`
@@ -380,10 +372,6 @@ crate::words! { thread:
     from_inbox_screen = "the inbox screen";
     /// when, in that tip: ` at 09:55`
     from_at(time) = " at {time}";
-    /// bise's own head line
-    every_project = "every project";
-    /// an agent in voice mode, in its head
-    voice_mode = "voice mode";
     /// an archived agent's thread
     is_archived(agent) = "{agent} is archived ·";
     /// the act that brings it back

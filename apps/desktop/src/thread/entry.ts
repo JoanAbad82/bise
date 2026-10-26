@@ -424,6 +424,23 @@ export function editWords(files: ToolLike['files']): { text: string; counts: str
   return { text: `${name}${more}`, counts: add === 0 && del === 0 ? '' : `+${String(add)} −${String(del)}` };
 }
 
+/**
+ * A tools row's line lines added and deleted by its edits (QA §4: 'edited 3 files +42 −18 ›', the
+ * hub's counts summed, the window's sum like the folds'); none when no edit counted a line. Pure.
+ */
+export function editCounts(items: readonly Pick<ToolLike, 'kind' | 'files'>[]): { add: number; del: number } | null {
+  let add = 0;
+  let del = 0;
+  for (const t of items) {
+    if (t.kind !== 'edit') continue;
+    for (const f of t.files ?? []) {
+      add += f.add;
+      del += f.del;
+    }
+  }
+  return add === 0 && del === 0 ? null : { add, del };
+}
+
 /** A JSON string field's value, decoded, read even from a capped payload (the TUI's render.rs
  *  json_str_field): a cut string keeps what came. Pure. */
 export function jsonStrField(s: string, field: string): string | null {

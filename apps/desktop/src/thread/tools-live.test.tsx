@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-// Bar S9: the call at work shows '∿' and its running time; finished ones keep their marks.
-import { cleanup, render } from '@testing-library/react';
+// Bar S9: the call at work shows '∿' and its running time under its row's summary line; finished
+// ones keep their marks, under the summary's › (QA §4).
+import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
 import { Store, StoreProvider, threadKey } from '@/store';
@@ -46,12 +47,18 @@ describe('the call at work (S9)', () => {
     expect(live.getAttribute('data-live')).toBe('true');
     expect(live.textContent).toMatch(/^\$ pnpm build/);
     expect(v.getByTestId('thread.tool.2.time').textContent).toMatch(/^∿ 1[12] s$/);
-    // the one before is done: its mark and its length
+    // the one before is done: folded under the summary, its mark and its length once opened
+    expect(v.queryByTestId('thread.tool.1')).toBeNull();
+    fireEvent.click(v.getByTestId('thread.tools.4'));
     expect(v.getByTestId('thread.tool.1').textContent).toContain('$');
     expect(v.getByTestId('thread.tool.1').textContent).toContain('8 s');
   });
   it('a turn at rest has no call at work', () => {
     const v = row('idle');
+    // at rest every call folds under the hub's counted words
+    expect(v.getByTestId('thread.tools.4').textContent).toContain('ran 2 commands');
+    expect(v.queryByTestId('thread.tool.2')).toBeNull();
+    fireEvent.click(v.getByTestId('thread.tools.4'));
     expect(v.getByTestId('thread.tool.2').getAttribute('data-live')).toBeNull();
     expect(v.getByTestId('thread.tool.2').textContent).toContain('$');
   });
@@ -66,6 +73,8 @@ describe('the call at work (S9)', () => {
         <EntryRow ctx={ctx} pos={4} />
       </StoreProvider>,
     );
+    expect(v.queryByTestId('thread.tool.2')).toBeNull();
+    fireEvent.click(v.getByTestId('thread.tools.4'));
     expect(v.queryByTestId('thread.tool.2')).toBeNull();
     expect(v.getByTestId('thread.tool.1').textContent).toContain('$');
   });

@@ -17,7 +17,7 @@ import { pathOf } from './paths';
 import { Code, PlainCode, known } from './Code';
 import { fade, type FadeOpts } from './fade';
 import { streamView } from './stream';
-import { ArtName, Kbd, Press } from '@/ds';
+import { AppIcon, ArtName, Kbd, Press } from '@/ds';
 import { useModHeld } from '@/app/held';
 
 /** A link he may open from an answer: http, https or mailto. */
@@ -182,6 +182,8 @@ export const Markdown = memo(function Markdown({
             }
             testId="thread.artname"
           >
+            {/* the pink chip (QA §4): its 14 line icon, then its name */}
+            <AppIcon name="artifacts" size={14} />
             {children}
           </ArtName>
         );

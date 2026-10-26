@@ -25,7 +25,7 @@ export const PENDING_HAND: Readonly<Record<string, number>> = {
   "review/review.css": 2,
   "setup/setup.css": 1,
   "terminal/terminal.css": 2,
-  "thread/thread.css": 19,
+  "thread/thread.css": 17,
 };
 
 /** text sizes off the 7 of native-mac §6 (lint.ts offScaleText): 30, 15, 14, 13, 12, 11.5 kbd, 12 mono */
@@ -43,7 +43,6 @@ export const PENDING_TYPE: Readonly<Record<string, number>> = {
   "inbox/inbox.css": 1,
   "log/log.css": 1,
   "plugins/plugins.css": 2,
-  "thread/thread.css": 1,
   "welcome/welcome.css": 1,
 };
 

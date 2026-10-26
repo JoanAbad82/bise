@@ -1,34 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { common } from '@/proto/words.gen';
-import { archivedFit, biseChip, composerWords, emptyEnter, emptyEnterAct, escTail, nothingOwnYet, roleOf, stateChip, STARTING_MS, usageLine } from './head';
-
-const NOW = 1_791_100_000_000;
-const MIN = 60_000;
+import { composerWords, emptyEnter, emptyEnterAct, escTail, nothingOwnYet, usageLine } from './head';
 
 describe("the agent view's head (designer's desktop-screens v6)", () => {
-  it("the state chip: working with its time, starting, waiting for you in accent, done, failed, idle", () => {
-    expect(stateChip({ status: 'working', since_ms: NOW - 14 * MIN, waits: 0 }, NOW)).toEqual({ text: 'working · 14 min', needs: false, live: true, breath: true });
-    expect(stateChip({ status: 'working', since_ms: NOW - STARTING_MS + 1, waits: 0 }, NOW).text).toBe('starting');
-    expect(stateChip({ status: 'working', since_ms: NOW - 2 * MIN, waits: 1 }, NOW)).toEqual({ text: '? waiting for you', needs: true, live: false });
-    expect(stateChip({ status: 'blocked', since_ms: NOW, waits: 0 }, NOW).needs).toBe(true);
-    expect(stateChip({ status: 'done', since_ms: NOW, waits: 0 }, NOW).text).toBe('✓ done');
-    expect(stateChip({ status: 'failed', since_ms: NOW, waits: 0 }, NOW).text).toBe('✗ failed');
-    // at rest: no chip (desktop-delight v2)
-    expect(stateChip({ status: 'idle', since_ms: NOW, waits: 0 }, NOW).text).toBe('');
-  });
-
-  it('the role line is its objective, else what it says it does', () => {
-    expect(roleOf({ purpose: 'product page speed', title: 'benching' })).toBe('product page speed');
-    expect(roleOf({ purpose: '', title: 'benching' })).toBe('benching');
-  });
-
-  it("a project's bise: what waits on him first, else who works, else all quiet", () => {
-    const a = (status: 'working' | 'idle', waits = 0, main = false) => ({ main, archived: false, status, waits });
-    expect(biseChip([a('idle', 0, true), a('working'), a('working')]).text).toBe('2 agents at work');
-    expect(biseChip([a('working'), a('idle', 1)])).toEqual({ text: '1 waiting for you', needs: true, live: false });
-    expect(biseChip([a('idle', 0, true)]).text).toBe(common.all_quiet);
-  });
-
   it("the composer: 'to perf', 'write to perf, then ⏎'", () => {
     expect(composerWords('perf')).toEqual({ label: 'to perf', placeholder: 'write to perf, then ⏎' });
   });
@@ -62,18 +35,6 @@ describe('D7: the context gauge in the head is named, an empty one goes', () => 
   });
 });
 
-describe('R9/S3: whom it waits on, in the state chip', () => {
-  const NOW2 = 1_791_100_000_000;
-  it("another agent's reply: a pause, '… waiting · 10 min' dim (agent-waiting-states A); '? waiting for you' in accent for him", () => {
-    expect(stateChip({ status: 'waiting', since_ms: NOW2 - 600_000, waits: 0, waiting_on: { who: 'agent', name: 'main' } }, NOW2)).toEqual({ text: '… waiting · 10 min', needs: false, live: false });
-    expect(stateChip({ status: 'waiting', since_ms: NOW2, waits: 0, waiting_on: { who: 'agent', name: 'docs' } }, NOW2).text).toBe('… waiting · 0 s');
-    expect(stateChip({ status: 'working', since_ms: NOW2, waits: 0, waiting_on: { who: 'you' } }, NOW2)).toEqual({ text: '? waiting for you', needs: true, live: false });
-  });
-  it('a kind this window does not know changes nothing', () => {
-    expect(stateChip({ status: 'done', since_ms: NOW2, waits: 0, waiting_on: { who: 'unknown' } }, NOW2).text).toBe('✓ done');
-  });
-});
-
 describe("'starting' = nothing of its own yet (designer m_18624, amb-home m_18628)", () => {
   it('no entry, or only his message or the brief that started it, is starting', () => {
     expect(nothingOwnYet([])).toBe(true);
@@ -86,27 +47,6 @@ describe("'starting' = nothing of its own yet (designer m_18624, amb-home m_1862
     expect(nothingOwnYet([undefined])).toBe(false);
     expect(nothingOwnYet(['you', 'agent'])).toBe(false);
     expect(nothingOwnYet(['from_agent', 'you'])).toBe(false);
-  });
-});
-
-describe('agent-waiting-states A: the head chip of a pause, none for an alarm', () => {
-  const NOW3 = 1_791_100_000_000;
-  it("a pause: '… waiting · 3 min'; an alarm: idle (it is free)", () => {
-    const bench = { id: 7, kind: 'bg' as const, what: 'cargo bench', since_ms: NOW3 - 180_000, resumes: true };
-    const gate = { id: 4, kind: 'file' as const, what: 'the nightly gate goes red', noted: true, since_ms: NOW3 - 16 * 3_600_000 };
-    expect(stateChip({ status: 'idle', since_ms: NOW3, waits: 0, watching: [bench] }, NOW3).text).toBe('… waiting · 3 min');
-    expect(stateChip({ status: 'idle', since_ms: NOW3, waits: 0, watching: [gate] }, NOW3).text).toBe('');
-  });
-});
-
-describe("the head's fit", () => {
-  it("an archived maker's head: the chip goes before restore turns to its icon (designer m_21714)", () => {
-    const base = { gap: 8, who: 90, chip: 64, restore: 78 };
-    // 90 + 8 + 64 + 8 + 78 = 248; without the chip 176
-    expect(archivedFit({ ...base, avail: 248 })).toBe(0);
-    expect(archivedFit({ ...base, avail: 247 })).toBe(1);
-    expect(archivedFit({ ...base, avail: 176 })).toBe(1);
-    expect(archivedFit({ ...base, avail: 175 })).toBe(2);
   });
 });
 

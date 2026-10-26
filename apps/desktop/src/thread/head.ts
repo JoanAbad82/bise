@@ -1,23 +1,13 @@
-// The agent view's head words (designer's desktop-screens v6, (1) and (3)): the state chip, the
-// role line, the branch line, the composer's label and placeholder. Pure: AgentHead.tsx draws
-// them. The words are the TUI's. Owner: amb-home.
+// The thread's words about its agent: whether it has started (nothing of its own yet), its context
+// gauge, the working row, the composer's label and placeholder, the empty composer's ⏎. Its head is
+// the window's bar since bise fait mac (nm-frame's title, the '…' menu): no chip, no role line here.
+// Pure. The words are the TUI's. Owner: nm-thread.
 import type { Agent, EntryKind } from '@/proto';
 import { common, thread } from '@/proto/words.gen';
-import { ago, shownName } from '@/agents/model';
+import { shownName } from '@/agents/model';
 import { MAIN } from '@/app/route';
-import { paused, pauseLine } from './wake';
+import { paused } from './wake';
 import { composer } from '../proto/words.gen';
-
-/** The state chip: '<breath> working · 14 min', 'starting', '? waiting for you' (accent). */
-export interface StateChip {
-  readonly text: string;
-  /** what waits on him: accent on accent 13% */
-  readonly needs: boolean;
-  /** working or starting */
-  readonly live: boolean;
-  /** working: the TUI's 1-cell breath before its words (designer's desktop-working page) */
-  readonly breath?: boolean;
-}
 
 /**
  * A thread with nothing of the agent's own yet (designer's v6 (5), m_18624): no entry, or only
@@ -29,42 +19,6 @@ export function nothingOwnYet(kinds: readonly (EntryKind | undefined)[]): boolea
   return kinds.length === 1 && (kinds[0] === 'you' || kinds[0] === 'from_agent');
 }
 
-/** A working agent under this long is still starting (its first turn, its folder). */
-export const STARTING_MS = 20_000;
-
-/** An agent's state chip at `now`. Pure. */
-export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'> & { watching?: Agent['watching']; turn_ms?: Agent['turn_ms'] }, now: number): StateChip {
-  // R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads the same field)
-  if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: thread.chip_waits, needs: true, live: false };
-  // a pause (agent-waiting-states A): it continues when a command ends or another agent answers, a
-  // dim chip with how long ('… waiting · 3 min'); what for in the line over the composer. An alarm
-  // leaves it idle: it is free.
-  const pause = pauseLine(a, now);
-  if (pause !== null) return { text: thread.chip_paused({ len: pause.len }), needs: false, live: false };
-  if (a.status === 'waiting' || a.status === 'blocked') return { text: thread.chip_waits, needs: true, live: false };
-  switch (a.status) {
-    case 'working': {
-      const since = now - a.since_ms;
-      if (a.since_ms > 0 && since < STARTING_MS) return { text: thread.chip_starting, needs: false, live: true };
-      // the current turn's age, the one the composer's label and the right bar say (designer m_20272 (1))
-      const t = ago(a.turn_ms != null ? now - a.turn_ms : a.since_ms, now);
-      return { text: t === 'now' ? thread.chip_working : thread.chip_working_for({ age: t }), needs: false, live: true, breath: true };
-    }
-    case 'done':
-      return { text: thread.chip_done, needs: false, live: false };
-    case 'failed':
-      return { text: thread.chip_failed, needs: false, live: false };
-    default:
-      // at rest is the default: no chip (desktop-delight v2); only working, waiting, failed or done
-      return { text: '', needs: false, live: false };
-  }
-}
-
-/** The role line: what it was asked to do ('product page speed'), else what it says it does. */
-export function roleOf(a: Pick<Agent, 'purpose' | 'title'>): string {
-  return a.purpose !== '' ? a.purpose : a.title;
-}
-
 /**
  * The context gauge in the head (designer D7: no unnamed numbers): the hub's words named,
  * 'context 42k · 17%'; an empty context ('15 · 0%') says nothing worth a place: none. Pure.
@@ -73,15 +27,6 @@ export function usageLine(words: string | null | undefined): string {
   const w = (words ?? '').trim();
   if (w === '' || /(^|\s)0%$/.test(w)) return '';
   return thread.head_context({ words: w });
-}
-
-/** A project's bise chip: '2 agents at work', '1 waiting for you', 'all quiet'. */
-export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'status' | 'waits'>[]): StateChip {
-  const waits = agents.reduce((n, a) => n + a.waits, 0);
-  if (waits > 0) return { text: common.waiting_for_you({ n: waits }), needs: true, live: false };
-  const work = agents.filter((a) => !a.main && !a.archived && a.status === 'working').length;
-  if (work > 0) return { text: common.agents_at_work({ n: work }), needs: false, live: true };
-  return { text: common.all_quiet, needs: false, live: false };
 }
 
 /** The composer's label and placeholder: 'to perf' / 'write to perf, then ⏎'. */
@@ -129,16 +74,4 @@ export function emptyEnterAct(
 
 export function emptyEnter(cards: readonly { kind: string; waiting?: readonly string[] | null }[], agent: string): { cmd: 'sign_in'; id: 'chatgpt' } | null {
   return cards.some((c) => c.kind === 'signin' && (c.waiting ?? []).includes(agent)) ? { cmd: 'sign_in', id: 'chatgpt' } : null;
-}
-
-/**
- * An archived maker's head beside its artifact (designer m_21714): it clips at its column, never runs
- * under the panel. Its purpose cuts with '…' first, down to nothing (css), then its name down to 12
- * chars (`who`: that short name and the gaps after it); then the 'archived' chip goes; last, '↺ restore'
- * becomes the '↺' icon button. 0: all shown, 1: no chip, 2: no chip and the icon.
- */
-export function archivedFit(widths: { avail: number; gap: number; who: number; chip: number; restore: number }): 0 | 1 | 2 {
-  if (widths.who + widths.gap + widths.chip + widths.gap + widths.restore <= widths.avail) return 0;
-  if (widths.who + widths.gap + widths.restore <= widths.avail) return 1;
-  return 2;
 }

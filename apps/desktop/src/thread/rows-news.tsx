@@ -1,13 +1,13 @@
 // A thread's news rows: landed, PRs, artifacts, scheduled tasks, compaction,
 // notices, a task's brief, a handoff, a message not delivered. Owner: amb-win.
 // Split out of rows.tsx (pure move).
-import { useOpenArtifact } from './openArtifact';
+import { useArtifactOpener, useOpenArtifact } from './openArtifact';
 import { useState, type ReactNode } from 'react';
 import { Act, ArtChip, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
 import type { Entry } from '@/proto';
 import { thread } from '@/proto/words.gen';
 import { useAgents, useArtifacts, useStore } from '@/store';
-import { leaves, LEAVES, useGoArtifact } from '@/artifacts/leave';
+import { leaves, LEAVES } from '@/artifacts/leave';
 import { glyphOf } from '@/artifacts/model';
 import { useFold } from './folds';
 import { useFoldHint } from './foldHint';
@@ -115,7 +115,7 @@ export function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 /** What an agent made: a card that opens it (its page, else the project's artifacts). */
 export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const artifacts = useArtifacts(ctx.project);
-  const goArtifact = useGoArtifact();
+  const goArtifact = useArtifactOpener();
   const openId = useOpenArtifact();
   const m = e.made;
   if (m == null) return <Marker>{e.text}</Marker>;
@@ -128,7 +128,7 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       title={m.title}
       meta={out ? LEAVES : [m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
       onClick={() => {
-        // designer's v6 (2): an artifact opens in the window, its own screen; a browser-only one his browser
+        // its tab in the panel (bise fait mac); a browser-only one his browser
         goArtifact(ctx.project, m.id, m);
       }}
       testId={`thread.artifact.${String(e.pos)}`}

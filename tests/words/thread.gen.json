@@ -179,50 +179,6 @@
     "one": null,
     "text": "? waits for you · in the inbox below"
   },
-  "thread.chip_archived": {
-    "args": [],
-    "one": null,
-    "text": "archived"
-  },
-  "thread.chip_done": {
-    "args": [],
-    "one": null,
-    "text": "✓ done"
-  },
-  "thread.chip_failed": {
-    "args": [],
-    "one": null,
-    "text": "✗ failed"
-  },
-  "thread.chip_paused": {
-    "args": [
-      "len"
-    ],
-    "one": null,
-    "text": "… waiting · {len}"
-  },
-  "thread.chip_starting": {
-    "args": [],
-    "one": null,
-    "text": "starting"
-  },
-  "thread.chip_waits": {
-    "args": [],
-    "one": null,
-    "text": "? waiting for you"
-  },
-  "thread.chip_working": {
-    "args": [],
-    "one": null,
-    "text": "working"
-  },
-  "thread.chip_working_for": {
-    "args": [
-      "age"
-    ],
-    "one": null,
-    "text": "working · {age}"
-  },
   "thread.closed_answered": {
     "args": [],
     "one": null,
@@ -463,11 +419,6 @@
     ],
     "one": null,
     "text": "{what} ends"
-  },
-  "thread.every_project": {
-    "args": [],
-    "one": null,
-    "text": "every project"
   },
   "thread.exit": {
     "args": [
@@ -963,6 +914,13 @@
     "one": null,
     "text": "reloading bise on {to}"
   },
+  "thread.rename_field": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "rename {agent}"
+  },
   "thread.report_waiting": {
     "args": [],
     "one": null,
@@ -1211,11 +1169,6 @@
     "one": null,
     "text": "your words, sent to bise and brought here"
   },
-  "thread.voice_mode": {
-    "args": [],
-    "one": null,
-    "text": "voice mode"
-  },
   "thread.wake_after": {
     "args": [
       "dur"
@@ -1357,6 +1310,20 @@
     ],
     "one": null,
     "text": "bise sent your words to {name}'s main · click opens it there"
+  },
+  "thread.worked_for": {
+    "args": [
+      "dur"
+    ],
+    "one": null,
+    "text": "worked for {dur}"
+  },
+  "thread.working_for": {
+    "args": [
+      "dur"
+    ],
+    "one": null,
+    "text": "working for {dur}"
   },
   "thread.you_answered_q": {
     "args": [

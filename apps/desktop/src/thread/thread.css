@@ -1,13 +1,8 @@
 /* The thread's own layout (amb-win): the list's scroll area and the
    markdown inside desktop-ds's .b-text. Type sizes and colors are the ds
    tokens (src/ds/tokens.css); the body stays at the ds's reading size
-   (bar ⛔4: never under 13 pt). */
-/* each thread row ends with its own 2 px, half the tight gap: two quiet rows' halves meet at
-   --gap-tight, and the gaps between rows (data-gap) are the token less this end */
-.th-list,
-.th-screen {
-  --th-row-end: calc(var(--s-1) / 2);
-}
+   (bar ⛔4: never under 13 pt). Owner: nm-thread. Every gap between rows is a whole token
+   (data-gap, app-polish #6: no 2 px row ends any more). */
 .th-list {
   position: relative;
   display: flex;
@@ -27,14 +22,14 @@
   pointer-events: none;
   background: linear-gradient(var(--c-window, var(--paper)), transparent);
 }
-/* and at the bottom edge no band and no shadow (designer's composer-strip A, m_23965 (1)): what
-   scrolls under the scroller's last 12 px fades out (an opacity mask); at the end that is the
-   list's own end (.th-list-end), never the last row */
+/* and at the bottom edge, above the composer: a 24 fade (QA §4, mockup 1), no band, no shadow:
+   what scrolls under the scroller's last 24 px fades out (an opacity mask); at the end that is the
+   list's own 24 end (.th-list-end), so the last message is never under it nor under the composer */
 .th-list > [data-virtuoso-scroller] {
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-3)), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-6)), transparent);
 }
 .th-list-end {
-  height: var(--s-3);
+  height: var(--s-6);
 }
 /* his sends on their way, the list's end in its footer (ThreadRows tail, ThreadList ListEnd): right
    after the last row, the list end's 12 px after them, so a bubble sits where its entry lands and
@@ -97,7 +92,7 @@
   min-height: 18px;
   padding: 0 var(--s-1);
   color: var(--c-text-2);
-  font-size: 11px;
+  font-size: var(--t-12);
 }
 
 /* ctrl held (foldHint.tsx): '⌃O expand' after a fold's words */
@@ -218,9 +213,9 @@
   right: 0;
   bottom: 0;
   /* the band from the last row's end to the list's bottom edge */
-  height: calc(var(--s-thread-end, var(--s-3)) - var(--th-row-end));
+  height: var(--s-thread-end, var(--s-3));
   width: var(--th-col, 100%);
-  margin: 0 auto;
+  margin: 0 0 0 var(--th-col-x, 0);
   display: flex;
   align-items: center;
   /* over the bottom fade, under the '↓ back to the bottom' pill */
@@ -318,7 +313,7 @@
   flex: 0 1 auto;
   min-height: 0;
   width: var(--th-col);
-  margin: 0 auto var(--s-2);
+  margin: 0 0 var(--s-2) var(--th-col-x);
 }
 .th-first.after .setup-firstrun {
   max-width: none;
@@ -326,33 +321,27 @@
   text-align: left;
 }
 
-/* each row ends with half the tight gap (2 px): two quiet rows' own halves meet at --gap-tight */
+/* a row has no padding of its own: the gap above it (data-gap, data-head, data-turn) is a token */
 .th-row {
   position: relative;
-  padding: 0 0 var(--th-row-end);
 }
 
-/* ambient m_11777 (a): one reading column, 720 px at most, centred, 24 px each side when
-   narrower. The rows, the day lines, the strip, the docked card, the voice pane and the
-   composer share its width and its left edge. A row's time sits on its name line (ds). */
+/* the reading column (bise fait mac, QA §4): 720 at most (--w-col), 24 each side (--pad-column), so
+   its text is --th-col (672), from --th-col-x. Centred here; ThreadScreen sets both from the
+   window's sideLayout (column.ts) where the column slides left of the bims' world. The rows, the
+   day lines, the live lines, the inbox block and the voice pane share the text's width and left
+   edge; the composer takes the whole column (its box is 48 narrower, nm-composer's). */
 .th-screen {
-  --th-col: min(var(--w-col), calc(100% - 48px));
-  /* more air (his try a43609b2, designer m_19359): prose reads at 1.65, the dim rows (tool lines,
-     folds, the live line) at 1.5, and 20 px between the thread's last row and what sits under it
-     (the inbox box, the docked card or the composer's label), carried by the list itself; the
-     composer, the inbox box's inside and the sidebar keep --lh-ui */
-  --lh-read: 1.65;
+  --th-col: calc(min(var(--w-col), 100%) - 2 * var(--pad-column));
+  --th-col-x: calc((100% - var(--th-col)) / 2);
+  /* the dim rows (tool lines, folds, the live line) at 1.5, and 24 between the thread's last row
+     and what sits under it, carried by the list itself; prose reads at --f-read (14/22) */
   --lh-row: 1.5;
   /* the thread's end to the composer's tab: 24 (designer's composer-strip A, m_23965 (1)) */
   --s-thread-end: var(--s-6);
   /* a quiet row's lead mark column (✓ ↗ ◷ ■), one em of its text: what sits under such a row
      (its note, its images, a schedule's words) starts after it, on the words */
   --th-mark: 1em;
-}
-.th-screen .th-list {
-  /* each row ends with its own 2 px, the list's end inside the scroller 12 (.th-list-end): the list
-   adds the rest of the 24 to the composer's tab (designer's composer-strip A) */
-  padding-bottom: calc(var(--s-thread-end) - var(--th-row-end) - var(--s-3));
 }
 .th-row,
 .th-day,
@@ -365,13 +354,21 @@
 .th-screen .inbox-strip,
 .th-screen .inbox-dock,
 .th-screen .vm-pane,
-.th-screen .b-composer {
+.th-hint,
+.th-tip,
+.th-answer-miss,
+.th-cu,
+.th-history {
   box-sizing: border-box;
   width: var(--th-col);
-  margin-left: auto;
-  margin-right: auto;
+  margin-left: var(--th-col-x);
+  margin-right: 0;
 }
 .th-screen .b-composer {
+  box-sizing: border-box;
+  width: calc(var(--th-col) + 2 * var(--pad-column));
+  margin-left: calc(var(--th-col-x) - var(--pad-column));
+  margin-right: 0;
   padding-left: 0;
   padding-right: 0;
   /* the list's end carries the room above the to-line (designer m_19359) */
@@ -390,22 +387,16 @@
   padding-top: var(--gap-turn);
 }
 
-/* a day ('today', 'yesterday', 'mon 6 oct') and 'session restored · 14:02': centred, thin rules */
+/* a day ('today', 'yesterday', 'mon 6 oct') and 'session restored · 14:02' (mockup 1): 32 high,
+   centred, 12/16 text-3, no rules */
 .th-day {
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  padding: var(--gap-section) 0 var(--s-2);
+  justify-content: center;
+  height: var(--h-row);
   color: var(--c-text-3);
-  font: var(--t-12) var(--font-ui);
+  font: 400 var(--f-meta);
   font-variant-numeric: tabular-nums;
-}
-.th-day::before,
-.th-day::after {
-  content: '';
-  flex: 1 1 0;
-  height: 1px;
-  background: var(--c-line);
 }
 .th-row > .th-day {
   width: auto;
@@ -470,7 +461,7 @@
 /* a folded steps pill, open: its rows as the tool lines, on the column's edge, no box (designer
    m_14269: not a filled box of bullets) */
 .th-tools .b-out {
-  margin: var(--th-row-end) 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
   background: none;
@@ -478,8 +469,6 @@
 .th-steps {
   display: flex;
   flex-direction: column;
-  /* the rows' own 2 px, as between the thread's rows */
-  gap: var(--th-row-end);
   /* what an open fold shows sits at +16, the thread's one indent (designer m_21012) */
   padding-left: var(--s-4);
 }
@@ -547,7 +536,7 @@
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
-  padding: var(--s-3) var(--pad-panel);
+  padding: var(--s-3) 0;
   border-top: 1px solid var(--c-line);
   color: var(--c-text-2);
 }
@@ -559,24 +548,6 @@
   text-underline-offset: 2px;
 }
 
-/* a project's main is 'bise' with its project dim after it (ambient m_11437) */
-.th-title-project {
-  color: var(--c-text-2);
-  font-weight: 400;
-}
-
-.th-agents-link {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-  transition: color var(--d-fast) var(--ease-out);
-}
-/* hover, as every control (qa-flows' O.6 clicks audit) */
-.th-agents-link:hover {
-  color: var(--c-text);
-}
-/* a tools row opens its steps: it points and darkens on hover */
 .th-row .b-tool[role='button'] {
   cursor: pointer;
   transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
@@ -590,7 +561,7 @@
 .th-waits {
   display: inline-block;
   margin-top: var(--gap-tight);
-  font-size: 12px;
+  font-size: var(--t-12);
 }
 
 .th-waits.main {
@@ -611,14 +582,14 @@
   margin: var(--gap-tight) 0 var(--s-2) var(--s-4);
   color: var(--c-text-2);
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--t-13);
 }
 /* the compaction's summary, open: the whole summary as markdown, where a thinking body opens, dim,
    its headings at reading size (the brief's) */
 .th-compact-body {
   margin: var(--gap-tight) 0 var(--s-2) var(--s-4);
   color: var(--c-text-2);
-  font-size: 13px;
+  font-size: var(--t-13);
   --md-text: var(--c-text-2);
 }
 .th-compact-body .b-md { --md-text: var(--c-text-2); }
@@ -762,162 +733,6 @@
   gap: var(--gap-inline);
 }
 
-/* the agent view's head (designer's desktop-screens v6 (1), (3); amb-home): one row, 16 px sides;
-   the name in 600, its role line text-2, a state chip (pill, a 7% tint; what waits on him in
-   accent on accent 13%); at the right, quiet: its branch and files, 'changes ⌘D', '⋯'. Under
-   1000 px the name and role go to the titlebar's crumb: the chip and the buttons stay. */
-.ah {
-  position: relative;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: var(--gap-inline);
-  min-height: var(--h-head);
-  /* the column's sides, as the rows under it (designer m_21404 (1)) */
-  padding: 0 var(--pad-column);
-  white-space: nowrap;
-  font: var(--t-13) var(--font-ui);
-}
-.ah-who {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: baseline;
-  gap: var(--gap-inline);
-  min-width: 0;
-  overflow: hidden;
-}
-/* a live agent's role: whole-or-drop below its floor (designer m_39925): it shows a word's start and
-   its '…' ('Propos…', the floor at 1100), else it goes whole (the name's tip says it). The floor is
-   its flex-basis, 6ch: when the name and 6ch don't fit on the line, the role wraps to a second line, hidden below the
-   head; when they fit, it grows to its whole width and cuts with '…' where the row ends. An
-   archived maker's head cuts its own way (useArchivedFit, below). */
-.ah:not(.ah-bise):not([data-arch]) .ah-who {
-  flex-wrap: wrap;
-  align-content: flex-start;
-  row-gap: var(--h-head);
-  /* one line (the name's), the same whether the role shows or went */
-  height: calc(var(--t-14) * var(--lh-ui));
-  line-height: var(--lh-ui);
-}
-.ah:not(.ah-bise):not([data-arch]) .ah-role {
-  flex: 1 1 6ch;
-  max-width: max-content;
-}
-.ah-bise .ah-who {
-  align-items: center;
-  gap: var(--gap-inline);
-}
-.ah-name {
-  color: var(--c-text);
-  font-weight: 600;
-  font-size: var(--t-14);
-}
-.ah-project {
-  color: var(--c-text-2);
-  font-weight: 400;
-}
-.ah-role {
-  /* the role ends with '…' when the row is short, never clipped silently (designer N1, m_17194) */
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--c-text-2);
-}
-.ah-chip {
-  flex: none;
-  padding: var(--th-row-end) var(--s-2);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-text) 7%, transparent);
-  color: var(--c-text-2);
-  font-size: var(--t-12);
-}
-.ah-chip.needs {
-  background: color-mix(in srgb, var(--c-accent) 13%, transparent);
-  color: var(--c-accent);
-}
-.ah-chip-btn {
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: none;
-  color: var(--c-text-2);
-  font: inherit;
-  cursor: pointer;
-}
-/* hover, as the head's other buttons (qa-flows' app/clicks: every control changes on hover) */
-.ah-chip-btn:hover {
-  color: var(--c-text);
-}
-.ah-chip-btn .b-chip {
-  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
-}
-.ah-chip-btn:hover .b-chip {
-  color: var(--c-text);
-  background: color-mix(in srgb, var(--c-text) 12%, transparent);
-}
-.ah-chip-btn:hover .b-chip.acc {
-  color: var(--c-accent);
-  background: color-mix(in srgb, var(--c-accent) 22%, transparent);
-}
-.ah-chip-btn:focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 2px var(--c-focus);
-}
-.ah-note {
-  flex: none;
-  color: var(--c-text-3);
-  font-size: var(--t-12);
-}
-/* an archived maker's chip and its whole restore, when they don't fit (AgentHead's useArchivedFit): out
-   of the flow, unseen, still measured */
-.ah .ah-gone {
-  position: absolute;
-  visibility: hidden;
-  pointer-events: none;
-}
-.ah-end {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: var(--gap-inline);
-  min-width: 0;
-  margin-left: auto;
-}
-/* the end's items never shrink */
-.ah-end > * {
-  flex: none;
-}
-.ah-btn {
-  padding: var(--s-1) var(--pad-control-x-sm);
-  border: 0;
-  border-radius: var(--r-2);
-  background: none;
-  color: var(--c-text-3);
-  font: var(--t-12) var(--font-ui);
-  cursor: pointer;
-}
-.ah-btn {
-  color: var(--c-text-2);
-}
-.ah-btn kbd {
-  font: inherit;
-  color: var(--c-text-3);
-}
-.ah-btn:hover {
-  background: var(--c-hover);
-  color: var(--c-text);
-}
-@media (max-width: 999px) {
-  .ah:not(.ah-bise) .ah-who {
-    display: none;
-  }
-  /* the maker's thread sliding over its artifact keeps its name and role ('perf  perf's job',
-     designer m_20435 (b)) */
-  .app-over.thread .ah:not(.ah-bise) .ah-who {
-    display: flex;
-  }
-}
 
 /* the agent view's rows (designer's desktop-screens v6 (2); amb-home): its commands and edits as
    mono 12 text-2 lines with their length text-3 after; an artifact made is a chip (1 px line,
@@ -925,7 +740,135 @@
 .th-tools {
   display: flex;
   flex-direction: column;
-  gap: var(--th-row-end);
+}
+/* a turn's fold line (TurnLine.tsx, mockup 1 '.worked'): 20 after his bubble (--gap-turn), 28
+   high, 13 text-3, a rule under it, 12 to the turn's first row (which then keeps no gap of its own) */
+.th-screen .th-turn {
+  padding-top: var(--gap-turn);
+}
+.th-turn-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  width: 100%;
+  height: var(--h-control-sm);
+  margin: 0 0 var(--gap-block);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--c-line);
+  background: none;
+  color: var(--c-text-3);
+  font: 400 var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+button.th-turn-line:hover {
+  color: var(--c-text-2);
+}
+button.th-turn-line:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+.th-turn-chev {
+  display: inline-flex;
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.th-turn-line[aria-expanded='true'] .th-turn-chev {
+  transform: rotate(90deg);
+}
+.th-screen .th-row[data-gap='flush'] {
+  padding-top: 0;
+}
+/* a tools row's summary line (QA §4, mockup 1 '.ran'): 28, 13 text-3, icon 14, the edits' + in
+   --c-ok and − in --c-err, a › that turns when its steps show */
+.th-ran {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  align-self: flex-start;
+  max-width: 100%;
+  height: var(--h-control-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text-3);
+  font: 400 var(--f-ui);
+  text-align: left;
+}
+.th-ran:hover {
+  color: var(--c-text-2);
+}
+.th-ran:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+.th-ran-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.th-ran-counts {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.th-ran-add {
+  color: var(--c-ok);
+}
+.th-ran-del {
+  color: var(--c-err);
+}
+.th-ran-chev {
+  display: inline-flex;
+  flex: none;
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.th-ran[aria-expanded='true'] .th-ran-chev {
+  transform: rotate(90deg);
+}
+/* an artifact's name, everywhere in the thread (QA §4, his rule): the pink chip, 22 high, 0·8, r 6,
+   13/500, its icon 14; a made artifact's row the same chip */
+.th-screen .b-artname,
+.th-screen .b-artchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  /* 22: the reading line's height (--f-read 14/22), so a chip in a line never moves it */
+  height: calc(var(--s-5) + var(--s-1) / 2);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-1);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  font: 500 var(--f-ui);
+  vertical-align: baseline;
+}
+/* a project main's counts in the window's bar, left of its '…' (tui-parity W2): 13 text-2, open
+   the agents list; a link's hand, its words brighter on hover */
+.th-agents-link {
+  color: var(--c-text-2);
+  font: 400 var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.th-agents-link:hover {
+  color: var(--c-text);
+}
+/* the bar's title, renamed in place (the menu's Rename, Rename.tsx): the title's own font */
+.th-rename {
+  width: calc(var(--s-16) * 3);
+  height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-1);
+  background: var(--c-sunken);
+  color: var(--c-text);
+  font: 600 var(--f-ui);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--c-focus);
 }
 /* one row: a long command is cut with …, its ✓ / ✗ and its time stay at its end (tui-parity H13,
    the TUI keeps '✓ 0.7s') */
@@ -992,7 +935,7 @@
 .th-tool-open {
   /* at +16 like everything an open row shows (designer m_21012); the thread's code block box
      (.th-pre: 8·12, r 8) */
-  margin: var(--th-row-end) 0 var(--s-2) var(--s-4);
+  margin: 0 0 var(--s-2) var(--s-4);
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--c-line);
   border-radius: 8px;
@@ -1029,7 +972,7 @@
 .th-live {
   color: var(--c-text-2);
   font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
-  padding: var(--s-2) 0 var(--th-row-end);
+  padding: var(--s-2) 0 0;
 }
 /* the starting row (designer's desktop-working page): the '·' pulse, 8 px, '<agent> is starting ·
    <where>', 28 px high, 20 above (the thread's end); the place cuts with … first, the rest whole */
@@ -1069,8 +1012,8 @@
   white-space: nowrap;
   /* the thread's end gap, 20 px whatever the last row is (designer m_21721): like a row, its own
      2 px, then the rest the list would have added under it */
-  padding-bottom: var(--th-row-end);
-  margin-bottom: calc(var(--s-thread-end) - var(--th-row-end));
+  padding-bottom: 0;
+  margin-bottom: var(--s-thread-end);
 }
 .th-step .b-fold {
   min-width: 0;
@@ -1120,18 +1063,18 @@
 /* between rows of one turn (rows.tsx gapOf): 8 px between two dim rows, 12 px from prose to a dim
    row or back; each row already ends with its 2 px */
 .th-row[data-gap='row'] {
-  padding-top: calc(var(--gap-rows) - var(--th-row-end));
+  padding-top: var(--gap-rows);
 }
 /* two quiet rows touch: 4 px (--gap-tight, tui-parity H1, designer m_19832) */
 .th-row[data-gap='tight'] {
-  padding-top: calc(var(--gap-tight) - var(--th-row-end));
+  padding-top: var(--gap-tight);
 }
 .th-row[data-gap='switch'] {
-  padding-top: calc(var(--gap-block) - var(--th-row-end));
+  padding-top: var(--gap-block);
 }
 /* an open run's messages stack 12 px apart (--gap-block, designer m_19784 (2)) */
 .th-row[data-gap='block'] {
-  padding-top: calc(var(--gap-block) - var(--th-row-end));
+  padding-top: var(--gap-block);
 }
 /* event-wake's live line: a blank row above it, as the terminal leaves (designer m_17827 (3)) */
 .th-live.th-waiting {
@@ -1158,14 +1101,14 @@
 .th-wait-note {
   min-width: 0;
 }
+/* its number in the text's own font (QA §4: numbers in the text font), tabular */
 .th-wait-num {
-  font-family: var(--font-mono);
-  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
 }
 /* the hub's brief (designer): one dim row 'bise started gift-ui · <objective>', cut with …; open, the
    whole brief under a thin rail, dim, its markdown at reading size without big headings */
-.th-brief { padding: var(--th-row-end) 0; }
-.th-brief-body { margin: var(--s-2) 0 var(--th-row-end) var(--s-1); padding-left: var(--s-3); border-left: 1px solid var(--c-line); color: var(--c-text-2); font-size: var(--t-14); }
+.th-brief { min-width: 0; }
+.th-brief-body { margin: var(--s-2) 0 0 var(--s-1); padding-left: var(--s-3); border-left: 1px solid var(--c-line); color: var(--c-text-2); font-size: var(--t-14); }
 /* bise's note to the agent, not the conversation: its words in --c-text-2 too (the markdown's own text colour) */
 .th-brief-body, .th-brief-body .b-md { --md-text: var(--c-text-2); }
 .th-brief-body :is(h1, h2, h3, h4) { font-size: var(--t-14); font-weight: 600; margin: var(--s-2) 0 var(--gap-tight); }
@@ -1173,41 +1116,9 @@
 .th-starting {
   color: var(--c-text-2);
   font: var(--t-13) var(--font-ui);
-  padding: var(--s-2) 0 var(--th-row-end);
+  padding: var(--s-2) 0 0;
 }
 
-/* an archived maker beside its artifact (designer m_20453): its own thread, dim; '↺ restore' in
-   its head; the composer goes to the project's main */
-.ah-chip.ah-archived {
-  color: var(--c-text-3);
-}
-/* short, it clips at its column, never under the panel (designer m_21714): the purpose cuts with '…'
-   first, down to nothing; then the name, to its first 12 chars (AgentHead's useArchivedFit keeps
-   them); then the chip goes; last, restore is its 28 px '↺' */
-.ah[data-arch] {
-  min-width: 0;
-  overflow: hidden;
-}
-.ah[data-arch] .ah-name {
-  flex: 0 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ah[data-arch] .ah-role {
-  flex-shrink: 1000;
-}
-.ah[data-arch] .ah-end {
-  flex: none;
-}
-.ah-restore-full {
-  display: flex;
-}
-.ah-icon {
-  display: flex;
-}
-.ah-icon > .b-btn {
-  width: var(--h-control-sm);
-  padding: 0;
 }
 .th-screen[data-dim='true'] .th-main {
   opacity: 0.55;
@@ -1230,7 +1141,7 @@
 }
 .th-noproj-t {
   margin: var(--s-1) 0 0;
-  font-size: var(--t-17, 17px);
+  font-size: var(--t-15);
   font-weight: 600;
   color: var(--c-text);
 }
@@ -1247,8 +1158,7 @@
 }
 .th-noproj-acts kbd {
   margin-left: var(--gap-inline);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font: 400 var(--f-kbd);
   opacity: 0.7;
   background: none;
   border: 0;
@@ -1281,7 +1191,7 @@
 
 /* S29/L19 W1: it drives his computer: one line under the head, its acts at the end; W4 the still */
 .th-cu {
-  padding: 0 var(--pad-panel) var(--s-2);
+  padding: 0 0 var(--s-2);
 }
 .th-cu-line {
   display: flex;
@@ -1372,7 +1282,7 @@
 .th-signin {
   display: flex;
   gap: var(--gap-section);
-  padding: var(--s-2) 0 var(--th-row-end);
+  padding: var(--s-2) 0 0;
   color: var(--c-text-2);
   font: var(--t-13) var(--font-ui);
 }
@@ -1386,8 +1296,8 @@
 /* a folded run of agent-to-agent messages (tui-parity R13): one dim line, a click opens it */
 .th-run {
   display: block;
-  margin: var(--th-row-end) 0 calc(var(--gap-rows) - var(--th-row-end));
-  padding: var(--th-row-end) var(--s-1);
+  margin: 0 0 var(--gap-rows);
+  padding: 0 var(--s-1);
   border: 0;
   border-radius: 4px;
   background: none;
@@ -1492,10 +1402,10 @@
   flex-direction: column;
   align-items: flex-end;
   min-width: 0;
-  max-width: 75%;
+  max-width: 80%;
 }
 .th-you-head {
-  margin: 0 var(--th-row-end) var(--gap-tight);
+  margin: 0 0 var(--gap-tight);
   font: var(--t-12) var(--font-ui);
   color: var(--c-text-3);
   text-align: right;
@@ -1511,11 +1421,13 @@
   box-sizing: border-box;
   max-width: 100%;
   min-width: 0;
-  /* a bubble pads as a card (desktop-spacing's --pad-card: 12·16) */
+  /* mockup 1: padding 12·16 (--pad-card), r 16, --c-raised and its 1 px rule drawn inside (no
+     size of its own), 14/22 --font-read */
   padding: var(--pad-card);
-  border: 1px solid var(--c-line);
-  border-radius: 16px 16px 6px 16px;
+  border-radius: var(--r-4);
   background: var(--c-raised);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+  font: 400 var(--f-read);
   text-align: left;
 }
 .th-bubble > :first-child,
@@ -1559,7 +1471,7 @@
   white-space: pre-wrap;
 }
 .th-you-under {
-  margin: var(--gap-tight) var(--th-row-end) 0;
+  margin: var(--gap-tight) 0 0;
   font: var(--t-12) var(--font-ui);
   color: var(--c-text-3);
   font-variant-numeric: tabular-nums;
@@ -1584,7 +1496,7 @@
   width: 16px;
   height: 16px;
   color: var(--c-text-3);
-  font-size: 13px;
+  font-size: var(--t-13);
   line-height: 16px;
   flex: none;
 }
@@ -1693,7 +1605,7 @@
 .th-you-under.th-hover {
   position: absolute;
   right: calc(100% + var(--s-2));
-  bottom: var(--th-row-end);
+  bottom: 0;
   margin: 0;
   white-space: nowrap;
   opacity: 0;
@@ -1733,7 +1645,7 @@
 /* under 640 px his bubble takes 85% of the column, never closer than 48 px to its left edge */
 @media (max-width: 640px) {
   .th-you {
-    max-width: min(85%, calc(100% - 48px));
+    max-width: min(85%, calc(100% - var(--s-12)));
   }
 }
 /* a quote he sent: first in his bubble, its rail and its source, then his words */
@@ -1829,7 +1741,7 @@
 .th-pause {
   box-sizing: border-box;
   width: var(--th-col);
-  margin: 0 auto;
+  margin: 0 0 0 var(--th-col-x);
   padding-top: var(--gap-block);
   color: var(--c-text-3);
   font: var(--t-12) var(--font-ui);
@@ -1982,10 +1894,10 @@
 .th-screen .th-run {
   box-sizing: border-box;
   width: var(--th-col);
-  margin: 0 auto;
+  margin: 0 0 0 var(--th-col-x);
   /* a dim row among dim rows: 8 px above it (--gap-rows, designer m_19784 (1)), the row before
      ends on its 2 px */
-  padding: calc(var(--gap-rows) - var(--th-row-end)) 0 var(--th-row-end);
+  padding: var(--gap-rows) 0 0;
   border-radius: 0;
   /* a quiet row like the news under it: sans 13 text-2, mono only for the machine's own text
      (designer m_20621 (1)) */
@@ -1998,10 +1910,10 @@
 }
 /* the fold is a quiet row (H1): 4 px under another, 12 under a message or prose */
 .th-screen .th-run[data-gap='tight'] {
-  padding-top: calc(var(--gap-tight) - var(--th-row-end));
+  padding-top: var(--gap-tight);
 }
 .th-screen .th-run[data-gap='switch'] {
-  padding-top: calc(var(--gap-block) - var(--th-row-end));
+  padding-top: var(--gap-block);
 }
 /* H12 (designer m_19832): no time on a head or under a bubble; on hover, right-aligned and dim,
    taking no room */
@@ -2049,10 +1961,10 @@
   margin-bottom: var(--gap-tight);
 }
 .th-md.b-md h1 {
-  font-size: var(--t-17);
+  font-size: var(--t-15);
 }
 .th-md.b-md :is(h2, h3, h4) {
-  font-size: var(--t-15);
+  font-size: var(--t-14);
 }
 /* H9: a model call's retries, one quiet row that updates in place: the ▲ dim, the words text-2, in
    --c-err only when the last try failed; each try's words under its ▸ */
@@ -2143,7 +2055,7 @@
 }
 /* tier 2: a report on his request reads as body (sans 14 ink); only what waits on him is the accent */
 .th-report .b-marker {
-  font: var(--t-14) / var(--lh-read, 1.65) var(--font-ui);
+  font: 400 var(--f-read);
 }
 .th-report:not([data-waits]) .b-marker {
   color: var(--c-text);
@@ -2167,7 +2079,7 @@
 .th-went {
   align-self: flex-end;
   max-width: 75%;
-  margin: 0 var(--th-row-end);
+  margin: 0 0;
   font: var(--t-12) var(--font-ui);
   color: var(--c-text-3);
   text-align: right;

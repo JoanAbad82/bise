@@ -22,7 +22,6 @@ export const PENDING_CLASSES: readonly string[] = [
   'th-link-off',
   'th-restored',
   'th-tool',
-  'th-voice',
   'vm-said',
 ];
 
@@ -30,5 +29,4 @@ export const PENDING_CLASSES: readonly string[] = [
  *  files their owner is changing now, fixed after it lands. It may only shrink. */
 export const PENDING_SMALL_TEXT: Readonly<Record<string, number>> = {
   'bims/office.css': 1,
-  'thread/thread.css': 2,
 };

@@ -1,7 +1,7 @@
-// A thread's tool rows (each call's state, time, error line, code and output on
-// open) and its thinking rows. Owner: amb-win. Split out of rows.tsx (pure move).
+// A thread's tool rows (one summary line per row, open to each call's state, time, error line,
+// code and output) and its thinking rows. Owner: nm-thread. Split out of rows.tsx (pure move).
 import { useContext, useEffect } from 'react';
-import { Fold, Tool, tipAttrs } from '@/ds';
+import { AppIcon, Fold, Press, tipAttrs } from '@/ds';
 import type { Entry } from '@/proto';
 import { thread } from '@/proto/words.gen';
 import { running } from '@/proto/words_running.gen';
@@ -14,7 +14,7 @@ import { liveTime, useLiveStep, useSecondsSince } from './live-step';
 import { useFold } from './folds';
 import { useFoldHint } from './foldHint';
 import { thinkingWords } from './thinking';
-import { toolLines, type ToolLine } from './entry';
+import { editCounts, toolLines, type ToolLine } from './entry';
 import { Code, known } from './Code';
 import type { RowCtx } from './rows';
 import { Pulse } from '@/working/Signs';
@@ -55,44 +55,49 @@ export function ThinkingLine({ pos, head, body: raw }: { pos: number; head: stri
   );
 }
 
-/** Its tool calls in a row: one counted line, open to the steps. */
+/**
+ * Its tool calls in a row (QA §4, mockup 1): one summary line, 28 high, 13 text-3, the hub's
+ * counted words and the edits' lines ('edited 3 files +42 −18 ›', the + in --c-ok, the − in
+ * --c-err), its › opening every step (a click, ⏎, ⌘E). What must show folded shows under it: a
+ * failed call (R11, the TUI's ✗ row) and the call at work with its '∿ 15 s' (S9); a call the model
+ * described is drawn once, by the growing fold at the thread's end (live-step.tsx).
+ */
 export function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const [open, setOpen] = useFold(false, e.pos);
   const items = e.tools?.items ?? [];
-  // the call at work (S9, designer's desktop-working v2 (4)): its mark stays, '∿ 15 s' at its end;
-  // a call the model described (its tool_intent) is drawn once, by the growing fold at the
-  // thread's end (live-step.tsx), not as a mono line too
   const step = useLiveStep(ctx.tkey, ctx.project, ctx.agent);
   const live = step?.entry === e.pos ? step : undefined;
   const runFor = useSecondsSince(live?.at);
-  // designer's desktop-screens v6 (2): its commands and edits as mono lines with their length
-  // ('$ lighthouse --preset=mobile …  38 s', '± web/product/Hero.tsx'); the rest fold into
-  // their counted words
   const t = toolLines(items);
-  const lines = live !== undefined && live.intent !== '' ? t.lines.filter((l) => l.pos !== live.pos) : t.lines;
+  const said = live !== undefined && live.intent !== '' ? live.pos : undefined;
+  const all = [...t.lines, ...t.rest].filter((l) => l.pos !== said).sort((x, y) => x.pos - y.pos);
+  const shown = open ? all : all.filter((l) => l.state === 'err' || l.pos === live?.pos);
+  const counts = editCounts(items);
+  const words = e.tools?.summary !== undefined && e.tools.summary !== '' ? e.tools.summary : e.text;
+  const id = `thread.tools.${String(e.pos)}`;
+  const toggle = () => {
+    setOpen((o) => !o);
+  };
   return (
     <div className="th-tools" data-testid={`thread.toolrow.${String(e.pos)}`}>
-      {lines.map((l) => (
-        <ToolLineRow key={l.pos} l={l} live={live?.pos === l.pos} runFor={runFor} project={ctx.project} agent={ctx.agent} />
-      ))}
-      {(t.rest.length > 0 || items.length === 0) && (
-        <Tool
-          state={open ? 'open' : undefined}
-          onToggle={() => {
-            setOpen((o) => !o);
-          }}
-          out={
-            // the same rows as the lines above: no bullets, no fill (designer m_14269)
-            <div className="th-steps">
-              {t.rest.map((r) => (
-                <ToolLineRow key={r.pos} l={r} live={false} runFor={0} project={ctx.project} agent={ctx.agent} />
-              ))}
-            </div>
-          }
-          testId={`thread.tools.${String(e.pos)}`}
-        >
-          {t.restWords !== '' ? t.restWords : (e.tools?.summary ?? e.text)}
-        </Tool>
+      <Press look="th-ran" aria-expanded={open} onClick={toggle} data-testid={id}>
+        <AppIcon name={counts === null ? 'terminal' : 'file'} size={14} />
+        <span className="th-ran-words">{words}</span>
+        {counts !== null && (
+          <span className="th-ran-counts" data-testid={`${id}.counts`}>
+            <span className="th-ran-add">+{String(counts.add)}</span> <span className="th-ran-del">−{String(counts.del)}</span>
+          </span>
+        )}
+        <span className="th-ran-chev">
+          <AppIcon name="right" size={14} />
+        </span>
+      </Press>
+      {shown.length > 0 && (
+        <div className="th-steps">
+          {shown.map((l) => (
+            <ToolLineRow key={l.pos} l={l} live={live?.pos === l.pos} runFor={runFor} project={ctx.project} agent={ctx.agent} />
+          ))}
+        </div>
       )}
     </div>
   );

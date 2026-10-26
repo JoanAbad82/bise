@@ -304,22 +304,12 @@ export const thread = {
   show_answer: "show your answer",
   /** an answered card's link, in another thread */
   open_in: (a: { thread: string | number }): string => "open it in " + String(a.thread),
-  /** its state chip: something waits on him */
-  chip_waits: "? waiting for you",
-  /** its state chip: paused, how long */
-  chip_paused: (a: { len: string | number }): string => "… waiting · " + String(a.len),
-  /** its state chip: its first seconds */
-  chip_starting: "starting",
-  /** its state chip: working, just now */
-  chip_working: "working",
-  /** its state chip: working, its turn's age */
-  chip_working_for: (a: { age: string | number }): string => "working · " + String(a.age),
-  /** its state chip: done */
-  chip_done: "✓ done",
-  /** its state chip: failed */
-  chip_failed: "✗ failed",
-  /** its state chip: an archived maker */
-  chip_archived: "archived",
+  /** a finished turn's work, folded: `worked for 3m 10s` */
+  worked_for: (a: { dur: string | number }): string => "worked for " + String(a.dur),
+  /** the turn at work, its work folded: `working for 42s` */
+  working_for: (a: { dur: string | number }): string => "working for " + String(a.dur),
+  /** the bar title's rename field, its VoiceOver name: `rename perf` */
+  rename_field: (a: { agent: string | number }): string => "rename " + String(a.agent),
   /** its context gauge: `context 42k · 17%` */
   head_context: (a: { words: string | number }): string => "context " + String(a.words),
   /** an empty thread: `checkout is starting` */
@@ -344,10 +334,6 @@ export const thread = {
   from_inbox_screen: "the inbox screen",
   /** when, in that tip: ` at 09:55` */
   from_at: (a: { time: string | number }): string => " at " + String(a.time),
-  /** bise's own head line */
-  every_project: "every project",
-  /** an agent in voice mode, in its head */
-  voice_mode: "voice mode",
   /** an archived agent's thread */
   is_archived: (a: { agent: string | number }): string => String(a.agent) + " is archived ·",
   /** the act that brings it back */

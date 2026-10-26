@@ -60,32 +60,6 @@ describe('the thread screen', () => {
     expect(cmds.slice(before)).toContainEqual({ cmd: 'unsubscribe', project: P, agent: 'perf' });
   });
 
-  it("voice mode on this agent adds 'voice mode' after the head's chip, gone when it ends or is another agent's (amb-home m_11684)", () => {
-    const { store } = setup();
-    const v = render(
-      <StoreProvider store={store}>
-        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
-      </StoreProvider>,
-    );
-    expect(v.queryByTestId('thread.voice')).toBeNull();
-    act(() => {
-      store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: true, state: 'listening' });
-    });
-    expect(v.getByTestId('thread.voice').textContent).toBe('voice mode');
-    act(() => {
-      store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: true, state: 'typing' });
-    });
-    expect(v.getByTestId('thread.voice')).toBeTruthy();
-    act(() => {
-      store.apply({ ev: 'voice_mode', project: P, agent: 'main', on: true, state: 'listening' });
-    });
-    expect(v.queryByTestId('thread.voice')).toBeNull();
-    act(() => {
-      store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: false, state: 'listening' });
-    });
-    expect(v.queryByTestId('thread.voice')).toBeNull();
-  });
-
   it("batch 3b: a scheduled entry is '◷ bise scheduled perf · …' (designer N2: no number, no chevron; main is 'bise', designer m_40683), its words open on a click; an ended one doesn't open", () => {
     const { store } = setup();
     // fixtures pos 33-34 (6e9d68f8): set with words, then ended without

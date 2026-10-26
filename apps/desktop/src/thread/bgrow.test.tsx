@@ -39,6 +39,7 @@ describe("a thread's backgrounded '$' call", () => {
         </StoreProvider>
       </RouterContext.Provider>,
     );
+    fireEvent.click(v.getByTestId('thread.tools.4'));
     const mark = v.getByTestId('thread.tool.2.bg');
     expect(mark.textContent).toBe('∿ 14 min');
     expect(mark.getAttribute('data-tip')).toBe(running.tip_thread_row);

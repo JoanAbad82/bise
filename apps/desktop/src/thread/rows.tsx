@@ -49,6 +49,7 @@ export const EntryRow = memo(function EntryRow({
   carry = false,
   afterFold = false,
   underFold = false,
+  underTurn = false,
   retries,
 }: {
   ctx: RowCtx;
@@ -65,6 +66,8 @@ export const EntryRow = memo(function EntryRow({
   afterFold?: boolean;
   /** the first message of an open run: 8 px under its fold row, never a new group's 20 (designer m_19912 (2)) */
   underFold?: boolean;
+  /** a turn's first row, under its 'worked for' line (turns.ts): the line's 12 is its gap */
+  underTurn?: boolean;
   /** a retry notice that ends a run of them: each try's words, oldest first (H9, tiers.ts retryRuns) */
   retries?: readonly string[] | undefined;
 }) {
@@ -81,7 +84,7 @@ export const EntryRow = memo(function EntryRow({
   // one 'session restored' row, never the same notice stacked (the TUI's)
   if (e.kind === 'notice' && p?.kind === 'notice' && (p.notice?.text ?? p.text) === (e.notice?.text ?? e.text)) return null;
   const n0 = next === undefined ? undefined : afterIt;
-  const { day, pause, head, turn, gap, side, chained } = rowLayout({ prev: p, e, next: n0, ctx, today, afterFold, underFold });
+  const { day, pause, head, turn, gap, side, chained } = rowLayout({ prev: p, e, next: n0, ctx, today, afterFold, underFold, underTurn });
   // H2: the name line opens an author's run on its first row, a tool or a thinking row too
   // (designer m_21404 (3)); the times themselves on hover only
   const shown = named ?? (head || carry);
@@ -116,6 +119,7 @@ export function rowLayout({
   today,
   afterFold = false,
   underFold = false,
+  underTurn = false,
 }: {
   prev: Entry | undefined;
   e: Entry;
@@ -124,7 +128,8 @@ export function rowLayout({
   today: number;
   afterFold?: boolean;
   underFold?: boolean;
-}): { day: string | null; pause: boolean; head: boolean; turn: boolean; gap: ReturnType<typeof gapOf> | 'row'; side: 'you' | 'them'; chained: boolean } {
+  underTurn?: boolean;
+}): { day: string | null; pause: boolean; head: boolean; turn: boolean; gap: ReturnType<typeof gapOf> | 'row' | 'flush'; side: 'you' | 'them'; chained: boolean } {
   // ambient m_11777: a day separator between days; a name line opens a group (a new author, 5
   // min of silence); the rows inside show their time on hover in its place
   const day = e.at_ms > 0 && (p === undefined || !sameDay(p.at_ms, e.at_ms)) ? dayLabel(e.at_ms, today) : null;
@@ -139,8 +144,9 @@ export function rowLayout({
   const chained = sameRoute(p, e, ctx.agent);
   // his on the right, the rest on the left (messages-right v1); a change of side opens more room
   const side = sideOf(e);
-  const turn = p !== undefined && day === null && sideOf(p) !== side;
-  const gap = underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : quietPrev ? { kind: QUIET_REPORT } : p, quietMe ? { kind: QUIET_REPORT } : e);
+  // under a turn's 'worked for' line (turns.ts): the line opened the turn and keeps its 12 after
+  const turn = !underTurn && p !== undefined && day === null && sideOf(p) !== side;
+  const gap = underTurn && day === null ? 'flush' : underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : quietPrev ? { kind: QUIET_REPORT } : p, quietMe ? { kind: QUIET_REPORT } : e);
   // H12: after 5 min of silence a faint '· 14:31 ·' (the TUI's)
   const pause = day === null && pauseOf(p, e);
   return { day, pause, head, turn, gap, side, chained };

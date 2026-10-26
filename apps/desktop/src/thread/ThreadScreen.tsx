@@ -1,5 +1,8 @@
-// One agent's thread: its head, its entries, its current step, ⌘F, and
-// amb-web's composer. Owner: amb-win. Bar ⛔3 (a send shows at once),
+// One agent's thread: its entries in the reading column, its current step, ⌘F, and the composer.
+// Its head is the window's bar since bise fait mac (QA §4): nm-frame's title and subtitle, this
+// screen's '…' (the agent's menu) through <InBar>, its rename inline in the title through <InTitle>;
+// the column sits where the window's sideLayout puts it (column.ts). Owner: nm-thread.
+// Bar ⛔3 (a send shows at once),
 // ⛔4 (readable answers), ⛔6 (ctrl+c stops the turn), 3.3 (writing to one
 // agent: the composer's target is this agent), 3.4 (⌘F).
 //
@@ -8,13 +11,15 @@
 // its own data; the composer is memo'd with stable props, so neither an
 // entry, a step nor a send ever re-renders it.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Button, Head, Marker } from '@/ds';
+import { Button, Marker, MoreButton } from '@/ds';
 import type { ComposerActions } from '@/composer';
 import type { Card } from '@/proto';
 import { threadKey, useAgents, useCards, useCoreState, useProjects, useStore, useThreadOrder, useTyping } from '@/store';
 import { usePartialText } from '@/shared/partial';
 import { useMenuAction } from '@/app/menu';
-import { useRouter } from '@/app/router';
+import { useRoute, useRouter } from '@/app/router';
+import { InBar } from '@/app/barslot';
+import { useEntityMenu } from '@/app/menus/use';
 import { MAIN } from '@/app/route';
 import { RefusedLine } from '@/app/Refused';
 import { keep } from '@/app/keep';
@@ -24,9 +29,10 @@ import { takeQuotes } from '@/review/quote';
 import { QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { HubNoteRow, InboxBlock, type Answering } from '@/inbox';
-import { dotOf, lineOf, shownName } from '@/agents/model';
-import { Tune } from '@/agents/Tune';
-import { AgentHead, BiseHead, StartingLine } from './AgentHead';
+import { shownName } from '@/agents/model';
+import { StartingLine } from './StartingLine';
+import { useColumn } from './column';
+import { TitleRename } from './Rename';
 import { PauseLine } from './PauseLine';
 import { LabelMark } from './LabelMark';
 import { StepLine } from './live-step';
@@ -42,7 +48,6 @@ import { useFindGo } from './useFindGo';
 import { quoteSourcePos } from './quote';
 import { QUOTE_SOURCE_EVENT } from '@/composer/pm/AttachList';
 import { FindBar } from './FindBar';
-import { LiveBiseMark } from '@/app/Marks';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { OpenArtifactContext } from './openArtifact';
@@ -240,21 +245,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
     }
   };
 
-  const [tuning, setTuning] = useState(false);
-  // a project's main is bise (ambient m_11437): 'bise · acme', the project dim
+  // a project's main is bise (ambient m_11437): the composer's words name it so
   const title = bise || agent !== 'main' ? shownName(bise ? 'main' : agent) : 'bise';
-  const headTitle =
-    agent === 'main' && !bise ? (
-      <>
-        bise
-        <span className="th-title-project" data-testid="thread.title.project">
-          {' · '}
-          {projectName ?? project}
-        </span>
-      </>
-    ) : (
-      title
-    );
   // b1/b2 (his card #476): the inbox block over the composer tells what his words do while one of
   // its items is open in place: a question's answer ('answering perf · …'), or a plain message
   // with what an approval waits for; esc folds the item and his words are a message again
@@ -294,33 +286,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         {counts}
       </a>
     );
-  const lead = bise ? thread.every_project : agent === 'main' ? '' : (projectName ?? project);
-  const sub = (
-    <>
-      {/* bise's own head: 'every project' alone (designer D7b) */}
-      {bise ? (
-        lead
-      ) : agent === 'main' && countsLink !== null ? (
-        lead === '' ? (
-          countsLink
-        ) : (
-          <>
-            {lead} · {countsLink}
-          </>
-        )
-      ) : (
-        [lead, agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
-      )}
-      {/* its context is the composer tab's (designer m_24325: one place per fact) */}
-      {/* voice mode on this agent (ambient's spec m_11632, amb-home m_11684) */}
-      {voice !== 'off' && (
-        <span className="th-voice" data-testid="thread.voice">
-          {` · ${thread.voice_mode}`}
-        </span>
-      )}
-    </>
-  );
-
   // designer's v6 (5): an agent whose thread has nothing of its own yet (his first message at most) is starting
   const order = useThreadOrder(tkey);
   // once it writes (a streamed reply, live.ts) it isn't starting any more, even between the
@@ -347,57 +312,31 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   const tabLabel = voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : artifact !== undefined ? artifact.to : composerWords(title).label;
   // one object while its words hold, so a new entry never draws the memoised composer again
   const tab = useTabWords(tabLabel, tabPlace, tabContext, markName);
-  // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
-  const more =
-    me && !me.archived && !bise ? (
-      <Button
-        kind="ghost"
-        title={me.main ? 'model, reasoning' : 'rename, model, reasoning'}
-        onClick={() => {
-          setTuning((x) => !x);
-        }}
-        testId="thread.more"
-      >
-        ⋯
-      </Button>
-    ) : undefined;
+  // the head is the window's bar (bise fait mac): its title and subtitle are nm-frame's; this
+  // thread puts the agent's '…' there (and a project main's counts, tui-parity W2), and takes the
+  // menu's Rename in the bar's title, when it is the route's screen (not a panel's tab)
+  const route = useRoute();
+  const inView = route.screen === 'thread' && route.project === project && route.agent === agent;
+  const menu = useEntityMenu({ kind: 'agent', project, agent });
+  const ours = !bise && me !== undefined && !me.archived;
+  // the column where the window's sideLayout puts it (column.ts)
+  const column = useColumn(section);
   return (
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
     <OpenArtifactContext value={artifact?.id}>
-      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} data-about={artifact !== undefined || undefined} data-dim={(artifact !== undefined && me?.archived === true) || undefined} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
-        {artifact !== undefined && me?.archived === true && agent !== MAIN ? (
-          <AgentHead project={project} a={me} restore={() => {
-              // '↺ restore' in an archived maker's head, beside its artifact (designer m_20453)
-              store.command({ cmd: 'unarchive', project, agent });
-            }}
-          />
-        ) : bise || !me || me.archived ? (
-          <Head
-            title={headTitle}
-            sub={sub}
-            lead={bise ? <LiveBiseMark testId="thread.head.mark" /> : undefined}
-            dot={bise || !me ? undefined : dotOf(me.status)}
-          />
-        ) : agent === MAIN ? (
-          <BiseHead project={project} name={projectName ?? project} more={more} />
-        ) : (
-          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? thread.voice_mode : undefined} starting={fresh} named={artifact !== undefined} />
+      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} data-about={artifact !== undefined || undefined} data-dim={(artifact !== undefined && me?.archived === true) || undefined} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture} style={column}>
+        {inView && ours && (
+          <InBar>
+            {agent === MAIN && countsLink}
+            <MoreButton menu={menu} testId="thread.more" />
+          </InBar>
         )}
+        <TitleRename project={project} agent={agent} agents={agents} take={inView && ours && !me.main} />
+        {/* an archived maker beside its artifact: its thread dim, a way to restore it on top (designer m_20453) */}
+        {artifact !== undefined && me?.archived === true && agent !== MAIN && <History project={project} agent={agent} />}
         {/* S29/L19 W1: it drives his computer: one line under the head, from computer_live only */}
         {!bise && <ComputerLine project={project} agent={agent} />}
-        {tuning && me && !me.archived && (
-          <Tune
-            key={me.name}
-            project={project}
-            a={me}
-            onRenamed={(to) => {
-              setTuning(false);
-              // the thread follows its new name
-              router.go({ screen: 'thread', project, agent: to });
-            }}
-          />
-        )}
         {answerMiss && (
           <div className="th-answer-miss" data-testid="thread.answer-miss">
             {thread.answer_further_up}
