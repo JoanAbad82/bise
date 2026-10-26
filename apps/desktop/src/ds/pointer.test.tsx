@@ -12,7 +12,7 @@ import { cleanup, render } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { Gallery } from "./gallery/Gallery";
+import { Gallery, SECTIONS } from "./gallery/Gallery";
 import {
   Act, ArtChip, ArtName, BriefLine, Button, CardLine, Check, Chip, Diff, Field, Filters, Group, IconButton, ListRow, MenuItem, MoreButton, Opts,
   PickerTrigger, RowAction, SchedHead, SearchButton, Seg, Select, Tabs, TextArea, Toggle, type EntityMenu,
@@ -120,12 +120,22 @@ describe("the hand on everything he clicks (ds/css/base.css)", () => {
     expect(fields.filter((n) => getComputedStyle(n).cursor === "pointer").map(name)).toEqual([]);
   });
 
-  it("the whole gallery: what he clicks has its role, and shows the hand", () => {
-    const { container } = render(<Gallery />);
-    const { roleless, arrow, count } = law(container);
-    expect(count).toBeGreaterThan(100);
-    expect(roleless, "a plain element he clicks: give it its role (button, option, tab, link...)").toEqual([]);
-    expect(arrow, "a clickable element without the hand: a stylesheet puts the arrow back on it").toEqual([]);
-    // the whole gallery is one render (0.6 s alone); under a loaded Mac (peers' gates) it took 9.7 s
-  }, 30_000);
+});
+
+// the gallery, one section per test (the whole of it in one render took 0.6 s alone and 5-10 s
+// under a loaded Mac, past vitest's 5 s): each section dark | light, as the gallery draws it
+describe("every gallery section: what he clicks has its role, and shows the hand", () => {
+  let total = 0;
+  for (const name of Object.keys(SECTIONS)) {
+    it(name, () => {
+      const { container } = render(<Gallery only={[name]} />);
+      const { roleless, arrow, count } = law(container);
+      total += count;
+      expect(roleless, "a plain element he clicks: give it its role (button, option, tab, link...)").toEqual([]);
+      expect(arrow, "a clickable element without the hand: a stylesheet puts the arrow back on it").toEqual([]);
+    });
+  }
+  it("walked them all: the gallery's clickables add up", () => {
+    expect(total).toBeGreaterThan(100);
+  });
 });

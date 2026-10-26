@@ -1,7 +1,8 @@
 // The sidebar (bise fait mac, page native-mac §6, mockup 1): beside the rail under the bar, 240
 // wide (200-320 by its border, kept: frame-state.ts), --p-raised 82% with a 12 top-left corner.
 // 'New project ⌘N' first (his m_44225: he rarely makes an agent by hand, he talks to main), then
-// 'New agent ⇧⌘N' and 'Search ⌘K'; then 'Pinned' (pins.ts, his own shortcuts) and 'Projects': one
+// 'New agent ⇧⌘N' and 'Search ⌘K'; then bise's own row (its ':*', what waits in all his projects,
+// ⌘0; as on main), 'Pinned' (pins.ts, his own shortcuts) and 'Projects': one
 // row per project, a click opens it (its main), no agent under it (round 2, his r2-img11: the
 // agents live on the right side), at its end one fact (what waits on him, else its agents at work)
 // and, ⌘ held, its ⌘1-9 digit: siderows.ts decides, this draws. Its head stays, its list scrolls;
@@ -27,6 +28,7 @@ import { MAIN, projectOf } from './route';
 import { useRoute, useRouter } from './router';
 import { useKeptScroll } from './keep';
 import { useModHeld } from './held';
+import { LiveBiseMark } from './Marks';
 import { usePinned, type Pin } from './pins';
 import { newAgent } from './newagent';
 import { addProject } from './addProject';
@@ -203,6 +205,7 @@ function ProjectList() {
   const here = projectOf(route);
   return (
     <div className="app-s-list" data-testid="app.side.list">
+      <BiseRow cmd={cmd} />
       {pins.length > 0 && <PinnedList pins={pins} />}
       <Label testId="app.side.label.projects" end={<AddProject />}>
         {frame.projects}
@@ -211,6 +214,46 @@ function ProjectList() {
         <ProjectItem key={p.project} p={p} index={i} on={p.project === here} cmd={cmd} />
       ))}
     </div>
+  );
+}
+
+/**
+ * bise's own row above the projects, as on main (native-lead m_44419): its live ':*' mark, 'bise',
+ * what waits on him in all his projects (the inbox's one number, in the accent); ⌘ held, ⌘0. It
+ * opens bise's place; marked there and on bise's own main (the home project stays out of the list).
+ */
+function BiseRow({ cmd }: { cmd: boolean }) {
+  const route = useRoute();
+  const router = useRouter();
+  const waits = useWaitingTotal();
+  const home = useProjects().find((p) => p.home)?.project;
+  const on = route.screen === 'bise' || (home !== undefined && route.screen === 'thread' && route.project === home && route.agent === MAIN);
+  const id = 'app.side.bise';
+  return (
+    <Press
+      look={`app-s-row bise${on ? ' on' : ''}`}
+      aria-current={on ? 'page' : undefined}
+      onClick={() => {
+        router.go({ screen: 'bise' });
+      }}
+      data-testid={id}
+    >
+      <LiveBiseMark size={16} testId={`${id}.mark`} />
+      <CutName name={panel.bise} />
+      {cmd ? (
+        <span className="app-s-end">
+          <kbd data-testid={`${id}.digit`}>⌘0</kbd>
+        </span>
+      ) : (
+        waits > 0 && (
+          <span className="app-s-end">
+            <span className="app-s-cnt waits" {...tipAttrs(waitsTip(waits, true))} data-testid={`${id}.waits`}>
+              {waits}
+            </span>
+          </span>
+        )
+      )}
+    </Press>
   );
 }
 

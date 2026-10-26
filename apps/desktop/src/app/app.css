@@ -316,16 +316,10 @@ body:has(.app-shell) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* a project row opens it (round 2): hover adds only the 6 % hover tint, the project in view keeps
+   its 9 % (.on, after :hover), and nothing changes weight or ink (designer m_44560) */
 .app-s-row.project {
   font-weight: 500;
-}
-/* one tinted row, the place in view (designer m_43568): a project row only folds, so no tint, not
-   even on hover (it stayed on after a click to fold); its folder goes to ink instead */
-.app-s-row.project:hover {
-  background: transparent;
-}
-.app-s-row.project:hover > svg {
-  color: var(--c-text);
 }
 /* the project's inline rename (the menu's Rename): the row's own font, a focus ring as its frame */
 .app-s-rename {

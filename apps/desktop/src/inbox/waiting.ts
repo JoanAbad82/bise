@@ -12,9 +12,9 @@ export function useWaitingList(): readonly Card[] {
   // the inbox's one view, from the store (machine/cards.ts inboxView)
   const real = useInboxItems();
   const asks = useNotifyAsks(real.length);
-  // the Dock's badge and the window title (main/counts.ts) count it too
+  // the Dock's badge and the window title (main/counts.ts) count it too; a component test has no preload
   useEffect(() => {
-    window.bise.notify.listed?.(asks);
+    (window as Partial<Window>).bise?.notify.listed?.(asks);
   }, [asks]);
   const home = rows.find((r) => r.home)?.project ?? '';
   const [since] = useState(() => Date.now());

@@ -122,6 +122,34 @@ describe('the sidebar', () => {
     }
   });
 
+  it("bise's own row above Projects (native-lead m_44419): what waits in all his projects, ⌘0 held, opens bise; home stays out of the list", () => {
+    vi.useFakeTimers();
+    try {
+      const { v, router } = frame({ screen: 'thread', project: HOME, agent: 'main' }, [agent('main')], [], { cards: null as never, waits: 2 });
+      const list = v.getByTestId('app.side.list');
+      const order = [...list.querySelectorAll('[data-testid="app.side.bise"],[data-testid="app.side.label.projects"]')].map((e) => e.getAttribute('data-testid'));
+      expect(order).toEqual(['app.side.bise', 'app.side.label.projects']);
+      expect(v.queryByTestId(`app.side.project.${HOME}`)).toBeNull();
+      // on bise's own main: marked
+      expect(v.getByTestId('app.side.bise').getAttribute('aria-current')).toBe('page');
+      expect(v.getByTestId('app.side.bise.waits').textContent).toBe('2');
+      act(() => {
+        fireEvent.keyDown(window, { key: 'Meta', code: 'MetaLeft', metaKey: true });
+        vi.advanceTimersByTime(HINT_HOLD_MS + 10);
+      });
+      expect(v.getByTestId('app.side.bise.digit').textContent).toBe('⌘0');
+      act(() => {
+        fireEvent.keyUp(window, { key: 'Meta', code: 'MetaLeft' });
+      });
+      fireEvent.click(v.getByTestId(`app.side.project.${ACME}`));
+      expect(v.getByTestId('app.side.bise').getAttribute('aria-current')).toBeNull();
+      fireEvent.click(v.getByTestId('app.side.bise'));
+      expect(router.get()).toEqual({ screen: 'bise' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('New project first (⌘N) opens the add-a-project way in; New agent (⇧⌘N) asks in the project in view', () => {
     const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
     const head = [...v.getByTestId('app.sidebar').querySelectorAll('.app-s-head [data-testid]')].map((e) => e.getAttribute('data-testid'));
