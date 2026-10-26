@@ -23,7 +23,7 @@ import { formatRoute, MAIN, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
-import { cutCrumb, giveWay, STATUS_NARROW_PX } from "./giveway";
+import { barFit, giveWay, STATUS_NARROW_PX } from "./giveway";
 import { CoinSlot } from "./side3d/Minis";
 import { useEscLayer } from "./escape";
 import { BarTabs } from "./panel/BarTabs";
@@ -298,11 +298,9 @@ function StatusSlot({ children }: { children?: ReactNode }) {
       const words = pill?.querySelector<HTMLElement>(".app-ts-words") ?? null;
       if (pill === null) pillFull = 0;
       else if (el.dataset["narrow"] !== "true" && words !== null) pillFull = pill.offsetWidth + Math.max(0, words.scrollWidth - words.clientWidth);
-      const minis = el.querySelector<HTMLElement>(".s3-minis-slot");
+      // the minis sit right after the crumb (designer m_45869), out of the slot: they never shrink
+      const minis = bar.querySelector<HTMLElement>(":scope > .s3-minis-slot");
       const minisW = minis === null || minis.childElementCount === 0 ? 0 : minis.offsetWidth + parseFloat(getComputedStyle(minis).marginLeft || "0");
-      const g = giveWay({ slot: el.clientWidth - (factHidden ? factRoom : 0), fact: factRoom, pill: pillFull, minis: minisW });
-      if (g.fact) bar.dataset["give"] = "fact";
-      else delete bar.dataset["give"];
       if (pill === null) pillShort = 0;
       else if (el.dataset["narrow"] === "true") pillShort = pill.scrollWidth;
       // beside the minis nothing is ever cut mid-word (ui-review m_45691, m_45714; designer m_45727):
@@ -315,15 +313,29 @@ function StatusSlot({ children }: { children?: ReactNode }) {
       const roleHidden = bar.dataset["role"] === "out";
       if (role !== null && !roleHidden) roleRoom = role.scrollWidth + parseFloat(getComputedStyle(title ?? role).columnGap || "0");
       if (role === null) roleRoom = 0;
-      const others = [...bar.children].reduce((n, c) => (c === title || c === el ? n : n + (c as HTMLElement).offsetWidth), 0);
+      const others = [...bar.children].reduce((n, c) => (c === title || c === el || c === minis ? n : n + (c as HTMLElement).offsetWidth), 0);
       const avail = bar.clientWidth - parseFloat(getComputedStyle(bar).paddingRight || "0") - others - parseFloat(getComputedStyle(el).marginLeft || "0");
       const nameMin = title === null || name === null ? 0 : parseFloat(getComputedStyle(title).paddingLeft || "0") + name.offsetWidth;
-      const crumb = cutCrumb({ avail, name: nameMin, role: roleRoom, minis: minisW, pillShort: pill === null ? 0 : pillShort, pillSign: pill === null ? 0 : PILL_SIGN_PX });
-      if (crumb.role) delete bar.dataset["role"];
+      if (minisW <= 0) {
+        // no minis: the pill gives way in the slot, the crumb cuts by the bar's flex
+        const g = giveWay({ slot: el.clientWidth - (factHidden ? factRoom : 0), fact: factRoom, pill: pillFull, minis: 0 });
+        if (g.fact) bar.dataset["give"] = "fact";
+        else delete bar.dataset["give"];
+        delete bar.dataset["role"];
+        if (title !== null) title.style.minWidth = "";
+        el.style.minWidth = "";
+        setNarrow(g.narrow || (pill !== null && el.clientWidth < STATUS_NARROW_PX));
+        return;
+      }
+      // the minis after the crumb: the fact goes, then the pill's short form, then the role whole, then the pill's sign; the name stays
+      const fit = barFit({ avail, name: nameMin, role: roleRoom, fact: factRoom, minis: minisW, pillFull: pill === null ? 0 : pillFull, pillShort: pill === null ? 0 : pillShort || pillFull, pillSign: pill === null ? 0 : PILL_SIGN_PX });
+      if (fit.fact) delete bar.dataset["give"];
+      else bar.dataset["give"] = "fact";
+      if (fit.role) delete bar.dataset["role"];
       else bar.dataset["role"] = "out";
-      if (title !== null) title.style.minWidth = minisW > 0 ? `${String(Math.ceil(nameMin + (crumb.role ? roleRoom : 0)))}px` : "";
-      el.style.minWidth = minisW > 0 ? `${String(Math.ceil(minisW + crumb.pill))}px` : "";
-      setNarrow(g.narrow || (pill !== null && el.clientWidth - minisW < STATUS_NARROW_PX));
+      if (title !== null) title.style.minWidth = `${String(Math.ceil(nameMin + (fit.role ? roleRoom : 0)))}px`;
+      el.style.minWidth = `${String(Math.ceil(fit.pill))}px`;
+      setNarrow(fit.narrow);
     };
     read();
     const ro = new ResizeObserver(read);
@@ -448,10 +460,10 @@ export function Bar({ frame: state }: { frame: FrameState }) {
           </span>
         )}
       </div>
+      {/* no room for the coins beside the thread (or a sheet over it): their minis right after the crumb, 12 after it (side3d Minis, his m_45864, designer m_45869) */}
+      <CoinSlot />
       <StatusSlot>
         <TitleStatus />
-        {/* no room for the coins beside the thread: their minis, right-aligned, 12 after the pill (side3d Minis, folded-side v9, designer m_45616) */}
-        <CoinSlot at="header" />
       </StatusSlot>
       {/* the page's search and action (barslot.tsx: a page's <InBar>) */}
       <BarSlot />

@@ -16,12 +16,12 @@ import { setCoinSlot } from './place';
 /** a mini's object, css px, on its 20 plate */
 export const MINI_PX = 16;
 
-/** Where the minis go: Frame's status slot ('header') and the panel's tab row ('tabs') each mount one. */
-export function CoinSlot({ at }: { at: 'header' | 'tabs' }) {
+/** Where the minis go: the title bar, right after the thread's crumb (his m_45864, designer m_45869), Frame mounts it. */
+export function CoinSlot() {
   const ref = useCallback((el: HTMLSpanElement | null) => {
-    setCoinSlot(at, el);
-  }, [at]);
-  return <span ref={ref} className="s3-minis-slot" data-at={at} data-testid={`app.coins.${at}`} />;
+    setCoinSlot(el);
+  }, []);
+  return <span ref={ref} className="s3-minis-slot" data-testid="app.coins.header" />;
 }
 
 export interface MiniProps {

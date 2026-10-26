@@ -60,3 +60,43 @@ export function cutCrumb(r: CrumbRoom): { readonly role: boolean; readonly pill:
   const pill = r.name + (role ? r.role : 0) + r.minis + r.pillShort <= r.avail ? r.pillShort : r.pillSign;
   return { role, pill };
 }
+
+/** What the bar holds when the minis sit after the crumb (his m_45864, designer m_45869), px. */
+export interface BarFit {
+  /** the room the crumb, the minis and the status slot share */
+  readonly avail: number;
+  /** the crumb's name with its lead padding */
+  readonly name: number;
+  /** its role ('profiling the hub · acme') and its gap, 0 without one */
+  readonly role: number;
+  /** its fact ('? waits for you') and its gap, 0 without one */
+  readonly fact: number;
+  /** the minis with their margin: they never shrink */
+  readonly minis: number;
+  /** the pill whole, its short form, its sign alone; 0 without a pill */
+  readonly pillFull: number;
+  readonly pillShort: number;
+  readonly pillSign: number;
+}
+
+/** What shows: the fact, the role, the pill's room and its short form. */
+export interface BarFits {
+  readonly fact: boolean;
+  readonly role: boolean;
+  readonly narrow: boolean;
+  readonly pill: number;
+}
+
+/**
+ * The minis right after the crumb (designer m_45869): they never shrink; first the crumb's fact goes,
+ * then the pill takes its short form, then the crumb's role drops whole (never cut mid-word), then the
+ * pill shows its sign alone; the name stays. Pure.
+ */
+export function barFit(r: BarFit): BarFits {
+  const fits = (role: boolean, fact: boolean, pill: number) => r.name + (role ? r.role : 0) + (fact ? r.fact : 0) + r.minis + pill <= r.avail;
+  if (fits(true, true, r.pillFull)) return { fact: true, role: true, narrow: false, pill: r.pillFull };
+  if (fits(true, false, r.pillFull)) return { fact: false, role: true, narrow: false, pill: r.pillFull };
+  if (fits(true, false, r.pillShort)) return { fact: false, role: true, narrow: r.pillFull > 0, pill: r.pillShort };
+  if (fits(false, false, r.pillShort)) return { fact: false, role: false, narrow: r.pillFull > 0, pill: r.pillShort };
+  return { fact: false, role: false, narrow: r.pillFull > 0, pill: r.pillSign };
+}

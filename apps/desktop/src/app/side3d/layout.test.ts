@@ -1,7 +1,7 @@
 // sideLayout at the widths of plan §2 (1000, 1100, 1280, 1440, 1728, 1920), the panel open and closed.
 import { describe, expect, it } from 'vitest';
 import type { Route } from '../route';
-import { BETWEEN_BAND, BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, sideLayout, sideShows, THREAD_KEEPS, WORLD_BAND } from './layout';
+import { BETWEEN_BAND, BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, sideLayout, sideShows, SIDE_ROOM, THREAD_KEEPS, WORLD_BAND } from './layout';
 
 /** rail 56 + sidebar 240 */
 const SIDE = 296;
@@ -10,17 +10,20 @@ const SIDE = 296;
 const right = (winW: number, l: { colLeft: number; colW: number }) => winW - l.colLeft - l.colW;
 
 describe('sideLayout, the panel folded', () => {
-  it('1920 and 1728: the column centred in what the sidebar leaves, the world small', () => {
-    for (const w of [1920, 1728]) {
+  it('1920, 1728 and 1440 (D1, designer m_45869): the side keeps its own 284, the column centred in what is left; plain captions', () => {
+    for (const w of [1920, 1728, 1440]) {
       const l = sideLayout(w, SIDE, false);
-      expect(l).toMatchObject({ colW: COL_W, world: 'small', gutter: WORLD_BAND, side: true });
-      expect(l.colLeft - SIDE).toBe(right(w, l));
+      expect(l).toMatchObject({ colW: COL_W, world: 'small', gutter: SIDE_ROOM, side: true, coins: 'edge', captions: 'plain' });
+      expect(right(w, l) - SIDE_ROOM).toBe(l.colLeft - SIDE);
     }
+    expect(sideLayout(1440, SIDE, false).colLeft).toBe(SIDE + 70);
   });
-  it('1440: still centred (212 each side, more than the world band)', () => {
-    const l = sideLayout(1440, SIDE, false);
-    expect(l).toMatchObject({ colLeft: SIDE + 212, colW: COL_W, world: 'small' });
-    expect(right(1440, l)).toBe(212);
+  it('the column, its two 24 and the 284 just fit: D1; a px less: the captions are cards over the thread', () => {
+    const just = SIDE + COL_W + 2 * MIN_LEFT + SIDE_ROOM;
+    expect(sideLayout(just, SIDE, false)).toMatchObject({ captions: 'plain', colLeft: SIDE + MIN_LEFT });
+    expect(sideLayout(just - 1, SIDE, false)).toMatchObject({ captions: 'card', gutter: WORLD_BAND });
+    expect(sideLayout(1100, SIDE, false).captions).toBe('card');
+    expect(sideLayout(1440, SIDE, true, 480).captions).toBe('card');
   });
   it('1280: centring would leave 132 on the right, so the column slides left and keeps the band', () => {
     const l = sideLayout(1280, SIDE, false);

@@ -1,7 +1,7 @@
 // The title bar's give-way order (designer m_45616, m_45674): the minis never shrink; the crumb's
 // fact goes first, then the pill's short form, never a word cut mid-way.
 import { describe, expect, it } from 'vitest';
-import { cutCrumb, giveWay, STATUS_NARROW_PX } from './giveway';
+import { barFit, cutCrumb, giveWay, STATUS_NARROW_PX } from './giveway';
 
 describe('the title bar gives way', () => {
   it('room for all: nothing gives way', () => {
@@ -47,5 +47,23 @@ describe('the crumb beside the minis (designer m_45727)', () => {
   });
   it('no minis in the bar: nothing changes for the crumb', () => {
     expect(cutCrumb({ ...room, minis: 0, avail: 10 })).toEqual({ role: true, pill: 90 });
+  });
+});
+
+describe('the minis after the crumb (designer m_45869)', () => {
+  const room = { name: 60, role: 180, fact: 110, minis: 200, pillFull: 330, pillShort: 90, pillSign: 24 };
+  it('all of it when it holds', () => {
+    expect(barFit({ ...room, avail: 900 })).toEqual({ fact: true, role: true, narrow: false, pill: 330 });
+  });
+  it('the fact goes first, then the pill takes its short form, then the role drops whole, then the pill is its sign', () => {
+    expect(barFit({ ...room, avail: 800 })).toMatchObject({ fact: false, role: true, narrow: false });
+    expect(barFit({ ...room, avail: 600 })).toMatchObject({ fact: false, role: true, narrow: true, pill: 90 });
+    expect(barFit({ ...room, avail: 400 })).toMatchObject({ fact: false, role: false, narrow: true, pill: 90 });
+    expect(barFit({ ...room, avail: 300 })).toMatchObject({ fact: false, role: false, pill: 24 });
+  });
+  it('no pill: the fact still goes before the role, never narrow', () => {
+    const none = { ...room, pillFull: 0, pillShort: 0, pillSign: 0 };
+    expect(barFit({ ...none, avail: 500 })).toEqual({ fact: false, role: true, narrow: false, pill: 0 });
+    expect(barFit({ ...none, avail: 300 })).toEqual({ fact: false, role: false, narrow: false, pill: 0 });
   });
 });

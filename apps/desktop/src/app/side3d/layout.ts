@@ -1,5 +1,8 @@
 // src/app/side3d · sideLayout: where the thread's column, the world and the bubbles go across the
-// window's width (plan native-mac-plan v4 §2, decision d3). The column is centred when both sides
+// window's width (plan native-mac-plan v4 §2, decision d3). D1 (his m_45864, designer m_45869): when
+// the room holds the column, its two 24 margins and the side's own 284, the side keeps that band and
+// the column is centred in what is left: its captions are plain words, never over the thread. Else
+// the column is centred when both sides
 // leave the world's band (148 + 12 + 12 = 172); else it slides left (24 from the sidebar at
 // least); else the world folds into a 5th bubble and the band drops to 92 (68 + 12 + 12); last,
 // the column narrows. The tabbed panel open (folded-side v9, the width rule): the coins stay
@@ -70,7 +73,16 @@ export interface SideLayout {
   readonly coins: CoinsAt;
   /** the coins' column from the window's right edge, px: 0 at the edge, the panel's width between */
   readonly right: number;
+  /** the coins' captions (D1, designer m_45869): 'plain' words in the side's own room (SIDE_ROOM
+   *  kept, the thread never under them), else 'card' over the thread */
+  readonly captions: Captions;
 }
+
+/** How the coins' captions show: plain words in the side's room, or quiet cards over the thread. */
+export type Captions = 'plain' | 'card';
+
+/** The side's own room when the window holds it (D1, his m_45864, designer m_45869): the coins' 68 + 216 for their captions */
+export const SIDE_ROOM = 284;
 
 /** Where the coins are (folded-side v9, Gabriel's pick). */
 export type CoinsAt = 'edge' | 'between' | 'header' | 'tabs' | 'none';
@@ -125,17 +137,19 @@ export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, pane
   const room = Math.max(0, winW - sideW - (panelOpen ? panelW : 0));
   const centred = (coins: CoinsAt): SideLayout => {
     const w = Math.min(COL_W, Math.max(0, room - 2 * MIN_LEFT));
-    return { colLeft: sideW + (room - w) / 2, colW: w, world: 'small', gutter: 0, side: false, coins, right: 0 };
+    return { colLeft: sideW + (room - w) / 2, colW: w, world: 'small', gutter: 0, side: false, coins, right: 0, captions: 'card' };
   };
   if (!shows) return centred('none');
   if (panelOpen) {
     if (beside.over || beside.full) return centred('tabs');
     if (winW < sideW + beside.threadMin + BETWEEN_BAND + panelW) return centred('header');
     const at = fit(room, BETWEEN_BAND) ?? { left: MIN_LEFT, w: Math.max(0, room - BETWEEN_BAND - MIN_LEFT) };
-    return { colLeft: sideW + at.left, colW: at.w, world: 'bubble', gutter: BETWEEN_BAND, side: true, coins: 'between', right: panelW };
+    return { colLeft: sideW + at.left, colW: at.w, world: 'bubble', gutter: BETWEEN_BAND, side: true, coins: 'between', right: panelW, captions: 'card' };
   }
-  const edge = (l: { left: number; w: number }, world: WorldSize, gutter: number): SideLayout =>
-    ({ colLeft: sideW + l.left, colW: l.w, world, gutter, side: true, coins: 'edge', right: 0 });
+  const edge = (l: { left: number; w: number }, world: WorldSize, gutter: number, captions: Captions = 'card'): SideLayout =>
+    ({ colLeft: sideW + l.left, colW: l.w, world, gutter, side: true, coins: 'edge', right: 0, captions });
+  // D1: room for the thread, its two margins and the side's own: the column centred in what is left of it
+  if (room >= COL_W + 2 * MIN_LEFT + SIDE_ROOM) return edge({ left: (room - SIDE_ROOM - COL_W) / 2, w: COL_W }, 'small', SIDE_ROOM, 'plain');
   const small = fit(room, WORLD_BAND);
   if (small !== null) return edge(small, 'small', WORLD_BAND);
   const bubble = fit(room, BUBBLE_BAND);

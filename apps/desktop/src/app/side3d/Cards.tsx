@@ -1,4 +1,5 @@
-// src/app/side3d · the coins' cards (page folded-side v9, Gabriel's pick, designer m_45474): a
+// src/app/side3d · the coins' cards (page folded-side v9, Gabriel's pick, designer m_45474; D1's
+// plain captions in the side's own room, designer m_45869): a
 // coin's name and two quiet lines, 12 left of the coin, right-aligned, 232 wide at most, each line
 // cut with … . Information only (pointer-events none): a click is the coin's. ⌥ held alone 300 ms
 // shows the four at once, no stagger (in 120 ms, out 80 ms; reduced motion: no fade); a hover 400
@@ -11,8 +12,8 @@ import { cardWords, type CardPart, type CoinCard } from './coincard';
 export const CARD_HOLD_MS = 300;
 /** a hover this long shows that coin's card (the ds tip's TIP_DELAY_MS) */
 export const CARD_HOVER_MS = 400;
-/** the card's top above its coin's: the card (64) centred on the coin (44) */
-export const CARD_LIFT = 10;
+/** a coin's middle under its top: the caption's block is centred on it (designer m_45869) */
+export const COIN_MID = 22;
 
 function Line({ parts, n }: { parts: readonly CardPart[]; n: 1 | 2 }) {
   if (parts.length === 0) return null;
@@ -28,10 +29,14 @@ function Line({ parts, n }: { parts: readonly CardPart[]; n: 1 | 2 }) {
   );
 }
 
-/** One coin's card, its top `top` (its coin's less CARD_LIFT). */
-export function CoinCardView({ id, card, top }: { id: BubbleId; card: CoinCard; top: number }) {
+/**
+ * One coin's caption, centred on its coin (`top` the coin's). `plain` (D1, the side's own room,
+ * designer m_45869): words only, no fill, border or shadow, the coin and its words one object; else a
+ * quiet card over the thread, the coin's own fill.
+ */
+export function CoinCardView({ id, card, top, plain = false }: { id: BubbleId; card: CoinCard; top: number; plain?: boolean }) {
   return (
-    <div className="s3-tcard" style={{ top: top - CARD_LIFT }} aria-hidden="true" title={cardWords(card)} data-testid={`app.bubble.${id}.card`}>
+    <div className="s3-tcard" data-plain={plain || undefined} style={{ top: top + COIN_MID }} aria-hidden="true" title={cardWords(card)} data-testid={`app.bubble.${id}.card`}>
       <span className="s3-tcard-name">{card.name}</span>
       <Line parts={card.l1} n={1} />
       <Line parts={card.l2} n={2} />

@@ -444,7 +444,7 @@ describe('the right side, folded', () => {
       panel.open = true;
       panel.width = 900;
       const { v } = side3d(1440);
-      const slot = render(<CoinSlot at="header" />);
+      const slot = render(<CoinSlot />);
       expect(v.getByTestId('app.side').getAttribute('data-at')).toBe('header');
       expect(v.queryByTestId('app.bubble.agents')).toBeNull();
       const minis = slot.getByTestId('app.coins.header');
@@ -474,14 +474,13 @@ describe('the right side, folded', () => {
     }
   });
 
-  it('a sheet over the thread: the minis go in its tab row', () => {
+  it('a sheet over the thread: the minis stay in the title bar after the crumb, never in its tab row (his m_45864)', () => {
     panel.open = true;
     panel.over = true;
     const { v } = side3d(1000);
-    const slot = render(<><CoinSlot at="header" /><CoinSlot at="tabs" /></>);
+    const slot = render(<CoinSlot />);
     expect(v.getByTestId('app.side').getAttribute('data-at')).toBe('tabs');
-    expect(slot.getByTestId('app.coins.tabs').querySelector('[data-testid="app.mini.agents"]')).toBeTruthy();
-    expect(slot.getByTestId('app.coins.header').children).toHaveLength(0);
+    expect(slot.getByTestId('app.coins.header').querySelector('[data-testid="app.mini.agents"]')).toBeTruthy();
   });
 
   it('the world takes the pointer on its island only: grown, never on the bubbles\' column', () => {

@@ -16,7 +16,7 @@ const subs = new Set<() => void>();
 
 /** Put a new layout (SideHost's); its readers hear it only when a place changed. */
 export function setSideLayout(next: SideLayout): void {
-  if (next.colLeft === now.colLeft && next.colW === now.colW && next.world === now.world && next.gutter === now.gutter && next.side === now.side && next.coins === now.coins && next.right === now.right) return;
+  if (next.colLeft === now.colLeft && next.colW === now.colW && next.world === now.world && next.gutter === now.gutter && next.side === now.side && next.coins === now.coins && next.right === now.right && next.captions === now.captions) return;
   now = next;
   for (const f of [...subs]) f();
 }
@@ -63,19 +63,19 @@ export function useLayoutDriver(winW: number, leftW: number, panel: PanelIn, sho
 }
 
 // ---- where the coins go when the thread has no room beside them (folded-side v9) ----
-/** the thread header's status slot and the sheet's tab row hold an element each (Minis.tsx CoinSlot); Side portals its minis there */
-const slots: Record<'header' | 'tabs', HTMLElement | null> = { header: null, tabs: null };
+/** the title bar's slot after the crumb holds an element (Minis.tsx CoinSlot); Side portals its minis there */
+let slot: HTMLElement | null = null;
 const slotSubs = new Set<() => void>();
 
-/** A coin slot mounts (its element) or goes (null). */
-export function setCoinSlot(at: 'header' | 'tabs', el: HTMLElement | null): void {
-  if (slots[at] === el) return;
-  slots[at] = el;
+/** The coin slot mounts (its element) or goes (null). */
+export function setCoinSlot(el: HTMLElement | null): void {
+  if (slot === el) return;
+  slot = el;
   for (const f of [...slotSubs]) f();
 }
 
-/** The element of that slot, live: null while nothing holds it. */
-export function useCoinSlot(at: 'header' | 'tabs' | null): HTMLElement | null {
+/** The slot's element, live, when `on`: null while nothing holds it. */
+export function useCoinSlot(on: boolean): HTMLElement | null {
   return useSyncExternalStore(
     (cb) => {
       slotSubs.add(cb);
@@ -83,6 +83,6 @@ export function useCoinSlot(at: 'header' | 'tabs' | null): HTMLElement | null {
         slotSubs.delete(cb);
       };
     },
-    () => (at === null ? null : slots[at]),
+    () => (on ? slot : null),
   );
 }

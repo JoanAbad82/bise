@@ -18,7 +18,6 @@ import { closable, fitTabs, shownOf, TAB_GAP, type Tab } from './model';
 import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanelState } from './state';
 import { useTabLooks, type TabLook } from './look';
 import { PANEL_KEYS } from './keys';
-import { CoinSlot } from '@/app/side3d/Minis';
 
 /** The panel's ▯ at the title bar's end (⌥⌘B), pressed while it is open; ⌥⌘ held, its ⌥⌘B keycap in place of the glyph (designer m_45008). */
 export function BarTabs() {
@@ -145,8 +144,6 @@ export function PanelTabs({ end, start }: { end?: ReactNode; start?: ReactNode }
           </IconButton>
         </div>
         </div>
-        {/* over a sheet or a full-width panel the thread is covered: the coins' minis go here (side3d Minis, folded-side v9) */}
-        <CoinSlot at="tabs" />
         {end}
     </div>
   );

@@ -43,7 +43,7 @@ import { useAgentRows } from '../agentrows';
 import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
-import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
+import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type Captions, type CoinsAt, type PanelIn } from './layout';
 import { newAgent, openOverview, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
 import { acrossSays, busyProjects, useListed } from './lists';
 import { barScope, inScope, scopeWords } from '../barscope';
@@ -148,11 +148,11 @@ export function SideHost() {
   if (layout.coins === 'none' || project === '') return null;
   // whose items it lists: the Overview's scope (a project's own; bise's own every project's)
   const scope = panelProject(route, home, rows.filter((p) => !p.home).length) ?? project;
-  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} at={layout.coins} right={layout.right} />;
+  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} at={layout.coins} right={layout.right} captions={layout.captions} />;
 }
 
 /** `project`: where its acts go (the world, + new agent, + add); `scope`: whose items it lists ('' every project's); `at`: where the coins are, `right` their column's distance from the window's right edge. */
-function Side({ project, scope, home, world, at: coinsAt, right }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble'; at: CoinsAt; right: number }) {
+function Side({ project, scope, home, world, at: coinsAt, right, captions = 'card' }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble'; at: CoinsAt; right: number; captions?: Captions }) {
   const router = useRouter();
   const route = useRoute();
   const store = useStore();
@@ -193,9 +193,9 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   const [open, setOpen] = useState<BubbleId | null>(null);
   // no room beside the thread: the coins are minis in the thread's header or the sheet's tab row,
   // their floats under the header (folded-side v9)
-  const slotAt = coinsAt === 'header' || coinsAt === 'tabs' ? coinsAt : null;
-  const slot = useCoinSlot(slotAt);
-  const mini = slotAt !== null;
+  // (his m_45864: both in the title bar, right after the thread's crumb, never in the panel's tab row)
+  const mini = coinsAt === 'header' || coinsAt === 'tabs';
+  const slot = useCoinSlot(mini);
   const tops = mini ? MINI_TOPS : bubbleTops(world === 'bubble' ? 'bubble' : 'small');
   // the one float (designer m_44990): from one bubble to another its frame moves (its place now,
   // read mid-move too, kept in `from`) and the bubble it leaves crossfades out (`leaving`)
@@ -491,7 +491,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
           toggle(b);
         }} />
       ))}
-      {carded.map((b) => <CoinCardView key={b} id={b} card={coinCard(b, facts)} top={tops.bubbles[b]} />)}
+      {carded.map((b) => <CoinCardView key={b} id={b} card={coinCard(b, facts)} top={tops.bubbles[b]} plain={captions === 'plain'} />)}
       {open !== null && (
         <Float id={open} name={bubbleName(open)} top={tops.bubbles[open]} maxH={maxH} moving={leaving !== null} frameRef={frame}>
           <FloatLayer key={open} c={floatOf(open)} scrolls={fit.scrolls} />

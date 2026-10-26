@@ -872,6 +872,7 @@
    inside. Name t-12/600 text-3, line 1 t-13 text-2, line 2 t-12 text-3; 14 / 16 / 14, 2 apart; each
    cut with … . Information only: a click is the coin's. In 120 ms; reduced motion: no fade. */
 .s3-tcard {
+  --s3-tcard-sh: rgb(0 0 0 / 0.3);
   position: absolute;
   z-index: 2;
   right: calc(var(--s-3) + var(--bubble) + var(--s-3));
@@ -883,10 +884,11 @@
   gap: 2px;
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-3);
-  background: color-mix(in srgb, var(--p-bg) 92%, transparent);
-  backdrop-filter: blur(24px);
+  /* over the thread (no room for the side's own): a quiet card in the coin's own fill, e-1 only (designer m_45869) */
+  background: var(--p-raised);
   border: 1px solid var(--c-line);
-  box-shadow: var(--e-2);
+  box-shadow: 0 1px 2px var(--s3-tcard-sh), 0 4px 12px var(--s3-tcard-sh);
+  transform: translateY(-50%);
   text-align: right;
   white-space: nowrap;
   pointer-events: none;
@@ -897,6 +899,23 @@
 }
 @keyframes s3-tcard-in {
   from { opacity: 0; }
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .s3-tcard {
+    --s3-tcard-sh: rgb(0 0 0 / 0.06);
+  }
+}
+[data-theme="light"] .s3-tcard {
+  --s3-tcard-sh: rgb(0 0 0 / 0.06);
+}
+/* D1: in the side's own room the caption is words only, the coin and its words one object (designer m_45869) */
+.s3-tcard[data-plain] {
+  max-width: 200px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 .s3-tcard-name,
 .s3-tcard-line {
@@ -947,10 +966,11 @@
 .s3-minis-slot:empty {
   display: none;
 }
-.app-title-status > .s3-minis-slot {
+/* the minis in the title bar right after the crumb, 12 after it (his m_45864, designer m_45869) */
+.app-bar > .s3-minis-slot {
   flex: none;
-  max-width: none;
   margin-left: var(--s-3);
+  -webkit-app-region: no-drag;
 }
 .s3-minis {
   display: flex;
