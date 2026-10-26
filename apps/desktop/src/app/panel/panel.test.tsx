@@ -3,6 +3,7 @@
 // Overview, '+' opens New tab whose rows act, × closes a tab, the last one folds the panel, a tab
 // in front always shows past six.
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
@@ -10,7 +11,7 @@ import { ev, projects, row } from '../../../tests/feature/inputs';
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
-import { panelState } from './state';
+import { panelState, usePanelScope, usePanelState } from './state';
 import { openTab } from './tabs';
 import { PANEL_KEYS } from './keys';
 import { panel } from '@/proto/words_panel.gen';
@@ -134,6 +135,64 @@ describe('the tabbed panel', () => {
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     fireEvent.pointerDown(document.body);
     expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
+  });
+  it("each project its own panel (his m_45500): a switch shows that project's tabs, never a frame of the other's", () => {
+    const BETA = 'beta-5e6f7a8b';
+    const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    (window as unknown as { bise: unknown }).bise = { notify: { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined } };
+    const store = new Store(port);
+    store.setCore('up');
+    store.apply(projects(row({ project: 'bise-home-00000000', name: 'bise', home: true }), row({ project: ACME, name: 'acme' }), row({ project: BETA, name: 'beta' })));
+    const router = createRouter({ screen: 'thread', project: ACME, agent: 'main' });
+    // what the panel drew at each commit: a frame of the old project's tabs would show here
+    const drawn: string[] = [];
+    function Scope() {
+      usePanelScope();
+      return null;
+    }
+    function Probe() {
+      const s = usePanelState();
+      useLayoutEffect(() => {
+        drawn.push(s.tabs.list.map((t) => t.id).join(','));
+      });
+      return null;
+    }
+    const v = render(
+      <StoreProvider store={store}>
+        <RouterContext value={router}>
+          <Scope />
+          <BarTabs />
+          <PanelHost />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    act(() => {
+      openTab({ kind: 'pr', project: ACME, number: 6 });
+    });
+    expect(v.getByTestId(`app.panel.tab.pr:${ACME}/6`)).toBeTruthy();
+    act(() => {
+      router.go({ screen: 'thread', project: BETA, agent: 'main' });
+    });
+    // beta never opened a panel: none
+    expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
+    expect(v.queryByTestId(`app.panel.tab.pr:${ACME}/6`)).toBeNull();
+    act(() => {
+      openTab({ kind: 'pr', project: BETA, number: 9 });
+    });
+    // a screen of no project keeps beta's
+    act(() => {
+      router.go({ screen: 'settings' });
+    });
+    expect(v.getByTestId(`app.panel.tab.pr:${BETA}/9`)).toBeTruthy();
+    const r = render(<Probe />);
+    drawn.length = 0;
+    act(() => {
+      router.go({ screen: 'thread', project: ACME, agent: 'main' });
+    });
+    expect(v.getByTestId(`app.panel.tab.pr:${ACME}/6`).getAttribute('aria-selected')).toBe('true');
+    expect(v.queryByTestId(`app.panel.tab.pr:${BETA}/9`)).toBeNull();
+    expect(drawn.every((d) => !d.includes(BETA))).toBe(true);
+    r.unmount();
   });
   it('a wide window: no sheet, no ▯ in the panel', () => {
     const v = shell();

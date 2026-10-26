@@ -224,6 +224,21 @@ export function dropGone(t: Tabs, known: (project: string) => ReadonlySet<string
   return out;
 }
 
+/**
+ * Drops the tabs of artifacts no longer in their project's list (panel-scope: a tab whose artifact
+ * is gone goes, quietly). `known(project)` is the ids of a project whose artifacts came, undefined
+ * while they did not (its tabs wait). Pure.
+ */
+export function dropGoneArts(t: Tabs, known: (project: string) => ReadonlySet<string> | undefined): Tabs {
+  let out: Tabs = t;
+  for (const x of t.list) {
+    if (x.what.kind !== 'thing' || x.what.e.kind !== 'artifact') continue;
+    const ids = known(x.what.e.project);
+    if (ids !== undefined && !ids.has(x.what.e.id)) out = closeIn(out, x.id);
+  }
+  return out;
+}
+
 /** The width each kind of tab asks, kept apart: the rows, a shell (mockup 2), a page (mockup 4). */
 export type WidthOf = 'rows' | 'shell' | 'page';
 

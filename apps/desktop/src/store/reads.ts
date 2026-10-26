@@ -180,6 +180,10 @@ export class StoreReads extends StoreBase {
   artifacts(project: string): readonly Artifact[] {
     return this.facts.artifacts[project] ?? EMPTY;
   }
+  /** the project's artifacts event came (its list is the hub's, even empty) */
+  artifactsCame(project: string): boolean {
+    return this.facts.artifacts[project] !== undefined;
+  }
   /** the library's folders, shared by every project (the newest artifacts event's); none until a hub said */
   folders(): readonly Folder[] {
     return this.slice<readonly Folder[]>("library:folders", EMPTY);

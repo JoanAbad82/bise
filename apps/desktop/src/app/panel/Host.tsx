@@ -20,7 +20,7 @@ import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
 import { backFromFull, MAX_W, MIN_W, pastFull, SHARE_MAX, SHARE_MIN, type Tab } from './model';
 import { useLeftWidth } from '@/app/frame-state';
-import { dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setFull, setFullPreview, setWidth, useFrontArtKind, usePanelFit, usePanelFull, usePanelState } from './state';
+import { dropGoneArtTabs, dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setFull, setFullPreview, setWidth, useFrontArtKind, usePanelFit, usePanelFull, usePanelState } from './state';
 import { PANEL_FULL_KEY } from './keys';
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
@@ -35,6 +35,7 @@ export function PanelHost() {
   const { width, over } = usePanelFit();
   const [dragging, setDragging] = useState(false);
   useDropGone(s.tabs.list);
+  useDropGoneArts(s.tabs.list);
   const box = useRef<HTMLElement>(null);
   useSheetOut(s.open && over, box);
   const front = s.tabs.list.find((t) => t.id === s.tabs.active);
@@ -196,6 +197,28 @@ function Border({ width, onDrag, artKind, full, canFull }: { width: number; onDr
       data-testid="app.panel.border"
     />
   );
+}
+
+/**
+ * The tabs of an artifact that left its project's list go, quietly (panel-scope): each project an
+ * artifact tab names is read from the store once its artifacts came; never before.
+ */
+function useDropGoneArts(list: readonly Tab[]): void {
+  const store = useStore();
+  const names = list.flatMap((t) => (t.what.kind === 'thing' && t.what.e.kind === 'artifact' ? [t.what.e.project] : []));
+  const key = [...new Set(names)].join('\n');
+  useEffect(() => {
+    if (key === '') return;
+    const ps = key.split('\n');
+    const check = () => {
+      dropGoneArtTabs((p) => (store.artifactsCame(p) ? new Set(store.artifacts(p).map((a) => a.id)) : undefined));
+    };
+    check();
+    const offs = ps.map((p) => store.subscribe(`artifacts:${p}`, check));
+    return () => {
+      for (const off of offs) off();
+    };
+  }, [store, key]);
 }
 
 /**

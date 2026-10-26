@@ -1,21 +1,33 @@
-// src/app/panel · the tabbed panel's live state, one per window: folded or open (folded by default,
-// page native-mac §7), its tabs (model.ts) and each kind's width, kept across a reload, an update
-// swap or the next day (keep.ts, no age: a Mac app reopens as he left it). Outside React's tree, as
-// the terminal's panel.ts: a tab opened or a width dragged re-renders the panel and the bar's tabs,
-// never the shell or the composer. Every door in: openTab (tabs.ts), the bar's ▯ and ⌥⌘B (⌥⌘0)
-// (panelToggle), ⌃` (openShell), the launcher's picks. Owner: nm-panel.
-import { useSyncExternalStore } from 'react';
+// src/app/panel · the tabbed panel's live state, one per project of the window (scope.ts, his
+// m_45500): folded or open (folded by default, page native-mac §7), its tabs (model.ts) and its
+// width; the project in front is App.tsx's (panelScope, from the route), his Recent and artifact
+// shares the window's. Kept across a reload, an update swap or the next day (keep.ts, no age: a Mac
+// app reopens as he left it). Outside React's tree, as the terminal's panel.ts: a tab opened or a
+// width dragged re-renders the panel and the bar's tabs, never the shell or the composer. Every
+// door in: openTab (tabs.ts), the bar's ▯ and ⌥⌘B (⌥⌘0) (panelToggle), ⌃` (openShell), the
+// launcher's picks. Owner: nm-panel; the per-project scope panel-scope.
+import { useEffect, useLayoutEffect, useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
+import { useRoute } from '@/app/router';
+import { useProjects } from '@/store';
 import { useLeftWidth } from '@/app/frame-state';
 import { iconKindOf } from '@/ds';
 import { useAllArtifacts } from '@/artifacts';
 import { armHandoff } from '@/composer/handoff';
-import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, pushRecent, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { isFlat, parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf, type PanelRec } from './scope';
 
 const KEY = 'panel';
 
-let state: PanelKept = parseKept(keep.view(KEY));
+/** The kept record as it was read; a flat one (from before the scope) waits for the first project in front. */
+let kept: unknown = keep.view(KEY);
+let rec: PanelRec = parseRec(kept);
+let state: PanelKept = viewOf(rec);
 const listeners = new Set<() => void>();
+
+function emit(): void {
+  for (const l of listeners) l();
+}
 
 function set(raw: PanelKept): void {
   if (raw === state) return;
@@ -23,8 +35,53 @@ function set(raw: PanelKept): void {
   // the thread's composer and the floating one swap (full width on or off): his caret goes across
   if (state.open && next.full !== state.full) armHandoff();
   state = next;
-  keep.setView(KEY, next);
-  for (const l of listeners) l();
+  rec = putView(rec, next);
+  keep.setView(KEY, rec);
+  emit();
+}
+
+/**
+ * The project in front of the window (App.tsx, scope.ts scopeOf): its own panel shows, as he left
+ * it; one that never opened a panel has none. '' (none known yet) changes nothing.
+ */
+export function panelScope(project: string): void {
+  if (project === '' || project === rec.at) return;
+  // TODO(panel-scope): a flat record from before becomes the panel of the first project in front
+  if (isFlat(kept)) rec = { ...parseRec(kept, project), recent: rec.recent, shares: rec.shares };
+  // what he opened before any project was in front (a first launch) is the first project's
+  else if (rec.at === '' && rec.byProject[project] === undefined) rec = putView(switchTo(rec, project), state);
+  else rec = switchTo(rec, project);
+  kept = undefined;
+  state = viewOf(rec);
+  keep.setView(KEY, rec);
+  emit();
+}
+
+/** The projects rows came: the panels of projects no longer in them go (never on an empty list). */
+export function prunePanels(projects: readonly string[]): void {
+  const next = pruneScopes(rec, projects);
+  if (next === rec) return;
+  rec = next;
+  keep.setView(KEY, rec);
+}
+
+/**
+ * App.tsx: the panel of the route's project in front (scope.ts scopeOf), switched before the
+ * paint so no frame shows the old project's panel; a full projects list (home in it) prunes the
+ * panels of projects gone.
+ */
+export function usePanelScope(): void {
+  const route = useRoute();
+  const rows = useProjects();
+  const home = rows.find((p) => p.home)?.project;
+  const at = scopeOf(route, home, rec.at);
+  useLayoutEffect(() => {
+    panelScope(at);
+  }, [at]);
+  useEffect(() => {
+    // the core's first rows (no home yet) are not the registry: nothing goes before it
+    if (home !== undefined) prunePanels(rows.map((p) => p.project));
+  }, [rows, home]);
 }
 
 function setTabs(tabs: Tabs): void {
@@ -39,11 +96,16 @@ export const panelState = {
       listeners.delete(l);
     };
   },
-  /** tests only: back to a fresh window */
-  reset(next: PanelKept = parseKept(undefined)): void {
-    state = next;
-    for (const l of listeners) l();
+  /** tests only: back to a fresh window (`raw`: the kept record it starts from) */
+  reset(raw?: unknown): void {
+    kept = raw;
+    rec = parseRec(raw);
+    state = viewOf(rec);
+    before.clear();
+    emit();
   },
+  /** tests only: the window's record as kept */
+  rec: (): PanelRec => rec,
 };
 
 /** The panel's state, live. */
@@ -158,7 +220,7 @@ export function useFullPreview(): boolean {
 export function openWhat(what: TabWhat, instead?: string): void {
   const recent = what.kind === 'thing' ? pushRecent(state.recent, what.e) : state.recent;
   const tabs = openIn(state.tabs, what, instead);
-  if (!state.open || tabs.active !== state.tabs.active) before.set(tabs.active, { open: state.open, active: state.tabs.active });
+  if (!state.open || tabs.active !== state.tabs.active) before.set(beforeKey(tabs.active), { open: state.open, active: state.tabs.active });
   // a page newly opened may widen the panel once (widenFor); an open one coming to the front doesn't
   const isNew = !state.tabs.list.some((t) => t.id === tabs.active);
   set({ ...state, open: true, tabs, recent, width: isNew ? widenFor(state, what) : state.width });
@@ -210,13 +272,14 @@ export function closeTabId(id: string): void {
   setTabs(closeIn(state.tabs, id));
 }
 
-/** What was in front when each tab came by openWhat (model.ts Before); a reload forgets it. */
+/** What was in front when each tab came by openWhat (model.ts Before), per project's panel; a reload forgets it. */
 const before = new Map<string, Before>();
+const beforeKey = (id: string): string => `${rec.at}\n${id}`;
 
 /** Esc on the tab `id`: it closes, the panel as it was before it came (model.ts closeBack, app/escape.ts). */
 export function closeTabBack(id: string): void {
-  const b = closeBack(state.tabs, id, before.get(id));
-  before.delete(id);
+  const b = closeBack(state.tabs, id, before.get(beforeKey(id)));
+  before.delete(beforeKey(id));
   set({ ...state, tabs: b.tabs, open: b.open });
 }
 
@@ -280,4 +343,9 @@ export function takeSection(): OverviewSection | null {
 /** The rows came: the tabs of agents no longer in them go (model.ts dropGone). */
 export function dropGoneTabs(known: (project: string) => ReadonlySet<string> | undefined): void {
   setTabs(dropGone(state.tabs, known));
+}
+
+/** A project's artifacts came: the tabs of its artifacts no longer in them go, quietly (model.ts dropGoneArts). */
+export function dropGoneArtTabs(known: (project: string) => ReadonlySet<string> | undefined): void {
+  setTabs(dropGoneArts(state.tabs, known));
 }

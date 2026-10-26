@@ -47,7 +47,7 @@ import { UnlessFull } from './panel/Full';
 import { SideHost } from './side3d/Host';
 import { FloatHost } from '@/composer/float/Host';
 import { ArtifactRoute } from './ArtifactView';
-import { panelState, toggleFull, useFullPreview, usePanelFit, usePanelFull, usePanelState } from './panel/state';
+import { panelState, toggleFull, useFullPreview, usePanelFit, usePanelFull, usePanelScope, usePanelState } from './panel/state';
 import { doPanelKey } from './panel/keys';
 import { TipLayer } from './TipLayer';
 import { noteJump, numbersOf } from '@/agents/model';
@@ -239,6 +239,8 @@ function Shell() {
   const route = useRoute();
   useMenuRouting(router);
   useMainRoutes(router);
+  // the panel of the route's project: each project keeps its own (panel/scope.ts)
+  usePanelScope();
   // fn fn with this window in front: voice mode with the thread in view, else bise's own (amb-web's src/voicemode/fn.ts)
   useFnVoice(router, useStore());
   // ⌘I / a notification's card: the inbox block opens it in place once the rows list it
