@@ -32,6 +32,25 @@
   color: var(--c-err);
 }
 
+/* an offer he can ignore (a newer bise, designer m_45423): the neutral pill even when it failed;
+   its words text-2, ' · ' text-3, then its action in ink at 500, underlined on hover; only a
+   failure's ▲ is --c-err (a text glyph, as in the thread's rows) */
+.app-ts.calm .app-ts-acts {
+  gap: var(--s-1);
+}
+.app-ts.calm .app-ts-acts::before {
+  content: "·";
+  color: var(--c-text-3);
+}
+.app-ts.calm .app-ts-acts .b-act {
+  padding: 0;
+  color: var(--c-text);
+  font-weight: 500;
+}
+.app-ts-err {
+  color: var(--c-err);
+}
+
 /* '✓ …' 3 s, then a 220 ms fade; none under reduced motion */
 .app-ts.fold {
   opacity: 0;

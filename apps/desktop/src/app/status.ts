@@ -40,6 +40,11 @@ export type StatusPart = {
   readonly close?: () => void;
   /** dim lines only the popover shows (the core's last log line, the build's last lines), with their own test ids */
   readonly more?: ReactNode;
+  /**
+   * an offer he can ignore (a newer bise, designer m_45423): the pill stays neutral even when it
+   * failed (only its ▲ in --c-err), its words text-2, ' · ' text-3, its action in ink at 500
+   */
+  readonly calm?: boolean;
 };
 
 /** The line to show: the highest rank, the first of equals (the callers' order). Pure. */

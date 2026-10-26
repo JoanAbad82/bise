@@ -251,7 +251,16 @@ export function useBiseUpdateLine(): StatusPart | null {
     testId: 'app.bise',
     state: line.state,
     tone: line.tone,
-    words: line.words,
+    // an offer he can ignore (designer m_45423): the neutral pill, its failure's ▲ alone in --c-err
+    calm: true,
+    words:
+      line.tone === 'err' ? (
+        <>
+          <span className="app-ts-err">▲</span> {line.words.replace(/^▲\s*/u, '')}
+        </>
+      ) : (
+        line.words
+      ),
     short: line.short,
     ...(line.lines.length > 0
       ? {

@@ -96,7 +96,9 @@ function Pill({ part }: { part: StatusPart }) {
   }, [open]);
   const tight = useTight(box, part.short);
   const id = part.testId;
-  const err = part.tone === 'err';
+  // a calm part's failure keeps the neutral pill: only its ▲ is red (designer m_45423)
+  const calm = part.calm === true;
+  const err = part.tone === 'err' && !calm;
   const acts = part.acts ?? [];
   const actions = (pop: boolean) => (
     <>
@@ -115,7 +117,7 @@ function Pill({ part }: { part: StatusPart }) {
   return (
     <div
       ref={box}
-      className={cx('app-ts', part.tone, part.fold === true && 'fold')}
+      className={cx('app-ts', calm && part.tone === 'err' ? 'quiet' : part.tone, calm && 'calm', part.fold === true && 'fold')}
       role={err ? 'alert' : 'status'}
       data-testid={id}
       data-state={part.state}
