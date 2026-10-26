@@ -423,6 +423,14 @@
     "one": null,
     "text": "Drag to the left edge for full width · {key}"
   },
+  "panel.panel_full_lead": {
+    "args": [
+      "agent",
+      "key"
+    ],
+    "one": null,
+    "text": "Show {agent}'s thread · {key}"
+  },
   "panel.panel_full_thread": {
     "args": [
       "key"

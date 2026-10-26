@@ -314,6 +314,8 @@ export const panel = {
   panel_full_back: "Drag right to bring the thread back",
   /** in full width, the button at the tab row's end: the thread comes back (tip and VoiceOver name) */
   panel_full_thread: (a: { key: string | number }): string => "Show the thread · " + String(a.key),
+  /** in full width, the tab row's lead (the hidden thread's name and state mark): its tip and VoiceOver name (designer m_45641) */
+  panel_full_lead: (a: { agent: string | number; key: string | number }): string => "Show " + String(a.agent) + "'s thread · " + String(a.key),
   /** the search field's placeholder and VoiceOver name */
   launch_search: "Search artifacts, or enter a URL",
   /** the launcher's first group */

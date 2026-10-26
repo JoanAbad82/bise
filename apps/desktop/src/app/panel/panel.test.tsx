@@ -11,7 +11,8 @@ import { ev, projects, row } from '../../../tests/feature/inputs';
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
-import { panelState, usePanelScope, usePanelState } from './state';
+import { panelState, setFull, usePanelScope, usePanelState } from './state';
+import { PANEL_FULL_KEY } from './keys';
 import { openTab } from './tabs';
 import { PANEL_KEYS } from './keys';
 import { panel } from '@/proto/words_panel.gen';
@@ -125,7 +126,8 @@ describe('the tabbed panel', () => {
     expect(v.getByTestId('app.panel').style.width).toBe('0px');
     // the sheet's row starts with its tabs: one 'Hide panel' ▯ in the window, the bar's (pressed)
     expect(v.getAllByLabelText(panel.panel_hide({ key: PANEL_KEYS.toggle }))).toEqual([v.getByTestId('app.panel.toggle')]);
-    expect(v.getByTestId('app.panel.top').firstElementChild?.nextElementSibling?.getAttribute('data-testid')).toBe('app.panel.tabs');
+    // (after the unseen measure row; the row of a lead, none here, and the tabs)
+    expect(v.getByTestId('app.panel.top').firstElementChild?.nextElementSibling?.firstElementChild?.getAttribute('data-testid')).toBe('app.panel.tabs');
     expect(v.getByTestId('app.panel.toggle').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').hasAttribute('data-open')).toBe(false);
@@ -205,5 +207,25 @@ describe('the tabbed panel', () => {
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').hasAttribute('data-over')).toBe(false);
     expect(v.getAllByLabelText(panel.panel_hide({ key: PANEL_KEYS.toggle }))).toEqual([v.getByTestId('app.panel.toggle')]);
+  });
+  it("full width: the tab row leads with the hidden thread's name, a click on it brings the thread back (designer m_45641); the button at its end too", () => {
+    const v = shell();
+    fireEvent.click(v.getByTestId('app.panel.toggle'));
+    expect(v.queryByTestId('app.panel.lead'), 'beside the thread: no lead').toBeNull();
+    act(() => {
+      setFull(true);
+    });
+    expect(v.getByTestId('app.panel').hasAttribute('data-full')).toBe(true);
+    const lead = v.getByTestId('app.panel.lead');
+    expect(lead.textContent).toBe('perf');
+    expect(lead.getAttribute('data-tip')).toBe(panel.panel_full_lead({ agent: 'perf', key: PANEL_FULL_KEY }));
+    fireEvent.click(lead);
+    expect(v.getByTestId('app.panel').hasAttribute('data-full')).toBe(false);
+    expect(v.queryByTestId('app.panel.lead')).toBeNull();
+    act(() => {
+      setFull(true);
+    });
+    fireEvent.click(v.getByTestId('app.panel.thread'));
+    expect(v.getByTestId('app.panel').hasAttribute('data-full')).toBe(false);
   });
 });

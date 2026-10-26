@@ -12,11 +12,16 @@
 // hidden (its shell runs on, the same one when it comes back), the others mount when in front.
 // The tabs of an agent no longer in the rows go (model.ts dropGone). Owner: nm-panel.
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react';
-import { AppIcon, IconButton, tipAttrs } from '@/ds';
-import { formatRoute } from '@/app/route';
+import { AppIcon, IconButton, Press, tipAttrs } from '@/ds';
+import { useRoute } from '@/app/router';
+import { stateFactOf } from '@/app/title';
+import { shownName } from '@/agents/model';
+import { useAboutWords } from '@/artifacts/maker';
+import { Breath } from '@/working/Signs';
+import { formatRoute, MAIN } from '@/app/route';
 import { useEscLayer } from '@/app/escape';
 import { panel } from '@/proto/words_panel.gen';
-import { useProjects, useStore } from '@/store';
+import { useAgents, useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
 import { backFromFull, MAX_W, MIN_W, pastFull, SHARE_MAX, SHARE_MIN, type Tab } from './model';
 import { useLeftWidth } from '@/app/frame-state';
@@ -60,7 +65,7 @@ export function PanelHost() {
     >
       {s.open && <Border width={width} onDrag={setDragging} full={full} canFull={!over} {...(artKind === undefined ? {} : { artKind })} />}
       <div className="pn-col" style={{ width }}>
-        <PanelTabs end={full ? <>{window_}<ThreadBack /></> : window_} />
+        <PanelTabs end={full ? <>{window_}<ThreadBack /></> : window_} {...(full ? { start: <FullLead /> } : {})} />
         <div className="pn-in" role="tabpanel" data-testid={`app.panel.body.${s.tabs.active}`}>
           {s.tabs.list.map((t) => (
             <Body key={t.id} tab={t} shown={s.open && t.id === s.tabs.active} />
@@ -121,6 +126,41 @@ function Body({ tab, shown }: { tab: Tab; shown: boolean }) {
     case 'thing':
       return what.e.kind === 'tab' ? null : <ThingTab e={what.e} tabId={tab.id} />;
   }
+}
+
+/** The thread full width hides: a thread's agent, bise's main on bise's view, an open artifact's maker; none on a page. */
+function useHiddenThread(): { readonly project: string; readonly agent: string; readonly name: string } | null {
+  const route = useRoute();
+  const rows = useProjects();
+  const home = rows.find((p) => p.home)?.project;
+  const artProject = route.screen === 'artifacts' && route.id !== undefined ? route.project : '';
+  const about = useAboutWords(artProject, route.screen === 'artifacts' ? (route.id ?? '') : '');
+  const named = (project: string, agent: string) => ({ project, agent, name: project === home && agent === MAIN ? 'bise' : shownName(agent) });
+  if (route.screen === 'thread') return named(route.project, route.agent);
+  if (route.screen === 'bise') return home === undefined ? null : named(home, MAIN);
+  if (artProject !== '' && about !== undefined) return named(artProject, about.agent);
+  return null;
+}
+
+/**
+ * In full width, the tab row's lead (designer m_45641): the hidden thread's name (500, ink), then its
+ * state mark (the breath while it works, ? in the accent while it waits on him); a click brings the
+ * thread back, as ⇧⌥⌘B. PanelTabs sets it 12 before the tabs and drops it before any tab is cut.
+ */
+function FullLead() {
+  const t = useHiddenThread();
+  const a = useAgents(t?.project ?? '').find((x) => x.name === t?.agent);
+  if (t === null) return null;
+  const fact = stateFactOf(a, 0);
+  const words = panel.panel_full_lead({ agent: t.name, key: PANEL_FULL_KEY });
+  return (
+    <Press look="pn-lead-b" aria-label={words} {...tipAttrs(words)} data-testid="app.panel.lead" onClick={() => {
+      setFull(false);
+    }}>
+      <span className="pn-lead-n">{t.name}</span>
+      {fact?.kind === 'waits' ? <span className="pn-lead-m waits"><AppIcon name="ask" size={14} /></span> : fact?.kind === 'working' ? <span className="pn-lead-m"><Breath /></span> : null}
+    </Press>
+  );
 }
 
 /** In full width, at the tab row's end: the thread comes back (designer m_45445: the panel glyph, mirrored). */

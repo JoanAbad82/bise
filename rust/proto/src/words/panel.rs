@@ -336,6 +336,8 @@ crate::words! { panel:
     panel_full_back = "Drag right to bring the thread back";
     /// in full width, the button at the tab row's end: the thread comes back (tip and VoiceOver name)
     panel_full_thread(key) = "Show the thread · {key}";
+    /// in full width, the tab row's lead (the hidden thread's name and state mark): its tip and VoiceOver name (designer m_45641)
+    panel_full_lead(agent, key) = "Show {agent}'s thread · {key}";
 
     // ---- New tab, the launcher (mockup 3)
     /// the search field's placeholder and VoiceOver name

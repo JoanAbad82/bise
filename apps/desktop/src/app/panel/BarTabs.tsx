@@ -60,15 +60,22 @@ function useWidthOf(): readonly [RefObject<HTMLDivElement | null>, number] {
 /** What the tab strip keeps past its tabs: '+' (28) and the overflow button (⌄ N), each with its gap. */
 const ADD_W = 28 + TAB_GAP;
 const OVER_W = 48 + TAB_GAP;
+/** The full width's lead and the first tab: 12 apart. */
+const LEAD_GAP = 12;
 
 /**
  * The tabs in the panel's top row, '+', and at its end what the tab in front adds (`end`). A sheet's
  * row starts with its tabs too: the bar's ▯ above it, at the window's edge, folds it (designer m_44391).
  */
-export function PanelTabs({ end }: { end?: ReactNode }) {
+export function PanelTabs({ end, start }: { end?: ReactNode; start?: ReactNode }) {
   const s = usePanelState();
   const look = useTabLooks();
   const [strip, room] = useWidthOf();
+  // `start` (the full width's lead, designer m_45641): 12 before the tabs, the first to go when
+  // they would not all fit; while out it stays measured, unseen
+  const [leadEl, leadW] = useWidthOf();
+  // the lead and the strip's row: what the tabs have when the lead is out
+  const [row, roomAll] = useWidthOf();
   // each tab's width at its title (designer m_43050 #5), measured in a hidden row of them all
   const measure = useRef<HTMLDivElement>(null);
   const [widths, setWidths] = useState<readonly number[]>([]);
@@ -81,6 +88,7 @@ export function PanelTabs({ end }: { end?: ReactNode }) {
   const active = s.tabs.list.findIndex((t) => t.id === s.tabs.active);
   // before the first measure (a test's DOM has no layout): six, the HIG's most
   const measured = room > 0 && widths.length === s.tabs.list.length && widths.every((w) => w > 0);
+  const leadIn = start !== undefined && (!measured || leadW === 0 || roomAll === 0 || fitTabs(widths, active, roomAll - leadW - LEAD_GAP - ADD_W) >= s.tabs.list.length);
   const all = measured ? fitTabs(widths, active, room - ADD_W) : undefined;
   const fit = all === undefined || all >= s.tabs.list.length ? all : fitTabs(widths, active, room - ADD_W - OVER_W);
   const { shown, over } = shownOf(s.tabs, fit);
@@ -104,6 +112,12 @@ export function PanelTabs({ end }: { end?: ReactNode }) {
             );
           })}
         </div>
+        <div className="pn-row" ref={row}>
+        {start !== undefined && (
+          <div className="pn-lead" ref={leadEl} data-out={!leadIn || undefined} aria-hidden={!leadIn || undefined}>
+            {start}
+          </div>
+        )}
         <div className="pn-tabs" ref={strip} role="tablist" aria-label={panel.tabs_label} data-testid="app.panel.tabs">
           {shown.map((t) => (
             <BarTab
@@ -128,6 +142,7 @@ export function PanelTabs({ end }: { end?: ReactNode }) {
           <IconButton label={panel.tab_add({ key: PANEL_KEYS.add })} size="bar" onClick={openLauncher} testId="app.panel.add">
             <AppIcon name="plus" size={16} />
           </IconButton>
+        </div>
         </div>
         {end}
     </div>

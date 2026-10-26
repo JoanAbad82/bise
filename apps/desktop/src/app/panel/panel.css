@@ -1008,3 +1008,52 @@
   color: var(--c-text);
   font-size: var(--t-11);
 }
+
+/* full width's lead (designer m_45641): the hidden thread's name, 500 ink, its state mark after it,
+   12 before the tabs; out (no room for every tab with it), measured unseen, never cutting a tab */
+.pn-lead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  margin-right: var(--s-3);
+}
+.pn-lead[data-out] {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+.pn-lead-b {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-2);
+  background: transparent;
+  font: 500 var(--f-ui);
+  color: var(--c-text);
+  white-space: nowrap;
+}
+.pn-lead-b:hover {
+  background: var(--c-hover);
+}
+.pn-lead-b:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 0;
+}
+.pn-lead-m {
+  display: inline-flex;
+  align-items: center;
+  color: var(--c-text-3);
+}
+.pn-lead-m.waits {
+  color: var(--c-accent);
+}
+/* the lead and the tabs' strip: its width is the tabs' room when the lead is out */
+.pn-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
