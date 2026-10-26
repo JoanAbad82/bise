@@ -70,6 +70,10 @@ describe('the record per project (pure)', () => {
     expect(pruneScopes(rec, [])).toBe(rec);
     expect(pruneScopes(rec, ['p1', 'p2'])).toBe(rec);
     expect(Object.keys(pruneScopes(rec, ['p2', 'home']).byProject)).toEqual(['p2']);
+    // the project in front removed (architect m_45552): its panel goes, the window shows none
+    const gone = pruneScopes(rec, ['p1', 'home']);
+    expect(gone.at).toBe('p2');
+    expect(viewOf(gone)).toEqual(FOLDED);
   });
   it("an artifact tab whose artifact is gone goes, once its project's artifacts came", () => {
     const t = openIn(openIn(FIRST, art('p1', 'a')), art('p1', 'b'));
