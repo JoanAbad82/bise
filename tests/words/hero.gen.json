@@ -54,7 +54,7 @@
   "hero.changes_say": {
     "args": [],
     "one": null,
-    "text": "what your agents changed in this project: their branches, the features they try, what reached main today."
+    "text": "what your agents changed here: their branches, the features they try, what reached main today."
   },
   "hero.changes_title": {
     "args": [],
@@ -147,6 +147,11 @@
     ],
     "one": "{n} place",
     "text": "{n} places"
+  },
+  "hero.plugins_title": {
+    "args": [],
+    "one": null,
+    "text": "Plugins"
   },
   "hero.processes_say": {
     "args": [],

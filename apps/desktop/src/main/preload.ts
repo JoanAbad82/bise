@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type A11y, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type FileFacts, type MenuAction, type NotifyAuth, type SaveResult, type Surface, type ThumbAnswer, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type A11y, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type FileFacts, type MenuAction, type NotifyAuth, type SaveResult, type SkillRead, type Surface, type ThumbAnswer, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -99,6 +99,7 @@ const api: BiseApi = {
   quickLook: async (path) => (await ipcRenderer.invoke(IPC.quickLook, path)) === true,
   showInFinder: async (path) => (await ipcRenderer.invoke(IPC.showInFinder, path)) === true,
   probePage: async (url) => ((await ipcRenderer.invoke(IPC.probePage, url)) === 'down' ? 'down' : 'up'),
+  readSkill: (path, file) => ipcRenderer.invoke(IPC.readSkill, path, file) as Promise<SkillRead>,
   saveCopy: async (path, name) => saved(await ipcRenderer.invoke(IPC.saveCopy, path, name)),
   fileIcon: async (path) => {
     const u: unknown = await ipcRenderer.invoke(IPC.fileIcon, path);

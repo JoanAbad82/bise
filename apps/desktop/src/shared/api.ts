@@ -95,6 +95,12 @@ export interface BiseApi {
    */
   readonly probePage: (url: string) => Promise<'up' | 'down'>;
   /**
+   * The skill tab's read (nm-pages-b, main/skillfile.ts): a skill's SKILL.md (`path`, from the
+   * plugins rows' skill part) or `file`, a .md name from its folder's own listing; fenced to the
+   * skill paths of the latest plugins rows, 256 KB at most (then `cut`), the folder listed by names.
+   */
+  readonly readSkill?: (path: string, file?: string) => Promise<SkillRead>;
+  /**
    * 'save a copy…' (art-save): macOS's save panel, attached to the asking window, named `name`
    * in the folder he last saved to (else Downloads); the file or folder at `path` (same fence)
    * copied where he says. `{to}` once copied, `{error}` when the copy failed, null when he
@@ -471,6 +477,11 @@ export type ThumbAnswer =
   | { readonly none: { readonly ext: string; readonly bytes: number }; readonly secs?: number }
   | { readonly files: number };
 
+/** A skill's file and its folder for the skill tab (readSkill), or why not: gone, or outside the fence. */
+export type SkillRead =
+  | { readonly text: string; readonly cut: boolean; readonly files: readonly { readonly name: string; readonly dir: boolean }[]; readonly more: number; readonly folder: string }
+  | { readonly error: 'gone' | 'not_allowed' };
+
 /** The IPC channels between the preload and main (owner: amb-mac). */
 export const IPC = {
   openExternal: 'bise:open-external',
@@ -481,6 +492,7 @@ export const IPC = {
   showInFinder: 'bise:show-in-finder',
   saveCopy: 'bise:save-copy',
   probePage: 'bise:probe-page',
+  readSkill: 'bise:read-skill',
   fileIcon: 'bise:file-icon',
   fileFacts: 'bise:file-facts',
   thumb: 'bise:thumb',

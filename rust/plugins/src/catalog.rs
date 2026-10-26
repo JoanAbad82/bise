@@ -116,7 +116,7 @@ fn plugin_row(i: &Inputs, p: &resolve::Plugin, names: &[(String, String, String)
     let bare = |s: &resolve::Skill| s.name.strip_prefix(&format!("{}:", p.namespace)).unwrap_or(&s.name).to_string();
     for (s, s_on) in p.skills.iter().map(|s| (s, true)).chain(p.off_skills.iter().map(|s| (s, false))) {
         let pid = id.part(IdPart::Skill, None, bare(s));
-        parts.push(PluginPart { on: on && s_on && i.state.is_on(&pid, false), ..part(&pid, PartKind::Skill, bare(s), Some(&s.description)) });
+        parts.push(PluginPart { on: on && s_on && i.state.is_on(&pid, false), path: Some(s.path.to_string_lossy().into_owned()), ..part(&pid, PartKind::Skill, bare(s), Some(&s.description)) });
     }
     let login_name = |server: &str| names.iter().find(|(pl, s, _)| *pl == p.name && s == server).map(|(_, _, n)| n.clone());
     for s in &p.servers {
@@ -170,6 +170,7 @@ fn part(id: &PluginId, kind: PartKind, name: String, what: Option<&str>) -> Plug
         error: None,
         tools: Vec::new(),
         tool_count: None,
+        path: None,
     }
 }
 
@@ -371,7 +372,7 @@ fn skills_row(i: &Inputs, scope: SkillsScope) -> Option<Plugin> {
         .iter()
         .map(|s| {
             let pid = id.part(IdPart::Skill, None, s.name.clone());
-            PluginPart { on: on && i.state.is_on(&pid, false), ..part(&pid, PartKind::Skill, s.name.clone(), Some(&s.description)) }
+            PluginPart { on: on && i.state.is_on(&pid, false), path: Some(s.path.to_string_lossy().into_owned()), ..part(&pid, PartKind::Skill, s.name.clone(), Some(&s.description)) }
         })
         .collect();
     Some(Plugin {

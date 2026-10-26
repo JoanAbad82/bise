@@ -5,8 +5,12 @@
 // then 'about': where it comes from, for which projects, when his agents see a change. A plugin of
 // his own folder has remove (one confirm, plug-tidy's `plugin_remove`). A row to add (browse) has
 // connect or + add in place of the switch. Every change is the core's. Owner: plug-desktop.
-import { useState } from 'react';
-import { Button, Press, Toggle, tipAttrs } from '@/ds';
+import { useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { Button, GroupLabel, PageBanner, Press, sentenceCase, Toggle, tipAttrs } from '@/ds';
+import { useBannerGutter } from '@/artifacts/hero/vignettes';
+import { openTab } from '@/app/panel/tabs';
+import { usePanelState } from '@/app/panel/state';
+import { entityKey } from '@/shared/entity';
 import type { AppCmd, Plugin, PluginPart } from '@/proto';
 import { settings } from '@/proto/words.gen';
 import { controlOf, gives, installed, isComputer, removable, tagsOf, titleOf, toolsOf } from './model';
@@ -40,21 +44,20 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
   const tools = (p.parts ?? []).filter((x) => x.kind === 'tool');
   const off = (p.parts ?? []).filter((x) => !x.on).length;
   const tid = `plugins.page.${id}`;
+  const gutter = useBannerGutter();
+  const kept = usePanelState();
+  const openTabs = useMemo(() => new Set(kept.tabs.list.map((t) => t.id)), [kept]);
   return (
     <section className="plg-place plg-page" data-testid={tid}>
-      <header className="plg-page-head">
-        <PluginIcon row={p} size="head" {...(project === undefined ? {} : { project })} {...(isComputer(p) ? { lit: true } : {})} />
-        <div className="plg-head-words">
-          <h1 className="plg-h1">
-            {titleOf(p)}
-            {tagsOf(p).map((t) => (
-              <span key={t} className="plg-tag">{t}</span>
-            ))}
-          </h1>
-          {p.what != null && <div className="plg-h2">{p.what}</div>}
-          <div className="plg-counts">{[gives(p), off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}</div>
-        </div>
-        <div className="plg-page-acts">
+      {/* the page's banner (ds PageBanner): its name and tags, what it does, what it gives, its own
+          object in the box; its actions in the row under it (no button in a banner) */}
+      <PageBanner edge="page" gutter={gutter} icon="plugins" testId={`${tid}.lead`}
+        title={<>{titleOf(p)}{tagsOf(p).map((t) => <span key={t} className="plg-tag">{t}</span>)}</>}
+        sentence={p.what ?? ''}
+        facts={[gives(p), off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}
+        visual={<PluginIcon row={p} size="head" {...(project === undefined ? {} : { project })} {...(isComputer(p) ? { lit: true } : {})} />} />
+      <div className="plg-page-col">
+        <div className="plg-page-acts" data-testid={`${tid}.acts`}>
           {!installed(p) ? (
             p.action === 'connect' || p.action === 'set_up' ? (
               <Button kind="pri" onClick={() => { ports.send({ cmd: 'plugin_connect', ...at, id }); }} testId={`${tid}.connect`}>
@@ -75,7 +78,6 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
             <Button kind="ghost" size="sm" onClick={() => { setAsking(true); }} testId={`${tid}.remove`}>{settings.plugins_remove}</Button>
           )}
         </div>
-      </header>
       {asking && ports.remove !== undefined && (
         <div className="plg-ask" role="group" data-testid={`${tid}.ask`}>
           <span>{settings.plugins_remove_confirm({ name: titleOf(p) })}</span>
@@ -98,7 +100,9 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
       {skills.length > 0 && (
         <Parts head={settings.plugins_kind_skills} n={skills.length}>
           {skills.map((x) => (
-            <PartRow key={x.id} x={x} lead="$" locked={p.locked === true} owner={p.on} onSet={set} />
+            <PartRow key={x.id} x={x} lead="$" locked={p.locked === true} owner={p.on} onSet={set}
+              // a skill opens in its own tab (page skill-panel, pick A); its row stays tinted while it is open
+              open={{ on: openTabs.has(entityKey({ kind: 'skill', plugin: id, name: x.name })), go: () => { openTab({ kind: 'skill', plugin: id, name: x.name }); } }} />
           ))}
         </Parts>
       )}
@@ -117,7 +121,7 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
         </Parts>
       )}
       <div className="plg-about" data-testid={`${tid}.about`}>
-        <div className="plg-group-head">{settings.plugins_about}</div>
+        <GroupLabel>{sentenceCase(settings.plugins_about)}</GroupLabel>
         <dl className="plg-kv">
           {p.path != null && (
             <>
@@ -137,30 +141,37 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
           <dd>{settings.plugins_change_when({ when: whenWords(p) })}</dd>
         </dl>
       </div>
+      </div>
     </section>
   );
 }
 
-/** A part group: its head as the list's ('SKILLS 1'), its rows. */
+/** A part group: its sentence-case label and count ('Skills 2', never 'SKILLS · 2': x1b), its rows. */
 function Parts({ head, n, children }: { head: string; n: number; children: React.ReactNode }) {
   return (
     <div className="plg-group">
-      <div className="plg-group-head">
-        <span>{head}</span>
-        <span className="plg-n">{n}</span>
-      </div>
+      <GroupLabel count={n}>{sentenceCase(head)}</GroupLabel>
       <div className="plg-list">{children}</div>
     </div>
   );
 }
 
-/** A skill or a tool: its name, what it does, its switch (off with its plugin: no switch). */
-function PartRow({ x, lead, locked, owner, onSet }: { x: PluginPart; lead: string; locked: boolean; owner: boolean; onSet: (id: string, on: boolean) => void }) {
+/** A skill or a tool: its name, what it does, its switch (off with its plugin: no switch). A skill's
+ *  row opens its tab (a click, ⏎), tinted while that tab is open. */
+function PartRow({ x, lead, locked, owner, onSet, open }: { x: PluginPart; lead: string; locked: boolean; owner: boolean; onSet: (id: string, on: boolean) => void; open?: { on: boolean; go: () => void } }) {
+  const go = open?.go;
   return (
-    <div className={`plg-row part${x.on ? '' : ' off'}`} data-testid={`plugins.part.${x.id}`}>
+    <div className={`plg-row part${x.on ? '' : ' off'}${open?.on === true ? ' on' : ''}`} data-testid={`plugins.part.${x.id}`}
+      {...(go === undefined ? {} : {
+        role: 'button',
+        tabIndex: 0,
+        'aria-current': open?.on === true || undefined,
+        onClick: (e: MouseEvent) => { if (!(e.target instanceof Element && e.target.closest('button, [role="switch"]') !== null)) go(); },
+        onKeyDown: (e: KeyboardEvent) => { if (e.key === 'Enter' && e.target === e.currentTarget) go(); },
+      })}>
       <span className="plg-lead">{lead}</span>
       <span className="plg-row-words">
-        <span className="plg-row-name"><span className="plg-title">{x.name}</span></span>
+        <span className="plg-row-name"><span className={lead === '$' ? 'plg-title plg-mono' : 'plg-title'}>{x.name}</span></span>
         {x.what != null && <span className="plg-row-what">{x.what}</span>}
       </span>
       <span className="plg-row-end">

@@ -7,7 +7,7 @@
 // row's '…' and right click are its menu (useEntityMenu). The floating composer's room at the foot
 // (--float-room). Owner: nm-pages-b (amb-win's before).
 import { useEffect } from 'react';
-import { AppIcon, Dot, Empty, GroupLabel, ListRow, MoreButton, PageBanner, tipAttrs } from '@/ds';
+import { AppIcon, Empty, GroupLabel, ListRow, MoreButton, PageBanner, tipAttrs } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { pages } from '@/proto/words_pages.gen';
 import type { Agent, Worktree } from '@/proto';
@@ -16,7 +16,7 @@ import { isRunning, markOf, stateOf, urlWords, type Proc } from '@/running/model
 import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { useRouter } from '@/app/router';
 import { useEntityMenu } from '@/app/menus/use';
-import { dotOf } from '@/agents/model';
+import { StateMark } from '@/agents/AgentsScreen';
 import { branchEnd } from './model';
 import './review.css';
 import { useKeptScroll } from '@/app/keep';
@@ -95,7 +95,7 @@ function AgentRow({ project, a }: { project: string; a: Agent }) {
   const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
   const tid = `environments.agent.${a.name}`;
   return (
-    <ListRow testId={tid} state={<Dot state={dotOf(a.status)} />}
+    <ListRow testId={tid} state={<StateMark a={a} />}
       title={a.main ? 'bise' : a.name}
       {...(a.branch == null || a.branch === '' ? {} : { sub: <span className="rv-mono">{a.branch}</span> })}
       onContextMenu={menu.onContextMenu}

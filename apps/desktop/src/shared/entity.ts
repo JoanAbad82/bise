@@ -35,6 +35,8 @@ export type Entity =
   | { readonly kind: 'process'; readonly project: string; readonly agent: string; readonly id: string }
   /** a plugin by its id */
   | { readonly kind: 'plugin'; readonly id: string }
+  /** a plugin's skill by its plugin's id and its own name (the skill tab, nm-pages-b) */
+  | { readonly kind: 'skill'; readonly plugin: string; readonly name: string }
   /** a scheduled task by its hub's id (rows::ScheduledTask.id: ids are per hub, nm-menus m_42167) */
   | { readonly kind: 'scheduled'; readonly project: string; readonly id: number }
   /** a tab of the panel itself (its own menu: close, close others, move...) */
@@ -67,6 +69,8 @@ export function entityKey(e: Entity): string {
       return `process:${e.project}/${e.agent}/${e.id}`;
     case 'plugin':
       return `plugin:${e.id}`;
+    case 'skill':
+      return `skill:${e.plugin}/${e.name}`;
     case 'scheduled':
       return `scheduled:${e.project}/${String(e.id)}`;
     case 'tab':

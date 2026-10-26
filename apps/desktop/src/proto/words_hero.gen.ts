@@ -26,6 +26,8 @@ export const hero = {
   crash_title: "Crash report",
   /** the update log page's banner title */
   update_log_title: "Update log",
+  /** the plugins place's banner title */
+  plugins_title: "Plugins",
   /** the inbox screen's hero sentence */
   inbox_say: "what your agents wait on you for, from every project.",
   /** the scheduled screen's hero sentence */
@@ -37,7 +39,7 @@ export const hero = {
   /** the archived agents screen's hero sentence */
   archived_say: "agents whose work is done. their threads stay here to read; restore one to talk to it again.",
   /** a project's changes screen's hero sentence (ui-review-app #2) */
-  changes_say: "what your agents changed in this project: their branches, the features they try, what reached main today.",
+  changes_say: "what your agents changed here: their branches, the features they try, what reached main today.",
   /** a project's pull requests screen's hero sentence */
   prs_say: "the pull requests open on GitHub for this project. in PR flow, an agent opens one when its work is done.",
   /** a project's environments screen's hero sentence */

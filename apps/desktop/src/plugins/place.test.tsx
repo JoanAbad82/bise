@@ -101,7 +101,7 @@ describe('the plugins place', () => {
     expect(screen.getByTestId('plugins.group.skills')).toBeTruthy();
     fireEvent.click(screen.getByTestId('plugins.kind.all'));
     expect(screen.getByTestId('plugins.group.plugin')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('plugins.tabs.1'));
+    fireEvent.click(screen.getByTestId('plugins.tabs.browse'));
     expect(screen.getByTestId('plugins.browse.row.mistral:linear')).toBeTruthy();
   });
 

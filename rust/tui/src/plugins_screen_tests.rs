@@ -15,7 +15,7 @@ fn part(owner: &str, kind: PartKind, name: &str, on: bool) -> PluginPart {
         PartKind::Mcp => "mcp",
         _ => "tool",
     };
-    PluginPart { id: format!("{owner}#{k}:{name}"), kind, name: name.into(), what: None, on, status: None, login: None, tools: vec![], tool_count: None, error: None }
+    PluginPart { id: format!("{owner}#{k}:{name}"), kind, name: name.into(), what: None, on, status: None, login: None, tools: vec![], tool_count: None, error: None, path: None }
 }
 
 fn plugin(id: &str, kind: PluginKind, scope: Scope, what: &str, parts: Vec<PluginPart>) -> Plugin {

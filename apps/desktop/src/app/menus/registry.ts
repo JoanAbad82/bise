@@ -58,7 +58,9 @@ export type MenuFacts =
   /** a panel tab: the menu of the thing in it (`inner`, none for Overview, New tab, a terminal) under its own items */
   | { readonly e: Of<'tab'>; readonly inner: MenuFacts | undefined; readonly moveable: boolean; readonly closable: boolean; readonly others: boolean }
   /** an office, a PR, a commit, a diff, a plugin: opened in a tab or a window */
-  | { readonly e: Of<'office' | 'pr' | 'commit' | 'diff' | 'plugin'> };
+  | { readonly e: Of<'office' | 'pr' | 'commit' | 'diff' | 'plugin'> }
+  /** a plugin's skill: its tab's own '…' holds its actions (plugins/SkillTab.tsx), its tab menu only the tab's */
+  | { readonly e: Of<'skill'> };
 
 /** The menu bar's keys, as Electron's accelerators; the '…' and the right click show the same. */
 export const KEYS: Partial<Record<Act, string>> = {
@@ -256,6 +258,8 @@ export function menuOf(f: MenuFacts): PopupItem[] {
     case 'diff':
     case 'plugin':
       return [item('move-right', menus.move_right), item('new-window', menus.new_window)];
+    case 'skill':
+      return [];
   }
 }
 

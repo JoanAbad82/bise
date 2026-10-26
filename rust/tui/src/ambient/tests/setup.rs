@@ -170,6 +170,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 error: None,
                 tools: vec![],
                 tool_count: None,
+                path: None,
             };
             let p = |name: &str, on: bool, parts: Vec<PluginPart>| Plugin {
                 id: name.into(),

@@ -1564,10 +1564,6 @@ export const settings = {
   plugins_place_counts: (a: { on: string | number; off: string | number }): string => String(a.on) + " on · " + String(a.off) + " off",
   /** place: the head's waiting part, in the accent */
   plugins_place_waits: (a: { n: number }): string => a.n === 1 ? String(a.n) + " needs you" : String(a.n) + " need you",
-  /** place: under the room */
-  plugins_room_sub: "each plugin you add gets a place here.",
-  /** place: the search field */
-  plugins_search: "search plugins, tools, skills",
   /** place: the add button */
   plugins_add: "add",
   /** band: its head */

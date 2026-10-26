@@ -340,6 +340,13 @@ pub struct PluginPart {
     /// (known before its `tools` are listed)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_count: Option<u32>,
+    /// a skill's `SKILL.md`, where the catalog found it (its realpath for
+    /// a plugin's skill); none for every other kind, and from a hub before
+    /// it. The desktop's skill tab reads that file and lists its folder
+    /// through main, fenced to the paths of the rows it got (nm-pages-b,
+    /// architect m_43316)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// What a plugin will run on his Mac once added, shown before his click

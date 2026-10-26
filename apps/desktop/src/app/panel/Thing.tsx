@@ -8,6 +8,7 @@ import { ThreadScreen } from '@/thread/ThreadScreen';
 import { ReviewScreen } from '@/review/ReviewScreen';
 import { PrsScreen } from '@/review/PrsScreen';
 import { PluginsScreen } from '@/plugins';
+import { SkillTab } from '@/plugins/SkillTab';
 import { ScheduledScreen } from '@/scheduled';
 import { Output } from '@/running/Output';
 import { isRunning, quietWords, stateOf, useAllProcesses } from '@/running';
@@ -67,6 +68,13 @@ export function ThingTab({ e, tabId }: { e: Exclude<Entity, { kind: 'tab' }>; ta
       );
     case 'office':
       return <OfficeTab project={e.project} />;
+    case 'skill':
+      // a plugin's skill (page skill-panel, pick A): its file, its frontmatter, its folder (nm-pages-b)
+      return (
+        <div className="pn-screen" data-testid="app.panel.skill">
+          <SkillTab plugin={e.plugin} name={e.name} />
+        </div>
+      );
   }
 }
 

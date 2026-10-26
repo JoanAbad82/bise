@@ -6,7 +6,7 @@ import { appendFile, existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type A11y, type FileFacts, type MenuAction, type PopupAt, type PopupItem, type SaveResult, type ThumbAnswer } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type A11y, type FileFacts, type MenuAction, type PopupAt, type PopupItem, type SaveResult, type SkillRead, type ThumbAnswer } from '../shared/api';
 import { saveCopy } from './savecopy';
 import { a11yNow } from './a11y';
 import { popupMenu } from './menu-popup';
@@ -20,6 +20,8 @@ import { imageDir, saveImage } from './images';
 import { pickedFilesInTest, pickedInTest } from './pick';
 import { allowedPath, realLookable } from './reveal';
 import { probePage } from './probe';
+import { readSkill, skillPaths } from './skillfile';
+import { onCoreEvent } from './core/ipc';
 import { thumbsDir } from './thumbs/cache';
 import { thumb, type ThumbEnv } from './thumbs/make';
 
@@ -145,6 +147,12 @@ export function installIpc(testMode: boolean): void {
   ipcMain.handle(IPC.showInFinder, (_e, raw: unknown): boolean => showInFinder(raw, testMode));
   // page-unreach: does an artifact's page server answer, before the panel frames it (probe.ts)
   ipcMain.handle(IPC.probePage, (_e, raw: unknown): Promise<'up' | 'down'> => probePage(raw));
+  // the skill tab (nm-pages-b): a skill's SKILL.md and its folder, fenced to the latest plugins rows' skill paths
+  let skills: string[] = [];
+  onCoreEvent((ev) => {
+    if (ev['ev'] === 'plugins') skills = skillPaths(ev);
+  });
+  ipcMain.handle(IPC.readSkill, (_e, raw: unknown, file: unknown): Promise<SkillRead> => readSkill(raw, file, skills));
   // art-save: an artifact's file copied where he says (savecopy.ts), behind the same fence
   ipcMain.handle(IPC.saveCopy, (e, raw: unknown, name: unknown): Promise<SaveResult> => {
     const p = lookable(raw);

@@ -20,6 +20,8 @@ export const pages = {
   done: "done",
   /** an archived row's state mark tip: it was stopped before it finished */
   stopped: "stopped",
+  /** a row's state mark tip and VoiceOver name: it works now */
+  working: "working",
   /** its row: the agent's name */
   tune_name: "Name",
   /** its row: the model it runs */
@@ -88,4 +90,42 @@ export const pages = {
   branch_no_diff: "its diff needs an agent on it for now.",
   /** the link to the changes page */
   see_changes: "see the changes",
+  /** the skill tab's action: its file in his editor */
+  skill_open_editor: "Open in editor",
+  /** its '…': the file in Finder */
+  skill_show_finder: "Show in Finder",
+  /** its '…': the file's path to the clipboard */
+  skill_copy_path: "Copy path",
+  /** its '…': the skill turned off (only when it can be) */
+  skill_turn_off: "Turn off",
+  /** its facts: on */
+  skill_on: "on",
+  /** its facts: off */
+  skill_off: "off",
+  /** its facts: a skill he can't turn off */
+  skill_always_on: "always on",
+  /** its facts: when the agents read it */
+  skill_used_when: "used when a task matches the description",
+  /** the frontmatter's group label */
+  skill_frontmatter: "Frontmatter",
+  /** the frontmatter it can't read: the line */
+  skill_front_broken: (a: { line: string | number }): string => "the frontmatter can't be read: line " + String(a.line),
+  /** shows the raw file */
+  skill_source: "Source",
+  /** shows the file read */
+  skill_rendered: "Rendered",
+  /** the folder's other files' group label */
+  skill_files: "Files",
+  /** more files than listed */
+  skill_more_files: (a: { n: string | number }): string => String(a.n) + " more",
+  /** past 256 KB */
+  skill_cut: "cut at 256 KB: open it in your editor for the rest.",
+  /** while main reads it */
+  skill_reading: "reading…",
+  /** its file left, or the skill left the rows */
+  skill_gone: "this skill isn't there anymore.",
+  /** a path outside the plugins' skills */
+  skill_not_allowed: "bise reads only the skills of your plugins.",
+  /** a skill from a hub that doesn't say where its file is */
+  skill_no_file: "this skill's file isn't known yet: update bise's hubs.",
 } as const;

@@ -3219,20 +3219,10 @@
     "one": null,
     "text": "removed {name} and its saved secrets — your agents lose its tools within a few seconds"
   },
-  "settings.plugins_room_sub": {
-    "args": [],
-    "one": null,
-    "text": "each plugin you add gets a place here."
-  },
   "settings.plugins_screen": {
     "args": [],
     "one": null,
     "text": "plugins"
-  },
-  "settings.plugins_search": {
-    "args": [],
-    "one": null,
-    "text": "search plugins, tools, skills"
   },
   "settings.plugins_secret_empty": {
     "args": [

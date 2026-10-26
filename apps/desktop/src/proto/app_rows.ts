@@ -257,7 +257,15 @@ tools?: Array<PluginPart>,
  * how many tools an MCP server has, once a session connected it
  * (known before its `tools` are listed)
  */
-tool_count?: number | null, };
+tool_count?: number | null, 
+/**
+ * a skill's `SKILL.md`, where the catalog found it (its realpath for
+ * a plugin's skill); none for every other kind, and from a hub before
+ * it. The desktop's skill tab reads that file and lists its folder
+ * through main, fenced to the paths of the rows it got (nm-pages-b,
+ * architect m_43316)
+ */
+path?: string | null, };
 
 /**
  * What a plugin will run on his Mac once added, shown before his click

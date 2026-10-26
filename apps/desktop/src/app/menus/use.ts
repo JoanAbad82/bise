@@ -56,6 +56,8 @@ export function factsOf(e: Entity, r: FactReads): MenuFacts {
       const t = r.tab(e.id);
       return { e, inner: t.inner === undefined ? undefined : factsOf(t.inner, r), moveable: t.moveable, closable: t.closable, others: t.others };
     }
+    case 'skill':
+      return { e };
     default:
       return { e };
   }

@@ -1,15 +1,21 @@
-// The plugins place (page plugins v48, plugins-ui's screens; Gabriel's pick on q-go: the room,
-// without drag and drop). Top to bottom: the head (its counts from the core's summary), the room
-// (bims' diorama of his plugins as office objects, Room.tsx; their icons on a floor without WebGL),
+// The plugins place (page plugins v48, plugins-ui's screens; bise fait mac §9, nm-pages-b). Top to
+// bottom: its banner (ds PageBanner: 'Plugins', what it is, the core's counts, the room in its box:
+// bims' diorama of his plugins as office objects, Room.tsx, their icons on a floor without WebGL),
 // 'connect your tools' (Mistral's connectors not connected yet, most useful first, the MCP servers
-// found in other apps, a repo's own skills), then installed | browse with the kind chips, and the
-// list: one row per plugin, its object as its icon, its tags, what it gives and its one control
-// (a switch; 'always on'; connect / log in where it waits on his account; a failed server's red
-// line and details). Adding goes through add, the band and browse only. Every number is the core's
-// (catalog::rows, catalog::summary); every change is the core's (plugin_set, plugin_connect,
-// plugin_login, plugin_add…), answered by `plugins` again. Owner: plug-desktop.
-import { useMemo, useState, type ReactNode } from 'react';
-import { Button, Chip, Field, Seg, Toggle, tipAttrs } from '@/ds';
+// found in other apps, a repo's own skills), then installed | browse (ds Filters, add at their
+// right) with the kind chips, and the list in sentence-case ds GroupLabels: one row per plugin, its
+// object as its icon, its tags, what it gives and its one control (a switch; 'always on'; connect /
+// log in where it waits on his account; a failed server's red line and details); a skill the search
+// found opens in its own tab (SkillTab.tsx). The search is in the window's bar (InBar). Adding goes
+// through add, the band and browse only. Every number is the core's (catalog::rows,
+// catalog::summary); every change is the core's (plugin_set, plugin_connect, plugin_login,
+// plugin_add…), answered by `plugins` again. Owner: nm-pages-b (plug-desktop's before).
+import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { BannerWait, BarSearch, Button, Chip, FilterRow, Filters, GroupLabel, PageBanner, sentenceCase, Toggle, tipAttrs } from '@/ds';
+import { hero } from '@/proto/words_hero.gen';
+import { InBar } from '@/app/barslot';
+import { openTab } from '@/app/panel/tabs';
+import { useBannerGutter } from '@/artifacts/hero/vignettes';
 import type { AppCmd, Plugin, PluginsSummary, ConnectorsProblem } from '@/proto';
 import { settings } from '@/proto/words.gen';
 import {
@@ -74,46 +80,27 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
   // /skills and /plugins mount it anew (the screen keys it by its kind)
   const [kind, setKind] = useState<KindFilter>(kind0 ?? 'all');
   const [q, setQ] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+  const gutter = useBannerGutter();
   const at = project === undefined ? {} : { project };
   const all = useMemo(() => rows ?? [], [rows]);
   const groups = useMemo(() => groupsOf(all, kind, q), [all, kind, q]);
   const counts = useMemo(() => kindCounts(all), [all]);
   const toBrowse = browse.reduce((n, b) => n + b.items.length, 0);
-  const search = (
-    <span className="plg-search">
-      <Field slash placeholder={settings.plugins_search} value={q} onChange={(e) => { setQ(e.currentTarget.value); }}
-        onKeyDown={(e) => { if (e.key === 'Escape') setQ(''); }} testId="plugins.search" />
-    </span>
-  );
-  // three sections at --gap-page (the hero, connect your tools, the list); inside the list, its
-  // head (the tabs, the search at their right: it filters the list), the chips and the groups at
-  // --gap-block (ui-review #1, #2, #10)
+  // three sections at --gap-page (the banner, connect your tools, the list); inside the list, its
+  // filters (installed | browse, add at their right), the chips and the groups at --gap-block
+  // (ui-review #1, #2, #10); the search is in the window's bar and filters the list
   return (
     <section className="plg-place" data-testid="plugins.place">
-      <header className="plg-head" data-testid="plugins.head">
-        <div className="plg-head-top">
-          <div className="plg-head-words">
-            <h1 className="plg-h1">{settings.plugins_screen}</h1>
-            <div className="plg-h2">{settings.plugins_place_sub}</div>
-            {summary !== null && (
-              <div className="plg-counts" data-testid="plugins.counts">
-                {settings.plugins_place_counts({ on: summary.on, off: summary.off })}
-                {summary.waiting > 0 && (
-                  <>
-                    {' · '}
-                    <span className="plg-acc">{settings.plugins_place_waits({ n: summary.waiting })}</span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          <AddMenu summary={summary} onPick={(item) => { if (item === 'browse') setTab('browse'); else ports.add(item); }} />
-        </div>
-        <div className="plg-room" data-testid="plugins.room">
-          {room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} onOpen={ports.open} />}
-        </div>
-        <div className="plg-room-sub">{settings.plugins_room_sub}</div>
-      </header>
+      {/* the page's banner (ds PageBanner, designer m_42762): its name, what it is, its counts (the
+          accent only on what needs him), the live room (Room.tsx) in its 360 x 176 box; full width: 32 in */}
+      <PageBanner title={hero.plugins_title} sentence={settings.plugins_place_sub} edge="page" gutter={gutter} icon="plugins" testId="plugins.head"
+        {...(summary !== null ? { facts: <span data-testid="plugins.counts">{settings.plugins_place_counts({ on: summary.on, off: summary.off })}{summary.waiting > 0 && <>{' · '}<BannerWait>{settings.plugins_place_waits({ n: summary.waiting })}</BannerWait></>}</span> } : {})}
+        visual={<div className="plg-room" data-testid="plugins.room">{room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} onOpen={ports.open} />}</div>} />
+      {/* the page's search, in the window's bar (app-polish #4); its action row under the banner */}
+      <InBar>
+        <BarSearch ref={searchRef} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); e.currentTarget.blur(); } }} testId="plugins.search" />
+      </InBar>
       {(bandShows(summary) && summary !== null) || problem != null ? (
         <div className="plg-sec">
           {bandShows(summary) && summary !== null && (
@@ -127,11 +114,13 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
         </div>
       ) : null}
       <div className="plg-sec" data-testid="plugins.list">
-        <div className="plg-tabs">
-          <Seg items={[<TabWords key="i" words={settings.plugins_tab_installed} n={counts.all} />, <TabWords key="b" words={settings.plugins_tab_browse} n={toBrowse} />]}
-            on={tab === 'installed' ? 0 : 1} onPick={(i) => { setTab(i === 0 ? 'installed' : 'browse'); }} testId="plugins.tabs" />
-          {search}
-        </div>
+        <FilterRow testId="plugins.tabs.row">
+          <Filters items={[{ id: 'installed', label: <TabWords words={sentenceCase(settings.plugins_tab_installed)} n={counts.all} /> }, { id: 'browse', label: <TabWords words={sentenceCase(settings.plugins_tab_browse)} n={toBrowse} /> }]}
+            on={tab} onPick={(id) => { setTab(id === 'browse' ? 'browse' : 'installed'); }} testId="plugins.tabs" />
+          <span className="plg-add">
+            <AddMenu summary={summary} onPick={(item) => { if (item === 'browse') setTab('browse'); else ports.add(item); }} />
+          </span>
+        </FilterRow>
         {tab === 'installed' ? (
           <>
             <div className="plg-kinds" role="group" data-testid="plugins.kinds">
@@ -149,14 +138,15 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
             ) : (
               groups.map((g) => (
                 <div key={g.kind} className="plg-group" data-testid={`plugins.group.${g.kind}`}>
-                  <div className="plg-group-head">
-                    <span>{groupWords(g.kind)}</span>
-                    <span className="plg-n">{g.hits.length}</span>
-                  </div>
+                  <GroupLabel count={g.hits.length}>{sentenceCase(groupWords(g.kind))}</GroupLabel>
                   <div className="plg-list">
                     {g.hits.map((h) => (
                       <PlaceRow key={h.p.id === '' ? h.p.name : h.p.id} h={h} project={project}
-                        onOpen={() => { ports.open(h.p.id === '' ? h.p.name : h.p.id); }}
+                        onOpen={() => {
+                          // a skill the search found opens in its own tab (page skill-panel, pick A)
+                          if (h.part?.kind === 'skill') openTab({ kind: 'skill', plugin: h.p.id === '' ? h.p.name : h.p.id, name: h.part.name });
+                          else ports.open(h.p.id === '' ? h.p.name : h.p.id);
+                        }}
                         onSet={(on) => { ports.send({ cmd: 'plugin_set', ...at, name: h.p.id === '' ? h.p.name : h.p.id, on }); }}
                         onConnect={(id) => { ports.send({ cmd: 'plugin_connect', ...at, id }); }}
                         onLogin={(name) => { ports.send({ cmd: 'plugin_login', ...at, name }); }}
@@ -371,10 +361,7 @@ function BrowseList({ browse, q, project, onConnect, onOpen }: {
     <>
       {shown.map((b) => (
         <div key={b.source} className="plg-group" data-testid={`plugins.browse.${b.source}`}>
-          <div className="plg-group-head">
-            <span>{b.source === 'mistral' ? settings.plugins_browse_mistral : b.source}</span>
-            <span className="plg-n">{b.items.length}</span>
-          </div>
+          <GroupLabel count={b.items.length}>{b.source === 'mistral' ? settings.plugins_browse_mistral : b.source}</GroupLabel>
           <div className="plg-list">
             {b.items.map((p) => {
               const id = p.id === '' ? p.name : p.id;

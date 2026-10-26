@@ -145,6 +145,105 @@
     "one": null,
     "text": "Show in Finder"
   },
+  "pages.skill_always_on": {
+    "args": [],
+    "one": null,
+    "text": "always on"
+  },
+  "pages.skill_copy_path": {
+    "args": [],
+    "one": null,
+    "text": "Copy path"
+  },
+  "pages.skill_cut": {
+    "args": [],
+    "one": null,
+    "text": "cut at 256 KB: open it in your editor for the rest."
+  },
+  "pages.skill_files": {
+    "args": [],
+    "one": null,
+    "text": "Files"
+  },
+  "pages.skill_front_broken": {
+    "args": [
+      "line"
+    ],
+    "one": null,
+    "text": "the frontmatter can't be read: line {line}"
+  },
+  "pages.skill_frontmatter": {
+    "args": [],
+    "one": null,
+    "text": "Frontmatter"
+  },
+  "pages.skill_gone": {
+    "args": [],
+    "one": null,
+    "text": "this skill isn't there anymore."
+  },
+  "pages.skill_more_files": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} more"
+  },
+  "pages.skill_no_file": {
+    "args": [],
+    "one": null,
+    "text": "this skill's file isn't known yet: update bise's hubs."
+  },
+  "pages.skill_not_allowed": {
+    "args": [],
+    "one": null,
+    "text": "bise reads only the skills of your plugins."
+  },
+  "pages.skill_off": {
+    "args": [],
+    "one": null,
+    "text": "off"
+  },
+  "pages.skill_on": {
+    "args": [],
+    "one": null,
+    "text": "on"
+  },
+  "pages.skill_open_editor": {
+    "args": [],
+    "one": null,
+    "text": "Open in editor"
+  },
+  "pages.skill_reading": {
+    "args": [],
+    "one": null,
+    "text": "reading…"
+  },
+  "pages.skill_rendered": {
+    "args": [],
+    "one": null,
+    "text": "Rendered"
+  },
+  "pages.skill_show_finder": {
+    "args": [],
+    "one": null,
+    "text": "Show in Finder"
+  },
+  "pages.skill_source": {
+    "args": [],
+    "one": null,
+    "text": "Source"
+  },
+  "pages.skill_turn_off": {
+    "args": [],
+    "one": null,
+    "text": "Turn off"
+  },
+  "pages.skill_used_when": {
+    "args": [],
+    "one": null,
+    "text": "used when a task matches the description"
+  },
   "pages.stopped": {
     "args": [],
     "one": null,
@@ -206,6 +305,11 @@
     "args": [],
     "one": null,
     "text": "waits on another agent"
+  },
+  "pages.working": {
+    "args": [],
+    "one": null,
+    "text": "working"
   },
   "pages.yours": {
     "args": [],

@@ -40,7 +40,7 @@ export const PENDING_TYPE: Readonly<Record<string, number>> = {
   "ds/css/window.css": 1,
   "inbox/inbox.css": 1,
   "log/log.css": 1,
-  "plugins/plugins.css": 2,
+  "plugins/plugins.css": 1,
   "welcome/welcome.css": 1,
 };
 

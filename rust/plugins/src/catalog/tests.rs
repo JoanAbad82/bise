@@ -186,6 +186,11 @@ fn a_real_plugin_its_skills_prompts_and_place() {
     assert_eq!(docs.path.as_deref(), Some(t.0.join("user/docs").to_string_lossy().as_ref()));
     assert!(part(docs, "docs#skill:docs").on);
     assert!(!part(docs, "docs#skill:extra").on, "a skill turned off is listed, off");
+    // a skill part carries its SKILL.md (the desktop's skill tab reads it, nm-pages-b): its realpath
+    let md = t.0.join("user/docs/skills/docs/SKILL.md").canonicalize().unwrap();
+    assert_eq!(part(docs, "docs#skill:docs").path.as_deref(), Some(md.to_string_lossy().as_ref()));
+    // no other kind has one
+    assert!(rows.iter().flat_map(|r| &r.parts).filter(|p| p.kind != PartKind::Skill).all(|p| p.path.is_none()));
     // at most 3, the blank one out, the long one cut
     assert_eq!(docs.prompts.len(), MAX_PROMPTS);
     assert_eq!(docs.prompts[0], "make a memo");
@@ -320,6 +325,8 @@ fn skills_folders_and_bise_locked_on() {
     assert_eq!(personal.path.as_deref(), Some(t.0.join("home/.agents/skills").to_string_lossy().as_ref()));
     let on: Vec<(&str, bool)> = personal.parts.iter().map(|p| (p.id.as_str(), p.on)).collect();
     assert_eq!(on, [("skills:personal#skill:p1", true), ("skills:personal#skill:p2", false)]);
+    // a loose skill's part carries its SKILL.md as the scan found it
+    assert_eq!(personal.parts[0].path.as_deref(), Some(t.0.join("home/.agents/skills/p1/SKILL.md").to_string_lossy().as_ref()));
     assert_eq!(row(&rows, "skills:workspace").title, settings::plugins_project_title("myproj"));
     // no Vibe skill: no row
     assert!(rows.iter().all(|r| r.id != "skills:vibe"));
