@@ -39,8 +39,8 @@ export function PrsScreen({ project }: { project: string }) {
         <div className="rv-col">
           {list === null && <Skel />}
           {list !== null && list.items.length === 0 && (
-            // the hub's own words, once (the banner already says none is open)
-            <Empty testId="prs.empty" title={<span data-testid="prs.none">{list.none ?? pages.no_pr}</span>} />
+            // one sentence, never the banner's again (designer m_43933 #7)
+            <Empty testId="prs.empty" title={<span data-testid="prs.none">{pages.no_pr}</span>} />
           )}
           {list !== null && list.items.length > 0 && (
             <div data-testid="prs.list">

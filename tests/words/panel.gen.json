@@ -145,11 +145,6 @@
     "one": null,
     "text": "changes"
   },
-  "panel.crumb_crash": {
-    "args": [],
-    "one": null,
-    "text": "crash report"
-  },
   "panel.crumb_debug": {
     "args": [],
     "one": null,
@@ -169,11 +164,6 @@
     "args": [],
     "one": null,
     "text": "settings"
-  },
-  "panel.crumb_update_log": {
-    "args": [],
-    "one": null,
-    "text": "update log"
   },
   "panel.driving": {
     "args": [

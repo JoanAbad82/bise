@@ -1,5 +1,6 @@
 // The bar's title is what he looks at, its subtitle where it sits (nearest first), each earlier
 // part still a way back; the window's title is the bar's.
+import { hero } from '@/proto/words_hero.gen';
 import { describe, expect, it } from 'vitest';
 import { barTitleOf, stateFactOf, windowTitleOf } from './title';
 
@@ -20,7 +21,7 @@ describe('barTitleOf', () => {
 
   it("a project's screen: its word, then the project", () => {
     const t = barTitleOf({ screen: 'changes', project: 'acme-1' }, name);
-    expect(t.title).toBe('changes');
+    expect(t.title).toBe(hero.changes_title);
     expect(t.sub.map((p) => p.c)).toEqual(['acme']);
   });
 });

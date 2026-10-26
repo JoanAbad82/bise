@@ -286,10 +286,6 @@ crate::words! { panel:
     crumb_settings = "settings";
     /// the crumb of an unknown route
     crumb_not_found = "not found";
-    /// the crumb of the update log
-    crumb_update_log = "update log";
-    /// the crumb of a crash report
-    crumb_crash = "crash report";
     /// the crumb of the lab
     crumb_lab = "lab";
     /// the panel button with its count

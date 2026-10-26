@@ -5,7 +5,7 @@
 /* the rhythm (ui-review #1): the sections (the hero, connect your tools, the list) --gap-page apart;
    inside a section its blocks --gap-block apart. One column for every shell page: --w-col (#13,
    designer m_41512). Two left edges: the column's, and a box's content at --pad-card-x (#12). */
-.plg-place { height: 100%; overflow-y: auto; box-sizing: border-box; padding: 0 0 var(--float-room); display: flex; flex-direction: column; gap: var(--gap-page); }
+.plg-place { height: 100%; overflow-y: auto; box-sizing: border-box; padding: 0 0 calc(var(--float-room) + var(--s-2)); display: flex; flex-direction: column; gap: var(--gap-page); }
 .plg-place > .b-banner { margin-bottom: 0; }
 .plg-place > :not(.b-banner) { margin-inline: var(--pad-page-x); box-sizing: border-box; }
 .plg-add { margin-left: auto; }
@@ -101,6 +101,8 @@
 .plg-page-acts { display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
 /* the plugin's own object in the banner's box: transparent, no tile (the box is the frame rule's) */
 .b-banner .vis > .plg-icon.head { width: 100%; height: 100%; border-radius: 0; background: none; box-shadow: none; }
+/* its '?' / '✗' badge says what it means on hover, though the banner's box takes no pointer (ui-review m_43947) */
+.b-banner .vis .plg-badge { pointer-events: auto; }
 .b-banner .vis > .plg-icon.head .plg-obj { width: auto; height: 100%; max-width: 100%; }
 .b-banner .vis > .plg-icon.head .plg-mono-letter { font: 600 var(--f-question); }
 .b-banner .title > .plg-tag { margin-left: var(--s-2); vertical-align: middle; }
@@ -153,6 +155,8 @@
 .plg-skill-toggle:hover { background: var(--c-hover); }
 .plg-skill-toggle[aria-pressed="true"] { background: var(--c-active); color: var(--c-text); }
 .plg-skill-body { font: var(--t-14)/1.6 var(--font-read); color: var(--c-text); }
+/* a code block keeps its lines: it scrolls sideways in the panel, never cut at its edge (ui-review m_43947 #5) */
+.plg-skill-body pre { overflow-x: auto; }
 .plg-skill-back { display: inline-flex; align-items: center; gap: var(--s-1); align-self: flex-start; margin: 0; padding: 0; border: 0; background: none; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
 .plg-skill-md { display: flex; flex-direction: column; gap: var(--s-2); }
 .plg-skill-files { display: flex; flex-direction: column; }

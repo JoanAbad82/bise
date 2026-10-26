@@ -2,8 +2,9 @@
    one scroller, the ds PageBanner the page's width, then the page's column: the actions' row 24
    under the banner, the report. The floating composer's room at the foot. ds tokens only. */
 .app-report { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-.app-report-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 0 var(--float-room); box-sizing: border-box; }
+.app-report-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 0 calc(var(--float-room) + var(--s-2)); box-sizing: border-box; }
 .app-report-col { margin-inline: var(--pad-page-x); }
+.app-report-col > .b-empty { padding-inline: var(--s-3); }
 .app-report-acts { display: flex; gap: var(--s-2); margin-bottom: var(--s-4); }
 /* the report: the page's column, its markdown at the reader's size */
 .app-report-text { min-width: 0; }

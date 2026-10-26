@@ -23,10 +23,10 @@ export interface BarTitle {
 
 /**
  * The bar's title and subtitle for a route. `what`: the thread's agent's own title ('profiling the
- * hub'), first in the subtitle. Pure.
+ * hub'), first in the subtitle. `plugin`: a plugin's title from its id (crumbOf). Pure.
  */
-export function barTitleOf(route: Route, name: (project: string) => string, place: PlaceCrumb = () => [], what = ''): BarTitle {
-  const crumb = crumbOf(route, name, place);
+export function barTitleOf(route: Route, name: (project: string) => string, place: PlaceCrumb = () => [], what = '', plugin?: (id: string) => string): BarTitle {
+  const crumb = crumbOf(route, name, place, plugin);
   const title = crumb[crumb.length - 1] ?? '';
   const earlier = crumbGoOf(route, name, place).reverse();
   const sub: SubPart[] = [...(what === '' ? [] : [{ c: what }]), ...earlier.map((p) => (p.go === undefined ? { c: p.c } : { c: p.c, go: p.go }))];

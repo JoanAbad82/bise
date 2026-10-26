@@ -61,7 +61,8 @@ function lookOf(tab: Tab, projects: ReturnType<typeof useProjects>, arts: Return
     case 'plugin':
       return { title: e.id, icon: <AppIcon name="plugins" size={14} /> };
     case 'skill':
-      return { title: `$ ${e.name}`, icon: <AppIcon name="plugins" size={14} /> };
+      // one glyph on the tab: its '$' (designer m_43933 #12), no plug icon too
+      return { title: `$ ${e.name}`, icon: null };
     case 'scheduled':
       return { title: panel.tab_scheduled, icon: <AppIcon name="scheduled" size={14} /> };
     case 'project':

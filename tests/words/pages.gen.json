@@ -145,7 +145,7 @@
   "pages.no_pr": {
     "args": [],
     "one": null,
-    "text": "no open PR"
+    "text": "no pull request open."
   },
   "pages.no_update_log": {
     "args": [],
@@ -226,7 +226,7 @@
   "pages.shared_folder": {
     "args": [],
     "one": null,
-    "text": "the shared folder"
+    "text": "The shared folder"
   },
   "pages.show_in_finder": {
     "args": [],

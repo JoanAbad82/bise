@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pr } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
+import { pages } from '@/proto/words_pages.gen';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
@@ -88,13 +89,13 @@ describe('the PR list', () => {
     delete (window as unknown as { bise?: unknown }).bise;
   });
 
-  it("empty: the hub's own words", () => {
+  it("empty: one line, never the banner's sentence again (designer m_43933 #7)", () => {
     const { store, wrap } = setup();
     const none = fixtures.find((e) => e.items.length === 0);
     if (!none) throw new Error('fixture');
     store.apply(none);
     const v = render(wrap(<PrsScreen project={P} />));
-    expect(v.getByTestId('prs.none').textContent).toBe(none.none);
+    expect(v.getByTestId('prs.none').textContent).toBe(pages.no_pr);
   });
 
   it('the changes screen asks prs, says how many, and opens the list', () => {

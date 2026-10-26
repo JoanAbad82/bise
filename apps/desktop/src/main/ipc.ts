@@ -148,11 +148,15 @@ export function installIpc(testMode: boolean): void {
   // page-unreach: does an artifact's page server answer, before the panel frames it (probe.ts)
   ipcMain.handle(IPC.probePage, (_e, raw: unknown): Promise<'up' | 'down'> => probePage(raw));
   // the skill tab (nm-pages-b): a skill's SKILL.md and its folder, fenced to the latest plugins rows' skill paths
-  let skills: string[] = [];
+  // kept per project: a later plugins event of another project (or of none) never wipes the paths a
+  // tab open on this one reads (a built-in skill gave not_allowed; designer m_43933 #12)
+  const skillsBy = new Map<string, string[]>();
   onCoreEvent((ev) => {
-    if (ev['ev'] === 'plugins') skills = skillPaths(ev);
+    if (ev['ev'] !== 'plugins') return;
+    const project = ev['project'];
+    skillsBy.set(typeof project === 'string' ? project : '', skillPaths(ev));
   });
-  ipcMain.handle(IPC.readSkill, (_e, raw: unknown, file: unknown): Promise<SkillRead> => readSkill(raw, file, skills));
+  ipcMain.handle(IPC.readSkill, (_e, raw: unknown, file: unknown): Promise<SkillRead> => readSkill(raw, file, [...skillsBy.values()].flat()));
   // art-save: an artifact's file copied where he says (savecopy.ts), behind the same fence
   ipcMain.handle(IPC.saveCopy, (e, raw: unknown, name: unknown): Promise<SaveResult> => {
     const p = lookable(raw);

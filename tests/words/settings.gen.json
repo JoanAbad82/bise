@@ -2448,7 +2448,7 @@
       "when"
     ],
     "one": null,
-    "text": "your agents get a change {when}"
+    "text": "changes reach your agents {when}"
   },
   "settings.plugins_choice_part": {
     "args": [

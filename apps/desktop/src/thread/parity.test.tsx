@@ -102,7 +102,7 @@ describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
     expect(places.map((p) => [p.title, p.agents.map((a) => a.name).join(','), p.procs.length])).toEqual([
       ['sb/x', 'a,b', 0],
       ['sb/c', 'c', 1],
-      ['the shared folder', 'main', 0],
+      ['The shared folder', 'main', 0],
     ]);
   });
 });

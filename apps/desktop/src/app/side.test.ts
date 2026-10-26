@@ -1,4 +1,5 @@
 // The sidebar's signs and words, the frame's widths (designer's desktop-screens v6/v7, signed).
+import { hero } from '@/proto/words_hero.gen';
 import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
 import { computerDot, crumbGoOf, crumbOf, folds, moreWords, panelAt, panelWords, panelProject, projectSide, signOf, turnShort } from './side';
@@ -93,8 +94,14 @@ describe('the frame', () => {
       { screen: 'thread', project: 'p', agent: 'perf' },
     ]);
     // /agents and /archived are two lists, each its own crumb (designer m_19489)
-    expect(crumbOf({ screen: 'agents', project: 'p' }, name)).toEqual(['storefront', 'agents']);
-    expect(crumbOf({ screen: 'agents', project: 'p', archived: true }, name)).toEqual(['storefront', 'archived']);
+    expect(crumbOf({ screen: 'agents', project: 'p' }, name)).toEqual(['storefront', hero.agents_title]);
+    expect(crumbOf({ screen: 'agents', project: 'p', archived: true }, name)).toEqual(['storefront', hero.archived_title]);
+    // a plugin's page: its name, never its id (designer m_43933 #2)
+    expect(crumbOf({ screen: 'plugins', id: 'skills:bise' }, name)).toEqual([hero.plugins_title, 'bise']);
+    // its title from the rows when the bar knows it (ui-review m_43947 #1)
+    expect(crumbOf({ screen: 'plugins', id: 'mistral:linear' }, name, () => [], (id) => (id === 'mistral:linear' ? 'Linear' : id))).toEqual([hero.plugins_title, 'Linear']);
+    // a feature: its name alone, no text glyph (ui-review m_43947 #3)
+    expect(crumbOf({ screen: 'feature', project: 'p', name: 'billing' }, name)).toEqual(['storefront', 'billing']);
   });
   it("an earlier crumb goes where it names: the project's main, that agent, that screen; the last stays plain", () => {
     const name = () => 'storefront';
@@ -233,8 +240,8 @@ describe("every crumb kind: each segment before the last opens that place (his a
     });
   }
   it("a plugin's page: 'plugins' opens the plugins list it came from (skills' list keeps its kind)", () => {
-    expect(crumbGoOf({ screen: 'plugins', id: 'computer' }, name)).toEqual([{ c: 'plugins', go: { screen: 'plugins' } }]);
-    expect(crumbGoOf({ screen: 'plugins', kind: 'skills', id: 'mistral:gmail' }, name)).toEqual([{ c: 'plugins', go: { screen: 'plugins', kind: 'skills' } }]);
+    expect(crumbGoOf({ screen: 'plugins', id: 'computer' }, name)).toEqual([{ c: hero.plugins_title, go: { screen: 'plugins' } }]);
+    expect(crumbGoOf({ screen: 'plugins', kind: 'skills', id: 'mistral:gmail' }, name)).toEqual([{ c: hero.plugins_title, go: { screen: 'plugins', kind: 'skills' } }]);
   });
 });
 

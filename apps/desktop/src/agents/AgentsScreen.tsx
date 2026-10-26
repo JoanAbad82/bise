@@ -160,14 +160,17 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
   );
 }
 
-/** A row's state mark: '?' in the accent when it asks him, a check when done, the sidebar's turning
- *  arc in text-3 while it works (app.css .app-s-ring, designer m_43568), else its status dot. */
+/** A row's state mark, the sidebar's marks (designer m_43933 #4): '?' in the accent when it asks him,
+ *  a check when done, the turning arc in text-3 while it works (app.css .app-s-ring, m_43568),
+ *  nothing at rest, else its status dot (blocked, failed). */
 export function StateMark({ a }: { a: Agent }) {
   if (asksHim(a)) return <span className="ag-ask" {...tipAttrs(pages.asks_you)}>?</span>;
   if (a.archived) return <span className="ag-mark" {...tipAttrs(a.status === 'done' ? pages.done : pages.stopped)}><AppIcon name={a.status === 'done' ? 'check' : 'stop'} size={14} /></span>;
   if (a.status === 'done' && a.waiting_on == null) return <span className="ag-mark" {...tipAttrs(pages.done)}><AppIcon name="check" size={14} /></span>;
   if (a.waiting_on?.who === 'agent') return <span className="ag-mark" {...tipAttrs(pages.waits_on_agent)}><AppIcon name="more" size={14} /></span>;
   if (a.status === 'working') return <span className="app-s-ring" role="img" aria-label={pages.working} {...tipAttrs(pages.working)} />;
+  // at rest: no mark, as the sidebar (designer m_43933 #4)
+  if (a.status === 'idle') return null;
   return <Dot state={dotOf(a.status)} />;
 }
 

@@ -51,10 +51,11 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
     <section className="plg-place plg-page" data-testid={tid}>
       {/* the page's banner (ds PageBanner): its name and tags, what it does, what it gives, its own
           object in the box; its actions in the row under it (no button in a banner) */}
-      <PageBanner edge="page" gutter={gutter} icon="plugins" testId={`${tid}.lead`}
+      <PageBanner edge="column" gutter={gutter} icon="plugins" testId={`${tid}.lead`}
         title={<>{titleOf(p)}{tagsOf(p).map((t) => <span key={t} className="plg-tag">{t}</span>)}</>}
         sentence={p.what ?? ''}
-        facts={[gives(p), off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}
+        // a built-in plugin says 'always on' in its facts, never alone in the actions' row (designer m_43933 #11)
+        facts={[gives(p), c.kind === 'locked' ? settings.plugins_always_on : '', off > 0 ? settings.plugins_n_off({ n: off }) : ''].filter((x) => x !== '').join(' · ')}
         visual={<PluginIcon row={p} size="head" {...(project === undefined ? {} : { project })} {...(isComputer(p) ? { lit: true } : {})} />} />
       <div className="plg-page-col">
         <div className="plg-page-acts" data-testid={`${tid}.acts`}>
@@ -64,9 +65,7 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
                 {sentenceCase(p.action === 'set_up' ? settings.plugins_set_up : settings.plugins_connect)}
               </Button>
             ) : null
-          ) : c.kind === 'locked' ? (
-            <span className="plg-dim">{settings.plugins_always_on}</span>
-          ) : c.kind === 'set_up_cu' || (isComputer(p) && !p.on) ? (
+          ) : c.kind === 'locked' ? null : c.kind === 'set_up_cu' || (isComputer(p) && !p.on) ? (
             <Button kind="pri" onClick={ports.setUpComputer} testId={`${tid}.set_up`}>{sentenceCase(settings.plugins_set_up)}</Button>
           ) : (
             <>

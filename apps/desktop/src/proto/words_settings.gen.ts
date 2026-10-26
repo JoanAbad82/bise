@@ -1419,7 +1419,7 @@ export const settings = {
   /** a plugin's page: off */
   plugins_off_everywhere: "off for every project",
   /** a plugin's page: when a change reaches his agents */
-  plugins_change_when: (a: { when: string | number }): string => "your agents get a change " + String(a.when),
+  plugins_change_when: (a: { when: string | number }): string => "changes reach your agents " + String(a.when),
   /** a plugin's page: the try block's head, wide */
   plugins_try_head_wide: "try it · 1-3 puts it in main's composer",
   /** a plugin's page: the try block's head, narrow */

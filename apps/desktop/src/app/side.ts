@@ -5,6 +5,7 @@
 // the right panel is open by default from 1100 px). Owner: amb-win. Pure:
 // Sidebar.tsx and App.tsx draw these.
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
+import { hero } from '@/proto/words_hero.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { running } from '@/proto/words_running.gen';
 import { MAIN, type Route } from './route';
@@ -154,7 +155,13 @@ export function panelProject(route: Route, home: string | undefined, projects: n
 /** The library's crumb after 'artifacts': each part's words and its place ('desktop app' f/<theme>, 'agent view' f/<task>). */
 export type PlaceCrumb = (at: string) => readonly { name: string; at: string }[];
 
-export function crumbOf(route: Route, name: (project: string) => string, place: PlaceCrumb = () => []): string[] {
+/** A plugin's name in the crumb from its id: its own part, without its kind's prefix ('skills:bise' → 'bise'). Pure. */
+export function pluginCrumb(id: string): string {
+  return id.replace(/^(skills|mistral):/u, '');
+}
+
+/** `plugin`: a plugin's title from its id ('mistral:linear' → 'Linear'), the plugins' rows'; pluginCrumb when unknown. */
+export function crumbOf(route: Route, name: (project: string) => string, place: PlaceCrumb = () => [], plugin: (id: string) => string = pluginCrumb): string[] {
   switch (route.screen) {
     case 'bise':
       return [panel.bise];
@@ -162,17 +169,21 @@ export function crumbOf(route: Route, name: (project: string) => string, place: 
       return route.agent === MAIN ? [name(route.project)] : [name(route.project), route.agent];
     case 'agents':
       // /archived is its own list, its crumb says so (designer m_19489)
-      return [name(route.project), route.archived === true ? panel.archived : panel.agents];
+      // the page's title, chrome in sentence case (designer m_43933 #1; nm-pages-b): its banner's
+      return [name(route.project), route.archived === true ? hero.archived_title : hero.agents_title];
     case 'changes':
+      return [name(route.project), hero.changes_title];
     case 'prs':
+      return [name(route.project), hero.prs_title];
     case 'environments':
-      return [name(route.project), route.screen];
+      return [name(route.project), hero.environments_title];
     case 'review':
       return [name(route.project), route.agent, panel.crumb_changes];
     case 'debug':
       return [name(route.project), route.agent, panel.crumb_debug];
     case 'feature':
-      return [name(route.project), `ψ ${route.name}`];
+      // its name alone, no text glyph in the bar (ui-review m_43947 #3)
+      return [name(route.project), route.name];
     case 'commit':
       return [name(route.project), route.sha.slice(0, 7)];
     case 'branch':
@@ -187,11 +198,12 @@ export function crumbOf(route: Route, name: (project: string) => string, place: 
       return [panel.crumb_not_found];
     case 'report':
       // the page's own words (designer m_17010)
-      return [route.log === 'restart' ? panel.crumb_update_log : panel.crumb_crash];
+      return [route.log === 'restart' ? hero.update_log_title : hero.crash_title];
     case 'lab':
       return [panel.crumb_lab, route.lab];
     case 'plugins':
-      return route.id === undefined ? [panel.plugins] : [panel.plugins, route.id];
+      // a plugin's page: 'Plugins › bise', its title, never its id ('skills:bise'; designer m_43933 #2, ui-review m_43947 #1)
+      return route.id === undefined ? [hero.plugins_title] : [hero.plugins_title, plugin(route.id)];
     case 'running':
       // its noun, not its route's name (designer m_38642); in a scope, whose: 'acme › perf › processes'
       if (route.scope === undefined) return [running.heading];

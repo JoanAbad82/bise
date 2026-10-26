@@ -35,11 +35,11 @@ export const hero = {
   /** the processes screen's hero sentence */
   processes_say: "what your agents left running on this Mac.",
   /** the agents screen's hero sentence */
-  agents_say: "who works on this project now: main, your lead, and the agents it started, one per job.",
+  agents_say: "who works on this project now: bise, your lead, and the agents it started, one per job.",
   /** the archived agents screen's hero sentence */
   archived_say: "agents whose work is done. their threads stay here to read; restore one to talk to it again.",
   /** a project's changes screen's hero sentence (ui-review-app #2) */
-  changes_say: "what your agents changed here: their branches, the features they try, what reached main today.",
+  changes_say: "what your agents changed here: their branches, features on trial, what reached main.",
   /** a project's pull requests screen's hero sentence */
   prs_say: "the pull requests open on GitHub for this project. in PR flow, an agent opens one when its work is done.",
   /** a project's environments screen's hero sentence */

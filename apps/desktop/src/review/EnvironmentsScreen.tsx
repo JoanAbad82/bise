@@ -17,6 +17,9 @@ import { PageVignette, useBannerGutter } from '@/artifacts/hero/vignettes';
 import { useRouter } from '@/app/router';
 import { useEntityMenu } from '@/app/menus/use';
 import { StateMark } from '@/agents/AgentsScreen';
+import { shortAge } from '@/agents/model';
+import { useNow } from '@/app/clock';
+import { running } from '@/proto/words_running.gen';
 import { branchEnd } from './model';
 import './review.css';
 import { useKeptScroll } from '@/app/keep';
@@ -66,6 +69,7 @@ export function EnvironmentsScreen({ project }: { project: string }) {
     store.command({ cmd: 'processes', project });
   }, [store, project]);
 
+  const now = useNow();
   const places = placesOf(agents, worktrees, procs);
   const listening = procs.filter((p) => isRunning(p) && (p.ports?.length ?? 0) > 0).length;
   return (
@@ -80,7 +84,7 @@ export function EnvironmentsScreen({ project }: { project: string }) {
             <div key={p.path} role="group" aria-label={p.title} data-testid={`environments.place.${String(i)}`}>
               <GroupLabel>{p.worktree ? `${p.title} · ${branchEnd(p.worktree)}` : p.title}</GroupLabel>
               {p.agents.map((a) => <AgentRow key={a.name} project={project} a={a} />)}
-              {p.procs.map((s) => <ServerRow key={`${s.agent}/${s.id}`} project={project} s={s} />)}
+              {p.procs.map((s) => <ServerRow key={`${s.agent}/${s.id}`} project={project} s={s} now={now} />)}
             </div>
           ))}
         </div>
@@ -106,19 +110,20 @@ function AgentRow({ project, a }: { project: string; a: Agent }) {
   );
 }
 
-/** One server an agent left running: its name, then its command and its address; a click shows its output. */
-function ServerRow({ project, s }: { project: string; s: Proc }) {
+/** One server an agent left running (designer m_43933 #8): its command in mono, then who started it
+ *  and how long ago, and its address with the 'open' line icon when it serves one; a click shows its
+ *  output on the processes page. */
+function ServerRow({ project, s, now }: { project: string; s: Proc; now: number }) {
   const router = useRouter();
   const menu = useEntityMenu({ kind: 'process', project, agent: s.agent, id: s.id });
   const st = stateOf(s);
   const u = urlWords(s, st);
   const tid = `environments.server.${s.agent}.${s.id}`;
   return (
-    // the processes page's marks (designer m_43401): '∿' in text-3 while it runs, no green dot; its
-    // address with the 'open' line icon, never a text arrow
+    // the processes page's marks (designer m_43401): '∿' in text-3 while it runs, no green dot
     <ListRow testId={tid} tip={s.cmd} state={<span className="rv-wave" {...tipAttrs(pages.server_up)}>{markOf(st).glyph}</span>}
-      title={s.name ?? s.cmd}
-      sub={<><span className="rv-mono">{s.cmd}</span>{u !== null && <span className="rv-url">{' · '}<span className="rv-mono">{u.row}</span><AppIcon name="open" size={14} /></span>}</>}
+      title={<span className="rv-mono">{s.cmd}</span>}
+      sub={<>{`${running.by({ agent: s.agent })} · ${shortAge(now - s.started_ms)}`}{u !== null && <span className="rv-url">{' · '}{u.row}<AppIcon name="open" size={14} /></span>}</>}
       onContextMenu={menu.onContextMenu}
       end={<MoreButton menu={menu} testId={`${tid}.more`} />}
       onClick={() => {

@@ -3,7 +3,7 @@
   "hero.agents_say": {
     "args": [],
     "one": null,
-    "text": "who works on this project now: main, your lead, and the agents it started, one per job."
+    "text": "who works on this project now: bise, your lead, and the agents it started, one per job."
   },
   "hero.agents_title": {
     "args": [],
@@ -54,7 +54,7 @@
   "hero.changes_say": {
     "args": [],
     "one": null,
-    "text": "what your agents changed here: their branches, the features they try, what reached main today."
+    "text": "what your agents changed here: their branches, features on trial, what reached main."
   },
   "hero.changes_title": {
     "args": [],

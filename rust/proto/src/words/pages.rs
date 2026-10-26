@@ -75,11 +75,11 @@ crate::words! { pages:
 
     // ---- pull requests
     /// no PR open: the empty state's title
-    no_pr = "no open PR";
+    no_pr = "no pull request open.";
 
     // ---- environments
     /// the project's checkout every agent without a worktree works in
-    shared_folder = "the shared folder";
+    shared_folder = "The shared folder";
     /// nobody works here
     no_places = "no agents at work here";
     /// a server row's state mark tip
