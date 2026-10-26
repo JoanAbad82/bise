@@ -11,10 +11,13 @@
 // finds under it (↑/↓ the highlighted row, ⏎ opens it in this tab), a URL goes to his browser on ⏎
 // (no web page loads in the app: main/guard.ts), esc clears it, then closes the tab. Owner: nm-panel.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppIcon, IconButton, Input, KindIcon, Press, iconKindOf, tipAttrs } from '@/ds';
+import { AppIcon, IconButton, Input, Kbd, KindIcon, Press, iconKindOf, tipAttrs } from '@/ds';
 import { ds } from '@/proto/words_ds.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { ArtifactOpen, ArtifactVersions, useAllArtifacts } from '@/artifacts';
+import { browserUrl } from '@/artifacts/Open';
+import { PRIMARY_KEY } from '@/artifacts/front';
+import { useModHeld } from '@/app/held';
 import { useEntityMenu } from '@/app/menus/use';
 import { closeTabId, openWhat } from './state';
 import { launchEnter, launchMatches, stepAt } from './launch';
@@ -55,6 +58,9 @@ export function Browser({ project, id, tabId }: { project: string; id: string; t
     };
   }, [id, tabId]);
   const address = a === undefined ? id : `${a.kind} · ${a.title} v${String(shown)}`;
+  // ↗: what the page's head would open; ⌘ held, its ⌘⏎ keycap in place of the glyph (app/held.ts)
+  const out = a === undefined ? null : browserUrl(a, shown);
+  const cmd = useModHeld('Meta');
   return (
     <div className="pn-browser" data-testid="app.panel.browser" data-artifact={id}>
       <div className="pn-addr" data-testid="app.panel.addr">
@@ -105,16 +111,19 @@ export function Browser({ project, id, tabId }: { project: string; id: string; t
             }}
           />
         )}
+        {/* the page's head's '↗ browser', the same url (Open.tsx browserUrl: never a file path) and
+            the same ⌘⏎ (artifacts/front.ts: the bare page below runs it) */}
         <IconButton
           label={panel.addr_out}
+          keys={out === null ? undefined : PRIMARY_KEY}
           size="bar"
-          disabled={a === undefined || a.url === ''}
+          disabled={out === null}
           onClick={() => {
-            if (a !== undefined) void bise?.openExternal(a.url);
+            if (out !== null) void bise?.openExternal(out);
           }}
           testId="app.panel.addr.out"
         >
-          <AppIcon name="open" size={16} />
+          {cmd && out !== null ? <Kbd>{PRIMARY_KEY}</Kbd> : <AppIcon name="open" size={16} />}
         </IconButton>
         {/* the bar's own size, like ← → ⟳ ↗ (ui-review m_42619 #6: ds' MoreButton is a row's 28) */}
         <IconButton label={ds.more_actions} size="bar" onClick={menu.open} testId="app.panel.addr.more">

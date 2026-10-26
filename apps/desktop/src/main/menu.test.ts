@@ -44,7 +44,7 @@ describe('the application menu (bar ⛔2)', () => {
   it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save, ⌘N / ⇧⌘N new project / agent, ⌘B / ⌥⌘B the sides", () => {
     const { items, sent } = build('darwin');
     const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
-    expect([...keys.keys()].sort()).toEqual(['Alt+CmdOrCtrl+B', 'CmdOrCtrl+,', 'CmdOrCtrl+B', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'Ctrl+`', 'Shift+CmdOrCtrl+N']);
+    expect([...keys.keys()].sort()).toEqual(['Alt+CmdOrCtrl+B', 'CmdOrCtrl+,', 'CmdOrCtrl+B', 'CmdOrCtrl+Enter', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'Ctrl+`', 'Shift+CmdOrCtrl+N']);
     for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N', 'CmdOrCtrl+B', 'Alt+CmdOrCtrl+B']) {
       const click = keys.get(k)?.click as (() => void) | undefined;
       click?.();
@@ -105,6 +105,22 @@ describe('menuTarget (qa-native m_9724)', () => {
     expect(menuTarget('save', false)).toEqual({ send: 'focused' });
     const { items } = build('darwin');
     expect(items.find((i) => i.accelerator === 'CmdOrCtrl+S')?.label).toBe('Save a Copy…');
+  });
+
+  it('File › Open in Browser ⌘⏎ (artifact-shortcut) goes to the focused page; dimmed with no artifact in front', () => {
+    expect(menuTarget('browser', false)).toEqual({ send: 'focused' });
+    const item = (sides?: { sidebar: boolean; panel: boolean; artifact?: boolean }) => {
+      const sent: string[] = [];
+      const t = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: (a) => sent.push(a), ...(sides ? { sides } : {}) });
+      const sub = (t.find((m) => m.label === 'File')?.submenu ?? []) as MenuItemConstructorOptions[];
+      return { i: sub.find((x) => x.accelerator === 'CmdOrCtrl+Enter'), sent };
+    };
+    expect(item().i?.label).toBe(menus.open_browser);
+    expect(item().i?.enabled).toBe(false);
+    const { i, sent } = item({ sidebar: true, panel: false, artifact: true });
+    expect(i?.enabled).toBe(true);
+    (i?.click as (() => void) | undefined)?.();
+    expect(sent).toEqual(['browser']);
   });
 
   it('File: New Project… ⌘N and New Agent… ⇧⌘N (his m_44225) go to the focused window, never a route', () => {

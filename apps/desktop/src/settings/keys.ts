@@ -50,6 +50,7 @@ export const KEY_SECTIONS: readonly KeySection[] = [
       { keys: '⌘F', action: settings.key_find, tui: 'ctrl+f' },
       { keys: '⌘D', action: settings.key_diff, tui: '/diff' },
       { keys: '⌘⇧A', action: settings.key_artifacts, tui: '/artifacts' },
+      { keys: '⌘⏎', action: settings.key_artifact_primary },
       { keys: '⌘E', action: settings.key_fold, tui: 'ctrl+o' },
       { keys: '⌘,', action: settings.key_settings },
       { keys: '⌘/', action: settings.key_this_list, tui: '/shortcuts' },

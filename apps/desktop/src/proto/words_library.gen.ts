@@ -198,6 +198,8 @@ export const library = {
   tip_stack: (a: { n: string | number; what: string | number }): string => String(a.n) + " " + String(a.what) + " saved in one turn",
   /** a PR's or a link's ↗ on its card */
   tip_leaves: "opens in your browser",
+  /** an open artifact's ⤓, its name and tip (with its key: `Save a copy… · ⌘S`, `· ⌘⏎` while it is the head's first button; designer m_45455) */
+  head_save: "Save a copy…",
   /** a card's ··· */
   tip_more: "more: open, move, archive…",
   /** a card's pick circle */

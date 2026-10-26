@@ -9,7 +9,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { APP_FRAME_NAME } from './frameNote';
 import { useFrameNote } from './useFrameNote';
-import { Button, IconButton, PickerPop, PickerTrigger, Press } from '@/ds';
+import { Button, IconButton, Kbd, PickerPop, PickerTrigger, Press } from '@/ds';
+import { frame as frameWords } from '@/proto/words_frame.gen';
+import { library } from '@/proto/words_library.gen';
+import { panel } from '@/proto/words_panel.gen';
+import { useModHeld } from '@/app/held';
+import { PRIMARY_KEY, useArtifactFront } from './front';
 import type { Artifact, ArtifactLive } from '@/proto';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useProjects, useStore } from '@/store';
@@ -143,6 +148,31 @@ export function browserUrl(
   const framed = frameSrc(a, shown, null);
   if (framed !== null) return framed;
   return /^https?:\/\//i.test(a.url) ? versionUrl(a.url, a.version, shown) : null;
+}
+
+/**
+ * The head's first button, its primary action (⌘⏎, front.ts): '↗ browser' when browserUrl gives a
+ * url (pages, decks, sheets, docs, links, a PR's page), else '⤓ save a copy…' when `save` is the
+ * version's bytes (a file with no page); null: neither button. Pure.
+ */
+export type Primary = { readonly act: 'browser'; readonly url: string } | { readonly act: 'save' };
+export function primaryOf(out: string | null, canSave: boolean): Primary | null {
+  if (out !== null) return { act: 'browser', url: out };
+  return canSave ? { act: 'save' } : null;
+}
+
+/**
+ * A row's primary action (the folded float's row, ⌘⏎ under the pointer): what its head's first
+ * button does at its current version, run from the row; null: none. The save goes straight to the
+ * window's save sheet (no strip: the row has none).
+ */
+export function rowPrimary(a: Artifact): (() => void) | null {
+  const bise = bridge();
+  const toSave = saveOf(a, a.version);
+  const p = primaryOf(browserUrl(a, a.version), toSave !== null && bise?.saveCopy !== undefined);
+  if (p === null) return null;
+  if (p.act === 'browser') return () => { void bise?.openExternal?.(p.url); };
+  return () => { if (toSave !== null) void bise?.saveCopy?.(toSave.path, toSave.name); };
 }
 
 /** The save line icon (designer m_26482): an arrow down onto a short line, 16 px, stroke 1.5. */
@@ -398,6 +428,13 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
   const hug = useFrameNote(frame, src, project, id, it?.a.title ?? '');
   // page-unreach: the page is framed once its server answers; meanwhile the panel says why (reach.ts)
   const { reach, again } = useReach(src);
+  // ⌘⏎ (front.ts): the head's first button, whether the head shows (the open view) or a panel tab's bar does
+  const primary = it === undefined ? null : primaryOf(browserUrl(it.a, v ?? it.a.version), toSave !== null && bise?.saveCopy !== undefined);
+  const runPrimary = primary === null ? null : primary.act === 'browser' ? () => { openChecked(primary.url, bise, again); } : save;
+  const box = useRef<HTMLElement>(null);
+  useArtifactFront(box, bare ? 'panel' : 'view', runPrimary);
+  // ⌘ held: the first button's ⌘⏎ keycap in place of its words (held.ts)
+  const cmd = useModHeld('Meta');
   const row = useProjects().find((p) => p.project === project);
   const close = () => {
     // ✕ and esc as ‹: back to the place before (designer's desktop-history); opened straight (a link) the list
@@ -438,13 +475,14 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
   const shown = v ?? a.version;
   const url = versionUrl(a.url, a.version, shown);
   // '↗ browser': what the panel frames, else an http(s) url; none: no button
-  const out = browserUrl(a, shown);
+  const out = primary?.act === 'browser' ? primary.url : null;
   // show in Finder: the file, else bise's copy when the file is gone (an archived agent's temp folder)
   const path = revealPathOf(a, shown);
   const finder = bise?.showInFinder;
   const canSave = toSave !== null && bise?.saveCopy !== undefined;
+  const savePrimary = primary?.act === 'save';
   return (
-    <section className="art-open" data-testid="artifact.open" data-agent={a.agent} data-bare={bare || undefined} onKeyDown={onKeyDown}>
+    <section ref={box} className="art-open" data-testid="artifact.open" data-agent={a.agent} data-bare={bare || undefined} onKeyDown={onKeyDown}>
       {!bare && <div className="art-open-head" data-testid="artifact.head">
         {lead}
         <span className="art-open-title" data-testid="artifact.title" title={a.title}>{a.title}</span>
@@ -457,12 +495,14 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
               onPick={(n) => { setV(n); setMenu(null); setGoneLine(a.live?.line ?? null); setSaved(null); }} />
           )}
           {out !== null && (
-            <Button kind="ghost" size="sm" onClick={() => { openChecked(out, bise, again); }} testId="artifact.browser" title="open in browser">
-              ↗ browser
+            <Button kind="ghost" size="sm" onClick={() => { openChecked(out, bise, again); }} testId="artifact.browser" title={frameWords.tip_key({ what: panel.addr_out, key: PRIMARY_KEY })}>
+              {cmd ? <Kbd>{PRIMARY_KEY}</Kbd> : '↗ browser'}
             </Button>
           )}
           {canSave && (
-            <IconButton label="save a copy…" keys="⌘S" size="bar" onClick={save} testId="artifact.save"><SaveIcon /></IconButton>
+            <IconButton label={library.head_save} keys={savePrimary ? PRIMARY_KEY : '⌘S'} size="bar" onClick={save} testId="artifact.save">
+              {savePrimary && cmd ? <Kbd>{PRIMARY_KEY}</Kbd> : <SaveIcon />}
+            </IconButton>
           )}
           <IconButton ref={moreAt} label="more" size="bar" pressed={menu === 'more'} onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</IconButton>
           {menu === 'more' && (

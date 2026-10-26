@@ -1444,6 +1444,11 @@
     "one": null,
     "text": "added"
   },
+  "settings.key_artifact_primary": {
+    "args": [],
+    "one": null,
+    "text": "open the artifact in your browser, or save a copy"
+  },
   "settings.key_artifacts": {
     "args": [],
     "one": null,

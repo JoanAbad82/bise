@@ -131,12 +131,14 @@ export interface SideRowProps {
   readonly onClick: MouseEventHandler<HTMLButtonElement>;
   readonly menu: EntityMenu;
   readonly testId: string;
+  /** the row's box (an artifact's row: ⌘⏎ under the pointer, artifacts/front.ts) */
+  readonly ref?: Ref<HTMLDivElement>;
 }
 
 /** A card's row: one button (its click, its focus ring, its VoiceOver name), the entity's menu on a right click. */
-export function SideRow({ pic, title, sub, end, label, tip, onClick, menu, testId }: SideRowProps) {
+export function SideRow({ pic, title, sub, end, label, tip, onClick, menu, testId, ref }: SideRowProps) {
   return (
-    <div className="s3-row" onContextMenu={menu.onContextMenu} data-testid={testId}>
+    <div ref={ref} className="s3-row" onContextMenu={menu.onContextMenu} data-testid={testId}>
       <Press look="s3-row-body" aria-label={label} {...tipAttrs(tip)} onClick={onClick} data-row="">
         <span className="s3-row-pic">{pic}</span>
         <span className="s3-row-lines">

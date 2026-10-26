@@ -103,6 +103,10 @@ export function openInbox(at?: { project: string; card: number }): boolean {
   return opened;
 }
 
+/** The blocks with an item open now: the inbox is in front, its ⌘⏎ wins over the artifact's (artifacts/front.ts). */
+const openBlocks = new Set<symbol>();
+export const inboxItemOpen = (): boolean => openBlocks.size > 0;
+
 /** Hear openInbox (the block itself, a test): returns the unsubscribe. */
 export function onOpenInbox(f: (at: OpenAt) => boolean): () => void {
   openers.add(f);
@@ -411,6 +415,15 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   if (listed !== undefined && seen !== listed) setSeen(listed);
   if (listed === undefined && open !== null && seen !== null && cardKey(seen) === open && closed === null && keepsWords(seen, gone)) setClosed(seen);
   const openCard = listed ?? (closed !== null && cardKey(closed) === open ? closed : undefined);
+  const isOpen = openCard !== undefined;
+  useEffect(() => {
+    if (!isOpen) return;
+    const me = Symbol('block');
+    openBlocks.add(me);
+    return () => {
+      openBlocks.delete(me);
+    };
+  }, [isOpen]);
   useEffect(() => {
     const f = () => {
       setClosed(null);

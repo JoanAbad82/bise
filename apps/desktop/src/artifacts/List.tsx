@@ -12,7 +12,7 @@ import { library } from '@/proto/words_library.gen';
 import { onCardClick, type PickHow } from './Card';
 import { Thumb } from './thumbs';
 import { useAllArtifacts } from './hooks';
-import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
+import { bridge, copyLink, openWithVersions, rowPrimary, usePutInMessage } from './Open';
 import { leaves, LEAVES, useGoArtifact } from './leave';
 import './artifacts.css';
 import { Press } from '@/ds';
@@ -41,6 +41,13 @@ export interface RowsProps {
 export function rowKey(e: KeyboardEvent, cur: Item | undefined, p: Pick<RowsProps, 'onOpen' | 'onLook' | 'onPut'>): boolean {
   if (cur === undefined || e.altKey || e.ctrlKey) return false;
   if (e.metaKey) {
+    // ⌘⏎: its head's first button, '↗ browser' else save a copy (front.ts, Open.tsx rowPrimary)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const run = rowPrimary(cur.a);
+      if (run === null) return false;
+      run();
+      return true;
+    }
     if (e.key !== 'c') return false;
     copyLink(cur.a.url);
     return true;

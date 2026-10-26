@@ -3,7 +3,7 @@
 // Electron roles, so each does exactly what the OS does (undo, redo, cut,
 // copy, paste, select all in the focused field; hide, quit, close, minimize)
 // and shows in the menu bar with its key. bise's own items (settings ⌘,,
-// inbox ⌘I, find ⌘F, terminal ⌃`, File › save a copy ⌘S) only send a MenuAction to the focused window's
+// inbox ⌘I, find ⌘F, terminal ⌃`, File › open in browser ⌘⏎ and save a copy ⌘S) only send a MenuAction to the focused window's
 // renderer, which decides what it means (src/shared/api.ts onMenu). The Agent menu (bise fait mac,
 // d4) is the agent in view's '…' with its keys live, every item dimmed when no agent is (main/agentmenu.ts).
 // Owner: nm-menus.
@@ -88,6 +88,9 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       ]
     : [];
 
+  // ⌘⏎ (artifact-shortcut, side-ux m_45436): the artifact in front's primary action, its head's first
+  // button (artifacts/front.ts); dimmed while the focused window shows none (ViewSides.artifact)
+  const browser: MenuItemConstructorOptions = { ...item(menus.open_browser, 'CmdOrCtrl+Enter', 'browser'), enabled: o.sides?.artifact === true };
   const file: MenuItemConstructorOptions = {
     label: 'File',
     // art-save: the open artifact's 'save a copy…' (no artifact open: the window does nothing);
@@ -97,8 +100,8 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       item('New Agent…', 'Shift+CmdOrCtrl+N', 'newAgent'),
       { type: 'separator' },
       ...(mac
-        ? [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, { role: 'close' as const }]
-        : [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, settings, { type: 'separator' as const }, { role: 'close' as const }, { role: 'quit' as const }]),
+        ? [browser, item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, { role: 'close' as const }]
+        : [browser, item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, settings, { type: 'separator' as const }, { role: 'close' as const }, { role: 'quit' as const }]),
     ],
   };
 
@@ -174,6 +177,6 @@ export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget
   // New Project / New Agent are the main window's sheets: the focused window's (the main one, or
   // nothing in the capsule), never a route to open
   // the two sides are the focused window's own (View › Hide/Show Sidebar, Panel), never a route either
-  if (action === 'find' || action === 'save' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || mainFocused) return { send: 'focused' };
+  if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || mainFocused) return { send: 'focused' };
   return { open: action };
 }

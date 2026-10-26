@@ -9,6 +9,8 @@
 // through its own per-key hooks, so an event re-renders the rows it
 // touches, never the shell, the sidebar or the composer.
 import { takeZoomKey } from '@/artifacts/zoomKeys';
+import { useHasFront, usePrimaryKey } from '@/artifacts/front';
+import { inboxItemOpen } from '@/inbox';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter, type SavedHistory } from './router';
 import { useHistoryWays } from './esc-up';
@@ -245,14 +247,18 @@ function Shell() {
   useMenuAction('panel', () => {
     if (!menuEcho(frameKeyAt.panel, Date.now())) frame.toggle('panel');
   });
+  // ⌘⏎ and File › Open in Browser: the artifact in front's primary action (artifacts/front.ts); the
+  // inbox in front (its screen, an item open in its block) keeps its own ⌘⏎
+  usePrimaryKey(() => router.get().screen === 'inbox' || inboxItemOpen());
+  const artifactShown = useHasFront();
   // the View menu's labels flip with the two sides (main/agentmenu.ts rebuilds on a change)
   const panelOpen = usePanelState().open;
   const sidebarShown = frame.side || frame.over === 'side';
   useEffect(() => {
     // a component test's window.bise may be a partial fake, and the page outside Electron has none
     const bise = (window as Partial<Window>).bise as Partial<Window['bise']> | undefined;
-    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen });
-  }, [sidebarShown, panelOpen]);
+    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen, artifact: artifactShown });
+  }, [sidebarShown, panelOpen, artifactShown]);
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
   // R8: a /model the core holds for its provider opens that provider's setup (amb-home)

@@ -5,7 +5,10 @@
 // in text-3 while it runs (the processes page's mark: green is only a diff's +, designer m_44499).
 // Scheduled: a timer's hourglass, a watch's telescope, its rhythm and next time. Each row opens its thing in a tab (openTab) and
 // wires its entity's menu (useEntityMenu). Owner: nm-side.
+import { useRef } from 'react';
 import type { Agent, Proc } from '@/proto';
+import { useArtifactFront } from '@/artifacts/front';
+import { rowPrimary } from '@/artifacts/Open';
 import { AppIcon, tipAttrs, type AppIconName } from '@/ds';
 import { ago } from '@/agents/model';
 import { kindOf, type Item } from '@/artifacts/model';
@@ -28,8 +31,12 @@ const CHIP: Record<ReturnType<typeof kindOf>, AppIconName> = { pr: 'branch', pag
 export function ArtifactRow({ it, now }: { it: Item; now: number }) {
   const a = it.a;
   const menu = useEntityMenu({ kind: 'artifact', project: it.project, id: a.id });
+  // ⌘⏎ with the pointer on the row: its head's first button (artifacts/front.ts rowPrimary)
+  const box = useRef<HTMLDivElement>(null);
+  useArtifactFront(box, 'row', rowPrimary(a));
   return (
     <SideRow
+      ref={box}
       pic={<ThingPic thing={{ obj: artifactObj(a.kind) }} px={ROW_PX} tile="artifacts" />}
       title={
         <span className="b-artchip s3-chip">

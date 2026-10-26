@@ -588,6 +588,8 @@ export const settings = {
   key_diff: "the agent's changes",
   /** ⌘⇧A */
   key_artifacts: "the artifacts",
+  /** ⌘⏎ (artifact-shortcut): the artifact in front's head's first button */
+  key_artifact_primary: "open the artifact in your browser, or save a copy",
   /** ⌘E */
   key_fold: "unfold / fold everything",
   /** ⌘, */
