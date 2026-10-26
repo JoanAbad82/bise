@@ -115,7 +115,7 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group }: { r: BarRow; a: A
               <Pr r={r} onOpenPr={onOpenPr} />
             </span>
           </span>
-          <span className="s3-arow-l2" data-err={failed || undefined} data-testid={`${id}.role`}>{asks ? card.question : group !== undefined && a !== undefined ? roleWords(a.title) : r.sub}</span>
+          <span className="s3-arow-l2" data-err={failed || undefined} data-testid={`${id}.role`}>{asks ? card.question : group !== undefined && a !== undefined ? roleWords(a.note || a.title || a.purpose) : r.sub}</span>
         </span>
       </Press>
       {b !== null && card !== undefined && (

@@ -97,7 +97,7 @@ export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: s
               e.stopPropagation();
               void (window as Partial<Window>).bise?.openExternal(u.url);
             }} data-testid={`app.flyout.processes.${x.project}.${p.agent}.${p.id}.port`}>
-              {u.label}
+              {u.label.replace(/ ↗$/u, '')}
               <AppIcon name="open" size={14} />
             </span>
           )}

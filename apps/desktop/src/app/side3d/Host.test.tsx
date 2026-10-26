@@ -241,7 +241,7 @@ describe('the right side, folded', () => {
       act(() => {
         vi.advanceTimersByTime(1);
       });
-      expect(['agents', 'artifacts', 'scheduled', 'processes'].map((b) => v.getByTestId(`app.bubble.${b}.key`).textContent)).toEqual(['⌥1', '⌥2', '⌥3', '⌥4']);
+      expect(['agents', 'artifacts', 'scheduled', 'processes'].map((b) => v.getByTestId(`app.bubble.${b}.key`).textContent)).toEqual(['⌥⌘1', '⌥⌘2', '⌥⌘3', '⌥⌘4']);
       for (const b of ['agents', 'artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.bubble.${b}.card`)).toBeTruthy();
       // the agents card: perf asks him, in the accent; 2 working under it
       const agents = v.getByTestId('app.bubble.agents.card');
@@ -267,9 +267,9 @@ describe('the right side, folded', () => {
     vi.useFakeTimers();
     try {
       const { v } = side3d();
+      // no card ever; ⌥⌘ held alone shows the coins' caps (their true key, designer m_45787), never a card
       const none = () => {
         expect(v.container.querySelector('.s3-tcard')).toBeNull();
-        expect(v.queryByTestId('app.bubble.agents.key')).toBeNull();
       };
       const press = (...keys: KeyboardEventInit[]) => {
         act(() => {
@@ -291,7 +291,20 @@ describe('the right side, folded', () => {
       // ⌥ down while another modifier is held, or one joins it
       press({ key: 'Shift', shiftKey: true }, { key: 'Alt', altKey: true, shiftKey: true });
       press({ key: 'Alt', altKey: true }, { key: 'Shift', altKey: true, shiftKey: true });
-      press({ key: 'Alt', altKey: true }, { key: 'Meta', altKey: true, metaKey: true });
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', altKey: true, metaKey: true }));
+        vi.advanceTimersByTime(HINT_HOLD_MS);
+      });
+      act(() => {
+        vi.advanceTimersByTime(CARD_HOLD_MS * 4);
+      });
+      none();
+      expect(v.getByTestId('app.bubble.agents.key').textContent).toBe('⌥⌘1');
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' }));
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
+      });
       // a key typed mid-hold, after 200 ms: the hold ends, nothing shows after
       act(() => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
@@ -450,7 +463,7 @@ describe('the right side, folded', () => {
       act(() => {
         vi.advanceTimersByTime(CARD_HOLD_MS);
       });
-      expect(slot.getByTestId('app.mini.scheduled.n').textContent).toBe('⌥3');
+      expect(slot.getByTestId('app.mini.scheduled.n').textContent).toBe('⌥⌘3');
       expect(document.querySelector('.s3-tcard')).toBeNull();
       act(() => {
         window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));

@@ -29,7 +29,7 @@ import { useNowFor } from '../clock';
 import { useRoute, useRouter } from '../router';
 import { MAIN, projectOf } from '../route';
 import { useMenuAction } from '../menu';
-import { useModHeldFor } from '../held';
+import { useModHeld, useModHeldFor } from '../held';
 import { CARD_HOLD_MS, CARD_HOVER_MS, CoinCardView } from './Cards';
 import { coinCard, type CardFacts } from './coincard';
 import { inRank, agentCounts, bubbleBadge, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type BubbleCount, type Counts } from './model';
@@ -93,8 +93,8 @@ export function bubbleTops(world: 'small' | 'bubble'): { readonly world: number 
   return { world: world === 'bubble' ? TOP_STACK : null, bubbles: tops };
 }
 
-/** A bubble's key while the side is folded ('⌥1' for the first, top to bottom: keys.ts). Pure. */
-export const bubbleKey = (b: BubbleId): string => `⌥${String(BUBBLES.indexOf(b) + 1)}`;
+/** A coin's key, its true one ('⌥⌘1' for the first, top to bottom: keys.ts; ⌥1-9 are the agents', designer m_45787). Pure. */
+export const bubbleKey = (b: BubbleId): string => `⌥⌘${String(BUBBLES.indexOf(b) + 1)}`;
 
 /** The row ↑ (-1) or ↓ (+1) goes to from `at` (-1: none focused: ↓ the first, ↑ the last), kept in the card's `n` rows. Pure. */
 export function rowStep(at: number, n: number, by: 1 | -1): number {
@@ -234,6 +234,9 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   // ⌥ held alone 300 ms: each coin shows its key and its card, all four at once (held.ts; keys.ts
   // gives ⌥1-4 to the folded side; page folded-side v9); any other key or the release hides them
   const alt = useModHeldFor('Alt', CARD_HOLD_MS);
+  // the coins' caps show their true key, ⌥⌘N: with ⌥ held beside their cards, with ⌥⌘ held alone (no cards; designer m_45787)
+  const altMeta = useModHeld('AltMeta');
+  const caps = alt || altMeta;
   // a hover 400 ms: that coin's card alone, gone on leave (its tip, information only)
   const [hover, setHover] = useState<BubbleId | null>(null);
   const hoverT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -451,7 +454,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   return (
     <div className="s3-side" ref={root} data-world={world} data-at={coinsAt} style={coinsAt === 'between' ? { right } : undefined} data-testid="app.side">
       {mini && slot !== null && createPortal(
-        <Minis counts={miniCounts} badge={bubbleBadge('agents', counts)} tips={miniTips} open={open} keys={alt ? bubbleKey : null} onClick={(b) => {
+        <Minis counts={miniCounts} badge={bubbleBadge('agents', counts)} tips={miniTips} open={open} keys={caps ? bubbleKey : null} onClick={(b) => {
           anchor();
           toggle(b);
         }} />,
@@ -472,7 +475,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       )}
       {!mini && BUBBLES.map((b) => (
         <Bubble key={b} id={b} count={bubbleCount(b, counts)} badge={bubbleBadge(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]}
-          hint={alt ? bubbleKey(b) : undefined} onHover={onHover(b)} onClick={() => {
+          hint={caps ? bubbleKey(b) : undefined} onHover={onHover(b)} onClick={() => {
           clearTimeout(hoverT.current);
           setHover(null);
           toggle(b);
