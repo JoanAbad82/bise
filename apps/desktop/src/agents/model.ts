@@ -22,6 +22,16 @@ export function dotOf(s: Status): DotState {
 }
 
 /**
+ * Its turn runs, for his composer: working, or waiting on a reply inside its turn (sb wait, sb ask,
+ * a --then pause), as rows::Agent::turn_running counts it since issue 22. Then tab queues his words
+ * for the turn's end (sb-core holds them while its run is busy), ⏎ steers, the send button stops.
+ * Pure.
+ */
+export function turnRuns(s: Status | undefined): boolean {
+  return s === 'working' || s === 'waiting';
+}
+
+/**
  * A length of time, short, the same everywhere (ambient m_12439: the
  * sidebar's turn time, the head's age, the inbox card's age()): "now",
  * "4 min", "2 h", "3 d". Pure.

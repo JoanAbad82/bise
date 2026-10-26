@@ -18,6 +18,7 @@ import { PRIMARY_KEY, useArtifactFront } from './front';
 import type { Artifact, ArtifactLive } from '@/proto';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useProjects, useStore } from '@/store';
+import { turnRuns } from '@/agents/model';
 import { downWords, probed, useReach, type DownWords } from './reach';
 import { themeOf } from '@/theme';
 import { answerOf, ThreadComposer } from '@/thread/ThreadComposer';
@@ -401,7 +402,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
   const [answering, setAnswering] = useState<Answering | null>(null);
   const agent = words?.agent ?? '';
   const agents = useAgents(project);
-  const busy = agents.find((x) => x.name === agent)?.status === 'working';
+  const busy = turnRuns(agents.find((x) => x.name === agent)?.status);
   // the maker its composer writes to: its place, context and model in the tab and the box's row
   const maker = words === undefined ? undefined : agents.find((x) => x.name === words.agent);
   const makerPlace = useTabPlace(project, maker, false);

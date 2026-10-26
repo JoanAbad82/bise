@@ -29,7 +29,7 @@ import { takeQuotes } from '@/review/quote';
 import { QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { HubNoteRow, InboxBlock, type Answering } from '@/inbox';
-import { shownName } from '@/agents/model';
+import { shownName, turnRuns } from '@/agents/model';
 import { StartingLine } from './StartingLine';
 import { useColumn } from './column';
 import { TitleRename } from './Rename';
@@ -116,7 +116,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   // voice mode on this agent: its pane takes the composer's place (amb-home's src/voicemode)
   const voice = useVoiceHere(project, agent);
   const typing = useTyping(tkey);
-  const busy = me?.status === 'working' || typing !== '';
+  const busy = turnRuns(me?.status) || typing !== '';
   // an open artifact's block lists only its maker's own items (this thread's agent)
   const onlyMaker = useCallback((c: Card) => c.project === project && c.agent === agent, [project, agent]);
 

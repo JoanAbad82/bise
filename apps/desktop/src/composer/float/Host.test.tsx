@@ -15,8 +15,8 @@ import { FloatHost } from './Host';
 
 vi.mock('@/composer', () => ({
   // the field is the composer's own (its tests); here a focusable stand-in that says its placeholder
-  Composer: ({ placeholder, testId }: { placeholder?: string; head?: ReactNode; testId?: string }) => (
-    <div data-testid={testId}>
+  Composer: ({ placeholder, testId, busy }: { placeholder?: string; head?: ReactNode; testId?: string; busy?: boolean }) => (
+    <div data-testid={testId} data-busy={busy === true || undefined}>
       <input data-testid="composer.field" placeholder={placeholder} />
     </div>
   ),
@@ -39,7 +39,7 @@ const mount = (route: Route) => {
       </RouterContext>
     </StoreProvider>,
   );
-  return { ...v, sent };
+  return { ...v, sent, store };
 };
 
 const state = (v: ReturnType<typeof mount>) => v.getByTestId('composer.float').dataset['state'];
@@ -73,6 +73,18 @@ describe('FloatHost', () => {
     fireEvent.focus(v.getByTestId('composer.field'));
     fireEvent.pointerDown(document.body);
     expect(state(v), 'a press outside folds it').toBe('rest');
+  });
+
+  it("its addressee waiting inside its turn (sb wait, sb ask, a --then pause) is busy: tab queues his words for the turn's end (his m_45980)", () => {
+    const v = mount({ screen: 'agents', project: 'acme-1a2b3c4d' });
+    const busy = (status: 'waiting' | 'idle') => {
+      act(() => {
+        v.store.apply({ ev: 'agents', project: 'acme-1a2b3c4d', agents: [{ name: 'main', dir: 'main', main: true, status, archived: false, title: '', purpose: '', since_ms: 1, waits: 0, watching: [] }] });
+      });
+      return v.getByTestId('composer').dataset['busy'];
+    };
+    expect(busy('waiting')).toBe('true');
+    expect(busy('idle')).toBeUndefined();
   });
 
   it("a project's page writes to its main", () => {

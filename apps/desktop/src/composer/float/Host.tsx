@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppIcon, PickerPop, PickerTrigger, Press, tipAttrs } from '@/ds';
 import { InboxBlock, type Answering } from '@/inbox';
 import { ThreadDrop } from '@/artifacts/Drops';
-import { shownName } from '@/agents/model';
+import { shownName, turnRuns } from '@/agents/model';
 import { threadKey, useAgents, useProjects, useStore, useThreadOrder } from '@/store';
 import { MAIN } from '@/app/route';
 import { useRoute } from '@/app/router';
@@ -220,7 +220,7 @@ function Float({ to: def, about }: { to: FloatTo; about?: FloatAbout }) {
       <ThreadComposer
         project={project}
         agent={agent}
-        busy={me?.status === 'working'}
+        busy={turnRuns(me?.status)}
         tab={tab}
         tabEnd={answering?.end}
         me={me}

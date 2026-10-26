@@ -83,6 +83,23 @@ describe('the thread screen', () => {
     expect(v.queryByTestId('thread.scheduled.34.head')).toBeNull();
   });
 
+  it("an agent waiting inside its turn (sb wait, sb ask, a --then pause) is busy: tab queues his words for the turn's end (his m_45980)", () => {
+    const { store } = setup();
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
+      </StoreProvider>,
+    );
+    const at = (status: 'waiting' | 'idle') => {
+      act(() => {
+        store.apply({ ev: 'agents', project: P, agents: store.agents(P).map((a) => (a.name === 'perf' ? { ...a, status } : a)) });
+      });
+      return composer.props?.busy;
+    };
+    expect(at('waiting')).toBe(true);
+    expect(at('idle')).toBe(false);
+  });
+
   it('⛔3: a send shows at once as his row, before any event; a failed one says so and retries', () => {
     const { store, cmds } = setup();
     const row = render(
