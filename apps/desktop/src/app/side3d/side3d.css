@@ -644,17 +644,49 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* talks and asks: a tail of 6 toward the head, 14 from the top */
+/* talks and asks: a tail of 6 toward the head, 14 to 26 from the top, one shape with the card (his
+   m_45876): the card's 1 px rule moves to ::before with a gap where the tail joins, the tail is the
+   outer half of a square turned 45° (its diagonal on the card's edge, never over its fill: the fill
+   is translucent) in the same fill, the same rule on its two outer sides */
+.s3-say[data-k='talks'],
+.s3-say[data-k='idle'],
+.s3-say[data-k='asks'] {
+  --say-fill: var(--c-raised);
+  --say-line: var(--c-line);
+  background: var(--say-fill);
+  box-shadow: none;
+}
+.s3-say[data-k='talks']::before,
+.s3-say[data-k='idle']::before,
+.s3-say[data-k='asks']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--say-line);
+  pointer-events: none;
+  /* all but the right column, then the right column with the tail's 12 cut out */
+  mask:
+    linear-gradient(#000 0 0) left / calc(100% - 1px) 100% no-repeat,
+    linear-gradient(#000 14.5px, transparent 14.5px 25.5px, #000 25.5px) right / 1px 100% no-repeat;
+}
 .s3-say[data-k='talks']::after,
 .s3-say[data-k='idle']::after,
 .s3-say[data-k='asks']::after {
   content: '';
   position: absolute;
-  right: calc(-1.5 * var(--s-1));
-  top: calc(var(--s-3) + var(--s-1) / 2);
-  border: 6px solid transparent;
-  border-right: 0;
-  border-left-color: var(--c-raised);
+  /* a square of 12/√2: its diagonal is the tail's 12 base, its turned corner 6 out, centered on
+     the card's edge 20 from the top */
+  width: calc(var(--s-3) * 0.7071);
+  height: calc(var(--s-3) * 0.7071);
+  right: calc(var(--s-3) * -0.35355);
+  top: calc(var(--s-5) - var(--s-3) * 0.35355);
+  background: var(--say-fill);
+  box-shadow: inset -1px 1px 0 0 var(--say-line);
+  transform: rotate(45deg);
+  /* the outer half, and 1 px in over the cut rule: no anti-aliased seam on the card's edge */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 1.414px) 100%, 0 1.414px);
+  pointer-events: none;
 }
 /* thinks: italic text-2, two dots of 6 and 4 toward the head */
 .s3-say[data-k='thinks'] {
@@ -681,13 +713,10 @@
   width: var(--s-1);
   height: var(--s-1);
 }
-/* asks: the accent's soft ground and its rule, its buttons of 24 */
+/* asks: the accent's soft ground and its rule, its buttons of 24 to 40 */
 .s3-say[data-k='asks'] {
-  background: var(--c-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--c-accent-line);
-}
-.s3-say[data-k='asks']::after {
-  border-left-color: var(--c-accent-soft);
+  --say-fill: var(--c-accent-soft);
+  --say-line: var(--c-accent-line);
 }
 .s3-say-acts {
   display: flex;
@@ -695,16 +724,32 @@
   gap: var(--s-2);
   margin-top: var(--s-2);
 }
+/* an option grows with its words (designer m_45875): 24 for one line, 40 for two (padding 4 8, the
+   meta font's 16 lines), as wide as its words up to the bubble's, clamped at 2 lines with … (the
+   full words in its tip); 'answer…' keeps one line */
 .s3-say-btn {
-  height: var(--h-seg-in);
+  min-height: var(--h-seg-in);
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
-  padding: 0 var(--s-2);
+  padding: var(--s-1) var(--s-2);
   border-radius: var(--r-1);
   background: var(--c-solid);
-  box-shadow: inset 0 0 0 1px var(--c-line-strong);
+  box-shadow: inset 0 0 0 1px var(--c-line);
   font: 500 var(--f-meta);
   color: var(--c-text);
+  text-align: left;
+}
+.s3-say-btn-w {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.s3-say-btn[data-one] {
+  white-space: nowrap;
 }
 .s3-say-btn:hover {
   background: var(--c-hover);

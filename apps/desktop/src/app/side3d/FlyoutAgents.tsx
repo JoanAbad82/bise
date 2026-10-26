@@ -3,10 +3,12 @@
 // in the world; '?' 16 in the accent when it asks) with its name under it, and its comic bubble
 // (max 252, padding 8 12, r 12) from its typed state (model speechOf): it talks (a tail 6 at 14),
 // thinks (the dots 6 and 4, italic text-2), asks (--c-accent-soft and the accent's rule, its
-// card's first options as 24 buttons, 'answer…' when words answer it). An option answers for real
+// card's first options as buttons of 24 that grow to 2 lines then clamp, the full words in the tip
+// (OptButton, designer m_45875), 'answer…' on one line when words answer it). An option answers for real
 // through the store's own pick, the inbox's path (store.do, model pickIntent); 'answer…' opens the
 // card in the inbox (askInbox, ⌘I's door). Keyed by name: a state change redraws its bubble in
 // place, no flicker. A click on a head or a bubble opens the agent's thread. Owner: nm-side.
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Agent, Card } from '@/proto';
 import { Press, tipAttrs } from '@/ds';
 import { shownName } from '@/agents/model';
@@ -37,6 +39,21 @@ function Head({ project, a, asks }: { project: string; a: Agent; asks: boolean }
   );
 }
 
+/** An ask's option: its words clamped at 2 lines (side3d.css .s3-say-btn-w), the full words in its tip only when the clamp cuts them. */
+export function OptButton({ label, onPick, testId }: { label: string; onPick: () => void; testId: string }) {
+  const w = useRef<HTMLSpanElement>(null);
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = w.current;
+    if (el !== null) setCut(el.scrollHeight > el.clientHeight);
+  }, [label]);
+  return (
+    <Press look="s3-say-btn" onClick={onPick} data-testid={testId} {...(cut ? tipAttrs(label) : {})}>
+      <span ref={w} className="s3-say-btn-w">{label}</span>
+    </Press>
+  );
+}
+
 function Words({ project, a, s, at, onOpen }: { project: string; a: Agent; s: Speech; at: AnswerAt | null; onOpen: () => void }) {
   const store = useStore();
   const who = (
@@ -63,12 +80,10 @@ function Words({ project, a, s, at, onOpen }: { project: string; a: Agent; s: Sp
       </Press>
       <span className="s3-say-acts">
         {b.opts.map((o) => (
-          <Press key={o.n} look="s3-say-btn" onClick={() => store.do(pickIntent(card, o.n, at))} data-testid={`${id}.opt.${String(o.n)}`}>
-            {o.label}
-          </Press>
+          <OptButton key={o.n} label={o.label} onPick={() => store.do(pickIntent(card, o.n, at))} testId={`${id}.opt.${String(o.n)}`} />
         ))}
         {b.words && (
-          <Press look="s3-say-btn" onClick={() => {
+          <Press look="s3-say-btn" data-one="" onClick={() => {
             askInbox({ project: card.project, card: card.id });
           }} data-testid={`${id}.answer`}>
             {side.answer}
