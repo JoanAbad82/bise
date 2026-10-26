@@ -1,7 +1,8 @@
 /* src/app/side3d · the folded right side (page native-mac §7, variant A; mockups 11-15): the world,
    the 3D bubbles, their cards. Fixed under the window's bar at the shell's root: nothing here has an
    overflow or a paint containment on the way up (noClip). Sizes are nm-ds's tokens (--world,
-   --world-big, --bubble, --bubble-obj, --w-flyout, --sh-world, --sh-obj) or 4 px steps. Moves take
+   --world-big, --bubble, --w-flyout, --sh-world, --sh-obj) or 4 px steps; the coin's own (its 3
+   side, its object's square from objects.ts COIN) are bims-plugins' r3 spec. Moves take
    --d-base (0 under reduce motion, tokens.css). The accent only on what waits on him: a count when
    an agent asks, an asking bubble, a new artifact's dot. Owner: nm-side. */
 
@@ -148,46 +149,81 @@
   }
 }
 
-/* a bubble: 44 round glass, its object 68 rising 28 out of its top */
+/* a bubble: a 44 opaque coin (round 3, B: bims-plugins' spec, designer m_44673): its top face
+   --c-raised (dark one step lifted), a 1 edge, the upper rim's light, a 3 side one step darker with
+   its own edge, and a soft 44 x 12 contact shadow under it (::after, centred 4 under the side). Its
+   object (Bubbles.tsx, objects.ts objectAt) stands on its top: base at 55 %, rising 20 */
+.s3-side {
+  --s3-coin-top: color-mix(in srgb, white 6%, var(--c-raised));
+  --s3-coin-rim: rgb(255 255 255 / .12);
+  --s3-coin-side: #0f0d0c;
+  --s3-coin-shadow: rgb(0 0 0 / .4);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .s3-side {
+    --s3-coin-top: var(--c-raised);
+    --s3-coin-rim: rgb(255 255 255 / .5);
+    --s3-coin-side: color-mix(in srgb, #e4dccf 80%, var(--p-bg));
+    --s3-coin-shadow: rgb(0 0 0 / .12);
+  }
+}
+[data-theme="light"] .s3-side {
+  --s3-coin-top: var(--c-raised);
+  --s3-coin-rim: rgb(255 255 255 / .5);
+  --s3-coin-side: color-mix(in srgb, #e4dccf 80%, var(--p-bg));
+  --s3-coin-shadow: rgb(0 0 0 / .12);
+}
 .s3-bubble {
+  /* the coin's side, px */
+  --s3-coin-h: 3px;
   position: absolute;
-  /* on the world's right edge: the 68 objects and the pills keep 24 from the 92 band's left (d3) */
+  /* on the world's right edge: the objects and the pills keep 24 from the 92 band's left (d3) */
   right: var(--s-3);
+  box-sizing: border-box;
   width: var(--bubble);
   height: var(--bubble);
   border-radius: 50%;
-  background: var(--c-overlay);
-  backdrop-filter: var(--glass);
-  box-shadow: var(--e-2);
+  background: var(--s3-coin-top);
+  border: 1px solid var(--c-line);
+  box-shadow: inset 0 1px 0 var(--s3-coin-rim), 0 var(--s3-coin-h) 0 var(--s3-coin-side), 0 var(--s3-coin-h) 0 1px var(--c-line);
   transition: top var(--d-base) var(--ease-out);
 }
+/* the contact shadow: 44 x 12, its centre 4 under the side's bottom (47 + 4 = 51), under the coin */
+.s3-bubble::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: calc(var(--bubble) + var(--s3-coin-h) + var(--s-1) - var(--s-3) / 2 - 1px);
+  width: var(--bubble);
+  height: var(--s-3);
+  border-radius: 50%;
+  background: var(--s3-coin-shadow);
+  filter: blur(6px);
+  z-index: -1;
+  pointer-events: none;
+}
 .s3-bubble[data-open] {
-  box-shadow: 0 0 0 2px var(--c-focus), var(--e-2);
+  box-shadow: inset 0 1px 0 var(--s3-coin-rim), 0 var(--s3-coin-h) 0 var(--s3-coin-side), 0 var(--s3-coin-h) 0 1px var(--c-line), 0 0 0 2px var(--c-focus);
 }
 .s3-bubble:focus-visible {
   outline: 2px solid var(--c-focus);
   outline-offset: 2px;
 }
+/* the object's square: placed and sized by Bubbles.tsx (objects.ts objectAt), from the coin's
+   top-left corner inside its 1 edge's box */
 .s3-obj {
   position: absolute;
-  left: 50%;
-  bottom: var(--s-1);
-  width: var(--bubble-obj);
-  height: var(--bubble-obj);
-  transform: translateX(-50%);
+  margin: -1px 0 0 -1px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   pointer-events: none;
 }
 .s3-obj img {
-  width: var(--bubble-obj);
-  height: var(--bubble-obj);
-  object-fit: contain;
-  object-position: 50% 100%;
-  filter: drop-shadow(var(--sh-obj));
+  width: 100%;
+  height: 100%;
 }
-/* no WebGL: the plain tile, the kind's line icon in the bubble's middle */
+/* no WebGL: the plain tile, the kind's line icon on the coin's middle */
 .s3-obj .s3-tile {
   margin-bottom: var(--s-2);
 }
@@ -200,46 +236,35 @@
   color: var(--c-text-2);
 }
 .s3-obj .s3-thumb {
-  width: var(--bubble-obj);
-  filter: drop-shadow(var(--sh-obj));
+  width: 100%;
 }
-/* ⌥ held: the bubble's key, a ds Kbd chip in the count pill's place (the pill hides meanwhile,
-   designer m_44373); gone at release, no fade (held.ts) */
-.s3-key {
-  position: absolute;
-  top: calc(var(--s-10) - var(--s-1) / 2);
-  left: calc(var(--s-1) * 1.5);
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  display: inline-flex;
-  pointer-events: none;
-}
-/* the count pill: centred on the bubble's rim at its bottom-left (6, 38 in the 44), under the
-   object that pokes out of its top, never over it (designer m_44373) */
+/* the pill: centred on the coin's bottom rim (22, 47), mono t-12 tabular, 3 digits whole ('589');
+   ⌥ held, the bubble's key '⌥1' in it (Bubbles.tsx pillOf). A total: text-2 on --p-chip with a 1
+   edge; what waits on him (an agent asks): the accent, no edge, the side's only pink */
 .s3-count {
   position: absolute;
-  top: calc(var(--s-10) - var(--s-1) / 2);
-  left: calc(var(--s-1) * 1.5);
+  left: 50%;
+  top: calc(var(--bubble) + var(--s3-coin-h) - 1px);
   transform: translate(-50%, -50%);
   z-index: 1;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 var(--s-1);
-  border-radius: 9px;
+  box-sizing: border-box;
+  padding: 0 calc(var(--s-1) * 1.5);
+  border-radius: var(--r-2);
+  border: 1px solid var(--c-line);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* a total: text-2 on --c-raised; what waits on him (an agent asks): the accent (designer m_42866) */
-  background: var(--c-raised);
+  white-space: nowrap;
+  background: var(--p-chip);
   color: var(--c-text-2);
-  box-shadow: 0 0 0 2px var(--c-solid), inset 0 0 0 1px var(--c-line);
-  font: 600 var(--f-kbd);
+  font: 500 var(--t-12)/16px var(--font-mono);
   font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 .s3-count[data-accent] {
+  border-color: transparent;
   background: var(--c-accent);
-  color: var(--c-on-ink);
-  box-shadow: 0 0 0 2px var(--c-solid);
+  color: var(--p-bg);
 }
 
 /* a card: 360 with its padding, 12 left of the bubbles (12 + 44 + 12), r 16, glass, --e-3; its top

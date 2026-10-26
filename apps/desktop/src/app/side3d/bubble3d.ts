@@ -1,22 +1,18 @@
 // src/app/side3d · the four side bubbles' own objects (bims-plugins' spec, picked by designer and
 // bims-plugins m_44222: agents B, artifacts A, scheduled A, processes B): minimal clay models that
-// read at once at 68 px poking out of a 44 px bubble, light and dark. agents = one bust (a teal bean
+// read at once standing on a 44 px coin, drawn in a 54 px square (objects.ts COIN), light and dark. agents = one bust (a teal bean
 // of shoulders, a round head), artifacts = three sheets fanned 8°, scheduled = a chunky hourglass
 // with no posts, processes = a small laptop open at 120° with one lit yellow line. Every part is
 // STYLE clay through clayLit (the laptop's lit line alone glows); the hourglass's bulbs are glass.
-// fitOf gives them one visual weight: 56 of the 68 high, at most 64 wide, the top 6 under the
-// square's top. Loaded only by render.ts (behind import('./render')). Owner: r2-objects.
+// fitOf gives them one visual weight (objects.ts WEIGHT): 56/68 of the square high, at most 64/68
+// wide, the top 6/68 under the square's top; at 54 that is 44 high. Loaded only by render.ts (behind import('./render')). Owner: r2-objects.
 import { type Box3, Group, Mesh, type BufferGeometry, type Material, type Object3D } from 'three';
 import { RIGHT, UP, type Fit } from '@/bims/render/camera';
 import { clayLit } from '@/bims/render/claylight';
 import { DAY, EYE, HAIR, HOODIE, MOUTH, PANTS, SKIN, WORLD } from '@/bims/render/palette';
 import { STYLE } from '@/bims/render/style';
-import type { BubbleId } from './objects';
+import { SQUARE, WEIGHT, type BubbleId } from './objects';
 
-/** the square a bubble's object is drawn in, css px (side3d.css's --bubble-obj) */
-export const SQUARE = 68;
-/** one visual weight (designer m_44222): the object's height, its widest, its top's gap, in px of the square */
-export const WEIGHT = { high: 56, wide: 64, top: 6 } as const;
 /** the hourglass's glass: how much of it shows */
 export const GLASS = 0.55;
 /** the glass by day (the office's window) and by night (the night text's cream) */

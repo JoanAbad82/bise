@@ -4,8 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import { Box3, Color, Mesh, type MeshStandardMaterial, Vector3 } from 'three';
 import { DAY, HOODIE, WORLD } from '@/bims/render/palette';
-import { BUBBLES } from './objects';
-import { GLASS, SQUARE, WEIGHT, bubbleModel, fitOf, projected } from './bubble3d';
+import { BUBBLES, COIN, SQUARE, WEIGHT, objectAt } from './objects';
+import { GLASS, bubbleModel, fitOf, projected } from './bubble3d';
 
 type Mat = MeshStandardMaterial;
 const meshes = (b: (typeof BUBBLES)[number], night: boolean): Mesh[] => {
@@ -134,5 +134,23 @@ describe('one visual weight (fitOf)', () => {
       expect(l.top).toBeCloseTo(WEIGHT.top, 6);
       expect(Math.max(Math.abs(l.high - WEIGHT.high), Math.abs(l.wide - WEIGHT.wide))).toBeLessThan(Math.max(WEIGHT.high, WEIGHT.wide));
     }
+  });
+});
+
+describe('the coin (bims-plugins r3, designer m_44673: B)', () => {
+  it('the object square 54 at left -5, top -25 of the 44 disc: 44 high, base at 55 %, rising 20', () => {
+    const at = objectAt();
+    expect(at).toMatchObject({ left: -5, top: -25, size: COIN.square });
+    expect(Math.round(at.high)).toBe(44);
+    expect(Math.round(at.rise)).toBe(20);
+    expect(at.top + (at.size * WEIGHT.top) / SQUARE + at.high).toBeCloseTo(COIN.disc * COIN.base, 0);
+  });
+
+  it('fitOf at the coin\'s square: a tall object is 44 high, its top 20 above the disc', () => {
+    const f = fitOf(new Box3(new Vector3(-0.25, 0, -0.25), new Vector3(0.25, 2, 0.25)), COIN.square);
+    const { y0, y1 } = projected(new Box3(new Vector3(-0.25, 0, -0.25), new Vector3(0.25, 2, 0.25)));
+    const k = COIN.square / (f.right - f.left);
+    expect(Math.round((y1 - y0) * k)).toBe(44);
+    expect(Math.round(-(objectAt().top + (f.top - y1) * k))).toBe(20);
   });
 });
