@@ -79,6 +79,7 @@ function RailButton({ place, on, children, dot, tip }: { place: RailPlace; on: b
         router.go(RAIL_GO[place]);
       }}
       data-testid={`app.rail.${place}`}
+      data-held={held || undefined}
     >
       {held ? (
         <span className="app-keyhint app-rail-key" data-testid={`app.rail.${place}.key`}>
@@ -87,8 +88,8 @@ function RailButton({ place, on, children, dot, tip }: { place: RailPlace; on: b
       ) : (
         children
       )}
-      {/* the dot would sit on the cap's corner: it steps aside while ⌘ is held (ui-review m_45572) */}
-      {dot === true && !held && <span className="app-rail-dot" data-testid={`app.rail.${place}.dot`} />}
+      {/* ⌘ held, the dot stays on the button's top-right corner, 2 clear of the cap (app.css; designer m_45574) */}
+      {dot === true && <span className="app-rail-dot" data-testid={`app.rail.${place}.dot`} />}
     </Press>
   );
 }

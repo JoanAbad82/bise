@@ -256,6 +256,11 @@ body:has(.app-shell) {
 .app-rail-gap {
   flex: 1;
 }
+/* ⌘ held: the dot keeps the top-right corner, 2 above the 20-high cap (cap from 8: dot from -2 to 6) */
+.app-rail-b[data-held] .app-rail-dot {
+  top: calc(var(--s-1) / -2);
+  right: 0;
+}
 /* ⌘ held: the place's key in place of its icon, centred, mono 11 text-2, 28 wide at least so ⇧⌘A
    fits (designer m_45492); over .app-keyhint's 16 square (the bar's ⌘B), hence the two classes */
 .app-keyhint.app-rail-key .b-kbd {
