@@ -144,6 +144,14 @@ pub(super) fn update_now(rev: &str, since: std::time::Instant) -> Value {
 /// by `bise update` or the daily check).
 const UPDATE_LOOK: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// update-flow: how often a hub reads the machine's release offer
+/// (`BISE_RELEASE_LOOK_SECS`, else [`UPDATE_LOOK`]).
+fn release_look_every() -> std::time::Duration {
+    bise_home::env::test_setting("BISE_RELEASE_LOOK_SECS")
+        .and_then(|s| s.trim().parse().ok())
+        .map_or(UPDATE_LOOK, std::time::Duration::from_secs)
+}
+
 /// The release `bise update` last read (`~/.bise/cache/latest.json`),
 /// in words, with what to do: None when it is the running version.
 fn release_line(inst: &Install, running_id: &str) -> Option<String> {
@@ -813,7 +821,7 @@ impl Shell {
         };
         if asked.is_none() {
             let off = std::env::var(bise_home::release::NO_UPDATE_ENV).is_ok_and(|v| !v.is_empty() && v != "0");
-            if off || self.release_checked.is_some_and(|t| t.elapsed() < UPDATE_LOOK) {
+            if off || self.release_checked.is_some_and(|t| t.elapsed() < release_look_every()) {
                 return;
             }
             self.release_checked = Some(std::time::Instant::now());
@@ -856,7 +864,7 @@ impl Shell {
         let running = self.opts.app_root.canonicalize().unwrap_or_else(|_| self.opts.app_root.clone());
         let home = bise_home::Home::from_env();
         let busy = self.hub.st.agents.values().any(|a| a.run == crate::model::Run::Busy);
-        let spawned = self.release_switched.is_some_and(|t| t.elapsed() < UPDATE_LOOK * 2);
+        let spawned = self.release_switched.is_some_and(|t| t.elapsed() < release_look_every() * 2);
         if dir == running
             || busy
             || spawned
@@ -1077,6 +1085,7 @@ pub(super) fn spawn_switcher(paths: &Paths, exe: &Path, to: &Path, how: Switcher
             Switcher::Reload => &["--restart", "--reload"][..],
             Switcher::Release => &["--release"][..],
         })
+        .args(bise_home::env::test_setting("BISE_PROBATION_SECS").map(|s| ["--probation".to_string(), s]).into_iter().flatten())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .process_group(0);

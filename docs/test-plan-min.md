@@ -539,6 +539,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `subscriptions_e2e` | KEEP | ChatGPT plan sign-in → turn → refresh → logout on fake servers (sign-in path) |
 | `unknown_tool_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
 | `utf8_say_e2e` | DELETE | dup of bend/laws/utf8.bend (bytes cut across recvs decode whole) |
+| `update_flow_e2e` | KEEP | two hubs, one machine update: later everywhere, switches in turn under the machine flock, a bad release fails once (real switcher) |
 | `version_skew_e2e` | KEEP | TUI and app core on two versions, one hub (update) |
 | `wake_deliver_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
 | `wake_e2e` | KEEP | sb wake on a real pid exit / file (OS watch); WAKE_SECS could shrink it |
