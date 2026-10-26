@@ -59,7 +59,10 @@ function useTight(box: RefObject<HTMLDivElement | null>, short: string): boolean
       const breath = pill.querySelector<HTMLElement>('.breath');
       const lead = breath === null ? 0 : breath.offsetWidth + parseFloat(cs.columnGap || '0');
       const need = words.offsetWidth + lead + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-      setTight(slot.clientWidth < need);
+      // the coins' minis share the slot (folded-side v9): the pill's room is what they leave
+      const minis = slot.querySelector<HTMLElement>('.s3-minis-slot');
+      const minisW = minis === null || minis.childElementCount === 0 ? 0 : minis.offsetWidth + parseFloat(getComputedStyle(minis).marginLeft || '0');
+      setTight(slot.clientWidth - minisW < need);
     };
     read();
     const ro = new ResizeObserver(read);

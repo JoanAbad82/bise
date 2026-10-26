@@ -263,6 +263,10 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
 
 /** under this much room the status pill takes its short form (designer's desktop-notices v2) */
 export { STATUS_NARROW_PX };
+/** the crumb's least: its name and room for a '…' after it */
+const CRUMB_CUT_PX = 16;
+/** the pill at its least: its sign alone, a 24 square (TitleStatus's tight form) */
+const PILL_SIGN_PX = 24;
 
 /**
  * The title bar's status slot (designer's desktop-notices v2, ambient-lead m_21070): the free room
@@ -303,7 +307,16 @@ function StatusSlot({ children }: { children?: ReactNode }) {
       else if (el.dataset["narrow"] === "true") pillShort = pill.scrollWidth;
       // with the minis here the slot never gets narrower than they and the pill's short form: the
       // crumb's name cuts instead, last (a pill under the minis was ui-review m_45691's red)
-      el.style.minWidth = minisW > 0 ? `${String(Math.ceil(minisW + pillShort))}px` : "";
+      // the crumb keeps its name and a '…' (ui-review m_45714: it was cut to nothing); when even
+      // that and the pill's short form don't fit beside the minis, the pill is its sign alone
+      const title = bar.querySelector<HTMLElement>(".app-bar-title");
+      const name = title?.querySelector<HTMLElement>(".t") ?? null;
+      const titleMin = title === null || name === null || minisW === 0 ? 0 : parseFloat(getComputedStyle(title).paddingLeft || "0") + name.offsetWidth + CRUMB_CUT_PX;
+      if (title !== null) title.style.minWidth = titleMin > 0 ? `${String(Math.ceil(titleMin))}px` : "";
+      const others = [...bar.children].reduce((n, c) => (c === title || c === el ? n : n + (c as HTMLElement).offsetWidth), 0);
+      const avail = bar.clientWidth - parseFloat(getComputedStyle(bar).paddingRight || "0") - others - parseFloat(getComputedStyle(el).marginLeft || "0");
+      const pillLeast = pill === null ? 0 : titleMin + minisW + pillShort <= avail ? pillShort : PILL_SIGN_PX;
+      el.style.minWidth = minisW > 0 ? `${String(Math.ceil(minisW + pillLeast))}px` : "";
       setNarrow(g.narrow || (pill !== null && el.clientWidth - minisW < STATUS_NARROW_PX));
     };
     read();
