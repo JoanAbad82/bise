@@ -48,7 +48,7 @@ export function countOnce(arrays: readonly (readonly unknown[])[]): number {
   const rels = new Set<string>();
   for (const a of arrays)
     for (const c of a) {
-      const k = typeof c === 'object' && c !== null ? releaseKey(c as PlaceCard) : '';
+      const k = typeof c === 'object' && c !== null ? releaseKey(c) : '';
       if (k === '') n += 1;
       else rels.add(k);
     }

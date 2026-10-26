@@ -249,7 +249,7 @@ export function useBiseUpdateLine(): StatusPart | null {
     }
     if (u?.state === 'failed') setAsked(false);
     return undefined;
-  }, [u]);
+  }, [u, setAsked]);
   // the core took it (its line left 'ready'): the app's own update goes with it
   const moved = u !== null && (u.state === 'installing' || u.state === 'updating');
   const appReady = app.state === 'ready';
