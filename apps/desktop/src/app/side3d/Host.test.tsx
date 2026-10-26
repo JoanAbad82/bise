@@ -154,6 +154,10 @@ describe('the right side, folded', () => {
     const card = v.getByTestId('app.flyout.scheduled');
     expect(card.querySelector('.s3-card-head b')?.textContent).toBe(side.scheduled);
     expect(v.getByTestId('app.flyout.scheduled.processes').textContent).toContain(side.processes);
+    // every 'all … ›' on the card's one foot, the clicked kind's first, never on a head (designer m_44411)
+    expect(card.querySelector('.s3-card-head .s3-link')).toBeNull();
+    expect(card.querySelectorAll('footer')).toHaveLength(1);
+    expect([...card.querySelectorAll('footer .s3-link')].map((e) => e.textContent)).toEqual([side.all_scheduled, side.all_processes]);
   });
 
   it('⌥ held: each bubble shows its key in its count\'s place, top to bottom; gone at release (designer m_44292, m_44373)', () => {
@@ -184,6 +188,8 @@ describe('the right side, folded', () => {
     const rows = [...v.getByTestId('app.flyout.agents').querySelectorAll<HTMLElement>('[data-row]')];
     expect(rows).toHaveLength(3);
     expect(document.activeElement).toBe(rows[0]);
+    // its ring at once, not only after the first ↓ (ui-review m_44435)
+    expect(v.getByTestId('app.flyout.agents').hasAttribute('data-kb')).toBe(true);
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(rows[1]);
     fireEvent.keyDown(window, { key: 'ArrowDown' });

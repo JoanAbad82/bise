@@ -26,7 +26,7 @@ import { inRank, agentCounts, bubbleCount, bubbleName, bubbleSays, bubbleTip, an
 import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
 import { World, WorldThumb } from './World';
-import { Empty, Flyout, HeadButton, SideLink } from './Flyout';
+import { Empty, Flyout, HeadButton } from './Flyout';
 import { AgentLine } from './FlyoutAgents';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useLayoutDriver, useSideLayout } from './place';
@@ -175,6 +175,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
         e.preventDefault();
         e.stopPropagation();
         rows[rowStep(rows.indexOf(document.activeElement as HTMLElement), rows.length, e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+        root.current?.querySelector('.s3-card')?.setAttribute('data-kb', '');
         return;
       }
       if (e.key !== 'Escape') return;
@@ -183,10 +184,17 @@ function Side({ project, home, world }: { project: string; home: string; world: 
       root.current?.querySelector<HTMLElement>(`[data-testid="app.bubble.${open}"]`)?.focus();
     };
     const down = (e: PointerEvent) => {
+      // the pointer in the card: its rows' focus is the pointer's again (no ring on a clicked row)
+      root.current?.querySelector('.s3-card')?.removeAttribute('data-kb');
       if (root.current !== null && e.target instanceof Node && root.current.contains(e.target)) return;
       setOpen(null);
     };
-    if (keyed.current) root.current?.querySelector<HTMLElement>('.s3-card [data-row]')?.focus();
+    // opened by its key: its first row focused, its ring shown at once (data-kb: a focus() after a
+    // menu accelerator is not :focus-visible in Chromium)
+    if (keyed.current) {
+      root.current?.querySelector('.s3-card')?.setAttribute('data-kb', '');
+      root.current?.querySelector<HTMLElement>('.s3-card [data-row]')?.focus();
+    }
     keyed.current = false;
     window.addEventListener('keydown', key, true);
     window.addEventListener('pointerdown', down, true);
@@ -266,7 +274,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
           <Flyout id="agents" name={bubbleName('agents')} says={bubbleSays('agents', counts)} top={place.top ?? tops.bubbles['agents']} maxH={cardMaxH(winH)} scrolls={place.scrolls}
             add={<HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />}
             onPin={() => { openOverview(project, 'agents'); }}
-            foot={{ left: archived > 0 ? side.archived({ n: archived }) : '', right: side.all_agents, onRight: () => { router.go({ screen: 'agents', project }); } }}>
+            foot={{ left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go({ screen: 'agents', project }); } }] }}>
             {live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => (
               <AgentLine key={a.name} project={project} a={a} cards={cards} at={at} onOpen={openAgent} />
             ))}
@@ -276,7 +284,7 @@ function Side({ project, home, world }: { project: string; home: string; world: 
           <Flyout id="artifacts" name={bubbleName('artifacts')} says={bubbleSays('artifacts', counts)} top={place.top ?? tops.bubbles['artifacts']} maxH={cardMaxH(winH)} scrolls={place.scrolls}
             add={<AddButton place={addPlace} testId="app.flyout.artifacts.add" />}
             onPin={() => { openOverview(project, 'artifacts'); }}
-            foot={{ left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), right: side.all_artifacts, onRight: () => { router.go({ screen: 'artifacts', project }); } }}>
+            foot={{ left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project }); } }] }}>
             {artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} />)}
           </Flyout>
         )}
@@ -299,15 +307,14 @@ function Side({ project, home, world }: { project: string; home: string; world: 
           return (
             <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={place.top ?? tops.bubbles[open]} maxH={cardMaxH(winH)} scrolls={place.scrolls}
               onPin={() => { openOverview(project, 'processes'); }}
-              link={{ text: open === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[open] }}
-              foot={null}>
+              foot={{ left: '', links: [
+                { text: open === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[open], testId: `app.flyout.${open}.all` },
+                { text: other === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[other === 'processes' ? 'processes' : 'scheduled'], testId: `app.flyout.${open}.${other}.all` },
+              ] }}>
               {rowsOf(open)}
               <div className="s3-card-sub" data-testid={`app.flyout.${open}.${other}`}>
                 <b>{bubbleName(other)}</b>
                 <span className="s3-card-says">{bubbleSays(other, counts)}</span>
-                <SideLink onClick={goAll[other === 'processes' ? 'processes' : 'scheduled']} testId={`app.flyout.${open}.${other}.all`}>
-                  {other === 'processes' ? side.all_processes : side.all_scheduled}
-                </SideLink>
               </div>
               {rowsOf(other === 'processes' ? 'processes' : 'scheduled')}
             </Flyout>

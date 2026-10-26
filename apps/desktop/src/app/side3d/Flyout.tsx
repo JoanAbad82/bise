@@ -3,7 +3,8 @@
 // 560) high (layout cardTop, cardMaxH), r 16, glass (--c-overlay + --glass), --e-3; a head of 32
 // (its name 13/600, what it counts text-3, then '+' and '▯' open as a tab), its rows (they scroll
 // inside under a 24 fade when they overflow), one foot: a rule and a 32 row of 12 text-3 ('3
-// archived' · 'all agents ›'), the card's end (no padding under it). Floats over the page with
+// archived' · 'all agents ›'; every card's 'all … ›' is there, never on its head, designer
+// m_44411), the card's end (no padding under it). Floats over the page with
 // its whole shadow (SideHost is fixed at the shell's root: noClip). Its rows: SideRow, 48 high, a
 // 40 object, 12 between, a name and a line under it, a dot at the end; its button is a `data-row`
 // (SideHost's ↑ ↓ walk the rows, ⏎ opens). Esc and a click outside close it (SideHost). Owner: nm-side.
@@ -31,6 +32,13 @@ export function SideLink({ children, onClick, testId }: { children: ReactNode; o
   );
 }
 
+/** A foot's link to a full page. */
+export interface FootLink {
+  readonly text: string;
+  readonly onClick: () => void;
+  readonly testId: string;
+}
+
 export interface FlyoutProps {
   readonly id: BubbleId;
   /** its name ('Agents') and what it counts ('3 working · 1 asks') */
@@ -42,9 +50,8 @@ export interface FlyoutProps {
   readonly onPin: () => void;
   /** its top, px from the side's top (aligned on its bubble, kept inside the window) */
   readonly top: number;
-  readonly foot: { readonly left: string; readonly right: string; readonly onRight: () => void } | null;
-  /** its full page's link on its head ('all processes ›'), when its kinds each keep theirs on their head */
-  readonly link?: { readonly text: string; readonly onClick: () => void };
+  /** its foot: what it says on the left ('3 archived'), its full pages' links on the right ('all agents ›'; the combined card: 'all scheduled ›' then 'all processes ›', 16 apart) */
+  readonly foot: { readonly left: string; readonly links: readonly FootLink[] } | null;
   /** its height at most: the window's (layout cardMaxH, min(window − 48, 560)); its rows scroll inside */
   readonly maxH: number;
   /** its rows overflow: they scroll under a 24 fade at the bottom */
@@ -52,18 +59,13 @@ export interface FlyoutProps {
   readonly children: ReactNode;
 }
 
-export function Flyout({ id, name, says, add, onPin, top, foot, link, maxH, scrolls = false, children }: FlyoutProps) {
+export function Flyout({ id, name, says, add, onPin, top, foot, maxH, scrolls = false, children }: FlyoutProps) {
   return (
     <section className="s3-card" style={{ top, maxHeight: maxH }} data-foot={foot !== null || undefined} role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
       <header className="s3-card-head">
         <b>{name}</b>
         {says !== '' && <span className="s3-card-says">{says}</span>}
         <span className="s3-card-acts">
-          {link !== undefined && (
-            <SideLink onClick={link.onClick} testId={`app.flyout.${id}.all`}>
-              {link.text}
-            </SideLink>
-          )}
           {add}
           <HeadButton icon="panel" tip={side.pin_tab} onClick={onPin} testId={`app.flyout.${id}.pin`} />
         </span>
@@ -74,9 +76,13 @@ export function Flyout({ id, name, says, add, onPin, top, foot, link, maxH, scro
       {foot !== null && (
         <footer className="s3-card-foot">
           <span>{foot.left}</span>
-          <SideLink onClick={foot.onRight} testId={`app.flyout.${id}.all`}>
-            {foot.right}
-          </SideLink>
+          <span className="s3-card-links">
+            {foot.links.map((l) => (
+              <SideLink key={l.testId} onClick={l.onClick} testId={l.testId}>
+                {l.text}
+              </SideLink>
+            ))}
+          </span>
         </footer>
       )}
     </section>
