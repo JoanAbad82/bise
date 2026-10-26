@@ -148,6 +148,21 @@
 .cmp-float[data-state='open'] .b-composer .box:focus-within {
   box-shadow: inset 0 1px 0 var(--c-line);
 }
+/* the composer's one-off notice (the hub's flow hint, a refused command) is its box's head: never
+   at rest, the pill is '+', the field, the mic, send (§6, ui-review m_43779); focused or open, its
+   own line over the field */
+.cmp-float .b-composer .box {
+  flex-wrap: wrap;
+}
+.cmp-float .b-composer .box > .head {
+  order: -1;
+  flex: 1 0 100%;
+  min-width: 0;
+  padding: var(--s-2) var(--s-2) 0;
+}
+.cmp-float[data-state='rest'] .b-composer .box > .head {
+  display: none;
+}
 .cmp-float .b-composer .box > .line {
   order: 1;
   flex: 1 1 auto;
