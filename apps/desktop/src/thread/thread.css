@@ -1081,6 +1081,9 @@ button.th-turn-line:focus-visible {
   display: flex;
   min-width: 0;
   padding-top: var(--s-4);
+  /* the thread's last row above the dock: its 4 of leading and these 8 make the 12 every row keeps
+     above the inbox box, carried by the thread, never the box's margin (designer m_44048) */
+  padding-bottom: var(--s-2);
   overflow: hidden;
   white-space: nowrap;
 }
