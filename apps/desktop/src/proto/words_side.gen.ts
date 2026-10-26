@@ -66,6 +66,28 @@ export const side = {
   answer: "answer…",
   /** the agents float's button on an approval card: the composer opens on that agent, yes / no stay the only way to decide (designer m_45824) */
   write_to: (a: { agent: string | number }): string => "write to " + String(a.agent) + "…",
+  /** the agents float, a row's state at its right edge (page agents-float v1): at work, the length of its turn */
+  row_working: (a: { len: string | number }): string => "working · " + String(a.len),
+  /** a row's state: it asks him (the accent, the only pink) */
+  row_asks: "asks you",
+  /** a row's state: another agent holds it (its line 2 says which) */
+  row_waits_agent: "waits for an agent",
+  /** a row's state: it waits on a command or an event it resumes on */
+  row_waits: (a: { len: string | number }): string => "waits · " + String(a.len),
+  /** a row's state: the hub says it waits, with nothing more */
+  row_waiting: "waiting",
+  /** a row's state: at rest since then */
+  row_idle: (a: { len: string | number }): string => "idle · " + String(a.len),
+  /** a row's state: it finished then */
+  row_done: (a: { len: string | number }): string => "done · " + String(a.len),
+  /** a row's state: its turn failed then */
+  row_failed: (a: { len: string | number }): string => "failed · " + String(a.len),
+  /** a row's state: at rest, a scheduled task wakes it at that time */
+  row_wakes: (a: { at: string | number }): string => "wakes at " + String(a.at),
+  /** a waiting row's line 2: the agent that holds it */
+  waits_for: (a: { agent: string | number }): string => "waits for " + String(a.agent),
+  /** a row's state, its tip: the full words ('working since 14:02 · 12 min') */
+  row_since_tip: (a: { state: string | number; at: string | number; len: string | number }): string => String(a.state) + " since " + String(a.at) + " · " + String(a.len),
   /** the '?' on an asking agent's head, its tip */
   asks_tip: (a: { agent: string | number }): string => String(a.agent) + " asks you something",
   /** the dot of a new artifact, its tip */

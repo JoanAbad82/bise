@@ -48,6 +48,8 @@ export interface FloatContent {
   /** its name ('Agents') and what it counts ('3 working · 1 asks') */
   readonly name: string;
   readonly says: string;
+  /** the part of its head that waits on him, after `says`, in the accent ('1 waiting for you', page agents-float v1) */
+  readonly loud?: string;
   /** the head's '+' (agents: a new agent; artifacts: add a file) */
   readonly add?: ReactNode;
   /** the head's '▯': the same list as a tab of the panel */
@@ -73,6 +75,7 @@ export function FloatLayer({ c, scrolls = false, leaving = false }: { c: FloatCo
       <header className="s3-card-head">
         <b>{c.name}</b>
         {c.says !== '' && <span className="s3-card-says">{c.says}</span>}
+        {c.loud !== undefined && c.loud !== '' && <span className="s3-card-says" data-loud="" data-testid={`app.flyout.${id}.loud`}>{c.says !== '' ? ` · ${c.loud}` : c.loud}</span>}
         <span className="s3-card-acts">
           {c.add}
           <HeadButton icon="panel" tip={side.pin_tab} onClick={c.onPin} testId={`app.flyout.${id}.pin`} />

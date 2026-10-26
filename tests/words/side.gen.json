@@ -248,6 +248,72 @@
     "one": null,
     "text": "Processes"
   },
+  "side.row_asks": {
+    "args": [],
+    "one": null,
+    "text": "asks you"
+  },
+  "side.row_done": {
+    "args": [
+      "len"
+    ],
+    "one": null,
+    "text": "done · {len}"
+  },
+  "side.row_failed": {
+    "args": [
+      "len"
+    ],
+    "one": null,
+    "text": "failed · {len}"
+  },
+  "side.row_idle": {
+    "args": [
+      "len"
+    ],
+    "one": null,
+    "text": "idle · {len}"
+  },
+  "side.row_since_tip": {
+    "args": [
+      "state",
+      "at",
+      "len"
+    ],
+    "one": null,
+    "text": "{state} since {at} · {len}"
+  },
+  "side.row_waiting": {
+    "args": [],
+    "one": null,
+    "text": "waiting"
+  },
+  "side.row_waits": {
+    "args": [
+      "len"
+    ],
+    "one": null,
+    "text": "waits · {len}"
+  },
+  "side.row_waits_agent": {
+    "args": [],
+    "one": null,
+    "text": "waits for an agent"
+  },
+  "side.row_wakes": {
+    "args": [
+      "at"
+    ],
+    "one": null,
+    "text": "wakes at {at}"
+  },
+  "side.row_working": {
+    "args": [
+      "len"
+    ],
+    "one": null,
+    "text": "working · {len}"
+  },
   "side.running": {
     "args": [
       "n"
@@ -298,6 +364,13 @@
     ],
     "one": null,
     "text": "{n} waiting for you"
+  },
+  "side.waits_for": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "waits for {agent}"
   },
   "side.watches": {
     "args": [

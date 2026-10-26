@@ -413,7 +413,9 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
     switch (b) {
       case 'agents':
         return {
-          id: b, name: bubbleName(b), says: saysOf(b),
+          id: b, name: bubbleName(b),
+          // in a project the waiting part goes in the accent (page agents-float v1); across projects one line
+          ...(across(b) < 2 ? { says: counts.working > 0 ? side.working({ n: counts.working }) : '', loud: counts.asks > 0 ? side.waiting_you({ n: counts.asks }) : '' } : { says: saysOf(b) }),
           add: <HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />,
           onPin: () => { openOverview('agents'); },
           foot: {

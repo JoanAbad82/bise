@@ -15,7 +15,7 @@ import type { AnswerAt } from '@/store/answered';
 import { panel } from '@/proto/words_panel.gen';
 import { side } from '@/proto/words_side.gen';
 import { markTip } from '../tipwords';
-import { AgentSign, agentMark } from '../RightBar';
+import { AgentSign } from '../RightBar';
 import { askInbox } from '../inboxAsk';
 import { useEntityMenu } from '../menus/use';
 import { roleWords, type BarRow, type ProjAgent } from '../barrows';
@@ -30,7 +30,7 @@ export const floatId = (r: BarRow): string =>
     : r.testId.replace(/^app\.right\./u, 'app.flyout.agents.');
 
 /** a row's head, css px */
-export const ROW_HEAD_PX = 40;
+export const ROW_HEAD_PX = 32;
 
 export interface FloatAgentsProps {
   readonly live: readonly BarRow[];
@@ -88,40 +88,44 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group, onHandoff }: { r: B
   const b = card === undefined ? null : askButtons(card);
   const failed = r.glyph === '✗';
   const id = floatId(r);
+  const st = r.state;
+  const job = asks ? card.question : st?.l2 !== undefined ? st.l2 : group !== undefined && a !== undefined ? roleWords(a.note || a.title || a.purpose) : r.sub;
+  const who = `${r.name} · ${group !== undefined && a !== undefined ? roleWords(a.note || a.title || a.purpose) : r.sub}`;
   return (
-    <div className="s3-arow" data-asks={asks || undefined} data-group={r.group} onContextMenu={menu.onContextMenu} data-testid={id}>
+    <div className="s3-arow" data-asks={asks || undefined} data-back={st?.back === true || undefined} data-group={r.group} onContextMenu={menu.onContextMenu} data-testid={id}>
       <Press look="s3-arow-open" aria-label={r.title} onClick={() => {
         onOpen(r);
       }} data-row="">
-        <span className="s3-head s3-arow-head">
+        <span className="s3-head s3-arow-head" {...tipAttrs(who)}>
           <span className="s3-head-pic">
             <ThingPic thing={{ head: r.agent ?? '', main: a?.main === true }} px={ROW_HEAD_PX} tile="thread" />
           </span>
         </span>
         <span className="s3-arow-text">
           <span className="s3-arow-l1">
-            <span className={`s3-arow-sign ${r.tone}`} {...tipAttrs(r.tips?.glyph)} data-testid={`${id}.sign`}>
-              {r.glyph.startsWith('⌥') ? <span className="s3-arow-key">{r.glyph}</span> : <AgentSign mark={agentMark(r.glyph, r.working === true)} testId={`${id}.sign`} />}
-            </span>
-            <span className="s3-arow-name" data-testid={`${id}.name`}>{g.project !== '' && <span className="s3-group">{g.project}</span>}{g.name}</span>
+            {r.glyph.startsWith('⌥') && <span className="s3-arow-key" data-testid={`${id}.sign`}>{r.glyph}</span>}
+            <span className="s3-arow-name" {...tipAttrs(who)} data-testid={`${id}.name`}>{g.project !== '' && <span className="s3-group">{g.project}</span>}{g.name}</span>
             {r.cu !== undefined && (
               <span className={`app-cu ${r.cu.tone}`} {...tipAttrs(r.cu.title)} data-testid={`${id}.computer`}>
                 {r.cu.g}
               </span>
             )}
-            <span className="s3-arow-cols">
-              <span className="s3-arow-time" {...tipAttrs(r.tips?.time)} data-testid={`${id}.time`}>{r.time ?? ''}</span>
-              {r.ctx !== undefined && r.pct !== undefined && r.pct !== '' && (
-                <span className="s3-arow-pct" {...tipAttrs(r.tips?.pct)} data-testid={`${id}.pct`}>
-                  <Ring pct={r.ctx} testId={`${id}.ring`} />
-                  {r.pct}
-                </span>
-              )}
-              <Pr r={r} onOpenPr={onOpenPr} />
-            </span>
+            {r.ctx !== undefined && r.pct !== undefined && r.pct !== '' && (
+              <span className="s3-arow-pct" {...tipAttrs(r.tips?.pct)} data-testid={`${id}.pct`}>
+                <Ring pct={r.ctx} testId={`${id}.ring`} />
+                {r.pct}
+              </span>
+            )}
+            <Pr r={r} onOpenPr={onOpenPr} />
           </span>
-          <span className="s3-arow-l2" data-err={failed || undefined} data-testid={`${id}.role`}>{asks ? card.question : group !== undefined && a !== undefined ? roleWords(a.note || a.title || a.purpose) : r.sub}</span>
+          <span className="s3-arow-l2" data-err={failed || undefined} data-testid={`${id}.role`}>{job}</span>
         </span>
+        {st !== undefined && (
+          <span className="s3-arow-state" data-tone={st.tone} {...tipAttrs(st.tip)} data-testid={`${id}.state`}>
+            {st.g === '∿' ? <AgentSign mark="works" testId={`${id}.state`} /> : st.g !== '' && <span className="s3-arow-sg">{st.g}</span>}
+            {st.words}
+          </span>
+        )}
       </Press>
       {b !== null && card !== undefined && (
         <span className="s3-arow-acts">

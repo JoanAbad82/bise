@@ -16,6 +16,7 @@ import { running } from '@/proto/words_running.gen';
 import { asksMerge, livePr, markOf, orphanPlaces, placeLabel, placeOf, sharedPlaces, tipWords, type Mark } from './barplaces';
 import { computerDot, signOf, type Sign, type Tone } from './side';
 import { archivedAgeTip, madeTip, pctTip, signTip, stateWord, timeTip } from './tipwords';
+import { rowState, type RowState } from './rowstate';
 
 /** One agent with its project, across the projects shown. */
 export interface ProjAgent {
@@ -74,6 +75,8 @@ export interface BarRow {
   readonly watch?: number;
   /** the hover tips of its compact marks (tipwords.ts): its sign, its end, its time and % columns */
   readonly tips?: { readonly glyph?: string; readonly end?: string; readonly time?: string; readonly pct?: string };
+  /** an agent's state in words at the row's right edge (the agents float, page agents-float v1) */
+  readonly state?: RowState;
 }
 
 /** What AGENTS reads besides the agents: their next wakes ('<project>/<agent>' -> ms), the project's worktrees and cards, the computer rows, the ⌥ numbers. */
@@ -186,6 +189,7 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     ...(pct === '' ? {} : { ctx: Number.parseInt(pct, 10) }),
     ...(mark === undefined ? {} : { mark }),
     ...(group === undefined ? {} : { group }),
+    state: rowState(x.a, now, wake),
   };
 }
 

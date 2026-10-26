@@ -120,8 +120,8 @@ describe('groups, orphan PRs and order (§4)', () => {
   ];
   const agents = [ag('main', { main: true }), ag('stock'), ag('search'), ag('docs'), ag('pricing'), ag('launch')];
   const rows = agentRows(agents, NOW, false, false, { places, numbers: nums('stock', 'search', 'docs', 'pricing', 'launch') });
-  it("the TUI's order: main first, unshared agents by number, then PRs with no agent, then groups by their smallest number", () => {
-    expect(rows.map((r) => `${r.kind ?? ''}:${r.name}`)).toEqual(['agent:bise', 'agent:search', 'agent:docs', 'agent:launch', 'orphan:sb/palette', 'group:sb/flash-sale', 'agent:stock', 'agent:pricing']);
+  it("the hub's rank (his m_45828): main first, each agent by its number, a group at its first member's number, then PRs with no agent", () => {
+    expect(rows.map((r) => `${r.kind ?? ''}:${r.name}`)).toEqual(['agent:bise', 'group:sb/flash-sale', 'agent:stock', 'agent:pricing', 'agent:search', 'agent:docs', 'agent:launch', 'orphan:sb/palette']);
   });
   it("a group: a 'ψ <branch>' head with its PR's mark and number, its rows with no mark, all on its rule", () => {
     const head = rows.find((r) => r.kind === 'group');
@@ -138,7 +138,7 @@ describe('groups, orphan PRs and order (§4)', () => {
   });
   it('⌥ held: the TUI numbers, not the place in the list; main ⌥0', () => {
     const alt = agentRows(agents, NOW, false, true, { places, numbers: nums('stock', 'search', 'docs', 'pricing', 'launch') });
-    expect(alt.filter((r) => r.kind === 'agent').map((r) => `${r.glyph} ${r.name}`)).toEqual(['⌥0 bise', '⌥2 search', '⌥3 docs', '⌥5 launch', '⌥1 stock', '⌥4 pricing']);
+    expect(alt.filter((r) => r.kind === 'agent').map((r) => `${r.glyph} ${r.name}`)).toEqual(['⌥0 bise', '⌥1 stock', '⌥4 pricing', '⌥2 search', '⌥3 docs', '⌥5 launch']);
   });
   it('the 8-row cap never hides an agent that waits on him, in a group too (its head shows with it)', () => {
     const many = Array.from({ length: 9 }, (_, i) => ag(`a${String(i + 1)}`));

@@ -1008,28 +1008,28 @@
   text-align: center;
 }
 
-/* the agents float with Overview's rows (folded-side v9, A's floats; FloatAgents.tsx): each agent
-   its 40 head, then line 1 (its mark 16, its name 13/600, the computer mark, then its time, its
-   ring with its % from 70 and its PR's number right-aligned, t-12 mono text-3) and line 2 (its now
-   line t-12 text-2, red when it failed). An ask: --c-accent-soft and the accent's rule, its two
-   options and 'answer…' under it. A ψ head: its branch text-2, 'N agents' text-3, its PR. */
+/* the agents float with Overview's rows (folded-side v9, A's floats; page agents-float v1;
+   FloatAgents.tsx): each agent a row of 48, 8 × 16 padding: its 32 head, 12 gap, line 1 (its name
+   13/500, the computer mark, its ring with its % from 70, its PR's number) and line 2 (its job in
+   one line, t-12 text-3, red when it failed), then its state at the right edge (.s3-arow-state).
+   An ask: its options and 'answer…' under it. A ψ head: its branch text-2, 'N agents' text-3. */
 .s3-arow {
   display: flex;
   flex-direction: column;
-  gap: var(--s-1);
-  padding: var(--s-1);
-  border-radius: var(--r-3);
+  gap: 0;
+  border-radius: var(--r-2);
 }
 .s3-arow[data-asks] {
-  background: var(--c-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--c-accent-line);
+  background: color-mix(in srgb, var(--c-accent) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--c-accent);
 }
 .s3-arow-open {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--s-3);
   width: 100%;
-  padding: var(--s-1);
+  min-height: 48px;
+  padding: var(--s-2) var(--s-3);
   border-radius: var(--r-2);
   text-align: left;
 }
@@ -1045,10 +1045,9 @@
 .s3-arow-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   flex: 1 1 auto;
   min-width: 0;
-  padding-top: var(--s-1);
 }
 .s3-arow-l1 {
   display: flex;
@@ -1072,7 +1071,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 600 var(--f-ui);
+  font: 500 var(--f-ui);
   color: var(--c-text);
 }
 .s3-arow-cols {
@@ -1104,18 +1103,59 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-left: calc(16px + var(--s-1));
   font: 400 var(--f-meta);
-  color: var(--c-text-2);
+  color: var(--c-text-3);
 }
 .s3-arow-l2[data-err] {
   color: var(--c-err);
+}
+/* the state, in words at the row's right edge, one column for every row (page agents-float v1, his
+   ask m_45828): working in ink 500 with the breath turning, '? asks you' the accent 600 (the only
+   pink), waits / idle / done text-3 (✓ in ink), failed red; idle and done rows step back: the
+   name text-2 400, the head at 55 %. An ask: the 9 % tint and a 2 px accent rail on its left. */
+.s3-arow-state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-1);
+  margin-left: auto;
+  font: 400 var(--f-meta);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--c-text-3);
+}
+.s3-arow-state[data-tone='work'] {
+  font-weight: 500;
+  color: var(--c-text);
+}
+.s3-arow-state[data-tone='ask'] {
+  font-weight: 600;
+  color: var(--c-accent);
+}
+.s3-arow-state[data-tone='err'] {
+  color: var(--c-err);
+}
+.s3-arow-state[data-tone='rest'] .s3-arow-sg {
+  color: var(--c-text);
+}
+.s3-arow-sg {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 12px;
+}
+.s3-arow[data-back] .s3-arow-name {
+  font-weight: 400;
+  color: var(--c-text-2);
+}
+.s3-arow[data-back] .s3-arow-head {
+  opacity: 0.55;
 }
 .s3-arow-acts {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: 0 0 var(--s-1) calc(var(--s-1) + 40px + var(--s-3) + 16px + var(--s-1));
+  padding: 0 var(--s-3) var(--s-2) calc(var(--s-3) + 32px + var(--s-3));
 }
 .s3-arow-answer {
   padding: 0 var(--s-2);
