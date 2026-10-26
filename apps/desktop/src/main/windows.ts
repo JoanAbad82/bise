@@ -293,5 +293,7 @@ export function windowTarget(raw: unknown): { readonly main: string | undefined 
     const kind = r['kind'];
     if ((kind === 'settings' || kind === 'artifact' || kind === 'agent') && typeof r['route'] === 'string') return { own: { kind, route: r['route'] } };
   }
+  // settings is a window of its own (nm-settings): the capsule's 'settings' (on its last page) or a 'settings/<page>'
+  if (typeof raw === 'string' && /^settings(\/|$)/u.test(raw)) return { own: { kind: 'settings', route: raw === 'settings' ? '' : raw } };
   return { main: typeof raw === 'string' ? raw : undefined };
 }

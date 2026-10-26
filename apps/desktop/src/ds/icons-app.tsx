@@ -59,6 +59,13 @@ const PARTS = {
   // nm-pages-a (native-lead m_42310): the artifacts' cards / list toggle, for ▦ ☰
   grid: ["M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"],
   list: ["M4 6h16M4 12h16M4 18h16"],
+  // nm-settings: the settings window's sidebar tiles (mockup 10; general, setup, voice and projects reuse settings, check, mic, folder)
+  eye: ["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z", [12, 12, 3]],
+  moon: ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"],
+  cpu: ["M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z", "M10 10h4v4h-4zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"],
+  shield: ["M12 21s7-3.5 7-9V5.5L12 3 5 5.5V12c0 5.5 7 9 7 9z"],
+  cursor: ["M5 4l6.5 16 2.3-6.7L20.5 11 5 4z"],
+  key: [[8, 15, 4], "M11 12l9-9M17 6l3 3M15 8l2 2"],
 } as const satisfies Record<string, readonly Part[]>;
 
 /** Every app icon's name. */

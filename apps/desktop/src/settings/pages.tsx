@@ -97,11 +97,12 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       return (
         <>
         <Group
+          title={settings.theme_label}
           testId="settings.general"
           items={[
             {
               id: 'theme',
-              label: settings.theme_label,
+              label: settings.theme_row,
               sub: settings.theme_sub,
               control: (
                 <Seg
@@ -114,9 +115,12 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
                 />
               ),
             },
-            ...notifyItems(data.notify ?? null, ports.notify),
           ]}
         />
+        {/* mockup 10: notifications in a group of their own (none when macOS's state isn't known) */}
+        {notifyItems(data.notify ?? null, ports.notify).length > 0 && (
+          <Group title={settings.notify_title} testId="settings.general.notify" items={notifyItems(data.notify ?? null, ports.notify)} />
+        )}
         {updateRow(data.appUpdate ?? null, null) !== null || !data.dist ? (
           <UpdateGroup update={data.appUpdate ?? null} ports={ports.update} />
         ) : (

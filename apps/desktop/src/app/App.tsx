@@ -21,7 +21,8 @@ import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
 import { useFnVoice } from '@/voicemode';
-import { SettingsScreen } from '@/settings';
+import { SettingsWindow } from '@/settings/window';
+import { toMainWindow, toSettingsWindow } from '@/settings/where';
 import { useSetupFirstOpens } from '@/settings/setup-first';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
 import { paletteOpen } from '@/setup/useTour';
@@ -75,7 +76,8 @@ import { useKissWatch } from './Marks';
 import { StoreEdge } from './edge';
 
 export function App() {
-  const [router] = useState(() => createRouter(firstRoute(), sessionHistory()));
+  // settings has a window of its own (nm-settings' settings/where.ts): each window sends the other its routes
+  const [router] = useState(() => createRouter(firstRoute(), sessionHistory(), ownWindow() === 'settings' ? toMainWindow() : toSettingsWindow()));
   // the window reopens where he left it, after a reload, an update swap or the next day (m_11763);
   // its back and forward places come back after a reload only (the window's session)
   useEffect(() => {
@@ -97,7 +99,7 @@ export function App() {
     <RouterContext value={router}>
       {/* the store's machine's effects run here, the one edge (edge.tsx) */}
       <StoreEdge />
-      <Shell />
+      {ownWindow() === 'settings' ? <SettingsWindow /> : <Shell />}
     </RouterContext>
   );
 }
@@ -112,7 +114,8 @@ function firstRoute(): Route {
   const own = ownWindow();
   if (own !== undefined) {
     const asked = startRouteOf(window.location.hash);
-    if (own === 'settings') return keptRoute('route.settings') ?? asked ?? { screen: 'settings' };
+    // a page asked (/model, a settings link) wins over the one he left
+    if (own === 'settings') return asked ?? keptRoute('route.settings') ?? { screen: 'settings' };
     return asked ?? { screen: 'bise' };
   }
   if (TERMINAL.test(window.location.hash)) {
@@ -407,8 +410,6 @@ function ScreenOf({ route }: { route: Route }) {
     case 'report':
       // the last crash report (CoreLine's 'show the report')
       return <ReportScreen log={route.log} />;
-    case 'settings':
-      return <SettingsScreen page={route.page} />;
     case 'onboarding':
       return <OnboardingScreen />;
     case 'lab':

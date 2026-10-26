@@ -41,7 +41,7 @@ describe('the store-fed screens', () => {
     fireEvent.click(screen.getByTestId('settings.pref.quiet.share'));
     expect(sent).toEqual([{ cmd: 'prefs_set', key: 'quiet.share', value: false }]);
     act(() => {
-      fireEvent.click(screen.getByTestId('settings.nav.models'));
+      fireEvent.click(screen.getByTestId('settings.nav.models.open'));
     });
     expect(router.get()).toEqual({ screen: 'settings', page: 'models' });
   });

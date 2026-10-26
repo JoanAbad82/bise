@@ -8,7 +8,7 @@
 // Owner: amb-home.
 import { useEffect, useRef } from 'react';
 import type { AppCmd, CoreEv } from '@/proto';
-import { Act, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
+import { Act, AppIcon, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
 import { settings } from '@/proto/words.gen';
 
 export type ComputerUse = Extract<CoreEv, { ev: 'computer_use' }>;
@@ -16,7 +16,8 @@ export type ComputerUse = Extract<CoreEv, { ev: 'computer_use' }>;
 /** how often the open page says it is still open */
 export const KEEP_MS = 30_000;
 
-const GLYPH: Record<string, string> = { done: '✓', waits: '?', checking: '…', failed: '▲', not_yet: '·' };
+/** a step's mark (done is the line icon check, never a ✓ glyph) */
+const GLYPH: Record<string, string> = { waits: '?', checking: '…', failed: '▲', not_yet: '·' };
 
 export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: AppCmd) => void }) {
   // the screen hands a new `send` on each render (each core event): the check follows the page's
@@ -42,16 +43,18 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
   const on = cu?.on ?? false;
   const row = (r: ComputerUse['rows'][number]): GroupItem => ({
     id: r.id,
+    // designer (via cu-settings m_42955): the step's mark in a 16 px column on the title's line,
+    // the sub lines aligned to the title's text
     label: (
-      <>
-        <span className={`settings-cu-st ${r.state}`} aria-label={r.state}>
-          {GLYPH[r.state] ?? '·'}
-        </span>{' '}
+      <span className="settings-cu-t">
+        <span className={`settings-cu-st ${r.state}`} aria-label={r.state} data-tip={r.state}>
+          {r.state === 'done' ? <AppIcon name="check" size={14} /> : (GLYPH[r.state] ?? '·')}
+        </span>
         {r.label}
-      </>
+      </span>
     ),
     sub: (
-      <>
+      <span className="settings-cu-sub">
         {r.detail}
         {r.state !== 'done' &&
           (r.help ?? []).map((h) => (
@@ -59,7 +62,7 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
               {h}
             </span>
           ))}
-      </>
+      </span>
     ),
     control:
       r.action != null && r.fix != null ? (

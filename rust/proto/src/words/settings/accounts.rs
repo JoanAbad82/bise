@@ -65,7 +65,7 @@ crate::words! { settings:
     /// a model whose provider needs its setup first
     role_setup_first(provider) = "{provider}: set up first";
     /// the roles' group
-    roles_title = "which model does what";
+    roles_title = "Which model does what";
     /// the roles' help
     roles_help = "the terminal's /models shows the same";
 
@@ -114,7 +114,7 @@ crate::words! { settings:
     log_out = "log out";
 
     /// computer use: the switch's row
-    cu_label = "agents may drive Chrome and your apps";
+    cu_label = "Agents may drive Chrome and your apps";
     /// computer use: on and ready
     cu_ready = "ready: step by step, and you can take the wheel";
     /// computer use: on, not ready
@@ -126,9 +126,9 @@ crate::words! { settings:
     /// computer use: the first check
     cu_checking = "checking Chrome and its extension…";
     /// computer use: the web steps' group
-    cu_web = "in Chrome";
+    cu_web = "In Chrome";
     /// computer use: the apps' steps' group
-    cu_apps = "for apps";
+    cu_apps = "For apps";
     /// computer use: remove it
-    cu_uninstall = "turn off and remove its files";
+    cu_uninstall = "Turn off and remove its files";
 }

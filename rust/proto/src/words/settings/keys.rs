@@ -4,7 +4,7 @@
 
 crate::words! { settings:
     /// keys: from any app
-    keys_anywhere = "from any app";
+    keys_anywhere = "From any app";
     /// hold fn
     key_hold_fn = "talk to bise, with what is in front of you";
     /// fn fn
@@ -12,7 +12,7 @@ crate::words! { settings:
     /// fn space
     key_fn_space = "the spotlight: find an agent, or ask bise";
     /// keys: the window
-    keys_window = "the window";
+    keys_window = "The window";
     /// ⌘0
     key_bise = "bise";
     /// ⌘1 … ⌘9
@@ -38,7 +38,7 @@ crate::words! { settings:
     /// ⌘/
     key_this_list = "this list";
     /// keys: the composer
-    keys_composer = "the composer";
+    keys_composer = "The composer";
     /// ⏎
     key_send = "send; during a turn, steer it";
     /// ⇧⏎
@@ -64,7 +64,7 @@ crate::words! { settings:
     /// ctrl+r
     key_dictation = "dictation into the composer";
     /// keys: the inbox
-    keys_inbox = "the inbox";
+    keys_inbox = "The inbox";
     /// ↑ ↓
     key_prev_next = "the previous / next item";
     /// ctrl+p / ctrl+n

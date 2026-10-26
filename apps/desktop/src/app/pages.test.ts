@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PAGES } from '@/settings';
+import { settings } from '@/proto/words.gen';
 import { searchList, type SearchData } from '@/search/rank';
 import { appPages, ASKS, SCREENS } from './pages';
 import { formatRoute, parseRoute, type Route } from './route';
@@ -70,9 +71,9 @@ describe('the pages group (designer m_21505)', () => {
   it("'set' finds settings and its setup page; 'keys' the keys page and help; ⏎ goes like its key", () => {
     const set = group('set')?.hits ?? [];
     expect(set[0]?.name).toBe('settings');
-    expect(set.some((h) => h.parent === 'settings' && h.name === 'setup')).toBe(true);
+    expect(set.some((h) => h.parent === 'settings' && h.name === settings.page_setup)).toBe(true);
     const keys = group('keys')?.hits ?? [];
-    expect(keys[0]).toMatchObject({ name: 'keys', parent: 'settings', open: { to: 'page', go: { route: 'settings/keys' } } });
+    expect(keys[0]).toMatchObject({ name: settings.page_keys, parent: 'settings', open: { to: 'page', go: { route: 'settings/keys' } } });
     expect(keys.some((h) => h.name === 'help' && h.key === '⌘/')).toBe(true);
     expect(group('inbox')?.hits[0]).toMatchObject({ glyph: '#', key: '⌘I', open: { to: 'page', go: { inbox: true } } });
   });

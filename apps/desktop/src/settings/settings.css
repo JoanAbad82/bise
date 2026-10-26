@@ -1,9 +1,6 @@
-/* settings (src/settings, amb-home): ds tokens only; the frame is the ds's .b-set */
-.settings { height: 100%; min-height: 0; outline: none; overflow: hidden; }
-/* b2: the inbox block under settings grows when an item opens; the frame shrinks with it (the ds's
-   380 px floor would run the nav under the block) and its nav and page scroll inside */
-.settings .b-set { height: 100%; min-height: 0; }
-.settings .b-set .nav, .settings .b-set .pg { min-height: 0; overflow-y: auto; }
+/* settings (src/settings, nm-settings): ds tokens only; the window's frame is the ds's .b-swin
+   (ds/css/settings.css), the whole window, its sidebar and its page scrolling apart */
+.settings-window { height: 100vh; overflow: hidden; }
 .settings-row-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
 /* settings › projects (projects.tsx, designer m_41841): one 32 px row each, on the column, its fill
    8 px past it as on every list; the name, then its folder short; at the right its ⌘N, then the ⋯
@@ -47,10 +44,16 @@
 .settings-add-opts .b-group { margin-bottom: 0; }
 .settings-add-say { margin-right: auto; font-size: var(--t-13); color: var(--c-text-2); }
 .settings-add-say.err { color: var(--c-err); }
-.settings-cu-st { display: inline-block; width: 1em; color: var(--c-text-3); }
-.settings-cu-st.done { color: var(--c-ok); }
-.settings-cu-st.waits { color: var(--c-accent); }
-.settings-cu-st.failed { color: var(--c-err); }
+/* computer use's steps (designer via cu-settings m_42955): the mark in a 16 px column on the title's
+   line, the sub lines under the title's text (16 + the 8 gap in); the done check in ink, ? in the
+   accent (it waits on him), · and … in text-3, ▲ red. The ds draws every span of a row's label as
+   its sub (block, 12 px, text-2): the title's spans undo it. */
+.b-gi .l span.settings-cu-t { display: flex; align-items: center; gap: var(--s-2); font-size: inherit; line-height: inherit; color: var(--c-text); }
+.b-gi .l span.settings-cu-st { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--w-state); font-size: inherit; color: var(--c-text-3); }
+.b-gi .l span.settings-cu-st.done { color: var(--c-ink); }
+.b-gi .l span.settings-cu-st.waits { color: var(--c-accent); }
+.b-gi .l span.settings-cu-st.failed { color: var(--c-err); }
+.b-gi .l span.settings-cu-sub { padding-left: calc(var(--w-state) + var(--s-2)); }
 /* a failed line under a settings row: the ds's '.b-gi .l span' (every span of a row's label, text-2)
    would win over one class, so the rule names the row (N1's failed keychain move) */
 .b-gi .l .settings-err { color: var(--c-err); }

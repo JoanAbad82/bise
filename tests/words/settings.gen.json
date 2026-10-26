@@ -206,7 +206,7 @@
   "settings.approvals_rules": {
     "args": [],
     "one": null,
-    "text": "always allowed here"
+    "text": "Always allowed here"
   },
   "settings.approvals_this_repo": {
     "args": [],
@@ -421,7 +421,7 @@
   "settings.cu_apps": {
     "args": [],
     "one": null,
-    "text": "for apps"
+    "text": "For apps"
   },
   "settings.cu_checking": {
     "args": [],
@@ -431,7 +431,7 @@
   "settings.cu_label": {
     "args": [],
     "one": null,
-    "text": "agents may drive Chrome and your apps"
+    "text": "Agents may drive Chrome and your apps"
   },
   "settings.cu_off": {
     "args": [],
@@ -456,12 +456,12 @@
   "settings.cu_uninstall": {
     "args": [],
     "one": null,
-    "text": "turn off and remove its files"
+    "text": "Turn off and remove its files"
   },
   "settings.cu_web": {
     "args": [],
     "one": null,
-    "text": "in Chrome"
+    "text": "In Chrome"
   },
   "settings.days": {
     "args": [
@@ -1554,7 +1554,7 @@
   "settings.keychain_label": {
     "args": [],
     "one": null,
-    "text": "keep them in the macOS keychain"
+    "text": "Keep them in the macOS keychain"
   },
   "settings.keychain_moving": {
     "args": [],
@@ -1579,22 +1579,22 @@
   "settings.keychain_title": {
     "args": [],
     "one": null,
-    "text": "your keys and sign-ins"
+    "text": "Your keys and sign-ins"
   },
   "settings.keys_anywhere": {
     "args": [],
     "one": null,
-    "text": "from any app"
+    "text": "From any app"
   },
   "settings.keys_composer": {
     "args": [],
     "one": null,
-    "text": "the composer"
+    "text": "The composer"
   },
   "settings.keys_inbox": {
     "args": [],
     "one": null,
-    "text": "the inbox"
+    "text": "The inbox"
   },
   "settings.keys_same": {
     "args": [],
@@ -1604,7 +1604,7 @@
   "settings.keys_window": {
     "args": [],
     "one": null,
-    "text": "the window"
+    "text": "The window"
   },
   "settings.lang_auto": {
     "args": [],
@@ -1664,6 +1664,11 @@
     "one": null,
     "text": "{names} and {more} more"
   },
+  "settings.nav_label": {
+    "args": [],
+    "one": null,
+    "text": "Settings"
+  },
   "settings.no_answer": {
     "args": [
       "s"
@@ -1701,10 +1706,15 @@
     "one": null,
     "text": "on"
   },
+  "settings.notify_title": {
+    "args": [],
+    "one": null,
+    "text": "Notifications"
+  },
   "settings.notify_turn_on": {
     "args": [],
     "one": null,
-    "text": "turn on"
+    "text": "Turn on"
   },
   "settings.onb_accessibility_lost": {
     "args": [],
@@ -1985,7 +1995,7 @@
   "settings.page_approvals": {
     "args": [],
     "one": null,
-    "text": "approvals"
+    "text": "Approvals"
   },
   "settings.page_approvals_sub": {
     "args": [],
@@ -1995,7 +2005,7 @@
   "settings.page_computer": {
     "args": [],
     "one": null,
-    "text": "computer use"
+    "text": "Computer use"
   },
   "settings.page_computer_sub": {
     "args": [],
@@ -2005,7 +2015,7 @@
   "settings.page_general": {
     "args": [],
     "one": null,
-    "text": "general"
+    "text": "General"
   },
   "settings.page_general_sub": {
     "args": [],
@@ -2015,7 +2025,7 @@
   "settings.page_keys": {
     "args": [],
     "one": null,
-    "text": "keys"
+    "text": "Keys"
   },
   "settings.page_keys_sub": {
     "args": [],
@@ -2025,7 +2035,7 @@
   "settings.page_models": {
     "args": [],
     "one": null,
-    "text": "models"
+    "text": "Models"
   },
   "settings.page_models_sub": {
     "args": [],
@@ -2035,7 +2045,7 @@
   "settings.page_privacy": {
     "args": [],
     "one": null,
-    "text": "context and privacy"
+    "text": "Context and privacy"
   },
   "settings.page_privacy_sub": {
     "args": [],
@@ -2045,7 +2055,7 @@
   "settings.page_projects": {
     "args": [],
     "one": null,
-    "text": "projects"
+    "text": "Projects"
   },
   "settings.page_projects_sub": {
     "args": [],
@@ -2055,7 +2065,7 @@
   "settings.page_quiet": {
     "args": [],
     "one": null,
-    "text": "quiet moments"
+    "text": "Quiet moments"
   },
   "settings.page_quiet_sub": {
     "args": [],
@@ -2065,7 +2075,7 @@
   "settings.page_setup": {
     "args": [],
     "one": null,
-    "text": "setup"
+    "text": "Setup"
   },
   "settings.page_setup_sub": {
     "args": [],
@@ -2075,7 +2085,7 @@
   "settings.page_voice": {
     "args": [],
     "one": null,
-    "text": "voice and fn"
+    "text": "Voice and fn"
   },
   "settings.page_voice_sub": {
     "args": [],
@@ -3545,12 +3555,12 @@
   "settings.privacy_add": {
     "args": [],
     "one": null,
-    "text": "add…"
+    "text": "Add…"
   },
   "settings.privacy_another_app": {
     "args": [],
     "one": null,
-    "text": "another app"
+    "text": "Another app"
   },
   "settings.privacy_app_id": {
     "args": [],
@@ -3560,7 +3570,7 @@
   "settings.privacy_apps": {
     "args": [],
     "one": null,
-    "text": "never sent to an agent"
+    "text": "Never sent to an agent"
   },
   "settings.privacy_apps_help": {
     "args": [],
@@ -3570,7 +3580,7 @@
   "settings.privacy_file": {
     "args": [],
     "one": null,
-    "text": "the open file and your selection"
+    "text": "The open file and your selection"
   },
   "settings.privacy_file_sub": {
     "args": [],
@@ -3580,17 +3590,17 @@
   "settings.privacy_hold": {
     "args": [],
     "one": null,
-    "text": "when you hold fn"
+    "text": "When you hold fn"
   },
   "settings.privacy_kept": {
     "args": [],
     "one": null,
-    "text": "kept"
+    "text": "Kept"
   },
   "settings.privacy_shot": {
     "args": [],
     "one": null,
-    "text": "a screenshot of the window in front"
+    "text": "A screenshot of the window in front"
   },
   "settings.privacy_shot_sub": {
     "args": [],
@@ -3600,7 +3610,7 @@
   "settings.privacy_shots": {
     "args": [],
     "one": null,
-    "text": "images"
+    "text": "Images"
   },
   "settings.privacy_shots_sub": {
     "args": [],
@@ -3610,7 +3620,7 @@
   "settings.privacy_url": {
     "args": [],
     "one": null,
-    "text": "the tab's URL and title"
+    "text": "The tab's URL and title"
   },
   "settings.privacy_url_sub": {
     "args": [],
@@ -3620,7 +3630,7 @@
   "settings.privacy_window_text": {
     "args": [],
     "one": null,
-    "text": "the text of the window"
+    "text": "The text of the window"
   },
   "settings.privacy_window_text_sub": {
     "args": [],
@@ -3941,7 +3951,7 @@
   "settings.quiet_away": {
     "args": [],
     "one": null,
-    "text": "while you were away"
+    "text": "While you were away"
   },
   "settings.quiet_away_sub": {
     "args": [],
@@ -3951,12 +3961,12 @@
   "settings.quiet_batch": {
     "args": [],
     "one": null,
-    "text": "they come together"
+    "text": "They come together"
   },
   "settings.quiet_batch_min": {
     "args": [],
     "one": null,
-    "text": "at most every"
+    "text": "At most every"
   },
   "settings.quiet_batch_min_sub": {
     "args": [],
@@ -3971,7 +3981,7 @@
   "settings.quiet_call": {
     "args": [],
     "one": null,
-    "text": "during a call"
+    "text": "During a call"
   },
   "settings.quiet_call_sub": {
     "args": [],
@@ -3981,7 +3991,7 @@
   "settings.quiet_focus": {
     "args": [],
     "one": null,
-    "text": "in focus mode"
+    "text": "In focus mode"
   },
   "settings.quiet_focus_sub": {
     "args": [],
@@ -3991,7 +4001,7 @@
   "settings.quiet_fullscreen": {
     "args": [],
     "one": null,
-    "text": "in full screen"
+    "text": "In full screen"
   },
   "settings.quiet_fullscreen_sub": {
     "args": [],
@@ -4001,7 +4011,7 @@
   "settings.quiet_share": {
     "args": [],
     "one": null,
-    "text": "while you share your screen"
+    "text": "While you share your screen"
   },
   "settings.quiet_share_sub": {
     "args": [],
@@ -4011,12 +4021,12 @@
   "settings.quiet_then": {
     "args": [],
     "one": null,
-    "text": "then"
+    "text": "Then"
   },
   "settings.quiet_wait": {
     "args": [],
     "one": null,
-    "text": "notifications wait"
+    "text": "Notifications wait"
   },
   "settings.release_dry": {
     "args": [],
@@ -4359,7 +4369,7 @@
   "settings.roles_title": {
     "args": [],
     "one": null,
-    "text": "which model does what"
+    "text": "Which model does what"
   },
   "settings.roles_use": {
     "args": [
@@ -4576,12 +4586,17 @@
   "settings.theme_label": {
     "args": [],
     "one": null,
-    "text": "appearance"
+    "text": "Appearance"
   },
   "settings.theme_light": {
     "args": [],
     "one": null,
     "text": "light"
+  },
+  "settings.theme_row": {
+    "args": [],
+    "one": null,
+    "text": "Theme"
   },
   "settings.theme_sub": {
     "args": [],
@@ -4797,7 +4812,7 @@
   "settings.update_title": {
     "args": [],
     "one": null,
-    "text": "update"
+    "text": "Updates"
   },
   "settings.update_you_run": {
     "args": [
@@ -4829,7 +4844,7 @@
   "settings.voice_fn_hold": {
     "args": [],
     "one": null,
-    "text": "hold fn to talk"
+    "text": "Hold fn to talk"
   },
   "settings.voice_fn_hold_sub": {
     "args": [],
@@ -4849,7 +4864,7 @@
   "settings.voice_language": {
     "args": [],
     "one": null,
-    "text": "what bise hears"
+    "text": "What bise hears"
   },
   "settings.voice_language_sub": {
     "args": [],

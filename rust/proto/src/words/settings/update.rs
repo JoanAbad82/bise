@@ -36,7 +36,7 @@ crate::words! { settings:
     /// approvals: the page's head
     approvals_in(repo) = "what runs without asking you in {repo}.";
     /// approvals: the rules' group
-    approvals_rules = "always allowed here";
+    approvals_rules = "Always allowed here";
     /// approvals: no rule
     approvals_empty = "nothing yet: a notification's “always allow” adds a rule here.";
 
@@ -77,7 +77,7 @@ crate::words! { settings:
     /// update: no swap from here
     update_this_build = "this build";
     /// update: the group's title
-    update_title = "update";
+    update_title = "Updates";
 
     /// dist update: the app and its version
     dist_me(version) = "bise {version}";

@@ -122,7 +122,7 @@ describe('Settings', () => {
     const p = ports();
     view('nope', p);
     expect(screen.getByTestId('settings.page.general')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('settings.nav.keys'));
+    fireEvent.click(screen.getByTestId('settings.nav.keys.open'));
     fireEvent.keyDown(screen.getByTestId('settings.root'), { key: 'Escape' });
     expect(p.went).toEqual(['keys', 'back']);
   });
