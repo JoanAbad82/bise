@@ -113,6 +113,24 @@ describe('the sidebar', () => {
     expect(week.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(7);
   });
 
+  it("the hub's real pulse (the proto fixture's hub/pulse, folded into acme's row by the core): its new artifacts, its news in the tip, its age, 7 days", () => {
+    const { pulse } = ev('pulse');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime((pulse.last_ms ?? 0) + 3 * 3_600_000);
+    try {
+      const { v } = frame({ screen: 'bise' }, [agent('main')], [], { pulse });
+      // never looked: the week's 2 artifacts are new, 3 entries for him unread, perf's land the news
+      expect(v.getByTestId(`app.side.project.${ACME}.say`).textContent).toBe(projects.new_artifacts({ n: 2 }));
+      expect(v.getByTestId(`app.side.project.${ACME}.age`).textContent).toBe('3 h');
+      expect(v.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(
+        ['acme', projects.new_artifacts({ n: 2 }), projects.unread({ n: 3 }), projects.landed({ agent: 'perf', target: 'main' }), projects.last_activity({ age: '3 h' })].join(' · '),
+      );
+      expect(v.getByTestId(`app.side.project.${ACME}.week`).querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(7);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('marks the project he opens seen, and again when he leaves it (prefs seen.<project>)', () => {
     const sent: unknown[] = [];
     const { router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent);

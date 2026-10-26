@@ -7,9 +7,10 @@
 import { useEffect, useMemo } from 'react';
 import { usePrefs, useStore, type Store } from '@/store';
 import { getPref, type Prefs } from '@/settings/prefs';
+import { SEEN_PREFIX } from '@/proto/app_methods.gen';
 
-/** The prefs key of a project's last look. */
-export const seenKey = (project: string): string => `seen.${project}`;
+/** The prefs key of a project's last look: bise_proto::rows::seen_key's, so the TUI reads the same. */
+export const seenKey = (project: string): string => `${SEEN_PREFIX}${project}`;
 
 /** When he last looked at `project`, from the prefs; undefined: never. Pure. */
 export function seenOf(prefs: Prefs | null, project: string): number | undefined {

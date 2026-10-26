@@ -118,8 +118,9 @@ export function applyTyped(s: Store, ev: Ev): void {
       s.put(`growth:${ev.project}`, ev.growth);
       return;
     case "pulse":
-      // the H1 sidebar: the project's pulse (busy buckets, last activity, news), at hello and at most once a minute
-      s.put(`pulse:${ev.project}`, ev.pulse);
+      // the H1 sidebar's pulse: the core folds a held hub's hub/pulse into its ProjectRow.pulse and
+      // sends the rows again (core/hubs.rs emit_rows), so the sidebar reads it from useProjects;
+      // no second copy here
       return;
     case "inbox_history": {
       // a page: the first one (no older held) replaces, an older one (its items older than the
