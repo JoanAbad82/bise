@@ -1437,7 +1437,7 @@
   "settings.key_fn_fn": {
     "args": [],
     "one": null,
-    "text": "hands-free voice; fn again stops"
+    "text": "hands-free voice, until fn again"
   },
   "settings.key_fn_space": {
     "args": [],
@@ -1467,7 +1467,7 @@
   "settings.key_main_or_agent": {
     "args": [],
     "one": null,
-    "text": "the project's main / an agent"
+    "text": "the project's bise / an agent"
   },
   "settings.key_new_line": {
     "args": [],
@@ -1512,7 +1512,7 @@
   "settings.key_project": {
     "args": [],
     "one": null,
-    "text": "a project, in the order of settings · projects"
+    "text": "a project, in the order of Settings › Projects"
   },
   "settings.key_put_away": {
     "args": [],
@@ -2090,7 +2090,7 @@
   "settings.page_projects_sub": {
     "args": [],
     "one": null,
-    "text": "the folders bise works in. each one has its own main."
+    "text": "the folders bise works in. each one has its own lead."
   },
   "settings.page_quiet": {
     "args": [],

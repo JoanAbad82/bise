@@ -182,7 +182,7 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
                 </span>
               ) : (
                 <span className="sp-end">
-                  {i < 9 && <Kbd>{`⌘${String(i + 1)}`}</Kbd>}
+                  {/* the ⋯'s kept slot sits before the keycap: the keycap ends 12 inside the box like every right-side control (designer m_43941) */}
                   <span className="sp-more">
                     <IconButton
                       size="bar"
@@ -196,6 +196,7 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
                       ⋯
                     </IconButton>
                   </span>
+                  {i < 9 && <Kbd>{`⌘${String(i + 1)}`}</Kbd>}
                 </span>
               )}
               {menu === p.project && (

@@ -36,7 +36,7 @@ crate::words! { settings:
     /// the nav's page: projects
     page_projects = "Projects";
     /// projects' hero sentence
-    page_projects_sub = "the folders bise works in. each one has its own main.";
+    page_projects_sub = "the folders bise works in. each one has its own lead.";
     /// the nav's page: computer use
     page_computer = "Computer use";
     /// computer use's hero sentence

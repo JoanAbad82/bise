@@ -11,6 +11,16 @@ export function chromeCase(s: string): string {
 }
 
 /**
+ * A key list's keys as keycaps (designer m_43941): '⌘[ / ⌘]' is two caps with ' / ' between them,
+ * '⌥0 / ⌥1 … ⌥9' three with ' / ' and ' … '; a key alone is one cap. Pure.
+ */
+export function capsOf(keys: string): { readonly text: string; readonly sep: boolean }[] {
+  return keys
+    .split(/ (\/|…) /u)
+    .map((text, i) => ({ text, sep: i % 2 === 1 }));
+}
+
+/**
  * His home folder as the projects' paths say it: the shell's when his projects live under it, else
  * the folder that holds bise's home project (a world whose shell runs on another home: a test's
  * fixtures). None: paths stay whole. Pure.

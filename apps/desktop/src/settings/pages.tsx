@@ -14,7 +14,7 @@ import { Projects } from './projects';
 import { UpdateGroup, updateRow } from './update';
 import { DistUpdateGroup } from './appupdate';
 import { Computer } from './computer';
-import { chromeCase, homeOf } from './chrome';
+import { capsOf, chromeCase, homeOf } from './chrome';
 import { checks, SetupCheck } from './check';
 import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
@@ -389,7 +389,20 @@ export function KeyList(): ReactNode {
             // a row title: sentence case like every page's rows (designer m_43882), the sub lowercase
             label: chromeCase(r.action),
             sub: r.tui === undefined ? undefined : settings.key_terminal({ keys: r.tui }),
-            control: <Kbd>{r.keys}</Kbd>,
+            // one keycap per key, a text-3 ' / ' or ' … ' between two (designer m_43941)
+            control: (
+              <span className="settings-caps">
+                {capsOf(r.keys).map((c, i) =>
+                  c.sep ? (
+                    <span key={i} className="settings-caps-sep">
+                      {c.text}
+                    </span>
+                  ) : (
+                    <Kbd key={i}>{c.text}</Kbd>
+                  ),
+                )}
+              </span>
+            ),
           }))}
         />
       ))}

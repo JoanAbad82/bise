@@ -37,7 +37,7 @@ export const settings = {
   /** the nav's page: projects */
   page_projects: "Projects",
   /** projects' hero sentence */
-  page_projects_sub: "the folders bise works in. each one has its own main.",
+  page_projects_sub: "the folders bise works in. each one has its own lead.",
   /** the nav's page: computer use */
   page_computer: "Computer use",
   /** computer use's hero sentence */
@@ -523,7 +523,7 @@ export const settings = {
   /** hold fn */
   key_hold_fn: "talk to bise, with what is in front of you",
   /** fn fn */
-  key_fn_fn: "hands-free voice; fn again stops",
+  key_fn_fn: "hands-free voice, until fn again",
   /** fn space */
   key_fn_space: "the spotlight: find an agent, or ask bise",
   /** keys: the window */
@@ -531,9 +531,9 @@ export const settings = {
   /** ⌘0 */
   key_bise: "bise",
   /** ⌘1 … ⌘9 */
-  key_project: "a project, in the order of settings · projects",
+  key_project: "a project, in the order of Settings › Projects",
   /** ⌥0 / ⌥1 … ⌥9 */
-  key_main_or_agent: "the project's main / an agent",
+  key_main_or_agent: "the project's bise / an agent",
   /** ⌘K */
   key_find_agent: "find an agent, a page or an artifact",
   /** ⌘[ / ⌘] */

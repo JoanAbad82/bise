@@ -15,7 +15,7 @@ import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, ty
 import { addPaths, offers, ordered, projectSub } from './projects';
 import { KEY_SECTIONS } from './keys';
 import { notifyRow } from './pages';
-import { chromeCase, homeOf } from './chrome';
+import { capsOf, chromeCase, homeOf } from './chrome';
 import { stepOf } from './computer';
 import { checks } from './check';
 import { FALLBACK } from './roles';
@@ -269,6 +269,11 @@ describe('chrome words (designer m_43882)', () => {
     expect(chromeCase('bise')).toBe('bise');
     expect(chromeCase('bise Computer Use')).toBe('bise Computer Use');
     expect(chromeCase('')).toBe('');
+  });
+  it('one keycap per key, the separators between them (designer m_43941)', () => {
+    expect(capsOf('⌘K')).toEqual([{ text: '⌘K', sep: false }]);
+    expect(capsOf('⌘[ / ⌘]').map((c) => c.text)).toEqual(['⌘[', '/', '⌘]']);
+    expect(capsOf('⌥0 / ⌥1 … ⌥9').map((c) => (c.sep ? `(${c.text})` : c.text))).toEqual(['⌥0', '(/)', '⌥1', '(…)', '⌥9']);
   });
   it("a numbered help step's number goes to the mark column, its words hang", () => {
     expect(stepOf('1  ⏎ opens chrome://extensions')).toEqual({ n: '1', text: '⏎ opens chrome://extensions' });
