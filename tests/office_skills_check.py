@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLUGINS = ("sheets", "slides", "docs")
@@ -83,6 +84,24 @@ def jsrt_bin():
     return os.environ.get("BEND_JSRT_BIN") or None
 
 
+def jsrt_stale(rel):
+    """Why the bend-jsrt `bise office` would run is too old for it, or None.
+    One from before script mode (rust/jsrt/target/debug, built Oct 1 in a
+    task's tree) answers 'script' with its old two-file usage, and all 24
+    scripts then failed with 'bend-jsrt stopped without a word' (web-pinch
+    m_45494): the red names the binary and the fix instead."""
+    path = rel if os.path.isabs(rel) else os.path.join(ROOT, rel)
+    try:
+        r = subprocess.run([path, "script"], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return "bend-jsrt at %s does not run: %s" % (path, e)
+    if "<program-file>" in r.stdout + r.stderr:
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(path)))
+        return ("bend-jsrt at %s (built %s) has no script mode: rebuild it "
+                "(cargo build --manifest-path rust/jsrt/Cargo.toml) or remove it so the fresh one is used" % (path, when))
+    return None
+
+
 def blocks(plugin):
     """[(file, script)] of a plugin's skill, in reading order"""
     out = []
@@ -113,6 +132,10 @@ def main():
     if miss:
         print(("FAIL" if strict else "skipped") + " office_skills: " + miss)
         return 1 if strict else 0
+    stale = jsrt_stale(jsrt_bin())
+    if stale:
+        print("FAIL office_skills: " + stale)
+        return 1
     env = {k: v for k, v in os.environ.items() if k not in ("SB_SOCKET", "SB_AGENT", "BEND_WORKDIR")}
     tmp = tempfile.mkdtemp(prefix="office-skills-")
     fails, n = [], 0
