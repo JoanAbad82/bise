@@ -9,15 +9,19 @@ import { keep } from '@/app/keep';
 import { useLeftWidth } from '@/app/frame-state';
 import { iconKindOf } from '@/ds';
 import { useAllArtifacts } from '@/artifacts';
-import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { armHandoff } from '@/composer/handoff';
+import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 
 const KEY = 'panel';
 
 let state: PanelKept = parseKept(keep.view(KEY));
 const listeners = new Set<() => void>();
 
-function set(next: PanelKept): void {
-  if (next === state) return;
+function set(raw: PanelKept): void {
+  if (raw === state) return;
+  const next = withOpen(raw);
+  // the thread's composer and the floating one swap (full width on or off): his caret goes across
+  if (state.open && next.full !== state.full) armHandoff();
   state = next;
   keep.setView(KEY, next);
   for (const l of listeners) l();
@@ -69,7 +73,8 @@ export function usePanelFit(): PanelFit {
   const kind = useFrontArtKind();
   const win = useWindowWidth();
   const left = useLeftWidth();
-  return kind === undefined ? fitW(widthNow(s), win, left) : artFit(shareOf(kind, s.shares), win, left);
+  const fit = kind === undefined ? fitW(widthNow(s), win, left) : artFit(shareOf(kind, s.shares), win, left);
+  return s.open && s.full ? fullFit(fit, win, left) : fit;
 }
 
 /** The kind (ds's iconKindOf) of the artifact in front of the panel; undefined for any other tab. */
@@ -99,15 +104,54 @@ export function resetArtShare(kind: string): void {
  * Open or folded, and the column it takes (0 folded, 0 as a sheet over the thread): what the right
  * side (nm-side's sideLayout) and the shell read. `over`: it is a sheet now.
  */
-export function usePanelBox(): { readonly open: boolean; readonly width: number; readonly over: boolean } {
+export function usePanelBox(): { readonly open: boolean; readonly width: number; readonly over: boolean; readonly full: boolean } {
   const s = usePanelState();
   const f = usePanelFit();
-  return { open: s.open, width: s.open && !f.over ? f.width : 0, over: s.open && f.over };
+  return { open: s.open, width: s.open && !f.over ? f.width : 0, over: s.open && f.over, full: s.open && s.full && !f.over };
+}
+
+/** Full width now (model.ts fullFit): open, full, and not a sheet. The thread hides, the floating composer comes over the panel. */
+export function usePanelFull(): boolean {
+  return usePanelBox().full;
 }
 
 /** The bar's ▯ and ⌥⌘B (⌥⌘0): fold or unfold, on the tab he left in front. */
 export function panelToggle(): void {
   set({ ...state, open: !state.open });
+}
+
+/** Full width on or off (his drag past the thread's 400, a drag back, ⇧⌥⌘B, the tab row's 'show the thread'); on unfolds the panel. */
+export function setFull(on: boolean): void {
+  if (on === (state.open && state.full)) return;
+  set({ ...state, open: state.open || on, full: on });
+}
+
+/** ⇧⌥⌘B and View › Panel Full Width: full width or back beside the thread. */
+export function toggleFull(): void {
+  setFull(!(state.open && state.full));
+}
+
+/** His drag on the border is past the thread's 400 now (Host.tsx Border): the thread dims as a preview. Not kept. */
+let fullPreview = false;
+const previewSubs = new Set<() => void>();
+
+export function setFullPreview(on: boolean): void {
+  if (on === fullPreview) return;
+  fullPreview = on;
+  for (const l of previewSubs) l();
+}
+
+/** The drag's preview, live (App.tsx dims the thread with it). */
+export function useFullPreview(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      previewSubs.add(l);
+      return () => {
+        previewSubs.delete(l);
+      };
+    },
+    () => fullPreview,
+  );
 }
 
 /** Opens `what` in a tab (an open one comes to the front), unfolding the panel; `instead`: the launcher it replaces. */

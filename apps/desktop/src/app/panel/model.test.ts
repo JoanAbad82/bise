@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   activate,
+  backFromFull,
+  FULL_AT,
+  FULL_BACK,
+  fullFit,
+  pastFull,
+  withOpen,
   fitW,
   clampW,
   closable,
@@ -240,8 +246,40 @@ describe('the kept record (kept per window, read back after a reload)', () => {
     const k = parseKept({ tabs: { active: 'nope', list: [{ what: { kind: 'terminal', project: 'acme', n: 1 } }] } });
     expect(k.tabs.active).toBe('overview');
   });
+  it('full width reads back only with the panel open (a folded one opens beside the thread)', () => {
+    expect(parseKept({ open: true, full: true }).full).toBe(true);
+    expect(parseKept({ open: false, full: true }).full).toBe(false);
+    expect(parseKept({ open: true }).full).toBe(false);
+  });
   it('round-trips what it wrote', () => {
     const k = { ...FOLDED, open: true, tabs: openIn(FIRST, art('a')) };
     expect(parseKept(JSON.parse(JSON.stringify(k)))).toEqual(k);
+  });
+});
+
+describe('full width (panel-full, designer m_45445)', () => {
+  // 1440 with a 56 rail and a 220 sidebar: 1164 of content
+  const WIN = 1440;
+  const LEFT = 276;
+  it('his drag goes past the threshold where the thread would keep under 400', () => {
+    expect(FULL_AT).toBe(400);
+    expect(pastFull(WIN - LEFT - FULL_AT, WIN, LEFT), 'the thread keeps 400: not yet').toBe(false);
+    expect(pastFull(WIN - LEFT - FULL_AT + 1, WIN, LEFT)).toBe(true);
+    expect(pastFull(640, WIN, LEFT), "today's widest panel: far from it").toBe(false);
+  });
+  it('in full width a drag right by 120 brings the thread back, less does nothing', () => {
+    expect(FULL_BACK).toBe(120);
+    expect(backFromFull(119)).toBe(false);
+    expect(backFromFull(120)).toBe(true);
+    expect(backFromFull(-300), 'a drag left').toBe(false);
+  });
+  it('full width takes the whole content; a sheet stays a sheet', () => {
+    expect(fullFit({ width: 640, over: false }, WIN, LEFT)).toEqual({ width: WIN - LEFT, over: false });
+    expect(fullFit({ width: 384, over: true }, 1000, LEFT)).toEqual({ width: 384, over: true });
+  });
+  it('a folded panel is never full', () => {
+    expect(withOpen({ ...FOLDED, open: false, full: true }).full).toBe(false);
+    const open = { ...FOLDED, open: true, full: true };
+    expect(withOpen(open)).toBe(open);
   });
 });

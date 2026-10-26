@@ -4,7 +4,9 @@
 // thread or bise's own view (their composer is the thread's), an open artifact (its maker's beside
 // it), settings (its own window), onboarding, the lab and the debug screens. This only picks the
 // default addressee shown in 'to bise ⌄': where a message to a project goes stays the hub's route
-// (sb-core). Pure. Owner: nm-composer.
+// (sb-core). The panel full width (panel-full, his m_45439): the thread is gone, so a thread and
+// bise's own view have the floating composer too, to the thread's agent (an open artifact's: its
+// maker, FloatHost reads it). Pure. Owner: nm-composer.
 import { MAIN, projectOf, type Route } from '@/app/route';
 
 /** A floating composer's addressee: a project's hub id and an agent's name. */
@@ -13,8 +15,13 @@ export interface FloatTo {
   readonly agent: string;
 }
 
-/** The floating composer's default addressee on `r` (`home`: the home hub's id); null: no floating composer there. Pure. */
-export function floatTarget(r: Route, home: string | undefined): FloatTo | null {
+/**
+ * The floating composer's default addressee on `r` (`home`: the home hub's id; `full`: the panel
+ * is full width, the screen hidden); null: no floating composer there. Pure.
+ */
+export function floatTarget(r: Route, home: string | undefined, full = false): FloatTo | null {
+  if (full && r.screen === 'thread') return { project: r.project, agent: r.agent };
+  if (full && r.screen === 'bise') return home === undefined ? null : { project: home, agent: MAIN };
   switch (r.screen) {
     case 'thread':
     case 'bise':

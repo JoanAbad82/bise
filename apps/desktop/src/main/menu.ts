@@ -140,6 +140,8 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       submenu: [
         item(sides.sidebar ? 'Hide Sidebar' : 'Show Sidebar', 'CmdOrCtrl+B', 'sidebar'),
         item(sides.panel ? 'Hide Panel' : 'Show Panel', 'Alt+CmdOrCtrl+B', 'panel'),
+        // panel-full (designer m_45445): a check item right under it, dimmed while the panel is a sheet
+        { ...item('Panel Full Width', 'Shift+Alt+CmdOrCtrl+B', 'panelFull'), type: 'checkbox', checked: sides.panelFull === true, enabled: sides.panelFullCan !== false },
         { type: 'separator' },
         item('Terminal', 'Ctrl+`', 'terminal'),
         ...(o.dev ? ([{ type: 'separator' }, { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] satisfies MenuItemConstructorOptions[]) : []),
@@ -177,6 +179,6 @@ export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget
   // New Project / New Agent are the main window's sheets: the focused window's (the main one, or
   // nothing in the capsule), never a route to open
   // the two sides are the focused window's own (View › Hide/Show Sidebar, Panel), never a route either
-  if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || mainFocused) return { send: 'focused' };
+  if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || action === 'panelFull' || mainFocused) return { send: 'focused' };
   return { open: action };
 }

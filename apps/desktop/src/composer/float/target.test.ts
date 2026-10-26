@@ -15,6 +15,12 @@ describe('floatTarget', () => {
       expect(floatTarget(r, 'home-1')).toEqual({ project: 'home-1', agent: MAIN });
     expect(floatTarget({ screen: 'inbox' }, undefined), 'no home hub yet: none').toBeNull();
   });
+  it('the panel full width (panel-full): a thread writes to its agent, bise\'s view to bise\'s main; pages as before', () => {
+    expect(floatTarget({ screen: 'thread', project: 'shop', agent: 'perf' }, 'home-1', true)).toEqual({ project: 'shop', agent: 'perf' });
+    expect(floatTarget({ screen: 'bise' }, 'home-1', true)).toEqual({ project: 'home-1', agent: MAIN });
+    expect(floatTarget({ screen: 'inbox' }, 'home-1', true)).toEqual({ project: 'home-1', agent: MAIN });
+    expect(floatTarget({ screen: 'settings' }, 'home-1', true)).toBeNull();
+  });
   it('none on a thread, bise, an open artifact, settings (its own window), onboarding, the lab or debug', () => {
     expect(floatTarget({ screen: 'thread', project: 'shop', agent: 'perf' }, 'home-1')).toBeNull();
     expect(floatTarget({ screen: 'bise' }, 'home-1')).toBeNull();

@@ -44,12 +44,12 @@ describe('the application menu (bar ⛔2)', () => {
   it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save, ⌘N / ⇧⌘N new project / agent, ⌘B / ⌥⌘B the sides", () => {
     const { items, sent } = build('darwin');
     const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
-    expect([...keys.keys()].sort()).toEqual(['Alt+CmdOrCtrl+B', 'CmdOrCtrl+,', 'CmdOrCtrl+B', 'CmdOrCtrl+Enter', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'Ctrl+`', 'Shift+CmdOrCtrl+N']);
-    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N', 'CmdOrCtrl+B', 'Alt+CmdOrCtrl+B']) {
+    expect([...keys.keys()].sort()).toEqual(['Alt+CmdOrCtrl+B', 'CmdOrCtrl+,', 'CmdOrCtrl+B', 'CmdOrCtrl+Enter', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'Ctrl+`', 'Shift+Alt+CmdOrCtrl+B', 'Shift+CmdOrCtrl+N']);
+    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N', 'CmdOrCtrl+B', 'Alt+CmdOrCtrl+B', 'Shift+Alt+CmdOrCtrl+B']) {
       const click = keys.get(k)?.click as (() => void) | undefined;
       click?.();
     }
-    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent', 'sidebar', 'panel']);
+    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent', 'sidebar', 'panel', 'panelFull']);
   });
 
   it('settings once per platform, never twice', () => {
@@ -151,6 +151,19 @@ describe('menuTarget (qa-native m_9724)', () => {
     expect(sent).toEqual(['sidebar', 'panel']);
     expect(menuTarget('sidebar', false)).toEqual({ send: 'focused' });
     expect(menuTarget('panel', false)).toEqual({ send: 'focused' });
+  });
+
+  it('View: Panel Full Width ⇧⌥⌘B right under the panel, checked in full width, dimmed while the panel is a sheet (panel-full, designer m_45445)', () => {
+    const third = (sides?: { sidebar: boolean; panel: boolean; panelFull?: boolean; panelFullCan?: boolean }) => {
+      const t = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: () => undefined, ...(sides ? { sides } : {}) });
+      const sub = (t.find((m) => m.label === 'View')?.submenu ?? []) as MenuItemConstructorOptions[];
+      const i = sub[2];
+      return [i?.label, i?.accelerator, i?.type, i?.checked, i?.enabled];
+    };
+    expect(third()).toEqual(['Panel Full Width', 'Shift+Alt+CmdOrCtrl+B', 'checkbox', false, true]);
+    expect(third({ sidebar: true, panel: true, panelFull: true, panelFullCan: true })).toEqual(['Panel Full Width', 'Shift+Alt+CmdOrCtrl+B', 'checkbox', true, true]);
+    expect(third({ sidebar: true, panel: true, panelFull: false, panelFullCan: false })[4]).toBe(false);
+    expect(menuTarget('panelFull', false)).toEqual({ send: 'focused' });
   });
 });
 

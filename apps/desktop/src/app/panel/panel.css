@@ -100,6 +100,49 @@
   outline-offset: -2px;
 }
 
+/* full width (panel-full, designer m_45445): the panel over the whole content, the thread gone, the
+   floating composer over its bottom. Its tab row starts after the bar's lead (the lights, the
+   sidebar button, ‹ ›: wider than the rail when the sidebar is hidden), by a margin, so neither its
+   box nor its drag region covers them; the panel's own boxes let the press through there. Its body
+   keeps the float's room at its foot (a page's native view never draws over the float). */
+.pn[data-full],
+.pn[data-full] > .pn-col {
+  pointer-events: none;
+}
+.pn[data-full] > .pn-border,
+.pn[data-full] > .pn-col > * {
+  pointer-events: auto;
+}
+.pn[data-full] .pn-top {
+  margin-left: max(0px, calc(var(--s-6) * 4 + var(--h-control-sm) * 3 + var(--s-1) * 2 - var(--w-rail) - var(--side-col, 0px)));
+}
+.pn[data-full] .pn-in {
+  padding-bottom: var(--float-room);
+}
+/* in full width the border keeps a grip in sight on hover: 2 × 24, --c-line-strong, centred */
+.pn[data-full] > .pn-border::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 2px;
+  height: var(--s-6);
+  margin-top: calc(var(--s-6) / -2);
+  border-radius: 1px;
+  background: var(--c-line-strong);
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+.pn[data-full] > .pn-border:hover::after,
+.pn[data-full][data-drag] > .pn-border::after {
+  opacity: 1;
+}
+/* 'show the thread': the panel glyph, mirrored (the thread's side is the left) */
+.pn-mirror {
+  display: inline-flex;
+  transform: scaleX(-1);
+}
+
 /* the tabs in the bar: 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…';
    × on the one in front and on hover; the one in front --c-active, never the accent */
 .pn-bar {

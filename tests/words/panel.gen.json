@@ -411,6 +411,25 @@
     "one": null,
     "text": "Show all"
   },
+  "panel.panel_full_back": {
+    "args": [],
+    "one": null,
+    "text": "Drag right to bring the thread back"
+  },
+  "panel.panel_full_drag": {
+    "args": [
+      "key"
+    ],
+    "one": null,
+    "text": "Drag to the left edge for full width · {key}"
+  },
+  "panel.panel_full_thread": {
+    "args": [
+      "key"
+    ],
+    "one": null,
+    "text": "Show the thread · {key}"
+  },
   "panel.panel_hide": {
     "args": [
       "key"

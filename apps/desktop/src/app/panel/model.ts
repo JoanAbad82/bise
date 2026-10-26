@@ -296,6 +296,31 @@ export function artFit(share: number, win: number, left: number): PanelFit {
   return { width: Math.max(MIN_W, Math.min(asked, win - left - ART_THREAD_MIN)), over: false };
 }
 
+/**
+ * Full width (panel-full, his m_45439, designer m_45445): the border dragged until the thread would
+ * keep under FULL_AT goes full on release, the panel over the whole content (rail and sidebar
+ * stay), the thread gone and the floating composer over the panel's bottom; in full width a drag
+ * right by FULL_BACK or more brings the thread back. A sheet (no room beside the thread) never goes
+ * full: it already covers the thread.
+ */
+export const FULL_AT = ART_THREAD_MIN;
+export const FULL_BACK = 120;
+
+/** During his drag beside the thread: `raw`, the width his pointer asks (before any clamp), leaves the thread under FULL_AT. Pure. */
+export function pastFull(raw: number, win: number, left: number): boolean {
+  return win - left - raw < FULL_AT;
+}
+
+/** In full width: his drag right by `dx` px (the pointer's move since the press) brings the thread back. Pure. */
+export function backFromFull(dx: number): boolean {
+  return dx >= FULL_BACK;
+}
+
+/** The panel in full width: the window but the left (rail and sidebar); a sheet stays a sheet. Pure. */
+export function fullFit(fit: PanelFit, win: number, left: number): PanelFit {
+  return fit.over ? fit : { width: Math.max(fit.width, win - left), over: false };
+}
+
 /** A width in the panel's limits. Pure. */
 export function clampW(w: number): number {
   return Number.isFinite(w) ? Math.round(Math.min(MAX_W, Math.max(MIN_W, w))) : WIDTHS.rows;
@@ -313,9 +338,16 @@ export interface PanelKept {
   readonly recent: readonly Entity[];
   /** his drag's share of the window per artifact kind (shareOf); none: the kind's own */
   readonly shares: Readonly<Record<string, number>>;
+  /** full width (fullFit): the thread gone while the panel is open; folding ends it (withOpen) */
+  readonly full: boolean;
 }
 
-export const FOLDED: PanelKept = { open: false, tabs: FIRST, width: WIDTHS.rows, dragged: false, recent: [], shares: {} };
+export const FOLDED: PanelKept = { open: false, tabs: FIRST, width: WIDTHS.rows, dragged: false, recent: [], shares: {}, full: false };
+
+/** The state as kept: a folded panel is never full, so it opens again beside the thread. Pure. */
+export function withOpen(k: PanelKept): PanelKept {
+  return !k.open && k.full ? { ...k, full: false } : k;
+}
 
 /**
  * The width after `what` opens in a new tab: a page (an artifact, an office, a thread) widens it
@@ -413,5 +445,6 @@ export function parseKept(raw: unknown): PanelKept {
   const recent = (Array.isArray(raw['recent']) ? (raw['recent'] as unknown[]) : []).map(entityOf).filter((e): e is Entity => e !== undefined).slice(0, RECENT_MAX);
   const shares: Record<string, number> = {};
   if (isObj(raw['shares'])) for (const [k, v] of Object.entries(raw['shares'])) if (typeof v === 'number' && Number.isFinite(v)) shares[k] = clampShare(v);
-  return { open: raw['open'] === true, tabs, width, dragged: raw['dragged'] === true, recent, shares };
+  const open = raw['open'] === true;
+  return { open, tabs, width, dragged: raw['dragged'] === true, recent, shares, full: open && raw['full'] === true };
 }

@@ -443,7 +443,7 @@ export interface A11y {
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
-export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'browser' | 'newProject' | 'newAgent' | 'sidebar' | 'panel';
+export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'browser' | 'newProject' | 'newAgent' | 'sidebar' | 'panel' | 'panelFull';
 
 /** A window's two sides, shown or not: the View menu's Hide/Show labels (window.bise.viewMenu); and
  *  whether it shows an artifact with a primary action (File › Open in Browser ⌘⏎ lit, artifacts/front.ts). */
@@ -452,6 +452,10 @@ export interface ViewSides {
   readonly panel: boolean;
   /** none: no artifact in front, the item dimmed */
   readonly artifact?: boolean;
+  /** the panel full width (panel-full): View › Panel Full Width checked */
+  readonly panelFull?: boolean;
+  /** full width can be had now (false while the panel is a sheet: the item dims) */
+  readonly panelFullCan?: boolean;
 }
 
 /** window.bise.saveCopy's answer: where the copy went, why it failed, or null (he cancelled, or refused). */

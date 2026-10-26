@@ -12,14 +12,16 @@
 // hidden (its shell runs on, the same one when it comes back), the others mount when in front.
 // The tabs of an agent no longer in the rows go (model.ts dropGone). Owner: nm-panel.
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react';
-import { AppIcon, IconButton } from '@/ds';
+import { AppIcon, IconButton, tipAttrs } from '@/ds';
 import { formatRoute } from '@/app/route';
 import { useEscLayer } from '@/app/escape';
 import { panel } from '@/proto/words_panel.gen';
 import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
-import { MAX_W, MIN_W, SHARE_MAX, SHARE_MIN, type Tab } from './model';
-import { dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setWidth, useFrontArtKind, usePanelFit, usePanelState } from './state';
+import { backFromFull, MAX_W, MIN_W, pastFull, SHARE_MAX, SHARE_MIN, type Tab } from './model';
+import { useLeftWidth } from '@/app/frame-state';
+import { dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setFull, setFullPreview, setWidth, useFrontArtKind, usePanelFit, usePanelFull, usePanelState } from './state';
+import { PANEL_FULL_KEY } from './keys';
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
@@ -38,6 +40,8 @@ export function PanelHost() {
   const front = s.tabs.list.find((t) => t.id === s.tabs.active);
   const art = front?.what.kind === 'thing' && front.what.e.kind === 'artifact' ? front.what.e : undefined;
   const artKind = useFrontArtKind();
+  const full = usePanelFull();
+  const window_ = art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />;
   return (
     <aside
       ref={box}
@@ -46,13 +50,14 @@ export function PanelHost() {
       data-open={s.open || undefined}
       data-drag={dragging || undefined}
       data-over={over || undefined}
+      data-full={full || undefined}
       aria-label={panel.panel_label}
       inert={!s.open}
       style={{ width: s.open && !over ? width : 0 }}
     >
-      {s.open && <Border width={width} onDrag={setDragging} {...(artKind === undefined ? {} : { artKind })} />}
+      {s.open && <Border width={width} onDrag={setDragging} full={full} canFull={!over} {...(artKind === undefined ? {} : { artKind })} />}
       <div className="pn-col" style={{ width }}>
-        <PanelTabs end={art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />} />
+        <PanelTabs end={full ? <>{window_}<ThreadBack /></> : window_} />
         <div className="pn-in" role="tabpanel" data-testid={`app.panel.body.${s.tabs.active}`}>
           {s.tabs.list.map((t) => (
             <Body key={t.id} tab={t} shown={s.open && t.id === s.tabs.active} />
@@ -115,9 +120,26 @@ function Body({ tab, shown }: { tab: Tab; shown: boolean }) {
   }
 }
 
-/** The panel's left border: a drag sets the width of what is in front (320-640), a double click resets it. */
-function Border({ width, onDrag, artKind }: { width: number; onDrag: (on: boolean) => void; artKind?: string }) {
-  const at = useRef<{ x: number; w: number } | null>(null);
+/** In full width, at the tab row's end: the thread comes back (designer m_45445: the panel glyph, mirrored). */
+function ThreadBack() {
+  return (
+    <IconButton label={panel.panel_full_thread({ key: PANEL_FULL_KEY })} size="bar" onClick={() => {
+      setFull(false);
+    }} testId="app.panel.thread">
+      <span className="pn-mirror"><AppIcon name="panel" size={16} /></span>
+    </IconButton>
+  );
+}
+
+/**
+ * The panel's left border: a drag sets the width of what is in front (320-640), a double click resets it.
+ * Beside the thread, a drag that would leave it under 400 dims it (the preview) and goes full width
+ * on release; in full width a drag right by 120 or a double click brings the thread back (model.ts
+ * pastFull, backFromFull). A sheet never goes full (`canFull` false).
+ */
+function Border({ width, onDrag, artKind, full, canFull }: { width: number; onDrag: (on: boolean) => void; artKind?: string; full: boolean; canFull: boolean }) {
+  const at = useRef<{ x: number; w: number; past: boolean } | null>(null);
+  const left = useLeftWidth();
   // an artifact in front: the drag sets its kind's share of the window (50-70%), else the one width
   const win = window.innerWidth;
   const size = (w: number) => {
@@ -125,17 +147,25 @@ function Border({ width, onDrag, artKind }: { width: number; onDrag: (on: boolea
     else setArtShare(artKind, w / win);
   };
   const down = (e: RPointerEvent<HTMLDivElement>) => {
-    at.current = { x: e.clientX, w: width };
+    at.current = { x: e.clientX, w: width, past: false };
     e.currentTarget.setPointerCapture(e.pointerId);
     onDrag(true);
   };
   const move = (e: RPointerEvent<HTMLDivElement>) => {
     const a = at.current;
-    if (a !== null) size(a.w + (a.x - e.clientX));
+    if (a === null || full) return;
+    const raw = a.w + (a.x - e.clientX);
+    size(raw);
+    a.past = canFull && pastFull(raw, win, left);
+    setFullPreview(a.past);
   };
-  const up = () => {
+  const up = (e: RPointerEvent<HTMLDivElement>) => {
+    const a = at.current;
     at.current = null;
     onDrag(false);
+    setFullPreview(false);
+    if (a === null) return;
+    if (full ? backFromFull(e.clientX - a.x) : a.past) setFull(!full);
   };
   return (
     <div
@@ -144,19 +174,23 @@ function Border({ width, onDrag, artKind }: { width: number; onDrag: (on: boolea
       aria-orientation="vertical"
       aria-label={panel.panel_width}
       aria-valuemin={artKind === undefined ? MIN_W : Math.round(win * SHARE_MIN)}
-      aria-valuemax={artKind === undefined ? MAX_W : Math.round(win * SHARE_MAX)}
+      aria-valuemax={full ? width : artKind === undefined ? MAX_W : Math.round(win * SHARE_MAX)}
       aria-valuenow={width}
       tabIndex={0}
+      {...(full ? tipAttrs(panel.panel_full_back) : canFull ? tipAttrs(panel.panel_full_drag({ key: PANEL_FULL_KEY })) : {})}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
       onPointerCancel={up}
       onDoubleClick={() => {
-        if (artKind === undefined) resetWidth();
+        if (full) setFull(false);
+        else if (artKind === undefined) resetWidth();
         else resetArtShare(artKind);
       }}
       onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') size(width + 16);
+        if (full) {
+          if (e.key === 'ArrowRight') setFull(false);
+        } else if (e.key === 'ArrowLeft') size(width + 16);
         else if (e.key === 'ArrowRight') size(width - 16);
       }}
       data-testid="app.panel.border"

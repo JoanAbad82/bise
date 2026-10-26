@@ -10,7 +10,9 @@
 // inbox block's own keys) shows its card and answer buttons over the head, and his words answer it,
 // as the dock did. It sends through the thread composer's one path (store.send, store.do answer);
 // floatTarget only picks the default addressee, the route to a project stays the hub's. State:
-// state.ts (pure). Owner: nm-composer.
+// state.ts (pure). The panel full width (panel-full): it comes over the panel's bottom, centred on
+// it, on a thread too (the thread is gone: it writes to that agent, the grip opens its history),
+// and on an open artifact, about it, to its maker, as the docked composer did. Owner: nm-composer.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppIcon, PickerPop, PickerTrigger, Press, tipAttrs } from '@/ds';
 import { InboxBlock, type Answering } from '@/inbox';
@@ -21,6 +23,10 @@ import { MAIN } from '@/app/route';
 import { useRoute } from '@/app/router';
 import { useEscLayer } from '@/app/escape';
 import { useSideLayout } from '@/app/side3d/place';
+import { useLeftWidth } from '@/app/frame-state';
+import { usePanelFull } from '@/app/panel/state';
+import { useAboutWords } from '@/artifacts/maker';
+import { useAllArtifacts } from '@/artifacts';
 import { answerOf, HERE_BISE, ThreadComposer } from '@/thread/ThreadComposer';
 import { usageLine } from '@/thread/head';
 import { useTabPlace, useTabWords } from '@/thread/ComposerTab';
@@ -37,10 +43,39 @@ const NOOP = (): void => undefined;
 export function FloatHost() {
   const route = useRoute();
   const home = useProjects().find((p) => p.home)?.project;
-  const to = floatTarget(route, home);
+  const full = usePanelFull();
+  // full width over an open artifact: its maker's composer, about it (the docked one's, gone)
+  if (full && route.screen === 'artifacts' && route.id !== undefined && route.project !== '') return <AboutFloat project={route.project} id={route.id} />;
+  const to = floatTarget(route, home, full);
   if (to === null) return null;
   // kept across pages of the same addressee (no route key): his draft and state stay
   return <Float key={`${to.project}/${to.agent}`} to={to} />;
+}
+
+/** Full width over an open artifact: the float writes to its maker (the project's main when archived), about it. */
+function AboutFloat({ project, id }: { project: string; id: string }) {
+  const it = useAllArtifacts(project).find((x) => x.a.id === id);
+  const words = useAboutWords(project, id);
+  if (it === undefined || words === undefined) return null;
+  const about: FloatAbout = { id, title: it.a.title, url: it.a.url, placeholder: words.placeholder };
+  return <Float key={`${project}/${words.agent}/artifact/${id}`} to={{ project, agent: words.agent }} about={about} />;
+}
+
+/** The artifact the float's words are about (full width over an open artifact), and the empty field's words. */
+interface FloatAbout {
+  readonly id: string;
+  readonly title: string;
+  readonly url: string;
+  readonly placeholder: string;
+}
+
+/** Where the float's centre goes: the content's column, or the panel's middle in full width. */
+function useFloatLeft(): number {
+  const col = useSideLayout();
+  const full = usePanelFull();
+  const left = useLeftWidth();
+  if (!full) return col.colLeft + col.colW / 2;
+  return left + (window.innerWidth - left) / 2;
 }
 
 /** Who the floating composer writes to: by default the route's, else what he picked in 'to bise ⌄'. */
@@ -49,7 +84,7 @@ function useAddressee(def: FloatTo): [FloatTo, (to: FloatTo) => void] {
   return [picked ?? def, setPicked];
 }
 
-function Float({ to: def }: { to: FloatTo }) {
+function Float({ to: def, about }: { to: FloatTo; about?: FloatAbout }) {
   const store = useStore();
   const [to, setTo] = useAddressee(def);
   const { project, agent } = to;
@@ -120,13 +155,14 @@ function Float({ to: def }: { to: FloatTo }) {
       store.unsubscribeThread(project, agent);
     };
   }, [open, store, project, agent]);
-  // centred on the content's column, not the window (nm-side's one sideLayout, page native-mac §6)
-  const col = useSideLayout();
+  // centred on the content's column, not the window (nm-side's one sideLayout, page native-mac §6);
+  // on the panel in full width
+  const floatLeft = useFloatLeft();
   const listRef = useRef<ThreadListHandle | null>(null);
   return (
     // data-pick-anchor: the composer's / @ $ list floats from the whole glass, never over its head (ui-review m_44570)
     <div ref={root} className="cmp-float" data-pick-anchor data-state={state} data-empty={(state === 'open' && (empty || loading)) || undefined} data-testid="composer.float" data-project={project} data-agent={agent}
-      role="region" aria-label={composer.float_name} style={{ left: col.colLeft + col.colW / 2 }}
+      role="region" aria-label={composer.float_name} style={{ left: floatLeft }}
       onFocus={() => {
         go('focus');
       }}
@@ -185,7 +221,8 @@ function Float({ to: def }: { to: FloatTo }) {
         tab={tab}
         tabEnd={answering?.end}
         me={me}
-        placeholder={answering?.placeholder ?? composer.placeholder_to({ agent: name })}
+        placeholder={answering?.placeholder ?? about?.placeholder ?? composer.placeholder_to({ agent: name })}
+        {...(about === undefined ? {} : { about: { id: about.id, title: about.title, url: about.url } })}
         answer={answerOf(answering)}
         onStop={stop}
         onEscape={onEscape}

@@ -97,6 +97,6 @@ export function setViewMenu(from: WebContents, raw: unknown): void {
   if (!sidesByWin.has(id)) from.once('destroyed', () => {
     sidesByWin.delete(id);
   });
-  sidesByWin.set(id, { sidebar: r.sidebar, panel: r.panel, ...(r.artifact === true ? { artifact: true } : {}) });
+  sidesByWin.set(id, { sidebar: r.sidebar, panel: r.panel, ...(r.artifact === true ? { artifact: true } : {}), ...(typeof r.panelFull === 'boolean' ? { panelFull: r.panelFull } : {}), ...(typeof r.panelFullCan === 'boolean' ? { panelFullCan: r.panelFullCan } : {}) });
   build();
 }

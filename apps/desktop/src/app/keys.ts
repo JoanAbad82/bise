@@ -23,8 +23,8 @@ export const HELP_EVENT = 'bise:help';
 /** What a screen does for a key (the thread listens with useAppAction). */
 export type ScreenAction = 'fold-all' | 'stop' | 'to-end' | 'copy-code' | 'side-1' | 'side-2' | 'side-3' | 'side-4';
 
-/** What the window's frame does: show or hide the sidebar (⌘B), the right panel (⌥⌘B). */
-export type FrameAction = 'sidebar' | 'panel';
+/** What the window's frame does: show or hide the sidebar (⌘B), the right panel (⌥⌘B), the panel full width (⇧⌥⌘B, panel-full). */
+export type FrameAction = 'sidebar' | 'panel' | 'panelFull';
 
 /** The keys the two sides show: settings/keys.ts's (the key list, a leaf module), re-exported here for the shell. */
 export { FRAME_KEYS } from '@/settings/keys';
@@ -115,6 +115,7 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   if (only('meta') && (e.code === 'KeyB' || e.code === 'Backslash')) return { frame: 'sidebar' };
   if (e.metaKey && e.ctrlKey && !e.altKey && !e.shiftKey && e.code === 'KeyS') return { frame: 'sidebar' };
   if (metaAlt && (e.code === 'KeyB' || e.code === 'Digit0')) return { frame: 'panel' };
+  if (e.metaKey && e.altKey && e.shiftKey && !e.ctrlKey && e.code === 'KeyB') return { frame: 'panelFull' };
   // bise fait mac (page native-mac §6): ⌘N New project, ⇧⌘N New agent (his m_44225), ⌘, settings
   // ⌥⌘1-⌥⌘4: the right side's bubbles, agents, artifacts, scheduled, processes (native-mac d1; app/side3d); ⌥1-4 too while it is folded
   if (metaAlt && n !== undefined && n >= 1 && n <= 4) return { screen: `side-${String(n)}` as ScreenAction };

@@ -143,6 +143,8 @@ describe('the frame', () => {
     expect(keyAction(k('Backslash'), ctx)).toEqual({ frame: 'sidebar' });
     expect(keyAction(k('KeyB', { altKey: true }), ctx)).toEqual({ frame: 'panel' });
     expect(keyAction(k('Digit0', { altKey: true }), ctx)).toEqual({ frame: 'panel' });
+    // ⇧⌥⌘B: the panel full width (panel-full)
+    expect(keyAction(k('KeyB', { altKey: true, shiftKey: true }), ctx)).toEqual({ frame: 'panelFull' });
     // the same keys in a thread, the panel open, typing in the composer: still the sides (⌘B never bolds)
     const busy = { ...ctx, route: { screen: 'thread' as const, project: 'acme', agent: 'perf' }, typing: true, panelOpen: true };
     expect(keyAction(k('KeyB'), busy)).toEqual({ frame: 'sidebar' });

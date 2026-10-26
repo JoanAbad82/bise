@@ -42,10 +42,11 @@ import { SideRail } from './SideRail';
 import { useZen, useZenWatch } from './zen';
 import { Bar, Over, SIDEBAR_WIDTH_LABEL, useFrame } from './Frame';
 import { PanelHost } from './panel/Host';
+import { UnlessFull } from './panel/Full';
 import { SideHost } from './side3d/Host';
 import { FloatHost } from '@/composer/float/Host';
 import { ArtifactRoute } from './ArtifactView';
-import { panelState, usePanelState } from './panel/state';
+import { panelState, toggleFull, useFullPreview, usePanelFit, usePanelFull, usePanelState } from './panel/state';
 import { doPanelKey } from './panel/keys';
 import { TipLayer } from './TipLayer';
 import { noteJump, numbersOf } from '@/agents/model';
@@ -212,12 +213,17 @@ function Shell() {
   const openPalette = useCallback(() => {
     setPalette(true);
   }, [setPalette]);
+  // ⇧⌥⌘B: the panel full width (panel-full), else the frame's two sides
+  const onFrame = useCallback((what: FrameAction) => {
+    if (what === 'panelFull') toggleFull();
+    else frame.toggle(what);
+  }, [frame]);
   useWindowKeys(
     openPalette,
     () => {
       setHelp(true);
     },
-    frame.toggle,
+    onFrame,
   );
   // the composer's /help and /shortcuts open the same key list
   useEffect(() => {
@@ -251,14 +257,21 @@ function Shell() {
   // inbox in front (its screen, an item open in its block) keeps its own ⌘⏎
   usePrimaryKey(() => router.get().screen === 'inbox' || inboxItemOpen());
   const artifactShown = useHasFront();
+  // View › Panel Full Width ⇧⌥⌘B (panel-full, designer m_45445): a check item, dimmed while the panel is a sheet
+  useMenuAction('panelFull', () => {
+    if (!menuEcho(frameKeyAt.panelFull, Date.now())) toggleFull();
+  });
   // the View menu's labels flip with the two sides (main/agentmenu.ts rebuilds on a change)
   const panelOpen = usePanelState().open;
+  const panelFull = usePanelFull();
+  const panelSheet = usePanelFit().over;
+  const fullPreview = useFullPreview();
   const sidebarShown = frame.side || frame.over === 'side';
   useEffect(() => {
     // a component test's window.bise may be a partial fake, and the page outside Electron has none
     const bise = (window as Partial<Window>).bise as Partial<Window['bise']> | undefined;
-    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen, artifact: artifactShown });
-  }, [sidebarShown, panelOpen, artifactShown]);
+    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen, artifact: artifactShown, panelFull, panelFullCan: !panelSheet });
+  }, [sidebarShown, panelOpen, artifactShown, panelFull, panelSheet]);
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
   // R8: a /model the core holds for its provider opens that provider's setup (amb-home)
@@ -288,7 +301,7 @@ function Shell() {
           {/* the frame (bise fait mac, mockup 1): the bar over everything, the rail always, the
               sidebar (0 wide when hidden: it stays mounted, inert, so ⌘\ animates its 220 ms), the
               screen, the tabbed panel (nm-panel's PanelHost, its own width) */}
-          <div className="app-frame" data-testid="app.frame">
+          <div className="app-frame" data-testid="app.frame" data-panel-full={panelFull || undefined} data-full-preview={fullPreview || undefined}>
             <Bar frame={frame} />
             <SideRail />
             <div className="app-sidecol" inert={!side} data-testid="app.sidecol">
@@ -350,6 +363,8 @@ function Shell() {
 
 function Current() {
   const route = useRoute();
+  // the panel full width (panel-full): the screen goes (panel/Full.tsx)
+  const full = usePanelFull();
   // a screen remounts when its route changes: no state of one thread
   // leaks into the next (the old window showed shop's thread under bise)
   return (
@@ -357,8 +372,10 @@ function Current() {
       <HubMoments />
       <AddHost />
       <NewAgentHost />
-      <div className="app-screen">
-        <ScreenOf key={formatRoute(route)} route={route} />
+      <div className="app-screen" inert={full} data-testid="app.screen">
+        <UnlessFull>
+          <ScreenOf key={formatRoute(route)} route={route} />
+        </UnlessFull>
       </div>
       <RouteTerminal route={route} />
     </Main>

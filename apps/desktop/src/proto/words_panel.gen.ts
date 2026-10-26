@@ -308,6 +308,12 @@ export const panel = {
   panel_label: "Panel",
   /** the panel's border: its VoiceOver name (drag to resize, double click resets) */
   panel_width: "Panel width",
+  /** the border's tip beside the thread (panel-full, designer m_45445): a drag past the thread's 400 fills the window */
+  panel_full_drag: (a: { key: string | number }): string => "Drag to the left edge for full width · " + String(a.key),
+  /** the border's tip in full width: a drag right brings the thread back */
+  panel_full_back: "Drag right to bring the thread back",
+  /** in full width, the button at the tab row's end: the thread comes back (tip and VoiceOver name) */
+  panel_full_thread: (a: { key: string | number }): string => "Show the thread · " + String(a.key),
   /** the search field's placeholder and VoiceOver name */
   launch_search: "Search artifacts, or enter a URL",
   /** the launcher's first group */

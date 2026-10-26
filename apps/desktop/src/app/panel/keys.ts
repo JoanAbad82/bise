@@ -11,6 +11,9 @@ import type { Agent } from '@/proto';
 import { closeActive, openArtifacts, openBrowser, openLauncher, openShell, openWhat, stepTab } from './state';
 import { hasChanges, type OpenRow } from './launch';
 
+/** Full width on and off (panel-full, designer m_45445): View › Panel Full Width, app/keys.ts. */
+export const PANEL_FULL_KEY = '⇧⌥⌘B';
+
 /** The keys the panel's tips and the launcher's rows name. */
 export const PANEL_KEYS = {
   toggle: '⌥⌘B',

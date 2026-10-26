@@ -43,6 +43,7 @@ import {
   type Store,
 } from "../drafts";
 import { entryOf, entrySegments } from "../entry";
+import { leaveCaret, takeCaret } from "../handoff";
 import {
   agentRows,
   argRows,
@@ -338,6 +339,10 @@ export function PmField(p: PmFieldProps): JSX.Element {
       window.removeEventListener("beforeunload", flushPending);
       unGrab();
       writeNow(); // the screen goes: the draft is kept before the editor does
+      // his caret too, while the field is still in the page with its focus: handoff.ts keeps it only for a swap
+      const q = props.current;
+      const sel = editor.view.state.selection;
+      leaveCaret(q.draftKey ?? q.target, { from: sel.from, to: sel.to, focused: editor.view.hasFocus() });
       editor.off("transaction", onTr);
       editor.destroy();
       ed.current = null;
@@ -378,6 +383,15 @@ export function PmField(p: PmFieldProps): JSX.Element {
     }
     forget(); // another target's text never comes back
     changed.current(null);
+    // the composer before this one of the same draft (the panel going full width or back, handoff.ts): his caret and focus
+    const caret = takeCaret(key);
+    const v0 = view();
+    if (caret !== undefined && v0 !== null) {
+      const end = v0.state.doc.content.size;
+      const at = (n: number) => Math.max(0, Math.min(end, n));
+      v0.dispatch(v0.state.tr.setSelection(TextSelection.between(v0.state.doc.resolve(at(caret.from)), v0.state.doc.resolve(at(caret.to)))));
+      if (caret.focused) v0.focus();
+    }
     return () => {
       writeNow(); // the target changes or the screen goes: the draft is kept at once
     };

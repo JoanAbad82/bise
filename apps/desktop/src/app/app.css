@@ -62,6 +62,25 @@ body:has(.app-shell) {
   min-height: 0;
   background: var(--c-solid);
 }
+/* the panel full width (panel-full, designer m_45445): his drag past the thread's 400 dims the
+   thread at .4 as a preview (its width stays: the words never reflow); in full width the screen's
+   column is 0 and fades in 120 ms, and the bar keeps only its lead (the title, the state line, the
+   page's slot and ▯ are the hidden thread's) */
+.app-frame > .b-main {
+  transition: opacity 120ms var(--ease-out);
+}
+.app-frame[data-full-preview] > .b-main {
+  opacity: 0.4;
+}
+.app-frame[data-panel-full] > .b-main {
+  opacity: 0;
+}
+.app-frame[data-panel-full] > .app-bar > :not(.app-bar-lead) {
+  display: none;
+}
+:root[data-reduce-motion] .app-frame > .b-main {
+  transition: none;
+}
 /* the panel's column runs the window's height: its tabs sit in the bar's row, on the same material
    (one bar across the top, his m_44307); folded or a sheet it is 0 wide */
 .app-panelcol {
