@@ -333,7 +333,10 @@ function StatusSlot({ children }: { children?: ReactNode }) {
       else bar.dataset["give"] = "fact";
       if (fit.role) delete bar.dataset["role"];
       else bar.dataset["role"] = "out";
-      if (title !== null) title.style.minWidth = `${String(Math.ceil(nameMin + (fit.role ? roleRoom : 0)))}px`;
+      // min-width is the title's content box (content-box sizing): its 24 lead padding stays out of it,
+      // else the minis sit 24 further than 12 after the crumb (ui-review m_45897)
+      const padIn = title === null || getComputedStyle(title).boxSizing === "border-box" ? 0 : parseFloat(getComputedStyle(title).paddingLeft || "0");
+      if (title !== null) title.style.minWidth = `${String(Math.ceil(nameMin - padIn + (fit.role ? roleRoom : 0)))}px`;
       el.style.minWidth = `${String(Math.ceil(fit.pill))}px`;
       setNarrow(fit.narrow);
     };
