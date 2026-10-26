@@ -194,6 +194,10 @@ body:has(.app-shell) {
 .app-bar[data-give='fact'] .app-bar-fact {
   display: none;
 }
+/* then the crumb's role, whole: 'perf' alone, never 'perf pro…' (designer m_45727) */
+.app-bar[data-role='out'] .app-bar-title .s {
+  display: none;
+}
 .app-bar-fact[data-kind='waits'] .b-app-icon {
   color: var(--c-accent);
 }

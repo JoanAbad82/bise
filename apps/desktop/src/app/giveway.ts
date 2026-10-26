@@ -34,3 +34,29 @@ export function giveWay(r: BarRoom): GiveWay {
   if (r.fact > 0 && need <= r.slot + r.fact) return { fact: true, narrow: false };
   return { fact: r.fact > 0, narrow: true };
 }
+
+/** What the crumb and the pill keep beside the minis, px. */
+export interface CrumbRoom {
+  /** the room the crumb and the status slot share */
+  readonly avail: number;
+  /** the crumb's name with its lead padding */
+  readonly name: number;
+  /** its role ('profiling the hub · acme') and its gap, 0 without one */
+  readonly role: number;
+  readonly minis: number;
+  /** the pill's short form, and its sign alone; 0 without a pill */
+  readonly pillShort: number;
+  readonly pillSign: number;
+}
+
+/**
+ * Beside the minis, nothing is cut mid-word (designer m_45727): the crumb's role shows whole or
+ * not at all, before the pill's short form gives way to its sign alone; the name always stays.
+ * `role`: the role shows; `pill`: the room the pill keeps (its short form, else its sign). Pure.
+ */
+export function cutCrumb(r: CrumbRoom): { readonly role: boolean; readonly pill: number } {
+  if (r.minis <= 0) return { role: true, pill: r.pillShort };
+  const role = r.role > 0 && r.name + r.role + r.minis + r.pillShort <= r.avail;
+  const pill = r.name + (role ? r.role : 0) + r.minis + r.pillShort <= r.avail ? r.pillShort : r.pillSign;
+  return { role, pill };
+}

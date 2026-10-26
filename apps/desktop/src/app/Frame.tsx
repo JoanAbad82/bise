@@ -23,7 +23,7 @@ import { formatRoute, MAIN, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
-import { giveWay, STATUS_NARROW_PX } from "./giveway";
+import { cutCrumb, giveWay, STATUS_NARROW_PX } from "./giveway";
 import { CoinSlot } from "./side3d/Minis";
 import { useEscLayer } from "./escape";
 import { BarTabs } from "./panel/BarTabs";
@@ -263,8 +263,6 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
 
 /** under this much room the status pill takes its short form (designer's desktop-notices v2) */
 export { STATUS_NARROW_PX };
-/** the crumb's least: its name and room for a '…' after it */
-const CRUMB_CUT_PX = 16;
 /** the pill at its least: its sign alone, a 24 square (TitleStatus's tight form) */
 const PILL_SIGN_PX = 24;
 
@@ -289,6 +287,8 @@ function StatusSlot({ children }: { children?: ReactNode }) {
     let pillFull = 0;
     // the pill's short form, kept from when it last showed: its own room before the minis
     let pillShort = 0;
+    // what the crumb's role ('profiling the hub · acme') takes, kept from when it last showed
+    let roleRoom = 0;
     const read = () => {
       const factHidden = bar.dataset["give"] === "fact";
       const fact = bar.querySelector<HTMLElement>('[data-testid="app.bar.title.fact"]');
@@ -305,18 +305,24 @@ function StatusSlot({ children }: { children?: ReactNode }) {
       else delete bar.dataset["give"];
       if (pill === null) pillShort = 0;
       else if (el.dataset["narrow"] === "true") pillShort = pill.scrollWidth;
-      // with the minis here the slot never gets narrower than they and the pill's short form: the
-      // crumb's name cuts instead, last (a pill under the minis was ui-review m_45691's red)
-      // the crumb keeps its name and a '…' (ui-review m_45714: it was cut to nothing); when even
-      // that and the pill's short form don't fit beside the minis, the pill is its sign alone
+      // beside the minis nothing is ever cut mid-word (ui-review m_45691, m_45714; designer m_45727):
+      // the slot keeps the minis and the pill's short form; the crumb keeps its name and drops its
+      // role whole ('perf' alone, never 'perf pro…'); when even that leaves no room for the pill's
+      // short form, the pill is its sign alone
       const title = bar.querySelector<HTMLElement>(".app-bar-title");
       const name = title?.querySelector<HTMLElement>(".t") ?? null;
-      const titleMin = title === null || name === null || minisW === 0 ? 0 : parseFloat(getComputedStyle(title).paddingLeft || "0") + name.offsetWidth + CRUMB_CUT_PX;
-      if (title !== null) title.style.minWidth = titleMin > 0 ? `${String(Math.ceil(titleMin))}px` : "";
+      const role = title?.querySelector<HTMLElement>(".s") ?? null;
+      const roleHidden = bar.dataset["role"] === "out";
+      if (role !== null && !roleHidden) roleRoom = role.scrollWidth + parseFloat(getComputedStyle(title ?? role).columnGap || "0");
+      if (role === null) roleRoom = 0;
       const others = [...bar.children].reduce((n, c) => (c === title || c === el ? n : n + (c as HTMLElement).offsetWidth), 0);
       const avail = bar.clientWidth - parseFloat(getComputedStyle(bar).paddingRight || "0") - others - parseFloat(getComputedStyle(el).marginLeft || "0");
-      const pillLeast = pill === null ? 0 : titleMin + minisW + pillShort <= avail ? pillShort : PILL_SIGN_PX;
-      el.style.minWidth = minisW > 0 ? `${String(Math.ceil(minisW + pillLeast))}px` : "";
+      const nameMin = title === null || name === null ? 0 : parseFloat(getComputedStyle(title).paddingLeft || "0") + name.offsetWidth;
+      const crumb = cutCrumb({ avail, name: nameMin, role: roleRoom, minis: minisW, pillShort: pill === null ? 0 : pillShort, pillSign: pill === null ? 0 : PILL_SIGN_PX });
+      if (crumb.role) delete bar.dataset["role"];
+      else bar.dataset["role"] = "out";
+      if (title !== null) title.style.minWidth = minisW > 0 ? `${String(Math.ceil(nameMin + (crumb.role ? roleRoom : 0)))}px` : "";
+      el.style.minWidth = minisW > 0 ? `${String(Math.ceil(minisW + crumb.pill))}px` : "";
       setNarrow(g.narrow || (pill !== null && el.clientWidth - minisW < STATUS_NARROW_PX));
     };
     read();
@@ -329,6 +335,7 @@ function StatusSlot({ children }: { children?: ReactNode }) {
       ro.disconnect();
       mo.disconnect();
       delete bar.dataset["give"];
+      delete bar.dataset["role"];
     };
   }, []);
   return (
