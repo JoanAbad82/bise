@@ -18,6 +18,10 @@ export const projects = {
   ready: (a: { title: string | number }): string => "report ready: " + String(a.title),
   /** the last news: its next scheduled run ('next run tomorrow 07:30') */
   next_run: (a: { when: string | number }): string => "next run " + String(a.when),
+  /** the row's tip, last: when its agents last worked ('last activity 3 h ago') */
+  last_activity: (a: { age: string | number }): string => "last activity " + String(a.age) + " ago",
+  /** the row's tip, last, while one of its agents works */
+  active_now: "active now",
   /** the sparkline's tip */
   week_tip: "its agents' work, last 7 days",
   /** the inbox pill's tip ('2 in your inbox') */

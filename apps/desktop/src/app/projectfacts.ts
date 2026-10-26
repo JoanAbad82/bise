@@ -39,7 +39,7 @@ export interface ProjectFacts {
   readonly age: string | null;
   /** line 2's words; null on a quiet row */
   readonly sentence: Sentence | null;
-  /** the week's busy time, 21 buckets ending with now's; null while unknown or on a quiet row */
+  /** the week's busy time, 7 days (3 buckets each) ending with now's; null while unknown or on a quiet row */
   readonly week: readonly number[] | null;
   /** the row's tip: everything at once */
   readonly tip: string;
@@ -54,6 +54,13 @@ export function weekOf(p: Pulse, now: number): number[] {
   while (busy.length < BUCKETS) busy.unshift(0);
   const shift = Math.max(0, Math.floor((now - p.from_ms) / BUCKET_MS) - (BUCKETS - 1));
   return shift >= BUCKETS ? new Array<number>(BUCKETS).fill(0) : [...busy.slice(shift), ...new Array<number>(shift).fill(0)];
+}
+
+/** The week's 21 buckets summed into its 7 days, oldest first (designer m_44915: 7 points, not a wave). Pure. */
+export function daysOf(week: readonly number[]): number[] {
+  const days: number[] = [];
+  for (let i = 0; i < week.length; i += 3) days.push((week[i] ?? 0) + (week[i + 1] ?? 0) + (week[i + 2] ?? 0));
+  return days;
 }
 
 /** How many times are after `seen` (none seen yet: all of them). Pure. */
@@ -83,6 +90,8 @@ export function newsWords(n: News, now: number): Sentence | null {
  */
 export function projectFacts(c: {
   readonly p: ProjectRow;
+  /** its name, the tip's first word (a cut name says itself whole there) */
+  readonly name?: string;
   /** its live agents at work now */
   readonly working: number;
   /** the inbox's count for it (inbox/waiting) */
@@ -108,7 +117,10 @@ export function projectFacts(c: {
         ? { text: busy.join(' · '), err: false }
         : (news ?? { text: unread > 0 ? projects.unread({ n: unread }) : waitsTip(waits), err: false });
   const last = pulse?.last_ms ?? null;
-  const tipParts = [
+  const age = working > 0 && pulse !== null ? ageWords(0) : last === null ? null : ageWords(now - last);
+  // the tip adds what the row doesn't say (designer m_44915): its whole name, then the facts, then the last activity in words
+  const lastWords = age === null ? [] : [working > 0 && pulse !== null ? projects.active_now : projects.last_activity({ age })];
+  const facts = [
     ...(news?.err === true ? [news.text] : []),
     ...(working > 0 ? [workingTip(working)] : []),
     ...(waits > 0 ? [waitsTip(waits)] : []),
@@ -116,17 +128,18 @@ export function projectFacts(c: {
     ...(unread > 0 ? [projects.unread({ n: unread })] : []),
     ...(news !== null && !news.err ? [news.text] : []),
   ];
+  const tip = facts.length === 0 ? [common.all_quiet, ...lastWords] : [...(c.name === undefined ? [] : [c.name]), ...facts, ...lastWords];
   return {
     quiet,
     pill: waits > 0 ? waits : null,
-    age: working > 0 && pulse !== null ? ageWords(0) : last === null ? null : ageWords(now - last),
+    age,
     sentence,
-    week: quiet || pulse === null || pulse.counting ? null : weekOf(pulse, now),
-    tip: tipParts.length === 0 ? common.all_quiet : tipParts.join(' · '),
+    week: quiet || pulse === null || pulse.counting ? null : daysOf(weekOf(pulse, now)),
+    tip: tip.join(' · '),
   };
 }
 
-/** The sparkline's points in a w x h box: the week left to right, its busiest bucket at the top, 1 px in from each edge. Pure. */
+/** The sparkline's points in a w x h box: the week's days left to right, straight segments, its busiest day at the top, 1 px in from each edge. Pure. */
 export function sparkPoints(week: readonly number[], width = 44, height = 12): string {
   if (week.length === 0) return '';
   const max = Math.max(...week);

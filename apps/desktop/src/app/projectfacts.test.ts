@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { News, ProjectRow, Pulse } from '@/proto';
 import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
-import { BUCKET_MS, BUCKETS, projectFacts, since, sparkPoints, weekOf } from './projectfacts';
+import { BUCKET_MS, BUCKETS, daysOf, projectFacts, since, sparkPoints, weekOf } from './projectfacts';
 import { waitsTip, workingTip } from './tipwords';
 
 const H = 3_600_000;
@@ -52,7 +52,7 @@ describe('a quiet project', () => {
   it('nothing works, waits or is new since he looked: one line, its age, no sentence, no week', () => {
     const p = pulse({ news: news({ kind: 'landed', agent: 'brush', sha: 'abc', target: 'main' }, NOW - 5 * H), artifacts_at: [NOW - 5 * H], said_at: [NOW - 6 * H] });
     const f = facts(p, 0, 0, NOW - 4 * H);
-    expect(f).toEqual({ quiet: true, pill: null, age: '2 h', sentence: null, week: null, tip: common.all_quiet });
+    expect(f).toEqual({ quiet: true, pill: null, age: '2 h', sentence: null, week: null, tip: `${common.all_quiet} · ${projects.last_activity({ age: '2 h' })}` });
   });
 
   it('never looked: everything of the week is new', () => {
@@ -83,16 +83,29 @@ describe('no pulse yet (a hub that does not send it)', () => {
   });
 });
 
-describe('the tip says it all', () => {
-  it("'5 agents working · 2 waiting for you · 3 new artifacts · 4 unread'", () => {
+describe('the tip adds what the row does not say (designer m_44915)', () => {
+  it("its whole name, every fact, then its last activity: 'acme · 5 agents working · 2 waiting for you · 3 new artifacts · 4 unread · active now'", () => {
     const p = pulse({ artifacts_at: [NOW - H, NOW - H, NOW - H], said_at: [NOW - H, NOW - H, NOW - H, NOW - H] });
-    expect(facts(p, 5, 2, NOW - 2 * H).tip).toBe([workingTip(5), waitsTip(2), projects.new_artifacts({ n: 3 }), projects.unread({ n: 4 })].join(' · '));
+    const f = projectFacts({ p: row(p), name: 'acme', working: 5, waits: 2, seen: NOW - 2 * H, now: NOW });
+    expect(f.tip).toBe(['acme', workingTip(5), waitsTip(2), projects.new_artifacts({ n: 3 }), projects.unread({ n: 4 }), projects.active_now].join(' · '));
+  });
+
+  it("a news row: 'codex · report ready: evals pass · last activity 3 h ago'", () => {
+    const p = pulse({ last_ms: NOW - 3 * H, news: news({ kind: 'artifact', id: 'a1', title: 'evals pass' }, NOW - 3 * H) });
+    const f = projectFacts({ p: row(p), name: 'codex', working: 0, waits: 0, seen: NOW - 4 * H, now: NOW });
+    expect(f.tip).toBe(['codex', projects.ready({ title: 'evals pass' }), projects.last_activity({ age: '3 h' })].join(' · '));
   });
 });
 
 describe('the week', () => {
   it("21 buckets ending with now's", () => {
     expect(weekOf(pulse(), NOW)).toEqual(week);
+  });
+
+  it('the row draws 7 days, each the sum of its 3 buckets (7 points, not a wave)', () => {
+    expect(daysOf([1, 2, 3, 0, 0, 0, 5, 0, 5, 1, 1, 1, 0, 0, 9, 2, 2, 2, 4, 0, 0])).toEqual([6, 0, 10, 3, 9, 6, 4]);
+    expect(facts(pulse(), 1, 0).week).toEqual(daysOf(week));
+    expect(facts(pulse(), 1, 0).week).toHaveLength(7);
   });
 
   it("a stopped hub's buckets slide by the 8 h steps since, the new ones empty", () => {
@@ -104,7 +117,7 @@ describe('the week', () => {
     const pts = sparkPoints([0, 5, 10]).split(' ');
     expect(pts).toEqual(['0.0,11.0', '22.0,6.0', '44.0,1.0']);
     expect(sparkPoints([0, 0])).toBe('0.0,11.0 44.0,11.0');
-    expect(sparkPoints(week).split(' ')).toHaveLength(BUCKETS);
+    expect(sparkPoints(daysOf(week)).split(' ')).toHaveLength(7);
   });
 });
 

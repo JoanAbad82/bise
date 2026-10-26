@@ -23,6 +23,10 @@ crate::words! { projects:
     ready(title) = "report ready: {title}";
     /// the last news: its next scheduled run ('next run tomorrow 07:30')
     next_run(when) = "next run {when}";
+    /// the row's tip, last: when its agents last worked ('last activity 3 h ago')
+    last_activity(age) = "last activity {age} ago";
+    /// the row's tip, last, while one of its agents works
+    active_now = "active now";
     /// the sparkline's tip
     week_tip = "its agents' work, last 7 days";
     /// the inbox pill's tip ('2 in your inbox')

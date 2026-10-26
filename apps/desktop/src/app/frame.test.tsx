@@ -90,7 +90,7 @@ describe('the sidebar', () => {
     expect(waits.getByTestId(`app.side.project.${ACME}.pill`).textContent).toBe('1');
     expect(waits.getByTestId(`app.side.project.${ACME}.pill`).getAttribute('data-tip')).toBe(projects.pill_tip({ n: 1 }));
     expect(waits.getByTestId(`app.side.project.${ACME}.say`).textContent).toBe(projects.working({ n: 2 }));
-    expect(waits.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(`${workingTip(2)} · ${waitsTip(1)}`);
+    expect(waits.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(`acme · ${workingTip(2)} · ${waitsTip(1)}`);
     // no marks: the words say it
     expect(waits.getByTestId(`app.side.project.${ACME}`).querySelector('.wk-sign, svg:not(.app-s-week)')).toBeNull();
     // docs: nothing works or waits, no pulse yet: quiet, one line
@@ -110,7 +110,7 @@ describe('the sidebar', () => {
     expect(say.classList.contains('err')).toBe(true);
     const week = v.getByTestId(`app.side.project.${ACME}.week`);
     expect(week.getAttribute('data-tip')).toBe(projects.week_tip);
-    expect(week.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(21);
+    expect(week.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(7);
   });
 
   it('marks the project he opens seen, and again when he leaves it (prefs seen.<project>)', () => {

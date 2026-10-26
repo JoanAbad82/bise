@@ -51,7 +51,7 @@ export function projectRowOf(c: {
   readonly seen?: number | undefined;
   readonly now: number;
 }): SideRow {
-  const facts = projectFacts({ p: c.p, working: workingOf(c.agents), waits: c.waits, seen: c.seen, now: c.now });
+  const facts = projectFacts({ p: c.p, name: c.p.name, working: workingOf(c.agents), waits: c.waits, seen: c.seen, now: c.now });
   const digit = c.cmd && c.index < 9 ? c.index + 1 : undefined;
   return { kind: 'project', p: c.p, on: c.on, facts, ...(digit === undefined ? {} : { digit }) };
 }
