@@ -7,7 +7,9 @@
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { useLeftWidth } from '@/app/frame-state';
-import { activate, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { iconKindOf } from '@/ds';
+import { useAllArtifacts } from '@/artifacts';
+import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, FOLDED, dropGone, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 
 const KEY = 'panel';
 
@@ -58,9 +60,39 @@ function useWindowWidth(): number {
   );
 }
 
-/** The panel in this window now: what the tab in front asks, beside the thread or over it (fitW). */
+/**
+ * The panel in this window now: an artifact in front takes its kind's share of the window, the
+ * thread keeping 400 (artFit); any other tab the one width, the thread keeping 560 (fitW).
+ */
 export function usePanelFit(): PanelFit {
-  return fitW(widthNow(usePanelState()), useWindowWidth(), useLeftWidth());
+  const s = usePanelState();
+  const kind = useFrontArtKind();
+  const win = useWindowWidth();
+  const left = useLeftWidth();
+  return kind === undefined ? fitW(widthNow(s), win, left) : artFit(shareOf(kind, s.shares), win, left);
+}
+
+/** The kind (ds's iconKindOf) of the artifact in front of the panel; undefined for any other tab. */
+export function useFrontArtKind(): string | undefined {
+  const s = usePanelState();
+  const front = s.tabs.list.find((t) => t.id === s.tabs.active)?.what;
+  const e = front?.kind === 'thing' && front.e.kind === 'artifact' ? front.e : undefined;
+  // no artifact in front: a project no row has, so it reads nothing ('' would read every project's)
+  const a = useAllArtifacts(e?.project ?? '\u0000').find((x) => x.a.id === e?.id)?.a;
+  if (e === undefined) return undefined;
+  return a === undefined ? 'page' : iconKindOf(a);
+}
+
+/** His drag on the border with an artifact of `kind` in front: that kind's share, 50-70%, kept. */
+export function setArtShare(kind: string, share: number): void {
+  const v = clampShare(share);
+  if (state.shares[kind] !== v) set({ ...state, shares: { ...state.shares, [kind]: v } });
+}
+
+/** A double click on the border with an artifact in front: that kind's own share again. */
+export function resetArtShare(kind: string): void {
+  if (!(kind in state.shares)) return;
+  set({ ...state, shares: Object.fromEntries(Object.entries(state.shares).filter(([k]) => k !== kind)) });
 }
 
 /**

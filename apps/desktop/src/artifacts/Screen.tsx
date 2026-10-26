@@ -18,7 +18,8 @@ import { AppIcon, BarSearch, Button, Empty, FilterRow, Filters, GroupLabel, More
 import { hero } from '@/proto/words_hero.gen';
 import { library } from '@/proto/words_library.gen';
 import { useFolders, useProjects, useStore } from '@/store';
-import { useRouter } from '@/app/router';
+import { DEPTH, useRouter } from '@/app/router';
+import { libraryExit } from '@/app/escape';
 import { InBar } from '@/app/barslot';
 import { publishColumn, useLibraryShown, type ColumnBits } from './library';
 import { useKeptScroll } from '@/app/keep';
@@ -255,10 +256,17 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     else if (stack !== null) setStack(null);
     else if (q !== '') setQ('');
     else if (archivedOn) setArchivedOn(false);
-    else if (atNow.at === 'folder') {
-      const p = lib.byId.get(atNow.id)?.parent ?? null;
-      setAt(p === null ? { at: 'all' } : { at: 'folder', id: p });
-    } else return false;
+    else if (atNow.at !== 'all') {
+      // esc goes up, never back down (designer m_44802): the parent replaces this step (‹ still
+      // reaches the folder); at the root, out to where he was before the library (app/escape.ts)
+      const p = atNow.at === 'folder' ? (lib.byId.get(atNow.id)?.parent ?? null) : null;
+      const path = atPath(p === null ? { at: 'all' } : { at: 'folder', id: p });
+      router.replace(path === '' ? { screen: 'artifacts', project: scope } : { screen: 'artifacts', project: scope, at: path });
+    } else {
+      const n = libraryExit(router.places('back', DEPTH));
+      if (n === null) return false;
+      router.jump('back', n);
+    }
     return true;
   }
   // the card's box (the picker opens from it), else the page's top

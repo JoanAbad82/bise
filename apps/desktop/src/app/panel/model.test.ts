@@ -169,7 +169,9 @@ describe('the panel width (page native-mac §6: 384; mockup 2: 480; mockup 4: 64
   });
   it('one width per window: a page newly opened widens it once to 640, never after his drag (designer m_43050 #7a)', () => {
     expect(FOLDED.width).toBe(384);
-    expect(widenFor(FOLDED, art('a'))).toBe(640);
+    // a thread, an office, a PR: a page; an artifact has its own width now (artwidth.test.ts)
+    expect(widenFor(FOLDED, { kind: 'thing', e: { kind: 'agent', project: 'acme', agent: 'perf' } })).toBe(640);
+    expect(widenFor(FOLDED, art('a'))).toBe(384);
     expect(widenFor(FOLDED, { kind: 'terminal', project: 'acme', n: 0 })).toBe(384);
     expect(widenFor(FOLDED, { kind: 'launcher', n: 1 })).toBe(384);
     expect(widenFor({ ...FOLDED, width: 500, dragged: true }, art('a'))).toBe(500);

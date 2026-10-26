@@ -262,6 +262,40 @@ export function fitW(asked: number, win: number, left: number, threadMin = THREA
   return { width: Math.max(MIN_W, Math.min(asked, win - left)), over: true };
 }
 
+/**
+ * An artifact in front (r3-escape item 2, Gabriel m_44728, designer m_44757, main's ArtifactView
+ * rule): the panel takes a share of the window, the thread beside it keeps ART_THREAD_MIN (not
+ * THREAD_MIN), the sidebar stays. 55% for every kind, 60% for a sheet and a web page; his drag
+ * keeps that kind's share within 50-70% until a double-click on the border.
+ */
+export const ART_THREAD_MIN = 400;
+export const SHARE_MIN = 0.5;
+export const SHARE_MAX = 0.7;
+const SHARE_WIDE: ReadonlySet<string> = new Set(['sheet', 'link']);
+
+/** A share in its limits. Pure. */
+export function clampShare(s: number): number {
+  return Math.min(SHARE_MAX, Math.max(SHARE_MIN, s));
+}
+
+/** The share of the window an artifact of `kind` (ds's iconKindOf) takes: his for that kind, else its own. Pure. */
+export function shareOf(kind: string, shares: Readonly<Record<string, number>>): number {
+  const his = shares[kind];
+  if (his !== undefined) return clampShare(his);
+  return SHARE_WIDE.has(kind) ? 0.6 : 0.55;
+}
+
+/**
+ * The panel with an artifact in front: its share of the window, capped so the thread keeps
+ * ART_THREAD_MIN beside the left; a sheet over the thread where fitW makes one (under 1176 with a
+ * sidebar), so the window classes stay. Pure.
+ */
+export function artFit(share: number, win: number, left: number): PanelFit {
+  const asked = Math.round(win * share);
+  if (fitW(MIN_W, win, left).over) return { width: Math.max(MIN_W, Math.min(asked, win - left)), over: true };
+  return { width: Math.max(MIN_W, Math.min(asked, win - left - ART_THREAD_MIN)), over: false };
+}
+
 /** A width in the panel's limits. Pure. */
 export function clampW(w: number): number {
   return Number.isFinite(w) ? Math.round(Math.min(MAX_W, Math.max(MIN_W, w))) : WIDTHS.rows;
@@ -277,9 +311,11 @@ export interface PanelKept {
   readonly dragged: boolean;
   /** the things he opened in a tab, newest first (the launcher's Recent) */
   readonly recent: readonly Entity[];
+  /** his drag's share of the window per artifact kind (shareOf); none: the kind's own */
+  readonly shares: Readonly<Record<string, number>>;
 }
 
-export const FOLDED: PanelKept = { open: false, tabs: FIRST, width: WIDTHS.rows, dragged: false, recent: [] };
+export const FOLDED: PanelKept = { open: false, tabs: FIRST, width: WIDTHS.rows, dragged: false, recent: [], shares: {} };
 
 /**
  * The width after `what` opens in a new tab: a page (an artifact, an office, a thread) widens it
@@ -287,6 +323,8 @@ export const FOLDED: PanelKept = { open: false, tabs: FIRST, width: WIDTHS.rows,
  * stays for every tab. Pure.
  */
 export function widenFor(k: PanelKept, what: TabWhat): number {
+  // an artifact has its own width (artFit): the one width stays for the other tabs
+  if (what.kind === 'thing' && what.e.kind === 'artifact') return k.width;
   return !k.dragged && widthOf(what) === 'page' ? Math.max(k.width, WIDTHS.page) : k.width;
 }
 
@@ -373,5 +411,7 @@ export function parseKept(raw: unknown): PanelKept {
   const tabs: Tabs = { list, active: list.some((x) => x.id === want) ? (want as string) : (list[0] as Tab).id };
   const width = typeof raw['width'] === 'number' ? clampW(raw['width']) : WIDTHS.rows;
   const recent = (Array.isArray(raw['recent']) ? (raw['recent'] as unknown[]) : []).map(entityOf).filter((e): e is Entity => e !== undefined).slice(0, RECENT_MAX);
-  return { open: raw['open'] === true, tabs, width, dragged: raw['dragged'] === true, recent };
+  const shares: Record<string, number> = {};
+  if (isObj(raw['shares'])) for (const [k, v] of Object.entries(raw['shares'])) if (typeof v === 'number' && Number.isFinite(v)) shares[k] = clampShare(v);
+  return { open: raw['open'] === true, tabs, width, dragged: raw['dragged'] === true, recent, shares };
 }

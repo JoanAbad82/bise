@@ -3,7 +3,9 @@
 // it (state.ts, kept per window). Its column runs the window's height: its own top row in the
 // transparent 52 bar (the tabs, '+', and 'open in a window' for an artifact: mockups 3 and 4), then
 // the body on --c-solid with its 1 px line. Its width is the one the tab in front asks (384 rows,
-// 480 a shell, 640 a page; 320-640 by its border, kept per kind); opening animates the width in
+// 480 a shell, 640 a page; 320-640 by its border); an artifact in front takes its kind's share of
+// the window instead, the thread keeping 400 (model.ts artFit, r3-escape item 2: 55%, a sheet and
+// a web page 60%, his drag 50-70% kept per kind, a double-click resets it); opening animates the width in
 // 220 ms (--d-base, none under reduce motion) while its inside keeps its final width, so nothing
 // in it reflows and the thread beside glides. Folded, it is inert and hidden: no Tab, no
 // VoiceOver reaches it (ui-review m_42482 #6). The tab in front draws; a shell's tab stays mounted
@@ -16,8 +18,8 @@ import { useEscLayer } from '@/app/escape';
 import { panel } from '@/proto/words_panel.gen';
 import { useProjects, useStore } from '@/store';
 import { TerminalTab } from '@/terminal/Terminal';
-import { MAX_W, MIN_W, type Tab } from './model';
-import { dropGoneTabs, panelToggle, resetWidth, setWidth, usePanelFit, usePanelState } from './state';
+import { MAX_W, MIN_W, SHARE_MAX, SHARE_MIN, type Tab } from './model';
+import { dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setWidth, useFrontArtKind, usePanelFit, usePanelState } from './state';
 import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
@@ -35,6 +37,7 @@ export function PanelHost() {
   useSheetOut(s.open && over, box);
   const front = s.tabs.list.find((t) => t.id === s.tabs.active);
   const art = front?.what.kind === 'thing' && front.what.e.kind === 'artifact' ? front.what.e : undefined;
+  const artKind = useFrontArtKind();
   return (
     <aside
       ref={box}
@@ -47,7 +50,7 @@ export function PanelHost() {
       inert={!s.open}
       style={{ width: s.open && !over ? width : 0 }}
     >
-      {s.open && <Border width={width} onDrag={setDragging} />}
+      {s.open && <Border width={width} onDrag={setDragging} {...(artKind === undefined ? {} : { artKind })} />}
       <div className="pn-col" style={{ width }}>
         <PanelTabs end={art === undefined ? undefined : <WindowButton project={art.project} id={art.id} />} />
         <div className="pn-in" role="tabpanel" data-testid={`app.panel.body.${s.tabs.active}`}>
@@ -113,8 +116,14 @@ function Body({ tab, shown }: { tab: Tab; shown: boolean }) {
 }
 
 /** The panel's left border: a drag sets the width of what is in front (320-640), a double click resets it. */
-function Border({ width, onDrag }: { width: number; onDrag: (on: boolean) => void }) {
+function Border({ width, onDrag, artKind }: { width: number; onDrag: (on: boolean) => void; artKind?: string }) {
   const at = useRef<{ x: number; w: number } | null>(null);
+  // an artifact in front: the drag sets its kind's share of the window (50-70%), else the one width
+  const win = window.innerWidth;
+  const size = (w: number) => {
+    if (artKind === undefined) setWidth(w);
+    else setArtShare(artKind, w / win);
+  };
   const down = (e: RPointerEvent<HTMLDivElement>) => {
     at.current = { x: e.clientX, w: width };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -122,7 +131,7 @@ function Border({ width, onDrag }: { width: number; onDrag: (on: boolean) => voi
   };
   const move = (e: RPointerEvent<HTMLDivElement>) => {
     const a = at.current;
-    if (a !== null) setWidth(a.w + (a.x - e.clientX));
+    if (a !== null) size(a.w + (a.x - e.clientX));
   };
   const up = () => {
     at.current = null;
@@ -134,18 +143,21 @@ function Border({ width, onDrag }: { width: number; onDrag: (on: boolean) => voi
       role="separator"
       aria-orientation="vertical"
       aria-label={panel.panel_width}
-      aria-valuemin={MIN_W}
-      aria-valuemax={MAX_W}
+      aria-valuemin={artKind === undefined ? MIN_W : Math.round(win * SHARE_MIN)}
+      aria-valuemax={artKind === undefined ? MAX_W : Math.round(win * SHARE_MAX)}
       aria-valuenow={width}
       tabIndex={0}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
       onPointerCancel={up}
-      onDoubleClick={resetWidth}
+      onDoubleClick={() => {
+        if (artKind === undefined) resetWidth();
+        else resetArtShare(artKind);
+      }}
       onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') setWidth(width + 16);
-        else if (e.key === 'ArrowRight') setWidth(width - 16);
+        if (e.key === 'ArrowLeft') size(width + 16);
+        else if (e.key === 'ArrowRight') size(width - 16);
       }}
       data-testid="app.panel.border"
     />

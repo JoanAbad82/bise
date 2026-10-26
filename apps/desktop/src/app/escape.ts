@@ -20,12 +20,14 @@
 // before any other window listener), reads the facts and runs the act of 2 and 6-9 itself, then
 // stops the esc: nothing below sees it, the route never also goes back. 1, 3-5 and 10 are the
 // handlers' own: the listener leaves the esc to them. The surfaces of 2, 8 and 9 hand their act in
-// with useEscLayer; 6 and 7 read their own state (zoomKeys.ts, the panel's). Owner: r3-escape.
+// with useEscLayer; 6 and 7 read their own state (zoomKeys.ts, the panel's). Esc goes up, never
+// back down (designer m_44802): the library's esc to a parent replaces the step, and at its root
+// libraryExit gives the way out to where he was before it (artifacts/Screen.tsx). Owner: r3-escape.
 import { useEffect } from 'react';
 import { isZoomed, takeZoomKey } from '@/artifacts/zoomKeys';
 import { useStore, type Store } from '@/store';
 import { closeTabBack, panelState } from './panel/state';
-import { MAIN } from './route';
+import { MAIN, type Route } from './route';
 import type { Router } from './router';
 
 /** The layers a surface hands in (useEscLayer). */
@@ -153,6 +155,16 @@ export function useEscape(r: Router): void {
       if (store === s) store = null;
     };
   }, [r, s]);
+}
+
+/**
+ * Esc at the library's root (designer m_44802: esc goes up, never back down): how many steps back
+ * is where he was before he opened the library, past every library step (`back`: the router's
+ * places behind, the nearest first); null: none, the window's esc-up decides. Pure.
+ */
+export function libraryExit(back: readonly Route[]): number | null {
+  const i = back.findIndex((r) => !(r.screen === 'artifacts' && r.id === undefined));
+  return i < 0 ? null : i + 1;
 }
 
 /** A surface's esc (2 the slid-over sidebar, 8 the sheet, 9 the float), while `on`; the newest acts. */
