@@ -794,6 +794,27 @@ fn the_new_release_card_shows_its_changelog() {
     assert_eq!(sent(&mut hub), vec!["/answer 21 1"]);
 }
 
+/// update-dot (designer m_46118): a short window clamps the update card,
+/// the changelog gives way first; the head, the safe line, the foot and
+/// the choices always show.
+#[test]
+fn a_clamped_update_card_keeps_its_foot() {
+    let (mut app, _hub) = app_with_hub();
+    let text = "bise v2026.10.2-5 is ready\n\n1. update now · your agents keep running\n2. later";
+    let notes = (1..=15).map(|i| format!("- fix {i}")).collect::<Vec<_>>().join("\n");
+    let release = bise_proto::rows::ReleaseNotes { version: "v2026.10.2-5".into(), running: "v2026.10.2-4".into(), notes };
+    app.sb.cards = vec![Card { place: Some("release:bbb".into()), link: Some("https://x.dev/n".into()), release: Some(release), ..card(21, "update", "main", text) }];
+    open(&mut app);
+    let rows = draw(&mut app, 120, 30);
+    let all = rows.join("\n");
+    let more = row_of(&rows, "┃ … ");
+    assert!(rows[more].contains("more lines · ctrl+o full screen"), "{all}");
+    assert!(all.contains("safe to update at any time"), "{all}");
+    let foot = row_of(&rows, "you're on v2026.10.2-4 · full notes on GitHub");
+    assert!(foot > more, "the foot under the clamp: {all}");
+    assert!(all.contains("1 update now"), "{all}");
+}
+
 /// pr-design §6.3: the ready-to-merge item, as the hub writes it. Its
 /// head line is the title, the facts dim; a digit answers with the digit
 /// (the hub merges, or files it); `2` opens the PR here and leaves it.

@@ -536,15 +536,18 @@ fn hint(c: &Card, s: &Shape) -> Option<String> {
 /// keeps its first lines, then `… n more lines · ctrl+o full screen`.
 fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
     let sb = &app.sb;
-    let s = shape(c);
+    let mut s = shape(c);
     // the bar and its gap on the left, one tinted column on the right:
     // `1 of 4 · 2m` never touches the tint's edge
     let tw = w.saturating_sub(3).max(1);
     let typing = !app.ed.text.is_empty();
+    // the update card's foot (`you're on v… · full notes on GitHub ↗`)
+    // always shows: its changelog gives way first (designer m_46118)
+    let foot = update_foot(c, &mut s, tw);
     let mut middle = middle_lines(app, c, &s, tw);
     let opts = option_lines(c, &s, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
     let link = super::cards::page_link_line(c, tw);
-    let fixed = 4 + opts.len() + usize::from(link.is_some());
+    let fixed = 4 + opts.len() + usize::from(link.is_some()) + foot.len();
     let room = cap.saturating_sub(fixed);
     if middle.len() > room {
         let keep = room.saturating_sub(1);
@@ -564,6 +567,7 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
     }
     let mut out = vec![Drawn::blank(), head_line(sb, c, &s, tw)];
     out.extend(middle);
+    out.extend(foot);
     out.extend(link);
     if !opts.is_empty() {
         out.push(Drawn::blank());
@@ -575,6 +579,16 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
         d.item = true;
     }
     out
+}
+
+/// An update card's last part (its foot, dim), taken out of its shape
+/// and drawn `w` wide; nothing for any other card.
+fn update_foot(c: &Card, s: &mut super::cards::Shape, w: usize) -> Vec<Drawn> {
+    if c.kind != "update" || c.release.is_none() || !matches!(s.parts.last(), Some(Part::Evidence(_))) {
+        return Vec::new();
+    }
+    let Some(Part::Evidence(t)) = s.parts.pop() else { return Vec::new() };
+    wrap_line(Line::from(crate::textlayer::copy_spans(&t, fg(theme::dim()))), w).into_iter().map(Drawn::plain).collect()
 }
 
 /// The box's inner lines, `w` columns, at most `max`; the open item at
