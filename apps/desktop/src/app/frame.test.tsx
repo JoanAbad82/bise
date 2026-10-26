@@ -1,17 +1,21 @@
 // @vitest-environment happy-dom
 // The frame of mockup 1, drawn from the store: the rail's places (the current one marked, inbox's
 // dot only while something waits), the sidebar's projects (round 2: one row each, no agent under
-// it, its one fact, ⌘ held its digit), its head bise, Search ⌘K, New project ⌘N (no New agent row).
+// it; round 3, H1: its name and pill or age, its sentence, a quiet one on one line; ⌘ held its
+// digit), its head bise, Search ⌘K, New project ⌘N (no New agent row).
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HINT_HOLD_MS } from './held';
 import type { Agent, ProjectRow } from '@/proto';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { ev, projects, row } from '../../tests/feature/inputs';
+import { ev, projects as projectsEv, row } from '../../tests/feature/inputs';
 import { createRouter, RouterContext } from './router';
 import type { Route } from './route';
-import { projectRowTip, Sidebar } from './Sidebar';
+import { Sidebar } from './Sidebar';
+import { projects } from '@/proto/words_projects.gen';
+import { common } from '@/proto/words.gen';
+import { waitsTip, workingTip } from './tipwords';
 import { SideRail } from './SideRail';
 import { askEntityAction } from './menus/actions';
 import { act } from '@testing-library/react';
@@ -29,7 +33,7 @@ function frame(route: Route, agents: Agent[], sent: unknown[] = [], acme: Partia
   (window as unknown as { bise: unknown }).bise = { notify: { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined } };
   const store = new Store(port);
   store.setCore('up');
-  store.apply(projects(row({ project: HOME, name: 'bise', home: true }), row({ project: ACME, name: 'acme', order: 1, ...acme }), row({ project: DOCS, name: 'docs', order: 2 })));
+  store.apply(projectsEv(row({ project: HOME, name: 'bise', home: true }), row({ project: ACME, name: 'acme', order: 1, ...acme }), row({ project: DOCS, name: 'docs', order: 2 })));
   store.apply(ev('agents', { project: ACME, agents }));
   const router = createRouter(route);
   const v = render(
@@ -80,19 +84,45 @@ describe('the sidebar', () => {
     });
   }
 
-  it("ends a project's row with one fact: what waits on him, else its agents at work, else nothing; its tip says both", () => {
+  it("H1: a project's pill, its sentence, its tip; a quiet one is one line with no sentence", () => {
     const working = [agent('main', { status: 'working' }), agent('perf', { status: 'working' })];
     const waits = frame({ screen: 'bise' }, working, [], { cards: null as never, waits: 1 }).v;
-    expect(waits.getByTestId(`app.side.project.${ACME}.waits`).textContent).toBe('1');
-    expect(waits.queryByTestId(`app.side.project.${ACME}.works`)).toBeNull();
-    expect(waits.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(projectRowTip(2, 1));
-    cleanup();
-    const works = frame({ screen: 'bise' }, working).v;
-    // the breath's one cell, then the count
-    expect(works.getByTestId(`app.side.project.${ACME}.works`).textContent).toMatch(/^.2$/u);
-    expect(works.getByTestId(`app.side.project.${ACME}.works.mark`).getAttribute('data-mark')).toBe('working');
-    expect(works.queryByTestId(`app.side.project.${DOCS}.works`)).toBeNull();
-    expect(works.queryByTestId(`app.side.project.${DOCS}.waits`)).toBeNull();
+    expect(waits.getByTestId(`app.side.project.${ACME}.pill`).textContent).toBe('1');
+    expect(waits.getByTestId(`app.side.project.${ACME}.pill`).getAttribute('data-tip')).toBe(projects.pill_tip({ n: 1 }));
+    expect(waits.getByTestId(`app.side.project.${ACME}.say`).textContent).toBe(projects.working({ n: 2 }));
+    expect(waits.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(`${workingTip(2)} · ${waitsTip(1)}`);
+    // no marks: the words say it
+    expect(waits.getByTestId(`app.side.project.${ACME}`).querySelector('.wk-sign, svg:not(.app-s-week)')).toBeNull();
+    // docs: nothing works or waits, no pulse yet: quiet, one line
+    const docs = waits.getByTestId(`app.side.project.${DOCS}`);
+    expect(docs.classList.contains('quiet')).toBe(true);
+    expect(waits.queryByTestId(`app.side.project.${DOCS}.say`)).toBeNull();
+    expect(docs.getAttribute('data-tip')).toBe(common.all_quiet);
+  });
+
+  it("H1 with the hub's pulse: the age, a failure in the error colour, the week's sparkline", () => {
+    const NOW = Date.now();
+    const pulse = { from_ms: NOW - 20 * 8 * 3_600_000, busy_ms: Array.from({ length: 21 }, (_, i) => i), last_ms: NOW - 40 * 60_000, news: { at_ms: NOW - 60_000, what: { kind: 'failed', agent: 'migrate' } }, counting: false };
+    const { v } = frame({ screen: 'bise' }, [agent('main')], [], { pulse } as Partial<ProjectRow>);
+    expect(v.getByTestId(`app.side.project.${ACME}.age`).textContent).toBe('40 min');
+    const say = v.getByTestId(`app.side.project.${ACME}.say`);
+    expect(say.textContent).toBe(projects.failed({ agent: 'migrate' }));
+    expect(say.classList.contains('err')).toBe(true);
+    const week = v.getByTestId(`app.side.project.${ACME}.week`);
+    expect(week.getAttribute('data-tip')).toBe(projects.week_tip);
+    expect(week.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(21);
+  });
+
+  it('marks the project he opens seen, and again when he leaves it (prefs seen.<project>)', () => {
+    const sent: unknown[] = [];
+    const { router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent);
+    const seen = () => sent.filter((c) => (c as { cmd: string; key?: string }).cmd === 'prefs_set' && (c as { key: string }).key === `seen.${ACME}`);
+    expect(seen()).toHaveLength(1);
+    act(() => {
+      router.go({ screen: 'thread', project: DOCS, agent: 'main' });
+    });
+    expect(seen()).toHaveLength(2);
+    expect(sent.some((c) => (c as { key?: string }).key === `seen.${DOCS}`)).toBe(true);
   });
 
   it('⌘ held shows each project its ⌘ digit, in his order (⌘1-9 opens it)', () => {
@@ -106,7 +136,7 @@ describe('the sidebar', () => {
       });
       expect(v.getByTestId(`app.side.project.${ACME}.digit`).textContent).toBe('⌘1');
       expect(v.getByTestId(`app.side.project.${DOCS}.digit`).textContent).toBe('⌘2');
-      expect(v.queryByTestId(`app.side.project.${ACME}.works`)).toBeNull();
+      expect(v.queryByTestId(`app.side.project.${ACME}.age`)).toBeNull();
       act(() => {
         fireEvent.keyUp(window, { key: 'Meta', code: 'MetaLeft' });
       });

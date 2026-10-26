@@ -15,6 +15,7 @@ export { library } from './words_library.gen';
 export { menus } from './words_menus.gen';
 export { pages } from './words_pages.gen';
 export { panel } from './words_panel.gen';
+export { projects } from './words_projects.gen';
 export { running } from './words_running.gen';
 export { scheduled } from './words_scheduled.gen';
 export { settings } from './words_settings.gen';

@@ -44,6 +44,7 @@ pub mod library;
 pub mod menus;
 pub mod pages;
 pub mod panel;
+pub mod projects;
 pub mod running;
 pub mod scheduled;
 pub mod settings;
@@ -79,6 +80,7 @@ pub const ALL: &[(&str, &[Word])] = &[
     ("menus", menus::WORDS),
     ("pages", pages::WORDS),
     ("panel", panel::WORDS),
+    ("projects", projects::WORDS),
     ("running", running::WORDS),
     ("scheduled", scheduled::WORDS),
     ("settings", settings::WORDS),

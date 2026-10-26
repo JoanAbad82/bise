@@ -1,23 +1,20 @@
-// The sidebar's rows (bise fait mac round 2, his m_44263 and r2-img11: projects only, as before
-// native-mac): 'Pinned' (the agents he pinned himself, pins.ts: his shortcuts, designer m_44271),
-// then 'Projects', one row per project in his order (Settings › Projects), no agent under it: the
-// agents of a project live on the right side. A project row's end says one fact, the bubbles'
-// grammar (designer m_44271): what waits on him (the count in the accent), else its agents at work
-// (main's breath and the count, Marks.tsx WorkingMark), else nothing; with ⌘ held, its ⌘ digit
-// instead (⌘1-9 opens it, keys.ts). A pinned agent's row keeps the dot (it waits on him) or the
-// breath (it works).
-// Pure: Sidebar.tsx draws them. Owner: r2-pointer (nm-frame's, archived).
+// The sidebar's rows: 'Pinned' (the agents he pinned himself, pins.ts: his shortcuts, designer
+// m_44271), then 'Projects', one row per project in his order (Settings › Projects), no agent under
+// it: the agents of a project live on the right side. A project row is Gabriel's H1 (round 3, page
+// sidebar-projects, designer m_44783): its name, the inbox pill or its age, one plain sentence and
+// its week (projectfacts.ts says them); a quiet one is one line. With ⌘ held, its ⌘ digit in the
+// pill's place (⌘1-9 opens it, keys.ts). A pinned agent's row keeps the dot (it waits on him) or
+// the breath (it works).
+// Pure: Sidebar.tsx draws them. Owner: r3-projects this round (nm-frame's, archived).
 import type { Agent, ProjectRow } from '@/proto';
 import { liveOf } from '@/agents/model';
+import { projectFacts, type ProjectFacts, type PulseRow } from './projectfacts';
 
 /** A pinned agent's end: it waits on him (the accent dot), it works (the breath), or nothing. */
 export type RowEnd = 'waits' | 'works' | null;
 
-/** A project row's end: how many things wait on him, else how many of its agents work, else nothing. */
-export type ProjectEnd = { readonly kind: 'waits' | 'works'; readonly n: number } | null;
-
 export type SideRow =
-  | { readonly kind: 'project'; readonly p: ProjectRow; readonly on: boolean; readonly end: ProjectEnd; readonly working: number; readonly waits: number; readonly digit?: number }
+  | { readonly kind: 'project'; readonly p: ProjectRow; readonly on: boolean; readonly facts: ProjectFacts; readonly digit?: number }
   | { readonly kind: 'agent'; readonly project: string; readonly a: Agent; readonly on: boolean; readonly end: RowEnd; readonly stopped: boolean };
 
 /** An agent's end: the dot when it asks him (a card, or the hub says it waits on him), the breath at work. Pure. */
@@ -40,16 +37,9 @@ export function workingOf(agents: readonly Agent[]): number {
   return liveOf(agents).filter((a) => a.status === 'working').length;
 }
 
-/** A project row's one fact: what waits on him first, else its agents at work, else nothing. Pure. */
-export function projectEndOf(waits: number, working: number): ProjectEnd {
-  if (waits > 0) return { kind: 'waits', n: waits };
-  if (working > 0) return { kind: 'works', n: working };
-  return null;
-}
-
 /** A project's row: `waits` is the inbox's own count for it (inbox/waiting useProjectWaiting), `index` its place in projectsOf (⌘ index+1, up to 9). Pure. */
 export function projectRowOf(c: {
-  readonly p: ProjectRow;
+  readonly p: PulseRow;
   readonly agents: readonly Agent[];
   readonly waits: number;
   readonly index: number;
@@ -57,10 +47,13 @@ export function projectRowOf(c: {
   readonly on: boolean;
   /** ⌘ is held: the row shows its digit */
   readonly cmd: boolean;
+  /** when he last looked at it (seen.ts) */
+  readonly seen?: number | undefined;
+  readonly now: number;
 }): SideRow {
-  const working = workingOf(c.agents);
+  const facts = projectFacts({ p: c.p, working: workingOf(c.agents), waits: c.waits, seen: c.seen, now: c.now });
   const digit = c.cmd && c.index < 9 ? c.index + 1 : undefined;
-  return { kind: 'project', p: c.p, on: c.on, end: projectEndOf(c.waits, working), working, waits: c.waits, ...(digit === undefined ? {} : { digit }) };
+  return { kind: 'project', p: c.p, on: c.on, facts, ...(digit === undefined ? {} : { digit }) };
 }
 
 /** A pinned agent's row; none when it left its project's live rows (renamed, archived). Pure. */

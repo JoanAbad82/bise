@@ -5,11 +5,13 @@
 // ⇧⌘N stays in keys.ts, the File menu, the project menu and ⌘K). Then 'Pinned' (pins.ts, his own
 // shortcuts) and 'Projects': one
 // row per project, a click opens it (its main), no agent under it (round 2, his r2-img11: the
-// agents live on the right side), at its end one fact (what waits on him, else its agents at work)
-// and, ⌘ held, its ⌘1-9 digit: siderows.ts decides, this draws. Its head stays, its list scrolls;
+// agents live on the right side), as Gabriel's H1 (round 3, designer m_44783): its name and the
+// inbox pill or its age, one plain sentence and its week's sparkline, a quiet one on one line; ⌘
+// held, its ⌘1-9 digit: siderows.ts and projectfacts.ts decide, this draws; the project in view is
+// marked seen (seen.ts). Its head stays, its list scrolls;
 // a right click on a pin or a project opens its menu (useEntityMenu, nm-menus'). On the artifacts
 // library (decision d2) it shows '← Projects' and the library (artifacts' ArtLibrary) at the same
-// width, a 160 ms crossfade. Owner: r3-sidebar this round (nm-frame's, archived).
+// width, a 160 ms crossfade. Owner: r3-projects this round (nm-frame's, archived).
 //
 // Each project row and each pin read their own project's agents (useAgents): an event re-renders
 // the row it touches, never the sidebar, and a thread's entries never do.
@@ -22,7 +24,6 @@ import { useAgents, useProjects, useStore } from '@/store';
 import { ArtLibrary } from '@/artifacts';
 import { SettingsNav } from '@/settings/nav';
 import { useProjectWaiting, useWaitingCount } from '@/inbox/waiting';
-import { common } from '@/proto/words.gen';
 import { useEntityMenu } from './menus/use';
 import { useEntityAction } from './menus/actions';
 import { MAIN, projectOf } from './route';
@@ -32,8 +33,12 @@ import { useModHeld } from './held';
 import { LiveBiseMark, WorkingMark } from './Marks';
 import { usePinned, type Pin } from './pins';
 import { addProject } from './addProject';
-import { pinRowOf, projectRowOf, projectsOf, type ProjectEnd, type RowEnd } from './siderows';
-import { waitsTip, workingTip } from './tipwords';
+import { pinRowOf, projectRowOf, projectsOf, type RowEnd } from './siderows';
+import { sparkPoints, type ProjectFacts } from './projectfacts';
+import { useMarkSeen, useSeen } from './seen';
+import { useNow } from './clock';
+import { projects } from '@/proto/words_projects.gen';
+import { waitsTip } from './tipwords';
 
 /** What waits on him, one number everywhere: the inbox's own list (designer m_25690). */
 export function useWaitingTotal(): number {
@@ -65,24 +70,71 @@ function CutName({ name }: { name: string }) {
   );
 }
 
-/** A project row's end (designer m_44271, the bubbles' grammar): the count in the accent when
- * something waits on him, else main's breath and the count in text-3; ⌘ held, its digit in their place. */
-export function ProjectEndView({ end, digit, testId }: { end: ProjectEnd; digit: number | undefined; testId: string }) {
-  if (digit !== undefined) return <kbd data-testid={`${testId}.digit`}>{`⌘${String(digit)}`}</kbd>;
-  if (end === null) return null;
-  if (end.kind === 'waits') return <span className="app-s-cnt waits" data-testid={`${testId}.waits`}>{end.n}</span>;
+/** A project's week (H1): a 44 x 12 line of its agents' busy time over 7 days, no fill, no dot. */
+function Week({ week, testId }: { week: readonly number[]; testId: string }) {
   return (
-    <span className="app-s-cnt" data-testid={`${testId}.works`}>
-      <WorkingMark pace="project" tip={workingTip(end.n)} testId={`${testId}.works.mark`} />
-      {end.n}
+    <svg className="app-s-week" viewBox="0 0 44 12" preserveAspectRatio="none" role="img" aria-label={projects.week_tip} {...tipAttrs(projects.week_tip)} data-testid={testId}>
+      <polyline points={sparkPoints(week)} />
+    </svg>
+  );
+}
+
+/** A project's line-1 end: ⌘ held, its digit; else the inbox pill (what waits on him), else its age. */
+function ProjectEnd({ facts, digit, testId }: { facts: ProjectFacts; digit: number | undefined; testId: string }) {
+  if (digit !== undefined) return <kbd data-testid={`${testId}.digit`}>{`⌘${String(digit)}`}</kbd>;
+  if (facts.pill !== null)
+    return (
+      <span className="app-s-pill" {...tipAttrs(projects.pill_tip({ n: facts.pill }))} data-testid={`${testId}.pill`}>
+        {facts.pill}
+      </span>
+    );
+  if (facts.age === null) return null;
+  return (
+    <span className="app-s-age" data-testid={`${testId}.age`}>
+      {facts.age}
     </span>
   );
 }
 
-/** A project's tip: '2 agents working · 1 waiting for you', 'all quiet'. Pure. */
-export function projectRowTip(working: number, waits: number): string {
-  const parts = [...(working > 0 ? [workingTip(working)] : []), ...(waits > 0 ? [waitsTip(waits)] : [])];
-  return parts.length === 0 ? common.all_quiet : parts.join(' · ');
+/**
+ * A project's row, Gabriel's H1 (designer m_44783): two calm lines, its name and its pill or age,
+ * then one plain sentence and its week; a quiet one is its name in text-2 and its age, one line.
+ * No icon, no mark, no border: the words say it, the tip says it all.
+ */
+function ProjectRowView({ name, facts, on, digit, onClick, onContextMenu, testId }: {
+  name: string;
+  facts: ProjectFacts;
+  on: boolean;
+  digit: number | undefined;
+  onClick: () => void;
+  onContextMenu: (e: MouseEvent<HTMLElement>) => void;
+  testId: string;
+}) {
+  return (
+    <Press
+      look={`app-s-row project${facts.quiet ? ' quiet' : ''}${on ? ' on' : ''}`}
+      aria-current={on ? 'page' : undefined}
+      {...tipAttrs(facts.tip)}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      data-testid={testId}
+    >
+      <span className="app-s-l1">
+        <CutName name={name} />
+        <span className="app-s-end">
+          <ProjectEnd facts={facts} digit={digit} testId={testId} />
+        </span>
+      </span>
+      {facts.sentence !== null && (
+        <span className="app-s-l2">
+          <span className={`app-s-say${facts.sentence.err ? ' err' : ''}`} data-testid={`${testId}.say`}>
+            {facts.sentence.text}
+          </span>
+          {facts.week !== null && <Week week={facts.week} testId={`${testId}.week`} />}
+        </span>
+      )}
+    </Press>
+  );
 }
 
 /** A pinned agent's end: the accent dot (it waits on him) or main's breath (it works), each with its tip; nothing else. */
@@ -93,13 +145,13 @@ export function AgentEnd({ end, testId }: { end: RowEnd; testId: string }) {
 }
 
 function Row({ kind, icon, name, end, on, stopped, tip, onClick, onContextMenu, testId }: {
-  kind: 'top' | 'project' | 'agent' | 'back';
+  kind: 'top' | 'agent' | 'back';
   icon?: AppIconName;
   name: string;
   end?: ReactNode;
   on?: boolean;
   stopped?: boolean;
-  /** the row's whole story on hover (a project's: '2 agents working · 1 waiting for you') */
+  /** the row's whole story on hover */
   tip?: string;
   onClick: () => void;
   onContextMenu?: (e: MouseEvent<HTMLElement>) => void;
@@ -190,16 +242,20 @@ function ProjectList() {
   const route = useRoute();
   // where he was in a long sidebar comes back after a reload (keep.ts)
   useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.side.list"]'));
-  const projects = projectsOf(rows);
+  const list = projectsOf(rows);
   const here = projectOf(route);
+  // he looked at the project in view: its news, artifacts and unread are seen (seen.ts)
+  useMarkSeen(here);
+  const seen = useSeen();
+  const now = useNow();
   return (
     <div className="app-s-list" data-testid="app.side.list">
       {pins.length > 0 && <PinnedList pins={pins} />}
       <Label testId="app.side.label.projects" end={<AddProject />}>
         {frame.projects}
       </Label>
-      {projects.map((p, i) => (
-        <ProjectItem key={p.project} p={p} index={i} on={p.project === here} cmd={cmd} />
+      {list.map((p, i) => (
+        <ProjectItem key={p.project} p={p} index={i} on={p.project === here} cmd={cmd} seen={seen(p.project)} now={now} />
       ))}
     </div>
   );
@@ -207,7 +263,7 @@ function ProjectList() {
 
 /**
  * bise's own row, the sidebar's first (his r3 order: bise, Search, New project): its live ':*' mark,
- * 'bise', what waits on him in all his projects (the inbox's one number, in the accent); ⌘ held, ⌘0.
+ * 'bise', what waits on him in all his projects (the inbox's one number, the projects' accent pill); ⌘ held, ⌘0.
  * It opens bise's place; marked there and on bise's own main (the home project stays out of the list).
  */
 function BiseRow() {
@@ -236,7 +292,7 @@ function BiseRow() {
       ) : (
         waits > 0 && (
           <span className="app-s-end">
-            <span className="app-s-cnt waits" {...tipAttrs(waitsTip(waits, true))} data-testid={`${id}.waits`}>
+            <span className="app-s-pill" {...tipAttrs(waitsTip(waits, true))} data-testid={`${id}.waits`}>
               {waits}
             </span>
           </span>
@@ -284,13 +340,13 @@ function AddProject() {
 }
 
 /** One project's row: it reads its own agents and its waiting count, so an event re-renders it alone. */
-const ProjectItem = memo(function ProjectItem({ p, index, on, cmd }: { p: ProjectRow; index: number; on: boolean; cmd: boolean }) {
+const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now }: { p: ProjectRow; index: number; on: boolean; cmd: boolean; seen: number | undefined; now: number }) {
   const store = useStore();
   const router = useRouter();
   const agents = useAgents(p.project);
   // what waits on him: the inbox's own count for this project (what he just answered left out)
   const waits = useProjectWaiting(p);
-  const r = projectRowOf({ p, agents, waits, index, on, cmd });
+  const r = projectRowOf({ p, agents, waits, index, on, cmd, seen, now });
   const menu = useEntityMenu({ kind: 'project', project: p.project });
   const [renaming, setRenaming] = useState(false);
   // the menu's Rename takes its new name here, inline (app/menus/actions.ts)
@@ -307,8 +363,7 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd }: { p: Projec
       if (n !== '' && n !== p.name) store.command({ cmd: 'project_rename', project: p.project, name: n });
     };
     return (
-      <div className="app-s-row project" data-testid={`${id}.rename`}>
-        <AppIcon name="folder" size={16} />
+      <div className="app-s-row project quiet" data-testid={`${id}.rename`}>
         <Input
           look="app-s-rename"
           autoFocus
@@ -332,14 +387,13 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd }: { p: Projec
       </div>
     );
   }
+  if (r.kind !== 'project') return null;
   return (
-    <Row
-      kind="project"
-      icon="folder"
+    <ProjectRowView
       name={p.name}
-      on={r.kind === 'project' && r.on}
-      tip={r.kind === 'project' ? projectRowTip(r.working, r.waits) : undefined}
-      end={r.kind === 'project' ? <ProjectEndView end={r.end} digit={r.digit} testId={id} /> : null}
+      facts={r.facts}
+      on={r.on}
+      digit={r.digit}
       onClick={() => {
         router.go({ screen: 'thread', project: p.project, agent: MAIN });
       }}
