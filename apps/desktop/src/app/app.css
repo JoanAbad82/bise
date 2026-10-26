@@ -190,6 +190,10 @@ body:has(.app-shell) {
   white-space: nowrap;
   align-self: center;
 }
+/* no room in the bar: the fact gives way first (giveway.ts, designer m_45674) */
+.app-bar[data-give='fact'] .app-bar-fact {
+  display: none;
+}
 .app-bar-fact[data-kind='waits'] .b-app-icon {
   color: var(--c-accent);
 }

@@ -23,6 +23,7 @@ import { formatRoute, MAIN, type Route } from "./route";
 import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
+import { giveWay, STATUS_NARROW_PX } from "./giveway";
 import { CoinSlot } from "./side3d/Minis";
 import { useEscLayer } from "./escape";
 import { BarTabs } from "./panel/BarTabs";
@@ -261,29 +262,53 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
 }
 
 /** under this much room the status pill takes its short form (designer's desktop-notices v2) */
-export const STATUS_NARROW_PX = 160;
+export { STATUS_NARROW_PX };
 
 /**
  * The title bar's status slot (designer's desktop-notices v2, ambient-lead m_21070): the free room
- * between the crumb's end (+16) and the right bar's toggle (8 before it), its content right-aligned;
- * the crumb never cuts for it. It marks data-narrow when that room is under 160 px, so the pill
- * (amb-home's TitleStatus) shows its short form. The slot drags like the bar; only what it holds is
- * a no-drag region (app.css).
+ * between the crumb's end (+16) and the right bar's toggle (8 before it), its content right-aligned:
+ * the status pill, then the coins' minis when the thread has no room for them (folded-side v9).
+ * When the room runs short they never shrink and give way in order (giveway.ts, designer m_45616,
+ * m_45674): the crumb's fact hides (the bar's data-give), then the pill takes its short form
+ * (data-narrow, also under 160 px of room for it), never a word cut; last the crumb's name cuts.
+ * The slot drags like the bar; only what it holds is a no-drag region (app.css).
  */
 function StatusSlot({ children }: { children?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
     const el = ref.current;
-    if (el === null) return;
+    const bar = el?.parentElement;
+    if (el === null || bar === null || bar === undefined) return;
+    // what the fact takes, and the pill's long width, kept from when they were last shown whole
+    let factRoom = 0;
+    let pillFull = 0;
     const read = () => {
-      setNarrow(el.clientWidth < STATUS_NARROW_PX);
+      const factHidden = bar.dataset["give"] === "fact";
+      const fact = bar.querySelector<HTMLElement>('[data-testid="app.bar.title.fact"]');
+      if (fact !== null && !factHidden) factRoom = fact.offsetWidth + parseFloat(getComputedStyle(fact.parentElement ?? fact).columnGap || "0");
+      if (fact === null) factRoom = 0;
+      const pill = el.querySelector<HTMLElement>(".app-ts");
+      const words = pill?.querySelector<HTMLElement>(".app-ts-words") ?? null;
+      if (pill === null) pillFull = 0;
+      else if (el.dataset["narrow"] !== "true" && words !== null) pillFull = pill.offsetWidth + Math.max(0, words.scrollWidth - words.clientWidth);
+      const minis = el.querySelector<HTMLElement>(".s3-minis-slot");
+      const minisW = minis === null || minis.childElementCount === 0 ? 0 : minis.offsetWidth + parseFloat(getComputedStyle(minis).marginLeft || "0");
+      const g = giveWay({ slot: el.clientWidth - (factHidden ? factRoom : 0), fact: factRoom, pill: pillFull, minis: minisW });
+      if (g.fact) bar.dataset["give"] = "fact";
+      else delete bar.dataset["give"];
+      setNarrow(g.narrow || (pill !== null && el.clientWidth - minisW < STATUS_NARROW_PX));
     };
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
+    // a pill or the minis come and go, the crumb's fact changes: read again
+    const mo = new MutationObserver(read);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
     return () => {
       ro.disconnect();
+      mo.disconnect();
+      delete bar.dataset["give"];
     };
   }, []);
   return (

@@ -16,8 +16,10 @@ import type { Route } from '../route';
  * The folded side (the world and its bubbles) shows inside a project only (r2-side item 7,
  * Gabriel m_44266, designer m_44292): a thread (bise's own too), its agents, archived, changes,
  * PRs, a review, a feature, a commit, a branch, environments, debug. Hidden on the app-wide pages:
- * the inbox, scheduled, processes, plugins, settings, report, onboarding, lab, not found and every
- * artifacts screen (the library, a project's own too). Pure.
+ * the inbox, scheduled, processes, plugins, settings, report, onboarding, lab, not found and the
+ * artifacts library (a project's own too). An artifact's route (artifacts/<project>/<id>) shows its
+ * maker's thread with the artifact in a panel tab: the side shows there (ui-review m_45670, designer
+ * m_45674: an artifact open keeps the minis). Pure.
  */
 export function sideShows(r: Route): boolean {
   switch (r.screen) {
@@ -34,6 +36,7 @@ export function sideShows(r: Route): boolean {
     case 'debug':
       return true;
     case 'artifacts':
+      return r.project !== '' && r.id !== undefined;
     case 'scheduled':
     case 'running':
     case 'plugins':
