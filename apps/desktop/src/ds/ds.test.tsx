@@ -3,7 +3,7 @@
 // re-render never replaces the editor in its slot, nor the rows of a list).
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArtChip, ArtName, ComposerFrame, Dock, Dot, Field, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
+import { ArtChip, ArtName, ComposerFrame, Dock, Dot, Field, Group, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
 import { CUT_CHARS, PickerCut } from "./picker";
 
 afterEach(cleanup);
@@ -88,7 +88,23 @@ describe("src/ds", () => {
     fireEvent.click(getByTestId("t"));
     fireEvent.keyDown(getByTestId("t"), { key: " " });
     fireEvent.click(getByTestId("d"));
-    expect(flip.mock.calls).toEqual([[true], [true]]);
+    expect(flip.mock.calls).toEqual([[true]]);
+    expect(getByTestId("t").getAttribute("role")).toBe("switch");
+    expect(getByTestId("t").getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("a settings switch row flips by a click anywhere on it, once by a click on the switch; a disabled one doesn't (designer m_44968)", () => {
+    const flip = vi.fn();
+    const { getByTestId } = render(<Group testId="g" items={[
+      { id: "a", label: "sounds", sub: "a soft tick", toggle: { on: false, onChange: flip, testId: "a.sw" } },
+      { id: "b", label: "beta", toggle: { on: true, onChange: flip, state: "disabled", testId: "b.sw" } },
+    ]} />);
+    fireEvent.click(getByTestId("g.a"));
+    fireEvent.click(getByTestId("g.a").querySelector(".l span") as Element);
+    fireEvent.click(getByTestId("a.sw"));
+    fireEvent.click(getByTestId("g.b"));
+    fireEvent.click(getByTestId("b.sw"));
+    expect(flip.mock.calls).toEqual([[true], [true], [true]]);
   });
 
   it("the field is a real input with its test id, uncontrolled", () => {

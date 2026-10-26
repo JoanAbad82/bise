@@ -2,6 +2,7 @@
 // W14, F1, F5, F7, V3, K16): what a key does, as a pure decision, and the
 // one listener in the shell that acts on it. Owner: amb-win.
 //
+// ⌘B the sidebar · ⌥⌘B the panel ·
 // ⌘0 bise · ⌘1-9 a project in his order · ⌥0 the project's main · ⌥1-9
 // its agents in the panel's order (the right side folded: ⌥1-4 its bubbles) · ⌘K the agent palette · ⌘D the agent's
 // changes · ⌘⇧A the artifacts · ⌘E fold/unfold everything · ⌘/ the key
@@ -22,8 +23,21 @@ export const HELP_EVENT = 'bise:help';
 /** What a screen does for a key (the thread listens with useAppAction). */
 export type ScreenAction = 'fold-all' | 'stop' | 'to-end' | 'copy-code' | 'side-1' | 'side-2' | 'side-3' | 'side-4';
 
-/** What the window's frame does: show or hide the sidebar (⌘\), the right panel (⌥⌘0). */
+/** What the window's frame does: show or hide the sidebar (⌘B), the right panel (⌥⌘B). */
 export type FrameAction = 'sidebar' | 'panel';
+
+/** The keys the two sides show: settings/keys.ts's (the key list, a leaf module), re-exported here for the shell. */
+export { FRAME_KEYS } from '@/settings/keys';
+
+/** How long after a window key the View menu's echo of the same key is dropped (Electron gives
+ *  both: the page's keydown, then the menu item's accelerator), as the terminal's ⌃`. */
+export const MENU_ECHO_MS = 300;
+
+/** The View menu's item for a side, at `now`, after the window's own key toggled it at `keyAt`:
+ *  its echo (dropped) or his pick from the menu (acted on). Pure. */
+export function menuEcho(keyAt: number | undefined, now: number): boolean {
+  return keyAt !== undefined && now - keyAt < MENU_ECHO_MS;
+}
 
 export type KeyAct =
   | { readonly go: Route }
@@ -94,11 +108,16 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   if (only('meta') && e.code === 'KeyK') return { palette: true };
   const pk = panelKeyOf(e, c.panelOpen === true);
   if (pk !== undefined) return { panel: pk };
-  // bise fait mac (page native-mac §6): ⌘\ the sidebar, ⌥⌘0 the panel, ⌘N New project, ⇧⌘N New agent (his m_44225), ⌘, settings
-  if (only('meta') && e.code === 'Backslash') return { frame: 'sidebar' };
-  if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'Digit0') return { frame: 'panel' };
+  // the two sides (his m_44999, designer m_45008 / m_45164): ⌘B the sidebar, ⌥⌘B the panel (VS Code,
+  // Cursor, Zed); ⌃⌘S (macOS's Show Sidebar), ⌘\ and ⌥⌘0 (the old ones) still work, shown nowhere.
+  // A capture-phase ⌘B never reaches the composer, so it never bolds text there
+  const metaAlt = e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey;
+  if (only('meta') && (e.code === 'KeyB' || e.code === 'Backslash')) return { frame: 'sidebar' };
+  if (e.metaKey && e.ctrlKey && !e.altKey && !e.shiftKey && e.code === 'KeyS') return { frame: 'sidebar' };
+  if (metaAlt && (e.code === 'KeyB' || e.code === 'Digit0')) return { frame: 'panel' };
+  // bise fait mac (page native-mac §6): ⌘N New project, ⇧⌘N New agent (his m_44225), ⌘, settings
   // ⌥⌘1-⌥⌘4: the right side's bubbles, agents, artifacts, scheduled, processes (native-mac d1; app/side3d); ⌥1-4 too while it is folded
-  if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && n !== undefined && n >= 1 && n <= 4) return { screen: `side-${String(n)}` as ScreenAction };
+  if (metaAlt && n !== undefined && n >= 1 && n <= 4) return { screen: `side-${String(n)}` as ScreenAction };
   if (only('meta') && e.code === 'KeyN') return { newProject: true };
   if (only('meta', true) && e.code === 'KeyN') {
     const p = here(c);

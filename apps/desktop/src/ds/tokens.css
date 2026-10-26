@@ -38,6 +38,11 @@
   --c-err-soft: color-mix(in srgb, var(--p-err) 12%, transparent);
   --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
   --c-seg-on: color-mix(in srgb, var(--p-text) 14%, var(--p-chip)); /* the chosen segment: lighter than its --c-sunken track (macOS; designer m_42136) */
+  /* the switch (designer m_44968): a grey track off, a dimmed ink on (never cream, never the pink),
+     a light knob always; hover 4 % more text off, 64 % on */
+  --c-switch-off: color-mix(in srgb, var(--p-text) 20%, var(--p-bg)); --c-switch-off-hover: color-mix(in srgb, var(--p-text) 24%, var(--p-bg));
+  --c-switch-on: color-mix(in srgb, var(--p-text) 58%, var(--p-bg)); --c-switch-on-hover: color-mix(in srgb, var(--p-text) 64%, var(--p-bg));
+  --c-knob: #f4efe6; --sh-knob: 0 1px 3px rgb(0 0 0 / .5);
   --t-11: .71875rem; /* the floor: 11.5 px, nothing smaller (ambient m_8298) */ --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
   --lh-ui: 1.35; --lh-read: 1.55;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
@@ -57,6 +62,7 @@
   --c-scrim: color-mix(in srgb, var(--c-solid) 62%, transparent);
   --glass: blur(30px) saturate(1.4);
   --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
+  --d-switch: 150ms; --d-switch-press: 100ms; --ease-switch: cubic-bezier(.3, .7, .4, 1); /* the switch's knob and track (designer m_44968) */
   --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
 }
 /* spacing (designer's page desktop-spacing, m_19568: rules, not taste). A 4 px grid: a margin,
@@ -102,7 +108,8 @@
 
   /* bise fait mac (page native-mac v10 §6 and §7, plan native-mac-plan v4). Every one a 4 px step
      but the radii --r-menu 10 (macOS's menus and settings groups) and nothing else */
-  --h-kbd: 20px;           /* a kbd chip, a switch's height */
+  --h-kbd: 20px;           /* a kbd chip */
+  --w-switch: 36px; --h-switch: 20px; /* a switch's track: its 16 knob 2 in, a travel of 16 (designer m_44968) */
   --h-seg-in: 24px;        /* a segment inside the 28 segmented filter (margin 2) */
   --h-group: 32px;         /* a group label over a page's rows (16 above it) */
   --h-launcher-row: 40px;  /* an entry of New tab, the launcher */
@@ -183,6 +190,11 @@
   --c-err-soft: color-mix(in srgb, var(--p-err) 12%, transparent);
   --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
   --c-seg-on: color-mix(in srgb, var(--p-text) 14%, var(--p-chip)); /* the chosen segment: lighter than its --c-sunken track (macOS; designer m_42136) */
+  /* the switch (designer m_44968): a grey track off, a dimmed ink on (never cream, never the pink),
+     a light knob always; hover 4 % more text off, 64 % on */
+  --c-switch-off: color-mix(in srgb, var(--p-text) 20%, var(--p-bg)); --c-switch-off-hover: color-mix(in srgb, var(--p-text) 24%, var(--p-bg));
+  --c-switch-on: color-mix(in srgb, var(--p-text) 58%, var(--p-bg)); --c-switch-on-hover: color-mix(in srgb, var(--p-text) 64%, var(--p-bg));
+  --c-knob: #f4efe6; --sh-knob: 0 1px 3px rgb(0 0 0 / .5);
   --t-11: .71875rem; /* the floor: 11.5 px, nothing smaller (ambient m_8298) */ --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
   --lh-ui: 1.35; --lh-read: 1.55;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
@@ -197,6 +209,7 @@
   --c-scrim: color-mix(in srgb, var(--c-solid) 62%, transparent);
   --glass: blur(30px) saturate(1.4);
   --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
+  --d-switch: 150ms; --d-switch-press: 100ms; --ease-switch: cubic-bezier(.3, .7, .4, 1); /* the switch's knob and track (designer m_44968) */
   --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
 }
 /* light: softer raised surfaces and shadows (amb-win's S6 review); the world's shadow in a brown tint */
@@ -207,6 +220,9 @@
   --sh-world-1: 14%; --sh-world-2: 20%; --sh-world-3: 12%;
   --c-seg-on: var(--c-solid);
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
+  --c-switch-off: color-mix(in srgb, var(--p-text) 14%, var(--p-bg)); --c-switch-off-hover: color-mix(in srgb, var(--p-text) 18%, var(--p-bg));
+  --c-switch-on: var(--p-text); --c-switch-on-hover: color-mix(in srgb, var(--p-text) 88%, var(--p-bg));
+  --c-knob: #fff; --sh-knob: 0 1px 2px rgb(0 0 0 / .16), 0 0 0 .5px rgb(0 0 0 / .08);
 } }
 [data-theme="light"] {
   --c-accent-soft: color-mix(in srgb, var(--p-accent) 7%, var(--p-bg));
@@ -215,6 +231,9 @@
   --sh-world-1: 14%; --sh-world-2: 20%; --sh-world-3: 12%;
   --c-seg-on: var(--c-solid);
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
+  --c-switch-off: color-mix(in srgb, var(--p-text) 14%, var(--p-bg)); --c-switch-off-hover: color-mix(in srgb, var(--p-text) 18%, var(--p-bg));
+  --c-switch-on: var(--p-text); --c-switch-on-hover: color-mix(in srgb, var(--p-text) 88%, var(--p-bg));
+  --c-knob: #fff; --sh-knob: 0 1px 2px rgb(0 0 0 / .16), 0 0 0 .5px rgb(0 0 0 / .08);
 }
 [data-theme="dark"] { --sh-world-1: 18%; --sh-world-2: 28%; --sh-world-3: 16%; }
 
@@ -235,11 +254,11 @@
 }
 /* reduce motion: every duration 0, and the world does not grow on hover */
 @media (prefers-reduced-motion: reduce) { :root, [data-theme] {
-  --d-press: 0ms; --d-fast: 0ms; --d-base: 0ms; --d-slow: 0ms; --d-mood: 0ms;
+  --d-press: 0ms; --d-fast: 0ms; --d-base: 0ms; --d-slow: 0ms; --d-mood: 0ms; --d-switch: 0ms; --d-switch-press: 0ms;
   --world-hover: var(--world);
 } }
 :root[data-reduce-motion], :root[data-reduce-motion] [data-theme] {
-  --d-press: 0ms; --d-fast: 0ms; --d-base: 0ms; --d-slow: 0ms; --d-mood: 0ms;
+  --d-press: 0ms; --d-fast: 0ms; --d-base: 0ms; --d-slow: 0ms; --d-mood: 0ms; --d-switch: 0ms; --d-switch-press: 0ms;
   --world-hover: var(--world);
 }
 /* increase contrast (designer, native-lead m_43631): every rule the strong one, the selected tint

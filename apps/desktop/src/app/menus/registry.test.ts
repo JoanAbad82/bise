@@ -187,6 +187,8 @@ describe('every menu', () => {
     const accs = keys.map(([, k]) => k);
     expect(new Set(accs).size).toBe(accs.length);
     for (const n of [0, 1, 2, 3, 4]) expect(accs).not.toContain(`Alt+CmdOrCtrl+${String(n)}`);
+    // ⌘B, ⌥⌘B the two sides, ⌃⌘S their hidden alias (app/keys.ts FRAME_KEYS): no menu item takes them
+    for (const a of ['CmdOrCtrl+B', 'Alt+CmdOrCtrl+B', 'Ctrl+CmdOrCtrl+S']) expect(accs).not.toContain(a);
     expect(KEYS.archive).toBeUndefined();
     for (const f of all) {
       const shown = menuOf(f).flatMap((i) => (i.type === 'item' || i.type === undefined ? (i.accelerator === undefined ? [] : [i.accelerator]) : []));

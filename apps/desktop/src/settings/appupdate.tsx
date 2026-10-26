@@ -8,7 +8,7 @@
 // app keeps app-swap v2's group (update.tsx) instead. distRow is the pure part. Owner: dist-updater.
 import type { ReactNode } from 'react';
 import type { UpdateInfo, UpdateState } from '@/shared/api';
-import { Act, Button, Group, Toggle, type GroupItem } from '@/ds';
+import { Act, Button, Group, type GroupItem } from '@/ds';
 import { tipAttrs } from '@/ds/tip';
 import { whenWords } from '@/artifacts/model';
 import { updatedTip } from '@/app/tipwords';
@@ -156,7 +156,7 @@ export function DistUpdateGroup({
       id: 'beta',
       label: settings.dist_beta,
       sub: settings.dist_beta_sub,
-      control: <Toggle on={beta} label={settings.dist_beta} onChange={setBeta} testId="settings.pref.desktop_channel" />,
+      toggle: { on: beta, label: settings.dist_beta, onChange: setBeta, testId: 'settings.pref.desktop_channel' },
     },
   ];
   const help = row.help ?? trace;

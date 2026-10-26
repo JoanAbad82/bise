@@ -23,10 +23,16 @@ describe('a modifier held alone', () => {
     expect(heldStep(null, k('keydown', 'Meta', { metaKey: true, altKey: true }))).toBe('hide');
     expect(heldStep('Meta', k('keyup', 'k', { metaKey: true }))).toBe('none');
   });
-  it('⌥ the same, ⌥⌘ is neither', () => {
+  it('⌥ the same; ⌥⌘ is neither, it is the pair (the panel\'s ⌥⌘B, designer m_45008)', () => {
     expect(heldStep(null, k('keydown', 'Alt', { altKey: true }))).toEqual({ arm: 'Alt' });
     expect(heldStep(null, k('keydown', 'Alt', { altKey: true, metaKey: true }))).toBe('hide');
-    expect(heldStep('Alt', k('keydown', 'Meta', { altKey: true, metaKey: true }))).toBe('hide');
+    expect(heldStep('Alt', k('keydown', 'Meta', { altKey: true, metaKey: true }))).toEqual({ arm: 'AltMeta' });
+    expect(heldStep('Meta', k('keydown', 'Alt', { altKey: true, metaKey: true }))).toEqual({ arm: 'AltMeta' });
+    expect(heldStep('Meta', k('keydown', 'Alt', { altKey: true, metaKey: true, shiftKey: true }))).toBe('hide');
+    expect(heldStep('AltMeta', k('keydown', 'Alt', { altKey: true, metaKey: true }))).toBe('none');
+    expect(heldStep('AltMeta', k('keydown', 'b', { altKey: true, metaKey: true }))).toBe('hide');
+    expect(heldStep('AltMeta', k('keyup', 'Meta', { altKey: true }))).toBe('hide');
+    expect(heldStep('Control', k('keydown', 'Alt', { ctrlKey: true, altKey: true }))).toBe('hide');
     expect(heldStep('Alt', k('keydown', '1', { altKey: true }))).toBe('hide');
     expect(heldStep('Alt', k('keyup', 'Alt'))).toBe('hide');
   });

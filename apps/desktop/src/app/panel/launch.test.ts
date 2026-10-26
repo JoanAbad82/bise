@@ -99,6 +99,6 @@ describe("the panel's keys (native-mac-qa §7, the launcher's rows)", () => {
     expect(panelKeyOf(key('KeyT', { ctrl: true, meta: true }), true)).toBeUndefined();
   });
   it('the rows name the keys they answer to', () => {
-    expect(PANEL_KEYS).toEqual({ files: '⌘P', terminal: '⌃`', changes: '⌥⌘D', browser: '⌘L', toggle: '⌥⌘0', close: '⌘W', add: '⌘T' });
+    expect(PANEL_KEYS).toEqual({ files: '⌘P', terminal: '⌃`', changes: '⌥⌘D', browser: '⌘L', toggle: '⌥⌘B', close: '⌘W', add: '⌘T' });
   });
 });

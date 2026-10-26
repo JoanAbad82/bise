@@ -168,7 +168,8 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     </div>
   ),
   controls: () => (
-    <div className="g-row"><Toggle on={false} label="off" /><Toggle on label="on" /><Toggle on={false} state="hover" /><Toggle on state="hover" /><Toggle on state="focus" /><Toggle on={false} state="disabled" /><Check on={false} /><Check on /></div>
+    // the switch's states (designer m_44968): off, on, hover ×2, pressed, focus, disabled off/on
+    <div className="g-row"><Toggle on={false} label="off" /><Toggle on label="on" /><Toggle on={false} state="hover" /><Toggle on state="hover" /><Toggle on={false} state="active" /><Toggle on state="focus" /><Toggle on={false} state="disabled" /><Toggle on state="disabled" /><Check on={false} /><Check on /></div>
   ),
   field: () => (
     <div className="g-col">
@@ -368,7 +369,9 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     <div className="b-settings">
       <Group title="Appearance" testId="ds.group" items={[
         { id: "theme", label: "theme", control: <Seg items={["system", "dark", "light"]} on={0} /> },
-        { id: "sounds", label: "sounds", sub: "a soft tick when an agent needs you", control: <Toggle on /> },
+        { id: "sounds", label: "sounds", sub: "a soft tick when an agent needs you", toggle: { on: true, label: "sounds" } },
+        { id: "dock", label: "dock badge", sub: "the count of what waits on you", toggle: { on: false, label: "dock badge" } },
+        { id: "beta", label: "beta builds", sub: "managed by your organization", toggle: { on: false, label: "beta builds", state: "disabled" } },
         { id: "workspace", label: "workspace", value: "~/bise" },
         { id: "sync", label: "sync drafts", check: <Check on />, control: <Button>sync now</Button> },
       ]} help="changes apply at once" />
@@ -404,7 +407,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   actions: () => (
     <>
       <div className="g-row">
-        <IconButton label="sidebar" keys="⌘\\" testId="ds.ibtn">☰</IconButton><IconButton label="panel" pressed>▥</IconButton>
+        <IconButton label="sidebar" keys="⌘B" testId="ds.ibtn">☰</IconButton><IconButton label="panel" pressed>▥</IconButton>
         <IconButton label="close" state="hover">✕</IconButton><IconButton label="close" state="focus">✕</IconButton>
         <IconButton label="close" state="disabled">✕</IconButton><IconButton label="to the end" size="bar">↓</IconButton>
       </div>

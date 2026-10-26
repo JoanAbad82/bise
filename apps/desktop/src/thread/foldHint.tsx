@@ -26,7 +26,8 @@ function useAllFolds(): FoldAll {
 export function useComposerHeld(): { mod: HeldMod; ctx: HeldCtx } | null {
   const mod = useHeld();
   const all = useAllFolds();
-  if (mod === null) return null;
+  // ⌥⌘ held is the title bar's (the panel's ⌥⌘B keycap): the composer lists nothing for it
+  if (mod === null || mod === 'AltMeta') return null;
   const block = document.querySelector<HTMLElement>('[data-testid="inbox.block"]');
   const list = document.querySelector('[data-testid="thread.list"]');
   return {

@@ -205,6 +205,9 @@ const api: BiseApi = {
     ipcRenderer.send(IPC.agentMenu, items);
   },
   onAgentMenu: (listener) => listen(IPC.agentMenu, listener),
+  viewMenu: (sides) => {
+    ipcRenderer.send(IPC.viewMenu, sides);
+  },
   a11y: async () => (await ipcRenderer.invoke(IPC.a11y)) as A11y,
   onA11y: (listener) => listen(IPC.a11y, listener),
   onRoute: (listener) => listen(IPC.route, listener),

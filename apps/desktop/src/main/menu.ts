@@ -9,7 +9,7 @@
 // Owner: nm-menus.
 import type { MenuItemConstructorOptions } from 'electron';
 import { menus } from '../proto/words_menus.gen';
-import type { MenuAction } from '../shared/api';
+import type { MenuAction, ViewSides } from '../shared/api';
 import type { ClipOp } from './clipfence';
 
 export interface MenuOptions {
@@ -36,6 +36,8 @@ export interface MenuOptions {
    * stays stable). None: no Agent menu (a test's template).
    */
   readonly agent?: readonly MenuItemConstructorOptions[];
+  /** The focused window's two sides (agentmenu.ts, from window.bise.viewMenu): the View menu's Hide/Show. None: the sidebar shown, the panel folded. */
+  readonly sides?: ViewSides;
 }
 
 export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
@@ -125,11 +127,17 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
     submenu: [item('Inbox', 'CmdOrCtrl+I', 'inbox')],
   };
 
-  // the terminal panel (bar T W25): ctrl+` as in the TUI; reload and the devtools in dev builds
+  // the two sides first (his m_44999, designer m_45008): Hide or Show as the focused window's are
+  // (none told: shown), ⌘B and ⌥⌘B; then the terminal panel (bar T W25): ctrl+` as in the TUI;
+  // reload and the devtools in dev builds
+  const sides = o.sides ?? { sidebar: true, panel: false };
   const view: MenuItemConstructorOptions[] = [
     {
       label: 'View',
       submenu: [
+        item(sides.sidebar ? 'Hide Sidebar' : 'Show Sidebar', 'CmdOrCtrl+B', 'sidebar'),
+        item(sides.panel ? 'Hide Panel' : 'Show Panel', 'Alt+CmdOrCtrl+B', 'panel'),
+        { type: 'separator' },
         item('Terminal', 'Ctrl+`', 'terminal'),
         ...(o.dev ? ([{ type: 'separator' }, { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] satisfies MenuItemConstructorOptions[]) : []),
       ],
@@ -165,6 +173,7 @@ export type MenuTarget = { readonly send: 'focused' } | { readonly open: string 
 export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget {
   // New Project / New Agent are the main window's sheets: the focused window's (the main one, or
   // nothing in the capsule), never a route to open
-  if (action === 'find' || action === 'save' || action === 'newProject' || action === 'newAgent' || mainFocused) return { send: 'focused' };
+  // the two sides are the focused window's own (View › Hide/Show Sidebar, Panel), never a route either
+  if (action === 'find' || action === 'save' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || mainFocused) return { send: 'focused' };
   return { open: action };
 }

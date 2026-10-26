@@ -11,7 +11,9 @@
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HINT_HOLD_MS } from './held';
+import { FRAME_KEYS } from './keys';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 import { projects, row } from '../../tests/feature/inputs';
@@ -118,5 +120,40 @@ describe('one title bar across the top', () => {
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').hasAttribute('data-over')).toBe(false);
     expect(barEnd(v, 1100)).toBe(1100 - 384);
+  });
+});
+
+describe('the two sides\' keys on their buttons (designer m_45008)', () => {
+  const hold = (keys: readonly string[]) => {
+    act(() => {
+      for (const key of keys) fireEvent.keyDown(window, { key, metaKey: keys.includes('Meta'), altKey: keys.includes('Alt') && keys.indexOf(key) > 0 });
+      vi.advanceTimersByTime(HINT_HOLD_MS + 10);
+    });
+  };
+  const release = () => {
+    act(() => {
+      fireEvent.keyUp(window, { key: 'Meta' });
+      fireEvent.keyUp(window, { key: 'Alt' });
+    });
+  };
+  it('their tips say ⌘B and ⌥⌘B; ⌘ held: ⌘B on the sidebar\'s button; ⌥⌘ held: ⌥⌘B on the panel\'s; never both', () => {
+    vi.useFakeTimers();
+    try {
+      const v = shell(1440);
+      expect(v.getByTestId('app.bar.sidebar').getAttribute('data-tip')).toContain(FRAME_KEYS.sidebar);
+      expect(v.getByTestId('app.panel.toggle').getAttribute('data-tip')).toContain(FRAME_KEYS.panel);
+      expect(v.queryByTestId('app.bar.sidebar.hint')).toBeNull();
+      hold(['Meta']);
+      expect(v.getByTestId('app.bar.sidebar.hint').textContent).toBe('⌘B');
+      expect(v.queryByTestId('app.panel.toggle.hint')).toBeNull();
+      release();
+      hold(['Meta', 'Alt']);
+      expect(v.getByTestId('app.panel.toggle.hint').textContent).toBe('⌥⌘B');
+      expect(v.queryByTestId('app.bar.sidebar.hint')).toBeNull();
+      release();
+      expect(v.queryByTestId('app.panel.toggle.hint')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

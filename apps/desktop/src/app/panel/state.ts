@@ -2,7 +2,7 @@
 // page native-mac §7), its tabs (model.ts) and each kind's width, kept across a reload, an update
 // swap or the next day (keep.ts, no age: a Mac app reopens as he left it). Outside React's tree, as
 // the terminal's panel.ts: a tab opened or a width dragged re-renders the panel and the bar's tabs,
-// never the shell or the composer. Every door in: openTab (tabs.ts), the bar's ▯ and ⌥⌘0
+// never the shell or the composer. Every door in: openTab (tabs.ts), the bar's ▯ and ⌥⌘B (⌥⌘0)
 // (panelToggle), ⌃` (openShell), the launcher's picks. Owner: nm-panel.
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
@@ -105,7 +105,7 @@ export function usePanelBox(): { readonly open: boolean; readonly width: number;
   return { open: s.open, width: s.open && !f.over ? f.width : 0, over: s.open && f.over };
 }
 
-/** The bar's ▯ and ⌥⌘0: fold or unfold, on the tab he left in front. */
+/** The bar's ▯ and ⌥⌘B (⌥⌘0): fold or unfold, on the tab he left in front. */
 export function panelToggle(): void {
   set({ ...state, open: !state.open });
 }

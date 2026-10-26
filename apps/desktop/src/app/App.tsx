@@ -43,7 +43,7 @@ import { PanelHost } from './panel/Host';
 import { SideHost } from './side3d/Host';
 import { FloatHost } from '@/composer/float/Host';
 import { ArtifactRoute } from './ArtifactView';
-import { panelState } from './panel/state';
+import { panelState, usePanelState } from './panel/state';
 import { doPanelKey } from './panel/keys';
 import { TipLayer } from './TipLayer';
 import { noteJump, numbersOf } from '@/agents/model';
@@ -52,7 +52,7 @@ import { ReportScreen } from './ReportScreen';
 import { Palette, usePaletteOpen } from './Palette';
 import { Help } from '@/help/Help';
 import { useTheme } from '@/theme';
-import { HELP_EVENT, keyAction, typingIn, type FrameAction } from './keys';
+import { HELP_EVENT, keyAction, menuEcho, typingIn, type FrameAction } from './keys';
 import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
 import { AddSheetHost } from '@/settings/AddSheet';
@@ -238,6 +238,21 @@ function Shell() {
   useMenuAction('terminal', () => {
     panel.toggleByMenu(Date.now());
   });
+  // View › Hide/Show Sidebar ⌘B, Hide/Show Panel ⌥⌘B: the window key's own echo is dropped (keys.ts menuEcho)
+  useMenuAction('sidebar', () => {
+    if (!menuEcho(frameKeyAt.sidebar, Date.now())) frame.toggle('sidebar');
+  });
+  useMenuAction('panel', () => {
+    if (!menuEcho(frameKeyAt.panel, Date.now())) frame.toggle('panel');
+  });
+  // the View menu's labels flip with the two sides (main/agentmenu.ts rebuilds on a change)
+  const panelOpen = usePanelState().open;
+  const sidebarShown = frame.side || frame.over === 'side';
+  useEffect(() => {
+    // a component test's window.bise may be a partial fake, and the page outside Electron has none
+    const bise = (window as Partial<Window>).bise as Partial<Window['bise']> | undefined;
+    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen });
+  }, [sidebarShown, panelOpen]);
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
   // R8: a /model the core holds for its provider opens that provider's setup (amb-home)
@@ -487,6 +502,9 @@ function NotFound({ path }: { path: string }) {
  * ⌘K opens the palette, the rest go to the shown screens. Capture phase, by
  * key code: the composer never types ⌥1's '¡'.
  */
+/** When a window key last toggled each side: the View menu's echo of it is dropped. */
+const frameKeyAt: Partial<Record<FrameAction, number>> = {};
+
 function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (what: FrameAction) => void) {
   const router = useRouter();
   const store = useStore();
@@ -533,7 +551,10 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
       if ('go' in act) router.go(act.go);
       else if ('palette' in act) openPalette();
       else if ('help' in act) openHelp();
-      else if ('frame' in act) frameRef.current(act.frame);
+      else if ('frame' in act) {
+        frameKeyAt[act.frame] = Date.now();
+        frameRef.current(act.frame);
+      }
       else if ('newProject' in act) addProject(router);
       else if ('newAgent' in act) newAgent(act.newAgent);
       else if ('panel' in act) doPanelKey(act.panel, { route: router.get(), home: store.projects().find((p) => p.home)?.project, agents: (p) => store.agents(p) });

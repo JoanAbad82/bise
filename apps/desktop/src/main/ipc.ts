@@ -10,7 +10,7 @@ import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKL
 import { saveCopy } from './savecopy';
 import { a11yNow } from './a11y';
 import { popupMenu } from './menu-popup';
-import { setAgentMenu } from './agentmenu';
+import { setAgentMenu, setViewMenu } from './agentmenu';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
@@ -183,6 +183,7 @@ export function installIpc(testMode: boolean): void {
   ipcMain.handle(IPC.popupMenu, (e, items: unknown, at: unknown): Promise<string | null> => popupMenu(BrowserWindow.fromWebContents(e.sender), Array.isArray(items) ? (items as PopupItem[]) : [], (at ?? undefined) as PopupAt | undefined));
   ipcMain.handle(IPC.a11y, (): A11y => a11yNow());
   ipcMain.on(IPC.agentMenu, (e, items: unknown) => { setAgentMenu(e.sender, items); });
+  ipcMain.on(IPC.viewMenu, (e, sides: unknown) => { setViewMenu(e.sender, sides); });
   // R41: a pasted or dropped image into the TUI's image store (the test home's under test)
   ipcMain.handle(IPC.saveImage, (_e, bytes: unknown): string | null => saveImage(imageDir(process.env), bytes));
   ipcMain.handle(IPC.copy, async (_e, text: unknown): Promise<void> => {

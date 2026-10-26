@@ -528,6 +528,10 @@ export const settings = {
   key_fn_space: "the spotlight: find an agent, or ask bise",
   /** keys: the window */
   keys_window: "The window",
+  /** ⌘B (⌃⌘S and ⌘\ too, shown nowhere) */
+  key_sidebar: "show / hide the sidebar",
+  /** ⌥⌘B (⌥⌘0 too, shown nowhere) */
+  key_panel: "show / hide the panel",
   /** ⌘0 */
   key_bise: "bise",
   /** ⌘1 … ⌘9 */

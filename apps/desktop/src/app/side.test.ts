@@ -3,7 +3,7 @@ import { hero } from '@/proto/words_hero.gen';
 import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
 import { computerDot, crumbGoOf, crumbOf, folds, moreWords, panelAt, panelWords, panelProject, projectSide, signOf, turnShort } from './side';
-import { keyAction, type KeyLike } from './keys';
+import { keyAction, menuEcho, MENU_ECHO_MS, type KeyLike } from './keys';
 import type { Route } from './route';
 import { PAGES } from '@/settings/pages';
 
@@ -134,12 +134,28 @@ describe('the frame', () => {
     // every project's artifacts: its word is the only crumb, the last
     expect(crumbGoOf({ screen: 'artifacts', project: '' }, name)).toEqual([]);
   });
-  it('the keys: ⌘\\ the sidebar, ⌥⌘0 the panel, ⌘N New agent in the project in view, ⌘, settings', () => {
+  it('the keys: ⌘B the sidebar (⌃⌘S, ⌘\\ too), ⌥⌘B the panel (⌥⌘0 too), ⌘N New agent in the project in view, ⌘, settings', () => {
     const k = (code: string, m: Partial<KeyLike> = {}): KeyLike => ({ key: '', code, metaKey: true, altKey: false, ctrlKey: false, shiftKey: false, ...m });
     const ctx = { route: { screen: 'bise' as const }, projects: [], agents: () => [], typing: false };
+    // his m_44999, designer m_45008: one common key each, the old ones kept working (m_45164)
+    expect(keyAction(k('KeyB'), ctx)).toEqual({ frame: 'sidebar' });
+    expect(keyAction(k('KeyS', { ctrlKey: true }), ctx)).toEqual({ frame: 'sidebar' });
     expect(keyAction(k('Backslash'), ctx)).toEqual({ frame: 'sidebar' });
+    expect(keyAction(k('KeyB', { altKey: true }), ctx)).toEqual({ frame: 'panel' });
     expect(keyAction(k('Digit0', { altKey: true }), ctx)).toEqual({ frame: 'panel' });
+    // the same keys in a thread, the panel open, typing in the composer: still the sides (⌘B never bolds)
+    const busy = { ...ctx, route: { screen: 'thread' as const, project: 'acme', agent: 'perf' }, typing: true, panelOpen: true };
+    expect(keyAction(k('KeyB'), busy)).toEqual({ frame: 'sidebar' });
+    expect(keyAction(k('KeyB', { altKey: true }), busy)).toEqual({ frame: 'panel' });
+    // and nothing near them: ⇧⌘B, ⌃⌥⌘B, ⌃⌘B, plain ⌃S and ⌘S are not the sides
+    for (const m of [{ shiftKey: true }, { altKey: true, ctrlKey: true }, { ctrlKey: true }]) expect(keyAction(k('KeyB', m), ctx)).toBeUndefined();
+    expect(keyAction(k('KeyS', { metaKey: false, ctrlKey: true }), ctx)).toBeUndefined();
+    expect(keyAction(k('KeyS'), ctx)).toBeUndefined();
     expect(keyAction(k('Digit0'), ctx)).toEqual({ go: { screen: 'bise' } });
+    // the View menu's item right after the key is its echo (dropped), later or with no key it is his pick
+    expect(menuEcho(1000, 1000 + MENU_ECHO_MS - 1)).toBe(true);
+    expect(menuEcho(1000, 1000 + MENU_ECHO_MS)).toBe(false);
+    expect(menuEcho(undefined, 1000)).toBe(false);
     // ⌘N: New project, wherever he is (his m_44225)
     expect(keyAction(k('KeyN'), ctx)).toEqual({ newProject: true });
     // ⇧⌘N: New agent; no project known yet: nothing; else the route's project, bise's own on bise's thread

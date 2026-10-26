@@ -1,6 +1,6 @@
 // src/app/panel · the panel's tabs and its ▯ (page native-mac §6 and mockups 1-4). BarTabs: the ▯
 // at the end of the window's title bar (Frame.tsx mounts it, so nm-panel never edits Frame.tsx),
-// pressed while the panel is open; ⌥⌘0 does the same. PanelTabs: the tabs in the panel's top row,
+// pressed while the panel is open; ⌥⌘B does the same (⌥⌘0 too). PanelTabs: the tabs in the panel's top row,
 // the window's one 52 bar over the panel's column (his m_44307: no band of its own; it drags and
 // double-clicks as the bar's ground; mockup 3: from the panel's left + 12; ui-review m_42482 #1): 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…';
 // × on the one in front and on hover, its slot kept so a tab never changes width (#4); Overview,
@@ -9,7 +9,8 @@
 // reorders; a right click is the tab's menu (nm-menus' useEntityMenu({ kind: 'tab', id })).
 // Owner: nm-panel (r2-titlebar this round).
 import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
-import { AppIcon, IconButton, Press, tipAttrs } from '@/ds';
+import { AppIcon, IconButton, Kbd, Press, tipAttrs } from '@/ds';
+import { useModHeld } from '@/app/held';
 import { panel } from '@/proto/words_panel.gen';
 import { useEntityMenu } from '@/app/menus/use';
 import { barGroundDoubleClick } from '@/app/barslot';
@@ -18,13 +19,20 @@ import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanel
 import { useTabLooks, type TabLook } from './look';
 import { PANEL_KEYS } from './keys';
 
-/** The panel's ▯ at the title bar's end (⌥⌘0), pressed while it is open. */
+/** The panel's ▯ at the title bar's end (⌥⌘B), pressed while it is open; ⌥⌘ held, its ⌥⌘B keycap in place of the glyph (designer m_45008). */
 export function BarTabs() {
   const s = usePanelState();
+  const held = useModHeld('AltMeta');
   return (
     <div className="pn-bar" data-testid="app.panel.bar" data-open={s.open || undefined}>
       <IconButton label={s.open ? panel.panel_hide({ key: PANEL_KEYS.toggle }) : panel.panel_show({ key: PANEL_KEYS.toggle })} size="bar" pressed={s.open} onClick={panelToggle} testId="app.panel.toggle">
-        <AppIcon name="panel" size={16} />
+        {held ? (
+          <span className="app-keyhint" data-testid="app.panel.toggle.hint">
+            <Kbd>{PANEL_KEYS.toggle}</Kbd>
+          </span>
+        ) : (
+          <AppIcon name="panel" size={16} />
+        )}
       </IconButton>
     </div>
   );

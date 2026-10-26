@@ -11,7 +11,7 @@
 // add.ts's (pure). Every change is the core's (project_add, found_scan). Owner: amb-home.
 import { useCallback, useEffect, useState } from 'react';
 import type { AppCmd, ProjectRow } from '@/proto';
-import { Act, Button, Check, Field, Group, Sheet, Toggle } from '@/ds';
+import { Act, Button, Check, Field, Group, Sheet } from '@/ds';
 import { useBroken, useCoreEvent, useFound, useProjects, type Ev } from '@/store';
 import { settings } from '@/proto/words.gen';
 import { addLabel, addPaths, addSay, foundSub, offers, scanSay } from './add';
@@ -215,7 +215,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
               id: 'land',
               label: settings.add_land,
               sub: land ? settings.add_land_on : settings.add_land_off,
-              control: <Toggle on={land} label={settings.add_land} onChange={setLand} testId="settings.add.land" />,
+              toggle: { on: land, label: settings.add_land, onChange: setLand, testId: 'settings.add.land' },
             },
           ]}
         />

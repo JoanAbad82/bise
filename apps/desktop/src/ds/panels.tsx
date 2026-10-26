@@ -2,9 +2,9 @@
 // settings.html, onboarding.html, capsule.html; css/board.css, sideviews.css, settings.css,
 // onboarding.css, capsule.css): Board + Job + Thumbs, SideView, Group + Check, Onb + FnKey,
 // Capsule + Wave + Shot + Edge.
-import { memo, type MouseEventHandler, type ReactNode, type Ref } from "react";
+import { memo, useId, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx, sub } from "./cx";
-import { Bar, Button, Chip, type ChipProps, Dot, Empty, Help, Kbd, Pearl, Skel, type DotState } from "./prim";
+import { Bar, Button, Chip, type ChipProps, Dot, Empty, Help, Kbd, Pearl, Skel, Toggle, type DotState, type ToggleProps } from "./prim";
 
 // ---- the task board
 
@@ -118,8 +118,11 @@ export interface GroupItem {
   sub?: ReactNode;
   /** a checkbox before the label */
   check?: ReactNode;
-  /** the control on the right: a Toggle, a Button, a Chip, a Field, or a value */
+  /** the control on the right: a Button, a Chip, a Field, or a value */
   control?: ReactNode;
+  /** a switch row (designer m_44968): the Toggle on the right, and the whole row is its <label>, so a
+   * click anywhere on it flips the switch; disabled, the label goes text-3 */
+  toggle?: ToggleProps;
   value?: ReactNode;
   /** a list's row (Group list): the keys' selection is on it (the 9% tint, past hover's 6%) */
   sel?: boolean;
@@ -129,18 +132,29 @@ export interface GroupItem {
 /** a settings group: a small head, its rows, a help line. `list`: its rows are a list the keys walk
  * (useListKeys): each row carries data-row, hover tints 6%, the selected row 9% (designer m_22280). */
 export function Group({ title, items, help, list, testId }: { title?: ReactNode; items: readonly GroupItem[]; help?: ReactNode; list?: boolean; testId?: string }) {
+  const uid = useId();
   return (
     <div data-testid={testId}>
       {title != null && <div className="b-gt">{title}</div>}
       <div className={cx("b-group", list && "is-list")}>
-        {items.map((it) => (
-          <div key={it.id} className={cx("b-gi", it.sel && "is-sel")} data-testid={sub(testId, it.id)}
-            role={it.onPick === undefined ? undefined : list ? "option" : "button"}
-            data-row={list ? it.id : undefined} aria-selected={list ? it.sel === true : undefined} onClick={it.onPick}>
-            <span className="l">{it.check}{it.check != null && " "}{it.label}{it.sub != null && <span>{it.sub}</span>}</span>
-            {it.control}{it.value != null && <span className="v">{it.value}</span>}
-          </div>
-        ))}
+        {items.map((it) => {
+          const body = <span className="l">{it.check}{it.check != null && " "}{it.label}{it.sub != null && <span>{it.sub}</span>}</span>;
+          if (it.toggle !== undefined) {
+            const id = `${uid}-${it.id}`;
+            return (
+              <label key={it.id} htmlFor={id} className={cx("b-gi", "has-switch", it.toggle.state === "disabled" && "is-disabled")} data-testid={sub(testId, it.id)}>
+                {body}<Toggle {...it.toggle} id={id} />
+              </label>
+            );
+          }
+          return (
+            <div key={it.id} className={cx("b-gi", it.sel && "is-sel")} data-testid={sub(testId, it.id)}
+              role={it.onPick === undefined ? undefined : list ? "option" : "button"}
+              data-row={list ? it.id : undefined} aria-selected={list ? it.sel === true : undefined} onClick={it.onPick}>
+              {body}{it.control}{it.value != null && <span className="v">{it.value}</span>}
+            </div>
+          );
+        })}
       </div>
       {help != null && <Help>{help}</Help>}
     </div>

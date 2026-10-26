@@ -13,7 +13,7 @@ import { hasChanges, type OpenRow } from './launch';
 
 /** The keys the panel's tips and the launcher's rows name. */
 export const PANEL_KEYS = {
-  toggle: '⌥⌘0',
+  toggle: '⌥⌘B',
   close: '⌘W',
   add: '⌘T',
   files: '⌘P',

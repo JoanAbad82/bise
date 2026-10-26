@@ -5,6 +5,10 @@
 // amb-home; a chunk that adds a key adds its row here (ask).
 import { settings } from '@/proto/words.gen';
 
+/** The keys the two sides show (the bar's tips and held keycaps, the View menu, this list); the
+ *  aliases ⌃⌘S, ⌘\ and ⌥⌘0 work and show nowhere (designer m_45164). app/keys.ts decides them. */
+export const FRAME_KEYS: Readonly<Record<'sidebar' | 'panel', string>> = { sidebar: '⌘B', panel: '⌥⌘B' };
+
 export interface KeyRow {
   /** the keys, as drawn ("⌘1 … ⌘9") */
   readonly keys: string;
@@ -33,6 +37,8 @@ export const KEY_SECTIONS: readonly KeySection[] = [
     id: 'window',
     title: settings.keys_window,
     rows: [
+      { keys: FRAME_KEYS.sidebar, action: settings.key_sidebar },
+      { keys: FRAME_KEYS.panel, action: settings.key_panel },
       { keys: '⌘0', action: settings.key_bise },
       { keys: '⌘1 … ⌘9', action: settings.key_project },
       { keys: '⌥0 / ⌥1 … ⌥9', action: settings.key_main_or_agent, tui: '⌥ + 0…9' },

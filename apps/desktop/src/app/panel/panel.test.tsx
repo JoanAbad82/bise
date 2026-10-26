@@ -114,7 +114,7 @@ describe('the tabbed panel', () => {
     // its whole title shows: no tip repeating it (ui-review m_42619 #5)
     fireEvent.pointerEnter(t);
     expect(t.getAttribute('data-tip')).toBeNull();
-    expect(v.getByTestId('app.panel.toggle').getAttribute('data-tip')).toContain('⌥⌘0');
+    expect(v.getByTestId('app.panel.toggle').getAttribute('data-tip')).toContain('⌥⌘B');
   });
   it("a narrow window: a sheet over the thread, the bar's ▯ its only one (designer m_44391); esc or a click outside folds it (ui-review m_42642)", () => {
     Object.defineProperty(window, 'innerWidth', { value: 1100, configurable: true });

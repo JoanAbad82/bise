@@ -58,8 +58,9 @@
 
 /* hover on every control he can act on (bar O.6, qa-flows' clicks): the reference draws it on buttons,
    rows, options, tabs and seg; these are the others. is-hover shows it in the gallery. */
-.b-toggle:not(.is-disabled):hover,.b-toggle.is-hover{background:color-mix(in srgb,var(--c-press) 70%,var(--c-text-3))}
-.b-toggle.on:not(.is-disabled):hover,.b-toggle.on.is-hover{background:color-mix(in srgb,var(--c-ink) 85%,var(--c-solid))}
+/* a switch's hover, also when he hovers the settings row it sits on (the whole row flips it) */
+.b-toggle:not(.is-disabled):hover,.b-toggle.is-hover,.b-gi.has-switch:not(.is-disabled):hover .b-toggle{background:var(--c-switch-off-hover)}
+.b-toggle.on:not(.is-disabled):hover,.b-toggle.on.is-hover,.b-gi.has-switch:not(.is-disabled):hover .b-toggle.on{background:var(--c-switch-on-hover)}
 .b-check:hover,.b-check.is-hover{box-shadow:inset 0 0 0 1.5px var(--c-text-2)}
 .b-check.on:hover,.b-check.on.is-hover{background:color-mix(in srgb,var(--c-ink) 85%,var(--c-solid));box-shadow:none}
 .b-field:not(.is-focus):not(.is-error):not(:focus-within):hover,.b-field.is-hover{box-shadow:inset 0 0 0 1px var(--c-line-strong)}
@@ -73,6 +74,7 @@
 
 /* keyboard focus on the parts that take it */
 .b-opt:focus-visible,.b-row:focus-visible,.b-mi:focus-visible,.b-task:focus-visible{outline:0;box-shadow:inset 0 0 0 2px var(--c-focus)}
-.b-toggle:focus-visible,.b-check:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+.b-check:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+.b-toggle:focus-visible{outline:0;--sw-ring:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
 /* a group row's check sits on the label's line: .b-gi .l span{display:block} (the sub) also caught the check (round 3 shots) */
 .b-gi .l>.b-check{display:inline-flex;margin-right:var(--gap-inline);vertical-align:-3px}

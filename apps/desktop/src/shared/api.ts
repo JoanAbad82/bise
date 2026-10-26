@@ -206,6 +206,8 @@ export interface BiseApi {
    */
   readonly agentMenu: (items: readonly PopupItem[] | null) => void;
   readonly onAgentMenu: (listener: (id: string) => void) => () => void;
+  /** This window's two sides, on every change: the View menu says Hide or Show for the focused window's (main/agentmenu.ts). */
+  readonly viewMenu: (sides: ViewSides) => void;
   /**
    * macOS's accessibility settings now (main/a11y.ts, nm-frame's: systemPreferences), and on every
    * change; the shell sets them on <html> as data-reduce-transparency, data-reduce-motion and
@@ -441,7 +443,13 @@ export interface A11y {
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
-export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'newProject' | 'newAgent';
+export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'newProject' | 'newAgent' | 'sidebar' | 'panel';
+
+/** A window's two sides, shown or not: the View menu's Hide/Show labels (window.bise.viewMenu). */
+export interface ViewSides {
+  readonly sidebar: boolean;
+  readonly panel: boolean;
+}
 
 /** window.bise.saveCopy's answer: where the copy went, why it failed, or null (he cancelled, or refused). */
 export type SaveResult = { readonly to: string } | { readonly error: string } | null;
@@ -524,6 +532,8 @@ export const IPC = {
   popupMenu: 'bise:popup-menu',
   /** a window -> main: its Agent menu's items (null: none); main -> the window: the picked id */
   agentMenu: 'bise:agent-menu',
+  /** a window -> main: its two sides shown or not (the View menu's labels) */
+  viewMenu: 'bise:view-menu',
   a11y: 'bise:a11y',
   route: 'bise:route',
   /** main -> a window: a link in its artifact's frame names another artifact (guard.ts, framelink.ts) */

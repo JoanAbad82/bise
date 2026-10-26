@@ -4,15 +4,19 @@
 // window (IPC.agentMenu). No agent in view: the menu stays, every item dimmed (designer m_42681).
 // No window focused (another app in front, an off-screen test window that
 // never took the keys): the last focused one's, ui-review m_42540. Rebuilt when a window's items or
-// the focus change, never on the same items. index.ts installs it once; ipc.ts hands it each window's items. Owner: nm-menus.
+// the focus change, never on the same items. index.ts installs it once; ipc.ts hands it each window's items.
+// Each window also tells its two sides (window.bise.viewMenu, IPC.viewMenu): the View menu's
+// Hide/Show Sidebar ⌘B and Hide/Show Panel ⌥⌘B say the focused window's (designer m_45008). Owner: nm-menus.
 import { app, BrowserWindow, Menu, type WebContents } from 'electron';
-import { IPC, type PopupItem } from '../shared/api';
+import { IPC, type PopupItem, type ViewSides } from '../shared/api';
 import { menuTemplate, type MenuOptions } from './menu';
 import { nativeItems, sfSymbol } from './menu-popup';
 import { AGENT_MENU_IDLE } from '../app/menus/registry';
 
 /** Each window's items, by its webContents id. */
 const byWin = new Map<number, readonly PopupItem[]>();
+/** Each window's two sides, by its webContents id (setViewMenu). */
+const sidesByWin = new Map<number, ViewSides>();
 let base: Omit<MenuOptions, 'agent'> | null = null;
 /** what the menu bar shows now: its window and its items' JSON (no rebuild on the same) */
 let shown = '';
@@ -34,10 +38,17 @@ function focusedItems(): { readonly to: WebContents; readonly items: readonly Po
   return items === undefined ? undefined : { to: w.webContents, items };
 }
 
+/** The focused window's two sides (the View menu's Hide/Show), none told yet: both shown. */
+function focusedSides(): ViewSides | undefined {
+  const w = menuWindow(BrowserWindow.getFocusedWindow(), lastFocused, (x) => x.isDestroyed());
+  return w === null ? undefined : sidesByWin.get(w.webContents.id);
+}
+
 function build(): void {
   if (base === null) return;
   const f = focusedItems();
-  const key = f === undefined ? '' : `${String(f.to.id)}:${JSON.stringify(f.items)}`;
+  const sides = focusedSides();
+  const key = `${f === undefined ? '' : `${String(f.to.id)}:${JSON.stringify(f.items)}`}|${JSON.stringify(sides ?? null)}`;
   if (key === shown) return;
   shown = key;
   const agent =
@@ -51,7 +62,7 @@ function build(): void {
           sfSymbol,
           true,
         );
-  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate({ ...base, agent })));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate({ ...base, agent, ...(sides !== undefined ? { sides } : {}) })));
 }
 
 /** Installs the application menu (index.ts, once); it follows the focus from then on. */
@@ -75,5 +86,17 @@ export function setAgentMenu(from: WebContents, raw: unknown): void {
     });
     byWin.set(id, raw as PopupItem[]);
   } else byWin.delete(id);
+  build();
+}
+
+/** A window's two sides (ipc.ts, IPC.viewMenu): the View menu's Hide/Show follow the focused one's. Not that shape: ignored. */
+export function setViewMenu(from: WebContents, raw: unknown): void {
+  const r = raw as Partial<Record<keyof ViewSides, unknown>> | null;
+  if (r === null || typeof r !== 'object' || typeof r.sidebar !== 'boolean' || typeof r.panel !== 'boolean') return;
+  const id = from.id;
+  if (!sidesByWin.has(id)) from.once('destroyed', () => {
+    sidesByWin.delete(id);
+  });
+  sidesByWin.set(id, { sidebar: r.sidebar, panel: r.panel });
   build();
 }

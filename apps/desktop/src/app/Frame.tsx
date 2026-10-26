@@ -16,6 +16,7 @@ import {
 import { AppIcon, Kbd, PickerPop, Press, tipAttrs, type AppIconName } from "@/ds";
 import { frame } from "@/proto/words_frame.gen";
 import { useModHeld } from "./held";
+import { FRAME_KEYS } from "./keys";
 import { useAgents, useProjects } from "@/store";
 import { usePluginTitle } from "@/plugins/title";
 import { formatRoute, MAIN, type Route } from "./route";
@@ -60,7 +61,7 @@ export interface FrameState {
   readonly side: boolean;
   /** what slides over the window now (under 1000 px, or the sidebar hidden by ⌘\) */
   readonly over: "side" | null;
-  /** ⌘\ the sidebar; ⌥⌘0 the tabbed panel (app/panel/state.ts, nm-panel's) */
+  /** ⌘B the sidebar; ⌥⌘B the tabbed panel (app/panel/state.ts, nm-panel's); keys.ts FRAME_KEYS */
   readonly toggle: (what: "sidebar" | "panel") => void;
   readonly close: () => void;
   /** the sidebar's width (kept), and what a drag on its border does */
@@ -339,6 +340,8 @@ export function Bar({ frame: state }: { frame: FrameState }) {
     document.title = winTitle;
   }, [winTitle]);
   const shown = state.side || state.over === "side";
+  // ⌘ held: the sidebar button shows ⌘B in place of its glyph (designer m_45008)
+  const cmdHeld = useModHeld("Meta");
   return (
     <header
       className="app-bar"
@@ -349,7 +352,8 @@ export function Bar({ frame: state }: { frame: FrameState }) {
         <BarButton
           icon="sidebar"
           label={shown ? frame.hide_sidebar : frame.show_sidebar}
-          keys="⌘\\"
+          keys={FRAME_KEYS.sidebar}
+          hint={cmdHeld}
           pressed={false}
           onClick={() => {
             state.toggle("sidebar");
@@ -403,7 +407,8 @@ export function Bar({ frame: state }: { frame: FrameState }) {
 }
 
 /** A bar button: 28 × 28, its line icon 16, its tip with its key; no-drag (app.css). */
-function BarButton({ icon, label, keys, pressed, disabled, onClick, testId }: { icon: AppIconName; label: string; keys?: string; pressed?: boolean; disabled?: boolean; onClick: () => void; testId: string }) {
+/** a title bar button; `hint`: its modifier is held, its key shows as a keycap in place of its glyph (held.ts) */
+function BarButton({ icon, label, keys, hint, pressed, disabled, onClick, testId }: { icon: AppIconName; label: string; keys?: string; hint?: boolean; pressed?: boolean; disabled?: boolean; onClick: () => void; testId: string }) {
   return (
     <Press
       look="app-bar-b"
@@ -414,7 +419,13 @@ function BarButton({ icon, label, keys, pressed, disabled, onClick, testId }: { 
       onClick={onClick}
       data-testid={testId}
     >
-      <AppIcon name={icon} size={16} />
+      {hint === true && keys !== undefined && keys !== "" ? (
+        <span className="app-keyhint" data-testid={`${testId}.hint`}>
+          <Kbd>{keys}</Kbd>
+        </span>
+      ) : (
+        <AppIcon name={icon} size={16} />
+      )}
     </Press>
   );
 }

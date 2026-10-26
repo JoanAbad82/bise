@@ -161,17 +161,21 @@ export interface ToggleProps {
   state?: UiState;
   label?: string;
   testId?: string;
+  /** the id a <label for> points at (Group's switch rows) */
+  id?: string;
 }
-/** a switch; role switch, space/enter flip it when it has focus */
-export function Toggle({ on, onChange, state, label, testId }: ToggleProps) {
+/**
+ * a switch (designer m_44968): a real <button role="switch">, so space and enter flip it, a
+ * disabled one takes no focus or click, and a <label> around it (Group's switch rows) forwards a
+ * click anywhere on the row to it, natively. The look: css/prim.css .b-toggle, live.css's hover/focus.
+ */
+export function Toggle({ on, onChange, state, label, testId, id }: ToggleProps) {
   const off = state === "disabled";
-  const flip = () => { if (!off && onChange) onChange(!on); };
   return (
-    <span className={cx("b-toggle", on && "on", st(state))} role="switch" aria-checked={on} aria-label={label} aria-disabled={off || undefined}
-      tabIndex={off ? -1 : 0} onClick={flip} data-testid={testId}
-      onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); } }}>
+    <button type="button" id={id} className={cx("b-toggle", on && "on", st(state))} role="switch" aria-checked={on} aria-label={label} disabled={off}
+      onClick={() => { if (onChange) onChange(!on); }} data-testid={testId}>
       <i />
-    </span>
+    </button>
   );
 }
 

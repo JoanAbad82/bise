@@ -41,15 +41,15 @@ describe('the application menu (bar ⛔2)', () => {
     for (const want of ['hide', 'hideOthers', 'quit', 'close', 'windowMenu', 'about']) expect(r).toContain(want);
   });
 
-  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save, ⌘N / ⇧⌘N new project / agent", () => {
+  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save, ⌘N / ⇧⌘N new project / agent, ⌘B / ⌥⌘B the sides", () => {
     const { items, sent } = build('darwin');
     const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
-    expect([...keys.keys()].sort()).toEqual(['CmdOrCtrl+,', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'Ctrl+`', 'Shift+CmdOrCtrl+N']);
-    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N']) {
+    expect([...keys.keys()].sort()).toEqual(['Alt+CmdOrCtrl+B', 'CmdOrCtrl+,', 'CmdOrCtrl+B', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'Ctrl+`', 'Shift+CmdOrCtrl+N']);
+    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N', 'CmdOrCtrl+B', 'Alt+CmdOrCtrl+B']) {
       const click = keys.get(k)?.click as (() => void) | undefined;
       click?.();
     }
-    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent']);
+    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent', 'sidebar', 'panel']);
   });
 
   it('settings once per platform, never twice', () => {
@@ -119,6 +119,23 @@ describe('menuTarget (qa-native m_9724)', () => {
     expect(menuTarget('newProject', false)).toEqual({ send: 'focused' });
     expect(menuTarget('newAgent', false)).toEqual({ send: 'focused' });
   });
+
+  it('View: Hide/Show Sidebar ⌘B and Hide/Show Panel ⌥⌘B, first, as the focused window says (designer m_45008)', () => {
+    const view = (sides?: { sidebar: boolean; panel: boolean }) => {
+      const sent: string[] = [];
+      const t = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: (a) => sent.push(a), ...(sides ? { sides } : {}) });
+      const sub = (t.find((m) => m.label === 'View')?.submenu ?? []) as MenuItemConstructorOptions[];
+      return { sub, sent };
+    };
+    // none told yet: the sidebar shown, the panel folded
+    expect(view().sub.slice(0, 2).map((i) => [i.label, i.accelerator])).toEqual([['Hide Sidebar', 'CmdOrCtrl+B'], ['Show Panel', 'Alt+CmdOrCtrl+B']]);
+    expect(view({ sidebar: false, panel: true }).sub.slice(0, 2).map((i) => i.label)).toEqual(['Show Sidebar', 'Hide Panel']);
+    const { sub, sent } = view({ sidebar: true, panel: true });
+    for (const i of sub.slice(0, 2)) (i.click as (() => void) | undefined)?.();
+    expect(sent).toEqual(['sidebar', 'panel']);
+    expect(menuTarget('sidebar', false)).toEqual({ send: 'focused' });
+    expect(menuTarget('panel', false)).toEqual({ send: 'focused' });
+  });
 });
 
 describe('externalUrl (window.bise.openExternal)', () => {
@@ -184,12 +201,13 @@ describe("the Agent menu (bise fait mac, d4): the agent in view's '…' in the m
     expect(labels.indexOf(menus.agent_menu)).toBe(labels.indexOf('View') + 1);
   });
 
-  it('no accelerator twice across the whole bar; ⌥⌘0-4 left to the panel and the bubbles', () => {
+  it('no accelerator twice across the whole bar; ⌥⌘0-4 left to the panel and the bubbles; ⌘B and ⌥⌘B the View menu\'s only', () => {
     const all = flat(menuTemplate({ ...base, agent: nativeItems(items, () => undefined, () => undefined, true) }));
     const acc = all.flatMap((i) => (typeof i.accelerator === 'string' ? [i.accelerator] : []));
     expect(acc).toContain('CmdOrCtrl+.');
     expect(new Set(acc).size).toBe(acc.length);
     for (const n of [0, 1, 2, 3, 4]) expect(acc).not.toContain(`Alt+CmdOrCtrl+${String(n)}`);
+    expect(acc.filter((a) => a === 'CmdOrCtrl+B' || a === 'Alt+CmdOrCtrl+B' || a === 'Ctrl+CmdOrCtrl+S')).toEqual(['CmdOrCtrl+B', 'Alt+CmdOrCtrl+B']);
   });
 
   it("a popup's keys are shown, never registered (the menu bar's are the live ones)", () => {

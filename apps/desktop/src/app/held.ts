@@ -12,7 +12,8 @@ import { useSyncExternalStore } from 'react';
  *  hints (rust/tui/src/ctrlhint.rs:43, DELAY 150 ms; his ask main m_22199), one for ⌘, ⌥ and ctrl. */
 export const HINT_HOLD_MS = 150;
 
-export type Mod = 'Alt' | 'Meta' | 'Control';
+/** 'AltMeta': ⌥ and ⌘ held together, nothing else (the panel's ⌥⌘B on its button, designer m_45008). */
+export type Mod = 'Alt' | 'Meta' | 'Control' | 'AltMeta';
 
 const MODS: readonly string[] = ['Alt', 'Meta', 'Control', 'Shift'];
 
@@ -29,8 +30,12 @@ export interface KeyLike {
  *  as the TUI's Hold::event: the held one alone arms; its release, another modifier with it, or any
  *  other key hides; another key's release, or the held one again (a repeat), changes nothing. */
 export function heldStep(armed: Mod | null, e: KeyLike): { arm: Mod } | 'hide' | 'none' {
-  if (e.type === 'keyup') return armed !== null && e.key === armed ? 'hide' : 'none';
-  if (armed !== null && e.key === armed) return 'none';
+  const mine = (key: string) => armed !== null && (key === armed || (armed === 'AltMeta' && (key === 'Alt' || key === 'Meta')));
+  if (e.type === 'keyup') return mine(e.key) ? 'hide' : 'none';
+  if (mine(e.key)) return 'none';
+  // ⌥ then ⌘ (or ⌘ then ⌥), no shift or ctrl: the pair arms
+  const pair = (armed === 'Alt' && e.key === 'Meta') || (armed === 'Meta' && e.key === 'Alt');
+  if (pair) return e.shiftKey || e.ctrlKey ? 'hide' : { arm: 'AltMeta' };
   if (armed !== null || !MODS.includes(e.key) || e.key === 'Shift') return 'hide';
   const mod = e.key as Mod;
   const others = (mod !== 'Alt' && e.altKey) || (mod !== 'Meta' && e.metaKey) || (mod !== 'Control' && e.ctrlKey) || e.shiftKey;
@@ -58,6 +63,9 @@ const onKey = (e: KeyboardEvent): void => {
   const step = heldStep(armed, e);
   if (step === 'hide') hide();
   else if (step !== 'none') {
+    // ⌘ held, then ⌥: the ⌘ hints go at once, the pair's show after the same delay
+    clearTimeout(timer);
+    set(null);
     armed = step.arm;
     timer = setTimeout(() => {
       timer = undefined;
