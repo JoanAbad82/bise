@@ -18,7 +18,7 @@ import { markTip } from '../tipwords';
 import { AgentSign, agentMark } from '../RightBar';
 import { askInbox } from '../inboxAsk';
 import { useEntityMenu } from '../menus/use';
-import type { BarRow, ProjAgent } from '../barrows';
+import { roleWords, type BarRow, type ProjAgent } from '../barrows';
 import { ThingPic } from './Bubbles';
 import { askButtons, pickIntent } from './model';
 import { groupParts } from './lists';
@@ -115,7 +115,7 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group }: { r: BarRow; a: A
               <Pr r={r} onOpenPr={onOpenPr} />
             </span>
           </span>
-          <span className="s3-arow-l2" data-err={failed || undefined} data-testid={`${id}.role`}>{asks ? card.question : r.sub}</span>
+          <span className="s3-arow-l2" data-err={failed || undefined} data-testid={`${id}.role`}>{asks ? card.question : group !== undefined && a !== undefined ? roleWords(a.title) : r.sub}</span>
         </span>
       </Press>
       {b !== null && card !== undefined && (
@@ -125,7 +125,7 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group }: { r: BarRow; a: A
               {o.label}
             </Press>
           ))}
-          {b.words && (
+          {(
             <Press look="s3-arow-answer" onClick={() => {
               askInbox({ project: card.project, card: card.id });
             }} data-testid={`${id}.answer`}>
@@ -155,28 +155,30 @@ function HeadRow({ r, members, onOpen, onOpenPr }: { r: BarRow; members: number;
   );
 }
 
-/** The foot's fold: '▸ 3 archived', open its rows (their sign, name and age), newest first. */
-export function ArchivedFold({ rows, open, onToggle, onOpen }: { rows: readonly BarRow[]; open: boolean; onToggle: () => void; onOpen: (r: BarRow) => void }) {
-  if (rows.length === 0) return null;
+/** The foot's fold: '▸ 3 archived'; its rows open at the end of the float's rows (ArchivedRows), so the float grows by them. */
+export function ArchivedFold({ n, open, onToggle }: { n: number; open: boolean; onToggle: () => void }) {
+  if (n === 0) return null;
   return (
-    <>
-      <Press look="s3-fold" aria-expanded={open} onClick={onToggle} data-testid="app.flyout.agents.archived">
-        <span className="s3-fold-tri" data-open={open || undefined} aria-hidden="true">▸</span>
-        {side.archived({ n: rows.length })}
-      </Press>
-      {open && (
-        <span className="s3-archived" data-testid="app.flyout.agents.archived.rows">
-          {rows.map((r) => (
-            <Press key={r.key} look="s3-arow-old" aria-label={r.title} {...tipAttrs(r.title)} onClick={() => {
-              onOpen(r);
-            }} data-row="" data-testid={floatId(r)}>
-              <span className={`s3-arow-g ${r.tone}`} aria-hidden="true">{r.glyph}</span>
-              <span className="s3-arow-gname">{r.name}</span>
-              <span className="s3-arow-time">{r.end}</span>
-            </Press>
-          ))}
-        </span>
-      )}
-    </>
+    <Press look="s3-fold" aria-expanded={open} onClick={onToggle} data-testid="app.flyout.agents.archived">
+      <span className="s3-fold-tri" data-open={open || undefined} aria-hidden="true">▸</span>
+      {side.archived({ n })}
+    </Press>
+  );
+}
+
+/** ARCHIVED's rows, open: their sign, name and age, newest first. */
+export function ArchivedRows({ rows, onOpen }: { rows: readonly BarRow[]; onOpen: (r: BarRow) => void }) {
+  return (
+    <span className="s3-archived" data-testid="app.flyout.agents.archived.rows">
+      {rows.map((r) => (
+        <Press key={r.key} look="s3-arow-old" aria-label={r.title} {...tipAttrs(r.title)} onClick={() => {
+          onOpen(r);
+        }} data-row="" data-testid={floatId(r)}>
+          <span className={`s3-arow-g ${r.tone}`} aria-hidden="true">{r.glyph}</span>
+          <span className="s3-arow-gname">{r.name}</span>
+          <span className="s3-arow-time">{r.end}</span>
+        </Press>
+      ))}
+    </span>
   );
 }

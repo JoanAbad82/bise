@@ -38,7 +38,7 @@ import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
 import { noGrow, World, WorldThumb } from './World';
 import { Empty, Float, FloatLayer, HeadButton, type FloatContent } from './Flyout';
-import { ArchivedFold, FloatAgents } from './FloatAgents';
+import { ArchivedFold, ArchivedRows, FloatAgents } from './FloatAgents';
 import { useAgentRows } from '../agentrows';
 import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
@@ -408,11 +408,16 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
           onPin: () => { openOverview('agents'); },
           foot: {
             left: '',
-            fold: <ArchivedFold rows={ov.archived} open={archivedOpen} onToggle={() => { setArchivedOpen((o) => !o); }} onOpen={openRow} />,
+            fold: <ArchivedFold n={ov.archived.length} open={archivedOpen} onToggle={() => { setArchivedOpen((o) => !o); }} />,
             links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go(all ? { screen: 'bise' } : { screen: 'agents', project }); } }],
           },
           // Overview's rows (folded-side v9, A's floats): the same as its AGENTS (app/agentrows.ts)
-          rows: ov.live.length === 0 ? <Empty>{side.no_agents}</Empty> : <FloatAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} onOpen={openRow} onOpenPr={openPr} groupOf={groupOf} />,
+          rows: (
+            <>
+              {ov.live.length === 0 ? <Empty>{side.no_agents}</Empty> : <FloatAgents live={ov.live} agents={ov.agents} cards={listed.cards} at={at} onOpen={openRow} onOpenPr={openPr} groupOf={groupOf} />}
+              {archivedOpen && ov.archived.length > 0 && <ArchivedRows rows={ov.archived} onOpen={openRow} />}
+            </>
+          ),
         };
       case 'artifacts':
         return {

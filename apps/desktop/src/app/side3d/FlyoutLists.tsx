@@ -9,7 +9,10 @@ import { useRef } from 'react';
 import type { Agent, Proc } from '@/proto';
 import { useArtifactFront } from '@/artifacts/front';
 import { rowPrimary } from '@/artifacts/Open';
-import { AppIcon, tipAttrs, type AppIconName } from '@/ds';
+import { Fragment, useState } from 'react';
+import { AppIcon, Button, tipAttrs, type AppIconName } from '@/ds';
+import { useStore } from '@/store';
+import { common } from '@/proto/words_common.gen';
 import { ago } from '@/agents/model';
 import { kindOf, type Item } from '@/artifacts/model';
 import { isRunning, markOf, portWords, rowCmd, stateOf, urlWords, type ProcItem } from '@/running/model';
@@ -80,12 +83,27 @@ export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: s
   const p = x.p;
   const menu = useEntityMenu({ kind: 'process', project: x.project, agent: p.agent, id: p.id });
   const on = isRunning(p);
+  const u = on ? urlWords(p, stateOf(p)) : null;
   return (
     <SideRow
       pic={<ThingPic thing={{ obj: procObj(p) }} px={ROW_PX} tile="terminal" />}
       title={<span className="s3-cmd">{typed(p)}</span>}
       sub={procSub(p, now, group)}
-      end={on ? <span className="s3-wave" {...tipAttrs(side.running_tip)} data-testid={`app.flyout.processes.${x.project}.${p.agent}.${p.id}.runs`}>{markOf(stateOf(p)).glyph}</span> : undefined}
+      end={
+        <>
+          {/* its port as a link that opens the page, never the row (folded-side v9, the Overview's port link) */}
+          {u !== null && (
+            <span className="s3-port" role="link" {...tipAttrs(u.tip)} onClick={(e) => {
+              e.stopPropagation();
+              void (window as Partial<Window>).bise?.openExternal(u.url);
+            }} data-testid={`app.flyout.processes.${x.project}.${p.agent}.${p.id}.port`}>
+              {u.label}
+              <AppIcon name="open" size={14} />
+            </span>
+          )}
+          {on && <span className="s3-wave" {...tipAttrs(side.running_tip)} data-testid={`app.flyout.processes.${x.project}.${p.agent}.${p.id}.runs`}>{markOf(stateOf(p)).glyph}</span>}
+        </>
+      }
       label={p.cmd}
       tip={p.cmd}
       onClick={() => {
@@ -118,24 +136,52 @@ export function TaskRow({ x, now, group }: { x: Task; now: number; group?: strin
 /** An agent's watches (sb wake): its telescope rows, each opening the agent. */
 export function WatchRows({ project, a, now, onOpen, group }: { project: string; a: Agent; now: number; onOpen: (agent: string) => void; group?: string }) {
   const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
+  const store = useStore();
   const g = groupParts(group, a.name);
+  // a watch's detail under its row (folded-side v9, the Overview's): who wakes, set when, until;
+  // its agent, and 'stop watching' (HubCmd wake_stop, sb wake --stop); one open at a time
+  const [open, setOpen] = useState<number | null>(null);
   return (
     <>
-      {alarms(a, now).map((al) => (
-        <SideRow
-          key={al.id}
-          pic={<ThingPic thing={{ obj: laterObj('watch') }} px={ROW_PX} tile="scheduled" />}
-          title={g.project === '' ? a.name : <><span className="s3-group">{g.project}</span>{g.name}</>}
-          sub={[al.note, al.end === '' ? '' : panel.until({ at: al.end })].filter((s) => s !== '').join(' · ')}
-          label={al.title}
-          tip={al.title}
-          onClick={() => {
-            onOpen(a.name);
-          }}
-          menu={menu}
-          testId={`app.flyout.scheduled.${project}.${a.name}.watch.${String(al.id)}`}
-        />
-      ))}
+      {alarms(a, now).map((al) => {
+        const id = `app.flyout.scheduled.${project}.${a.name}.watch.${String(al.id)}`;
+        const [head = '', ...rest] = al.title.split(' · ');
+        return (
+          <Fragment key={al.id}>
+            <SideRow
+              pic={<ThingPic thing={{ obj: laterObj('watch') }} px={ROW_PX} tile="scheduled" />}
+              title={g.project === '' ? a.name : <><span className="s3-group">{g.project}</span>{g.name}</>}
+              sub={[al.note, al.end === '' ? '' : panel.until({ at: al.end })].filter((s) => s !== '').join(' · ')}
+              label={al.title}
+              tip={al.title}
+              onClick={() => {
+                setOpen((o) => (o === al.id ? null : al.id));
+              }}
+              menu={menu}
+              testId={id}
+            />
+            {open === al.id && (
+              <div className="s3-detail" data-testid={`${id}.detail`}>
+                <span className="s3-detail-words">
+                  <span>{head}</span>
+                  {rest.map((x) => <span key={x}>{x}</span>)}
+                </span>
+                <span className="s3-detail-acts">
+                  <Button kind="ghost" size="sm" onClick={() => { onOpen(a.name); }} testId={`${id}.open`}>
+                    {common.open_agent({ agent: a.name })}
+                  </Button>
+                  <Button kind="ghost" size="sm" onClick={() => {
+                    store.command({ cmd: 'wake_stop', project, id: al.id } as never);
+                    setOpen(null);
+                  }} testId={`${id}.stop`}>
+                    {common.stop_watching}
+                  </Button>
+                </span>
+              </div>
+            )}
+          </Fragment>
+        );
+      })}
     </>
   );
 }

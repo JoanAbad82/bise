@@ -1192,3 +1192,34 @@
   display: flex;
   flex-direction: column;
 }
+
+/* a process's port as a link at its row's end (folded-side v9): t-12 mono text-2, the open icon,
+   its click opens the page, never the row */
+.s3-port {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font: 400 var(--t-12)/16px var(--font-mono);
+  color: var(--c-text-2);
+  cursor: pointer;
+}
+.s3-port:hover {
+  color: var(--c-text);
+}
+/* a watch's detail under its row: its words one a line text-2, then its agent and 'stop watching' */
+.s3-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0 var(--s-2) var(--s-2) calc(var(--s-2) + 40px + var(--s-3));
+  font: 400 var(--f-meta);
+  color: var(--c-text-2);
+}
+.s3-detail-words {
+  display: flex;
+  flex-direction: column;
+}
+.s3-detail-acts {
+  display: flex;
+  gap: var(--s-2);
+}
