@@ -137,6 +137,43 @@ An agent that saves a file 30 times in one turn makes one version, not
 - `archived.json`: `{"<id>": <archived at ms>}`, the archived artifacts
   (stored ones and pages alike; `artifacts_archive.rs`).
 
+### A local site serves itself again (site-revive, architect m_44365)
+
+A link to a dev server (`127.0.0.1`, `localhost`, `0.0.0.0`, `[::1]` with
+a port) used to be only a URL: its server gone (agent archived, Mac
+restarted), a dead tab. Now:
+
+- **At the add** (`daemon/art.rs` `serve_ask`, off the loop,
+  `artifacts_probe.rs`): who listens on its port (lsof, the processes
+  parsers), its argv (macOS `KERN_PROCARGS2`, Linux `/proc/<pid>/cmdline`)
+  and folder go on the version as `serve: {argv, cwd, port}` (meta.json;
+  never from a request: a GET can only restart a known recipe). When `GET
+  /` answers exactly the bytes of `index.html` in its folder or its
+  `dist`, `build`, `out` or `public`, it is a static site: that folder is
+  copied as the version's `copy` (50 MB / 5000 files, like any folder),
+  and the recipe stays as the fallback. Nothing listens: the link only, as
+  before.
+- **The door** `GET /a/<id>/live[/<path>]` (`pages/artifact/live.rs`;
+  decisions in `artifacts_serve.rs`): its own server answers (same argv and
+  folder): 302 to the link (`+ /<path>`); another server holds the port
+  (another agent's vite on 5173): a why-page, never its site; nothing
+  there: 302 to bise's copy when it kept one, else `PageMsg::Revive` to
+  the hub, whose one owner (`daemon/revive.rs`) starts the argv with no
+  shell in its folder (`env_for(Child::Shell)`, its own session, output in
+  `<state>/revive/<id>.out`), at most one start per artifact; the door
+  waits up to 30 s for the port, then 302, or a why-page (folder gone,
+  exited, too slow) with its last lines.
+- **One door for every client**: the row's `live`
+  (`<pages base>/a/<id>/live`) is the typed row's `url` (desktop), what
+  the terminal opens (`Artifact.url`), and the site sidebar's href;
+  `target` stays the link. A version with a copy is framed from it
+  (`frame_url`, `serves_copy`), a link or not.
+- The servers it started are the hub's, tied to no agent: their process
+  groups end when the hub quits for good (`Revive::stop_all`).
+- Proof: `daemon/revive_tests.rs` (a dev server stopped with its agent
+  starts again on open; another server on its port and a gone folder give
+  a why-page and no start; the static copy opens once its folder is gone).
+
 ### Archive
 
 `sb artifact archive <id>... | --agent <a> | --before <YYYY-MM-DD[THH:MM]>

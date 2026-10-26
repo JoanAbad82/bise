@@ -64,11 +64,15 @@ pub fn items(pages: &[PageMeta], arts: &[ArtMeta]) -> Vec<Item> {
         .collect();
     for a in arts.iter().filter(|a| a.kind == "site" && a.by != "page") {
         let Some(cur) = a.current() else { continue };
-        let (href, outside) = if is_link(&cur.target) {
-            (cur.target.clone(), true)
-        } else if let Some(copy) = &cur.copy {
+        // a copy first: framed from it (the typed row's frame_url rule, serves_copy)
+        let (href, outside) = if let Some(copy) = cur.copy.as_ref().filter(|c| serves_copy(&a.by, c)) {
             // in bise's viewer, where his notes go (art-notes)
             (frame_href(&a.id, cur.v, copy, true), false)
+        } else if crate::artifacts_serve::has_door(cur) {
+            // a local site bise starts again: its door (artifacts_serve)
+            (crate::artifacts_serve::live_href(&a.id), true)
+        } else if is_link(&cur.target) {
+            (cur.target.clone(), true)
         } else {
             continue;
         };

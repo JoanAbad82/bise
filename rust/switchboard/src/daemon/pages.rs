@@ -337,6 +337,11 @@ impl Shell {
                 let (status, body) = self.art_save(&pages, &id, req);
                 reply.send(status, body);
             }
+            // a local site's door found its port free: its recipe again (daemon/revive.rs)
+            crate::pages::PageMsg::Revive { id, reply } => {
+                let (status, body) = self.revive.answer(&self.art_store(), &self.opts.paths.revive_dir(), &id);
+                reply.send(status, body);
+            }
             crate::pages::PageMsg::Mirror { id, error } => {
                 // the last good public copy stays up; main hears it once (designer m_7509)
                 self.feed_rec(MAIN, Feed::warn(format!("▲ couldn't publish {id} to the public mirror: {error}")));

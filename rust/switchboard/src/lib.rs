@@ -34,6 +34,8 @@ pub mod agents_md;
 pub mod approvals;
 pub mod artifacts;
 pub mod artifacts_assets;
+pub mod artifacts_probe;
+pub mod artifacts_serve;
 pub mod artifacts_turns;
 pub mod attach;
 pub mod attached;

@@ -130,6 +130,11 @@ impl Paths {
     pub fn procs_dir(&self) -> PathBuf {
         self.state.join("procs")
     }
+    /// The output of the local sites' servers the hub started again
+    /// (`<id>.out`, daemon/revive.rs's; site-revive).
+    pub fn revive_dir(&self) -> PathBuf {
+        self.state.join("revive")
+    }
     pub fn bin_dir(&self) -> PathBuf {
         self.state.join("bin")
     }

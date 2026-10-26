@@ -55,6 +55,9 @@ pub(crate) struct Artifact {
     pub(crate) v: u32,
     /// the current version's path or link
     pub(crate) target: String,
+    /// what the hub says opens it (the typed row's `url`): for a local
+    /// site bise serves again, its door `…/a/<id>/live` (site-revive)
+    pub(crate) url: String,
     pub(crate) copy: Option<String>,
     /// the file is gone from disk (never a link)
     pub(crate) gone: bool,
@@ -105,7 +108,10 @@ impl Artifact {
             None => (self.target.clone(), self.copy.clone()),
         };
         if is_url(&target) {
-            return target;
+            // the current version: what the hub says opens it (a local
+            // site's door, which starts its server again)
+            let current = ver.is_none_or(|x| x.v == self.v);
+            return if current && is_url(&self.url) { self.url.clone() } else { target };
         }
         let here = !target.is_empty() && std::path::Path::new(&target).exists();
         match (here, copy) {
@@ -212,6 +218,7 @@ impl Artifact {
             ts_ms: r.at_ms,
             v: r.version.max(1),
             target: r.target.clone(),
+            url: r.url.clone(),
             copy: r.copy.clone(),
             gone: r.gone,
             detail: r.detail.clone(),

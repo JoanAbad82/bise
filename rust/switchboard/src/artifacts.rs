@@ -66,6 +66,11 @@ pub struct Version {
     /// Its saves, oldest first (none in a store from before them: one).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub revs: Vec<Rev>,
+    /// A local site's recipe (artifacts_serve, site-revive): how its
+    /// server runs again; written by the hub after the add, never from a
+    /// request. None: a file, another link, or no listener at the add.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub serve: Option<crate::artifacts_serve::Serve>,
 }
 
 impl Version {
@@ -704,7 +709,7 @@ impl Store {
             }
             _ => {
                 let revs = vec![rev(&[])];
-                meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig, turn: a.turn.clone(), sitting: a.sitting.clone(), revs });
+                meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig, turn: a.turn.clone(), sitting: a.sitting.clone(), revs, serve: None });
             }
         }
         self.save(&meta)?;
@@ -864,7 +869,48 @@ impl Store {
             // raw: the hub resolves it against the library (artifacts_ev)
             "folder": m.folder,
             "turn": cur.turn.as_ref().map(|t| t.started_ms),
+            // a local site bise serves again (artifacts_serve): the page
+            // server's door, what every client opens; `target` stays the link
+            "live": self.live_url(m),
         })
+    }
+
+    /// The door of a local site bise can serve again
+    /// (`<pages base>/a/<id>/live`, artifacts_serve::has_door); None
+    /// otherwise or with no page server.
+    pub fn live_url(&self, m: &Meta) -> Option<String> {
+        m.current().filter(|v| m.by != "page" && crate::artifacts_serve::has_door(v))?;
+        Some(format!("{}{}", self.pages_base()?, crate::artifacts_serve::live_href(&m.id)))
+    }
+
+    /// Version `v` of artifact `id` gets its recipe (artifacts_serve,
+    /// found off the hub's loop after the add) and, for a static site,
+    /// bise's copy of the folder it serves (`root`; the caps of any
+    /// folder). False: no such version, or nothing to write.
+    pub fn set_serve(&self, id: &str, v: u64, serve: crate::artifacts_serve::Serve, root: Option<&Path>) -> Result<bool, String> {
+        let Some(mut meta) = self.stored().into_iter().find(|m| m.id == id) else { return Ok(false) };
+        let Some(ver) = meta.versions.iter_mut().find(|x| x.v == v) else { return Ok(false) };
+        if ver.serve.as_ref() == Some(&serve) && (root.is_none() || ver.copy.is_some()) {
+            return Ok(false);
+        }
+        ver.serve = Some(serve);
+        if let Some(root) = root.filter(|_| ver.copy.is_none()) {
+            let (bytes, _, files) = measure(root);
+            if bytes > MAX_COPY {
+                ver.no_copy = Some("over 50 MB".into());
+            } else if files > MAX_COPY_FILES {
+                ver.no_copy = Some(format!("over {} files", MAX_COPY_FILES));
+            } else {
+                let name = root.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "site".into());
+                let rel = format!("v{}/{}", v, name);
+                match copy_whole(root, &self.dir().join(id).join(&rel)) {
+                    Ok(()) => ver.copy = Some(rel),
+                    Err(e) => ver.no_copy = Some(format!("copy failed: {}", e)),
+                }
+            }
+        }
+        self.save(&meta)?;
+        Ok(true)
     }
 
     /// How many came after the user last looked (the archived ones never).

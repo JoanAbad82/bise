@@ -434,13 +434,17 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_ba
             let at_ms = r.get("ts_ms").and_then(Value::as_u64).unwrap_or(0);
             let url = match page_url(&id).filter(|_| s(r, "by") == "page") {
                 Some(u) => u,
-                None => Some(s(r, "copy")).filter(|c| !c.is_empty() && !s(r, "target").contains("://")).unwrap_or_else(|| s(r, "target")),
+                // a local site bise serves again: its door (artifacts_serve)
+                None => Some(s(r, "live"))
+                    .filter(|l| !l.is_empty())
+                    .or_else(|| Some(s(r, "copy")).filter(|c| !c.is_empty() && !s(r, "target").contains("://")))
+                    .unwrap_or_else(|| s(r, "target")),
             };
             let target = s(r, "target");
             let path = Some(target.clone()).filter(|t| s(r, "by") != "page" && !crate::artifacts::is_link(t) && Path::new(t).is_absolute());
             let version = r.get("v").and_then(Value::as_u64).unwrap_or(0);
             let frame_url = frame_base
-                .filter(|_| !crate::artifacts::is_link(&target) && crate::pages::site::serves_copy(&s(r, "by"), &s(r, "copy")))
+                .filter(|_| crate::pages::site::serves_copy(&s(r, "by"), &s(r, "copy")))
                 .map(|b| format!("{b}{}", crate::pages::site::frame_href(&id, version, &s(r, "copy"), true)));
             let versions = r.get("versions").and_then(Value::as_array).map_or_else(Vec::new, |vs| {
                 vs.iter()
@@ -454,7 +458,7 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_ba
                             copy: Some(s(x, "copy")).filter(|c| !c.is_empty()),
                             // the row's rule, per version (architect m_23970)
                             frame_url: frame_base
-                                .filter(|_| !crate::artifacts::is_link(&s(x, "target")) && crate::pages::site::serves_copy(&s(r, "by"), &s(x, "copy")))
+                                .filter(|_| crate::pages::site::serves_copy(&s(r, "by"), &s(x, "copy")))
                                 .map(|b| format!("{b}{}", crate::pages::site::frame_href(&id, n, &s(x, "copy"), n == version))),
                         }
                     })

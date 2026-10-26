@@ -289,6 +289,7 @@ impl Shell {
             Msg::Release { client, v } => self.release_event(client, v),
             Msg::Update(v) => self.update_event(v),
             Msg::Changes { name, v } => self.on_changes(name, v),
+            Msg::Serve { id, v, serve, root } => self.on_serve(&id, v, serve, root),
             Msg::RoleLine { dir, key, line } => self.step(Input::RoleLine { dir, key, line }),
             Msg::UsageCounted(l) => self.usage_counted(*l),
             Msg::TimerName { id, reply } => self.step(Input::TimerName { id, reply }),

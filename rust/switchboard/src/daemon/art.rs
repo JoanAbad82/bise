@@ -266,6 +266,7 @@ impl Shell {
         if a.new_version {
             self.art_lines(&a);
         }
+        self.serve_ask(&a);
         Ok(format!("↗ added: {}", a.meta.title))
     }
 
@@ -350,6 +351,7 @@ impl Shell {
                             }
                             self.art_live_push(&a.meta);
                         }
+                        self.serve_ask(&a);
                         self.artifacts_refresh(false);
                         json!({"ok": true, "text": artifacts::added_text(&a), "id": a.meta.id})
                     }
@@ -452,6 +454,33 @@ impl Shell {
             let v = changes_of(&place);
             let _ = tx.send(Msg::Changes { name, v });
         });
+    }
+
+    /// After the add of a local link (a dev server, artifacts_serve): who
+    /// listens on its port, found off the loop (lsof, its argv, `GET /`);
+    /// the answer comes back as `Msg::Serve`. Nothing listens: nothing
+    /// comes, the link stays a link.
+    fn serve_ask(&self, a: &Added) {
+        let Some(v) = a.meta.current().filter(|_| a.new_version && !a.page) else { return };
+        if crate::artifacts_serve::local_port(&v.target).is_none() {
+            return;
+        }
+        let (tx, id, n, link) = (self.tx.clone(), a.meta.id.clone(), v.v, v.target.clone());
+        std::thread::spawn(move || {
+            if let Some((serve, root)) = crate::artifacts_probe::recipe(&link) {
+                let _ = tx.send(Msg::Serve { id, v: n, serve, root });
+            }
+        });
+    }
+
+    /// A local site's recipe was found: on its version (and a static
+    /// site's copy), then the list again (its row's `url` is its door).
+    pub(super) fn on_serve(&mut self, id: &str, v: u64, serve: crate::artifacts_serve::Serve, root: Option<PathBuf>) {
+        match self.art_store().set_serve(id, v, serve, root.as_deref()) {
+            Ok(true) => self.artifacts_refresh(false),
+            Ok(false) => {}
+            Err(e) => log_line(&self.opts.paths, &format!("artifact {id}: its recipe not kept: {e}")),
+        }
     }
 
     /// An agent's changes are computed: the state again when they moved.

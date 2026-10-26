@@ -12,6 +12,9 @@
 //!   its worker, pdf-notes; Univer's grid, xlsx-univer), read from `office/dist` in the app root (one copy, never
 //!   in `kit/`, architect m_23781); the renderers beside them
 //!   (`kit/office/*.js`) are kit files;
+//! - `GET /a/<id>/live[/<path>]`: the door of a local site bise serves
+//!   again ([`live`], site-revive): its server, bise's copy, or the hub
+//!   starts it again;
 //! - `GET /a/<id>/notes`, `POST /api/a/<id>/notes|send`: the notes on an
 //!   artifact ([`notes`]; the POSTs through [`post`], server.rs's `/api`
 //!   arm, after its token and origin checks);
@@ -19,6 +22,7 @@
 //!   next version ([`save`], decided and written by the hub).
 
 pub mod events;
+pub mod live;
 pub mod notes;
 pub mod save;
 pub mod view;
@@ -37,6 +41,7 @@ pub fn route(pages: &Pages, segs: &[&str]) -> Option<Response> {
         ["kit", "office", f] if BUNDLES.contains(f) => bundle(pages, f),
         ["a", id, "view"] if valid_id(id) => view::serve(pages, id, None),
         ["a", id, "notes"] if valid_id(id) => notes::get(pages, id),
+        ["a", id, "live", rest @ ..] if valid_id(id) => live::serve(pages, id, rest),
         ["a", id, v, "view"] if valid_id(id) => match v.parse() {
             Ok(n) => view::serve(pages, id, Some(n)),
             Err(_) => Response::missing(&format!("no such version: a/{id}/{v}/view")),
@@ -58,7 +63,7 @@ pub fn post(pages: &Pages, segs: &[&str], body: &[u8]) -> Option<Response> {
 
 fn bundle(pages: &Pages, f: &str) -> Response {
     match std::fs::read(pages.office_dir.join(f)) {
-        Ok(body) => Response { status: 200, ctype: "text/javascript; charset=utf-8", body, csp: super::server::CSP },
+        Ok(body) => Response { status: 200, ctype: "text/javascript; charset=utf-8", body, csp: super::server::CSP, location: None },
         Err(_) => Response::missing(&format!("no such file: kit/office/{f} (office/dist in the app root)")),
     }
 }

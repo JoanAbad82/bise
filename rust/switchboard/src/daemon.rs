@@ -61,6 +61,7 @@ mod merged;
 mod outbox;
 mod photo_take;
 mod processes;
+mod revive;
 mod state_gate;
 mod contexts;
 mod tindex;
@@ -252,6 +253,15 @@ enum Msg {
     Changes {
         name: String,
         v: Option<bise_proto::rows::Changes>,
+    },
+    /// A local site's recipe, found off the loop after its add
+    /// (`daemon/art.rs`, artifacts_probe): `root` the folder a static
+    /// site serves, which bise copies.
+    Serve {
+        id: String,
+        v: u64,
+        serve: crate::artifacts_serve::Serve,
+        root: Option<PathBuf>,
     },
     /// a thread's typed event: an answer or a hub-wide notification
     Typed {
@@ -446,6 +456,8 @@ struct Shell {
     holds: crate::idle::Holds,
     /// artifacts and diffs (`daemon/art.rs`, docs/artifacts.md)
     art: art::Art,
+    /// the local sites' servers it started again (`daemon/revive.rs`)
+    revive: revive::Revive,
     /// `sb wake`'s look, on its worker (`daemon/wake_look.rs`)
     wake_look: wake_look::WakeLook,
     /// sb-core's worktrees, made off the loop (`daemon/place_work.rs`)
@@ -1705,6 +1717,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         ),
         holds: crate::idle::Holds::default(),
         art: art::Art::default(),
+        revive: revive::Revive::default(),
         wake_look: wake_look::WakeLook::start(tx.clone()),
         place_work: place_work::PlaceWork::start(&paths, tx.clone()),
         procs: processes::Worker::start(paths.clone(), proc_hub.clone(), crate::paths::workspace_id(&paths.workspace), tx.clone()),
@@ -1864,6 +1877,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         }
         // the processes list's rows end as stopped with their agents first
         sh.procs.quit(Duration::from_secs(2));
+        // the local sites it started again are the hub's: they go with it
+        sh.revive.stop_all(crate::procs::STOP_GRACE);
         let hit = crate::procs::reap(&sh.proc_hub, &crate::procs::Want::NotLive(&none), &sessions, crate::procs::STOP_GRACE);
         if !hit.is_empty() {
             log_line(&paths, &format!("processes of the agents killed: {}", crate::procs::describe(&hit)));

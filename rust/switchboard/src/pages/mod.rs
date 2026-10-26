@@ -51,6 +51,10 @@ pub enum PageMsg {
     /// his edits of artifact `id` in the viewer's grid (artifact/save.rs):
     /// the hub decides, writes the file and the version, and answers `reply`
     Save { id: String, req: artifact::save::SaveReq, reply: artifact::save::Reply },
+    /// the door of local site `id` (artifact/live.rs) found its port free:
+    /// the hub starts its recipe again (daemon/revive.rs) and answers
+    /// `reply` (200 `{pid}`, else `{why}`); the door waits for the port
+    Revive { id: String, reply: artifact::save::Reply },
     /// the user's mirror of the public pages failed after a publish of `id`
     /// (mirror.rs): one line in main's thread
     Mirror { id: String, error: String },

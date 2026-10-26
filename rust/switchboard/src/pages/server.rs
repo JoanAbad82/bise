@@ -91,11 +91,15 @@ pub struct Response {
     pub body: Vec<u8>,
     /// the response's CSP: [`CSP`], or a site artifact's sandbox (site.rs)
     pub csp: &'static str,
+    /// a redirect's `Location` (a local site's door, artifact/live.rs)
+    pub location: Option<String>,
 }
 
 fn reason(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        302 => "Found",
+        502 => "Bad Gateway",
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
@@ -109,10 +113,10 @@ fn reason(status: u16) -> &'static str {
 
 impl Response {
     pub(crate) fn json(status: u16, v: &Value) -> Response {
-        Response { status, ctype: "application/json", body: v.to_string().into_bytes(), csp: CSP }
+        Response { status, ctype: "application/json", body: v.to_string().into_bytes(), csp: CSP, location: None }
     }
     fn html(body: String) -> Response {
-        Response { status: 200, ctype: "text/html; charset=utf-8", body: body.into_bytes(), csp: CSP }
+        Response { status: 200, ctype: "text/html; charset=utf-8", body: body.into_bytes(), csp: CSP, location: None }
     }
     pub(crate) fn err(status: u16, why: &str) -> Response {
         Response::json(status, &json!({"error": why}))
@@ -121,12 +125,23 @@ impl Response {
     /// JSON, which a browser reports as a stylesheet of the wrong MIME type
     /// (Benjamin's -31: "MIME type ('application/json')", the kit missing).
     pub(crate) fn missing(why: &str) -> Response {
-        Response { status: 404, ctype: "text/plain; charset=utf-8", body: why.as_bytes().to_vec(), csp: CSP }
+        Response { status: 404, ctype: "text/plain; charset=utf-8", body: why.as_bytes().to_vec(), csp: CSP, location: None }
+    }
+
+    /// A 302 to `to` (a local site's door: its server, or bise's copy).
+    pub(crate) fn redirect(to: &str) -> Response {
+        Response { status: 302, ctype: "text/plain; charset=utf-8", body: Vec::new(), csp: CSP, location: Some(to.to_string()) }
+    }
+    /// A page that says why (a local site's door when it could not open it).
+    pub(crate) fn page(status: u16, html: String) -> Response {
+        Response { status, ctype: "text/html; charset=utf-8", body: html.into_bytes(), csp: CSP, location: None }
     }
 
     pub fn bytes(&self) -> Vec<u8> {
+        // a Location never carries a line break (the header's end)
+        let location = self.location.as_deref().filter(|l| !l.contains(['\r', '\n'])).map(|l| format!("Location: {l}\r\n")).unwrap_or_default();
         let mut out = format!(
-            "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nContent-Security-Policy: {}\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+            "HTTP/1.1 {} {}\r\n{location}Content-Type: {}\r\nContent-Length: {}\r\nContent-Security-Policy: {}\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
             self.status,
             reason(self.status),
             self.ctype,
@@ -383,8 +398,8 @@ fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     };
     let at = format!("a/{id}/{v}/{}", rest.join("/"));
     match std::fs::read(&path) {
-        Ok(body) if ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::tagged(&body, select), csp: super::site::ARTIFACT_CSP },
-        Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP },
+        Ok(body) if ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::tagged(&body, select), csp: super::site::ARTIFACT_CSP, location: None },
+        Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP, location: None },
         Err(_) => Response::missing(&format!("no such file: {at}")),
     }
 }
@@ -454,7 +469,7 @@ fn page_css(pages: &Pages, id: &str, n: u64) -> Response {
         None if n == 0 && pages.store.meta(id).is_some() => String::new(),
         None => return Response::missing(&format!("no such version: p/{id}/v/{n}/page.css")),
     };
-    Response { status: 200, ctype: "text/css; charset=utf-8", body: super::ui::page_css(&html).into_bytes(), csp: CSP }
+    Response { status: 200, ctype: "text/css; charset=utf-8", body: super::ui::page_css(&html).into_bytes(), csp: CSP, location: None }
 }
 
 fn kit_file(pages: &Pages, rel: &str) -> Response {
@@ -474,7 +489,7 @@ fn kit_file(pages: &Pages, rel: &str) -> Response {
         _ => return Response::missing(&format!("not served: kit/{rel}")),
     };
     match std::fs::read(pages.kit_dir.join(rel)) {
-        Ok(body) => Response { status: 200, ctype, body, csp: CSP },
+        Ok(body) => Response { status: 200, ctype, body, csp: CSP, location: None },
         Err(_) => Response::missing(&format!("no such file: kit/{rel}")),
     }
 }
