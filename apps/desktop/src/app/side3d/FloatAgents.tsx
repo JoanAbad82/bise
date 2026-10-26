@@ -22,6 +22,7 @@ import { roleWords, type BarRow, type ProjAgent } from '../barrows';
 import { ThingPic } from './Bubbles';
 import { askButtons, pickIntent } from './model';
 import { groupParts } from './lists';
+import { OptButton } from './FlyoutAgents';
 
 /** a row's test id in the float: the Overview's own, under the float's ('app.flyout.agents.agent.perf'), never the same id twice in the window */
 export const floatId = (r: BarRow): string =>
@@ -130,10 +131,9 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group, onHandoff }: { r: B
       </Press>
       {b !== null && card !== undefined && (
         <span className="s3-arow-acts">
+          {/* the options grow to 2 lines then clamp, the full words in the tip when cut (float-buttons dd382b7d3, his m_45871) */}
           {b.opts.map((o) => (
-            <Press key={o.n} look="s3-say-btn" onClick={() => store.do(pickIntent(card, o.n, at))} data-testid={`${id}.opt.${String(o.n)}`}>
-              {o.label}
-            </Press>
+            <OptButton key={o.n} label={o.label} onPick={() => store.do(pickIntent(card, o.n, at))} testId={`${id}.opt.${String(o.n)}`} />
           ))}
           {(
             <Press look="s3-arow-answer" onClick={() => {
