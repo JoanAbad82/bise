@@ -357,7 +357,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   // the rim), under the headset's band when she wears one. Behind, it ends above the collar and the hood
   // at every head turn (the hair law: hair-clip.test.ts)
   /** a ponytail's tie and tail: baked apart from the head, hidden while she lies flat (on it) */
-  let hang: Group | null = null;
+  // set inside herHair (a closure): typed whole so the check below is not narrowed to null
+  let hang = null as Group | null;
   const herHair = (cut: Cut, crowned: boolean, headset: boolean): void => {
     const hm = mat(o.hair);
     const tie = mat(o.hatColor);

@@ -4,7 +4,7 @@
 // band and cups, a peak, a pompom) or out through a hat's crown above its rim, and over the eyes; and how
 // many skull vertices show through a shell of hair. The law (hair-clip.test.ts) and the turnaround
 // sheets read it. Tests and studios only, never the app. Owner: bims-girls.
-import { Matrix4, type Mesh, Object3D, SphereGeometry, Vector3 } from 'three';
+import { Matrix4, Mesh, Object3D, SphereGeometry, Vector3 } from 'three';
 import { type Bim, hangPitch, makeBim } from './bim';
 import { HAT_K, HEAD_R } from './laptop';
 import { CUTS, CUT_HATS, type Cut, type HeadWear, KINDS, type Kind, outfitOf } from './palette';
@@ -27,7 +27,8 @@ const meshesUnder = (o: Object3D, keep: (m: Mesh) => boolean, stop: ReadonlySet<
   const walk = (x: Object3D): void => {
     for (const c of x.children) {
       if (stop.has(c)) continue;
-      if ((c as Mesh).isMesh && keep(c as Mesh)) out.push(c as Mesh);
+      const m: Mesh | null = c instanceof Mesh ? (c as Mesh) : null;
+      if (m && keep(m)) out.push(m);
       walk(c);
     }
   };
@@ -56,7 +57,7 @@ function hairPoints(b: Bim): { pts: Vector3[]; hang: Vector3[]; at: Vector3 } {
   const hung: Vector3[] = [];
   for (const m of meshesUnder(head, (x) => x.userData.hair === true)) {
     const inHang = hangInv !== null && under(m);
-    const to = new Matrix4().multiplyMatrices(inHang && hangInv ? hangInv : inv, m.matrixWorld);
+    const to = new Matrix4().multiplyMatrices(inHang ? hangInv : inv, m.matrixWorld);
     const pos = m.geometry.getAttribute('position');
     for (let i = 0; i < pos.count; i++) (inHang ? hung : pts).push(new Vector3().fromBufferAttribute(pos, i).applyMatrix4(to));
   }

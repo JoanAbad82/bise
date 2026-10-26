@@ -10,7 +10,7 @@ import { AZ } from '../render/camera';
 import { makeBim, type Bim } from '../render/bim';
 import { MUSIC } from '../render/objects/music';
 import { CREAM, INK, PANE, PAPER, SKY, SLATE, SLATE_L, STEEL, TEAL, VIOLET, WOOD, WOOD_D, WOOD_L, YELLOW, darker, lighter, partOf } from '../render/objects/kit';
-import { DAY, WORLD } from '../render/palette';
+import { DAY, WORLD, outfitOf } from '../render/palette';
 import { makePlane, type Plane } from '../render/plane';
 import { rimmedMaterial } from '../render/rim';
 import { STYLE } from '../render/style';
@@ -361,7 +361,8 @@ export function buildIsland(s: Island): IslandScene {
   const first = s.frames[0];
   if (!first) throw new Error(`${s.id}: no frames`);
   const bims: Bim[] = first.bims.map((a) => {
-    const b = makeBim(a.name, false, STYLE);
+    // her island's own cut, bare-headed (a hat sits on her name's cut)
+    const b = makeBim(a.name, false, STYLE, a.cut ? { ...outfitOf(a.name, false), cut: a.cut, hat: 'bare' } : undefined);
     castShadows(b.group);
     root.add(b.group);
     return b;

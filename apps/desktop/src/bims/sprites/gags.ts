@@ -9,6 +9,7 @@
 // page. Units are the office's: a standing bim is ~1.2 tall, the island's top is y 0, its middle
 // x 0 z 0; the camera is the town's 2:1 iso (camera.ts). Owner: bims-islands.
 import { AZ } from '../render/camera';
+import type { Cut } from '../render/palette';
 import { NO_PROPS, type Rig, type Rot } from '../render/pose';
 
 /** the sheets' frame rate */
@@ -22,6 +23,8 @@ export const SLAB = { w: 2.2, h: 0.55, top: 0.12, r: 0.22, n: 7 } as const;
 export interface Actor {
   readonly name: string;
   readonly rig: Rig;
+  /** her hair on this island, over her name's (palette.ts herHair): one that reads in the pose people look at longest */
+  readonly cut?: Cut;
 }
 
 /** a point in the world: x, y, z */
@@ -247,10 +250,11 @@ function hard(): Island {
   /** its head's turn from its sideways body: ahead along the board, or to you */
   const AHEAD = 1.0;
   const YOU = -Math.PI / 2 - SIDE;
-  const ride = (u: number, o: Partial<Rig> = {}): Actor => bim(name, {
+  // buns, not her ponytail: she faces you in her held pose, where a ponytail hides behind her head (designer m_43723)
+  const ride = (u: number, o: Partial<Rig> = {}): Actor => ({ cut: 'buns', ...bim(name, {
     ...spot(u - 0.25, 0.3), dir, y: DECK - 0.04, body: [0, SIDE, 0], head: [0, AHEAD, 0], armL: [0, 0, -1.0], armR: [0, 0, 1.0],
     legL: 0.5, legR: -0.3, board: BOARD, props: { ...NO_PROPS, skate: true }, ...o,
-  });
+  }) });
   /** in the air `h` over the floor, the board kept under the feet, pitched `p` */
   const air = (u: number, h: number, p: number, o: Partial<Rig> = {}): Actor =>
     ride(u, { lift: h, board: { ...BOARD, rot: [p, 0, 0] }, armL: [0, 0, -1.35], armR: [0, 0, 1.35], legL: 0.8, legR: -0.5, ...o });
