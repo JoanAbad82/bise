@@ -138,6 +138,16 @@ export const composer = {
   bar_expand: "expand",
   /** held ctrl: ctrl+o closes everything open */
   bar_collapse: "collapse",
+  /** the desktop's held ⌃ (the composer's row, designer m_44287): ⌃1 … ⌃9 open an inbox item */
+  held_open_item: "open an item",
+  /** the desktop's held ⌃, an item open: ⌃N ⌃P walk the items */
+  held_next_item: "next/previous item",
+  /** the desktop's held ⌥: ⌥↑↓ the agent above or below */
+  held_next_agent: "previous/next agent",
+  /** the desktop's held ⌘: ⌘F finds in the thread */
+  held_find_thread: "find in thread",
+  /** the desktop's held ⌘: ⌘N adds a project */
+  held_new_project: "new project",
   /** the key bar's tip, on its right */
   tip: (a: { words: string | number }): string => "tip · " + String(a.words),
   /** the key bar's tip, plain ASCII (and the desktop's) */

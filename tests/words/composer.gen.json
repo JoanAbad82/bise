@@ -632,6 +632,31 @@
     "one": null,
     "text": "Send to"
   },
+  "composer.held_find_thread": {
+    "args": [],
+    "one": null,
+    "text": "find in thread"
+  },
+  "composer.held_new_project": {
+    "args": [],
+    "one": null,
+    "text": "new project"
+  },
+  "composer.held_next_agent": {
+    "args": [],
+    "one": null,
+    "text": "previous/next agent"
+  },
+  "composer.held_next_item": {
+    "args": [],
+    "one": null,
+    "text": "next/previous item"
+  },
+  "composer.held_open_item": {
+    "args": [],
+    "one": null,
+    "text": "open an item"
+  },
   "composer.hint_auto_jev": {
     "args": [
       "who"

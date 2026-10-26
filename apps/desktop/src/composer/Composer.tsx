@@ -9,8 +9,11 @@
 // the callbacks go through refs). The frame around it is amb-kit's ComposerFrame: its head is the
 // screen's context strip (thread/ComposerTab.tsx), with this composer's one-off notice at its right;
 // its row the screen's tools, then the mic and send. No key bar (bise fait mac): the keys work, their
-// words live in the menus and the controls' tips. Owner: nm-composer.
+// words live in the menus and the controls' tips; a modifier held alone lists bise's keys of it in
+// the row's empty middle and puts ⌃R on the mic (heldkeys.ts, designer m_44287). Owner: r2-hints
+// (nm-composer's before).
 import {
+  Fragment,
   memo,
   useEffect,
   useLayoutEffect,
@@ -20,9 +23,10 @@ import {
   type JSX,
   type ReactNode,
 } from "react";
-import { AppIcon, ComposerFrame, cutWords, Press, tipAttrs } from "@/ds";
+import { AppIcon, ComposerFrame, cutWords, Kbd, Press, tipAttrs } from "@/ds";
 import "./composer.css";
 import { composer } from "../proto/words.gen";
+import { heldPairs, type HeldCtx, type HeldMod, type HeldPair } from "./heldkeys";
 import type { ComposerActions, FieldBar } from "./actions";
 import { endsLine, monoRuns, type Notice } from "./notice";
 import { PmField } from "./pm/PmField";
@@ -89,6 +93,9 @@ export interface ComposerProps {
    *  right, nothing moves; `onLineDone` at his first key in the frame */
   readonly line?: Notice | null;
   readonly onLineDone?: () => void;
+  /** a modifier held alone (app/held.ts) and the window's facts (thread/foldHint.tsx
+   *  useComposerHeld): the row lists that modifier's keys, ⌃ puts ⌃R on the mic; none: nothing held */
+  readonly held?: { readonly mod: HeldMod; readonly ctx: HeldCtx } | null;
   /** whether the field holds something to send (the floating composer stays open while it does) */
   readonly onCanSend?: (can: boolean) => void;
   readonly testId?: string;
@@ -134,6 +141,18 @@ export const Composer = memo(function Composer(
   });
   const dictating = field.dictating;
   const notice = props.line ?? null;
+  // a modifier held alone: its keys in the row's empty middle; a take keeps the row as it is
+  const held = props.held != null && dictating === null ? props.held : null;
+  const pairs =
+    held === null
+      ? null
+      : heldPairs(held.mod, {
+          ...held.ctx,
+          busy,
+          typing: field.typing,
+          dictate: sources.dictate !== undefined,
+          voice: sources.voice !== undefined,
+        });
 
   return (
     <ComposerFrame
@@ -149,13 +168,19 @@ export const Composer = memo(function Composer(
       answering={answering}
       answerTip={answerTip}
       {...(quiet === true ? { quiet } : {})}
-      tools={tools}
+      tools={
+        <>
+          {tools}
+          {pairs !== null && <HeldKeys mod={held?.mod ?? "Control"} pairs={pairs} testId={testId} />}
+        </>
+      }
       toolsEnd={
         <>
           {toolsEnd}
           {sources.dictate !== undefined && (
             <Mic
               state={dictating}
+              ctrl={held?.mod === "Control"}
               onClick={() => {
                 actions.current?.dictate();
                 actions.current?.focus();
@@ -295,10 +320,13 @@ function NoticeLine({ line }: { line: Notice }): JSX.Element {
  *  (pm/dictation.ts), with no button of its own. Its own state only: the field never re-renders. */
 function Mic({
   state,
+  ctrl,
   onClick,
   testId,
 }: {
   state: "recording" | "transcribing" | null;
+  /** ⌃ held alone: the icon gives way to the ⌃R keycap in the same 28 box, nothing moves (designer m_44287) */
+  ctrl: boolean;
   onClick: () => void;
   testId: string;
 }): JSX.Element {
@@ -315,7 +343,34 @@ function Mic({
       data-testid={`${testId}.mic`}
       data-state={state ?? "off"}
     >
-      <AppIcon name="mic" />
+      {ctrl ? (
+        <span className="cmp-mic-key" data-testid={`${testId}.mic.hint`}>
+          <Kbd>⌃R</Kbd>
+        </span>
+      ) : (
+        <AppIcon name="mic" />
+      )}
     </Press>
+  );
+}
+
+/** A held modifier's keys in the row's empty middle (heldkeys.ts): one keycap per key, a text-3
+ *  '…' between a range's two, the word t-12 text-3; one line high, what doesn't fit wraps to its
+ *  hidden second line, whole pairs from the end (designer m_44287). */
+function HeldKeys({ mod, pairs, testId }: { mod: HeldMod; pairs: readonly HeldPair[]; testId: string }): JSX.Element {
+  return (
+    <span className="cmp-held" data-testid={`${testId}.held`} data-mod={mod}>
+      {pairs.map((p) => (
+        <span key={p.caps.join(p.sep) + p.word} className="cmp-held-pair" data-testid={`${testId}.held.pair`}>
+          {p.caps.map((c, i) => (
+            <Fragment key={i}>
+              {i > 0 && p.sep === "…" && <span className="cmp-held-sep">…</span>}
+              <Kbd>{c}</Kbd>
+            </Fragment>
+          ))}
+          <span className="cmp-held-word">{p.word}</span>
+        </span>
+      ))}
+    </span>
   );
 }

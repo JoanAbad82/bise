@@ -258,4 +258,26 @@ describe('the composer', () => {
     });
     expect(container.textContent).toContain(words.no_undo);
   });
+
+  // r2-hints (his m_44255, designer m_44287): the held keys came back after nm-composer's key bar left
+  it('a modifier held alone: ⌃ puts ⌃R on the mic in place of its icon, and the row lists its keys; nothing held, neither', async () => {
+    const dictate = { start: () => 'd1', stop: () => {}, cancel: () => {} } as unknown as NonNullable<typeof NO_SOURCES.dictate>;
+    const sources = { ...NO_SOURCES, dictate, voice: () => {} };
+    const ctx = { fold: null, inbox: 2, itemOpen: false, code: false, agents: 0, thread: true };
+    const { getByTestId, queryByTestId, rerender, onSend, store } = await mount({ sources });
+    expect(queryByTestId('composer.held')).toBeNull();
+    expect(queryByTestId('composer.mic.hint')).toBeNull();
+    rerender(<Composer target="p/main" store={store} onSend={onSend} sources={sources} busy held={{ mod: 'Control', ctx }} />);
+    expect(getByTestId('composer.mic.hint').textContent).toBe('⌃R');
+    expect(getByTestId('composer.mic').querySelector('svg')).toBeNull();
+    const pairs = [...getByTestId('composer.held').querySelectorAll('[data-testid="composer.held.pair"]')].map((p) => p.textContent);
+    expect(pairs).toEqual([`⌃C${words.bar_stop}`, `⌃1…⌃2${words.held_open_item}`, `⌃R${words.bar_dictate}`, `⌃R⌃R${words.bar_voice_mode}`, `⌃\`${words.bar_terminal}`]);
+    // ⌘ held: its own keys, the mic keeps its icon
+    rerender(<Composer target="p/main" store={store} onSend={onSend} sources={sources} held={{ mod: 'Meta', ctx }} />);
+    expect(queryByTestId('composer.mic.hint')).toBeNull();
+    expect(getByTestId('composer.held').dataset.mod).toBe('Meta');
+    expect(getByTestId('composer.held').textContent).toContain(words.held_new_project);
+    rerender(<Composer target="p/main" store={store} onSend={onSend} sources={sources} held={null} />);
+    expect(queryByTestId('composer.held')).toBeNull();
+  });
 });

@@ -18,6 +18,7 @@ import { HELP_EVENT } from '@/app/keys';
 import { keptStorage } from '@/app/keep';
 import { cardDraftKey, leaveClosed, openInbox } from '@/inbox';
 import { emptyEnterAct } from './head';
+import { useComposerHeld } from './foldHint';
 import { computerRowOf, computerState } from './ComputerLine';
 import type { Agent } from '@/proto';
 import { ComposerTab, type StripProject } from './ComposerTab';
@@ -385,6 +386,8 @@ export const ThreadComposer = memo(function ThreadComposer({
     [attach, answering, project, floating],
   );
   const toolsEnd = answering || floating || me === undefined ? undefined : <ModelTool project={project} a={me} />;
+  // a modifier held alone: its keys in the composer's row, ⌃R on the mic (composer/heldkeys.ts)
+  const held = useComposerHeld();
   // answering, the tab holds only 'answering <agent> · <question>' and the way back: its place and
   // context come back with a plain message (designer m_24517)
   // (the pink artifact's tab the same: '↳ to perf · about “…”' and 'esc to bise instead')
@@ -422,7 +425,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   useEffect(() => {
     doneRef.current = lineDone;
   });
-  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={floating ? undefined : tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} head={floating ? undefined : tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} held={held} onShiftTab={onShiftTab} placeholder={placeholder} placeholderTail={placeholderTail} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} lead={lead} {...(onCanSend === undefined ? {} : { onCanSend })} testId="composer" />;
   // its focus says whom he talks to (composer/talking.ts: nm-side's camera); the wrapper has no box
   const talk = useMemo(() => talkFocusHandlers({ project, agent }), [project, agent]);
   // gone while focused (a route change): no blur comes, so it lets go here

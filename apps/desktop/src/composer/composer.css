@@ -432,6 +432,54 @@
 .b-composer .cmp-mic[hidden] {
   display: none;
 }
+/* ⌃ held (heldkeys.ts, designer m_44287): the ⌃R keycap in the mic's 28 box, in place of its icon */
+.b-composer .cmp-mic-key {
+  display: inline-flex;
+  animation: cmp-held-in 120ms var(--ease-out);
+}
+/* a held modifier's keys in the row's empty middle: one line high, what doesn't fit wraps to the
+   hidden second line, whole pairs from the end (the drop order is heldkeys.ts's); 12 between pairs */
+.b-composer .cmp-held {
+  flex: 1 1 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--s-3);
+  min-width: 0;
+  height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  overflow: hidden;
+  font: var(--f-meta);
+  color: var(--c-text-3);
+  white-space: nowrap;
+  animation: cmp-held-in 120ms var(--ease-out);
+}
+.b-composer .cmp-held-pair {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: var(--h-control-sm);
+}
+.b-composer .cmp-held-sep {
+  color: var(--c-text-3);
+}
+@keyframes cmp-held-in {
+  from {
+    opacity: 0;
+  }
+}
+/* reduced motion: there at once; gone at release with no fade (it unmounts) */
+@media (prefers-reduced-motion: reduce) {
+  .b-composer .cmp-held,
+  .b-composer .cmp-mic-key {
+    animation: none;
+  }
+}
+:root[data-reduce-motion] .b-composer .cmp-held,
+:root[data-reduce-motion] .b-composer .cmp-mic-key {
+  animation: none;
+}
 /* the mode and model chips are the ds PickerTrigger (ds/dropdown.tsx: the same 28 px chip, the
    caret centered 8 px after the words): 12/16 text-2, the mode 500 */
 .b-composer .cmp-menu {
