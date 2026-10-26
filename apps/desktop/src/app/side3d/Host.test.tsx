@@ -145,6 +145,7 @@ describe('the right side, folded', () => {
     expect(v.getByTestId(`app.flyout.agents.${ACME}.docs`).hasAttribute('data-asks')).toBe(false);
     fireEvent.click(v.getByTestId(`app.flyout.agents.${ACME}.perf.opt.1`));
     expect(does).toHaveBeenCalledWith({ i: 'pick', project: ACME, card: 7, n: 1, from: { at: { project: ACME, agent: 'perf' } } });
+    // a question (not an approval): 'answer…' (designer m_45824: an approval says 'write to perf…')
     expect(v.getByTestId(`app.flyout.agents.${ACME}.perf.answer`).textContent).toBe(side.answer);
     // ARCHIVED folded in its foot, open on a click
     expect(v.getByTestId('app.flyout.agents.archived').textContent).toContain(side.archived({ n: 1 }));

@@ -64,6 +64,8 @@ export const side = {
   state_idle: "idle",
   /** the button of an asking agent's bubble that opens the question in the inbox, to answer in words */
   answer: "answer…",
+  /** the agents float's button on an approval card: the composer opens on that agent, yes / no stay the only way to decide (designer m_45824) */
+  write_to: (a: { agent: string | number }): string => "write to " + String(a.agent) + "…",
   /** the '?' on an asking agent's head, its tip */
   asks_tip: (a: { agent: string | number }): string => String(a.agent) + " asks you something",
   /** the dot of a new artifact, its tip */

@@ -329,5 +329,12 @@
     "args": [],
     "one": null,
     "text": "open the office in a tab"
+  },
+  "side.write_to": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "write to {agent}…"
   }
 }

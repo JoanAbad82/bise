@@ -140,7 +140,9 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group, onHandoff }: { r: B
                 document.querySelector<HTMLElement>(COMPOSER_FIELD)?.focus();
               });
             }} data-testid={`${id}.answer`}>
-              {side.answer}
+              {/* the word follows the card's kind (designer m_45824): a question 'answer…' (the composer
+                  answers it), an approval 'write to perf…' (yes / no stay the only way to decide) */}
+              {card.approval === true ? side.write_to({ agent: r.name }) : side.answer}
             </Press>
           )}
         </span>
