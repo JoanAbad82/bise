@@ -49,6 +49,11 @@ Focus emulation is on, so the caret is drawn even though the window is never foc
 | `inputs.ts` | `dropFiles` (CDP drag, the real drop path) · `pasteImage` (a paste event carrying the image, the one exception: his pasteboard is never written) |
 | `proof.ts` | `Watch`, `prove`, `violationsIn` |
 
+A WebGL canvas that stopped drawing (the bims office at rest, any still loop, reduced motion) comes out
+blank in `page.screenshot` about 0.4 s after its last frame, `preserveDrawingBuffer` or not, while the
+window shows it: off-screen rendering's capture, not the app (checked on a bare WebGL page, bims-reduced).
+Read what is shown from the screencast: `Recorder`, or `shotOf` in `checks/bims/world.ts`.
+
 Self-tests (`self/harness.spec.ts`, fixture `fixtures/typing.html`): each detector passes on a good field and
 fails on a bad one. Measured: 59.5 fps off screen, caret blinks, 0 replaced nodes and 0 pixels changed outside
 a good field, and the innerHTML rewrite is caught.
