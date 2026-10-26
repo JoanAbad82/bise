@@ -98,9 +98,10 @@ export function AgentLine({ project, a, cards, at, onOpen }: AgentLineProps) {
   return (
     <div className="s3-agent" data-k={s.k} onContextMenu={menu.onContextMenu} data-testid={`app.flyout.agents.${project}.${a.name}`}>
       <Words project={project} a={a} s={s} at={at} onOpen={open} />
-      <Press look="s3-agent-who" aria-label={shownName(a.name)} onClick={open} data-row="">
+      <Press look="s3-agent-who" aria-label={shownName(a.name)} onClick={open} data-row=""
+        {...tipAttrs(`${shownName(a.name)} · ${speechWord(s)}`)}>
         <Head project={project} a={a} asks={s.k === 'asks'} />
-        <span className="s3-agent-name">{shownName(a.name)}</span>
+        <span className="s3-agent-name" data-testid={`app.flyout.agents.${project}.${a.name}.name`}>{shownName(a.name)}</span>
       </Press>
     </div>
   );

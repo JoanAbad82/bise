@@ -15,10 +15,11 @@ export type BubbleId = (typeof BUBBLES)[number];
 /**
  * The coin a bubble's object stands on (bims-plugins' r3 spec, designer m_44673: B; its objects
  * placed again, designer m_45014: E.5): the disc (--bubble), the box every object fits in (aspect
- * kept: a tall one 32 high, a wide one 36 wide) and its base, css px from the disc's top: the
- * disc's centre, as if set on the middle of the plate.
+ * kept: a tall one 32 high, a wide one 36 wide) and its base, css px from the disc's top: 8 under
+ * the disc's centre (30), so a tall object's middle sits 8 above the coin's centre, not 16, and it
+ * rises 2 above the disc at most (Gabriel m_45524: 'about 8 px too high' on E.5's base at 22).
  */
-export const COIN = { disc: 44, box: { w: 36, h: 32 }, base: 22 } as const;
+export const COIN = { disc: 44, box: { w: 36, h: 32 }, base: 30 } as const;
 
 /**
  * Where a bubble's object picture goes, css px from the disc's top-left corner (y down): a square

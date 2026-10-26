@@ -1,8 +1,8 @@
 // src/app/side3d · the 3D bubbles under the world (page native-mac §7, pick A; round 3: B, the coin,
 // bims-plugins' spec, designer m_44673): each a 44 opaque coin (side3d.css: the top face, a 3 px
 // side one step darker, a soft contact shadow), 36 apart; its object drawn in a 36 square at
-// objects.ts objectAt (left 4, top -14: its base on the disc's centre, rising 10 at most, designer
-// m_45014) over the plate's own shadow; agents = a bust, artifacts = three sheets, scheduled = the
+// objects.ts objectAt (left 4, top -6: its base 8 under the disc's centre, rising 2 at most, designer
+// m_45014, Gabriel m_45524) over the plate's own shadow; agents = a bust, artifacts = three sheets, scheduled = the
 // hourglass, processes = a laptop (bubble3d.ts), drawn by cache.ts; no WebGL: a plain tile with the
 // kind's line icon. One pill centred on the coin's rim lower-left (mono t-12 tabular, 3 digits
 // whole, text-2 on --c-raised): the count, none at 0; the agents bubble's is its active agents,

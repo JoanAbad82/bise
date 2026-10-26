@@ -191,7 +191,7 @@ export function alphaBox(data: ArrayLike<number>, w: number, h: number, min = 8)
  * The square camera on a bubble's object, `size` px (designer m_45014, bims-plugins m_45029): its
  * drawn box (`drawn`, px of the first look `look`, `lookPx` square) fitted in COIN.box, aspect
  * kept (a tall one COIN.box.h high, a wide one the square's width), centred across, its lowest
- * drawn pixel on the square's bottom (objects.ts objectAt puts that on the disc's centre). Pure.
+ * drawn pixel on the square's bottom (objects.ts objectAt puts that 8 under the disc's centre). Pure.
  */
 export function alphaFit(look: Fit, drawn: PxBox, lookPx: number, size: number): Fit {
   const u = (look.right - look.left) / lookPx;

@@ -159,11 +159,17 @@ describe('placed by the drawn box (designer m_45014)', () => {
   });
 });
 
-describe('the coin (designer m_45014: E.5)', () => {
-  it('the object\'s 36 square at left 4, top -14 of the 44 disc: its base on the disc\'s centre, rising 10 at most', () => {
+describe('the coin (designer m_45014: E.5; Gabriel m_45524: 8 lower)', () => {
+  it('the object\'s 36 square at left 4, top -6 of the 44 disc: its base 8 under the disc\'s centre, rising 2 at most', () => {
     const at = objectAt();
-    expect(at).toEqual({ left: 4, top: -14, size: 36, rise: 10 });
-    expect(at.top + at.size).toBe(COIN.disc / 2);
+    expect(at).toEqual({ left: 4, top: -6, size: 36, rise: 2 });
+    expect(at.top + at.size).toBe(COIN.disc / 2 + 8);
     expect(COIN.base - COIN.box.h).toBe(-at.rise);
+  });
+  it('a tall object\'s drawn middle sits 8 above the coin\'s centre (it was 16: too high by about 8)', () => {
+    const at = objectAt();
+    // alphaFit: a tall object fills COIN.box.h, its lowest pixel on the square's bottom
+    const middle = at.top + at.size - COIN.box.h / 2;
+    expect(COIN.disc / 2 - middle).toBe(8);
   });
 });
