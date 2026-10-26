@@ -1,50 +1,35 @@
-// The sidebar's rows: a project's agents in the hub's rank (no order of its own), the first 4 then
-// 'Show N more' (the agent in view always shows), the dot when it waits on him, the ring at work,
-// nothing else; a pinned agent leaves its project's list; a folded project says what waits.
+// The sidebar's rows (round 2, his r2-img11): one row per project, no agent under it; at its end
+// one fact (designer m_44271): what waits on him (the count), else its agents at work (the ring and
+// the count), else nothing; ⌘ held, its digit 1-9. A pinned agent's row keeps the dot or the ring.
 import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
-import { endOf, pinRowOf, projectBlockOf, projectsOf, SHOWN_AGENTS, type SideRow } from './siderows';
+import { endOf, pinRowOf, projectEndOf, projectRowOf, projectsOf, workingOf } from './siderows';
 
 const agent = (name: string, o: Partial<Agent> = {}): Agent =>
   ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 0, waits: 0, ...o }) as Agent;
 const project = (id: string, o: Partial<ProjectRow> = {}): ProjectRow => ({ project: id, name: id, order: 0, home: false, ...o }) as ProjectRow;
-const names = (rows: readonly SideRow[]) => rows.map((r) => (r.kind === 'agent' ? r.a.name : r.kind === 'more' ? `more ${String(r.n)}` : r.kind === 'project' ? `[${r.p.name}]` : r.label));
 
 const ACME = project('acme');
-const nums = (order: string[]) => new Map(order.map((n, i) => [n, i]));
 
-describe('projectBlockOf', () => {
-  it("lists the live agents in the hub's rank, never its own order, archived ones out", () => {
-    const agents = [agent('main'), agent('docs'), agent('perf'), agent('old', { archived: true })];
-    const rows = projectBlockOf({ p: ACME, agents, numbers: nums(['main', 'perf', 'docs']), pinned: [], folded: false, all: false });
-    expect(names(rows)).toEqual(['[acme]', 'main', 'perf', 'docs']);
+describe('projectRowOf', () => {
+  it('one fact at the end: what waits on him first, else its agents at work, else nothing', () => {
+    expect(projectEndOf(2, 3)).toEqual({ kind: 'waits', n: 2 });
+    expect(projectEndOf(0, 3)).toEqual({ kind: 'works', n: 3 });
+    expect(projectEndOf(0, 0)).toBeNull();
   });
 
-  it("shows the first 4, then 'Show N more'; open, all of them and 'Show less'", () => {
-    const agents = ['main', 'a', 'b', 'c', 'd', 'e', 'f'].map((n) => agent(n));
-    const numbers = nums(['main', 'a', 'b', 'c', 'd', 'e', 'f']);
-    const shut = projectBlockOf({ p: ACME, agents, numbers, pinned: [], folded: false, all: false });
-    expect(names(shut)).toEqual(['[acme]', 'main', 'a', 'b', 'c', 'more 3']);
-    expect(SHOWN_AGENTS).toBe(4);
-    const open = projectBlockOf({ p: ACME, agents, numbers, pinned: [], folded: false, all: true });
-    expect(names(open)).toEqual(['[acme]', 'main', 'a', 'b', 'c', 'd', 'e', 'f', 'more 0']);
+  it("counts its live agents at work, an archived one out; its row carries both counts for the tip", () => {
+    const agents = [agent('main', { status: 'working' }), agent('perf', { status: 'working' }), agent('old', { status: 'working', archived: true }), agent('docs')];
+    expect(workingOf(agents)).toBe(2);
+    expect(projectRowOf({ p: ACME, agents, waits: 1, index: 0, on: true, cmd: false })).toEqual({ kind: 'project', p: ACME, on: true, end: { kind: 'waits', n: 1 }, working: 2, waits: 1 });
   });
 
-  it('keeps the agent in view even past the first 4', () => {
-    const agents = ['main', 'a', 'b', 'c', 'd', 'e'].map((n) => agent(n));
-    const rows = projectBlockOf({ p: ACME, agents, numbers: nums(['main', 'a', 'b', 'c', 'd', 'e']), pinned: [], folded: false, all: false, at: 'e' });
-    expect(names(rows)).toEqual(['[acme]', 'main', 'a', 'b', 'c', 'e', 'more 1']);
-    expect(rows.find((r) => r.kind === 'agent' && r.a.name === 'e')).toMatchObject({ on: true });
-  });
-
-  it('leaves a pinned agent out (it sits in Pinned)', () => {
-    const rows = projectBlockOf({ p: ACME, agents: [agent('main'), agent('perf')], numbers: nums(['main', 'perf']), pinned: ['perf'], folded: false, all: false });
-    expect(names(rows)).toEqual(['[acme]', 'main']);
-  });
-
-  it('folded: only its row, the dot when one of its agents waits on him', () => {
-    const rows = projectBlockOf({ p: ACME, agents: [agent('main'), agent('perf', { waits: 1 })], numbers: nums(['main', 'perf']), pinned: [], folded: true, all: false });
-    expect(rows).toEqual([{ kind: 'project', p: ACME, open: false, end: 'waits' }]);
+  it('⌘ held: its digit, index + 1, the first 9 only (⌘1-9 in keys.ts)', () => {
+    const row = (index: number, cmd: boolean) => projectRowOf({ p: ACME, agents: [], waits: 0, index, on: false, cmd });
+    expect(row(0, true)).toMatchObject({ digit: 1 });
+    expect(row(8, true)).toMatchObject({ digit: 9 });
+    expect(row(9, true)).not.toHaveProperty('digit');
+    expect(row(0, false)).not.toHaveProperty('digit');
   });
 });
 
@@ -61,7 +46,7 @@ describe('endOf', () => {
 describe('pinRowOf', () => {
   it("a pinned agent's row, none once it left the live rows", () => {
     const agents = [agent('main'), agent('perf', { status: 'done' })];
-    expect(pinRowOf('acme', 'perf', agents, 'perf')).toMatchObject({ kind: 'agent', pinned: true, on: true, stopped: true });
+    expect(pinRowOf('acme', 'perf', agents, 'perf')).toMatchObject({ kind: 'agent', on: true, stopped: true });
     expect(pinRowOf('acme', 'gone', agents)).toBeNull();
   });
 });

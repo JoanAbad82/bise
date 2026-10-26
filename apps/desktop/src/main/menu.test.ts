@@ -41,15 +41,15 @@ describe('the application menu (bar ⛔2)', () => {
     for (const want of ['hide', 'hideOthers', 'quit', 'close', 'windowMenu', 'about']) expect(r).toContain(want);
   });
 
-  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save", () => {
+  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save, ⌘N / ⇧⌘N new project / agent", () => {
     const { items, sent } = build('darwin');
     const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
-    expect([...keys.keys()].sort()).toEqual(['CmdOrCtrl+,', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+S', 'Ctrl+`']);
-    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S']) {
+    expect([...keys.keys()].sort()).toEqual(['CmdOrCtrl+,', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'Ctrl+`', 'Shift+CmdOrCtrl+N']);
+    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N']) {
       const click = keys.get(k)?.click as (() => void) | undefined;
       click?.();
     }
-    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save']);
+    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent']);
   });
 
   it('settings once per platform, never twice', () => {
@@ -105,6 +105,19 @@ describe('menuTarget (qa-native m_9724)', () => {
     expect(menuTarget('save', false)).toEqual({ send: 'focused' });
     const { items } = build('darwin');
     expect(items.find((i) => i.accelerator === 'CmdOrCtrl+S')?.label).toBe('Save a Copy…');
+  });
+
+  it('File: New Project… ⌘N and New Agent… ⇧⌘N (his m_44225) go to the focused window, never a route', () => {
+    const { items, sent } = build('darwin');
+    const project = items.find((i) => i.label === 'New Project…');
+    const agent = items.find((i) => i.label === 'New Agent…');
+    expect(project?.accelerator).toBe('CmdOrCtrl+N');
+    expect(agent?.accelerator).toBe('Shift+CmdOrCtrl+N');
+    (project?.click as (() => void) | undefined)?.();
+    (agent?.click as (() => void) | undefined)?.();
+    expect(sent).toEqual(['newProject', 'newAgent']);
+    expect(menuTarget('newProject', false)).toEqual({ send: 'focused' });
+    expect(menuTarget('newAgent', false)).toEqual({ send: 'focused' });
   });
 });
 

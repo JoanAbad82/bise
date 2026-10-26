@@ -126,5 +126,6 @@ describe("the hand on everything he clicks (ds/css/base.css)", () => {
     expect(count).toBeGreaterThan(100);
     expect(roleless, "a plain element he clicks: give it its role (button, option, tab, link...)").toEqual([]);
     expect(arrow, "a clickable element without the hand: a stylesheet puts the arrow back on it").toEqual([]);
-  });
+    // the whole gallery is one render (0.6 s alone); under a loaded Mac (peers' gates) it took 9.7 s
+  }, 30_000);
 });

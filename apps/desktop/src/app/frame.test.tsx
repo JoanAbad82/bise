@@ -1,16 +1,17 @@
 // @vitest-environment happy-dom
 // The frame of mockup 1, drawn from the store: the rail's places (the current one marked, inbox's
-// dot only while something waits), the sidebar's two levels (an agent's thread from its row, the
-// dot and the ring, 'Show N more'), and New agent ⌘N on the project in view.
+// dot only while something waits), the sidebar's projects (round 2: one row each, no agent under
+// it, its one fact, ⌘ held its digit), New project ⌘N and New agent ⇧⌘N.
 import { cleanup, fireEvent, render } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
-import type { Agent } from '@/proto';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HINT_HOLD_MS } from './held';
+import type { Agent, ProjectRow } from '@/proto';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 import { ev, projects, row } from '../../tests/feature/inputs';
 import { createRouter, RouterContext } from './router';
 import type { Route } from './route';
-import { Sidebar } from './Sidebar';
+import { projectRowTip, Sidebar } from './Sidebar';
 import { SideRail } from './SideRail';
 import { NewAgentHost, useNewAgentAsked } from './newagent';
 import { askEntityAction } from './menus/actions';
@@ -19,6 +20,7 @@ import { act } from '@testing-library/react';
 afterEach(cleanup);
 const HOME = 'bise-home-00000000';
 const ACME = 'acme-1a2b3c4d';
+const DOCS = 'docs-5e6f7a8b';
 
 const AGENT = (ev('agents').agents[0] ?? {}) as Agent;
 const agent = (name: string, o: Partial<Agent> = {}): Agent => ({ ...AGENT, name, main: name === 'main', status: 'idle', waits: 0, archived: false, ...o });
@@ -27,12 +29,12 @@ function Asked() {
   return <span data-testid="asked">{useNewAgentAsked() ?? ''}</span>;
 }
 
-function frame(route: Route, agents: Agent[], sent: unknown[] = []) {
+function frame(route: Route, agents: Agent[], sent: unknown[] = [], acme: Partial<ProjectRow> = {}) {
   const port: CorePort = { send: (c) => { sent.push(c); }, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   (window as unknown as { bise: unknown }).bise = { notify: { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined } };
   const store = new Store(port);
   store.setCore('up');
-  store.apply(projects(row({ project: HOME, name: 'bise', home: true }), row({ project: ACME, name: 'acme' })));
+  store.apply(projects(row({ project: HOME, name: 'bise', home: true }), row({ project: ACME, name: 'acme', order: 1, ...acme }), row({ project: DOCS, name: 'docs', order: 2 })));
   store.apply(ev('agents', { project: ACME, agents }));
   const router = createRouter(route);
   const v = render(
@@ -69,47 +71,66 @@ describe('the rail', () => {
 });
 
 describe('the sidebar', () => {
-  it("lists a project's agents in the hub's rank, an agent's row opens its thread, the one in view marked", () => {
-    const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'docs' }, [agent('main'), agent('docs', { rank: 2 }), agent('perf', { rank: 1 })]);
-    const list = v.getByTestId('app.side.list');
-    const ids = [...list.querySelectorAll('[data-testid^="app.side.agent."]')].map((e) => e.getAttribute('data-testid'));
-    expect(ids).toEqual([`app.side.agent.${ACME}.main`, `app.side.agent.${ACME}.perf`, `app.side.agent.${ACME}.docs`]);
-    expect(v.getByTestId(`app.side.agent.${ACME}.docs`).getAttribute('aria-current')).toBe('page');
-    fireEvent.click(v.getByTestId(`app.side.agent.${ACME}.perf`));
-    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'perf' });
-    fireEvent.click(v.getByTestId(`app.side.agent.${ACME}.main`));
-    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'main' });
+  // light and dark (designer's shots): the same rows, the theme only paints them
+  for (const theme of ['light', 'dark'] as const) {
+    it(`${theme}: one row per project in his order, no agent under it; a click opens its main, the one in view marked`, () => {
+      document.documentElement.dataset.theme = theme;
+      const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'perf' }, [agent('main'), agent('perf'), agent('docs')]);
+      const list = v.getByTestId('app.side.list');
+      const ids = [...list.querySelectorAll('[data-testid^="app.side."]')].map((e) => e.getAttribute('data-testid')).filter((id) => /^app\.side\.(project|agent|more)\.[^.]+$/.test(id ?? ''));
+      expect(ids).toEqual([`app.side.project.${ACME}`, `app.side.project.${DOCS}`]);
+      expect(v.getByTestId(`app.side.project.${ACME}`).getAttribute('aria-current')).toBe('page');
+      expect(v.getByTestId(`app.side.project.${DOCS}`).getAttribute('aria-current')).toBeNull();
+      fireEvent.click(v.getByTestId(`app.side.project.${DOCS}`));
+      expect(router.get()).toEqual({ screen: 'thread', project: DOCS, agent: 'main' });
+      delete document.documentElement.dataset.theme;
+    });
+  }
+
+  it("ends a project's row with one fact: what waits on him, else its agents at work, else nothing; its tip says both", () => {
+    const working = [agent('main', { status: 'working' }), agent('perf', { status: 'working' })];
+    const waits = frame({ screen: 'bise' }, working, [], { cards: null as never, waits: 1 }).v;
+    expect(waits.getByTestId(`app.side.project.${ACME}.waits`).textContent).toBe('1');
+    expect(waits.queryByTestId(`app.side.project.${ACME}.works`)).toBeNull();
+    expect(waits.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(projectRowTip(2, 1));
+    cleanup();
+    const works = frame({ screen: 'bise' }, working).v;
+    expect(works.getByTestId(`app.side.project.${ACME}.works`).textContent).toBe('2');
+    expect(works.getByTestId(`app.side.project.${ACME}.works`).querySelector('.app-s-ring')).not.toBeNull();
+    expect(works.queryByTestId(`app.side.project.${DOCS}.works`)).toBeNull();
+    expect(works.queryByTestId(`app.side.project.${DOCS}.waits`)).toBeNull();
   });
 
-  it('ends a row with the dot when it waits on him, the ring at work, nothing else', () => {
-    const { v } = frame({ screen: 'bise' }, [agent('main'), agent('perf', { waits: 2 }), agent('docs', { status: 'working' })]);
-    expect(v.getByTestId(`app.side.agent.${ACME}.perf.waits`)).toBeTruthy();
-    expect(v.getByTestId(`app.side.agent.${ACME}.docs.works`)).toBeTruthy();
-    expect(v.queryByTestId(`app.side.agent.${ACME}.main.waits`)).toBeNull();
-    expect(v.getByTestId(`app.side.agent.${ACME}.perf`).textContent).toBe('perf');
+  it('⌘ held shows each project its ⌘ digit, in his order (⌘1-9 opens it)', () => {
+    vi.useFakeTimers();
+    try {
+      const { v } = frame({ screen: 'bise' }, [agent('main', { status: 'working' })]);
+      expect(v.queryByTestId(`app.side.project.${ACME}.digit`)).toBeNull();
+      act(() => {
+        fireEvent.keyDown(window, { key: 'Meta', code: 'MetaLeft', metaKey: true });
+        vi.advanceTimersByTime(HINT_HOLD_MS + 10);
+      });
+      expect(v.getByTestId(`app.side.project.${ACME}.digit`).textContent).toBe('⌘1');
+      expect(v.getByTestId(`app.side.project.${DOCS}.digit`).textContent).toBe('⌘2');
+      expect(v.queryByTestId(`app.side.project.${ACME}.works`)).toBeNull();
+      act(() => {
+        fireEvent.keyUp(window, { key: 'Meta', code: 'MetaLeft' });
+      });
+      expect(v.queryByTestId(`app.side.project.${ACME}.digit`)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("'Show N more' after 4 agents opens the rest", () => {
-    const { v } = frame({ screen: 'bise' }, ['main', 'a', 'b', 'c', 'd', 'e'].map((n, i) => agent(n, { rank: i })));
-    const more = v.getByTestId(`app.side.more.${ACME}`);
-    expect(more.textContent).toBe('Show 2 more');
-    expect(v.queryByTestId(`app.side.agent.${ACME}.e`)).toBeNull();
-    fireEvent.click(more);
-    expect(v.getByTestId(`app.side.agent.${ACME}.e`)).toBeTruthy();
-  });
-
-  it('a click on the project folds its agents', () => {
-    const { v } = frame({ screen: 'bise' }, [agent('main'), agent('perf')]);
-    fireEvent.click(v.getByTestId(`app.side.project.${ACME}`));
-    expect(v.queryByTestId(`app.side.agent.${ACME}.perf`)).toBeNull();
-    expect(v.getByTestId(`app.side.project.${ACME}`).getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(v.getByTestId(`app.side.project.${ACME}`));
-  });
-
-  it('New agent asks for an agent in the project in view', () => {
-    const { v } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+  it('New project first (⌘N) opens the add-a-project way in; New agent (⇧⌘N) asks in the project in view', () => {
+    const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+    const head = [...v.getByTestId('app.sidebar').querySelectorAll('.app-s-head [data-testid]')].map((e) => e.getAttribute('data-testid'));
+    expect(head).toEqual(['app.side.new-project', 'app.side.new', 'app.side.search']);
     fireEvent.click(v.getByTestId('app.side.new'));
     expect(v.getByTestId('asked').textContent).toBe(ACME);
+    // no sheet mounted in this test: settings › projects is the way in (addProject.ts)
+    fireEvent.click(v.getByTestId('app.side.new-project'));
+    expect(router.get()).toEqual({ screen: 'settings', page: 'projects' });
   });
 
   it("the menu's Rename takes the new name inline on the project's row", () => {

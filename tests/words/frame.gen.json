@@ -54,6 +54,11 @@
     "one": null,
     "text": "in {project}"
   },
+  "frame.new_project": {
+    "args": [],
+    "one": null,
+    "text": "New project"
+  },
   "frame.pinned": {
     "args": [],
     "one": null,
@@ -88,18 +93,6 @@
     "args": [],
     "one": null,
     "text": "Settings"
-  },
-  "frame.show_less": {
-    "args": [],
-    "one": null,
-    "text": "Show less"
-  },
-  "frame.show_more": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "Show {n} more"
   },
   "frame.show_sidebar": {
     "args": [],

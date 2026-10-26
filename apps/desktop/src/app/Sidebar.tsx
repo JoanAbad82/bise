@@ -1,35 +1,37 @@
 // The sidebar (bise fait mac, page native-mac §6, mockup 1): beside the rail under the bar, 240
 // wide (200-320 by its border, kept: frame-state.ts), --p-raised 82% with a 12 top-left corner.
-// 'New agent ⌘N' and 'Search ⌘K' first, then 'Pinned' (pins.ts) and 'Projects': each project a
-// folder row (a click folds it), its live agents in the hub's rank under it, the first 4 then
-// 'Show N more', at a row's end only the dot (it waits on him) or the ring (it works): siderows.ts
-// decides, this draws. Its head stays, its list scrolls; a right click on an agent or a project
-// opens its menu (useEntityMenu, nm-menus'). On the artifacts library (decision d2) it shows
-// '← Projects' and the library (artifacts' ArtLibrary) at the same width, a 160 ms crossfade.
-// Owner: nm-frame.
+// 'New project ⌘N' first (his m_44225: he rarely makes an agent by hand, he talks to main), then
+// 'New agent ⇧⌘N' and 'Search ⌘K'; then 'Pinned' (pins.ts, his own shortcuts) and 'Projects': one
+// row per project, a click opens it (its main), no agent under it (round 2, his r2-img11: the
+// agents live on the right side), at its end one fact (what waits on him, else its agents at work)
+// and, ⌘ held, its ⌘1-9 digit: siderows.ts decides, this draws. Its head stays, its list scrolls;
+// a right click on a pin or a project opens its menu (useEntityMenu, nm-menus'). On the artifacts
+// library (decision d2) it shows '← Projects' and the library (artifacts' ArtLibrary) at the same
+// width, a 160 ms crossfade. Owner: r2-pointer this round (nm-frame's, archived).
 //
-// Each project's block and each pin read their own project's agents (useAgents): an event
-// re-renders the block it touches, never the sidebar, and a thread's entries never do.
+// Each project row and each pin read their own project's agents (useAgents): an event re-renders
+// the row it touches, never the sidebar, and a thread's entries never do.
 import { memo, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { AppIcon, Input, tipAttrs, type AppIconName, Press } from '@/ds';
 import type { ProjectRow } from '@/proto';
 import { frame } from '@/proto/words_frame.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { useAgents, useProjects, useStore } from '@/store';
-import { numbersOf } from '@/agents/model';
 import { ArtLibrary } from '@/artifacts';
 import { SettingsNav } from '@/settings/nav';
-import { useWaitingCount } from '@/inbox/waiting';
+import { useProjectWaiting, useWaitingCount } from '@/inbox/waiting';
+import { common } from '@/proto/words.gen';
 import { useEntityMenu } from './menus/use';
 import { useEntityAction } from './menus/actions';
 import { MAIN, projectOf } from './route';
 import { useRoute, useRouter } from './router';
-import { keep, useKeptScroll } from './keep';
+import { useKeptScroll } from './keep';
 import { useModHeld } from './held';
 import { usePinned, type Pin } from './pins';
 import { newAgent } from './newagent';
 import { addProject } from './addProject';
-import { pinRowOf, projectBlockOf, projectsOf, type RowEnd, type SideRow } from './siderows';
+import { pinRowOf, projectRowOf, projectsOf, type ProjectEnd, type RowEnd } from './siderows';
+import { waitsTip, workingTip } from './tipwords';
 
 /** What waits on him, one number everywhere: the inbox's own list (designer m_25690). */
 export function useWaitingTotal(): number {
@@ -61,22 +63,42 @@ function CutName({ name }: { name: string }) {
   );
 }
 
-/** A row's end: the accent dot (it waits on him) or the ring (it works), each with its tip; nothing else. */
+/** A project row's end (designer m_44271, the bubbles' grammar): the count in the accent when
+ * something waits on him, else the ring and the count in text-3; ⌘ held, its digit in their place. */
+function ProjectEndView({ end, digit, testId }: { end: ProjectEnd; digit: number | undefined; testId: string }) {
+  if (digit !== undefined) return <kbd data-testid={`${testId}.digit`}>{`⌘${String(digit)}`}</kbd>;
+  if (end === null) return null;
+  if (end.kind === 'waits') return <span className="app-s-cnt waits" data-testid={`${testId}.waits`}>{end.n}</span>;
+  return (
+    <span className="app-s-cnt" data-testid={`${testId}.works`}>
+      <span className="app-s-ring" />
+      {end.n}
+    </span>
+  );
+}
+
+/** A project's tip: '2 agents working · 1 waiting for you', 'all quiet'. Pure. */
+export function projectRowTip(working: number, waits: number): string {
+  const parts = [...(working > 0 ? [workingTip(working)] : []), ...(waits > 0 ? [waitsTip(waits)] : [])];
+  return parts.length === 0 ? common.all_quiet : parts.join(' · ');
+}
+
+/** A pinned agent's end: the accent dot (it waits on him) or the ring (it works), each with its tip; nothing else. */
 function End({ end, testId }: { end: RowEnd; testId: string }) {
   if (end === 'waits') return <span className="app-s-dot" {...tipAttrs(panel.asks_you)} data-testid={`${testId}.waits`} />;
   if (end === 'works') return <span className="app-s-ring" {...tipAttrs(panel.state_working)} data-testid={`${testId}.works`} />;
   return null;
 }
 
-function Row({ kind, icon, name, end, on, stopped, expanded, onClick, onContextMenu, testId }: {
-  kind: 'top' | 'project' | 'agent' | 'more' | 'back';
+function Row({ kind, icon, name, end, on, stopped, tip, onClick, onContextMenu, testId }: {
+  kind: 'top' | 'project' | 'agent' | 'back';
   icon?: AppIconName;
   name: string;
   end?: ReactNode;
   on?: boolean;
   stopped?: boolean;
-  /** a project's row: its agents shown */
-  expanded?: boolean;
+  /** the row's whole story on hover (a project's: '2 agents working · 1 waiting for you') */
+  tip?: string;
   onClick: () => void;
   onContextMenu?: (e: MouseEvent<HTMLElement>) => void;
   testId: string;
@@ -85,7 +107,7 @@ function Row({ kind, icon, name, end, on, stopped, expanded, onClick, onContextM
     <Press
       look={`app-s-row ${kind}${on === true ? ' on' : ''}${stopped === true ? ' stopped' : ''}`}
       aria-current={on === true ? 'page' : undefined}
-      aria-expanded={expanded}
+      {...tipAttrs(tip)}
       onClick={onClick}
       onContextMenu={onContextMenu}
       data-testid={testId}
@@ -106,24 +128,9 @@ function Label({ children, end, testId }: { children: string; end?: ReactNode; t
   );
 }
 
-/** A kept set of project ids (the folded ones, the ones whose 'Show N more' is open): keep.ts. */
-function useKeptSet(key: string): readonly [ReadonlySet<string>, (id: string) => void] {
-  const [set, setSet] = useState<ReadonlySet<string>>(() => {
-    const v = keep.view(key);
-    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
-  });
-  const flip = (id: string) => {
-    const next = new Set(set);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    keep.setView(key, [...next]);
-    setSet(next);
-  };
-  return [set, flip];
-}
-
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const route = useRoute();
+  const router = useRouter();
   const home = useProjects().find((p) => p.home)?.project;
   // d2: the artifacts library takes the projects' place on artifacts, at the same width
   const library = route.screen === 'artifacts';
@@ -135,9 +142,19 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         <div className="app-s-head">
           <Row
             kind="top"
+            icon="folderPlus"
+            name={frame.new_project}
+            end={<kbd>⌘N</kbd>}
+            onClick={() => {
+              addProject(router);
+            }}
+            testId="app.side.new-project"
+          />
+          <Row
+            kind="top"
             icon="rename"
             name={frame.new_agent}
-            end={<kbd>⌘N</kbd>}
+            end={<kbd>⇧⌘N</kbd>}
             onClick={() => {
               if (here !== undefined) newAgent(here);
             }}
@@ -177,27 +194,21 @@ function LibraryList() {
 function ProjectList() {
   const rows = useProjects();
   const pins = usePinned();
-  const [folded, fold] = useKeptSet('frame.side.folded');
-  const [more, showMore] = useKeptSet('frame.side.more');
+  // ⌘ held: each project row shows its ⌘1-9 (keys.ts opens it), the held hints' delay (held.ts)
+  const cmd = useModHeld('Meta');
+  const route = useRoute();
   // where he was in a long sidebar comes back after a reload (keep.ts)
   useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.side.list"]'));
   const projects = projectsOf(rows);
+  const here = projectOf(route);
   return (
     <div className="app-s-list" data-testid="app.side.list">
       {pins.length > 0 && <PinnedList pins={pins} />}
       <Label testId="app.side.label.projects" end={<AddProject />}>
         {frame.projects}
       </Label>
-      {projects.map((p) => (
-        <ProjectBlock
-          key={p.project}
-          p={p}
-          pinned={pins.filter((x) => x.project === p.project).map((x) => x.agent)}
-          folded={folded.has(p.project)}
-          all={more.has(p.project)}
-          fold={fold}
-          showMore={showMore}
-        />
+      {projects.map((p, i) => (
+        <ProjectItem key={p.project} p={p} index={i} on={p.project === here} cmd={cmd} />
       ))}
     </div>
   );
@@ -219,53 +230,7 @@ function PinItem({ pin }: { pin: Pin }) {
   const agents = useAgents(pin.project);
   const at = route.screen === 'thread' && route.project === pin.project ? route.agent : undefined;
   const r = pinRowOf(pin.project, pin.agent, agents, at);
-  return r === null ? null : <SideItem r={r} />;
-}
-
-/** One project's block: it reads its own agents and its own ⌥ numbers (held while ⌥ is down). */
-const ProjectBlock = memo(function ProjectBlock({ p, pinned, folded, all, fold, showMore }: {
-  p: ProjectRow;
-  pinned: readonly string[];
-  folded: boolean;
-  all: boolean;
-  fold: (p: string) => void;
-  showMore: (p: string) => void;
-}) {
-  const route = useRoute();
-  const agents = useAgents(p.project);
-  // agent-rank: the hub's rank as ⌥ numbers, held while ⌥ is down and 5 s after a jump (agents/model)
-  const alt = useModHeld('Alt');
-  const at = route.screen === 'thread' && route.project === p.project ? route.agent : undefined;
-  const rows = projectBlockOf({ p, agents, numbers: numbersOf(p.project, agents, alt), pinned, folded, all, ...(at === undefined ? {} : { at }) });
-  return (
-    <>
-      {rows.map((r) => (
-        <SideItem key={r.kind === 'agent' ? `a:${r.a.name}` : r.kind} r={r} fold={fold} showMore={showMore} />
-      ))}
-    </>
-  );
-});
-
-function SideItem({ r, fold, showMore }: { r: SideRow; fold?: (p: string) => void; showMore?: (p: string) => void }) {
-  switch (r.kind) {
-    case 'label':
-      return null;
-    case 'project':
-      return <ProjectItem p={r.p} open={r.open} end={r.end} fold={fold} />;
-    case 'agent':
-      return <AgentItem project={r.project} name={r.a.name} main={r.a.main} on={r.on} end={r.end} stopped={r.stopped} pinned={r.pinned} />;
-    case 'more':
-      return (
-        <Row
-          kind="more"
-          name={r.open ? frame.show_less : frame.show_more({ n: r.n })}
-          onClick={() => {
-            showMore?.(r.project);
-          }}
-          testId={`app.side.more.${r.project}`}
-        />
-      );
-  }
+  return r === null || r.kind !== 'agent' ? null : <PinRow project={r.project} name={r.a.name} main={r.a.main} on={r.on} end={r.end} stopped={r.stopped} />;
 }
 
 /** '+' at the Projects label's end: add a project (the add-a-project sheet). */
@@ -286,8 +251,14 @@ function AddProject() {
   );
 }
 
-function ProjectItem({ p, open, end, fold }: { p: ProjectRow; open: boolean; end: RowEnd; fold: ((p: string) => void) | undefined }) {
+/** One project's row: it reads its own agents and its waiting count, so an event re-renders it alone. */
+const ProjectItem = memo(function ProjectItem({ p, index, on, cmd }: { p: ProjectRow; index: number; on: boolean; cmd: boolean }) {
   const store = useStore();
+  const router = useRouter();
+  const agents = useAgents(p.project);
+  // what waits on him: the inbox's own count for this project (what he just answered left out)
+  const waits = useProjectWaiting(p);
+  const r = projectRowOf({ p, agents, waits, index, on, cmd });
   const menu = useEntityMenu({ kind: 'project', project: p.project });
   const [renaming, setRenaming] = useState(false);
   // the menu's Rename takes its new name here, inline (app/menus/actions.ts)
@@ -334,21 +305,23 @@ function ProjectItem({ p, open, end, fold }: { p: ProjectRow; open: boolean; end
       kind="project"
       icon="folder"
       name={p.name}
-      expanded={open}
-      end={<End end={end} testId={id} />}
+      on={r.kind === 'project' && r.on}
+      tip={r.kind === 'project' ? projectRowTip(r.working, r.waits) : undefined}
+      end={r.kind === 'project' ? <ProjectEndView end={r.end} digit={r.digit} testId={id} /> : null}
       onClick={() => {
-        fold?.(p.project);
+        router.go({ screen: 'thread', project: p.project, agent: MAIN });
       }}
       onContextMenu={menu.onContextMenu}
       testId={id}
     />
   );
-}
+});
 
-function AgentItem({ project, name, main, on, end, stopped, pinned }: { project: string; name: string; main: boolean; on: boolean; end: RowEnd; stopped: boolean; pinned: boolean }) {
+/** A pinned agent's row: his own shortcut to it (pins.ts); its end the dot or the ring. */
+function PinRow({ project, name, main, on, end, stopped }: { project: string; name: string; main: boolean; on: boolean; end: RowEnd; stopped: boolean }) {
   const router = useRouter();
   const menu = useEntityMenu({ kind: 'agent', project, agent: name });
-  const id = pinned ? `app.side.pin.${project}.${name}` : `app.side.agent.${project}.${name}`;
+  const id = `app.side.pin.${project}.${name}`;
   return (
     <Row
       kind="agent"

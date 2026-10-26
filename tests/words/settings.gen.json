@@ -1469,10 +1469,20 @@
     "one": null,
     "text": "the project's bise / an agent"
   },
+  "settings.key_new_agent": {
+    "args": [],
+    "one": null,
+    "text": "New agent"
+  },
   "settings.key_new_line": {
     "args": [],
     "one": null,
     "text": "a new line"
+  },
+  "settings.key_new_project": {
+    "args": [],
+    "one": null,
+    "text": "New project"
   },
   "settings.key_open_folded": {
     "args": [],

@@ -441,7 +441,7 @@ export interface A11y {
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
-export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save';
+export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'newProject' | 'newAgent';
 
 /** window.bise.saveCopy's answer: where the copy went, why it failed, or null (he cancelled, or refused). */
 export type SaveResult = { readonly to: string } | { readonly error: string } | null;

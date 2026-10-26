@@ -88,10 +88,16 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
 
   const file: MenuItemConstructorOptions = {
     label: 'File',
-    // art-save: the open artifact's 'save a copy…' (no artifact open: the window does nothing)
-    submenu: mac
-      ? [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' }, { role: 'close' }]
-      : [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' }, settings, { type: 'separator' }, { role: 'close' }, { role: 'quit' }],
+    // art-save: the open artifact's 'save a copy…' (no artifact open: the window does nothing);
+    // r2-pointer (designer m_44251): New Project… ⌘N, New Agent… ⇧⌘N, the sidebar's first two rows
+    submenu: [
+      item('New Project…', 'CmdOrCtrl+N', 'newProject'),
+      item('New Agent…', 'Shift+CmdOrCtrl+N', 'newAgent'),
+      { type: 'separator' },
+      ...(mac
+        ? [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, { role: 'close' as const }]
+        : [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, settings, { type: 'separator' as const }, { role: 'close' as const }, { role: 'quit' as const }]),
+    ],
   };
 
   const edit: MenuItemConstructorOptions = {
@@ -157,6 +163,8 @@ export type MenuTarget = { readonly send: 'focused' } | { readonly open: string 
  * included), else the main window's (qa-flows m_9739: never dropped).
  */
 export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget {
-  if (action === 'find' || action === 'save' || mainFocused) return { send: 'focused' };
+  // New Project / New Agent are the main window's sheets: the focused window's (the main one, or
+  // nothing in the capsule), never a route to open
+  if (action === 'find' || action === 'save' || action === 'newProject' || action === 'newAgent' || mainFocused) return { send: 'focused' };
   return { open: action };
 }

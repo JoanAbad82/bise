@@ -6,8 +6,11 @@
 //! there. Sentence case as the mockups say them; designer signs them.
 
 crate::words! { frame:
-    /// the sidebar's first row and the new agent sheet's head (⌘N): start
-    /// a new agent in the project in view
+    /// the sidebar's first row (⌘N, his m_44225): add a project (the
+    /// add-a-project sheet)
+    new_project = "New project";
+    /// the sidebar's second row and the new agent sheet's head (⇧⌘N):
+    /// start a new agent in the project in view
     new_agent = "New agent";
     /// the new agent sheet's head, under it: the project
     new_agent_in(project) = "in {project}";
@@ -18,10 +21,6 @@ crate::words! { frame:
     /// the sidebar's label over his projects; on the artifacts library, the
     /// row that goes back to them ('← Projects')
     projects = "Projects";
-    /// after a project's first 4 agents, the row that shows the rest
-    show_more(n) = "Show {n} more";
-    /// the same row once open: back to the first 4
-    show_less = "Show less";
     /// the rail's VoiceOver name
     places = "Places";
     /// a control's hover tip with its key ('inbox · ⌘I')

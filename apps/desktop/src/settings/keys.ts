@@ -36,6 +36,8 @@ export const KEY_SECTIONS: readonly KeySection[] = [
       { keys: '⌘0', action: settings.key_bise },
       { keys: '⌘1 … ⌘9', action: settings.key_project },
       { keys: '⌥0 / ⌥1 … ⌥9', action: settings.key_main_or_agent, tui: '⌥ + 0…9' },
+      { keys: '⌘N', action: settings.key_new_project },
+      { keys: '⇧⌘N', action: settings.key_new_agent },
       { keys: '⌘K', action: settings.key_find_agent },
       { keys: '⌘[ / ⌘]', action: settings.key_back_forward },
       { keys: '⌘I', action: settings.key_inbox, tui: '/inbox, ctrl+1-9' },

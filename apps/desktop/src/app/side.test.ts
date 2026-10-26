@@ -140,11 +140,15 @@ describe('the frame', () => {
     expect(keyAction(k('Backslash'), ctx)).toEqual({ frame: 'sidebar' });
     expect(keyAction(k('Digit0', { altKey: true }), ctx)).toEqual({ frame: 'panel' });
     expect(keyAction(k('Digit0'), ctx)).toEqual({ go: { screen: 'bise' } });
-    // no project known yet: nothing; else the route's project, bise's own on bise's thread
-    expect(keyAction(k('KeyN'), ctx)).toBeUndefined();
+    // ⌘N: New project, wherever he is (his m_44225)
+    expect(keyAction(k('KeyN'), ctx)).toEqual({ newProject: true });
+    // ⇧⌘N: New agent; no project known yet: nothing; else the route's project, bise's own on bise's thread
+    const shift = { shiftKey: true };
+    expect(keyAction(k('KeyN', shift), ctx)).toBeUndefined();
     const home = { ...ctx, projects: [{ project: 'home-1', home: true } as never] };
-    expect(keyAction(k('KeyN'), home)).toEqual({ newAgent: 'home-1' });
-    expect(keyAction(k('KeyN'), { ...home, route: { screen: 'thread' as const, project: 'acme', agent: 'perf' } })).toEqual({ newAgent: 'acme' });
+    expect(keyAction(k('KeyN', shift), home)).toEqual({ newAgent: 'home-1' });
+    expect(keyAction(k('KeyN', shift), { ...home, route: { screen: 'thread' as const, project: 'acme', agent: 'perf' } })).toEqual({ newAgent: 'acme' });
+    expect(keyAction(k('KeyN'), home)).toEqual({ newProject: true });
     expect(keyAction(k('Comma'), ctx)).toEqual({ go: { screen: 'settings' } });
   });
 });

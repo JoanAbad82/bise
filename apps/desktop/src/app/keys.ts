@@ -31,7 +31,9 @@ export type KeyAct =
   | { readonly help: true }
   | { readonly screen: ScreenAction }
   | { readonly frame: FrameAction }
-  /** ⌘N: New agent in the project in view, else bise's own (newagent.tsx) */
+  /** ⌘N: New project, the add-a-project sheet (addProject.ts; his m_44225) */
+  | { readonly newProject: true }
+  /** ⇧⌘N: New agent in the project in view, else bise's own (newagent.tsx) */
   | { readonly newAgent: string }
   /** the tabbed panel's keys (app/panel/keys.ts): ⌘T, ⌘W, ⌘⇧[ ], ⌘P, ⌘L, ⌥⌘D */
   | { readonly panel: PanelKey };
@@ -92,12 +94,13 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   if (only('meta') && e.code === 'KeyK') return { palette: true };
   const pk = panelKeyOf(e, c.panelOpen === true);
   if (pk !== undefined) return { panel: pk };
-  // bise fait mac (page native-mac §6): ⌘\ the sidebar, ⌥⌘0 the panel, ⌘N New agent, ⌘, settings
+  // bise fait mac (page native-mac §6): ⌘\ the sidebar, ⌥⌘0 the panel, ⌘N New project, ⇧⌘N New agent (his m_44225), ⌘, settings
   if (only('meta') && e.code === 'Backslash') return { frame: 'sidebar' };
   if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'Digit0') return { frame: 'panel' };
   // ⌥⌘1-⌥⌘4: the right side's bubbles, agents, artifacts, scheduled, processes (native-mac d1; app/side3d); ⌥1-4 too while it is folded
   if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && n !== undefined && n >= 1 && n <= 4) return { screen: `side-${String(n)}` as ScreenAction };
-  if (only('meta') && e.code === 'KeyN') {
+  if (only('meta') && e.code === 'KeyN') return { newProject: true };
+  if (only('meta', true) && e.code === 'KeyN') {
     const p = here(c);
     return p === undefined ? undefined : { newAgent: p };
   }

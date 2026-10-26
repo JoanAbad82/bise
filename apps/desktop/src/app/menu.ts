@@ -9,8 +9,11 @@
 import { useEffect, useRef } from 'react';
 import type { MenuAction } from '@/shared/api';
 import type { Router } from './router';
-import { inboxAtOf, parseRoute } from './route';
+import { inboxAtOf, parseRoute, projectOf } from './route';
 import { askInbox } from './inboxAsk';
+import { addProject } from './addProject';
+import { newAgent } from './newagent';
+import { useStore } from '@/store';
 import type { ScreenAction } from './keys';
 import { panel } from '@/terminal/panel';
 import { useAgentMenuBar } from './menus/use';
@@ -35,6 +38,7 @@ export function routeOfMenu(action: MenuAction): 'settings' | undefined {
 export function useMenuRouting(router: Router) {
   // the menu bar's Agent menu follows the agent in view (bise fait mac, d4)
   useAgentMenuBar();
+  const store = useStore();
   useEffect(() => {
     // the page outside Electron (a component test) has no preload
     const bise = (window as Partial<Window>).bise;
@@ -45,11 +49,22 @@ export function useMenuRouting(router: Router) {
         askInbox();
         return;
       }
+      // File › New Project… / New Agent… (r2-pointer): the same sheets as ⌘N / ⇧⌘N (keys.ts); the
+      // key's own echo opens the same sheet again, a no-op
+      if (action === 'newProject') {
+        addProject(router);
+        return;
+      }
+      if (action === 'newAgent') {
+        const p = projectOf(router.get()) ?? store.projects().find((x) => x.home)?.project;
+        if (p !== undefined) newAgent(p);
+        return;
+      }
       const screen = routeOfMenu(action);
       if (screen !== undefined) router.go({ screen });
       else emitAction(action);
     });
-  }, [router]);
+  }, [router, store]);
 }
 
 /**

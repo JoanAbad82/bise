@@ -58,6 +58,7 @@ import { TerminalPanel } from '@/terminal/Terminal';
 import { AddSheetHost } from '@/settings/AddSheet';
 import { pickerPort } from '@/settings/picker';
 import { newAgent, NewAgentHost } from './newagent';
+import { addProject } from './addProject';
 import { useA11yRoot, useGroundRoot } from './a11yroot';
 import { ownWindow, routeKeyOf } from './own';
 import { Splitter } from './Splitter';
@@ -533,6 +534,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
       else if ('palette' in act) openPalette();
       else if ('help' in act) openHelp();
       else if ('frame' in act) frameRef.current(act.frame);
+      else if ('newProject' in act) addProject(router);
       else if ('newAgent' in act) newAgent(act.newAgent);
       else if ('panel' in act) doPanelKey(act.panel, { route: router.get(), home: store.projects().find((p) => p.home)?.project, agents: (p) => store.agents(p) });
       else emitAction(act.screen);

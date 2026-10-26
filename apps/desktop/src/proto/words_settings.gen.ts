@@ -534,6 +534,10 @@ export const settings = {
   key_project: "a project, in the order of Settings › Projects",
   /** ⌥0 / ⌥1 … ⌥9 */
   key_main_or_agent: "the project's bise / an agent",
+  /** ⌘N */
+  key_new_project: "New project",
+  /** ⇧⌘N */
+  key_new_agent: "New agent",
   /** ⌘K */
   key_find_agent: "find an agent, a page or an artifact",
   /** ⌘[ / ⌘] */
