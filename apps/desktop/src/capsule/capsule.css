@@ -48,7 +48,7 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-talk, .b-cap-answer { min-height: calc(var(--s-4) * 2 + var(--s-10)); padding: var(--s-6) var(--s-6) var(--s-5) calc(var(--s-4) * 2 + var(--s-10)); font: var(--t-17)/1.45 var(--font-read); color: var(--c-text); }
 .b-cap-talk { color: var(--c-text-2); }
 /* the 'over' line's link to where he fixes it ('settings › voice', designer m_21945): the line's own words, underlined */
-.b-cap-link { all: unset; color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.b-cap-link { all: unset; color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; }
 .b-cap-link:focus-visible { outline: 2px solid var(--c-focus, currentColor); outline-offset: 2px; }
 /* THE CORNER CARD (his pick C, designer m_22118): the talk, its answer and every 'over' line, at the
    bottom-right of the screen (amb-mac's 'corner': the window keeps its right edge and bottom, it

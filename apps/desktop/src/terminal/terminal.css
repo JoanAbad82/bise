@@ -63,7 +63,6 @@
   padding: 0;
   color: var(--c-accent);
   font: inherit;
-  cursor: pointer;
 }
 
 /* its head: where the shell runs, and how to hide it (ambient m_10689) */
@@ -81,7 +80,6 @@
   background: none;
   color: inherit;
   font: inherit;
-  cursor: pointer;
 }
 
 /* a shell in a tab of the panel (bise fait mac, mockup 2): it fills the tab, 12/18 mono, 12 16 in */

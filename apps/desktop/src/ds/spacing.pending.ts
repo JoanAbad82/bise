@@ -12,19 +12,13 @@ export const PENDING_SPACING: Readonly<Record<string, number>> = {
 // rule (a count only goes down; the screen's owner lowers its line in the commit that moves it, and
 // a file at 0 leaves the list). What each stylesheet had when nm-ds landed:
 
-/** cursor:pointer on something not a link (lint.ts handRules): macOS draws the arrow on a control */
+/** a screen's own cursor:pointer (lint.ts handRules): ds/css/base.css gives every control and link
+ * the hand (his m_44190), so the rest is the hand on what is no control. office.css's 3: the map's
+ * canvas over a bim or a sign (data-pointer, Office.tsx and town/Town.tsx pick what is under the
+ * mouse) and a project's pill */
 export const PENDING_HAND: Readonly<Record<string, number>> = {
-  "bims/office.css": 10,
-  "capsule/capsule.css": 1,
-  "composer/composer.css": 1,
-  "ds/css/thread.css": 4,
-  "log/log.css": 3,
-  "plugins/plugins.css": 2,
-  "quote/quote.css": 1,
-  "review/review.css": 1,
-  "setup/setup.css": 1,
-  "terminal/terminal.css": 2,
-  "thread/thread.css": 17,
+  "bims/office.css": 3,
+  "plugins/plugins.css": 1,
 };
 
 /** text sizes off the 7 of native-mac §6 (lint.ts offScaleText): 30, 15, 14, 13, 12, 11.5 kbd, 12 mono */

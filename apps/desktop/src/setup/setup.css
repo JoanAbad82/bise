@@ -33,7 +33,7 @@
 /* the first message (v4 §2.4): a real composer, the ideas under it (a click fills, never sends), the fn line */
 .setup-first { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-3); width: 100%; margin-top: var(--s-4); text-align: left; }
 .setup-ideas { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); }
-.setup-ideas .b-chip { cursor: pointer; border: 0; font-family: var(--font-ui); }
+.setup-ideas .b-chip { border: 0; font-family: var(--font-ui); }
 .setup-ideas .b-chip:hover { color: var(--c-text); }
 .setup-fnline { margin: var(--s-2) 0 0; text-align: center; color: var(--c-text-3); font-size: var(--t-13); }
 .setup-fnline .b-kbd { margin: 0 var(--s-1); vertical-align: 1px; }

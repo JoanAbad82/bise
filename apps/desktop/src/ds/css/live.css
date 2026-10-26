@@ -67,7 +67,6 @@
    the editor shows no border or outline of its own on hover or focus (his round 2) */
 .b-composer .in .b-field:not(.is-focus):not(.is-error):not(:focus-within):hover,.b-composer .in .b-field.b-field:focus,.b-composer .in .b-field.b-field:focus-within{box-shadow:none;outline:0;border:0}
 .b-composer .box{cursor:text}
-.b-composer .box .send{cursor:default}
 .b-chip[role=button]:hover,.b-chip[role=button].is-hover{background:var(--c-active)}
 .b-tabs>span:not(.on):hover{background:var(--c-active)}
 .b-task:focus-visible{outline:0}

@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { classesOf, cssClasses, drawnScrollbars, handRules, looseSpacing, menuDrawn, offGridTokens, offScaleText, plainClicks, rawControls, smallText } from './lint';
+import { arrowRules, classesOf, cssClasses, drawnScrollbars, handRules, looseSpacing, menuDrawn, offGridTokens, offScaleText, plainClicks, rawControls, smallText } from './lint';
 import { PENDING_CLASSES, PENDING_RAW, PENDING_SMALL_TEXT } from './lint.pending';
 import { PENDING_HAND, PENDING_SCROLLBAR, PENDING_SPACING, PENDING_TYPE } from './spacing.pending';
 
@@ -136,8 +136,8 @@ describe('the spacing law (designer desktop-spacing m_19568, ambient-lead m_1956
   });
 });
 
-describe('the arrow law (page native-mac §1: « le curseur flèche (pas la main) sur les boutons »)', () => {
-  it('reads a plain element he clicks with no role, and a rule that puts the hand on a control', () => {
+describe("the hand law (his m_44190: « il manque des cursor pointer sur un grand nombre d'elements interactifs »)", () => {
+  it('reads a plain element he clicks with no role, a rule that puts the hand on something, and one that puts the arrow back', () => {
     expect(plainClicks(`<div onClick={go}>a</div>
 <span role="button" onClick={go} />
 <button onClick={go} />
@@ -152,6 +152,7 @@ describe('the arrow law (page native-mac §1: « le curseur flèche (pas la main
   <Press onClick={go} />
 </span>`)).toEqual(['1 <div>', '4 <li>']);
     expect(handRules('/* .no{cursor:pointer} */ .a{color:red;cursor:pointer} .b,a[href].c{cursor: pointer} .d[role=link]{cursor:pointer} .e{cursor:default} .f{cursor:text}')).toEqual(['.a', '.b']);
+    expect(arrowRules('/* .no{cursor:default} */ .a{cursor:default} .b:disabled,.c[aria-disabled="true"],.d{cursor: auto} .e{cursor:pointer} .f{cursor:text}')).toEqual(['.a', '.d']);
   });
 
   it('every plain element he clicks has a role, so the root rule and VoiceOver know it', () => {
@@ -166,8 +167,19 @@ describe('the arrow law (page native-mac §1: « le curseur flèche (pas la main
     expect(found, 'a div/span he clicks: give it its role (button, option, tab, link...) or use a ds control').toEqual([]);
   });
 
-  it('no stylesheet puts more hands on controls than when the arrow law came in (PENDING_HAND, a ratchet)', () => {
-    expect(ratchet(PENDING_HAND, (css, r) => (r === 'ds/css/base.css' ? 0 : handRules(css).length)), 'cursor:pointer on a control: macOS draws the arrow (ds/css/base.css owns the cursor; a link has the hand from there)').toEqual([]);
+  it('no stylesheet writes its own hand (PENDING_HAND, a ratchet): ds/css/base.css gives it to every control', () => {
+    expect(ratchet(PENDING_HAND, (css, r) => (r === 'ds/css/base.css' ? 0 : handRules(css).length)), 'cursor:pointer in a screen: drop it, ds/css/base.css gives the hand to every control and link (a clicked div gets its role)').toEqual([]);
+  });
+
+  it('no stylesheet puts the arrow back on a control: only on a disabled one, or on what is no control', () => {
+    // office.css: a plugin object's pill with no click (:not([role=button])); panel.css: the overview's
+    // 'none' row, a div he does not click
+    const may: Record<string, number> = { 'bims/office.css': 1, 'app/panel/panel.css': 2 };
+    const found = files.filter((p) => p.endsWith('.css')).flatMap((p) => {
+      const hits = arrowRules(readFileSync(p, 'utf8'));
+      return hits.length > (may[rel(p)] ?? 0) ? hits.map((h) => `${rel(p)}: ${h}`) : [];
+    });
+    expect(found, 'cursor:default on a control takes its hand away (ds/css/base.css): drop it, or say :disabled').toEqual([]);
   });
 });
 

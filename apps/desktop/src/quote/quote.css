@@ -6,7 +6,6 @@
 }
 .q-part {
   all: unset;
-  cursor: pointer;
   border-radius: 3px;
 }
 .q-part:hover {

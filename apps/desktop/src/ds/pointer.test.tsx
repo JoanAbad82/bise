@@ -1,34 +1,65 @@
 // @vitest-environment happy-dom
-// src/ds · the cursor as macOS draws it (bise fait mac, page native-mac §1: « le curseur flèche
-// (pas la main) sur les boutons »). The ds's whole stylesheet (index.css's imports, in order) on its
-// clickable components, read back with getComputedStyle: no control shows the hand (the root rule's
-// arrow, or a ds rule's own default), a link does. ds/css/base.css owns it; lint.test.ts's arrow
-// law counts the screens' own hands. Mutation: base.css's link rule dropped, or a ds stylesheet's
-// cursor:pointer on a control, turns this red.
+// src/ds · the hand on everything he clicks (his m_44190, round 2 of native-mac: « il manque des
+// cursor pointer sur un grand nombre d'elements interactifs »). The ds's whole stylesheet
+// (index.css's imports, in order) on its clickable components and on the whole gallery, read back
+// with getComputedStyle: every control, clicked role and link shows the hand, a disabled one the
+// arrow, a text field its text cursor. In the gallery, every element React gave an onClick is a
+// control or carries its role (a plain div he clicks is a red: give it the role). ds/css/base.css
+// owns the rule; lint.test.ts's hand law counts the screens' own cursors. Mutation: base.css's
+// rule back to cursor:default, a role dropped from Group's rows, or a ds rule's cursor:default on a
+// control, turns this red.
 import { cleanup, render } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { Gallery } from "./gallery/Gallery";
 import {
-  Act, ArtChip, ArtName, BriefLine, Button, CardLine, Check, Chip, Diff, Group, IconButton, Opts, PickerTrigger,
-  SchedHead, SearchButton, Seg, Select, Tabs, Toggle,
+  Act, ArtChip, ArtName, BriefLine, Button, CardLine, Check, Chip, Diff, Field, Filters, Group, IconButton, ListRow, MenuItem, MoreButton, Opts,
+  PickerTrigger, RowAction, SchedHead, SearchButton, Seg, Select, Tabs, TextArea, Toggle, type EntityMenu,
 } from "./index";
 
-/** what the root rule must reach: a control, or a role that takes a click */
-const CLICKABLE = "button, a[href], select, summary, [role=button], [role=link], [role=tab], [role=option], [role=switch], [role=checkbox], [role=radio], [role=menuitem]";
+/** what the root rule reaches: a control, or a role that takes a click, or a link */
+const CLICKABLE = [
+  "button", "a[href]", "select", "summary", "label[for]", "input[type=checkbox]", "input[type=radio]",
+  "[role=button]", "[role=link]", "[role=tab]", "[role=option]", "[role=switch]", "[role=checkbox]", "[role=radio]",
+  "[role=menuitem]", "[role=menuitemradio]", "[role=menuitemcheckbox]",
+].join(",");
+const OFF = ":disabled,[aria-disabled=true],[aria-disabled=true] *";
 const go = () => undefined;
+const menu: EntityMenu = { onContextMenu: go, open: go };
 
 beforeAll(() => {
   const css = readFileSync(join(__dirname, "index.css"), "utf8");
   const files = [...css.matchAll(/@import "\.\/([\w/.-]+)";/g)].map((m) => m[1] ?? "");
   const style = document.createElement("style");
-  style.textContent = files.map((f) => readFileSync(join(__dirname, f), "utf8")).join("\n");
+  style.textContent = files.map((f) => readFileSync(join(__dirname, f), "utf8")).join(String.fromCharCode(10));
   document.head.append(style);
 });
 afterEach(cleanup);
 
-describe("the arrow on every ds control, the hand on a link (ds/css/base.css)", () => {
-  it("no clickable ds control shows the hand; a link does", () => {
+/** React's own props on a DOM node (its onClick, not a copy of which components take one) */
+function clicked(n: Element): boolean {
+  const key = Object.keys(n).find((k) => k.startsWith("__reactProps$"));
+  const props = key === undefined ? undefined : (n as unknown as Record<string, { onClick?: unknown } | undefined>)[key];
+  return typeof props?.onClick === "function";
+}
+const name = (n: Element) => n.outerHTML.slice(0, 100);
+/** a wrapper that only keeps a click from what is under it (bims/MapChip's, around its chip): no
+ * words of its own, and each of its children a control or holding one. Not a thing he aims at. */
+const wrapper = (n: Element) =>
+  n.children.length > 0 && [...n.childNodes].every((c) => c.nodeType !== 3 || (c.textContent ?? "").trim() === "")
+  && [...n.children].every((c) => c.matches(CLICKABLE) || c.querySelector(CLICKABLE) !== null);
+/** the law on a rendered tree: what he clicks has its role, and every live one shows the hand */
+function law(root: HTMLElement): { roleless: string[]; arrow: string[]; count: number } {
+  const all = [...root.querySelectorAll<HTMLElement>("*")];
+  const roleless = all.filter((n) => clicked(n) && !n.matches(CLICKABLE) && !wrapper(n)).map(name);
+  const live = all.filter((n) => n.matches(CLICKABLE) && !n.matches(OFF));
+  const arrow = live.filter((n) => getComputedStyle(n).cursor !== "pointer").map(name);
+  return { roleless, arrow, count: live.length };
+}
+
+describe("the hand on everything he clicks (ds/css/base.css)", () => {
+  it("every clickable ds control shows the hand, a link too", () => {
     const { container } = render(
       <div>
         <Button onClick={go}>save</Button>
@@ -47,8 +78,11 @@ describe("the arrow on every ds control, the hand on a link (ds/css/base.css)", 
         <PickerTrigger onClick={go}>all agents</PickerTrigger>
         <Opts items={[{ n: 1, text: "yes" }]} onPick={go} />
         <Tabs items={[{ id: "a", text: "a" }]} onPick={go} />
+        <Filters items={[{ id: "w", label: "waiting" }, { id: "a", label: "answered" }]} on="w" onPick={go} />
         <Group items={[{ id: "a", label: "a", onPick: go }]} />
         <Group list items={[{ id: "b", label: "b", onPick: go }]} />
+        <ListRow title="perf" sub="acme" onClick={go} end={<><RowAction onClick={go}>answer</RowAction><MoreButton menu={menu} /></>} />
+        <MenuItem onClick={go}>rename</MenuItem>
         <SchedHead open={false} onClick={go}>every 30m</SchedHead>
         <BriefLine open={false} onClick={go}>brief</BriefLine>
         <CardLine onClick={go}>bise asks</CardLine>
@@ -57,16 +91,10 @@ describe("the arrow on every ds control, the hand on a link (ds/css/base.css)", 
         <details><summary>more</summary></details>
       </div>,
     );
-    const nodes = [...container.querySelectorAll<HTMLElement>(CLICKABLE)].filter((n) => !n.matches(":disabled,[aria-disabled=true]"));
-    expect(nodes.length).toBeGreaterThan(20);
-    const link = (n: HTMLElement) => n.matches("a[href],[role=link]");
-    // ds/css/thread.css's own hands (nm-thread's file, counted in spacing.pending.ts PENDING_HAND)
-    const pending = (n: HTMLElement) => n.matches(".b-act.ref,.b-route.handoff,.b-brief-line,.b-card-line");
-    const hand = nodes.filter((n) => !link(n) && !pending(n) && getComputedStyle(n).cursor === "pointer").map((n) => n.outerHTML.slice(0, 90));
-    expect(hand, "a control with the hand: macOS draws the arrow").toEqual([]);
-    const links = nodes.filter(link);
-    expect(links.length).toBeGreaterThan(0);
-    expect(links.map((n) => getComputedStyle(n).cursor)).toEqual(links.map(() => "pointer"));
+    const { roleless, arrow, count } = law(container);
+    expect(count).toBeGreaterThan(25);
+    expect(roleless, "a plain element he clicks: give it its role").toEqual([]);
+    expect(arrow, "a control without the hand").toEqual([]);
   });
 
   it("a disabled control shows the arrow, even a link", () => {
@@ -75,18 +103,28 @@ describe("the arrow on every ds control, the hand on a link (ds/css/base.css)", 
         <Button disabled onClick={go}>save</Button>
         <IconButton label="back" state="disabled" onClick={go}>‹</IconButton>
         <Toggle on onChange={go} state="disabled" />
+        <MenuItem disabled onClick={go}>rename</MenuItem>
         <ArtChip title="report" onClick={go} />
       </div>,
     );
-    const art = container.querySelector<HTMLElement>(".b-artchip");
-    art?.setAttribute("aria-disabled", "true");
+    container.querySelector<HTMLElement>(".b-artchip")?.setAttribute("aria-disabled", "true");
     const off = [...container.querySelectorAll<HTMLElement>(":disabled,[aria-disabled=true]")];
-    expect(off.length).toBeGreaterThan(2);
+    expect(off.length).toBeGreaterThan(3);
     expect(off.map((n) => getComputedStyle(n).cursor)).toEqual(off.map(() => "default"));
   });
 
-  it("a plain element with no role keeps the browser's cursor: the hand means a link", () => {
-    const { container } = render(<div><span data-x>words</span></div>);
-    expect(getComputedStyle(container.querySelector("[data-x]") as HTMLElement).cursor).not.toBe("pointer");
+  it("a text field keeps its text cursor, a plain element no hand", () => {
+    const { container } = render(<div><Field defaultValue="sk-test" /><TextArea defaultValue="words" /><span data-x>words</span></div>);
+    const fields = [...container.querySelectorAll<HTMLElement>("input,textarea,[data-x]")];
+    expect(fields.length).toBe(3);
+    expect(fields.filter((n) => getComputedStyle(n).cursor === "pointer").map(name)).toEqual([]);
+  });
+
+  it("the whole gallery: what he clicks has its role, and shows the hand", () => {
+    const { container } = render(<Gallery />);
+    const { roleless, arrow, count } = law(container);
+    expect(count).toBeGreaterThan(100);
+    expect(roleless, "a plain element he clicks: give it its role (button, option, tab, link...)").toEqual([]);
+    expect(arrow, "a clickable element without the hand: a stylesheet puts the arrow back on it").toEqual([]);
   });
 });

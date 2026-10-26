@@ -168,8 +168,8 @@ export function looseSpacing(css: string): LooseSpace[] {
 }
 
 /**
- * A thing he clicks says what it is: ds/css/base.css's root rule (the arrow on a control, the hand
- * on a link, chrome text not selectable) and VoiceOver match controls and roles. A plain element
+ * A thing he clicks says what it is: ds/css/base.css's root rule (the hand on a control and a link,
+ * chrome text not selectable) and VoiceOver match controls and roles. A plain element
  * he clicks (a div, a span, an li with onClick) and no role is outside both. A double-click or a
  * drag alone is no click (designer m_38970). One entry per such tag: its line and its tag. A
  * native control (button,
@@ -207,18 +207,34 @@ function openingTag(src: string, at: number): string {
 }
 
 /**
- * The arrow law (bise fait mac, page native-mac §1: « le curseur flèche (pas la main) sur les
- * boutons », as macOS draws it): ds/css/base.css's root rule gives every control the arrow and a
- * link the hand. The rules of a stylesheet that put the hand on something: one selector each. A
- * link's (a[href], [role=link]) is the root rule's own and left out. Pure.
+ * The hand law (his m_44190, round 2 of native-mac: the hand on everything he clicks):
+ * ds/css/base.css's root rule gives every control, every clicked role and every link the hand. A
+ * screen's own cursor:pointer is then useless, or puts the hand on something that is no control
+ * (give it its role instead). The rules of a stylesheet that put the hand on something: one
+ * selector each. A link's (a[href], [role=link]) is left out. Pure.
  */
 export function handRules(css: string): string[] {
+  return cursorRules(css, /^pointer$/).filter((sel) => !/a\[href\]|\[role=["']?link/.test(sel));
+}
+
+/**
+ * The other side of the hand law: a rule that puts the arrow (cursor default or auto) back on
+ * something, so a control under it loses the root rule's hand. A disabled one's is right (the
+ * arrow on what does nothing): a selector that says :disabled or aria-disabled is left out. Pure.
+ */
+export function arrowRules(css: string): string[] {
+  return cursorRules(css, /^(default|auto)$/).filter((sel) => !/:disabled|aria-disabled/.test(sel));
+}
+
+/** the selectors of the rules whose cursor matches `value`, one each, comments dropped */
+function cursorRules(css: string, value: RegExp): string[] {
   const body = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const out: string[] = [];
   for (const m of body.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
-    if (!/(^|[;\s])cursor\s*:\s*pointer\b/.test(m[2] ?? "")) continue;
+    const cursor = /(?:^|[;\s])cursor\s*:\s*([\w-]+)/.exec(m[2] ?? "")?.[1] ?? "";
+    if (!value.test(cursor)) continue;
     for (const sel of (m[1] ?? "").split(",").map((s) => s.trim().replace(/\s+/g, " "))) {
-      if (sel !== "" && !/a\[href\]|\[role=["']?link/.test(sel)) out.push(sel);
+      if (sel !== "") out.push(sel);
     }
   }
   return out;

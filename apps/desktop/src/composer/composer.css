@@ -165,7 +165,6 @@
 }
 .b-composer .b-field .b-dictation .retry {
   color: var(--c-text);
-  cursor: pointer;
 }
 .b-composer .b-field .b-dictation .retry:hover {
   text-decoration: underline;

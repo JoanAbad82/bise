@@ -6,13 +6,15 @@
    browser ring around the whole screen; its row's highlight says where he is (his m_24123). Zero
    specificity, and never a control (a role, a button): every real focus ring still wins. */
 :where(section[tabindex="-1"]:focus,div[tabindex="-1"]:not([role]):focus){outline:0}
-/* the cursor as macOS draws it (bise fait mac, page native-mac §1: « le curseur flèche (pas la
-   main) sur les boutons »): the arrow on every control, the hand on a link only. Owned here, at the
-   root: zero specificity, so a screen's own cursor (text, grab, resize) still wins; a screen's own
-   cursor:pointer is counted by lint.ts handRules (spacing.pending.ts PENDING_HAND, shrink-only); a
-   plain div/span he clicks gets a role (lint.ts plainClicks). ds/pointer.test.tsx. */
-:where(button,select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio]){cursor:default}
-:where(a[href],[role=link]){cursor:pointer}
+/* the hand on everything he clicks (his m_44190, round 2 of native-mac: « il manque des cursor
+   pointer sur un grand nombre d'elements interactifs »): every control, every role that takes a
+   click, every link. Owned here, at the root, the app's one cursor rule: zero specificity, so a
+   screen's own cursor (text, grab, resize) still wins. A text field keeps the text cursor (not in
+   the list), a disabled control the arrow (the rule below). A screen writes no cursor:pointer of
+   its own (lint.ts handRules, spacing.pending.ts PENDING_HAND, shrink-only) and no arrow on a
+   control (lint.ts arrowRules); a plain div/span he clicks gets a role (lint.ts plainClicks).
+   ds/pointer.test.tsx. */
+:where(button,select,summary,label[for],label:has(input:is([type=checkbox],[type=radio])),input:is([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file],[type=range]),[role=button],[role=tab],[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],[role=switch],[role=checkbox],[role=radio],a[href],[role=link]){cursor:pointer}
 /* chrome text is not selectable, as in a Mac app: every control, and what the frame marks as
    chrome (.b-chrome: the bar, the rail, the sidebar, the tabs; a ds row or label). Content (the
    thread, a page's words, a field) keeps its selection */

@@ -63,19 +63,19 @@
 .b-msg .b-quote{display:flex;width:fit-content;margin:0 0 var(--gap-tight)}
 /* the thread's signed one-line looks as ds variants (designer m_18626): the landed sha / PR # (Act
    ref), the '→ perf' handoff (Route handoff), the scheduled head, the brief line, the card line */
-.b-act.ref{margin:0;padding:0;color:var(--c-text);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.b-act.ref{margin:0;padding:0;color:var(--c-text);text-decoration:underline;text-underline-offset:3px}
 /* hover: the same 1 px underline as at rest, the words in ink (designer m_18804) */
 .b-act.ref:hover,.b-act.ref.is-hover{color:var(--c-text);text-decoration:underline}
-.b-route.handoff{display:block;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--c-text);font:var(--t-13) var(--font-ui);text-align:left;cursor:pointer}
+.b-route.handoff{display:block;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--c-text);font:var(--t-13) var(--font-ui);text-align:left}
 .b-route.handoff .p2{font-size:inherit;white-space:normal}
 .b-route.handoff:hover .p2,.b-route.handoff.is-hover .p2{color:var(--c-text)}
 .b-route.handoff:focus-visible,.b-sched-head:focus-visible,.b-brief-line:focus-visible,.b-card-line:focus-visible{outline:2px solid var(--c-focus);outline-offset:1px}
 .b-sched-head{margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;text-align:left}
-.b-brief-line{display:flex;align-items:baseline;gap:var(--gap-inline);max-width:100%;margin:0;padding:0;border:0;background:none;color:var(--c-text-2);font:var(--t-13) var(--font-ui);text-align:left;cursor:pointer}
+.b-brief-line{display:flex;align-items:baseline;gap:var(--gap-inline);max-width:100%;margin:0;padding:0;border:0;background:none;color:var(--c-text-2);font:var(--t-13) var(--font-ui);text-align:left}
 .b-brief-line:hover,.b-brief-line.is-hover{color:var(--c-text)}
 .b-brief-line .chev{flex:none;color:var(--c-text-3);transition:transform var(--d-fast) var(--ease-out)}
 .b-brief-line.open .chev{transform:rotate(90deg)}
 .b-brief-line .w{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.b-card-line{display:block;max-width:100%;margin:0 0 var(--gap-tight);padding:0;border:0;background:none;font:var(--t-14) var(--font-ui);color:var(--c-text);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.b-card-line{display:block;max-width:100%;margin:0 0 var(--gap-tight);padding:0;border:0;background:none;font:var(--t-14) var(--font-ui);color:var(--c-text);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .b-card-line:hover,.b-card-line.is-hover{color:var(--c-text)}
 .b-card-line .b-rowmark{margin-right:var(--s-1)}

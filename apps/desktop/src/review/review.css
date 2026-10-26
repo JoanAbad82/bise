@@ -125,7 +125,6 @@
   color: var(--c-text);
   text-decoration: underline;
   text-underline-offset: 3px;
-  cursor: pointer;
 }
 .rv-link:hover {
   color: var(--c-accent);
