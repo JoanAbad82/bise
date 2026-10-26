@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { cardKey, sortCards } from './order';
-import { current, digitWords, pickWaits, prune, START, step, takesWords, visible, withConfirmOptions, type InboxState, type Key } from './model';
+import { current, digitWords, markOf, pickWaits, prune, START, step, takesWords, visible, withConfirmOptions, type InboxState, type Key } from './model';
 
 const card = (id: number, kind: string, rank: number | undefined, since_ms: number, project = 'acme', extra: Partial<Card> = {}): Card => ({
   id,
@@ -169,5 +169,21 @@ describe('which items his words answer (ambient m_8773, the TUI and hub choice_k
     expect(pickWaits({ kind: 'feature_merge', options: [...two, { n: 3, label: 'drop' }] })).toBe('the merge waits for 1 to 3');
     expect(pickWaits({ kind: 'question', options: two })).toBeNull();
     expect(digitWords(1)).toBe('1');
+  });
+});
+
+describe("an item's one mark (designer m_45259, m_45255): no '!' in the inbox", () => {
+  it("'?' for anything that asks him, an approval and a choice too; ✗ for a failure that asks nothing; none for a done report", () => {
+    const none: Partial<Card> = { options: [] };
+    expect(markOf(card(1, 'question', 1, 1))).toBe('ask');
+    expect(markOf(card(2, 'confirm', 0, 1, 'acme', { approval: true }))).toBe('ask');
+    for (const kind of ['merge', 'feature_try', 'update', 'signin', 'plan', 'blocked', 'drop', 'overlap']) expect(markOf(card(3, kind, 1, 1)), kind).toBe('ask');
+    // 'it failed: retry?' asks; a failure that only reports does not
+    expect(markOf(card(4, 'failed', 1, 1))).toBe('ask');
+    expect(markOf(card(5, 'failed', 1, 1, 'acme', none))).toBe('fail');
+    expect(markOf(card(6, 'restart', 1, 1, 'acme', none))).toBe('fail');
+    expect(markOf(card(7, 'done', 1, 1, 'acme', none))).toBeNull();
+    // the hub fixture's cards all ask him
+    expect(fixture().map(markOf)).toEqual(fixture().map(() => 'ask'));
   });
 });

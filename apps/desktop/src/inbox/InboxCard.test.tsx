@@ -5,7 +5,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Store, StoreProvider } from '@/store';
-import { InboxCard, PICKED_MS } from './InboxCard';
+import { age, idTip, InboxCard, PICKED_MS } from './InboxCard';
+import { inbox } from '@/proto/words_inbox.gen';
 import type { InboxItem } from './listed';
 
 afterEach(() => {
@@ -65,5 +66,38 @@ describe('InboxCard pick', () => {
     mount(pick).unmount();
     vi.advanceTimersByTime(PICKED_MS);
     expect(pick).not.toHaveBeenCalled();
+  });
+});
+
+describe("the card head: one mark, no id (designer m_45259, m_45255)", () => {
+  const head = (c: InboxItem) =>
+    render(
+      <StoreProvider store={new Store(null)}>
+        <InboxCard card={c} acts={{ pick: () => undefined }} now={1791100060000} testId="h" />
+      </StoreProvider>,
+    );
+
+  it("an approval reads '?' in the accent as its row does, never '!'", () => {
+    head({ ...card, kind: 'confirm', approval: true });
+    expect(screen.getByTestId('h.g').textContent).toBe('?');
+    expect(screen.getByTestId('h.g').dataset['tone']).toBe('acc');
+  });
+
+  it('a failure that asks nothing reads ✗ in err', () => {
+    head({ ...card, kind: 'failed', options: [] });
+    expect(screen.getByTestId('h.g').textContent).toBe('✗');
+    expect(screen.getByTestId('h.g').dataset['tone']).toBe('err');
+  });
+
+  it("the age alone, the hub's number in its tip only", () => {
+    head({ ...card, id: 10 });
+    const ageEl = screen.getByTestId('h.age');
+    expect(ageEl.textContent).toBe(age(60_000));
+    expect(ageEl.getAttribute('data-tip')).toBe(idTip(10));
+    expect(screen.getByTestId('h').querySelector('.ic-h')?.textContent).not.toContain(inbox.card_id({ id: 10 }));
+    cleanup();
+    // bise's own items have no hub number: no tip
+    head({ ...card, id: -1 });
+    expect(screen.getByTestId('h.age').getAttribute('data-tip')).toBeNull();
   });
 });
