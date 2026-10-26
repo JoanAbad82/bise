@@ -8,20 +8,23 @@
 // folds back GRACE_MS after the pointer leaves; never under reduced motion. A click opens the office in a tab. The office lives
 // (its bims move) on its own loop, which already rests while the window is away (bims/room.ts);
 // SideHost unmounts the world while the right side is hidden. As a 5th bubble (no room, d3) the
-// same office draws at the bubble's 68 object. The office's labels and pills are the office tab's;
-// grown, its camera takes his input as the open map does (r2-side, Gabriel m_44190): a pinch
-// zooms, two fingers or a drag while zoomed move it, through the office's own handlers (Office
-// cameraFrom: the hit span over the island); the beats are off while it is grown, and folding
-// back gives the camera to the lead again. Owner: nm-side.
+// same office draws at the bubble's 68 object. The office's labels and pills are the office tab's.
+// Its camera (designer m_44998, E.4): folded, always the whole map, never a follow or a zoom,
+// whoever he talks to; a beat (camera.ts: an agent just asks or changes state) shows only as its
+// glass label over that bim's head. Grown, it opens at fit, plays no beats, and takes his input
+// as the open map does (r2-side, Gabriel m_44190): a pinch zooms, two fingers or a drag while
+// zoomed move it, through the office's own handlers (Office cameraFrom: the hit span over the
+// island); folding back eases it to fit again (Office refit). While his pinch cuts the map the box
+// becomes a small window onto the world (the frame: r 12, --c-sunken under the map, 1 --c-line,
+// a soft shadow), faded in and out in 150 ms; the whole map has none. Owner: nm-side; the fit and
+// the frame: m-bubbles.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
 import { mapOf, mapPrefKey, type MapId } from '@/bims/maps/ids';
-import { layoutOf } from '@/bims/maps';
 import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
-import { beatDelay, EASE_MS, happenedOf, HOLD_MS, leadZoom, pickBeat, seenOf, shotOf, stillRecent, TALK_HOLD_MS, tickSoon, type Happened, type LastBeat, type Seen, type Shot } from './camera';
-import { useTalkingTo } from '@/composer/talking';
+import { beatDelay, EASE_MS, happenedOf, HOLD_MS, pickBeat, seenOf, stillRecent, tickSoon, type Happened, type LastBeat, type Seen } from './camera';
 import { speechOf, speechWord } from './model';
 import type { Agent, Card } from '@/proto';
 import { getPref, type Prefs } from '@/settings/prefs';
@@ -68,38 +71,28 @@ interface OfficeOf {
   readonly cards: readonly Card[];
 }
 
-/** How the world's camera runs (camera.ts): hovered (the whole office), frozen (a card open), or on its own (lead, beats). */
-interface CamState {
+/** A beat's label place, px in the folded world's box. */
+type BeatAt = { readonly x: number; readonly y: number };
+/** A beat: its agent and where its label goes (over its bim's head as the beat starts). */
+interface Beat {
+  readonly agent: string;
+  readonly at: BeatAt;
+}
+
+/** When the beats play: not while grown (hovered) or while a float is open. */
+interface BeatState {
   readonly hover: boolean;
   readonly frozen: boolean;
 }
 
-/** `on`, and still true `ms` after it went off. */
-function useHeld(on: boolean, ms: number): boolean {
-  const [held, setHeld] = useState(on);
-  if (on && !held) setHeld(true);
-  useEffect(() => {
-    if (on) return;
-    const t = setTimeout(() => {
-      setHeld(false);
-    }, ms);
-    return () => {
-      clearTimeout(t);
-    };
-  }, [on, ms]);
-  return on || held;
-}
-
 /**
- * The world's camera (camera.ts, designer m_42974): the lead framing at rest, a beat now and then
- * on what just happened, the whole office while hovered. A card open freezes it where it is; the
- * window away or hidden plays no beat; reduced motion: the lead only; while he talks to this
- * project's main (composer/talking.ts) and TALK_HOLD_MS after, the lead holds. The clock restarts
- * when the hover, the card or the talk ends.
+ * The world's beats (camera.ts, designer m_42974; as labels only, designer m_44998): now and then
+ * the agent that just did something, for EASE_MS + HOLD_MS; null the rest of the time. None while
+ * grown, while a float is open, while the window is away or hidden, nor under reduced motion. The
+ * clock restarts when the hover or the float ends. The camera never moves for one.
  */
-function useWorldCamera(agents: readonly Agent[], project: string, lead: string | null, zoom: number, { hover, frozen }: CamState): Shot {
+function useWorldBeat(agents: readonly Agent[], { hover, frozen }: BeatState, placeOf: (agent: string) => BeatAt): Beat | null {
   const reduced = noGrow();
-  const talking = useHeld(useTalkingTo() === project, TALK_HOLD_MS);
   const seen = useRef<ReadonlyMap<string, Seen> | null>(null);
   const happened = useRef<Happened[]>([]);
   // the clock's 'something just happened': its next tick pulled in (camera.ts tickSoon)
@@ -112,9 +105,13 @@ function useWorldCamera(agents: readonly Agent[], project: string, lead: string 
     seen.current = next;
     if (fresh.length > 0) soon.current();
   }, [agents]);
-  const [beat, setBeat] = useState<string | null>(null);
+  const [beat, setBeat] = useState<Beat | null>(null);
   const last = useRef<LastBeat | null>(null);
-  const stopped = hover || frozen || reduced || talking;
+  const place = useRef(placeOf);
+  useEffect(() => {
+    place.current = placeOf;
+  });
+  const stopped = hover || frozen || reduced;
   useEffect(() => {
     if (stopped) return;
     let t: ReturnType<typeof setTimeout> | undefined;
@@ -137,8 +134,8 @@ function useWorldCamera(agents: readonly Agent[], project: string, lead: string 
       }
       last.current = { agent: b.agent, at: now };
       tickAt = null;
-      setBeat(b.agent);
-      // its ease in and its hold, then back to the lead (the follow camera's own ease)
+      setBeat({ agent: b.agent, at: place.current(b.agent) });
+      // its label shows as long as a beat lasted when the camera went there, then the clock again
       t = setTimeout(() => {
         setBeat(null);
         arm();
@@ -149,7 +146,7 @@ function useWorldCamera(agents: readonly Agent[], project: string, lead: string 
       const at = tickSoon(Date.now(), tickAt, last.current);
       if (at < tickAt) armAt(at);
     };
-    // back from a hover or a card: a beat cut short goes back to the lead now, the clock starts again
+    // back from a hover or a float: a beat cut short goes, the clock starts again
     t = setTimeout(() => {
       setBeat(null);
       arm();
@@ -158,11 +155,7 @@ function useWorldCamera(agents: readonly Agent[], project: string, lead: string 
       if (t !== undefined) clearTimeout(t);
     };
   }, [stopped]);
-  const shot = shotOf({ lead, zoom, beat, hover, reduced, talking });
-  // a card open: the camera stays where it is
-  const [kept, setKept] = useState(shot);
-  if (!frozen && (kept.follow !== shot.follow || kept.zoom !== shot.zoom)) setKept(shot);
-  return frozen ? kept : shot;
+  return stopped ? null : beat;
 }
 
 /** The project's map, his /bims pick. */
@@ -171,18 +164,16 @@ function useMap(project: string): MapId {
   return mapOf(getPref(prefs, mapPrefKey(project)));
 }
 
-/** The lead framing's zoom from the office's size: its map and its desks (one per agent but main). */
-function useLeadZoom(agents: readonly Agent[], map: MapId): number {
-  const desks = agents.filter((a) => !a.main).length;
-  return useMemo(() => {
-    const o = layoutOf(agents, map);
-    return leadZoom(o.W, o.D);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the office's size moves with its map and its desks' count, not each agent's state
-  }, [map, desks]);
+/** What the world's office takes besides its rows: his camera's input while grown, the head finder, the zoom it reports, the refit. */
+interface OfficeCam {
+  readonly cameraFrom?: HTMLElement | null;
+  readonly headRef?: { current: ((name: string) => { readonly x: number; readonly y: number } | null) | null };
+  readonly onZoomed?: (zoomed: boolean) => void;
+  readonly refit?: number;
 }
 
-/** The project's office as the world draws it: its map, its plugins' objects, its growth; `shot`: its camera (camera.ts), none: the whole office. */
-function WorldOffice({ project, agents, cards, shot, cameraFrom = null }: OfficeOf & { readonly shot?: Shot; readonly cameraFrom?: HTMLElement | null }) {
+/** The project's office as the world draws it: its map, its plugins' objects, its growth; never a follow camera (the whole map). */
+function WorldOffice({ project, agents, cards, cameraFrom = null, headRef, onZoomed, refit }: OfficeOf & OfficeCam) {
   const places = usePlaces(project);
   const growth = useGrowth(project);
   const prefs = usePrefs() as Prefs | null;
@@ -192,20 +183,20 @@ function WorldOffice({ project, agents, cards, shot, cameraFrom = null }: Office
   const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
   return (
     <Office project={project} agents={agents} cards={cards} places={places} objects={objects} growth={growth} map={map}
-      parts={bimsParts} transparent onOpen={() => undefined} follow={shot?.follow ?? null} followZoom={shot?.zoom} cameraFrom={cameraFrom} />
+      parts={bimsParts} transparent onOpen={() => undefined} follow={null} cameraFrom={cameraFrom} headRef={headRef} onZoomed={onZoomed} refit={refit} />
   );
 }
 
 /**
- * The beat's name label (designer m_43213): the followed agent's name and its state word, over the
- * island's middle, where the follow camera puts its bim; outside the scaled island, so it reads at
- * 148. From the beat's start to the start of its return. Pure render.
+ * The beat's name label (designer m_43213, m_44998): the agent's name and its state word, its
+ * bottom over that bim's head on the whole map (`at`, px in the world's box; none found: over the
+ * island's middle); outside the scaled island, so it reads at 148. For the beat's length. Pure render.
  */
-function BeatLabel({ agent, cards, mid }: { readonly agent: Agent; readonly cards: readonly Card[]; readonly mid: number }) {
+function BeatLabel({ agent, cards, at }: { readonly agent: Agent; readonly cards: readonly Card[]; readonly at: { readonly x: number; readonly y: number } }) {
   // it asks him when it has open cards (the beat's own signal, camera.ts seenOf), even before its card is in `cards`
   const asks = agent.waits > 0;
   return (
-    <span className="s3-beat" style={{ top: mid }} data-testid="app.world.beat">
+    <span className="s3-beat" style={{ left: at.x, top: at.y }} data-testid="app.world.beat">
       <b>{agent.name}</b>
       <span className="s3-beat-says" data-asks={asks || undefined}>{asks ? side.state_asks : speechWord(speechOf(agent, cards))}</span>
     </span>
@@ -219,18 +210,39 @@ export interface WorldProps extends OfficeOf {
   readonly says: string;
   /** a click: the office in a tab */
   readonly onOpen: () => void;
-  /** a card is open: the camera stays where it is (camera.ts) */
+  /** a float is open: no beat plays (camera.ts) */
   readonly frozen?: boolean;
+}
+
+/**
+ * Where a beat's label goes, px in the folded world's box: over its bim's head on the whole map
+ * (`head`, the office's canvas px at BIG, scaled to SMALL), else over the island's middle. Pure.
+ */
+export function beatPlace(head: { readonly x: number; readonly y: number } | null, isleH: number): { readonly x: number; readonly y: number } {
+  const k = SMALL / BIG;
+  if (head === null) return { x: Math.round(SMALL / 2), y: Math.round((isleH * k) / 2) };
+  return { x: Math.round(head.x * k), y: Math.round(head.y * k) };
 }
 
 /** The world, small at rest, big after a hover. */
 export function World({ project, name, says, agents, cards, onOpen, frozen = false }: WorldProps) {
   const [big, setBig] = useState(false);
-  // its camera: the lead framing, a beat now and then (camera.ts)
-  const zoom = useLeadZoom(agents, useMap(project));
-  const lead = agents.find((a) => a.main)?.name ?? null;
-  const shot = useWorldCamera(agents, project, lead, zoom, { hover: big, frozen });
-  const beat = shot.follow !== null && shot.follow !== lead ? agents.find((a) => a.name === shot.follow) : undefined;
+  // where a bim's head is on the whole map (Office headRef), read as its beat starts
+  const heads = useRef<((n: string) => BeatAt | null) | null>(null);
+  const isleHRef = useRef(0);
+  // folded, the whole map; a beat now and then as a label over its bim (camera.ts, designer m_44998)
+  const beatOf = useWorldBeat(agents, { hover: big, frozen }, (agent) => beatPlace(heads.current?.(agent) ?? null, isleHRef.current));
+  const beat = beatOf === null ? undefined : agents.find((a) => a.name === beatOf.agent);
+  // folding back: the office eases to fit again (his pinch while grown is forgotten)
+  const [refit, setRefit] = useState(0);
+  const [wasBig, setWasBig] = useState(big);
+  if (wasBig !== big) {
+    setWasBig(big);
+    if (!big) setRefit((n) => n + 1);
+  }
+  // his pinch cuts the map: the box is framed (designer m_44998)
+  const [zoomed, setZoomed] = useState(false);
+
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stop = () => {
     if (timer.current !== null) clearTimeout(timer.current);
@@ -259,6 +271,7 @@ export function World({ project, name, says, agents, cards, onOpen, frozen = fal
     if (el === null || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => {
       setIsleH(el.offsetHeight);
+      isleHRef.current = el.offsetHeight;
     });
     ro.observe(el);
     return () => {
@@ -269,16 +282,18 @@ export function World({ project, name, says, agents, cards, onOpen, frozen = fal
   const [hit, setHit] = useState<HTMLSpanElement | null>(null);
   const label = side.world_open({ project: name });
   return (
-    <Press look="s3-world" data-big={big || undefined} aria-label={label} {...tipAttrs(big ? undefined : label)}
+    <Press look="s3-world" data-big={big || undefined} data-framed={(big && zoomed) || undefined} aria-label={label} {...tipAttrs(big ? undefined : label)}
       onPointerEnter={enter} onPointerLeave={leave} onFocus={enter} onBlur={leave} onClick={onOpen} data-testid="app.world">
       {/* the one place that takes the pointer: the island's box as drawn, never the bubbles' column under it */}
       <span ref={setHit} className="s3-world-hit" style={hitBox(isleH, big)} data-testid="app.world.hit" />
       <span ref={isle} className="s3-world-isle" style={{ '--s3-scale': String(big ? 1 : SMALL / BIG) } as CSSProperties}>
+        {/* the frame: shown only while his pinch cuts the map (side3d.css .s3-world[data-framed]) */}
+        <span className="s3-world-frame" aria-hidden="true" data-testid="app.world.frame" />
         <span className="s3-world-office" aria-hidden="true">
-          <WorldOffice project={project} agents={agents} cards={cards} shot={shot} cameraFrom={big ? hit : null} />
+          <WorldOffice project={project} agents={agents} cards={cards} cameraFrom={big ? hit : null} headRef={heads} onZoomed={setZoomed} refit={refit} />
         </span>
       </span>
-      {beat !== undefined && !big && <BeatLabel agent={beat} cards={cards} mid={Math.round((isleH * SMALL) / BIG / 2)} />}
+      {beat !== undefined && beatOf !== null && !big && <BeatLabel agent={beat} cards={cards} at={beatOf.at} />}
       {big && (
         <span className="s3-legend" data-testid="app.world.legend">
           <b>{name}</b>

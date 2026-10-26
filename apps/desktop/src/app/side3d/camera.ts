@@ -1,17 +1,12 @@
-// src/app/side3d · the floating world's camera (designer's rule m_42974, from Gabriel's ask m_42966:
-// the world was too far out to read). At rest it frames the project's main (its lead) LEAD_UNITS
-// desk tiles across; every BEAT_EVERY_MS ± BEAT_JITTER_MS, when something happened in the last
-// RECENT_MS, a beat zooms on that agent (bims/focus.ts's follow, FOLLOW_ZOOM), holds HOLD_MS, then
-// goes back to the lead. First match wins: an agent that just asks, then one that just changed
-// state; never two beats within GAP_MS, never the same agent twice in a row unless it asks again.
-// Hover: the whole office; reduced motion: the lead only, no beats. The beat picker and the shot
-// are pure; World.tsx runs the clock and feeds bims/Office's `follow` and `followZoom`. Owner: nm-side.
-import { FOLLOW_ZOOM } from '@/bims/focus';
-import { MAX_ZOOM } from '@/bims/zoom';
+// src/app/side3d · the floating world's beats (designer's rule m_42974, from Gabriel's ask m_42966;
+// as labels only, designer m_44998: the world is always the whole map, never a follow or a zoom).
+// Every BEAT_EVERY_MS ± BEAT_JITTER_MS, when something happened in the last RECENT_MS, a beat
+// names that agent over its bim (World.tsx BeatLabel) for EASE_MS + HOLD_MS. First match wins: an
+// agent that just asks, then one that just changed state; never two beats within GAP_MS, never the
+// same agent twice in a row unless it asks again. None while grown, nor under reduced motion. The
+// beat picker is pure; World.tsx runs the clock. Owner: nm-side.
 import type { Agent, Status } from '@/proto';
 
-/** the lead framing: this many desk tiles across the world's width */
-export const LEAD_UNITS = 6;
 /** a beat comes every 30 s ± 8 */
 export const BEAT_EVERY_MS = 30_000;
 export const BEAT_JITTER_MS = 8_000;
@@ -19,11 +14,9 @@ export const BEAT_JITTER_MS = 8_000;
 export const RECENT_MS = 20_000;
 /** at least this long between two beats */
 export const GAP_MS = 20_000;
-/** a beat: its ease in, then its hold (the ease back is the follow camera's own, to the lead) */
+/** a beat's label lasts its old camera move's ease in and hold */
 export const EASE_MS = 600;
 export const HOLD_MS = 6_000;
-/** he talks to the project's main (composer/talking.ts): the lead holds, and this long after */
-export const TALK_HOLD_MS = 10_000;
 
 /** What made a beat, by priority (first wins). */
 export type Why = 'asks' | 'state';
@@ -99,30 +92,4 @@ export function tickSoon(now: number, tickAt: number, last: LastBeat | null): nu
 /** The wait before the next beat, from a draw r in [0, 1): 30 s ± 8. Pure. */
 export function beatDelay(r: number): number {
   return Math.round(BEAT_EVERY_MS + (2 * r - 1) * BEAT_JITTER_MS);
-}
-
-/**
- * The lead framing's zoom for an office W × D tiles: LEAD_UNITS across the frame. The fit shows
- * its iso diamond, (W + D) / √2 tiles wide; an office narrower than that stays at the fit. Pure.
- */
-export function leadZoom(W: number, D: number): number {
-  const across = (W + D) / Math.SQRT2;
-  return Math.min(MAX_ZOOM, Math.max(1, across / LEAD_UNITS));
-}
-
-/** What the office looks at: the agent it follows (null: the whole office) and how close. */
-export interface Shot {
-  readonly follow: string | null;
-  readonly zoom: number;
-}
-
-/**
- * The shot now: the whole office while hovered; the lead at its framing under reduced motion,
- * while he talks to it (`talking`: TALK_HOLD_MS past his last word too) or with no beat; a beat's
- * agent at the follow zoom. `lead` null (no main): the whole office. Pure.
- */
-export function shotOf(o: { readonly lead: string | null; readonly zoom: number; readonly beat: string | null; readonly hover: boolean; readonly reduced: boolean; readonly talking?: boolean }): Shot {
-  if (o.hover || o.lead === null) return { follow: null, zoom: o.zoom };
-  if (o.beat !== null && !o.reduced && o.talking !== true) return { follow: o.beat, zoom: FOLLOW_ZOOM };
-  return { follow: o.lead, zoom: o.zoom };
 }

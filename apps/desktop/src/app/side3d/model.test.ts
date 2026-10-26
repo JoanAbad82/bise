@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, Card } from '@/proto';
 import { side } from '@/proto/words_side.gen';
-import { agentCounts, askButtons, bubbleCount, bubbleTip, inRank, pickIntent, speechOf, type Counts } from './model';
+import { agentCounts, askButtons, bubbleBadge, bubbleCount, bubbleTip, pillText, inRank, pickIntent, speechOf, type Counts } from './model';
 import { artifactObj, bubbleThing, laterObj, procObj } from './objects';
 
 const agent = (name: string, over: Partial<Agent> = {}): Agent => ({
@@ -11,32 +11,42 @@ const agent = (name: string, over: Partial<Agent> = {}): Agent => ({
 const card = (id: number, agentName: string, over: Partial<Card> = {}): Card => ({
   id, project: 'acme', kind: 'question', agent: agentName, question: 'run it?', options: [{ n: 1, label: 'yes' }, { n: 2, label: 'no' }, { n: 3, label: 'later' }], urgent: false, since_ms: id, ...over,
 });
-const COUNTS: Counts = { working: 3, asks: 1, busy: 3, artifacts: 12, newArtifacts: 2, timers: 1, watches: 1, running: 2, doneToday: 3 };
+const COUNTS: Counts = { working: 3, asks: 1, busy: 3, active: 4, inbox: 2, artifacts: 12, newArtifacts: 2, timers: 1, watches: 1, running: 2, listening: 1 };
 
 describe('the counts', () => {
-  it('agents: working without main, asking by its open cards, busy each once', () => {
+  it('agents: working without main, asking by its open cards, busy each once; active: working or waiting (on an agent or on him), never main, idle, done or archived', () => {
     const c = agentCounts([
-      agent('main', { main: true, status: 'working' }),
+      agent('main', { main: true, status: 'working', waits: 1 }),
       agent('perf', { status: 'working', waits: 1 }),
       agent('docs', { status: 'working' }),
+      agent('relay', { status: 'waiting' }),
+      agent('stuck', { status: 'blocked' }),
+      agent('asks', { status: 'idle', waits: 2 }),
       agent('old', { status: 'working', archived: true }),
+      agent('fin', { status: 'done' }),
       agent('idle'),
     ]);
-    expect(c).toEqual({ working: 2, asks: 1, busy: 2 });
+    expect(c).toEqual({ working: 2, asks: 3, busy: 4, active: 5 });
   });
-  it('a bubble shows its count, the agents in the accent only when one asks', () => {
-    // what waits on him in the accent (1 asks), else the total plain (designer m_42866)
-    expect(bubbleCount('agents', COUNTS)).toEqual({ n: 1, accent: true });
-    expect(bubbleCount('agents', { ...COUNTS, asks: 0 })).toEqual({ n: 3, accent: false });
-    expect(bubbleCount('artifacts', COUNTS)).toEqual({ n: 2, accent: false });
+  it('a bubble\'s bottom pill: its count; the agents\' its active ones, shown at 0 too (designer m_44986); the accent only on top', () => {
+    expect(bubbleCount('agents', COUNTS)).toEqual({ n: 4, always: true });
+    expect(bubbleCount('agents', { ...COUNTS, active: 0 })).toEqual({ n: 0, always: true });
+    expect(bubbleCount('artifacts', COUNTS)).toEqual({ n: 2, always: false });
     expect(bubbleCount('scheduled', COUNTS).n).toBe(2);
     expect(bubbleCount('processes', COUNTS).n).toBe(2);
+    expect(bubbleBadge('agents', COUNTS)).toBe(2);
+    for (const b of ['artifacts', 'scheduled', 'processes'] as const) expect(bubbleBadge(b, COUNTS)).toBe(0);
   });
-  it('a tip names the bubble and what it counts, "nothing" when empty', () => {
-    expect(bubbleTip('agents', COUNTS)).toBe(side.bubble_tip({ name: side.agents, says: `${side.working({ n: 3 })} · ${side.asks({ n: 1 })}` }));
-    const none: Counts = { working: 0, asks: 0, busy: 0, artifacts: 0, newArtifacts: 0, timers: 0, watches: 0, running: 0, doneToday: 0 };
+  it('the agents\' pills say 99+ past 99; the other bubbles\' 3 digits whole', () => {
+    expect([pillText('agents', 99), pillText('agents', 128), pillText('artifacts', 593)]).toEqual(['99', '99+', '593']);
+  });
+  it('a tip names the bubble and what it counts, "nothing" when empty; the agents\' says its two pills, parts dropped at 0', () => {
+    expect(bubbleTip('agents', COUNTS)).toBe(side.bubble_tip({ name: side.agents, says: `${side.active({ n: 4 })} · ${side.waiting_you({ n: 2 })}` }));
+    expect(bubbleTip('agents', { ...COUNTS, inbox: 0 })).toBe(side.bubble_tip({ name: side.agents, says: side.active({ n: 4 }) }));
+    const none: Counts = { working: 0, asks: 0, busy: 0, active: 0, inbox: 0, artifacts: 0, newArtifacts: 0, timers: 0, watches: 0, running: 0, listening: 0 };
+    expect(bubbleTip('agents', none)).toBe(side.bubble_tip({ name: side.agents, says: side.bubble_none }));
     expect(bubbleTip('processes', none)).toBe(side.bubble_tip({ name: side.processes, says: side.bubble_none }));
-    expect(bubbleTip('processes', COUNTS)).toBe(side.bubble_tip({ name: side.processes, says: `${side.running({ n: 2 })} · ${side.done_today({ n: 3 })}` }));
+    expect(bubbleTip('processes', COUNTS)).toBe(side.bubble_tip({ name: side.processes, says: `${side.running({ n: 2 })} · ${side.listening({ n: 1 })}` }));
   });
 });
 

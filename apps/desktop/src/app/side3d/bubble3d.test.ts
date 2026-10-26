@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 // The 4 bubbles' own objects (bims-plugins' spec): their parts and colours light and dark, and one
-// visual weight in the 68 square (designer m_44222).
+// placement by their drawn box on the coin (designer m_45014: E.5).
 import { describe, expect, it } from 'vitest';
 import { Box3, Color, Mesh, type MeshStandardMaterial, Vector3 } from 'three';
 import { DAY, HOODIE, WORLD } from '@/bims/render/palette';
-import { BUBBLES, COIN, SQUARE, WEIGHT, objectAt } from './objects';
-import { GLASS, bubbleModel, fitOf, projected } from './bubble3d';
+import { BUBBLES, COIN, objectAt } from './objects';
+import { GLASS, alphaBox, alphaFit, bubbleModel, lookOf, projected } from './bubble3d';
 
 type Mat = MeshStandardMaterial;
 const meshes = (b: (typeof BUBBLES)[number], night: boolean): Mesh[] => {
@@ -21,12 +21,12 @@ const hex = (m: Mesh | undefined): string => {
   if (m === undefined) throw new Error('no such part');
   return `#${(m.material as Mat).color.getHexString()}`;
 };
-/** the picture's px per object unit at 68 (fitOf's side) */
+/** the picture's css px per object unit on the coin: its projected box in COIN.box (the drawn box is inside it) */
 const pxPerUnit = (b: (typeof BUBBLES)[number]): number => {
   const g = bubbleModel(b, false);
   g.updateMatrixWorld(true);
-  const f = fitOf(new Box3().setFromObject(g, true), SQUARE);
-  return 1 / f.scale;
+  const { x0, x1, y0, y1 } = projected(new Box3().setFromObject(g, true));
+  return Math.min(COIN.box.w / (x1 - x0), COIN.box.h / (y1 - y0));
 };
 
 describe('the 4 bubble objects', () => {
@@ -79,7 +79,7 @@ describe('the 4 bubble objects', () => {
     }
   });
 
-  it('no part under 4 px at 68 (1x), but the hourglass\'s sand stream (designer signed it)', () => {
+  it('no part under 3 px on the coin at 1x (sheet D, designer m_45014; was 4 at the old 68), but the hourglass\'s sand stream (designer signed it)', () => {
     for (const b of BUBBLES) {
       const k = pxPerUnit(b);
       for (const m of meshes(b, false)) {
@@ -87,70 +87,83 @@ describe('the 4 bubble objects', () => {
         const { x0, x1, y0, y1 } = projected(box);
         const px = Math.max(x1 - x0, y1 - y0) * k;
         const stream = b === 'scheduled' && box.getSize(new Vector3()).x < 0.06;
-        if (!stream) expect(px, `${b} ${hex(m)}`).toBeGreaterThanOrEqual(4);
+        if (!stream) expect(px, `${b} ${hex(m)}`).toBeGreaterThanOrEqual(3);
       }
     }
   });
 });
 
-describe('one visual weight (fitOf)', () => {
-  const box = (w: number, h: number, d: number) => new Box3(new Vector3(-w / 2, 0, -d / 2), new Vector3(w / 2, h, d / 2));
-  /** where the box lands in the square, in its px (y down from its top) */
-  const land = (b: Box3, size = SQUARE) => {
-    const f = fitOf(b, size);
-    const { x0, x1, y0, y1 } = projected(b);
-    const k = size / (f.right - f.left);
-    return { high: (y1 - y0) * k, wide: (x1 - x0) * k, top: (f.top - y1) * k, left: (x0 - f.left) * k };
-  };
+/** an RGBA buffer w x h with alpha 255 in the box [x0, x1) x [y0, y1) */
+const drawnIn = (w: number, h: number, b: { x0: number; y0: number; x1: number; y1: number }): Uint8ClampedArray => {
+  const d = new Uint8ClampedArray(w * h * 4);
+  for (let y = b.y0; y < b.y1; y++) for (let x = b.x0; x < b.x1; x++) d[(y * w + x) * 4 + 3] = 255;
+  return d;
+};
 
-  it('a tall object: 56 of the 68 high, its top 6 under the square\'s top, centred', () => {
-    const l = land(box(0.5, 2, 0.5));
-    expect(l.high).toBeCloseTo(WEIGHT.high, 6);
-    expect(l.top).toBeCloseTo(WEIGHT.top, 6);
-    expect(l.wide).toBeLessThan(WEIGHT.wide);
-    expect(l.left * 2 + l.wide).toBeCloseTo(SQUARE, 6);
+describe('placed by the drawn box (designer m_45014)', () => {
+  it('alphaBox: the pixels with some alpha, none when nothing is drawn, a faint edge left out', () => {
+    expect(alphaBox(drawnIn(20, 20, { x0: 3, y0: 5, x1: 9, y1: 17 }), 20, 20)).toEqual({ x0: 3, y0: 5, x1: 9, y1: 17 });
+    expect(alphaBox(new Uint8ClampedArray(20 * 20 * 4), 20, 20)).toBeNull();
+    const faint = drawnIn(20, 20, { x0: 3, y0: 5, x1: 9, y1: 17 });
+    faint[(19 * 20 + 19) * 4 + 3] = 4;
+    expect(alphaBox(faint, 20, 20)).toEqual({ x0: 3, y0: 5, x1: 9, y1: 17 });
   });
 
-  it('a wide object caps on its width (64) and sits lower, its top still 6 under', () => {
-    const l = land(box(3, 0.3, 3));
-    expect(l.wide).toBeCloseTo(WEIGHT.wide, 6);
-    expect(l.high).toBeLessThan(WEIGHT.high);
-    expect(l.top).toBeCloseTo(WEIGHT.top, 6);
+  /** where a drawn box of the first look lands in the picture, its px (y down from its top) */
+  const land = (drawn: { x0: number; y0: number; x1: number; y1: number }, size: number) => {
+    const box = new Box3(new Vector3(-0.5, 0, -0.5), new Vector3(0.5, 2, 0.5));
+    const look = lookOf(box, 400);
+    const f = alphaFit(look, drawn, 400, size);
+    const u = (look.right - look.left) / 400;
+    const k = size / (f.right - f.left);
+    expect(f.top - f.bottom).toBeCloseTo(f.right - f.left, 9);
+    const left = (look.left + drawn.x0 * u - f.left) * k;
+    const right = (look.left + drawn.x1 * u - f.left) * k;
+    const top = (f.top - (look.top - drawn.y0 * u)) * k;
+    const bottom = (f.top - (look.top - drawn.y1 * u)) * k;
+    return { left, right, top, bottom, wide: right - left, high: bottom - top };
+  };
+
+  it('a tall object: 32 of the 36 square high, its lowest pixel on the square\'s bottom, centred', () => {
+    const l = land({ x0: 150, y0: 40, x1: 250, y1: 360 }, COIN.box.w);
+    expect(l.high).toBeCloseTo(COIN.box.h, 6);
+    expect(l.bottom).toBeCloseTo(COIN.box.w, 6);
+    expect(l.left + l.right).toBeCloseTo(COIN.box.w, 6);
+  });
+
+  it('a wide object: 36 wide, lower, its base still on the square\'s bottom', () => {
+    const l = land({ x0: 20, y0: 200, x1: 380, y1: 300 }, COIN.box.w);
+    expect(l.wide).toBeCloseTo(COIN.box.w, 6);
+    expect(l.high).toBeLessThan(COIN.box.h);
+    expect(l.bottom).toBeCloseTo(COIN.box.w, 6);
   });
 
   it('the same at 2x: the numbers scale with the picture', () => {
-    const l = land(box(0.5, 2, 0.5), SQUARE * 2);
-    expect(l.high).toBeCloseTo(WEIGHT.high * 2, 6);
-    expect(l.top).toBeCloseTo(WEIGHT.top * 2, 6);
+    const l = land({ x0: 150, y0: 40, x1: 250, y1: 360 }, COIN.box.w * 2);
+    expect(l.high).toBeCloseTo(COIN.box.h * 2, 6);
+    expect(l.bottom).toBeCloseTo(COIN.box.w * 2, 6);
   });
 
-  it('each bubble object fits: at most 56 high and 64 wide, its top 6 under', () => {
+  it('the first look leaves every object whole, with air on each side', () => {
     for (const b of BUBBLES) {
       const g = bubbleModel(b, false);
       g.updateMatrixWorld(true);
-      const l = land(new Box3().setFromObject(g, true));
-      expect(l.high).toBeLessThanOrEqual(WEIGHT.high + 1e-6);
-      expect(l.wide).toBeLessThanOrEqual(WEIGHT.wide + 1e-6);
-      expect(l.top).toBeCloseTo(WEIGHT.top, 6);
-      expect(Math.max(Math.abs(l.high - WEIGHT.high), Math.abs(l.wide - WEIGHT.wide))).toBeLessThan(Math.max(WEIGHT.high, WEIGHT.wide));
+      const box = new Box3().setFromObject(g, true);
+      const f = lookOf(box, 100);
+      const p = projected(box);
+      expect(p.x0).toBeGreaterThan(f.left);
+      expect(p.x1).toBeLessThan(f.right);
+      expect(p.y0).toBeGreaterThan(f.bottom);
+      expect(p.y1).toBeLessThan(f.top);
     }
   });
 });
 
-describe('the coin (bims-plugins r3, designer m_44673: B)', () => {
-  it('the object square 54 at left -5, top -25 of the 44 disc: 44 high, base at 55 %, rising 20', () => {
+describe('the coin (designer m_45014: E.5)', () => {
+  it('the object\'s 36 square at left 4, top -14 of the 44 disc: its base on the disc\'s centre, rising 10 at most', () => {
     const at = objectAt();
-    expect(at).toMatchObject({ left: -5, top: -25, size: COIN.square });
-    expect(Math.round(at.high)).toBe(44);
-    expect(Math.round(at.rise)).toBe(20);
-    expect(at.top + (at.size * WEIGHT.top) / SQUARE + at.high).toBeCloseTo(COIN.disc * COIN.base, 0);
-  });
-
-  it('fitOf at the coin\'s square: a tall object is 44 high, its top 20 above the disc', () => {
-    const f = fitOf(new Box3(new Vector3(-0.25, 0, -0.25), new Vector3(0.25, 2, 0.25)), COIN.square);
-    const { y0, y1 } = projected(new Box3(new Vector3(-0.25, 0, -0.25), new Vector3(0.25, 2, 0.25)));
-    const k = COIN.square / (f.right - f.left);
-    expect(Math.round((y1 - y0) * k)).toBe(44);
-    expect(Math.round(-(objectAt().top + (f.top - y1) * k))).toBe(20);
+    expect(at).toEqual({ left: 4, top: -14, size: 36, rise: 10 });
+    expect(at.top + at.size).toBe(COIN.disc / 2);
+    expect(COIN.base - COIN.box.h).toBe(-at.rise);
   });
 });

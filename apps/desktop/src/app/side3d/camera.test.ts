@@ -2,8 +2,7 @@
 // twice, reduced motion, the lead framing.
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { FOLLOW_ZOOM } from '@/bims/focus';
-import { BEAT_EVERY_MS, BEAT_JITTER_MS, BEAT_SOON_MS, beatDelay, GAP_MS, happenedOf, leadZoom, pickBeat, RECENT_MS, seenOf, shotOf, stillRecent, tickSoon, type Happened } from './camera';
+import { BEAT_EVERY_MS, BEAT_JITTER_MS, BEAT_SOON_MS, beatDelay, GAP_MS, happenedOf, pickBeat, RECENT_MS, seenOf, stillRecent, tickSoon, type Happened } from './camera';
 
 const agent = (name: string, o: Partial<Agent> = {}): Agent => ({ name, main: false, status: 'working', archived: false, waits: 0, ...o }) as unknown as Agent;
 
@@ -61,30 +60,5 @@ describe('the beat picker', () => {
     expect(beatDelay(0)).toBe(BEAT_EVERY_MS - BEAT_JITTER_MS);
     expect(beatDelay(0.5)).toBe(BEAT_EVERY_MS);
     expect(beatDelay(0.999999)).toBe(BEAT_EVERY_MS + BEAT_JITTER_MS);
-  });
-});
-
-describe('the shot', () => {
-  const o = { lead: 'main', zoom: 2.2, beat: null, hover: false, reduced: false };
-  it('at rest the lead at its framing; a beat its agent at the follow zoom', () => {
-    expect(shotOf(o)).toEqual({ follow: 'main', zoom: 2.2 });
-    expect(shotOf({ ...o, beat: 'perf' })).toEqual({ follow: 'perf', zoom: FOLLOW_ZOOM });
-  });
-  it('hovered: the whole office; no main: the whole office', () => {
-    expect(shotOf({ ...o, beat: 'perf', hover: true }).follow).toBeNull();
-    expect(shotOf({ ...o, lead: null }).follow).toBeNull();
-  });
-  it('reduced motion: the lead only, never a beat', () => {
-    expect(shotOf({ ...o, beat: 'perf', reduced: true })).toEqual({ follow: 'main', zoom: 2.2 });
-  });
-  it('while he talks to the main: the lead holds, a beat waits', () => {
-    expect(shotOf({ ...o, beat: 'perf', talking: true })).toEqual({ follow: 'main', zoom: 2.2 });
-    expect(shotOf({ ...o, beat: 'perf', talking: true, hover: true }).follow).toBeNull();
-  });
-  it('the lead framing: 6 tiles across, never past the fit', () => {
-    // a 12 × 6 office: (12 + 6) / √2 ≈ 12.7 tiles across the fit
-    expect(leadZoom(12, 6)).toBeCloseTo(18 / Math.SQRT2 / 6, 5);
-    expect(leadZoom(3, 3)).toBe(1);
-    expect(leadZoom(200, 200)).toBe(6);
   });
 });

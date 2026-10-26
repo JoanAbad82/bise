@@ -8,7 +8,7 @@ export const side = {
   agents: "Agents",
   /** the artifacts bubble and its card's head */
   artifacts: "Artifacts",
-  /** the scheduled bubble, and the scheduled half of the processes card */
+  /** the scheduled bubble and its card's head */
   scheduled: "Scheduled",
   /** the processes bubble and its card's head */
   processes: "Processes",
@@ -28,6 +28,12 @@ export const side = {
   artifact_count: (a: { n: number }): string => a.n === 1 ? String(a.n) + " artifact" : String(a.n) + " artifacts",
   /** a count of running processes */
   running: (a: { n: string | number }): string => String(a.n) + " running",
+  /** a count of running processes that listen on a port (the processes card's head) */
+  listening: (a: { n: string | number }): string => String(a.n) + " listening",
+  /** the agents bubble's bottom pill and its tip: the live agents working or waiting (on another agent or on him); main, idle, done, archived out */
+  active: (a: { n: string | number }): string => String(a.n) + " active",
+  /** the agents bubble's top pill (the accent) and its tip: this scope's inbox */
+  waiting_you: (a: { n: string | number }): string => String(a.n) + " waiting for you",
   /** a count of timers (scheduled tasks) */
   timers: (a: { n: number }): string => a.n === 1 ? String(a.n) + " timer" : String(a.n) + " timers",
   /** a count of watches (an agent waiting on a file or a process) */
@@ -36,15 +42,13 @@ export const side = {
   archived: (a: { n: string | number }): string => String(a.n) + " archived",
   /** the artifacts card's foot, left: how many, in how many projects (two or more; one project says artifact_count) */
   in_projects: (a: { n: string | number; p: string | number }): string => String(a.n) + " in " + String(a.p) + " projects",
-  /** the processes card's foot, left: what ended today */
-  done_today: (a: { n: string | number }): string => String(a.n) + " done today",
   /** the agents card's foot: its full page */
   all_agents: "all agents ›",
   /** the artifacts card's foot: its full page */
   all_artifacts: "all artifacts ›",
   /** the processes card's foot: its full page */
   all_processes: "all processes ›",
-  /** the scheduled part's link to its full page */
+  /** the scheduled card's foot: its full page */
   all_scheduled: "all scheduled ›",
   /** a card's head button: the same thing as a tab of the panel */
   pin_tab: "open as a tab",
@@ -71,9 +75,9 @@ export const side = {
   /** the artifacts card with nothing in it */
   no_artifacts: "no artifacts yet",
   /** the processes card with nothing running */
-  no_processes: "nothing running",
-  /** the processes card's scheduled part with nothing in it */
-  no_scheduled: "nothing scheduled",
+  no_processes: "nothing running.",
+  /** the scheduled card with nothing in it */
+  no_scheduled: "nothing scheduled.",
   /** the world's legend: how many bims sit at their desks */
   at_desks: (a: { n: string | number }): string => String(a.n) + " at their desks",
   /** the world's VoiceOver name, and its click's tip */

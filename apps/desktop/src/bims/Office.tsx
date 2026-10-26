@@ -213,6 +213,9 @@ export function Office({
   cameraFrom = null,
   onState,
   snapRef,
+  headRef,
+  onZoomed,
+  refit = 0,
 }: {
   project: string;
   /** the project's live agents (main among them) */
@@ -248,6 +251,12 @@ export function Office({
   onState?: (s: OfficeState) => void;
   /** set while it draws: the office as drawn now onto a 2d canvas (the welcome's dock, renderer.copyTo) */
   snapRef?: { current: ((target: HTMLCanvasElement) => void) | null };
+  /** set while it draws: a bim's head on the canvas now, css px from its top left, null off view (the right side's folded world puts a beat's label there, app/side3d/World.tsx; renderer.headOf) */
+  headRef?: { current: ((name: string) => { readonly x: number; readonly y: number } | null) | null };
+  /** his camera leaves the fit or comes back to it (the right side's world frames a cut map) */
+  onZoomed?: (zoomed: boolean) => void;
+  /** a change eases the camera back to the whole office (the right side's world folding back) */
+  refit?: number;
 }) {
   const [state, setState] = useState<OfficeState>('loading');
   useEffect(() => {
@@ -321,6 +330,17 @@ export function Office({
     followRef.current = { target: follow !== null ? { name: follow } : was === null ? null : 'fit', at: 0 };
     kickRef.current();
   }, [follow]);
+  // back to the whole office when asked (the side's world folds): eased as the follow camera's 'fit'
+  const refitRef = useRef(refit);
+  useEffect(() => {
+    if (refitRef.current === refit) return;
+    refitRef.current = refit;
+    followRef.current = { target: 'fit', at: 0 };
+    kickRef.current();
+  }, [refit]);
+  useEffect(() => {
+    onZoomed?.(!fitted);
+  }, [fitted, onZoomed]);
   // how close it follows (the world's lead framing, then a beat's closer look): a change eases there
   const zoomRef = useRef(followZoom);
   useEffect(() => {
@@ -677,6 +697,7 @@ export function Office({
           snapRef.current = (target) => {
             made.copyTo(target);
           };
+        if (headRef !== undefined) headRef.current = (name) => (lost ? null : made.headOf(name));
         made.setCam(camRef.current);
         started = true;
         setState('on');
@@ -703,9 +724,10 @@ export function Office({
       applyCam.current = () => undefined;
       pick.current = () => null;
       if (snapRef !== undefined) snapRef.current = null;
+      if (headRef !== undefined) headRef.current = null;
       r?.dispose();
     };
-  }, [parts, driver, layoutTags, moveCam, snapRef, transparent, fill]);
+  }, [parts, driver, layoutTags, moveCam, snapRef, headRef, transparent, fill]);
 
   // hover: the bim under the pointer, its line after the tip's delay; off it, at once
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

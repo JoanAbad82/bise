@@ -1,13 +1,15 @@
 // src/app/side3d · SideHost: the right side, folded (page native-mac §7, variant A): the bims'
-// world floating at the top right (World), the 3D bubbles under it (Bubbles) and their 360 cards
+// world floating at the top right (World), the 3D bubbles under it (Bubbles) and their 360 floats
 // (Flyout*). Mounted at the shell's root by App.tsx, position fixed under the window's bar,
 // outside .app-main and .app-screen, so no parent's overflow clips the world's or an object's
 // shadow (plan §2; ds/noclip.ts checks it). It computes the window's sideLayout (place.ts: at a
 // resize's end, a sidebar or panel fold) and hides while the tabbed panel is open or on a page
 // that is no project's (layout sideShows: the inbox, scheduled, plugins, artifacts...; the world's
 // office unmounted: no loop while hidden). The project is the route's (bise's home on a page with
-// none). One card open at a time: a bubble's click, ⌥1-⌥4 (folded) or ⌥⌘1-⌥⌘4 (keys.ts) toggle it
-// (by its key, its first row takes the focus); ⌥ held shows each bubble's key; ↑ ↓ walk the rows,
+// none). One float open at a time, one per bubble (designer m_44975): a bubble's click, ⌥1-⌥4
+// (folded) or ⌥⌘1-⌥⌘4 (keys.ts) toggle it (by its key, its first row takes the focus); from one
+// bubble to another the same float moves to its new place and size in 240 ms, its content
+// crossfading (moveFrames, designer m_44990; reduced motion: a 120 ms fade in place); ⌥ held shows each bubble's key; ↑ ↓ walk the rows,
 // ⏎ opens one; esc closes it (the focus back on its bubble), a click outside too. Places, in px
 // under the bar: the world 12 from the top and the right edge; the bubbles 12 from the right, 152
 // from the top, 80 apart (44 + 36), never moving (the big world floats over them, designer
@@ -22,11 +24,11 @@ import { useRoute, useRouter } from '../router';
 import { MAIN, projectOf } from '../route';
 import { useMenuAction } from '../menu';
 import { useModHeld } from '../held';
-import { inRank, agentCounts, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type Counts } from './model';
+import { inRank, agentCounts, bubbleBadge, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type Counts } from './model';
 import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
-import { World, WorldThumb } from './World';
-import { Empty, Flyout, HeadButton } from './Flyout';
+import { noGrow, World, WorldThumb } from './World';
+import { Empty, Float, FloatLayer, HeadButton, type FloatContent } from './Flyout';
 import { AgentLine } from './FlyoutAgents';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useLayoutDriver, useSideLayout } from './place';
@@ -37,7 +39,7 @@ import { useAgents, useCards, useProjects, useStore } from '@/store';
 import { useAllArtifacts } from '@/artifacts';
 import { AddButton, useAddPlace } from '@/artifacts/Drops';
 import { useAllScheduled } from '@/scheduled';
-import { endedAt, isRunning, today, useAllProcesses } from '@/running';
+import { isRunning, useAllProcesses } from '@/running';
 import { side } from '@/proto/words_side.gen';
 import './side3d.css';
 
@@ -50,6 +52,20 @@ const TOP_STACK = 40;
 const STEP = 80;
 /** how many rows a card lists before 'all … ›' */
 const ROWS = 6;
+/** the float's move from one bubble to another, ms, and its curve (designer m_44990) */
+export const MOVE_MS = 240;
+export const MOVE_EASE = 'cubic-bezier(.3,.7,.4,1)';
+/** reduced motion: no move, the whole float fades in this long */
+export const FADE_MS = 120;
+/** the rows ↑ ↓ walk: the float's content now, never the leaving one */
+const ROWS_NOW = '.s3-card-layer[data-now] [data-row]';
+
+/** The float's move as Web Animations keyframes and timing: its top and height from where it is to its new bubble's; reduced motion, a fade in only. Pure. */
+export function moveFrames(from: { readonly top: number; readonly height: number }, to: { readonly top: number; readonly height: number }, reduced: boolean): [Keyframe[], KeyframeAnimationOptions] {
+  if (reduced) return [[{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS, easing: 'linear' }];
+  const px = (n: number) => `${String(Math.round(n))}px`;
+  return [[{ top: px(from.top), height: px(from.height) }, { top: px(to.top), height: px(to.height) }], { duration: MOVE_MS, easing: MOVE_EASE }];
+}
 
 /** Where each bubble's top goes, px under the bar. Pure. */
 export function bubbleTops(world: 'small' | 'bubble'): { readonly world: number | null; readonly bubbles: Readonly<Record<BubbleId, number>> } {
@@ -136,12 +152,31 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     timers: tasks.length,
     watches: live.reduce((n, a) => n + alarms(a, now).length, 0),
     running: procs.filter((x) => isRunning(x.p)).length,
-    doneToday: procs.filter((x) => !isRunning(x.p) && today(endedAt(x.p) ?? 0, now)).length,
+    listening: procs.filter((x) => isRunning(x.p) && (x.p.ports ?? []).length > 0).length,
+    inbox: rows.find((p) => p.project === project)?.waits ?? 0,
   };
   const [open, setOpen] = useState<BubbleId | null>(null);
   const tops = bubbleTops(world === 'bubble' ? 'bubble' : 'small');
+  // the one float (designer m_44990): from one bubble to another its frame moves (its place now,
+  // read mid-move too, kept in `from`) and the bubble it leaves crossfades out (`leaving`)
+  const root = useRef<HTMLDivElement | null>(null);
+  const frame = useRef<HTMLElement | null>(null);
+  const from = useRef<{ readonly top: number; readonly height: number } | null>(null);
+  const [leaving, setLeaving] = useState<BubbleId | null>(null);
   const toggle = (b: BubbleId) => {
-    setOpen((o) => (o === b ? null : b));
+    if (open === b) {
+      setOpen(null);
+      setLeaving(null);
+      return;
+    }
+    const el = frame.current;
+    const side = root.current;
+    if (open !== null && el !== null && side !== null) {
+      const r = el.getBoundingClientRect();
+      from.current = { top: r.top - side.getBoundingClientRect().top, height: r.height };
+      setLeaving(noGrow() ? null : open);
+    }
+    setOpen(b);
   };
   // a card opened by its key (⌥1-4, ⌥⌘1-4): its first row takes the focus, so ⏎ opens it at once
   const keyed = useRef(false);
@@ -165,17 +200,16 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   const alt = useModHeld('Alt');
   // esc closes the open card and gives the focus back to its bubble, ↑ ↓ walk its rows (the
   // focus ring), ⏎ opens the focused one (its button's own); a click outside closes it
-  const root = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (open === null) return;
     const key = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        const rows = [...(root.current?.querySelectorAll<HTMLElement>('.s3-card [data-row]') ?? [])];
+        const rows = [...(root.current?.querySelectorAll<HTMLElement>(ROWS_NOW) ?? [])];
         if (rows.length === 0) return;
         e.preventDefault();
         e.stopPropagation();
         rows[rowStep(rows.indexOf(document.activeElement as HTMLElement), rows.length, e.key === 'ArrowDown' ? 1 : -1)]?.focus();
-        root.current?.querySelector('.s3-card')?.setAttribute('data-kb', '');
+        frame.current?.setAttribute('data-kb', '');
         return;
       }
       if (e.key !== 'Escape') return;
@@ -185,15 +219,15 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     };
     const down = (e: PointerEvent) => {
       // the pointer in the card: its rows' focus is the pointer's again (no ring on a clicked row)
-      root.current?.querySelector('.s3-card')?.removeAttribute('data-kb');
+      frame.current?.removeAttribute('data-kb');
       if (root.current !== null && e.target instanceof Node && root.current.contains(e.target)) return;
       setOpen(null);
     };
     // opened by its key: its first row focused, its ring shown at once (data-kb: a focus() after a
     // menu accelerator is not :focus-visible in Chromium)
     if (keyed.current) {
-      root.current?.querySelector('.s3-card')?.setAttribute('data-kb', '');
-      root.current?.querySelector<HTMLElement>('.s3-card [data-row]')?.focus();
+      frame.current?.setAttribute('data-kb', '');
+      root.current?.querySelector<HTMLElement>(ROWS_NOW)?.focus();
     }
     keyed.current = false;
     window.addEventListener('keydown', key, true);
@@ -206,7 +240,6 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   // a card's top is always its bubble's, its height at most the room under it less 16
   // (cardMaxH: nothing measured, it never moves nor runs past the window); its rows scroll inside
   // under a 16 fade, set once they overflow (a measure that finds the same sets nothing)
-  const card = useRef<HTMLDivElement | null>(null);
   const winH = useWinH();
   const [fit, setFit] = useState<CardFit>(NO_FIT);
   const fitted = useRef<CardFit>(NO_FIT);
@@ -216,15 +249,15 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     setFit(next);
   };
   useLayoutEffect(() => {
-    const el = card.current?.firstElementChild;
+    const el = frame.current;
     const side = root.current;
-    if (!(el instanceof HTMLElement) || side === null || open === null) {
+    if (el === null || side === null || open === null) {
       put(NO_FIT);
       return;
     }
     const maxH = cardMaxH(side.getBoundingClientRect().top, tops.bubbles[open], winH);
     const measure = () => {
-      const body = el.querySelector('.s3-card-body');
+      const body = el.querySelector('.s3-card-layer[data-now] .s3-card-body');
       put({ maxH, scrolls: body !== null && body.scrollHeight > body.clientHeight });
     };
     measure();
@@ -236,6 +269,28 @@ function Side({ project, home, world }: { project: string; home: string; world: 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- its bubble's top follows `open` and the layout
   }, [open, world, winH]);
+  // the move (designer m_44990): the frame goes from where it is to its new bubble's place and
+  // height in MOVE_MS; a switch mid-move starts from where it is; reduced motion: no move, the
+  // whole float fades in over FADE_MS. The leaving layer goes at the move's end.
+  const moving = useRef<Animation | null>(null);
+  useLayoutEffect(() => {
+    const el = frame.current;
+    const was = from.current;
+    from.current = null;
+    if (el === null || was === null || open === null || typeof el.animate !== 'function') return;
+    moving.current?.cancel();
+    const side = root.current;
+    if (side !== null) el.style.maxHeight = `${String(cardMaxH(side.getBoundingClientRect().top, tops.bubbles[open], winH))}px`;
+    const to = { top: tops.bubbles[open], height: el.getBoundingClientRect().height };
+    moving.current = el.animate(...moveFrames(was, to, noGrow()));
+    const t = setTimeout(() => {
+      setLeaving(null);
+    }, MOVE_MS);
+    return () => {
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a move is one switch of `open`
+  }, [open]);
   const maxH = fit.maxH ?? CARD_MAX;
   const here = route.screen === 'thread' ? { project: route.project, agent: route.agent } : { project: null, agent: null };
   const at = answerFrom(here, home);
@@ -246,6 +301,46 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   const says = [side.at_desks({ n: live.length }), counts.asks > 0 ? side.asks({ n: counts.asks }) : ''].filter((s) => s !== '').join(' · ');
   const archived = agents.filter((a) => a.archived).length;
   const running = procs.filter((x) => isRunning(x.p));
+  /** each bubble's float: its head, rows and foot (designer m_44975: one per bubble) */
+  const floatOf = (b: BubbleId): FloatContent => {
+    switch (b) {
+      case 'agents':
+        return {
+          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          add: <HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />,
+          onPin: () => { openOverview(project, 'agents'); },
+          foot: { left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go({ screen: 'agents', project }); } }] },
+          rows: live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => <AgentLine key={a.name} project={project} a={a} cards={cards} at={at} onOpen={openAgent} />),
+        };
+      case 'artifacts':
+        return {
+          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          add: <AddButton place={addPlace} testId="app.flyout.artifacts.add" />,
+          onPin: () => { openOverview(project, 'artifacts'); },
+          foot: { left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project }); } }] },
+          rows: artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} />),
+        };
+      case 'scheduled':
+        return {
+          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          onPin: () => { openOverview(project, 'processes'); },
+          foot: { left: '', links: [{ text: side.all_scheduled, testId: 'app.flyout.scheduled.all', onClick: () => { router.go({ screen: 'scheduled' }); } }] },
+          rows: tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
+            <>
+              {tasks.slice(0, ROWS).map((x) => <TaskRow key={x.t.id} x={x} now={now} />)}
+              {watching.map((a) => <WatchRows key={a.name} project={project} a={a} now={now} onOpen={openAgent} />)}
+            </>
+          ),
+        };
+      case 'processes':
+        return {
+          id: b, name: bubbleName(b), says: bubbleSays(b, counts),
+          onPin: () => { openOverview(project, 'processes'); },
+          foot: { left: '', links: [{ text: side.all_processes, testId: 'app.flyout.processes.all', onClick: () => { router.go({ screen: 'running', scope: { project } }); } }] },
+          rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.p.agent}/${x.p.id}`} x={x} now={now} />),
+        };
+    }
+  };
   return (
     <div className="s3-side" ref={root} data-world={world} data-testid="app.side">
       {world !== 'bubble' && (
@@ -256,69 +351,23 @@ function Side({ project, home, world }: { project: string; home: string; world: 
         </div>
       )}
       {tops.world !== null && (
-        <Bubble id="world" count={{ n: 0, accent: false }} tip={WORLD_NAME} open={false} top={tops.world}
+        <Bubble id="world" count={null} tip={WORLD_NAME} open={false} top={tops.world}
           pic={<WorldThumb project={project} agents={live} cards={cards} />} onClick={() => {
             openTab({ kind: 'office', project });
           }} />
       )}
       {BUBBLES.map((b) => (
-        <Bubble key={b} id={b} count={bubbleCount(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]}
+        <Bubble key={b} id={b} count={bubbleCount(b, counts)} badge={bubbleBadge(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]}
           hint={alt ? bubbleKey(b) : undefined} onClick={() => {
           toggle(b);
         }} />
       ))}
-      <div ref={card}>
-        {open === 'agents' && (
-          <Flyout id="agents" name={bubbleName('agents')} says={bubbleSays('agents', counts)} top={tops.bubbles['agents']} maxH={maxH} scrolls={fit.scrolls}
-            add={<HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />}
-            onPin={() => { openOverview(project, 'agents'); }}
-            foot={{ left: archived > 0 ? side.archived({ n: archived }) : '', links: [{ text: side.all_agents, testId: 'app.flyout.agents.all', onClick: () => { router.go({ screen: 'agents', project }); } }] }}>
-            {live.length === 0 ? <Empty>{side.no_agents}</Empty> : live.map((a) => (
-              <AgentLine key={a.name} project={project} a={a} cards={cards} at={at} onOpen={openAgent} />
-            ))}
-          </Flyout>
-        )}
-        {open === 'artifacts' && (
-          <Flyout id="artifacts" name={bubbleName('artifacts')} says={bubbleSays('artifacts', counts)} top={tops.bubbles['artifacts']} maxH={maxH} scrolls={fit.scrolls}
-            add={<AddButton place={addPlace} testId="app.flyout.artifacts.add" />}
-            onPin={() => { openOverview(project, 'artifacts'); }}
-            foot={{ left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project }); } }] }}>
-            {artifacts.length === 0 ? <Empty>{side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} />)}
-          </Flyout>
-        )}
-        {(open === 'processes' || open === 'scheduled') && (() => {
-          // one card for both (mockup 15), the clicked kind first under the card's head, the other under it
-          const other: BubbleId = open === 'processes' ? 'scheduled' : 'processes';
-          const goAll: Record<'processes' | 'scheduled', () => void> = {
-            processes: () => { router.go({ screen: 'running', scope: { project } }); },
-            scheduled: () => { router.go({ screen: 'scheduled' }); },
-          };
-          const rowsOf = (k: 'processes' | 'scheduled') =>
-            k === 'processes' ? (
-              running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.p.agent}/${x.p.id}`} x={x} now={now} />)
-            ) : tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
-              <>
-                {tasks.slice(0, ROWS).map((x) => <TaskRow key={x.t.id} x={x} now={now} />)}
-                {watching.map((a) => <WatchRows key={a.name} project={project} a={a} now={now} onOpen={openAgent} />)}
-              </>
-            );
-          return (
-            <Flyout id={open} name={bubbleName(open)} says={bubbleSays(open, counts)} top={tops.bubbles[open]} maxH={maxH} scrolls={fit.scrolls}
-              onPin={() => { openOverview(project, 'processes'); }}
-              foot={{ left: '', links: [
-                { text: open === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[open], testId: `app.flyout.${open}.all` },
-                { text: other === 'processes' ? side.all_processes : side.all_scheduled, onClick: goAll[other === 'processes' ? 'processes' : 'scheduled'], testId: `app.flyout.${open}.${other}.all` },
-              ] }}>
-              {rowsOf(open)}
-              <div className="s3-card-sub" data-testid={`app.flyout.${open}.${other}`}>
-                <b>{bubbleName(other)}</b>
-                <span className="s3-card-says">{bubbleSays(other, counts)}</span>
-              </div>
-              {rowsOf(other === 'processes' ? 'processes' : 'scheduled')}
-            </Flyout>
-          );
-        })()}
-      </div>
+      {open !== null && (
+        <Float id={open} name={bubbleName(open)} top={tops.bubbles[open]} maxH={maxH} moving={leaving !== null} frameRef={frame}>
+          <FloatLayer key={open} c={floatOf(open)} scrolls={fit.scrolls} />
+          {leaving !== null && leaving !== open && <FloatLayer key={`leaving-${leaving}`} c={floatOf(leaving)} leaving />}
+        </Float>
+      )}
     </div>
   );
 }

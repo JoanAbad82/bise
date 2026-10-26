@@ -17,41 +17,67 @@ export interface Counts {
   /** live agents working (main out), and agents that ask him something */
   readonly working: number;
   readonly asks: number;
-  /** agents working or asking, each once: the agents bubble's number */
+  /** agents working or asking, each once */
   readonly busy: number;
+  /** live agents working, waiting on another agent or on him (main, idle, done, archived out): the agents bubble's bottom pill (designer m_44986) */
+  readonly active: number;
+  /** what waits for him in this scope (the project row's inbox, as the projects sidebar's pill): the agents bubble's top pill */
+  readonly inbox: number;
   readonly artifacts: number;
   readonly newArtifacts: number;
   readonly timers: number;
   readonly watches: number;
   readonly running: number;
-  /** processes that ended today (the processes head's 'done today') */
-  readonly doneToday: number;
+  /** running processes that listen on a port (the processes card's head) */
+  readonly listening: number;
 }
 
 /** The agents' part of the counts. Pure. */
-export function agentCounts(agents: readonly Agent[]): Pick<Counts, 'working' | 'asks' | 'busy'> {
+export function agentCounts(agents: readonly Agent[]): Pick<Counts, 'working' | 'asks' | 'busy' | 'active'> {
   const live = agents.filter((a) => !a.archived);
   const working = live.filter((a) => !a.main && a.status === 'working');
   const asking = live.filter((a) => a.waits > 0);
   const busy = live.filter((a) => (!a.main && a.status === 'working') || a.waits > 0);
-  return { working: working.length, asks: asking.length, busy: busy.length };
+  const active = live.filter((a) => !a.main && (ACTIVE.has(a.status) || a.waits > 0));
+  return { working: working.length, asks: asking.length, busy: busy.length, active: active.length };
+}
+
+/** an agent's statuses that count as active: it works, or waits on another agent or on him */
+const ACTIVE: ReadonlySet<Agent['status']> = new Set(['working', 'waiting', 'blocked']);
+
+/** A coin's count pill: its number, shown at 0 too or not. */
+export interface BubbleCount {
+  readonly n: number;
+  /** shown at 0 ('0' in text-3): the agents' active count */
+  readonly always: boolean;
 }
 
 /**
- * A bubble's count pill (designer m_42866): the number waiting on him, in the accent, when there is
- * one (the agents that ask); otherwise its total, text-2 on --c-raised; none at 0. Pure.
+ * A bubble's bottom pill (designer m_42866, m_44986): text-2 on --c-raised, none at 0; the agents
+ * bubble's is its active agents, always shown. The accent is only the agents bubble's top pill
+ * (bubbleBadge). Pure.
  */
-export function bubbleCount(b: BubbleId, c: Counts): { readonly n: number; readonly accent: boolean } {
+export function bubbleCount(b: BubbleId, c: Counts): BubbleCount {
   switch (b) {
     case 'agents':
-      return c.asks > 0 ? { n: c.asks, accent: true } : { n: c.busy, accent: false };
+      return { n: c.active, always: true };
     case 'artifacts':
-      return { n: c.newArtifacts, accent: false };
+      return { n: c.newArtifacts, always: false };
     case 'scheduled':
-      return { n: c.timers + c.watches, accent: false };
+      return { n: c.timers + c.watches, always: false };
     case 'processes':
-      return { n: c.running, accent: false };
+      return { n: c.running, always: false };
   }
+}
+
+/** The agents bubble's top pill: what waits for him (the accent), none at 0 (designer m_44986). Pure. */
+export function bubbleBadge(b: BubbleId, c: Counts): number {
+  return b === 'agents' ? c.inbox : 0;
+}
+
+/** A pill's number: whole up to 99 on the agents bubble ('99+' past it), 3 digits whole elsewhere. Pure. */
+export function pillText(b: BubbleId, n: number): string {
+  return b === 'agents' && n > 99 ? '99+' : String(n);
 }
 
 /** A bubble's name, as its card's head says it. Pure. */
@@ -77,15 +103,17 @@ export function bubbleSays(b: BubbleId, c: Counts): string {
       break;
     case 'processes':
       if (c.running > 0) parts.push(side.running({ n: c.running }));
-      if (c.doneToday > 0) parts.push(side.done_today({ n: c.doneToday }));
+      if (c.listening > 0) parts.push(side.listening({ n: c.listening }));
       break;
   }
   return parts.join(' · ');
 }
 
-/** A bubble's tip and VoiceOver name: 'Agents · 3 working · 1 asks'. Pure. */
+/** A bubble's tip and VoiceOver name: 'Processes · 4 running · 2 listening'; the agents bubble says its two pills ('Agents · 3 active · 2 waiting for you', parts dropped at 0). Pure. */
 export function bubbleTip(b: BubbleId, c: Counts): string {
-  const says = bubbleSays(b, c);
+  const says = b === 'agents'
+    ? [c.active > 0 ? side.active({ n: c.active }) : '', c.inbox > 0 ? side.waiting_you({ n: c.inbox }) : ''].filter((s) => s !== '').join(' · ')
+    : bubbleSays(b, c);
   return side.bubble_tip({ name: bubbleName(b), says: says === '' ? side.bubble_none : says });
 }
 

@@ -12,29 +12,23 @@ import type { Proc } from '@/proto';
 export const BUBBLES = ['agents', 'artifacts', 'scheduled', 'processes'] as const;
 export type BubbleId = (typeof BUBBLES)[number];
 
-/** the square one visual weight is written in, px (designer m_44222); a picture of any size scales it */
-export const SQUARE = 68;
-/** one visual weight (designer m_44222): the object's height, its widest, its top's gap, in px of SQUARE */
-export const WEIGHT = { high: 56, wide: 64, top: 6 } as const;
+/**
+ * The coin a bubble's object stands on (bims-plugins' r3 spec, designer m_44673: B; its objects
+ * placed again, designer m_45014: E.5): the disc (--bubble), the box every object fits in (aspect
+ * kept: a tall one 32 high, a wide one 36 wide) and its base, css px from the disc's top: the
+ * disc's centre, as if set on the middle of the plate.
+ */
+export const COIN = { disc: 44, box: { w: 36, h: 32 }, base: 22 } as const;
 
 /**
- * The coin a bubble's object stands on (bims-plugins' r3 spec, designer m_44673: B, the coin): the
- * disc's top face (--bubble), the square its object is drawn in, and where the object's base sits
- * on the disc, a share of its height from its top.
+ * Where a bubble's object picture goes, css px from the disc's top-left corner (y down): a square
+ * as wide as the box, its bottom on the base (bubble3d alphaFit puts the object's lowest drawn
+ * pixel on it, its drawn box in COIN.box), so it rises at most `rise` above the disc's top. Whole
+ * px so the 2x picture is never resampled. Pure.
  */
-export const COIN = { disc: 44, square: 54, base: 0.55 } as const;
-
-/**
- * Where a bubble's object square goes, css px from the disc's top-left corner (y down), and what
- * that makes: its object `high` px high, rising `rise` px above the disc, its base on the disc at
- * COIN.base. Whole px so the 2x picture is never resampled. Pure.
- */
-export function objectAt(): { left: number; top: number; size: number; high: number; rise: number } {
-  const size = COIN.square;
-  const high = (size * WEIGHT.high) / SQUARE;
-  const air = (size * WEIGHT.top) / SQUARE;
-  const top = Math.round(COIN.disc * COIN.base - high - air);
-  return { left: (COIN.disc - size) / 2, top, size, high, rise: -(top + air) };
+export function objectAt(): { left: number; top: number; size: number; rise: number } {
+  const size = COIN.box.w;
+  return { left: (COIN.disc - size) / 2, top: COIN.base - size, size, rise: COIN.box.h - COIN.base };
 }
 
 /** What a picture shows: an object of the office, a bim's head (an agent's card), or a bubble's own object (bubble3d.ts). */

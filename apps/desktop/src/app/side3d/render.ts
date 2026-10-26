@@ -3,12 +3,12 @@
 // same offscreen view, the office's day sun, its contact shadow; read, never changed), and a bim's
 // head and shoulders through makeBim (the same bim as the world's: its outfit from its name, the
 // clay of the day), standing, turned to the camera, in the office's iso view under the same sun,
-// on a transparent ground; and a bubble's own object (bubble3d.ts) in the same view, light, sun
-// and contact shadow, fitted to one visual weight. Each a PNG data URL `px` css px square drawn at
-// 2x; cache.ts keeps them. Throws when there is no WebGL (the caller draws the plain tile).
+// on a transparent ground; and a bubble's own object (bubble3d.ts) in the same view, light and sun,
+// placed by its drawn box (no floor: the coin draws the plate's shadow). Each a PNG data URL `px`
+// css px square drawn at 2x; cache.ts keeps them. Throws when there is no WebGL (the caller draws the plain tile).
 // Owner: nm-side; bubblePng: r2-objects.
-import { Box3, type BufferGeometry, type Material, Mesh, type Object3D, PlaneGeometry, ShadowMaterial } from 'three';
-import { bubbleModel, fitOf } from './bubble3d';
+import { Box3, type BufferGeometry, type Material, Mesh, type Object3D } from 'three';
+import { alphaBox, alphaFit, bubbleModel, lookOf } from './bubble3d';
 import type { BubbleId } from './objects';
 import { iconOf } from '@/plugins/render';
 import type { ObjId } from '@/bims/render/objects/ids';
@@ -107,10 +107,15 @@ export function headPng(name: string, main: boolean, px: number, night: boolean)
   return url;
 }
 
-/** how dark the bubble objects' contact shadow is on the transparent floor (plugins/render's) */
-const SHADOW = 0.22;
+/** the first look's size, a multiple of the picture's: the drawn box is found to a quarter of its px */
+const LOOK_K = 2;
 
-/** A bubble's own object (bubble3d.ts), by day or by night: one visual weight in the square, its contact shadow under it. */
+/**
+ * A bubble's own object (bubble3d.ts), by day or by night, placed by its drawn box (designer
+ * m_45014): a first look with air, the box its pixels fill, then the picture with that box in
+ * COIN.box and its lowest pixel on the square's bottom. No floor: the plate's shadow is the coin's
+ * own (side3d.css), under the object.
+ */
 export function bubblePng(b: BubbleId, px: number, night: boolean): string {
   const v = theView();
   lightOffice(v.hemi, v.sun, night ? NIGHT : DAY, { x0: -1, W: 2, D: 2 } as unknown as LightBox, STYLE);
@@ -118,20 +123,26 @@ export function bubblePng(b: BubbleId, px: number, night: boolean): string {
   v.sun.target.position.set(0, 0, 0);
   const g = bubbleModel(b, night);
   g.updateMatrixWorld(true);
-  const box = new Box3().setFromObject(g, true);
-  const floor = new Mesh(new PlaneGeometry(4, 4), new ShadowMaterial({ opacity: SHADOW }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0.001;
-  floor.receiveShadow = true;
-  v.scene.add(g, floor);
-  const fit = fitOf(box, px * 2);
+  const size = px * 2;
+  const lookPx = size * LOOK_K;
+  const whole = new Box3().setFromObject(g, true);
+  const look = lookOf(whole, lookPx);
+  v.scene.add(g);
+  v.renderer.setSize(lookPx, lookPx, false);
+  v.look(look);
+  const read = document.createElement('canvas');
+  read.width = lookPx;
+  read.height = lookPx;
+  v.copyTo(read);
+  const drawn = read.getContext('2d')?.getImageData(0, 0, lookPx, lookPx).data;
+  const box = drawn === undefined ? null : alphaBox(drawn, lookPx, lookPx);
+  const fit = box === null ? lookOf(whole, size) : alphaFit(look, box, lookPx, size);
   v.renderer.setSize(fit.widthPx, fit.heightPx, false);
   v.look(fit);
   v.render();
   const url = v.renderer.domElement.toDataURL('image/png');
-  v.scene.remove(g, floor);
+  v.scene.remove(g);
   disposeAll(g);
-  disposeAll(floor);
   return url;
 }
 

@@ -18,13 +18,21 @@ import { keyAction } from '../keys';
 import { SideHost, bubbleTops } from './Host';
 import { CARD_MAX, cardMaxH } from './layout';
 import { sideLayoutNow } from './place';
-import { GRACE_MS, HOVER_MS, hitBox } from './World';
+import { GRACE_MS, HOVER_MS, beatPlace, hitBox } from './World';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
-const office = vi.hoisted(() => ({ cameraFrom: [] as (HTMLElement | null)[] }));
+const office = vi.hoisted(() => ({
+  cameraFrom: [] as (HTMLElement | null)[],
+  follow: [] as (string | null)[],
+  refit: [] as number[],
+  zoomed: null as ((z: boolean) => void) | null,
+}));
 vi.mock('@/bims/Office', () => ({
-  Office: ({ cameraFrom = null }: { cameraFrom?: HTMLElement | null }) => {
+  Office: ({ cameraFrom = null, follow = null, refit = 0, onZoomed }: { cameraFrom?: HTMLElement | null; follow?: string | null; refit?: number; onZoomed?: (z: boolean) => void }) => {
     office.cameraFrom.push(cameraFrom);
+    office.follow.push(follow);
+    office.refit.push(refit);
+    office.zoomed = onZoomed ?? null;
     return <canvas data-testid="office" />;
   },
 }));
@@ -91,18 +99,22 @@ function side3d(winW = 1440, onCommit?: () => void) {
 }
 
 describe('the right side, folded', () => {
-  it('the world and the four bubbles, each with its tip; the counts, the agents in the accent when one asks, none at 0', () => {
+  it('the world and the four bubbles, each with its tip; the counts, none at 0; the agents\' two pills: active at the bottom, what waits for him on top in the accent (designer m_44986)', () => {
     const { v } = side3d();
     expect(v.getByTestId('app.world')).toBeTruthy();
     for (const b of ['agents', 'artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.bubble.${b}`).getAttribute('data-tip')).toBeTruthy();
-    // 2 working, 1 of them asks: the badge is what waits on him
-    expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('1');
-    expect(v.getByTestId('app.bubble.agents.count').hasAttribute('data-accent')).toBe(true);
+    // 2 working (1 of them asks): 2 active, plain; the project's inbox (1) on top, the accent
+    expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('2');
+    expect(v.getByTestId('app.bubble.agents.count').hasAttribute('data-accent')).toBe(false);
+    expect(v.getByTestId('app.bubble.agents.count').getAttribute('data-tip')).toBe(side.active({ n: 2 }));
+    expect(v.getByTestId('app.bubble.agents.badge').textContent).toBe('1');
+    expect(v.getByTestId('app.bubble.agents.badge').hasAttribute('data-accent')).toBe(true);
+    expect(v.getByTestId('app.bubble.agents.badge').getAttribute('data-tip')).toBe(side.waiting_you({ n: 1 }));
     expect(v.getByTestId('app.bubble.artifacts.count').textContent).toBe('1');
     expect(v.getByTestId('app.bubble.artifacts.count').hasAttribute('data-accent')).toBe(false);
     expect(v.queryByTestId('app.bubble.processes.count')).toBeNull();
     expect(v.getByTestId('app.bubble.agents').getAttribute('aria-label')).toBe(
-      side.bubble_tip({ name: side.agents, says: `${side.working({ n: 2 })} · ${side.asks({ n: 1 })}` }),
+      side.bubble_tip({ name: side.agents, says: `${side.active({ n: 2 })} · ${side.waiting_you({ n: 1 })}` }),
     );
   });
 
@@ -147,17 +159,55 @@ describe('the right side, folded', () => {
       emitAction('side-4');
     });
     expect(v.getByTestId('app.flyout.processes').textContent).toContain(side.no_processes);
-    // the scheduled bubble: its own head first, the processes under it
+    // the scheduled bubble: its own float (designer m_44975), its head, its one foot with its own link
     act(() => {
       emitAction('side-3');
     });
     const card = v.getByTestId('app.flyout.scheduled');
-    expect(card.querySelector('.s3-card-head b')?.textContent).toBe(side.scheduled);
-    expect(v.getByTestId('app.flyout.scheduled.processes').textContent).toContain(side.processes);
-    // every 'all … ›' on the card's one foot, the clicked kind's first, never on a head (designer m_44411)
+    expect(card.querySelector('.s3-card-layer[data-now] .s3-card-head b')?.textContent).toBe(side.scheduled);
+    expect(card.querySelector('.s3-card-layer[data-now]')?.textContent).toContain(side.no_scheduled);
+    expect(card.querySelector('.s3-card-layer[data-now]')?.textContent).not.toContain(side.processes);
+    // its 'all … ›' on the float's one foot, never on a head (designer m_44411)
     expect(card.querySelector('.s3-card-head .s3-link')).toBeNull();
-    expect(card.querySelectorAll('footer')).toHaveLength(1);
-    expect([...card.querySelectorAll('footer .s3-link')].map((e) => e.textContent)).toEqual([side.all_scheduled, side.all_processes]);
+    expect(card.querySelectorAll('.s3-card-layer[data-now] footer')).toHaveLength(1);
+    expect([...card.querySelectorAll('.s3-card-layer[data-now] footer .s3-link')].map((e) => e.textContent)).toEqual([side.all_scheduled]);
+  });
+
+  it('from one bubble to another, the one float moves: the same frame, its top and height animated 240 ms, the old content fading out inert over the new; reduced motion: a fade, no move (designer m_44990)', () => {
+    const calls: Keyframe[][] = [];
+    const proto = HTMLElement.prototype as unknown as { animate?: unknown };
+    const had = proto.animate;
+    proto.animate = function (frames: Keyframe[]) {
+      calls.push(frames);
+      return { cancel: () => undefined } as unknown as Animation;
+    };
+    try {
+      const { v } = side3d();
+      fireEvent.click(v.getByTestId('app.bubble.agents'));
+      const frame = v.getByTestId('app.flyout.agents');
+      expect(calls).toHaveLength(0);
+      fireEvent.click(v.getByTestId('app.bubble.scheduled'));
+      // one frame, its anchor and content changed, never a second mount
+      expect(v.getByTestId('app.flyout.scheduled')).toBe(frame);
+      expect(v.getByTestId('app.side').querySelectorAll('.s3-card')).toHaveLength(1);
+      expect(frame.hasAttribute('data-moving')).toBe(true);
+      expect(frame.style.top).toBe(v.getByTestId('app.bubble.scheduled').style.top);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.[1]).toMatchObject({ top: `${String(bubbleTops('small').bubbles.scheduled)}px` });
+      expect(calls[0]?.[0]).toHaveProperty('top');
+      const old = v.getByTestId('app.flyout.agents.leaving');
+      expect(old.hasAttribute('inert')).toBe(true);
+      expect(old.getAttribute('aria-hidden')).toBe('true');
+      // reduced motion: the frame takes its new place at once, the whole float fades in, no leaving layer
+      document.documentElement.setAttribute('data-reduce-motion', '');
+      fireEvent.click(v.getByTestId('app.bubble.processes'));
+      expect(v.getByTestId('app.flyout.processes')).toBe(frame);
+      expect(calls[1]).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+      expect(v.queryByTestId('app.flyout.scheduled.leaving')).toBeNull();
+    } finally {
+      document.documentElement.removeAttribute('data-reduce-motion');
+      proto.animate = had;
+    }
   });
 
   it('⌥ held: each bubble shows its key in its count\'s place, top to bottom; gone at release (designer m_44292, m_44373)', () => {
@@ -170,11 +220,13 @@ describe('the right side, folded', () => {
       });
       expect(['agents', 'artifacts', 'scheduled', 'processes'].map((b) => v.getByTestId(`app.bubble.${b}.key`).textContent)).toEqual(['⌥1', '⌥2', '⌥3', '⌥4']);
       expect(v.queryByTestId('app.bubble.agents.count')).toBeNull();
+      // the top accent pill stays while ⌥ is held
+      expect(v.getByTestId('app.bubble.agents.badge').textContent).toBe('1');
       act(() => {
         window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
       });
       expect(v.queryByTestId('app.bubble.agents.key')).toBeNull();
-      expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('1');
+      expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('2');
     } finally {
       vi.useRealTimers();
     }
@@ -252,7 +304,7 @@ describe('the right side, folded', () => {
     fireEvent.click(v.getByTestId('app.bubble.agents'));
     const card = v.getByTestId('app.flyout.agents');
     expect(card.querySelectorAll('footer')).toHaveLength(1);
-    expect(card.lastElementChild?.tagName).toBe('FOOTER');
+    expect(card.querySelector('.s3-card-layer[data-now]')?.lastElementChild?.tagName).toBe('FOOTER');
     expect(card.hasAttribute('data-foot')).toBe(true);
     expect(card.querySelector('footer')?.textContent).toBe(`${side.archived({ n: 1 })}${side.all_agents}`);
   });
@@ -318,6 +370,54 @@ describe('the right side, folded', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('folded, the world is the whole map, whoever he talks to; grown, his pinch that cuts the map frames it; folding back eases it to fit (designer m_44998)', () => {
+    vi.useFakeTimers();
+    try {
+      office.follow.length = 0;
+      const { v } = side3d();
+      // he talks to acme's main (the composer's target): still no follow camera
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(office.follow.length).toBeGreaterThan(0);
+      expect(office.follow.every((f) => f === null)).toBe(true);
+      const world = v.getByTestId('app.world');
+      expect(world.hasAttribute('data-framed')).toBe(false);
+      fireEvent.pointerEnter(world);
+      act(() => {
+        vi.advanceTimersByTime(HOVER_MS);
+      });
+      // grown at fit: no frame; his pinch cuts it: framed; back at fit: none
+      expect(world.hasAttribute('data-framed')).toBe(false);
+      act(() => {
+        office.zoomed?.(true);
+      });
+      expect(world.hasAttribute('data-framed')).toBe(true);
+      act(() => {
+        office.zoomed?.(false);
+      });
+      expect(world.hasAttribute('data-framed')).toBe(false);
+      act(() => {
+        office.zoomed?.(true);
+      });
+      const before = office.refit.at(-1) ?? 0;
+      fireEvent.pointerLeave(world);
+      act(() => {
+        vi.advanceTimersByTime(GRACE_MS);
+      });
+      // folded: the office asked back to fit, and never framed folded
+      expect(office.refit.at(-1)).toBe(before + 1);
+      expect(world.hasAttribute('data-framed')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a beat\'s label sits over its bim\'s head on the whole folded map, scaled 148 / 384; none found, over the island\'s middle', () => {
+    expect(beatPlace({ x: 192, y: 96 }, 300)).toEqual({ x: 74, y: 37 });
+    expect(beatPlace(null, 384)).toEqual({ x: 74, y: 74 });
   });
 
   it('the bubbles under the world at 152, 80 apart, put whatever the world does; as a 5th bubble the world tops the stack', () => {

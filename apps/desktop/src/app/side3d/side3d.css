@@ -65,6 +65,63 @@
 .s3-world[data-big] .s3-world-isle {
   margin-left: 0;
 }
+/* the frame (designer m_44998): while his pinch cuts the grown map, the box becomes a small window
+   onto the world: r 12, --c-sunken under the map (never paper at a cut edge), 1 --c-line, a soft
+   shadow (light .06/.08, dark .40/.35 and a 4 % top light), faded in and out in 150 ms (reduced
+   motion: on and off); the whole map has none, only its own drop shadow on its alpha */
+.s3-side {
+  --s3-frame-shadow: 0 1px 2px rgb(0 0 0 / .40), 0 8px 24px rgb(0 0 0 / .35), inset 0 1px 0 rgb(255 255 255 / .04);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .s3-side {
+    --s3-frame-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  }
+}
+[data-theme="light"] .s3-side {
+  --s3-frame-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+}
+.s3-world-isle {
+  position: relative;
+}
+.s3-world-frame {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--c-sunken);
+  border: 1px solid var(--c-line);
+  box-shadow: var(--s3-frame-shadow);
+  opacity: 0;
+  transition: opacity 150ms var(--ease-out);
+  pointer-events: none;
+}
+.s3-world-office {
+  position: relative;
+  border-radius: 12px;
+}
+.s3-world[data-framed] .s3-world-frame {
+  opacity: 1;
+}
+/* framed: the map clipped to the window's round corners, no drop shadow on its alpha (the frame
+   has its own) */
+.s3-world[data-framed] .s3-world-office {
+  overflow: hidden;
+}
+.s3-world[data-framed] .s3-world-isle {
+  filter: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .s3-world-frame {
+    transition: none;
+  }
+}
+:root[data-reduce-motion] .s3-world-frame {
+  transition: none;
+}
+/* no side fade on the box's edges, folded or grown (designer m_44998): the frame says it is cut */
+.s3-world-office .bims-canvas.bims-fade {
+  mask-image: none;
+}
 /* the office takes no pointer and shows none of its own chrome here: the office tab has them;
    grown, the hit span's pinch and drag reach its camera (Office cameraFrom) */
 .s3-world-office,
@@ -152,12 +209,14 @@
 /* a bubble: a 44 opaque coin (round 3, B: bims-plugins' spec, designer m_44673): its top face
    --c-raised (dark one step lifted), a 1 edge, the upper rim's light, a 3 side one step darker with
    its own edge, and a soft 44 x 12 contact shadow under it (::after, centred 4 under the side). Its
-   object (Bubbles.tsx, objects.ts objectAt) stands on its top: base at 55 %, rising 20 */
+   object (Bubbles.tsx, objects.ts objectAt) stands on the disc's centre, rising 10 at most, over
+   the plate's own 24 x 6 shadow (::before; designer m_45014, E.5) */
 .s3-side {
   --s3-coin-top: color-mix(in srgb, white 6%, var(--c-raised));
   --s3-coin-rim: rgb(255 255 255 / .12);
   --s3-coin-side: #0f0d0c;
   --s3-coin-shadow: rgb(0 0 0 / .4);
+  --s3-plate-shadow: rgb(0 0 0 / .45);
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) .s3-side {
@@ -165,6 +224,7 @@
     --s3-coin-rim: rgb(255 255 255 / .5);
     --s3-coin-side: color-mix(in srgb, #e4dccf 80%, var(--p-bg));
     --s3-coin-shadow: rgb(0 0 0 / .12);
+    --s3-plate-shadow: rgb(0 0 0 / .18);
   }
 }
 [data-theme="light"] .s3-side {
@@ -172,6 +232,7 @@
   --s3-coin-rim: rgb(255 255 255 / .5);
   --s3-coin-side: color-mix(in srgb, #e4dccf 80%, var(--p-bg));
   --s3-coin-shadow: rgb(0 0 0 / .12);
+  --s3-plate-shadow: rgb(0 0 0 / .18);
 }
 .s3-bubble {
   /* the coin's side, px */
@@ -202,6 +263,42 @@
   z-index: -1;
   pointer-events: none;
 }
+/* the plate's shadow (designer m_45014): a 24 x 6 ellipse on the disc's centre, blur 2, on the
+   top face under the object (the object's square comes after it); hovered or pressed, the object
+   lifts 2 in 120 ms and its shadow shrinks to 20 x 5 and lightens; reduced motion: no lift */
+.s3-bubble::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--s3-plate-shadow);
+  filter: blur(2px);
+  pointer-events: none;
+  transition: width 120ms var(--ease-out), height 120ms var(--ease-out), opacity 120ms var(--ease-out);
+}
+.s3-bubble:is(:hover, :active)::before {
+  width: 20px;
+  height: 5px;
+  opacity: .7;
+}
+.s3-obj {
+  transition: transform 120ms var(--ease-out);
+}
+.s3-bubble:is(:hover, :active) .s3-obj {
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .s3-bubble:is(:hover, :active) .s3-obj {
+    transform: none;
+  }
+}
+:root[data-reduce-motion] .s3-bubble:is(:hover, :active) .s3-obj {
+  transform: none;
+}
 .s3-bubble[data-open] {
   box-shadow: inset 0 1px 0 var(--s3-coin-rim), 0 var(--s3-coin-h) 0 var(--s3-coin-side), 0 var(--s3-coin-h) 0 1px var(--c-line), 0 0 0 2px var(--c-focus);
 }
@@ -209,8 +306,8 @@
   outline: 2px solid var(--c-focus);
   outline-offset: 2px;
 }
-/* the object's square: placed and sized by Bubbles.tsx (objects.ts objectAt), from the coin's
-   top-left corner inside its 1 edge's box */
+/* the object's square: placed and sized by Bubbles.tsx (objects.ts objectAt: 36 at left 4, its
+   bottom on the disc's centre), from the coin's top-left corner inside its 1 edge's box */
 .s3-obj {
   position: absolute;
   margin: -1px 0 0 -1px;
@@ -238,13 +335,20 @@
 .s3-obj .s3-thumb {
   width: 100%;
 }
-/* the pill: centred on the coin's bottom rim (22, 47), mono t-12 tabular, 3 digits whole ('589');
-   ⌥ held, the bubble's key '⌥1' in it (Bubbles.tsx pillOf). A total: text-2 on --p-chip with a 1
-   edge; what waits on him (an agent asks): the accent, no edge, the side's only pink */
+/* the pill: centred on the coin's rim lower-left (at 225°: 22 - 15.6, 22 + 15.6 of the 44 disc,
+   designer m_44986 and sheet D), mono t-12 tabular, 3 digits whole ('589'); ⌥ held, the bubble's
+   key '⌥1' in it (Bubbles.tsx pillOf). text-2 on --p-chip with a 1 edge; the agents' '0' in
+   text-3. The agents bubble's second pill, what waits for him: the same, mirrored on the rim
+   upper-left (31 apart), the accent with no edge, over the object like an app badge; in, a fade
+   and a scale .8 to 1 in 150 ms, out a 120 ms fade; reduced motion: the fade only */
+.s3-side {
+  /* the rim's 45° point from the disc's centre, px: 22 / √2 */
+  --s3-rim: 15.56px;
+}
 .s3-count {
   position: absolute;
-  left: 50%;
-  top: calc(var(--bubble) + var(--s3-coin-h) - 1px);
+  left: calc(var(--bubble) / 2 - var(--s3-rim) - 1px);
+  top: calc(var(--bubble) / 2 + var(--s3-rim) - 1px);
   transform: translate(-50%, -50%);
   z-index: 1;
   box-sizing: border-box;
@@ -261,10 +365,46 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+.s3-count[data-zero] {
+  color: var(--c-text-3);
+}
+/* the agents' two pills say their tip ('3 active', '2 waiting for you') */
+.s3-count[data-tip] {
+  pointer-events: auto;
+}
 .s3-count[data-accent] {
   border-color: transparent;
   background: var(--c-accent);
   color: var(--p-bg);
+}
+.s3-badge {
+  top: calc(var(--bubble) / 2 - var(--s3-rim) - 1px);
+  z-index: 2;
+  animation: s3-badge-in 150ms var(--ease-out);
+  transition: opacity 120ms var(--ease-out);
+}
+.s3-badge[data-out] {
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes s3-badge-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.8);
+  }
+}
+@keyframes s3-badge-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s3-badge {
+    animation-name: s3-badge-fade;
+  }
+}
+:root[data-reduce-motion] .s3-badge {
+  animation-name: s3-badge-fade;
 }
 
 /* a card: 360 with its padding, 12 left of the bubbles (12 + 44 + 12), r 16, glass, --e-3; its top
@@ -283,23 +423,52 @@
   backdrop-filter: var(--glass);
   box-shadow: var(--e-3);
   color: var(--c-text);
-  transition: top var(--d-base) var(--ease-out);
+}
+/* its content now, a column in the frame (its head and foot whole, its rows scroll); while the
+   frame moves to another bubble (Host.tsx moveFrames, designer m_44990) its content is clipped to
+   it and the leaving bubble's content lies over the new one: old 1 to 0 in 0-100 ms, new 0 to 1
+   in 100-240 ms; reduced motion: no leaving layer, the whole float fades in */
+.s3-card-layer {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.s3-card[data-moving] {
+  overflow: hidden;
+}
+.s3-card[data-moving] .s3-card-layer[data-now] {
+  animation: s3-layer-in 140ms linear 100ms backwards;
+}
+.s3-card-layer[data-leaving] {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-2);
+  right: var(--s-2);
+  animation: s3-layer-out 100ms linear forwards;
+  pointer-events: none;
+}
+@keyframes s3-layer-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes s3-layer-out {
+  to {
+    opacity: 0;
+  }
 }
 /* the head and the foot stay whole: only the rows give room */
 .s3-card-head {
   flex: none;
 }
-.s3-card-head,
-.s3-card-sub {
+.s3-card-head {
   display: flex;
   align-items: center;
   gap: var(--s-2);
   min-height: var(--h-row);
   padding: 0 var(--s-2);
   font: 600 var(--f-ui);
-}
-.s3-card-sub {
-  margin-top: var(--s-2);
 }
 .s3-card-says {
   font-weight: 400;
