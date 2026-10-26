@@ -3,7 +3,7 @@
 // one listener in the shell that acts on it. Owner: amb-win.
 //
 // ⌘0 bise · ⌘1-9 a project in his order · ⌥0 the project's main · ⌥1-9
-// its agents in the panel's order · ⌘K the agent palette · ⌘D the agent's
+// its agents in the panel's order (the right side folded: ⌥1-4 its bubbles) · ⌘K the agent palette · ⌘D the agent's
 // changes · ⌘⇧A the artifacts · ⌘E fold/unfold everything · ⌘/ the key
 // list · end back to the bottom · ctrl+y copy a code
 // block · ⌥↑/⌥↓ the previous / next agent (empty composer).
@@ -14,6 +14,7 @@ import { liveOf, rankedOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { projectsOf } from './siderows';
 import { panelKeyOf, type PanelKey } from './panel/keys';
+import { sideShows } from './side3d/layout';
 
 /** A window event that opens the key list (the composer's /help and /shortcuts). */
 export const HELP_EVENT = 'bise:help';
@@ -82,6 +83,8 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     const p = here(c);
     if (p === undefined) return undefined;
     if (n === 0) return { go: { screen: 'thread', project: p, agent: MAIN } };
+    // the right side folded (its bubbles show: no panel, a project's page): ⌥1-4 are the 4 bubbles, ⌥5-9 nothing (r2-side 6, designer m_44292)
+    if (c.panelOpen !== true && sideShows(c.route)) return n <= 4 ? { screen: `side-${String(n)}` as ScreenAction } : undefined;
     const nums = c.numbers?.(p) ?? rankedOf(liveOf(c.agents(p)));
     const name = [...nums].find(([, k]) => k === n)?.[0];
     return name !== undefined ? { go: { screen: 'thread', project: p, agent: name } } : undefined;
@@ -92,7 +95,7 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   // bise fait mac (page native-mac §6): ⌘\ the sidebar, ⌥⌘0 the panel, ⌘N New agent, ⌘, settings
   if (only('meta') && e.code === 'Backslash') return { frame: 'sidebar' };
   if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'Digit0') return { frame: 'panel' };
-  // ⌥⌘1-⌥⌘4: the right side's bubbles, agents, artifacts, scheduled, processes (native-mac d1; app/side3d)
+  // ⌥⌘1-⌥⌘4: the right side's bubbles, agents, artifacts, scheduled, processes (native-mac d1; app/side3d); ⌥1-4 too while it is folded
   if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && n !== undefined && n >= 1 && n <= 4) return { screen: `side-${String(n)}` as ScreenAction };
   if (only('meta') && e.code === 'KeyN') {
     const p = here(c);

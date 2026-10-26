@@ -203,10 +203,24 @@
   width: var(--bubble-obj);
   filter: drop-shadow(var(--sh-obj));
 }
+/* ⌥ held: the bubble's key, a ds Kbd chip in the count pill's place (the pill hides meanwhile,
+   designer m_44373); gone at release, no fade (held.ts) */
+.s3-key {
+  position: absolute;
+  top: calc(var(--s-10) - var(--s-1) / 2);
+  left: calc(var(--s-1) * 1.5);
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: inline-flex;
+  pointer-events: none;
+}
+/* the count pill: centred on the bubble's rim at its bottom-left (6, 38 in the 44), under the
+   object that pokes out of its top, never over it (designer m_44373) */
 .s3-count {
   position: absolute;
-  top: calc(-1 * var(--s-1) / 2);
-  left: calc(-1 * var(--s-2));
+  top: calc(var(--s-10) - var(--s-1) / 2);
+  left: calc(var(--s-1) * 1.5);
+  transform: translate(-50%, -50%);
   z-index: 1;
   min-width: 18px;
   height: 18px;

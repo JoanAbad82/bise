@@ -2,8 +2,9 @@
 // right side, nm-thread's column, nm-composer's floating composer): SideHost computes it from the
 // window's width, the left width (rail + sidebar) and the tabbed panel, and puts it here; the
 // readers subscribe (useSideLayout). Designer's condition (m_42050): it is computed again only at
-// a resize's end (RESIZE_END_MS after the last resize event) or when the sidebar or the panel
-// folds, never while he types or scrolls. Owner: nm-side.
+// a resize's end (RESIZE_END_MS after the last resize event), when the sidebar or the panel
+// folds, or when he goes to a page that shows no side (layout sideShows), never while he types or
+// scrolls. Owner: nm-side.
 import { useEffect, useSyncExternalStore } from 'react';
 import { sideLayout, type SideLayout } from './layout';
 
@@ -53,9 +54,9 @@ export function onResizeEnd(cb: (w: number) => void): () => void {
   };
 }
 
-/** In SideHost: compute the layout at a resize's end and when the left width or the panel changes. */
-export function useLayoutDriver(winW: number, leftW: number, panel: { readonly open: boolean; readonly width: number }): void {
+/** In SideHost: compute the layout at a resize's end, when the left width or the panel changes, and when the route shows the side or not (layout sideShows). */
+export function useLayoutDriver(winW: number, leftW: number, panel: { readonly open: boolean; readonly width: number }, shows: boolean): void {
   useEffect(() => {
-    setSideLayout(sideLayout(winW, leftW, panel.open, panel.open && panel.width > 0 ? panel.width : undefined));
-  }, [winW, leftW, panel.open, panel.width]);
+    setSideLayout(sideLayout(winW, leftW, panel.open, panel.open && panel.width > 0 ? panel.width : undefined, shows));
+  }, [winW, leftW, panel.open, panel.width, shows]);
 }

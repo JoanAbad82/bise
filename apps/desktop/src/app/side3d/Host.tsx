@@ -3,21 +3,25 @@
 // (Flyout*). Mounted at the shell's root by App.tsx, position fixed under the window's bar,
 // outside .app-main and .app-screen, so no parent's overflow clips the world's or an object's
 // shadow (plan §2; ds/noclip.ts checks it). It computes the window's sideLayout (place.ts: at a
-// resize's end, a sidebar or panel fold) and hides while the tabbed panel is open (the world's
+// resize's end, a sidebar or panel fold) and hides while the tabbed panel is open or on a page
+// that is no project's (layout sideShows: the inbox, scheduled, plugins, artifacts...; the world's
 // office unmounted: no loop while hidden). The project is the route's (bise's home on a page with
-// none). One card open at a time: a bubble's click or ⌥⌘1-⌥⌘4 (keys.ts) toggle it; esc and a click
-// outside close it. Places, in px under the bar: the world 12 from the top and the right edge; the
-// bubbles 12 from the right, 152 from the top, 80 apart (44 + 36), never moving (the big world
-// floats over them, designer m_42536); with the world folded into a bubble, it is the stack's
-// first, at 40; a card 68 from the right, its top on its bubble's, kept 24 inside the window and
-// at most min(window − 48, 560) high (layout cardTop, cardMaxH): placed on open, at a resize's
-// end and when its own height changes, never from where it was drawn (no measure loop). Under every palette, sheet and menu (z 15: over the composer's 10, under the
-// palette's 20). Owner: nm-side.
+// none). One card open at a time: a bubble's click, ⌥1-⌥4 (folded) or ⌥⌘1-⌥⌘4 (keys.ts) toggle it
+// (by its key, its first row takes the focus); ⌥ held shows each bubble's key; ↑ ↓ walk the rows,
+// ⏎ opens one; esc closes it (the focus back on its bubble), a click outside too. Places, in px
+// under the bar: the world 12 from the top and the right edge; the bubbles 12 from the right, 152
+// from the top, 80 apart (44 + 36), never moving (the big world floats over them, designer
+// m_42536); with the world folded into a bubble, it is the stack's first, at 40; a card 68 from
+// the right, its top on its bubble's, kept 24 inside the window and at most min(window − 48, 560)
+// high (layout cardTop, cardMaxH): placed on open, at a resize's end and when its own height
+// changes, never from where it was drawn (no measure loop). Under every palette, sheet and menu
+// (z 15: over the composer's 10, under the palette's 20). Owner: nm-side.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNowFor } from '../clock';
 import { useRoute, useRouter } from '../router';
 import { MAIN, projectOf } from '../route';
 import { useMenuAction } from '../menu';
+import { useModHeld } from '../held';
 import { inRank, agentCounts, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type Counts } from './model';
 import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
@@ -26,7 +30,7 @@ import { Empty, Flyout, HeadButton, SideLink } from './Flyout';
 import { AgentLine } from './FlyoutAgents';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useLayoutDriver, useSideLayout } from './place';
-import { cardMaxH, cardTop } from './layout';
+import { cardMaxH, cardTop, sideShows } from './layout';
 import { newAgent, openOverview, openTab, useLeftWidth, usePanelBox } from './ports';
 import { alarms } from '@/thread/wake';
 import { useAgents, useCards, useProjects, useStore } from '@/store';
@@ -52,6 +56,15 @@ export function bubbleTops(world: 'small' | 'bubble'): { readonly world: number 
   const first = world === 'bubble' ? TOP_STACK + STEP : TOP_SMALL;
   const tops = Object.fromEntries(BUBBLES.map((b, i) => [b, first + i * STEP])) as Record<BubbleId, number>;
   return { world: world === 'bubble' ? TOP_STACK : null, bubbles: tops };
+}
+
+/** A bubble's key while the side is folded ('⌥1' for the first, top to bottom: keys.ts). Pure. */
+export const bubbleKey = (b: BubbleId): string => `⌥${String(BUBBLES.indexOf(b) + 1)}`;
+
+/** The row ↑ (-1) or ↓ (+1) goes to from `at` (-1: none focused: ↓ the first, ↑ the last), kept in the card's `n` rows. Pure. */
+export function rowStep(at: number, n: number, by: 1 | -1): number {
+  if (at < 0) return by === 1 ? 0 : n - 1;
+  return Math.min(n - 1, Math.max(0, at + by));
 }
 
 /** The artifacts card's foot: how many, and in how many projects when more than one. Pure. */
@@ -88,9 +101,9 @@ export function SideHost() {
   const winW = useWinW();
   const leftW = useLeftWidth();
   const panel = usePanelBox();
-  useLayoutDriver(winW, leftW, panel);
-  const layout = useSideLayout();
   const route = useRoute();
+  useLayoutDriver(winW, leftW, panel, sideShows(route));
+  const layout = useSideLayout();
   const rows = useProjects();
   const home = rows.find((p) => p.home)?.project ?? '';
   const project = projectOf(route) ?? home;
@@ -130,31 +143,51 @@ function Side({ project, home, world }: { project: string; home: string; world: 
   const toggle = (b: BubbleId) => {
     setOpen((o) => (o === b ? null : b));
   };
+  // a card opened by its key (⌥1-4, ⌥⌘1-4): its first row takes the focus, so ⏎ opens it at once
+  const keyed = useRef(false);
+  const byKey = (b: BubbleId) => {
+    keyed.current = true;
+    toggle(b);
+  };
   useMenuAction('side-1', () => {
-    toggle('agents');
+    byKey('agents');
   });
   useMenuAction('side-2', () => {
-    toggle('artifacts');
+    byKey('artifacts');
   });
   useMenuAction('side-3', () => {
-    toggle('scheduled');
+    byKey('scheduled');
   });
   useMenuAction('side-4', () => {
-    toggle('processes');
+    byKey('processes');
   });
-  // esc and a click outside close the open card
+  // ⌥ held alone: each bubble shows its key (held.ts; keys.ts gives ⌥1-4 to the folded side)
+  const alt = useModHeld('Alt');
+  // esc closes the open card and gives the focus back to its bubble, ↑ ↓ walk its rows (the
+  // focus ring), ⏎ opens the focused one (its button's own); a click outside closes it
   const root = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (open === null) return;
     const key = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const rows = [...(root.current?.querySelectorAll<HTMLElement>('.s3-card [data-row]') ?? [])];
+        if (rows.length === 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        rows[rowStep(rows.indexOf(document.activeElement as HTMLElement), rows.length, e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+        return;
+      }
       if (e.key !== 'Escape') return;
       e.stopPropagation();
       setOpen(null);
+      root.current?.querySelector<HTMLElement>(`[data-testid="app.bubble.${open}"]`)?.focus();
     };
     const down = (e: PointerEvent) => {
       if (root.current !== null && e.target instanceof Node && root.current.contains(e.target)) return;
       setOpen(null);
     };
+    if (keyed.current) root.current?.querySelector<HTMLElement>('.s3-card [data-row]')?.focus();
+    keyed.current = false;
     window.addEventListener('keydown', key, true);
     window.addEventListener('pointerdown', down, true);
     return () => {
@@ -223,7 +256,8 @@ function Side({ project, home, world }: { project: string; home: string; world: 
           }} />
       )}
       {BUBBLES.map((b) => (
-        <Bubble key={b} id={b} count={bubbleCount(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]} onClick={() => {
+        <Bubble key={b} id={b} count={bubbleCount(b, counts)} tip={bubbleTip(b, counts)} open={open === b} top={tops.bubbles[b]}
+          hint={alt ? bubbleKey(b) : undefined} onClick={() => {
           toggle(b);
         }} />
       ))}

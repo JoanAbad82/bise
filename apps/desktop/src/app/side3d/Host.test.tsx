@@ -13,9 +13,11 @@ import { side } from '@/proto/words_side.gen';
 import { artifact, artifacts, card, ev, projects, row } from '../../../tests/feature/inputs';
 import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
+import { HINT_HOLD_MS } from '../held';
 import { keyAction } from '../keys';
 import { SideHost, bubbleTops } from './Host';
 import { CARD_MAX } from './layout';
+import { sideLayoutNow } from './place';
 import { GRACE_MS, HOVER_MS, hitBox } from './World';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
@@ -154,11 +156,65 @@ describe('the right side, folded', () => {
     expect(v.getByTestId('app.flyout.scheduled.processes').textContent).toContain(side.processes);
   });
 
+  it('⌥ held: each bubble shows its key in its count\'s place, top to bottom; gone at release (designer m_44292, m_44373)', () => {
+    vi.useFakeTimers();
+    try {
+      const { v } = side3d();
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }));
+        vi.advanceTimersByTime(HINT_HOLD_MS);
+      });
+      expect(['agents', 'artifacts', 'scheduled', 'processes'].map((b) => v.getByTestId(`app.bubble.${b}.key`).textContent)).toEqual(['⌥1', '⌥2', '⌥3', '⌥4']);
+      expect(v.queryByTestId('app.bubble.agents.count')).toBeNull();
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
+      });
+      expect(v.queryByTestId('app.bubble.agents.key')).toBeNull();
+      expect(v.getByTestId('app.bubble.agents.count').textContent).toBe('1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a card opened by its key: its first row focused, ↓ ↑ walk the rows (kept in the card), ⏎ is the row\'s own, esc closes and gives the focus back to its bubble', () => {
+    const { v } = side3d();
+    act(() => {
+      emitAction('side-1');
+    });
+    const rows = [...v.getByTestId('app.flyout.agents').querySelectorAll<HTMLElement>('[data-row]')];
+    expect(rows).toHaveLength(3);
+    expect(document.activeElement).toBe(rows[0]);
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(rows[1]);
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(rows[2]);
+    fireEvent.keyDown(window, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(rows[1]);
+    expect(rows[1]?.tagName).toBe('BUTTON');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(v.queryByTestId('app.flyout.agents')).toBeNull();
+    expect(document.activeElement).toBe(v.getByTestId('app.bubble.agents'));
+  });
+
   it('1100 wide: the world folds into a 5th bubble on top of the stack', () => {
     const { v } = side3d(1100);
     expect(v.queryByTestId('app.world')).toBeNull();
     expect(v.getByTestId('app.bubble.world').style.top).toBe('40px');
     expect(v.getByTestId('app.bubble.agents').style.top).toBe('120px');
+  });
+
+  it('an app page (the inbox): no world, no bubbles, no band kept for them', () => {
+    const { v, router } = side3d();
+    act(() => {
+      router.go({ screen: 'inbox' });
+    });
+    expect(v.queryByTestId('app.side')).toBeNull();
+    expect(sideLayoutNow()).toMatchObject({ side: false, gutter: 0 });
+    act(() => {
+      router.go({ screen: 'thread', project: ACME, agent: 'perf' });
+    });
+    expect(v.getByTestId('app.world')).toBeTruthy();
   });
 
   it('the tabbed panel open: no world, no bubbles', () => {

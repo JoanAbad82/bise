@@ -21,13 +21,25 @@ describe("the window's keys", () => {
     expect(keyAction(k('Digit3', { metaKey: true }), ctx())).toBeUndefined();
   });
 
-  it("⌥0 the project's main, ⌥1-9 its live agents in the panel's order (by code: ⌥1 types '¡')", () => {
-    expect(keyAction(k('Digit0', { altKey: true, key: 'º' }), ctx())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'main' } });
-    expect(keyAction(k('Digit1', { altKey: true, key: '¡' }), ctx())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'perf' } });
-    expect(keyAction(k('Digit2', { altKey: true }), ctx())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'docs' } });
-    expect(keyAction(k('Digit3', { altKey: true }), ctx())).toBeUndefined();
+  it("the panel open: ⌥0 the project's main, ⌥1-9 its live agents in the panel's order (by code: ⌥1 types '¡')", () => {
+    const open = (over: Partial<KeyCtx> = {}) => ctx({ panelOpen: true, ...over });
+    expect(keyAction(k('Digit0', { altKey: true, key: 'º' }), open())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'main' } });
+    expect(keyAction(k('Digit1', { altKey: true, key: '¡' }), open())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'perf' } });
+    expect(keyAction(k('Digit2', { altKey: true }), open())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'docs' } });
+    expect(keyAction(k('Digit3', { altKey: true }), open())).toBeUndefined();
     // on bise's own screen, bise's agents
-    expect(keyAction(k('Digit0', { altKey: true }), ctx({ route: { screen: 'bise' } }))).toEqual({ go: { screen: 'thread', project: 'h', agent: 'main' } });
+    expect(keyAction(k('Digit0', { altKey: true }), open({ route: { screen: 'bise' } }))).toEqual({ go: { screen: 'thread', project: 'h', agent: 'main' } });
+  });
+
+  it('the right side folded (no panel, a project\'s page): ⌥1-4 its bubbles top to bottom, ⌥5-9 nothing, ⌥0 still main; a page with no side: the agents (r2-side 6, designer m_44292)', () => {
+    expect([1, 2, 3, 4, 5, 9].map((n) => keyAction(k(`Digit${String(n)}`, { altKey: true }), ctx()))).toEqual([
+      { screen: 'side-1' }, { screen: 'side-2' }, { screen: 'side-3' }, { screen: 'side-4' }, undefined, undefined,
+    ]);
+    expect(keyAction(k('Digit0', { altKey: true }), ctx())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'main' } });
+    // ⌥⌘1-4 stay the bubbles, panel open or not
+    expect(keyAction(k('Digit2', { altKey: true, metaKey: true }), ctx({ panelOpen: true }))).toEqual({ screen: 'side-2' });
+    // the inbox shows no side: ⌥1 is the home project's first agent, as before
+    expect(keyAction(k('Digit1', { altKey: true }), ctx({ route: { screen: 'inbox' } }))).not.toEqual({ screen: 'side-1' });
   });
 
   it('⌘K palette, ⌘D changes / review, ⌘⇧A artifacts, ⌘E ctrl+y to the screen, ⌘/ the key list (⌘. is the Agent menu’s Stop)', () => {

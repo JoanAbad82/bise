@@ -1,6 +1,7 @@
 // sideLayout at the widths of plan §2 (1000, 1100, 1280, 1440, 1728, 1920), the panel open and closed.
 import { describe, expect, it } from 'vitest';
-import { BUBBLE_BAND, CARD_MARGIN, CARD_MAX, cardMaxH, cardTop, COL_W, MIN_LEFT, sideLayout, WORLD_BAND } from './layout';
+import type { Route } from '../route';
+import { BUBBLE_BAND, CARD_MARGIN, CARD_MAX, cardMaxH, cardTop, COL_W, MIN_LEFT, sideLayout, sideShows, WORLD_BAND } from './layout';
 
 /** rail 56 + sidebar 240 */
 const SIDE = 296;
@@ -100,5 +101,49 @@ describe('a card: its top on its bubble, inside the window (Gabriel m_44190)', (
           expect(BAR + top).toBeGreaterThanOrEqual(CARD_MARGIN);
           expect(BAR + top + drawn).toBeLessThanOrEqual(winH - CARD_MARGIN);
         }
+  });
+});
+
+describe('the folded side shows inside a project only (designer m_44292)', () => {
+  const P = 'acme-1a2b3c4d';
+  // every screen of route.ts, once (a new screen breaks sideShows' switch at typecheck)
+  const table: readonly (readonly [Route, boolean])[] = [
+    [{ screen: 'bise' }, true],
+    [{ screen: 'thread', project: P, agent: 'main' }, true],
+    [{ screen: 'thread', project: P, agent: 'perf' }, true],
+    [{ screen: 'agents', project: P }, true],
+    [{ screen: 'agents', project: P, archived: true }, true],
+    [{ screen: 'changes', project: P }, true],
+    [{ screen: 'prs', project: P }, true],
+    [{ screen: 'review', project: P, agent: 'perf' }, true],
+    [{ screen: 'feature', project: P, name: 'native-mac' }, true],
+    [{ screen: 'commit', project: P, sha: 'abc' }, true],
+    [{ screen: 'branch', project: P, branch: 'sb/x' }, true],
+    [{ screen: 'environments', project: P }, true],
+    [{ screen: 'debug', project: P, agent: 'perf' }, true],
+    [{ screen: 'artifacts', project: P }, false],
+    [{ screen: 'artifacts', project: P, id: 'a1' }, false],
+    [{ screen: 'artifacts', project: P, at: 'recent' }, false],
+    [{ screen: 'scheduled' }, false],
+    [{ screen: 'running' }, false],
+    [{ screen: 'running', scope: { project: P } }, false],
+    [{ screen: 'plugins' }, false],
+    [{ screen: 'plugins', kind: 'skills' }, false],
+    [{ screen: 'inbox' }, false],
+    [{ screen: 'report' }, false],
+    [{ screen: 'settings' }, false],
+    [{ screen: 'onboarding' }, false],
+    [{ screen: 'lab', lab: 'composer' }, false],
+    [{ screen: 'notfound', path: 'x' }, false],
+  ];
+  it.each(table)('%j: %s', (r, shows) => {
+    expect(sideShows(r)).toBe(shows);
+  });
+  it('no side: no band, the column centred in the whole room (the banners and columns take the freed width)', () => {
+    for (const w of [1000, 1100, 1280, 1440, 1728, 1920]) {
+      const l = sideLayout(w, SIDE, false, undefined, false);
+      expect(l).toMatchObject({ side: false, gutter: 0 });
+      expect(l.colLeft - SIDE).toBeCloseTo(right(w, l));
+    }
   });
 });

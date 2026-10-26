@@ -2,13 +2,16 @@
 // (--c-overlay + --glass, --e-2), 36 apart; each holds its object at 68, sitting 4 above its bottom
 // and rising 28 out of its top with its own shadow (--sh-obj); agents = bise's head, artifacts =
 // the easel, scheduled = the hourglass, processes = the rack (objects.ts), drawn by cache.ts; no
-// WebGL: a plain tile with the kind's line icon. The count pill 18 at -2/-8 (11.5/600 tabular,
-// a 2 ring of the ground), --c-ink, the accent when an agent asks; none at 0. Open: a 2 ring of
-// --c-focus (never the accent). ⌥⌘1-⌥⌘4 open them (keys.ts, d1). Each has its tip and VoiceOver
+// WebGL: a plain tile with the kind's line icon. The count pill 18 centred on its rim at the
+// bottom-left (11.5/600 tabular, a 2 ring of the ground; designer m_44373: never over the object),
+// --c-ink, the accent when an agent asks; none at 0. Open: a 2 ring of
+// --c-focus (never the accent). ⌥1-⌥4 open them while the side is folded, ⌥⌘1-⌥⌘4 always
+// (keys.ts; r2-side 6, designer m_44292); ⌥ held shows each one's key, a ds Kbd chip in the count
+// pill's place (the pill hides), gone at release. Each has its tip and VoiceOver
 // name ('Agents · 3 working · 1 asks'). The world folded into one (d3) is a 5th, on top, the same.
 // Owner: nm-side.
 import type { ReactNode } from 'react';
-import { AppIcon, Press, tipAttrs, type AppIconName } from '@/ds';
+import { AppIcon, Kbd, Press, tipAttrs, type AppIconName } from '@/ds';
 import { side } from '@/proto/words_side.gen';
 import { useThingPng } from './cache';
 import { bubbleThing, type BubbleId, type Thing } from './objects';
@@ -44,17 +47,24 @@ export interface BubbleProps {
   readonly onClick: () => void;
   /** the world's thumbnail in place of an object */
   readonly pic?: ReactNode;
+  /** ⌥ held (folded side): its key ('⌥1'), a ds Kbd chip 4 outside its bottom-left edge; none: no chip */
+  readonly hint?: string | undefined;
 }
 
-export function Bubble({ id, count, tip, open, top, onClick, pic }: BubbleProps) {
+export function Bubble({ id, count, tip, open, top, onClick, pic, hint }: BubbleProps) {
   return (
     <Press look="s3-bubble" style={{ top }} aria-label={tip} aria-expanded={id === 'world' ? undefined : open}
       aria-haspopup={id === 'world' ? undefined : 'dialog'} data-open={open || undefined} {...tipAttrs(tip)} onClick={onClick}
       data-testid={`app.bubble.${id}`}>
       <span className="s3-obj">{pic ?? (id === 'world' ? null : <ThingPic thing={bubbleThing(id)} px={OBJ_PX} tile={TILE[id]} />)}</span>
-      {count.n > 0 && (
+      {count.n > 0 && hint === undefined && (
         <span className="s3-count" data-accent={count.accent || undefined} aria-hidden="true" data-testid={`app.bubble.${id}.count`}>
           {count.n}
+        </span>
+      )}
+      {hint !== undefined && (
+        <span className="s3-key" aria-hidden="true" data-testid={`app.bubble.${id}.key`}>
+          <Kbd>{hint}</Kbd>
         </span>
       )}
     </Press>

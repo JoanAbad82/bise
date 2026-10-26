@@ -5,8 +5,8 @@
 // inside under a 24 fade when they overflow), one foot: a rule and a 32 row of 12 text-3 ('3
 // archived' · 'all agents ›'), the card's end (no padding under it). Floats over the page with
 // its whole shadow (SideHost is fixed at the shell's root: noClip). Its rows: SideRow, 48 high, a
-// 40 object, 12 between, a name and a line under it, a dot at the end. Esc and a click outside
-// close it (SideHost). Owner: nm-side.
+// 40 object, 12 between, a name and a line under it, a dot at the end; its button is a `data-row`
+// (SideHost's ↑ ↓ walk the rows, ⏎ opens). Esc and a click outside close it (SideHost). Owner: nm-side.
 import type { MouseEventHandler, ReactNode } from 'react';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import type { EntityMenu } from '@/ds';
@@ -101,7 +101,7 @@ export interface SideRowProps {
 export function SideRow({ pic, title, sub, end, label, tip, onClick, menu, testId }: SideRowProps) {
   return (
     <div className="s3-row" onContextMenu={menu.onContextMenu} data-testid={testId}>
-      <Press look="s3-row-body" aria-label={label} {...tipAttrs(tip)} onClick={onClick}>
+      <Press look="s3-row-body" aria-label={label} {...tipAttrs(tip)} onClick={onClick} data-row="">
         <span className="s3-row-pic">{pic}</span>
         <span className="s3-row-lines">
           <span className="s3-row-l1">{title}</span>

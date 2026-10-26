@@ -2,9 +2,47 @@
 // window's width (plan native-mac-plan v4 §2, decision d3). The column is centred when both sides
 // leave the world's band (148 + 12 + 12 = 172); else it slides left (24 from the sidebar at
 // least); else the world folds into a 5th bubble and the band drops to 92 (68 + 12 + 12); last,
-// the column narrows. The tabbed panel open: the right side hides (the panel takes the right), the
+// the column narrows. The tabbed panel open, or a route that is no project's (sideShows: the inbox,
+// scheduled, processes, plugins, settings, every artifacts screen...): the right side hides, the
 // column is centred in what is left. Recomputed at the end of a resize or a fold only (place.ts).
 // Pure: widths in, places out; nm-thread and nm-composer read it through place.ts. Owner: nm-side.
+
+import type { Route } from '../route';
+
+/**
+ * The folded side (the world and its bubbles) shows inside a project only (r2-side item 7,
+ * Gabriel m_44266, designer m_44292): a thread (bise's own too), its agents, archived, changes,
+ * PRs, a review, a feature, a commit, a branch, environments, debug. Hidden on the app-wide pages:
+ * the inbox, scheduled, processes, plugins, settings, report, onboarding, lab, not found and every
+ * artifacts screen (the library, a project's own too). Pure.
+ */
+export function sideShows(r: Route): boolean {
+  switch (r.screen) {
+    case 'bise':
+    case 'thread':
+    case 'agents':
+    case 'changes':
+    case 'prs':
+    case 'review':
+    case 'feature':
+    case 'commit':
+    case 'branch':
+    case 'environments':
+    case 'debug':
+      return true;
+    case 'artifacts':
+    case 'scheduled':
+    case 'running':
+    case 'plugins':
+    case 'inbox':
+    case 'report':
+    case 'settings':
+    case 'onboarding':
+    case 'lab':
+    case 'notfound':
+      return false;
+  }
+}
 
 /** How the bims' world shows: 'big' (384, hovered), 'small' (148, folded), 'bubble' (a 5th bubble, no room). */
 export type WorldSize = 'big' | 'small' | 'bubble';
@@ -46,11 +84,12 @@ function fit(room: number, band: number): { left: number; w: number } | null {
 
 /**
  * The layout for a window `winW` wide, a sidebar (with the rail) `sideW` wide, the tabbed panel
- * open or not (`panelW` its width, --w-panel when its owner did not say). Pure.
+ * open or not (`panelW` its width, --w-panel when its owner did not say), the route showing the
+ * side or not (`shows`, sideShows: off, the column is centred in the whole room, no band). Pure.
  */
-export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, panelW: number = PANEL_W): SideLayout => {
+export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, panelW: number = PANEL_W, shows = true): SideLayout => {
   const room = Math.max(0, winW - sideW - (panelOpen ? panelW : 0));
-  if (panelOpen) {
+  if (panelOpen || !shows) {
     const w = Math.min(COL_W, Math.max(0, room - 2 * MIN_LEFT));
     return { colLeft: sideW + (room - w) / 2, colW: w, world: 'small', gutter: 0, side: false };
   }
