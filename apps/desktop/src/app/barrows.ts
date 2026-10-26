@@ -8,7 +8,7 @@ import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
 import { keyOf, portWords, shortCmd, stateOf, tipOf as procTip, urlWords, whereOf, worktreeName, type ProcItem, type Root } from '@/running/model';
 import { howOften, nextWords } from '@/scheduled/model';
-import { shortAge, shownName } from '@/agents/model';
+import { rankedOf, shortAge, shownName } from '@/agents/model';
 import { alarms, pauseLine, waitLen } from '@/thread/wake';
 import type { Agent, Card, ComputerAgent, Place } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
@@ -220,49 +220,30 @@ function taskRows(agents: readonly ProjAgent[], now: number, all: boolean, alt: 
   const places = all ? [] : (extras.places ?? []);
   const cards = extras.cards ?? [];
   if (places.length === 0) {
-    const order = extras.numbers === undefined ? live : live.slice().sort(byNum);
+    const order = all ? acrossProjects(live, extras.home) : extras.numbers === undefined ? live : live.slice().sort(byNum);
     return order.map((x, i) => agentRow(x, now, all, num(x.a.name) ?? i + 1, alt, extras, undefined, undefined));
   }
   const liveA = live.map((x) => x.a);
   const shared = sharedPlaces(places, liveA);
-  const inGroup = new Set([...shared.values()].flat().map((a) => a.name));
   const project = live[0]?.project ?? agents[0]?.project ?? '';
-  const rows: BarRow[] = live
+  // the hub's rank leads (agent-rank, his m_45828: keep the order): each agent alone at its number,
+  // each worktree two or more share as one unit at its first member's number, its agents under it
+  const groups = places.flatMap((p) => {
+    const members = live.filter((x) => shared.get(p.id)?.some((a) => a.name === x.a.name) === true).sort(byNum);
+    return members.length >= 2 ? [{ p, members }] : [];
+  });
+  const inGroup = new Set(groups.flatMap((g) => g.members.map((x) => x.a.name)));
+  type Unit = { readonly at: number; readonly rows: BarRow[] };
+  const units: Unit[] = live
     .filter((x) => !inGroup.has(x.a.name))
-    .sort(byNum)
     .map((x) => {
       const p = placeOf(x.a, places);
-      return agentRow(x, now, all, num(x.a.name), alt, extras, p === undefined ? undefined : markOf(p, asksMerge(p, cards)), undefined);
+      return { at: num(x.a.name) ?? Number.MAX_SAFE_INTEGER, rows: [agentRow(x, now, all, num(x.a.name), alt, extras, p === undefined ? undefined : markOf(p, asksMerge(p, cards)), undefined)] };
     });
-  for (const p of orphanPlaces(places, liveA)) {
-    const label = placeLabel(p);
-    rows.push({
-      key: `pr:${project}/${p.id}`,
-      kind: 'orphan',
-      project,
-      branch: p.branch ?? undefined,
-      glyph: '',
-      tone: 'dim',
-      name: label,
-      sub: '',
-      end: '',
-      endTone: 'dim',
-      title: tipWords(p),
-      testId: `app.right.pr.${String(livePr(p)?.number ?? label)}`,
-      waits: false,
-      mark: markOf(p, asksMerge(p, cards)),
-    });
-  }
-  const groups = places
-    .flatMap((p) => {
-      const members = live.filter((x) => shared.get(p.id)?.some((a) => a.name === x.a.name) === true).sort(byNum);
-      return members.length >= 2 ? [{ p, members }] : [];
-    })
-    .sort((a, b) => byNum(a.members[0] as ProjAgent, b.members[0] as ProjAgent));
   for (const { p, members } of groups) {
     const head = markOf(p, asksMerge(p, cards));
     const memberRows = members.map((x) => agentRow(x, now, all, num(x.a.name), alt, extras, undefined, p.id));
-    rows.push({
+    const headRow: BarRow = {
       key: `ψ:${project}/${p.id}`,
       kind: 'group',
       project,
@@ -282,10 +263,46 @@ function taskRows(agents: readonly ProjAgent[], now: number, all: boolean, alt: 
       waits: memberRows.some((r) => r.waits),
       // the head's mark: the PR's '↑' with its number, or its land's '…'; nothing for a lone 'ψ'
       ...(head.g === 'ψ' || head.g === 'Δ' ? {} : { mark: head }),
+    };
+    units.push({ at: num(members[0]?.a.name ?? '') ?? Number.MAX_SAFE_INTEGER, rows: [headRow, ...memberRows] });
+  }
+  // a stable sort: equal numbers (none, an older hub) keep the agents' start order
+  const rows = units.sort((x, y) => x.at - y.at).flatMap((u) => u.rows);
+  // the open PRs with no live agent, after the agents
+  for (const p of orphanPlaces(places, liveA)) {
+    const label = placeLabel(p);
+    rows.push({
+      key: `pr:${project}/${p.id}`,
+      kind: 'orphan',
+      project,
+      branch: p.branch ?? undefined,
+      glyph: '',
+      tone: 'dim',
+      name: label,
+      sub: '',
+      end: '',
+      endTone: 'dim',
+      title: tipWords(p),
+      testId: `app.right.pr.${String(livePr(p)?.number ?? label)}`,
+      waits: false,
+      mark: markOf(p, asksMerge(p, cards)),
     });
-    rows.push(...memberRows);
   }
   return rows;
+}
+
+/**
+ * Every project's agents on bise's own screen (no ⌥ numbers there): project by project, the home's
+ * first, the others as they come; in each, the hub's rank (agents/model rankedOf, as the folded
+ * side's lists.ts did). Pure.
+ */
+export function acrossProjects(live: readonly ProjAgent[], home: string | undefined): ProjAgent[] {
+  const projects = [...new Set(live.map((x) => x.project))].sort((a, b) => Number(b === home) - Number(a === home));
+  return projects.flatMap((p) => {
+    const here = live.filter((x) => x.project === p);
+    const slots = rankedOf(here.map((x) => x.a));
+    return here.slice().sort((x, y) => (slots.get(x.a.name) ?? 0) - (slots.get(y.a.name) ?? 0));
+  });
 }
 
 /**

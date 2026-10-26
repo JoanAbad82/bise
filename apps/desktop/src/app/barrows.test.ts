@@ -145,3 +145,32 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     expect(procRows(items, 'all', roots).map((r) => r.sub)).toEqual(['storefront › perf/site', 'storefront › apps/api', 'storefront']);
   });
 });
+
+// the agents' order, kept (agent-rank cf77a069a, his m_45828): main first, then the hub's rank
+// (rows::Agent.rank, rankedOf's numbers); a worktree two agents share sits at its first member's
+// number with its agents under it, never pushed after the others; open PRs with no agent last; on
+// bise's own, project by project (the home's first), each in its rank
+describe('the agents order (law: the hub rank leads)', () => {
+  const place = (id: string, agents: string[]) => ({ id, branch: `sb/${id}`, agents } as unknown as import('@/proto').Place);
+  it('rows follow the rank; a shared worktree takes its first member\'s place', () => {
+    const list = [ag('main', { main: true }), ag('a', { rank: 4 }), ag('b', { rank: 1 }), ag('c', { rank: 3 }), ag('d', { rank: 2 })];
+    const numbers = new Map([['main', 0], ['b', 1], ['d', 2], ['c', 3], ['a', 4]]);
+    // no worktree: exactly the rank
+    expect(agentRows(list, NOW, false, false, { numbers }).map((r) => r.agent)).toEqual(['main', 'b', 'd', 'c', 'a']);
+    // d and a share a worktree: its head at d's number (2), d then a under it; c stays after
+    const rows = agentRows(list, NOW, false, false, { numbers, places: [place('wt', ['d', 'a'])] });
+    expect(rows.map((r) => (r.kind === 'group' ? 'ψ' : r.agent))).toEqual(['main', 'b', 'ψ', 'd', 'a', 'c']);
+  });
+  it('every permutation of the input gives the same order (the rank, not the arrival)', () => {
+    const base = [ag('x', { rank: 2 }), ag('y', { rank: 1 }), ag('z', { rank: 3 })];
+    const numbers = new Map([['y', 1], ['x', 2], ['z', 3]]);
+    for (const list of [base, [...base].reverse(), [base[1], base[2], base[0]]] as ProjAgent[][]) {
+      expect(agentRows(list, NOW, false, false, { numbers }).map((r) => r.agent)).toEqual(['y', 'x', 'z']);
+    }
+  });
+  it("bise's own: the home's agents first, then each project's, each in its rank", () => {
+    const at = (project: string, name: string, rank: number): ProjAgent => ({ ...ag(name, { rank }), project, projectName: project });
+    const list = [at('shop', 's2', 2), at('home', 'h2', 2), at('shop', 's1', 1), at('home', 'h1', 1)];
+    expect(agentRows(list, NOW, true, false, { home: 'home' }).map((r) => `${r.project}/${r.agent ?? ''}`)).toEqual(['home/h1', 'home/h2', 'shop/s1', 'shop/s2']);
+  });
+});
