@@ -295,6 +295,10 @@ body:has(.app-shell) {
   font: 400 var(--f-ui);
   text-align: left;
 }
+/* the library's '← Projects' opens its view under the fixed head: one section gap, as 'Projects' (designer m_44691) */
+.app-s-row.back {
+  margin-top: var(--s-3);
+}
 .app-s-row > svg {
   flex: none;
   color: var(--c-text-2);
