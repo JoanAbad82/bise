@@ -61,6 +61,7 @@
 .ic:has(> .ic-rel) > .ic-q { flex: none; }
 .ic-rel { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-2); margin: 0 0 var(--gap-block); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
 .ic-rel p { margin: 0; }
+.ic-rel-safe { color: var(--c-text-2); }
 .ic-rel-notes { flex: 0 1 auto; min-height: 0; max-height: 240px; overflow-y: auto; }
 .ic-rel-notes .th-md { color: var(--c-text-2); font: var(--t-13) var(--font-ui); }
 .ic-rel-notes[data-top] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
