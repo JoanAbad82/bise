@@ -75,7 +75,12 @@ export function FloatLayer({ c, scrolls = false, leaving = false }: { c: FloatCo
       <header className="s3-card-head">
         <b>{c.name}</b>
         {c.says !== '' && <span className="s3-card-says">{c.says}</span>}
-        {c.loud !== undefined && c.loud !== '' && <span className="s3-card-says" data-loud="" data-testid={`app.flyout.${id}.loud`}>{c.says !== '' ? ` · ${c.loud}` : c.loud}</span>}
+        {c.loud !== undefined && c.loud !== '' && (
+          <span className="s3-card-says">
+            {c.says !== '' && '· '}
+            <span className="s3-card-says" data-loud="" data-testid={`app.flyout.${id}.loud`}>{c.loud}</span>
+          </span>
+        )}
         <span className="s3-card-acts">
           {c.add}
           <HeadButton icon="panel" tip={side.pin_tab} onClick={c.onPin} testId={`app.flyout.${id}.pin`} />

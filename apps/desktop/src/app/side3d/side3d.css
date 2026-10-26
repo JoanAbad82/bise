@@ -479,6 +479,10 @@
   font-weight: 400;
   color: var(--c-text-3);
 }
+/* the part of a float's head that waits on him: the accent ('1 waiting for you', page agents-float v1) */
+.s3-card-says[data-loud] {
+  color: var(--c-accent);
+}
 .s3-card-acts {
   margin-left: auto;
   display: inline-flex;
@@ -1150,6 +1154,20 @@
 }
 .s3-arow[data-back] .s3-arow-head {
   opacity: 0.55;
+}
+/* the float's heads are 32 (the Overview's other heads stay 40) and its two lines 16 each: a row of 48 */
+.s3-arow-head,
+.s3-arow-head .s3-head-pic,
+.s3-arow-head .s3-head-pic img,
+.s3-arow-head .s3-head-pic .s3-tile {
+  width: 32px;
+  height: 32px;
+}
+.s3-arow-l1 {
+  height: 16px;
+}
+.s3-arow-name {
+  line-height: 16px;
 }
 .s3-arow-acts {
   display: flex;
