@@ -20,7 +20,7 @@ import { library } from '@/proto/words_library.gen';
 import { useFolders, useProjects, useStore } from '@/store';
 import { DEPTH, useRouter } from '@/app/router';
 import { libraryExit } from '@/app/escape';
-import { publishColumn, useLibraryShown, type ColumnBits } from './library';
+import { publishColumn, retractColumn, useLibraryShown, type ColumnBits } from './library';
 import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
 import { rowKey, useLook } from './List';
@@ -373,8 +373,10 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
     onNew: () => { setEditing({ kind: 'new', parent: null }); }, onRename: (id) => { setEditing({ kind: 'rename', id }); }, onEdited,
     onMenu: (id, e: MouseEvent) => { setOver({ k: 'folder', id, at: { x: e.clientX, y: e.clientY } }); },
   };
-  useLayoutEffect(() => { publishColumn(colBits); });
-  useEffect(() => () => { publishColumn(null); }, []);
+  // what this page published last: its leave clears the library only if no newer page published since
+  const published = useRef<ColumnBits | null>(null);
+  useLayoutEffect(() => { published.current = colBits; publishColumn(colBits); });
+  useEffect(() => () => { retractColumn(published.current); }, []);
   const column = <FolderColumn {...colBits} testId="artifacts.col" />;
   const grid = (items: readonly Card[], placeHere: Place, days: boolean, testId: string) => (
     <ArtifactGrid cards={items} cols={cols} view={view} now={now} place={placeHere} days={days} cursor={sel} picked={picked}

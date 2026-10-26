@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { BarSlot } from '@/app/barslot';
 import type { Artifact } from '@/proto';
 import { Store, StoreProvider } from '@/store';
-import { RouterContext, createRouter } from '@/app/router';
+import { RouterContext, createRouter, useRoute } from '@/app/router';
 import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, revealPathOf, saveOf, splitArchived, timeOf, versions, whenWords, type Item } from './model';
@@ -136,6 +136,22 @@ describe('the page in bise fait mac (mockup 7, decision d2)', () => {
     // the folders' + puts a field in the library
     fireEvent.click(screen.getByTestId('artifacts.lib.new'));
     expect(screen.getByTestId('artifacts.lib.field')).toBeTruthy();
+  });
+
+  it("a click on a library row keeps the sidebar's library: the page remounts on its new route (App's key), the old one's leave never blanks the new one's (his m_45883)", () => {
+    // App.tsx's Current: a new route is a new screen (key={formatRoute(route)})
+    function Keyed() {
+      const r = useRoute();
+      return r.screen === 'artifacts' ? <ArtifactsScreen key={formatRoute(r)} project={r.project} at={r.at} /> : null;
+    }
+    const router = mount(<><ArtLibrary /><Keyed /></>);
+    for (const row of ['recent', 'unfiled', 'all', 'recent']) {
+      fireEvent.click(screen.getByTestId(`artifacts.lib.${row}`));
+      // the frame right after the click: 'Library' and 'Folders' still there, the new place lit
+      expect(screen.queryByTestId('artifacts.lib')?.textContent).toContain(library.folders);
+      expect(screen.getByTestId(`artifacts.lib.${row}`).getAttribute('aria-current')).toBe('true');
+    }
+    expect(router.get()).toEqual({ screen: 'artifacts', project: '', at: 'recent' });
   });
 
   it('with no library in the sidebar, the page keeps its column', () => {

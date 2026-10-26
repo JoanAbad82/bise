@@ -3,7 +3,8 @@
 // its esc and ⌘[), in the projects' place: All artifacts, Recent, Unfiled, then the folders. The
 // state stays the page's (Screen.tsx: the place, the open themes, the field, the drop targets, the
 // folder menu): the page publishes its column's props here (publishColumn) on each render and the
-// library draws them, so the page and the sidebar never hold two copies. While a library is
+// library draws them, so the page and the sidebar never hold two copies; a page that leaves takes
+// back only its own (retractColumn), never the next page's. While a library is
 // mounted the page draws no column of its own (useLibraryShown); with none (the onboarding's
 // window, before the sidebar mounts it, under 900 px's fold) the page keeps its column. A small
 // external store (useSyncExternalStore), no React context: the sidebar is outside the page's tree.
@@ -28,10 +29,20 @@ const subscribe = (cb: () => void) => {
   };
 };
 
-/** The page's column now (null: the page is not mounted). Screen.tsx calls it on each render, null when it leaves. */
-export function publishColumn(b: ColumnBits | null): void {
+/** The page's column now (null: the page is not mounted). Screen.tsx calls it on each render. */
+export function publishColumn(b: ColumnBits): void {
   if (b === bits) return;
   bits = b;
+  notify();
+}
+
+/** The page leaves: the library goes, unless a newer page published since. A click on a row is a
+ *  new route, so App.tsx remounts the page (its key): the new page publishes in its layout effect,
+ *  the old one leaves after it (a passive effect's cleanup). Cleared then, the sidebar drew no
+ *  'Library' nor 'Folders' until the new page rendered again, about a second (his m_45883). */
+export function retractColumn(b: ColumnBits | null): void {
+  if (b === null || b !== bits) return;
+  bits = null;
   notify();
 }
 
