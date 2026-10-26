@@ -2,10 +2,10 @@
 // working + new artifacts / news / unread / waits / quiet), the pill or the age, the quiet row, the
 // week sliding for a stopped hub, the sparkline's points, and the fallback with no pulse.
 import { describe, expect, it } from 'vitest';
-import type { ProjectRow } from '@/proto';
+import type { News, ProjectRow, Pulse } from '@/proto';
 import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
-import { BUCKET_MS, BUCKETS, projectFacts, since, sparkPoints, weekOf, type News, type Pulse, type PulseRow } from './projectfacts';
+import { BUCKET_MS, BUCKETS, projectFacts, since, sparkPoints, weekOf } from './projectfacts';
 import { waitsTip, workingTip } from './tipwords';
 
 const H = 3_600_000;
@@ -13,7 +13,7 @@ const NOW = 1_800_000_000_000;
 const FROM = NOW - 20 * BUCKET_MS - H;
 const week = Array.from({ length: BUCKETS }, (_, i) => i * 60_000);
 const pulse = (o: Partial<Pulse> = {}): Pulse => ({ from_ms: FROM, busy_ms: week, last_ms: NOW - 2 * H, counting: false, ...o });
-const row = (p: Pulse | null): PulseRow => ({ project: 'acme', name: 'acme', order: 0, home: false, pulse: p }) as unknown as PulseRow;
+const row = (p: Pulse | null): ProjectRow => ({ project: 'acme', name: 'acme', order: 0, home: false, pulse: p }) as unknown as ProjectRow;
 const news = (what: News['what'], at_ms = NOW - H): News => ({ at_ms, what });
 
 const facts = (p: Pulse | null, working = 0, waits = 0, seen?: number) => projectFacts({ p: row(p), working, waits, seen, now: NOW });

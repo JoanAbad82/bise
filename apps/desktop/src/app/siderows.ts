@@ -8,7 +8,7 @@
 // Pure: Sidebar.tsx draws them. Owner: r3-projects this round (nm-frame's, archived).
 import type { Agent, ProjectRow } from '@/proto';
 import { liveOf } from '@/agents/model';
-import { projectFacts, type ProjectFacts, type PulseRow } from './projectfacts';
+import { projectFacts, type ProjectFacts } from './projectfacts';
 
 /** A pinned agent's end: it waits on him (the accent dot), it works (the breath), or nothing. */
 export type RowEnd = 'waits' | 'works' | null;
@@ -39,7 +39,7 @@ export function workingOf(agents: readonly Agent[]): number {
 
 /** A project's row: `waits` is the inbox's own count for it (inbox/waiting useProjectWaiting), `index` its place in projectsOf (⌘ index+1, up to 9). Pure. */
 export function projectRowOf(c: {
-  readonly p: PulseRow;
+  readonly p: ProjectRow;
   readonly agents: readonly Agent[];
   readonly waits: number;
   readonly index: number;

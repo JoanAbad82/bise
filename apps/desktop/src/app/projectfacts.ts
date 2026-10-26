@@ -9,37 +9,12 @@
 // yet): the pill from the inbox, 'N working' from the agents, no age, no news, no sparkline.
 // Nothing here decides what is news: the hub picks it (pulse::news); this only says it in words.
 // Pure: Sidebar.tsx draws it. Owner: r3-projects.
-import type { ProjectRow } from '@/proto';
+import type { News, ProjectRow, Pulse } from '@/proto';
 import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
 import { shortAge } from '@/agents/model';
 import { ahead } from '@/scheduled/model';
 import { waitsTip, workingTip } from './tipwords';
-
-// TODO(project-pulse): the generated rows::Pulse / News (bise_proto, architect m_44801) replace
-// this mirror and PulseRow when project-pulse's hub change reaches native-mac.
-/** The hub's last news of a project, picked by the hub (serde: tag 'kind', snake_case, other = unknown). */
-export type News = {
-  at_ms: number;
-  what: { kind: 'failed'; agent: string } | { kind: 'landed'; agent: string; sha: string; target: string } | { kind: 'artifact'; id: string; title: string } | { kind: 'scheduled'; id: string; name: string } | { kind: 'unknown' };
-};
-/** A project's week, from its hub: busy time per 8 h bucket, its last activity, its news. */
-export type Pulse = {
-  /** the first bucket's start (a local 00:00 / 08:00 / 16:00) */
-  from_ms: number;
-  /** 21 buckets of 8 h, oldest first: its agents' turn time in each */
-  busy_ms: number[];
-  /** its last activity: a turn's end, or now while one runs */
-  last_ms?: number | null;
-  news?: News | null;
-  /** the week's artifacts' at_ms, newest first (absent: none) */
-  artifacts_at?: number[];
-  /** the entries of its main's thread written for him, newest first (absent: none) */
-  said_at?: number[];
-  /** the week's fill is not done yet */
-  counting: boolean;
-};
-export type PulseRow = ProjectRow & { pulse?: Pulse | null };
 
 /** The week: 21 buckets of 8 h. */
 export const BUCKETS = 21;
@@ -107,7 +82,7 @@ export function newsWords(n: News, now: number): Sentence | null {
  * counts only when it is newer than his last look. Pure.
  */
 export function projectFacts(c: {
-  readonly p: PulseRow;
+  readonly p: ProjectRow;
   /** its live agents at work now */
   readonly working: number;
   /** the inbox's count for it (inbox/waiting) */
