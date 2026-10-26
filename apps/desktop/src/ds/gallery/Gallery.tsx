@@ -10,7 +10,7 @@ import "@/thread/thread.css";
 import {
   Act, Answered, Art, ArtName, Bar, BiseMark, Kiss, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Dropdown, Empty, Err,
   Field, Fold, Group, Head, Help, HeroWait, IconButton, PageHero, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, PickerTrigger, Quote, Route, Row,
-  SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
+  SchedHead, SectionHead, Seg, Select, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
   APP_ICONS, AppIcon, BannerWait, BarSearch, FilterRow, Filters, GroupLabel, ListRow, MoreButton, PageBanner, RowAction, type EntityMenu,
 } from "../index";
@@ -364,15 +364,15 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     </div>
   ),
   settings: () => (
-    <Settings title="general" sub="how bise looks and listens"
-      nav={<><Row name="general" on /><Row name="models" /><Row name="voice" /><Row name="plugins" /></>}>
-      <Group title="appearance" testId="ds.group" items={[
+    // a settings group (the window's own frame is settings/Settings.tsx, nm-settings)
+    <div className="b-swin-page">
+      <Group title="Appearance" testId="ds.group" items={[
         { id: "theme", label: "theme", control: <Seg items={["system", "dark", "light"]} on={0} /> },
         { id: "sounds", label: "sounds", sub: "a soft tick when an agent needs you", control: <Toggle on /> },
         { id: "workspace", label: "workspace", value: "~/bise" },
         { id: "sync", label: "sync drafts", check: <Check on />, control: <Button>sync now</Button> },
       ]} help="changes apply at once" />
-    </Settings>
+    </div>
   ),
   onboarding: () => (
     <Onb mark={<Kiss size={112} pop turn />} title="hold fn, then talk" sub="bise hears you only while fn is down. let go and it acts on what you said."
