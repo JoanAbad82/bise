@@ -21,7 +21,16 @@
 .b-tool.run .lbl::after{content:"…"}
 .b-tool.err{color:var(--c-err);background:var(--c-err-soft)}
 .b-out{margin:var(--gap-tight) 0 0;padding:var(--s-2) var(--s-3);border-radius:var(--r-2);font:var(--t-12)/1.5 var(--font-mono);color:var(--c-text-2);background:var(--c-sunken);white-space:pre;overflow:hidden}
-.b-fold{font-size:var(--t-12);color:var(--c-text-3)}
+.b-fold{display:flex;align-items:center;gap:var(--s-1);font-size:var(--t-12);color:var(--c-text-3)}
+.b-fold-chev{display:inline-flex;flex:none;transition:transform var(--d-fast) var(--ease-out)}
+.b-fold.open .b-fold-chev{transform:rotate(90deg)}
+/* a row's mark (RowMark, ui-review m_43792): its 14 line icon centred in a 16 column, toned by its kind */
+.b-rowmark{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--w-state);color:var(--c-text-3);vertical-align:-2px}
+.b-rowmark[data-tone="plain"]{color:var(--c-text-2)}
+.b-rowmark[data-tone="ok"]{color:var(--c-ok)}
+.b-rowmark[data-tone="err"]{color:var(--c-err)}
+.b-rowmark[data-tone="accent"]{color:var(--c-accent)}
+.b-tool .chev,.b-brief-line .chev{display:inline-flex}
 /* a fold's held key (designer m_25695): at the row's right end, where the hover time sits, out of the flow (it never
    widens a bubble or moves a line); a row with no room after its words drops it whole (thread.tsx FoldHint) */
 .b-fold:has(> .b-fold-hint){position:relative}

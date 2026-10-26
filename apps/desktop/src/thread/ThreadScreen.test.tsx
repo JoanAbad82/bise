@@ -70,15 +70,16 @@ describe('the thread screen', () => {
       </StoreProvider>,
     );
     const set = v.getByTestId('thread.scheduled.33');
-    expect(set.textContent).toContain('◷');
-    expect(set.textContent).toBe('◷bise scheduled perf · every 2 min · 6 times · next 14:22 ▸');
+    expect(set.querySelector('.b-rowmark')?.getAttribute('data-icon')).toBe('scheduled');
+    expect(set.textContent).toBe('bise scheduled perf · every 2 min · 6 times · next 14:22');
     expect(set.dataset.id).toBe('48');
     expect(v.queryByTestId('thread.scheduled.33.words')).toBeNull();
     fireEvent.click(v.getByTestId('thread.scheduled.33.head'));
     expect(v.getByTestId('thread.scheduled.33.words').textContent).toBe('check the build');
     const ended = v.getByTestId('thread.scheduled.34');
     // never the internal number: in perf's thread it names perf (designer m_14246)
-    expect(ended.textContent).toBe('◷scheduled perf ended · stopped by you');
+    expect(ended.textContent).toBe('scheduled perf ended · stopped by you');
+    expect(ended.querySelector('.b-rowmark')?.getAttribute('data-icon')).toBe('scheduled');
     expect(v.queryByTestId('thread.scheduled.34.head')).toBeNull();
   });
 
@@ -151,7 +152,8 @@ describe('the thread screen', () => {
       </StoreProvider>,
     );
     expect(v.getByTestId('thread.entry.950').dataset.kind).toBe('stopped');
-    expect(v.getByTestId('thread.entry.950').textContent).toContain('■ stopped');
+    expect(v.getByTestId('thread.entry.950').textContent).toContain('stopped');
+    expect(v.getByTestId('thread.entry.950').querySelector('.b-rowmark')?.getAttribute('data-icon')).toBe('stop');
   });
 
   it("thread/news-rows: a landing says who landed where, its short sha, and a click opens that commit", () => {
@@ -243,10 +245,10 @@ describe('his answer to a card, on his side', () => {
 
 describe("his answer's mark", () => {
   it('✓ only when the hub says allowed, ✕ only when it says no, a neutral · when it says nothing (lead m_16314)', () => {
-    expect(answeredMark(true)).toBe('✓');
-    expect(answeredMark(false)).toBe('✕');
-    expect(answeredMark(undefined)).toBe('·');
-    expect(answeredMark(null)).toBe('·');
+    expect(answeredMark(true)).toBe('check');
+    expect(answeredMark(false)).toBe('close');
+    expect(answeredMark(undefined)).toBe('dot');
+    expect(answeredMark(null)).toBe('dot');
   });
 });
 

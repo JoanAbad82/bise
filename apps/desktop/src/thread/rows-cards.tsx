@@ -3,7 +3,7 @@
 // rows.tsx (pure move).
 import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { useFold } from './folds';
-import { Act, Answered, ArtName, CardLine, Chip, Marker, Press } from '@/ds';
+import { Act, Answered, ArtName, CardLine, Chip, Marker, Press, RowMark, type AppIconName } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import { ArtWords } from '@/inbox/artWords';
 import type { Entry, EntryCard } from '@/proto';
@@ -35,7 +35,7 @@ export function AnsweredRow({ e }: { e: Entry }) {
   const mine = a.why === 'he answered';
   return (
     <div className="th-answered" data-testid={`thread.answered.${e.pos}`}>
-      <NewsLine mark="↳" tone="plain" testId={`thread.answered.${e.pos}.head`}>
+      <NewsLine mark="check" tone="plain" testId={`thread.answered.${e.pos}.head`}>
         {mine ? thread.you_answered_q({ agent: a.agent, question: a.question }) : thread.main_answered_q({ main: shownName('main'), agent: a.agent, question: a.question })}
         <b>{a.answer}</b>
       </NewsLine>
@@ -194,9 +194,9 @@ export function PageAnswerRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: E
 }
 
 /** '✓ you answered gift-ui': the dim head over his answer's bubble, the mark saying it with no color alone. */
-/** The mark of his answer: '✓' allowed, '✕' said no, '·' when the hub doesn't say. Pure. */
-export function answeredMark(ok: boolean | null | undefined): string {
-  return ok === true ? '✓' : ok === false ? '✕' : '·';
+/** The mark of his answer, a line icon (ui-review m_43792): check allowed, close said no, a dot when the hub doesn't say. Pure. */
+export function answeredMark(ok: boolean | null | undefined): AppIconName {
+  return ok === true ? 'check' : ok === false ? 'close' : 'dot';
 }
 
 function AnsweredHead({ ok, children }: { ok: boolean | null | undefined; children: ReactNode }) {
@@ -206,7 +206,7 @@ function AnsweredHead({ ok, children }: { ok: boolean | null | undefined; childr
   return (
     <>
       <span className={ok === true ? 'th-you-mark ok' : 'th-you-mark'} data-ok={ok === true ? 'yes' : ok === false ? 'no' : 'unknown'}>
-        {mark}
+        <RowMark icon={mark} />
       </span>
       {children}
     </>
@@ -552,7 +552,12 @@ function AnsweredCard({ c, ctx, follows }: { c: EntryCard; ctx: RowCtx; follows:
   const at = cardTarget(ctx.project, ctx.agent, c);
   // one fact, one row (designer m_24812): his own '✓ you answered' row in this thread says it
   if (answerPos(order, (p) => store.entry(ctx.tkey, p), c.id) !== null) return null;
-  const row = <Answered testId={`thread.card.${String(c.id)}`}>{follows ? thread.card_answered : thread.card_answered_q({ question: c.question })}</Answered>;
+  const row = (
+    <Answered testId={`thread.card.${String(c.id)}`}>
+      <RowMark icon="check" />
+      {follows ? thread.card_answered : thread.card_answered_q({ question: c.question })}
+    </Answered>
+  );
   if (at === null) return row;
   return (
     <AnswerLink at={at} here={ctx.agent}>

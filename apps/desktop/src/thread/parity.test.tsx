@@ -196,7 +196,8 @@ describe('code colors (tui-parity B15)', () => {
         entry: { pos: 9, at_ms: 3, kind: 'card', text: ask, card: { id: 2, question: ask, options: [{ n: 1, label: 'on the cart page' }, { n: 2, label: 'only at checkout' }], answered: true } },
       });
     });
-    expect(v.getByTestId('thread.card.2').textContent).toContain('✓ answered');
+    expect(v.getByTestId('thread.card.2').textContent).toContain('answered');
+    expect(v.getByTestId('thread.card.2').querySelector('.b-rowmark')?.getAttribute('data-icon')).toBe('check');
     expect(v.queryByTestId('thread.card.2.opt.1')).toBeNull();
   });
 });
@@ -310,7 +311,7 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(v.getByTestId('thread.compacted.23.body').textContent).toContain(tail);
   });
 
-  it('a notice says its level in a glyph, not by color alone; an unknown kind is its words, dim', () => {
+  it('a notice says its level in a line icon, not by color alone; an unknown kind is its words, dim', () => {
     const store = new Store(null);
     const levels = ['info', 'warn', 'err'] as const;
     levels.forEach((level, i) => {
@@ -320,11 +321,12 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     levels.forEach((level, i) => {
       const n = rowOf(store, 30 + i).getByTestId(`thread.notice.${String(30 + i)}`);
       expect(n.dataset.level).toBe(level);
-      expect(n.textContent).toBe(`${NOTICE_MARK[level]}${level} words`);
+      expect(n.textContent).toBe(`${level} words`);
+      expect(n.querySelector('.b-rowmark')?.getAttribute('data-icon')).toBe(NOTICE_MARK[level]);
       cleanup();
     });
-    expect(NOTICE_MARK.warn).toBe('▲');
-    expect(NOTICE_MARK.err).toBe('✗');
+    expect(NOTICE_MARK.warn).toBe('alert');
+    expect(NOTICE_MARK.err).toBe('close');
     expect(rowOf(store, 40).getByTestId('thread.unknown.40').textContent).toBe('from a newer hub');
   });
 
@@ -347,8 +349,8 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     warn(61, 'turn interrupted');
     warn(62, 'context nearly full');
     for (const [pos, words] of [
-      [60, '▲turn interrupted by main'],
-      [61, '▲turn interrupted'],
+      [60, 'turn interrupted by main'],
+      [61, 'turn interrupted'],
     ] as const) {
       const n = rowOf(store, pos).getByTestId(`thread.notice.${String(pos)}`);
       expect(n.className).toBe('th-notice warn interrupted');

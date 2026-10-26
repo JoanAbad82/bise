@@ -604,8 +604,8 @@
   color: var(--c-text-2);
 }
 /* ✗ and ▲ in the error tone, as a tool row's '✗ exit 1': the accent is only what waits on him (designer m_14246) */
-.th-notice.warn .th-notice-mark,
-.th-notice.err .th-notice-mark {
+.th-notice.warn .b-rowmark,
+.th-notice.err .b-rowmark {
   color: var(--c-err);
 }
 /* 'compacting its context…' and '■ stopped · 09:46': the agent's own state, dim, never the accent */
@@ -613,6 +613,7 @@
 .th-stopped .b-marker {
   color: var(--c-text-2);
 }
+/* the inbox's confirm line keeps a text mark of its own (inbox/confirm.tsx) */
 .th-notice-mark {
   flex: none;
   width: 1em;
@@ -626,15 +627,10 @@
   align-items: baseline;
   color: var(--c-text-2);
 }
-.th-news-mark {
-  flex: none;
-  width: 1em;
-  text-align: center;
-}
-.th-news.ok .th-news-mark {
+.th-news.ok .b-rowmark {
   color: var(--c-ok, var(--c-text));
 }
-.th-news.err .th-news-mark {
+.th-news.err .b-rowmark {
   color: var(--c-accent);
 }
 .th-news.dim {
@@ -711,7 +707,7 @@
 /* '▲ turn interrupted (by main)': the TUI's dim line (render.rs G_INTERRUPTED), a stop, not an
    error: glyph and words dim, never the error tone (designer m_18084) */
 .th-notice.interrupted,
-.th-notice.interrupted .th-notice-mark {
+.th-notice.interrupted .b-rowmark {
   color: var(--c-text-2);
 }
 /* 8 px above it, as the wake line: it never touches a cut reply's last list item (designer m_18098) */
@@ -835,7 +831,8 @@ button.th-turn-line:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: var(--s-1);
-  /* 22: the reading line's height (--f-read 14/22), so a chip in a line never moves it */
+  /* 22: the reading line's height (--f-read 14/22), so a chip in a line never moves it; a sum of
+     tokens (a 22 token fails the tokens' 4 px law, ds/lint.test) */
   height: calc(var(--s-5) + var(--s-1) / 2);
   padding: 0 var(--s-2);
   border-radius: var(--r-1);
@@ -1558,12 +1555,9 @@ button.th-turn-line:focus-visible {
   align-items: baseline;
   column-gap: 0;
 }
-/* the glyph's lead column, the news rows' own (1em + 8 px) */
-.th-wake-mark {
-  width: 1em;
+/* the mark's lead column, the news rows' own (16 + 8 px) */
+.th-wake-head > .b-rowmark {
   margin-right: var(--gap-inline);
-  flex: none;
-  text-align: center;
 }
 .th-wake-err {
   color: var(--c-err);
@@ -1735,7 +1729,29 @@ button.th-turn-line:focus-visible {
   text-overflow: ellipsis;
 }
 .th-sched-chev {
+  display: inline-flex;
+  vertical-align: -2px;
   color: var(--c-text-3);
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.th-sched-chev[data-open] {
+  transform: rotate(90deg);
+}
+/* an artifact made, a page shared (MadeChip): its pink chip, then its kind and version dim */
+.th-made {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
+}
+.th-made-meta {
+  color: var(--c-text-3);
+  font: 400 var(--f-meta);
+  white-space: nowrap;
+}
+/* beside its open artifact: an ink outline, never more pink (designer's artifact-open page) */
+.th-made[data-open] .b-artname {
+  box-shadow: inset 0 0 0 1px var(--c-ink);
 }
 /* after 5 min of silence: a faint '· 14:31 ·' on the column, as the TUI's (H12) */
 .th-pause {
@@ -1980,7 +1996,7 @@ button.th-turn-line:focus-visible {
   white-space: nowrap;
   cursor: pointer;
 }
-.th-retry-line .th-news-mark {
+.th-retry-line .b-rowmark {
   color: var(--c-text-3);
 }
 .th-retry-words {
@@ -1997,7 +2013,7 @@ button.th-turn-line:focus-visible {
   color: var(--c-text-3);
 }
 .th-retry[data-failed] .th-retry-line,
-.th-retry[data-failed] .th-news-mark {
+.th-retry[data-failed] .b-rowmark {
   color: var(--c-err);
 }
 .th-retry-tries {

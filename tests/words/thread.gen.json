@@ -98,14 +98,14 @@
   "thread.card_answered": {
     "args": [],
     "one": null,
-    "text": "✓ answered"
+    "text": "answered"
   },
   "thread.card_answered_q": {
     "args": [
       "question"
     ],
     "one": null,
-    "text": "✓ answered: {question}"
+    "text": "answered: {question}"
   },
   "thread.card_closed": {
     "args": [
@@ -920,6 +920,11 @@
     ],
     "one": null,
     "text": "rename {agent}"
+  },
+  "thread.report_fold": {
+    "args": [],
+    "one": null,
+    "text": "report"
   },
   "thread.report_waiting": {
     "args": [],

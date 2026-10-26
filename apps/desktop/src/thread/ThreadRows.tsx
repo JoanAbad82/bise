@@ -16,7 +16,7 @@ import { useHoldsOf } from './routes';
 import { NoProject } from './NoProject';
 import { landedEchoes, retryRuns } from './tiers';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
-import { turnKey, turnsOf, withTurns } from './turns';
+import { turnLines, turnsOf, withTurns, type Turn } from './turns';
 import { TurnLine } from './TurnLine';
 import { absolute } from './paths';
 import { FoldsContext } from './folds';
@@ -144,8 +144,16 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   // and the latest, under the window's last row
   const gap = view.gap;
   const listed = useMemo(() => withGap(withTurns(withRuns(shown, runs, openRuns, entryKey), turns, turnsOpen, entryKey), gap?.hi), [shown, runs, openRuns, turns, turnsOpen, gap?.hi]);
-  // the row a turn's line sits on: it starts right under the line's 12, never a new group's 20
-  const underTurn = useMemo(() => new Set(turns.map((t) => t.start)), [turns]);
+  // the row each turn's line sits on (under its day line): it starts right under the line's 12
+  const lineOn = useMemo(() => turnLines(turns, turnsOpen), [turns, turnsOpen]);
+  const toggleTurn = useCallback((t: Turn) => {
+    setTurnsOpen((s) => {
+      const next = new Set(s);
+      if (next.has(t.start)) next.delete(t.start);
+      else next.add(t.start);
+      return next;
+    });
+  }, []);
   // the reply being written (streaming): a live row at the end, drawn as the entry it becomes,
   // which takes its place with the same key (live.ts, text-appearing v2)
   const partial = usePartialText(project, agent);
@@ -244,29 +252,24 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
           </Press>
         );
       }
-      const turn = key.startsWith('t:') ? turns.find((t) => turnKey(t.start) === key) : undefined;
-      if (turn !== undefined)
-        return (
-          <TurnLine
-            turn={turn}
-            open={turnsOpen.has(turn.start)}
-            onToggle={() => {
-              setTurnsOpen((s) => {
-                const next = new Set(s);
-                if (next.has(turn.start)) next.delete(turn.start);
-                else next.add(turn.start);
-                return next;
-              });
-            }}
-          />
-        );
       if (isGapKey(key)) return <GapRow project={project} agent={agent} />;
       if (key === INTRO) return <IntroRow project={project} />;
       if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} carry={heads.carry} />;
       const pos = posOfKey(key);
-      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} underFold={underFold.has(pos)} underTurn={underTurn.has(pos)} retries={retries.runs.get(pos)} />;
+      const turn = pos === undefined ? undefined : lineOn.get(pos);
+      const turnLine =
+        turn === undefined ? undefined : (
+          <TurnLine
+            turn={turn}
+            open={turnsOpen.has(turn.start)}
+            onToggle={() => {
+              toggleTurn(turn);
+            }}
+          />
+        );
+      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} underFold={underFold.has(pos)} turnLine={turnLine} retries={retries.runs.get(pos)} />;
     },
-    [ctx, prevOf, nextOf, runs, openRuns, setOpenRuns, turns, turnsOpen, underTurn, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries, project, agent],
+    [ctx, prevOf, nextOf, runs, openRuns, setOpenRuns, turnsOpen, lineOn, toggleTurn, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries, project, agent],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

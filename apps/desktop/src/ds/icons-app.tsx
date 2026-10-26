@@ -66,6 +66,9 @@ const PARTS = {
   shield: ["M12 21s7-3.5 7-9V5.5L12 3 5 5.5V12c0 5.5 7 9 7 9z"],
   cursor: ["M5 4l6.5 16 2.3-6.7L20.5 11 5 4z"],
   key: [[8, 15, 4], "M11 12l9-9M17 6l3 3M15 8l2 2"],
+  // nm-thread (ui-review m_43792): a thread row's marks, for ▲ and ·
+  alert: ["M10.3 4.2 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z", "M12 9v4", [12, 17, 1]],
+  dot: [[12, 12, 1]],
 } as const satisfies Record<string, readonly Part[]>;
 
 /** Every app icon's name. */

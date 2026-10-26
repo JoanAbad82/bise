@@ -3,12 +3,11 @@
 // Split out of rows.tsx (pure move).
 import { useArtifactOpener, useOpenArtifact } from './openArtifact';
 import { useState, type ReactNode } from 'react';
-import { Act, ArtChip, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
+import { Act, AppIcon, ArtName, BriefLine, Button, Fold, iconKindOf, KindIcon, Marker, Press, RowMark, SchedHead, type AppIconName, type IconKind } from '@/ds';
 import type { Entry } from '@/proto';
 import { thread } from '@/proto/words.gen';
 import { useAgents, useArtifacts, useStore } from '@/store';
 import { leaves, LEAVES } from '@/artifacts/leave';
-import { glyphOf } from '@/artifacts/model';
 import { useFold } from './folds';
 import { useFoldHint } from './foldHint';
 import { Markdown } from './Markdown';
@@ -18,12 +17,10 @@ import { useRouter } from '@/app/router';
 import type { RowCtx } from './rows';
 import { retryOf, retryWords, typedRetry, type Retry } from './tiers';
 /** A news line's mark: what it means, never its color alone. */
-export function NewsLine({ mark, tone, testId, children }: { mark: string; tone: 'ok' | 'err' | 'plain' | 'dim'; testId: string; children: ReactNode }) {
+export function NewsLine({ mark, tone, testId, children }: { mark: AppIconName; tone: 'ok' | 'err' | 'plain' | 'dim'; testId: string; children: ReactNode }) {
   return (
     <div className={`th-news ${tone}`} data-testid={testId} data-tone={tone}>
-      <span className="th-news-mark" aria-hidden="true">
-        {mark}
-      </span>
+      <RowMark icon={mark} tone={tone} />
       <span className="th-news-text">{children}</span>
     </div>
   );
@@ -67,7 +64,7 @@ export function LandedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const l = e.landed;
   if (l == null) return <Marker>{e.text}</Marker>;
   return (
-    <NewsLine mark="✓" tone="plain" testId={`thread.landed.${e.pos}`}>
+    <NewsLine mark="check" tone="plain" testId={`thread.landed.${e.pos}`}>
       {l.agent} landed on {l.target} ·{' '}
       <Act
         kind="ref"
@@ -95,7 +92,7 @@ export function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   // the TUI's PR mark (theme::G_PR '↑', render.rs pr_lines), toned by its state: failing in the
   // error tone, done dim (designer m_19784 (3)); the words after it say the checks, never color alone
   const tone = p.state === 'failing' ? 'err' : p.state === 'done' ? 'dim' : 'plain';
-  const mark = '↑';
+  const mark = 'branch';
   return (
     <NewsLine mark={mark} tone={tone} testId={`thread.pr.${e.pos}`}>
       <Act
@@ -119,20 +116,36 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const openId = useOpenArtifact();
   const m = e.made;
   if (m == null) return <Marker>{e.text}</Marker>;
-  // a browser-only one (a PR, a link): '↗' in place of its kind and version (designer m_21714)
-  const out = leaves(artifacts.find((x) => x.id === m.id) ?? m);
+  // a browser-only one (a PR, a link): 'opens in your browser' in place of its kind and version (designer m_21714)
+  const known = artifacts.find((x) => x.id === m.id);
+  const out = leaves(known ?? m);
+  const meta = out ? LEAVES : [m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ');
   return (
-    <ArtChip
-      open={openId === m.id}
-      glyph={glyphOf(m.kind)}
+    <MadeChip
+      kind={iconKindOf(known ?? m)}
       title={m.title}
-      meta={out ? LEAVES : [m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
+      meta={meta}
+      open={openId === m.id}
       onClick={() => {
         // its tab in the panel (bise fait mac); a browser-only one his browser
         goArtifact(ctx.project, m.id, m);
       }}
       testId={`thread.artifact.${String(e.pos)}`}
     />
+  );
+}
+
+/** An artifact in the thread (QA §4): the pink chip, its kind's 14 line icon (ds KindIcon, no glyph:
+ *  ui-review m_43792) and its title, then its kind and version dim after it. */
+export function MadeChip({ kind, title, meta, open = false, onClick, testId }: { kind: IconKind; title: string; meta: string; open?: boolean; onClick: () => void; testId: string }) {
+  return (
+    <div className="th-made" data-open={open || undefined}>
+      <ArtName onClick={onClick} testId={testId}>
+        <KindIcon kind={kind} size={14} />
+        {title}
+      </ArtName>
+      {meta !== '' && <span className="th-made-meta">{meta}</span>}
+    </div>
   );
 }
 
@@ -150,9 +163,7 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <div className="th-sched" data-testid={`thread.scheduled.${e.pos}`} data-id={s?.id}>
       <div className="th-sched-line">
-        <span className="th-news-mark" aria-hidden="true">
-          ◷
-        </span>
+        <RowMark icon="scheduled" />
         {words === '' ? (
           <SchedHead>{schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}</SchedHead>
         ) : (
@@ -164,8 +175,8 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
             testId={`thread.scheduled.${e.pos}.head`}
           >
             {schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}
-            <span className="th-sched-chev" aria-hidden="true">
-              {open ? ' ▾' : ' ▸'}
+<span className="th-sched-chev" data-open={open || undefined} aria-hidden="true">
+              <AppIcon name="right" size={14} />
             </span>
           </SchedHead>
         )}
@@ -222,9 +233,7 @@ export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <div className="th-wake" data-for={other ?? undefined} data-testid={`thread.wake.${String(e.pos)}`}>
       <div className="th-wake-head">
-        <span className="th-wake-mark" aria-hidden="true">
-          {mark}
-        </span>
+        <RowMark icon={mark === '–' ? 'fold' : 'dot'} />
         {parts.map((p, i) => (
           <span key={i} className={p.err ? 'th-wake-err' : undefined} data-err={p.err || undefined}>
             {/* a flex item drops its leading space: the one before '·' is kept unbreakable */}
@@ -250,8 +259,13 @@ export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
-/** A notice's mark by level (the TUI's: info dim, warn ▲, err ✗): the tone is said in a glyph and words, never by color alone. */
-export const NOTICE_MARK = { info: '·', warn: '▲', err: '✗', unknown: '·' } as const;
+/** A notice's mark by level (the TUI's: info dim, warn ▲, err ✗), as line icons (ui-review m_43792): the tone is said by the icon and words, never by color alone. */
+export const NOTICE_MARK = { info: 'dot', warn: 'alert', err: 'close', unknown: 'dot' } as const satisfies Record<string, AppIconName>;
+
+/** A notice's mark, its level's icon and tone, named for VoiceOver. */
+export function NoticeMark({ level }: { level: keyof typeof NOTICE_MARK }) {
+  return <RowMark icon={NOTICE_MARK[level]} tone={level === 'err' ? 'err' : level === 'warn' ? 'plain' : 'dim'} label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'} />;
+}
 
 export function NoticeRow({ e, ctx, retries }: { e: Entry; ctx: RowCtx; retries?: readonly string[] | undefined }) {
   const level = e.notice?.level ?? 'info';
@@ -275,9 +289,7 @@ export function NoticeRow({ e, ctx, retries }: { e: Entry; ctx: RowCtx; retries?
   const interrupted = level === 'warn' && (text === thread.turn_interrupted || text.startsWith(thread.turn_interrupted_by({ by: '' })));
   return (
     <div className={`th-notice ${level}${interrupted ? ' interrupted' : ''}`} data-level={level} data-testid={`thread.notice.${e.pos}`}>
-      <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'}>
-        {NOTICE_MARK[level]}
-      </span>
+      <NoticeMark level={level} />
       <span>{text}</span>
     </div>
   );
@@ -312,7 +324,7 @@ function HandoffRow({ pos, to, brief, ctx }: { pos: number; to: string; brief: s
   const a = useAgents(ctx.project).find((x) => x.name === to);
   const role = a !== undefined && a.purpose !== '' ? a.purpose : brief;
   return (
-    <NewsLine mark="✚" tone="plain" testId={`thread.handoff.${String(pos)}`}>
+    <NewsLine mark="plus" tone="plain" testId={`thread.handoff.${String(pos)}`}>
       new agent{' '}
       <Act
         kind="ref"
@@ -397,15 +409,18 @@ export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; 
   );
   if (dup) {
     // its words stay (designer, ambient-lead m_20040): '✓ <summary>… ▸ report', sans 13, text-2
-    const mark = /^[✓✗] /u.exec(line)?.[0] ?? '· ';
+    const mark: AppIconName = line.startsWith('✓ ') ? 'check' : line.startsWith('✗ ') ? 'close' : 'dot';
     return (
       <div className="th-report" data-dup="true" data-testid={`thread.report.${String(pos)}`}>
         <Press look="th-report-fold" aria-expanded={open} onClick={toggle} data-testid={`thread.report.${String(pos)}.fold`}>
-          <span className="th-news-mark" aria-hidden="true">
-            {mark.trim()}
-          </span>
+          <RowMark icon={mark} tone={mark === 'close' ? 'err' : 'dim'} />
           <span className="th-report-words">{body.split('\n')[0] ?? ''}</span>
-          <span className="th-report-more">{open ? '▾ report' : '▸ report'}</span>
+          <span className="th-report-more">
+            <span className="th-sched-chev" data-open={open || undefined} aria-hidden="true">
+              <AppIcon name="right" size={14} />
+            </span>
+            {thread.report_fold}
+          </span>
         </Press>
         {whole}
       </div>
@@ -417,7 +432,10 @@ export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; 
         <Marker>{line}</Marker>
         {more && (
           <Act onClick={toggle} testId={`thread.report.${String(pos)}.more`}>
-            {open ? '▾ report' : '▸ report'}
+            <span className="th-sched-chev" data-open={open || undefined} aria-hidden="true">
+              <AppIcon name="right" size={14} />
+            </span>
+            {thread.report_fold}
           </Act>
         )}
       </div>
@@ -446,12 +464,10 @@ function RetryRow({ pos, retry, tries }: { pos: number; retry: Retry; tries: rea
         }}
         data-testid={`thread.notice.${String(pos)}.retry`}
       >
-        <span className="th-news-mark" aria-label={failed ? 'error' : 'warning'}>
-          ▲
-        </span>
+        <RowMark icon="alert" tone={failed ? 'err' : 'dim'} label={failed ? 'error' : 'warning'} />
         <span className="th-retry-words">{retryWords(retry)}</span>
-        <span className="th-sched-chev" aria-hidden="true">
-          {open ? ' ▾' : ' ▸'}
+        <span className="th-sched-chev" data-open={open || undefined} aria-hidden="true">
+          <AppIcon name="right" size={14} />
         </span>
       </Press>
       {open && (

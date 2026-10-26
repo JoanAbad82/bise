@@ -297,13 +297,15 @@ export const thread = {
   /** the line with its question's first line */
   card_line_q: (a: { asks: string | number; question: string | number }): string => "? " + String(a.asks) + ": " + String(a.question) + " · in the inbox below",
   /** an answered card, right under its ask */
-  card_answered: "✓ answered",
+  card_answered: "answered",
   /** an answered card with its question */
-  card_answered_q: (a: { question: string | number }): string => "✓ answered: " + String(a.question),
+  card_answered_q: (a: { question: string | number }): string => "answered: " + String(a.question),
   /** an answered card's link, in its own thread */
   show_answer: "show your answer",
   /** an answered card's link, in another thread */
   open_in: (a: { thread: string | number }): string => "open it in " + String(a.thread),
+  /** a report's fold, after its line icon: `report` */
+  report_fold: "report",
   /** a finished turn's work, folded: `worked for 3m 10s` */
   worked_for: (a: { dur: string | number }): string => "worked for " + String(a.dur),
   /** the turn at work, its work folded: `working for 42s` */

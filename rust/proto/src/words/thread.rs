@@ -329,13 +329,16 @@ crate::words! { thread:
     /// the line with its question's first line
     card_line_q(asks, question) = "? {asks}: {question} · in the inbox below";
     /// an answered card, right under its ask
-    card_answered = "✓ answered";
+    card_answered = "answered";
     /// an answered card with its question
-    card_answered_q(question) = "✓ answered: {question}";
+    card_answered_q(question) = "answered: {question}";
     /// an answered card's link, in its own thread
     show_answer = "show your answer";
     /// an answered card's link, in another thread
     open_in(thread) = "open it in {thread}";
+
+    /// a report's fold, after its line icon: `report`
+    report_fold = "report";
 
     // ---- a turn's fold (the desktop's thread, bise fait mac QA §4)
     /// a finished turn's work, folded: `worked for 3m 10s`

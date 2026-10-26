@@ -8,7 +8,7 @@
 // calls, thinking), rows-cards (cards, approvals, answers, agent-to-agent),
 // rows-news (landed, PRs, artifacts, scheduled, notices, briefs, not delivered).
 import { memo, type ReactNode } from 'react';
-import { ArtChip, Marker, Msg } from '@/ds';
+import { Marker, Msg, RowMark } from '@/ds';
 import type { Entry } from '@/proto';
 import { thread } from '@/proto/words.gen';
 import { useEntry } from '@/store';
@@ -22,7 +22,7 @@ import { pageOf } from './parts';
 import { shownName } from '@/agents/model';
 import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, QUIET_KINDS, QUIET_REPORT, ROW_KINDS, sameRoute } from './tiers';
 import { YouRow } from './rows-messages';
-import { BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ReportRow, ScheduledRow, WakeRow } from './rows-news';
+import { BriefRow, CompactedRow, LandedRow, MadeChip, MadeRow, NotDeliveredRow, NoticeMark, NoticeRow, PrRow, ReportRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
 /** What a row needs of its thread. */
 export interface RowCtx {
@@ -49,7 +49,7 @@ export const EntryRow = memo(function EntryRow({
   carry = false,
   afterFold = false,
   underFold = false,
-  underTurn = false,
+  turnLine,
   retries,
 }: {
   ctx: RowCtx;
@@ -66,8 +66,8 @@ export const EntryRow = memo(function EntryRow({
   afterFold?: boolean;
   /** the first message of an open run: 8 px under its fold row, never a new group's 20 (designer m_19912 (2)) */
   underFold?: boolean;
-  /** a turn's first row, under its 'worked for' line (turns.ts): the line's 12 is its gap */
-  underTurn?: boolean;
+  /** its turn's 'worked for' line (TurnLine.tsx), drawn over it under its day line: the line's 12 is its gap */
+  turnLine?: ReactNode;
   /** a retry notice that ends a run of them: each try's words, oldest first (H9, tiers.ts retryRuns) */
   retries?: readonly string[] | undefined;
 }) {
@@ -84,7 +84,7 @@ export const EntryRow = memo(function EntryRow({
   // one 'session restored' row, never the same notice stacked (the TUI's)
   if (e.kind === 'notice' && p?.kind === 'notice' && (p.notice?.text ?? p.text) === (e.notice?.text ?? e.text)) return null;
   const n0 = next === undefined ? undefined : afterIt;
-  const { day, pause, head, turn, gap, side, chained } = rowLayout({ prev: p, e, next: n0, ctx, today, afterFold, underFold, underTurn });
+  const { day, pause, head, turn, gap, side, chained } = rowLayout({ prev: p, e, next: n0, ctx, today, afterFold, underFold, underTurn: turnLine !== undefined });
   // H2: the name line opens an author's run on its first row, a tool or a thinking row too
   // (designer m_21404 (3)); the times themselves on hover only
   const shown = named ?? (head || carry);
@@ -101,6 +101,7 @@ export const EntryRow = memo(function EntryRow({
           · {clock(e.at_ms)} ·
         </div>
       )}
+      {turnLine}
       <div className="th-row" data-hit={hit || undefined} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined} data-gap={gap}>
         <EntryBody e={e} ctx={ctx} head={shown} next={n} live={live !== undefined} still={still} chained={chained} retries={retries} />
       </div>
@@ -201,7 +202,8 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       return <CardRow e={e} ctx={ctx} />;
     case 'page':
       return e.page ? (
-        <ArtChip
+        <MadeChip
+          kind="page"
           title={e.page.title}
           meta={[e.page.v == null ? '' : `v${String(e.page.v)}`, clock(e.at_ms)].filter(Boolean).join(' · ')}
           onClick={() => {
@@ -217,7 +219,8 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       return (
         <div className="th-stopped" data-testid={`thread.stopped.${String(e.pos)}`}>
           <Marker>
-            ■ {e.text === '' ? 'stopped' : e.text}
+            <RowMark icon="stop" tone="plain" />
+            {e.text === '' ? 'stopped' : e.text}
             {e.at_ms > 0 ? ` · ${clock(e.at_ms)}` : ''}
           </Marker>
         </div>
@@ -258,9 +261,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       const level = e.turn_failed != null && e.text === e.turn_failed.why ? 'warn' : 'err';
       return (
         <div className={`th-notice ${level}`} data-level={level} data-testid={`thread.failed.${String(e.pos)}`}>
-          <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : 'warning'}>
-            {NOTICE_MARK[level]}
-          </span>
+          <NoticeMark level={level} />
           <span>{e.text}</span>
         </div>
       );

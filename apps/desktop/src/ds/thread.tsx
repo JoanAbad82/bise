@@ -1,5 +1,6 @@
 // src/ds · the thread's parts (desktop-ds v5: components/thread.html, css/thread.css): Thread, Msg,
-// Tool, Fold, Day, Answered, Marker, Route (and its handoff), SchedHead, BriefLine, CardLine, Art, Diff. The answer's words come in as ReactNode: the
+// Tool, Fold, Day, Answered, Marker, Route (and its handoff), SchedHead, BriefLine, CardLine, Art, Diff, RowMark (a
+// row's line icon in its 16 mark column: no Unicode glyph as an icon, ui-review m_43792). The answer's words come in as ReactNode: the
 // markdown render is src/thread's. Msg is memo'd: it sits in a long, virtualized list, and a new
 // message must not re-render the others.
 import { memo, useRef, type MouseEventHandler, type ReactNode, type Ref } from "react";
@@ -8,6 +9,7 @@ import { useFitsAfterWords } from "./hooks";
 import { Bar, Chip, Dot } from "./prim";
 import { BiseMark } from "./mark";
 import { Quote } from "./composer";
+import { AppIcon, type AppIconName } from "./icons-app";
 
 /** the thread column (a virtualized list goes here as one child) */
 export function Thread({ children, testId }: { children: ReactNode; testId?: string }) {
@@ -75,8 +77,9 @@ export interface ToolProps {
 export function Tool({ children, state, out, onToggle, testId }: ToolProps) {
   const head = (
     <div className={cx("b-tool", state)} onClick={onToggle} role={onToggle ? "button" : undefined} aria-expanded={state === "open"} data-testid={testId}>
-      <span className="chev">▸</span>
-      <span className={state === "err" ? undefined : "lbl"}>{state === "err" ? <>▲ {children}</> : children}</span>
+      <span className="chev"><AppIcon name="right" size={14} /></span>
+      {state === "err" && <RowMark icon="alert" tone="err" />}
+      <span className={state === "err" ? undefined : "lbl"}>{children}</span>
     </div>
   );
   if (state === "open" && out != null) return <div>{head}<div className="b-out">{out}</div></div>;
@@ -106,7 +109,7 @@ export function Fold({ children, open, onToggle, hint, testId }: { children: Rea
       aria-expanded={open || false}
       data-testid={testId}
     >
-      {open ? "▾ " : "▸ "}{children}
+      <span className="b-fold-chev" aria-hidden="true"><AppIcon name="right" size={14} /></span>{children}
       {hint != null && <FoldHint>{hint}</FoldHint>}
     </div>
   );
@@ -118,6 +121,16 @@ function FoldHint({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLSpanElement>(null);
   const fits = useFitsAfterWords(ref, 8, [children]);
   return <span ref={ref} className="b-fold-hint" data-fits={fits}>{children}</span>;
+}
+
+/** A row's mark: its line icon at 14 in the 16 mark column, toned by its kind (ok, err, dim: text-3,
+ *  plain: text-2); `label` names it for VoiceOver where the words after it don't say it. */
+export function RowMark({ icon, tone = "dim", label }: { icon: AppIconName; tone?: "ok" | "err" | "dim" | "plain" | "accent"; label?: string }) {
+  return (
+    <span className="b-rowmark" data-tone={tone} data-icon={icon} role={label === undefined ? undefined : "img"} aria-label={label} aria-hidden={label === undefined || undefined}>
+      <AppIcon name={icon} size={14} />
+    </span>
+  );
 }
 
 /** a day line ("today") */
@@ -210,7 +223,7 @@ export interface BriefLineProps {
 export function BriefLine({ children, open, onClick, testId }: BriefLineProps) {
   return (
     <button type="button" className={cx("b-brief-line", open && "open")} aria-expanded={open} onClick={onClick} data-testid={testId}>
-      <span className="chev" aria-hidden="true">▸</span>
+      <span className="chev" aria-hidden="true"><AppIcon name="right" size={14} /></span>
       <span className="w">{children}</span>
     </button>
   );
