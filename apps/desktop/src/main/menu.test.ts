@@ -47,13 +47,19 @@ describe('the application menu (bar ⛔2)', () => {
     const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
     expect([...keys.keys()].sort()).toEqual([
       'Alt+CmdOrCtrl+B', 'CmdOrCtrl+,', 'CmdOrCtrl+0', 'CmdOrCtrl+B', 'CmdOrCtrl+Enter', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'CmdOrCtrl+Y', 'Ctrl+`',
-      'Shift+Alt+CmdOrCtrl+B', 'Shift+CmdOrCtrl+A', 'Shift+CmdOrCtrl+I', 'Shift+CmdOrCtrl+N', 'Shift+CmdOrCtrl+X',
+      'Shift+Alt+CmdOrCtrl+B', 'Shift+CmdOrCtrl+A', 'Shift+CmdOrCtrl+I', 'Shift+CmdOrCtrl+N', 'Shift+CmdOrCtrl+T', 'Shift+CmdOrCtrl+X',
     ]);
-    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N', 'CmdOrCtrl+B', 'Alt+CmdOrCtrl+B', 'Shift+Alt+CmdOrCtrl+B', 'CmdOrCtrl+0', 'Shift+CmdOrCtrl+I', 'CmdOrCtrl+Y', 'Shift+CmdOrCtrl+A', 'Shift+CmdOrCtrl+X']) {
+    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S', 'CmdOrCtrl+N', 'Shift+CmdOrCtrl+N', 'CmdOrCtrl+B', 'Alt+CmdOrCtrl+B', 'Shift+Alt+CmdOrCtrl+B', 'CmdOrCtrl+0', 'Shift+CmdOrCtrl+I', 'CmdOrCtrl+Y', 'Shift+CmdOrCtrl+A', 'Shift+CmdOrCtrl+X', 'Shift+CmdOrCtrl+T']) {
       const click = keys.get(k)?.click as (() => void) | undefined;
       click?.();
     }
-    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent', 'sidebar', 'panel', 'panelFull', 'bise', 'inboxPage', 'scheduled', 'artifacts', 'plugins']);
+    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save', 'newProject', 'newAgent', 'sidebar', 'panel', 'panelFull', 'bise', 'inboxPage', 'scheduled', 'artifacts', 'plugins', 'reopenTab']);
+  });
+
+  it("File › Reopen Closed Tab ⇧⌘T (his m_46187, designer m_46216), the focused window's own, never a route", () => {
+    const file = build('darwin').items;
+    expect(file.find((i) => i.label === 'Reopen Closed Tab')?.accelerator).toBe('Shift+CmdOrCtrl+T');
+    expect(menuTarget('reopenTab', false)).toEqual({ send: 'focused' });
   });
 
   it("each Go item has its rail place's key (settings/keys.ts PLACE_KEYS, the glyph the rail shows) and sends its action; ⌘I stays the inbox block (rail-keys)", () => {

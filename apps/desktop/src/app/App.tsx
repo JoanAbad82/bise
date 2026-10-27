@@ -47,7 +47,7 @@ import { UnlessFull } from './panel/Full';
 import { SideHost } from './side3d/Host';
 import { FloatHost } from '@/composer/float/Host';
 import { ArtifactRoute } from './ArtifactView';
-import { panelState, toggleFull, useFullPreview, usePanelFit, usePanelFull, usePanelScope, usePanelState } from './panel/state';
+import { panelState, reopenClosed, toggleFull, useFullPreview, usePanelFit, usePanelFull, usePanelScope, usePanelState } from './panel/state';
 import { doPanelKey } from './panel/keys';
 import { TipLayer } from './TipLayer';
 import { noteJump, numbersOf } from '@/agents/model';
@@ -261,6 +261,8 @@ function Shell() {
   usePrimaryKey(() => router.get().screen === 'inbox' || inboxItemOpen());
   const artifactShown = useHasFront();
   // View › Panel Full Width ⇧⌥⌘B (panel-full, designer m_45445): a check item, dimmed while the panel is a sheet
+  // File › Reopen Closed Tab ⇧⌘T (reopen-panel, designer m_46216): the menu's alone, no echo to drop
+  useMenuAction('reopenTab', reopenClosed);
   useMenuAction('panelFull', () => {
     if (!menuEcho(frameKeyAt.panelFull, Date.now())) toggleFull();
   });

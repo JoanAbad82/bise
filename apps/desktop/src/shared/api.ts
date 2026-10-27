@@ -443,7 +443,7 @@ export interface A11y {
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
-export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'browser' | 'newProject' | 'newAgent' | 'sidebar' | 'panel' | 'panelFull' | GoAction;
+export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'browser' | 'newProject' | 'newAgent' | 'sidebar' | 'panel' | 'panelFull' | 'reopenTab' | GoAction;
 
 /** The Go menu's places, the rail's (rail-keys): each a route of the main window (app/menu.ts routeOfMenu). */
 export type GoAction = 'bise' | 'inboxPage' | 'scheduled' | 'artifacts' | 'plugins';

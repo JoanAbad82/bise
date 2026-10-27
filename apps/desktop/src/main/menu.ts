@@ -99,6 +99,10 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       item('New Project…', 'CmdOrCtrl+N', 'newProject'),
       item('New Agent…', 'Shift+CmdOrCtrl+N', 'newAgent'),
       { type: 'separator' },
+      // reopen-panel (his m_46187, designer m_46216): the panel's last closed tab back, as Chrome; the
+      // menu owns ⇧⌘T (⌃⇧T off a Mac), the page's keydown never acts on it, so it fires once
+      item('Reopen Closed Tab', 'Shift+CmdOrCtrl+T', 'reopenTab'),
+      { type: 'separator' },
       ...(mac
         ? [browser, item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, { role: 'close' as const }]
         : [browser, item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' as const }, settings, { type: 'separator' as const }, { role: 'close' as const }, { role: 'quit' as const }]),
@@ -195,6 +199,6 @@ export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget
   // New Project / New Agent are the main window's sheets: the focused window's (the main one, or
   // nothing in the capsule), never a route to open
   // the two sides are the focused window's own (View › Hide/Show Sidebar, Panel), never a route either
-  if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || action === 'panelFull' || mainFocused) return { send: 'focused' };
+  if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || action === 'panelFull' || action === 'reopenTab' || mainFocused) return { send: 'focused' };
   return { open: isGo(action) ? GO_OPENS[action] : action };
 }

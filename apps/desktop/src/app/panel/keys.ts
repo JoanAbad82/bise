@@ -1,6 +1,6 @@
 // src/app/panel · the panel's keys (page native-mac §4 #2, native-mac-qa §7 and §12): ⌘T New tab,
-// ⌘W closes the tab in front (only while the panel is open: else the window's), ⇧⌘T (⌃⇧T too, as
-// Chrome) the last closed tab back, ⌘⇧] and ⌘⇧[ the next and previous tab, and the launcher's rows: ⌘P Artifacts (the picker of the latest), ⌥⌘D
+// ⌘W closes the tab in front (only while the panel is open: else the window's), ⌃⇧T the last closed
+// tab back (⇧⌘T is File › Reopen Closed Tab's, App.tsx), ⌘⇧] and ⌘⇧[ the next and previous tab, and the launcher's rows: ⌘P Artifacts (the picker of the latest), ⌥⌘D
 // Changes (nothing when the agent in view has none), ⌘L Browser (a browser
 // tab). ⌥⌘0 (the panel) and ⌃` (the terminal) keep their arms in app/keys.ts and
 // terminal/model.ts. panelKeyOf decides, pure (app/keys.ts's one arm calls it); doPanelKey acts.
@@ -31,8 +31,9 @@ export type PanelKey = 'new-tab' | 'close-tab' | 'reopen-tab' | 'next-tab' | 'pr
 
 /** The panel's key for `e`, if it is one; ⌘W, ⌘⇧[ and ⌘⇧] only while the panel is open. Pure. */
 export function panelKeyOf(e: KeyLike, open: boolean): PanelKey | undefined {
-  // ⇧⌘T, and ⌃⇧T as Chrome on Windows and Linux (his m_46187): folded or open
-  if (e.shiftKey && !e.altKey && e.metaKey !== e.ctrlKey && e.code === 'KeyT') return 'reopen-tab';
+  // ⌃⇧T, as Chrome on Windows and Linux (his m_46187), folded or open; ⇧⌘T is File › Reopen Closed
+  // Tab's (main/menu.ts), never the page's: one press, one tab (designer m_46216)
+  if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyT') return 'reopen-tab';
   const meta = e.metaKey && !e.ctrlKey;
   if (!meta) return undefined;
   if (!e.altKey && !e.shiftKey) {
@@ -86,7 +87,8 @@ export function doPanelKey(k: PanelKey | OpenRow, c: PanelCtx, instead?: string)
       closeActive();
       return;
     case 'reopen-tab':
-      reopenClosed();
+      // off a Mac ⌃⇧T is the menu's Shift+CmdOrCtrl+T: it acts there, once
+      if ((window as Partial<Window>).bise?.platform === 'darwin') reopenClosed();
       return;
     case 'next-tab':
       stepTab(1);

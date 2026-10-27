@@ -92,9 +92,10 @@ describe("the panel's keys (native-mac-qa §7, the launcher's rows)", () => {
     expect(panelKeyOf(key('BracketLeft', { meta: true, shift: true }), true)).toBe('prev-tab');
     expect(panelKeyOf(key('BracketLeft', { meta: true, shift: true }), false)).toBeUndefined();
   });
-  it('⇧⌘T and ⌃⇧T reopen the last closed tab, folded or open (his m_46187, as Chrome); ⌃⇧⌘T and ⌥⇧⌘T nothing', () => {
-    expect(panelKeyOf(key('KeyT', { meta: true, shift: true }), false)).toBe('reopen-tab');
+  it('⌃⇧T reopens the last closed tab, folded or open (his m_46187, as Chrome); ⇧⌘T is the File menu\'s, never the page\'s (designer m_46216)', () => {
+    expect(panelKeyOf(key('KeyT', { ctrl: true, shift: true }), false)).toBe('reopen-tab');
     expect(panelKeyOf(key('KeyT', { ctrl: true, shift: true }), true)).toBe('reopen-tab');
+    expect(panelKeyOf(key('KeyT', { meta: true, shift: true }), true)).toBeUndefined();
     expect(panelKeyOf(key('KeyT', { ctrl: true, meta: true, shift: true }), true)).toBeUndefined();
     expect(panelKeyOf(key('KeyT', { meta: true, alt: true, shift: true }), true)).toBeUndefined();
   });
