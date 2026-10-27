@@ -12,7 +12,9 @@
 // floatTarget only picks the default addressee, the route to a project stays the hub's. State:
 // state.ts (pure). The panel full width (panel-full): it comes over the panel's bottom, centred on
 // it, on a thread too (the thread is gone: it writes to that agent, the grip opens its history),
-// and on an open artifact, about it, to its maker, as the docked composer did. Owner: nm-composer.
+// and on an open artifact (the panel's tab in front, else the route's), about it, to its maker,
+// by the docked composer's one rule (artifacts/maker.ts aboutWords: an archived maker's words go
+// to the project's main, the pink follows whom it writes to; float-about, his m_47259). Owner: nm-composer.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppIcon, PickerPop, PickerTrigger, Press, tipAttrs } from '@/ds';
 import { InboxBlock, type Answering } from '@/inbox';
@@ -24,8 +26,8 @@ import { useRoute } from '@/app/router';
 import { useEscLayer } from '@/app/escape';
 import { useSideLayout } from '@/app/side3d/place';
 import { useLeftWidth } from '@/app/frame-state';
-import { usePanelFull } from '@/app/panel/state';
-import { useAboutWords } from '@/artifacts/maker';
+import { useFrontArt, usePanelFull } from '@/app/panel/state';
+import { aboutWords, useAboutWords } from '@/artifacts/maker';
 import { useAllArtifacts } from '@/artifacts';
 import { answerOf, HERE_BISE, ThreadComposer } from '@/thread/ThreadComposer';
 import { usageLine } from '@/thread/head';
@@ -45,29 +47,34 @@ export function FloatHost() {
   const route = useRoute();
   const home = useProjects().find((p) => p.home)?.project;
   const full = usePanelFull();
-  // full width over an open artifact: its maker's composer, about it (the docked one's, gone)
-  if (full && route.screen === 'artifacts' && route.id !== undefined && route.project !== '') return <AboutFloat project={route.project} id={route.id} />;
+  const front = useFrontArt();
+  // full width over an open artifact (the panel's tab in front, else the route's): its maker's
+  // composer, about it (the docked one's, gone)
+  const art = !full ? undefined : front ?? (route.screen === 'artifacts' && route.id !== undefined && route.project !== '' ? { project: route.project, id: route.id } : undefined);
+  if (art !== undefined) return <AboutFloat project={art.project} id={art.id} />;
   const to = floatTarget(route, home, full);
   if (to === null) return null;
   // kept across pages of the same addressee (no route key): his draft and state stay
   return <Float key={`${to.project}/${to.agent}`} to={to} />;
 }
 
-/** Full width over an open artifact: the float writes to its maker (the project's main when archived), about it. */
+/**
+ * Full width over an open artifact: the docked composer's one rule (artifacts/maker.ts
+ * useAboutWords): the float writes to its maker (the project's main when archived), about it.
+ */
 function AboutFloat({ project, id }: { project: string; id: string }) {
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
   const words = useAboutWords(project, id);
   if (it === undefined || words === undefined) return null;
-  const about: FloatAbout = { id, title: it.a.title, url: it.a.url, placeholder: words.placeholder };
+  const about: FloatAbout = { id, title: it.a.title, url: it.a.url };
   return <Float key={`${project}/${words.agent}/artifact/${id}`} to={{ project, agent: words.agent }} about={about} />;
 }
 
-/** The artifact the float's words are about (full width over an open artifact), and the empty field's words. */
+/** The artifact the float's words are about (full width over an open artifact). */
 interface FloatAbout {
   readonly id: string;
   readonly title: string;
   readonly url: string;
-  readonly placeholder: string;
 }
 
 /** Where the float's centre goes: the content's column, or the panel's middle in full width. */
@@ -94,6 +101,9 @@ function Float({ to: def, about }: { to: FloatTo; about?: FloatAbout }) {
   const isHome = row?.home === true;
   const agents = useAgents(project);
   const me = agents.find((a) => a.name === agent);
+  // about an artifact: the docked composer's words for whom it writes to now (its maker by
+  // default, or the one he picked): the placeholder, and the pink while that is a live sub-agent
+  const aw = about === undefined ? undefined : aboutWords(agent, about.title, me);
   const [state, setState] = useState<FloatState>('rest');
   const go = useCallback((ev: FloatEvent) => {
     setState((s) => floatNext(s, ev));
@@ -224,8 +234,9 @@ function Float({ to: def, about }: { to: FloatTo; about?: FloatAbout }) {
         tab={tab}
         tabEnd={answering?.end}
         me={me}
-        placeholder={answering?.placeholder ?? about?.placeholder ?? composer.placeholder_to({ agent: name })}
+        placeholder={answering?.placeholder ?? aw?.placeholder ?? composer.placeholder_to({ agent: name })}
         {...(about === undefined ? {} : { about: { id: about.id, title: about.title, url: about.url } })}
+        aboutPink={aw?.pink?.tip}
         answer={answerOf(answering)}
         onStop={stop}
         onEscape={onEscape}

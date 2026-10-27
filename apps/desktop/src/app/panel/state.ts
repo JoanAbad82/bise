@@ -162,11 +162,16 @@ export function usePanelFit(): PanelFit {
   return s.open && s.full ? fullFit(fit, win, left) : fit;
 }
 
-/** The kind (ds's iconKindOf) of the artifact in front of the panel; undefined for any other tab. */
-export function useFrontArtKind(): string | undefined {
+/** The artifact in front of the panel (its tab's entity, open or folded); undefined for any other tab. */
+export function useFrontArt(): { readonly project: string; readonly id: string } | undefined {
   const s = usePanelState();
   const front = s.tabs.list.find((t) => t.id === s.tabs.active)?.what;
-  const e = front?.kind === 'thing' && front.e.kind === 'artifact' ? front.e : undefined;
+  return front?.kind === 'thing' && front.e.kind === 'artifact' ? front.e : undefined;
+}
+
+/** The kind (ds's iconKindOf) of the artifact in front of the panel; undefined for any other tab. */
+export function useFrontArtKind(): string | undefined {
+  const e = useFrontArt();
   // no artifact in front: a project no row has, so it reads nothing ('' would read every project's)
   const a = useAllArtifacts(e?.project ?? '\u0000').find((x) => x.a.id === e?.id)?.a;
   if (e === undefined) return undefined;

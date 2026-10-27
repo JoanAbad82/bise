@@ -6,7 +6,7 @@
 // default addressee shown in 'to bise ⌄': where a message to a project goes stays the hub's route
 // (sb-core). The panel full width (panel-full, his m_45439): the thread is gone, so a thread and
 // bise's own view have the floating composer too, to the thread's agent (an open artifact's: its
-// maker, FloatHost reads it). Pure. Owner: nm-composer.
+// maker, the panel's artifact in front too: FloatHost reads them). Pure. Owner: nm-composer.
 import { MAIN, projectOf, type Route } from '@/app/route';
 
 /** A floating composer's addressee: a project's hub id and an agent's name. */
