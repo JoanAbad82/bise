@@ -161,10 +161,16 @@ function FullLead() {
   );
 }
 
-/** In full width, at the tab row's end: the thread comes back, under the thread's own bubble (the tabs' glyph; his m_47445, designer m_47468). */
+/**
+ * In full width, at the tab row's end: the thread comes back, under the thread's own bubble (the tabs'
+ * glyph; his m_47445, designer m_47468). The lead's action, so the lead's tip: its owner by name,
+ * 'the thread' only when none is named (designer m_47517).
+ */
 function ThreadBack() {
+  const t = useHiddenThread();
+  const words = t === null ? panel.panel_full_thread({ key: PANEL_FULL_KEY }) : panel.panel_full_lead({ agent: t.name, key: PANEL_FULL_KEY });
   return (
-    <IconButton label={panel.panel_full_thread({ key: PANEL_FULL_KEY })} size="bar" onClick={() => {
+    <IconButton label={words} size="bar" onClick={() => {
       setFull(false);
     }} testId="app.panel.thread">
       <AppIcon name="thread" size={16} />

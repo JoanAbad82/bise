@@ -262,6 +262,8 @@ describe('the tabbed panel', () => {
     const back = v.getByTestId('app.panel.thread');
     expect(Array.from(back.querySelectorAll('svg')).map((s) => s.getAttribute('data-icon'))).toEqual(['thread']);
     expect(back.querySelector('.pn-mirror')).toBeNull();
+    // the lead's action, the lead's tip: the thread's owner by name (designer m_47517)
+    expect(back.getAttribute('data-tip')).toBe(panel.panel_full_lead({ agent: 'perf', key: PANEL_FULL_KEY }));
     fireEvent.click(back);
     expect(v.getByTestId('app.panel').hasAttribute('data-full')).toBe(false);
   });
