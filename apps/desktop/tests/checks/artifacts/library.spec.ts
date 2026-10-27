@@ -55,13 +55,19 @@ for (const theme of THEMES) {
         await page.waitForTimeout(250);
         await page.screenshot({ path: test.info().outputPath(`lib-${tab}-${w}-${theme}.png`) });
       };
-      // the column, or under 900 the crumb that opens it
+      // the library's folders: in bise fait mac the sidebar's library (artifacts.lib, Sidebar.tsx)
+      // when shown, else the page's column; under 900 the crumb that opens the column
+      const colId = async (testId: string): Promise<string> =>
+        (await id(page, 'artifacts.lib').isVisible()) ? testId.replace(/^artifacts\.col\./, 'artifacts.lib.') : testId;
       const go = async (testId: string) => {
         if (narrowOf(size)) {
           await id(page, 'artifacts.fold').click();
           await id(page, 'artifacts.fold.pop').getByTestId(testId).click();
-        } else await id(page, testId).click();
+        } else await id(page, await colId(testId)).click();
       };
+      // the place's name is the window bar's crumb now, never the head's (Screen.tsx, designer's
+      // rule on #5): the screen's title path says where he is
+      const at = (name: string) => expect(id(page, 'artifacts.screen')).toHaveAttribute('data-title-path', new RegExp(name));
       try {
         await expect(id(page, 'artifacts.lead')).toContainText(library.say);
         await expect(id(page, 'artifacts.tiles')).toBeVisible();
@@ -86,13 +92,25 @@ for (const theme of THEMES) {
         }
 
         // the scope at the search, then one project: the folders say 'n of m'
-        await id(page, 'artifacts.projects').click();
-        await expect(id(page, 'artifacts.projects.menu')).toContainText('ai-docs');
+        // bise fait mac's toolbar (Toolbar.tsx): the scope is 'artifacts.projects' while the row has
+        // room, else it folds with the kinds into one Filters menu ('artifacts.toolbar.fold')
+        const folded = async (): Promise<boolean> => (await id(page, 'artifacts.toolbar').getAttribute('data-folded')) !== null;
+        const narrowBar = await folded();
+        const scopeId = narrowBar ? 'artifacts.toolbar.fold' : 'artifacts.projects';
+        const scopeRow = (p: string): string => (narrowBar ? `artifacts.toolbar.fold.p.${p}` : `artifacts.projects.${p}`);
+        await id(page, scopeId).click();
+        await expect(id(page, `${scopeId}.menu`)).toContainText('ai-docs');
         await shot('scope');
-        await id(page, `artifacts.projects.${P.ai}`).click();
+        await id(page, scopeRow(P.ai)).click();
         await expect(id(page, 'artifacts.lead')).toContainText('ai-docs');
         await shot('one-project');
-        await id(page, 'artifacts.projects.clear').click();
+        // back to every project: the scope's × while the row has room, else the menu's 'all'
+        if (await id(page, 'artifacts.projects.clear').isVisible()) await id(page, 'artifacts.projects.clear').click();
+        else {
+          await id(page, 'artifacts.toolbar.fold').click();
+          await id(page, 'artifacts.toolbar.fold.p.all').click();
+        }
+        await expect(id(page, 'artifacts.lead')).not.toContainText('ai-docs');
 
         // a theme: its task tiles, then its cards
         await go('artifacts.col.f.f-desktop00');
@@ -101,7 +119,7 @@ for (const theme of THEMES) {
 
         // a task's folder, its menu, the merge picker, the delete dialog
         await go('artifacts.col.f.f-agentview');
-        await expect(id(page, 'artifacts.head')).toContainText('agent view');
+        await at('agent view');
         await shot('task');
         // art-grid's tabs: a card hovered (its marks), the stack open with a chip on, the ☰ list
         const card0 = page.locator('[data-testid^="artifacts.grid.card."]').first();
@@ -116,7 +134,7 @@ for (const theme of THEMES) {
         for (let i = 0; i < 3 && await id(page, 'artifacts.sheet').isVisible(); i++) await page.keyboard.press('Escape');
         await expect(id(page, 'artifacts.sheet')).toBeHidden();
         await go('artifacts.col.f.f-agentview');
-        await expect(id(page, 'artifacts.head')).toContainText('agent view');
+        await at('agent view');
         await id(page, 'artifacts.view.list').click();
         await shot('list');
         await id(page, 'artifacts.view.grid').click();
@@ -162,8 +180,8 @@ for (const theme of THEMES) {
 
         // a new folder in the column, inline
         if (!narrowOf(size)) {
-          await id(page, 'artifacts.col.new').click();
-          await expect(id(page, 'artifacts.col.field')).toBeFocused();
+          await id(page, await colId('artifacts.col.new')).click();
+          await expect(id(page, await colId('artifacts.col.field'))).toBeFocused();
           await shot('new-folder');
           await page.keyboard.press('Escape');
         }

@@ -76,12 +76,24 @@ test('native/chrome: setup is one window with macOS lights only, no drawn dots, 
 
 test('native/chrome: a thread is one window, macOS lights over the sidebar, its top a drag region, no drawn dots', async () => {
   const helper = new FakeHelper();
-  const core = new FakeCore(world(true) as unknown as ConstructorParameters<typeof FakeCore>[0]);
-  const s = await launchDesktop({ helper, core });
+  // the fake core's whole world (the fixtures: bise's home and its thread, a project): this check's
+  // own 5-event world left the redesigned window empty (no data-testid, no page error in 6 s on
+  // d06cea41f, with whole prefs and with route 'bise' alike)
+  const core = new FakeCore();
+  const s = await launchDesktop({ helper, core, route: 'bise' });
   try {
     await expect(s.page.getByTestId('thread.screen')).toBeVisible({ timeout: 10_000 });
     expect(await windows(s), 'one native window, its lights over the sidebar').toEqual([{ lights: LIGHTS }]);
-    expect(await drawn(s.page), 'the frame is the window: no drawn dots, the sidebar top moves it').toEqual({ dots: 0, frames: 1, drag: 0, sideDrag: ['drag'] });
+    // bise fait mac (b06021770): no ds frame at all in the window (.b-win, its .b-lights gone) and
+    // the 52 px bar is what moves it: a drag region along the window's top
+    expect(await drawn(s.page), 'the frame is the window: no drawn dots, no frame inside it').toMatchObject({ dots: 0, frames: 0 });
+    const barDrag = await s.page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>('body *')).filter((e) => {
+        const r = e.getBoundingClientRect();
+        return getComputedStyle(e).getPropertyValue('-webkit-app-region') === 'drag' && r.top < 1 && r.height >= 40 && r.width > 0;
+      }).length,
+    );
+    expect(barDrag, "the window's top bar moves it (a drag region)").toBeGreaterThan(0);
     await shots(s.page, 'thread');
   } finally {
     await s.close();

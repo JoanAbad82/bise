@@ -130,6 +130,12 @@ test('the plugins place: the rail button, the band, the list, a page, add', asyn
         }, { w, h: H });
         await scrollTo(s, 'plugins.group.mistral');
         await s.page.getByTestId('plugins.place').evaluate((el) => { el.scrollTo(0, 0); });
+        // bise fait mac: the room is the page banner's visual, which a narrow page draws not at all
+        // (ds banner.tsx: none under 760 px of page, designer m_42762); no box is never an empty one
+        if (!(await s.page.getByTestId('plugins.room').isVisible())) {
+          expect(await s.page.evaluate(() => document.querySelector('.b-banner')?.getBoundingClientRect().width ?? 0), `no room box at ${String(w)}: a narrow banner`).toBeLessThan(760);
+          continue;
+        }
         await expect.poll(() => roomShows(s), { timeout: 5000, message: `the room at ${String(w)} ${theme}` }).toBe(true);
       }
     }
