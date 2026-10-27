@@ -184,6 +184,22 @@ def lists_round(c):
     ok(req(c, "artifacts/seen"), "artifacts/seen")
     c.wait(lambda: any(i["title"] == "Notes" and not i["new"] for i in hub_now(c, "hub/artifacts")["items"]), 20, "seen: not new")
     c.wait_idle("main", timeout=30)
+    # artifact-folders (architect m_46319): a task spawned with --folder
+    # files its add there (made by main at its first add); one spawned
+    # without stays unfiled
+    c.say("[[bash: sb spawn filer --folder x/y --objective '{{bash: echo a > $TMPDIR/fa.md && sb artifact add $TMPDIR/fa.md --title FiledA}}']]")
+    c.say("[[bash: sb spawn loose --objective '{{bash: echo b > $TMPDIR/fb.md && sb artifact add $TMPDIR/fb.md --title LooseB}}']]")
+    def row(title):
+        now = hub_now(c, "hub/artifacts")
+        return next((i for i in now["items"] if i["title"] == title), None), now.get("folders") or []
+    c.wait(lambda: row("FiledA")[0] is not None and row("LooseB")[0] is not None, 60, "both tasks' artifacts")
+    filed, folders = row("FiledA")
+    by_id = {f["id"]: f for f in folders}
+    f = by_id.get(filed.get("folder") or "")
+    parent = by_id.get((f or {}).get("parent") or "")
+    check(f is not None and f["name"] == "y" and parent is not None and parent["name"] == "x", "filed in x/y: %r in %r" % (filed, folders))
+    check(not row("LooseB")[0].get("folder"), "no --folder: unfiled: %r" % (row("LooseB")[0],))
+    c.wait_idle("main", timeout=30)
 
     subscribe(c, "main")
     c.say('[[bash: sb every 10m "poll the build" --times 2]]')
