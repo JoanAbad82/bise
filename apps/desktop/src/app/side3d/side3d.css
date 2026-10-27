@@ -1562,10 +1562,12 @@
   background: var(--c-raised);
   box-shadow: var(--e-1);
 }
+/* a column, so the office (Office fill: flex 1) takes the tile's box, its corner chips inside it (ui-review m_46598) */
 .s3-otile-office {
   position: absolute;
   inset: 0;
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
 .s3-otile-acts {
   position: absolute;
