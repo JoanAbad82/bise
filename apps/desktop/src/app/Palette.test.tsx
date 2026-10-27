@@ -72,14 +72,19 @@ describe('⌘K with a big list', () => {
     const drawn = view.container.querySelectorAll('[role="option"]').length;
     // unmeasured (no layout here): one 720 px screen of 32 px rows and the overscan
     expect(drawn).toBeLessThanOrEqual(Math.ceil(720 / 32) + 2 * OVERSCAN + 2);
-    for (let i = 0; i < 60; i++)
+    // a far row: a few past the drawn ones, not drawn yet. Each ↓ is a render: just past the window
+    // keeps the test cheap (60 ↓ timed out at 5 s in the whole suite under load, 0.24 s alone)
+    const at = drawn + 3;
+    expect(view.queryByTestId(`app.palette.item.${String(at)}`)).toBeNull();
+    for (let i = 0; i < at; i++)
       act(() => {
         fireEvent.keyDown(field, { key: 'ArrowDown' });
       });
-    const far = view.getByTestId('app.palette.item.60');
+    const far = view.getByTestId(`app.palette.item.${String(at)}`);
     expect(far.getAttribute('aria-selected')).toBe('true');
     expect(view.container.querySelectorAll('[role="option"][aria-selected="true"]').length).toBe(1);
-  });
+    // ~35 renders: 0.4 s alone, the whole suite at load stretches a test 20-25x (9.6 s on 2a0cf0caf)
+  }, 15_000);
 
   it.runIf(process.env['PERF'] === '1')('PERF: ms per keystroke', () => {
     const store = bigStore(20, 60, 100, 10);

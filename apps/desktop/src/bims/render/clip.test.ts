@@ -23,7 +23,7 @@ import { Box3, Mesh, type Object3D, Vector3 } from 'three';
 import { crowd } from '../fixtures';
 import { layoutOf, readyMaps } from '../maps';
 import { bedsAt, LAST_STAGE, NO_GROW } from '../growth';
-import type { Activity, Box, Office, Pose, Pt, Spot } from '../model';
+import type { Activity, Box, MapId, Office, Pose, Pt, Spot } from '../model';
 import { bedKey, bedPieces, restAt, shapeAt, type NapRest } from './nap';
 import { buildWorld } from './world';
 import { meshBoxes } from './cozy';
@@ -126,8 +126,13 @@ function underTurned(d: Spot, p: Vector3): boolean {
 }
 const napName = (i: number): string => `agent-${String(i + 1)}`;
 
-/** the plan's reds: beds that overlap, a napper off its bed */
-function planReds(o: Office): string[] {
+/**
+ * the plan's reds: beds that overlap, a napper off its bed. `bodies`: the nappers' boxes already
+ * posed, by map, bed and spot: the same napper on the same spot is the same box, and the lounge
+ * barely moves from one office size to the next (riad: 8 beds at every size), so posing each once
+ * keeps 0..31 agents under 3 s alone (it took 61 s at the whole suite's load, its budget 60 s).
+ */
+function planReds(o: Office, bodies: Map<string, Box3>): string[] {
   const out: string[] = [];
   const beds = o.lounge.map((s) => ({ s, bed: bedOf(o, s) }));
   beds.forEach(({ s, bed }, i) => {
@@ -137,8 +142,13 @@ function planReds(o: Office): string[] {
       if (overlap(bed, f)) out.push(`bed ${String(i)} ${fmtBox(bed)} over ${isBed(o, f) ? 'bed' : 'furniture'} ${fmtBox(f)}`);
     }
     // its napper as it lies on its bed's shape (render/nap.ts), on a cushion's height
-    const rest: NapRest = { shape: shapeAt(lookOf(o.map), i), top: 0.2 };
-    const body = bimBoxes(napName(i), s, NAP, false, () => rest).reduce((a, b) => a.union(b), new Box3());
+    const key = `${o.map}|${String(i)}|${String(s.x)},${String(s.z)},${String(s.face)}`;
+    let body = bodies.get(key);
+    if (!body) {
+      const rest: NapRest = { shape: shapeAt(lookOf(o.map), i), top: 0.2 };
+      body = bimBoxes(napName(i), s, NAP, false, () => rest).reduce((a, b) => a.union(b), new Box3());
+      bodies.set(key, body);
+    }
     if (!within(body, bed, 0)) out.push(`napper ${String(i)} ${fmt(body)} off its bed ${fmtBox(bed)}`);
   });
   return out;
@@ -198,6 +208,22 @@ function worldReds(o: Office, stage: number, seated: ReadonlyMap<string, Box3[]>
   return out;
 }
 
+/**
+ * the office of `n` agents on map `id`, laid out once for the whole file: the string and nap laws
+ * both walk 0..31 agents on every map, and the 32 layouts were most of the nap law's time (61 s at
+ * the whole suite's load, its budget 60 s). An office is a plain value no law changes.
+ */
+const offices = new Map<string, Office>();
+function officeAt(id: MapId, n: number): Office {
+  const key = `${id}|${String(n)}`;
+  let o = offices.get(key);
+  if (!o) {
+    o = layoutOf(crowd(n).agents, id);
+    offices.set(key, o);
+  }
+  return o;
+}
+
 /** a string over a napper's head on the screen, at the office's fits (index.ts applyFit): the last stage, every bed */
 function stringReds(o: Office): string[] {
   const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, { ...NO_GROW, stage: LAST_STAGE });
@@ -227,7 +253,7 @@ describe('clip: no string over a napper\'s head on the screen', () => {
       const out: string[] = [];
       const seen = new Set<string>();
       for (let n = 0; n <= 31; n++) {
-        const o = layoutOf(crowd(n).agents, id);
+        const o = officeAt(id, n);
         if (seen.has(o.size)) continue;
         seen.add(o.size);
         out.push(...stringReds(o).map((r) => `${String(n)} agents, ${r}`));
@@ -242,8 +268,9 @@ describe('clip: the nap beds hold their nappers', () => {
   for (const id of readyMaps()) {
     it(`${id}: beds apart and off the furniture, each napper inside its own, 0..31 agents`, async () => {
       const out: string[] = [];
+      const bodies = new Map<string, Box3>();
       for (let n = 0; n <= 31; n++) {
-        out.push(...planReds(layoutOf(crowd(n).agents, id)).map((r) => `${String(n)} agents, ${r}`));
+        out.push(...planReds(officeAt(id, n), bodies).map((r) => `${String(n)} agents, ${r}`));
         await turn();
       }
       expect([...new Set(out)]).toEqual([]);
@@ -256,7 +283,7 @@ describe('clip: nothing through a desk, a bed or a bim', () => {
     it(`${id}: stages 0..${String(LAST_STAGE)}, ${WORLDS.join(' and ')} agents`, async () => {
       const out: string[] = [];
       for (const n of WORLDS) {
-        const o = layoutOf(crowd(n).agents, id);
+        const o = officeAt(id, n);
         const seated = new Map([...o.desks.entries()].map(([name, d]) => [name, bimBoxes(name, d, WORK)] as const));
         for (let stage = 0; stage <= LAST_STAGE; stage++) {
           out.push(...worldReds(o, stage, seated).map((r) => `${String(n)} agents, stage ${String(stage)}, ${r}`));

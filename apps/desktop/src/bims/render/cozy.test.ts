@@ -176,9 +176,11 @@ describe('the cozy law: every map, every stage', () => {
     expect(out).toEqual([]);
   });
 
-  it('costs <= 25 draw calls at stage 0, <= 60 at 14 (merged per stage)', async () => {
-    const out: string[] = [];
-    for (const id of readyMaps()) {
+  // one test a map: 8 worlds each (~1 s alone); all 13 maps in one test built 104 (13 s alone, 127 s
+  // in the whole suite at load, over its 120 s)
+  for (const id of readyMaps()) {
+    it(`${id}: costs <= 25 draw calls at stage 0, <= 60 at 14 (merged per stage)`, async () => {
+      const out: string[] = [];
       const o = layoutOf(crowd(20).agents, id);
       const bare: Office = { ...o, cozy: undefined };
       for (const [stage, max] of [[0, 25], [14, 60]] as const) {
@@ -188,9 +190,9 @@ describe('the cozy law: every map, every stage', () => {
           await turn();
         }
       }
-    }
-    expect(out).toEqual([]);
-  }, 120_000);
+      expect(out).toEqual([]);
+    }, 120_000);
+  }
 
   it(`draws the ${String(BASE_BEDS)} base beds from stage 0`, () => {
     const o = layoutOf(crowd(3).agents, 'loft');
