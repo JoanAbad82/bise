@@ -130,7 +130,9 @@
 .art-selbar-a:hover{background:var(--c-hover)}
 .art-selbar-a .k{font-family:var(--font-mono);font-size:var(--t-11);color:var(--c-text-3)}
 @keyframes art-selbar-in{from{opacity:0;transform:translate(-50%,var(--s-2))}to{opacity:1;transform:translate(-50%,0)}}
-.art-toast{position:fixed;left:var(--float-x, 50%);bottom:calc(var(--float-bottom) + var(--float-now, var(--float-h)) + var(--s-4));z-index:30;transform:translateX(-50%)}
+/* the toast's box is the ds toast's own width (min(380px, 100%) of this one), so the -50% centres
+   the toast itself on the pill's axis (ui-review m_48524: 13.5 px right of it) */
+.art-toast{position:fixed;left:var(--float-x, 50%);width:max-content;max-width:380px;bottom:calc(var(--float-bottom) + var(--float-now, var(--float-h)) + var(--s-4));z-index:30;transform:translateX(-50%)}
 .art-ghost{position:fixed;top:0;left:0;padding:0;border-radius:var(--r-2);transform:translateX(-200vw) rotate(-4deg);box-shadow:var(--e-2);overflow:visible}
 .art-ghost > :first-child{display:block;width:100%;aspect-ratio:16/10;border-radius:var(--r-2);overflow:hidden}
 .art-ghost-n{position:absolute;top:calc(-1 * var(--s-2));right:calc(-1 * var(--s-2));min-width:var(--s-5);height:var(--s-5);padding:0 var(--s-1);border-radius:var(--s-3);background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-12);font-weight:600;line-height:20px;text-align:center}

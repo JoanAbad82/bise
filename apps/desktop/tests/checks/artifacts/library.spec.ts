@@ -5,7 +5,8 @@
 // its task tiles; a task's folder, unfiled, the m picker (typing filters and offers '+ new folder'),
 // a card's right-click menu, three picked with the selection bar, a folder's menu, the merge picker,
 // the delete dialog, the inline new folder, a search grouped by folder, a search that finds
-// nothing, the scope menu, one project ('14 of 74'), and the empty pages each show. It sends
+// nothing, the scope menu, one project ('14 of 74'), and the empty pages each show; the selection
+// bar and the undo toast after a move sit on the floating composer's axis, 16 over it. It sends
 // nothing to a hub but what his gestures send. Shots: lib-<tab>-<w>-<theme>.png. art-grid adds its
 // card tabs. Owner: art-folders.
 import { createServer } from 'node:http';
@@ -201,6 +202,30 @@ for (const theme of THEMES) {
         await id(page, 'artifacts.search.input').fill('zzqx');
         await expect(id(page, 'artifacts.nothing')).toContainText(library.nothing_matches({ q: 'zzqx' }));
         await shot('nothing-found');
+
+        // last (it moves three cards): the bar and the undo toast on the floating composer's axis,
+        // within 1 px, 16 over its top (selbar-float; ui-review m_48524: the toast sat 13.5 px right)
+        const axis = async (testId: string) => {
+          const b = await id(page, testId).boundingBox();
+          if (b === null) throw new Error(`${testId}: no box`);
+          return { x: b.x + b.width / 2, bottom: b.y + b.height, top: b.y };
+        };
+        await id(page, 'artifacts.search.input').fill('');
+        await cards.nth(0).click({ modifiers: ['Meta'] });
+        await cards.nth(1).click({ modifiers: ['Meta'] });
+        await cards.nth(2).click({ modifiers: ['Meta'] });
+        await expect(id(page, 'artifacts.selbar')).toBeVisible();
+        const pill = await axis('composer.float');
+        const bar = await axis('artifacts.selbar');
+        expect(Math.abs(bar.x - pill.x), 'the bar on the pill axis').toBeLessThanOrEqual(1);
+        expect(pill.top - bar.bottom, 'the bar 16 over the pill').toBeGreaterThanOrEqual(15);
+        await page.keyboard.press('m');
+        await id(page, 'artifacts.move.field').fill('bims');
+        await page.keyboard.press('Enter');
+        await expect(id(page, 'artifacts.toast')).toBeVisible();
+        const toast = await axis('artifacts.toast');
+        expect(Math.abs(toast.x - pill.x), 'the undo toast on the pill axis').toBeLessThanOrEqual(1);
+        expect(pill.top - toast.bottom, 'the undo toast 16 over the pill').toBeGreaterThanOrEqual(15);
       } finally {
         await s.close();
         real.close();
