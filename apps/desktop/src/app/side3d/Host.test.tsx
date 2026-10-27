@@ -14,7 +14,7 @@ import { artifact, artifacts, card, ev, projects, row } from '../../../tests/fea
 import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
 import { HINT_HOLD_MS } from '../held';
-import { CARD_HOLD_MS, CARD_HOVER_MS } from './Cards';
+import { CARD_GRACE_MS, CARD_HOLD_MS, CARD_HOVER_MS, CARD_OUT_MS, CARD_WARM_MS } from './Cards';
 import { CoinSlot } from './Minis';
 import { keyAction } from '../keys';
 import { SideHost, bubbleTops } from './Host';
@@ -335,7 +335,7 @@ describe('the right side, folded', () => {
     }
   });
 
-  it('a hover 400 ms shows that coin\'s card alone, information only; gone on leave; nothing at rest; a click opens the float, no card over it', () => {
+  it('a hover 150 ms shows that coin\'s card alone, information only; gone on leave; nothing at rest; a click opens the float, no card over it', () => {
     vi.useFakeTimers();
     try {
       const { v } = side3d();
@@ -354,14 +354,35 @@ describe('the right side, folded', () => {
       expect(v.container.querySelectorAll('.s3-tcard')).toHaveLength(1);
       // no key on a hover: they are ⌥'s
       expect(v.queryByTestId('app.bubble.scheduled.key')).toBeNull();
+      // gone on leave after a 100 ms grace (the gap between coins doesn't blink), then an 80 ms fade
       fireEvent.pointerLeave(v.getByTestId('app.bubble.scheduled'));
+      act(() => {
+        vi.advanceTimersByTime(CARD_GRACE_MS - 1);
+      });
+      expect(v.getByTestId('app.bubble.scheduled.card')).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
       expect(v.queryByTestId('app.bubble.scheduled.card')).toBeNull();
-      // the artifacts card: the newest's name as its chip
+      expect(v.getByTestId('app.bubble.scheduled.card.out')).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(CARD_OUT_MS);
+      });
+      expect(v.queryByTestId('app.bubble.scheduled.card.out')).toBeNull();
+      // warm: the next coin's card at once, no delay (designer m_46248)
       fireEvent.pointerEnter(v.getByTestId('app.bubble.artifacts'));
+      expect(v.getByTestId('app.bubble.artifacts.card').querySelector('.b-artchip')).toBeTruthy();
+      // cold again after 1 s
+      fireEvent.pointerLeave(v.getByTestId('app.bubble.artifacts'));
+      act(() => {
+        vi.advanceTimersByTime(CARD_GRACE_MS + CARD_WARM_MS + CARD_OUT_MS);
+      });
+      fireEvent.pointerEnter(v.getByTestId('app.bubble.artifacts'));
+      expect(v.queryByTestId('app.bubble.artifacts.card')).toBeNull();
       act(() => {
         vi.advanceTimersByTime(CARD_HOVER_MS);
       });
-      expect(v.getByTestId('app.bubble.artifacts.card').querySelector('.b-artchip')).toBeTruthy();
+      expect(v.getByTestId('app.bubble.artifacts.card')).toBeTruthy();
       fireEvent.click(v.getByTestId('app.bubble.artifacts'));
       expect(v.getByTestId('app.flyout.artifacts')).toBeTruthy();
       expect(v.container.querySelector('.s3-tcard')).toBeNull();

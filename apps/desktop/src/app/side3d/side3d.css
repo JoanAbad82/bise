@@ -895,13 +895,20 @@
   text-align: right;
   white-space: nowrap;
   pointer-events: none;
-  animation: s3-tcard-in 120ms var(--ease-out);
+  animation: s3-tcard-in 100ms var(--ease-out);
+}
+/* gone: an 80 ms fade (designer m_46248) */
+.s3-tcard[data-out] {
+  animation: s3-tcard-out 80ms var(--ease-out) forwards;
 }
 :root[data-reduce-motion] .s3-tcard {
   animation: none;
 }
 @keyframes s3-tcard-in {
   from { opacity: 0; }
+}
+@keyframes s3-tcard-out {
+  to { opacity: 0; }
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) .s3-tcard {

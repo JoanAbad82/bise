@@ -10,8 +10,14 @@ import { cardWords, type CardPart, type CoinCard } from './coincard';
 
 /** ⌥ held alone this long shows the four cards and the coins' keys (⌥ is a typing key: a French keyboard needs it for { } [ ] |) */
 export const CARD_HOLD_MS = 300;
-/** a hover this long shows that coin's card (the ds tip's TIP_DELAY_MS) */
-export const CARD_HOVER_MS = 400;
+/** a hover this long shows that coin's card: a label, quicker than the ds tips' 400 (designer m_46248, his m_46245) */
+export const CARD_HOVER_MS = 150;
+/** once a card showed, the next coin's shows at once for this long (sliding down the coins never waits) */
+export const CARD_WARM_MS = 1000;
+/** the pointer gone this long before the card goes (crossing the gap between coins doesn't blink) */
+export const CARD_GRACE_MS = 100;
+/** the card's fade out */
+export const CARD_OUT_MS = 80;
 /** a coin's middle under its top: the caption's block is centred on it (designer m_45869) */
 export const COIN_MID = 22;
 
@@ -34,9 +40,9 @@ function Line({ parts, n }: { parts: readonly CardPart[]; n: 1 | 2 }) {
  * designer m_45869): words only, no fill, border or shadow, the coin and its words one object; else a
  * quiet card over the thread, the coin's own fill.
  */
-export function CoinCardView({ id, card, top, plain = false }: { id: BubbleId; card: CoinCard; top: number; plain?: boolean }) {
+export function CoinCardView({ id, card, top, plain = false, out = false }: { id: BubbleId; card: CoinCard; top: number; plain?: boolean; out?: boolean }) {
   return (
-    <div className="s3-tcard" data-plain={plain || undefined} style={{ top: top + COIN_MID }} aria-hidden="true" title={cardWords(card)} data-testid={`app.bubble.${id}.card`}>
+    <div className="s3-tcard" data-plain={plain || undefined} data-out={out || undefined} style={{ top: top + COIN_MID }} aria-hidden="true" title={cardWords(card)} data-testid={out ? `app.bubble.${id}.card.out` : `app.bubble.${id}.card`}>
       <span className="s3-tcard-name">{card.name}</span>
       <Line parts={card.l1} n={1} />
       <Line parts={card.l2} n={2} />

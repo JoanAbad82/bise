@@ -6,7 +6,7 @@
 // resize's end, a sidebar or panel fold): the coins at the window's edge, between the thread and
 // the open panel (the side's right on the panel's left edge), or as minis portalled into the
 // header's or the sheet's tab row's CoinSlot (Minis.tsx; their float under the header, folded-side
-// v9); ⌥ held alone 300 ms or a hover 400 ms shows the coins' cards (Cards.tsx). It hides on a page
+// v9); ⌥ held alone 300 ms or a hover 150 ms shows the coins' cards (Cards.tsx). It hides on a page
 // that is no project's (layout sideShows: the inbox, scheduled, plugins, artifacts...; the world's
 // office unmounted: no loop while hidden). The project is the route's (bise's home on a page with
 // none): the world and the acts (+ new agent, + add) are its; the floats list the Overview's
@@ -30,7 +30,7 @@ import { useRoute, useRouter } from '../router';
 import { MAIN, projectOf } from '../route';
 import { useMenuAction } from '../menu';
 import { useModHeld, useModHeldFor } from '../held';
-import { CARD_HOLD_MS, CARD_HOVER_MS, CoinCardView } from './Cards';
+import { CARD_GRACE_MS, CARD_HOLD_MS, CARD_HOVER_MS, CARD_OUT_MS, CARD_WARM_MS, CoinCardView } from './Cards';
 import { coinCard, type CardFacts } from './coincard';
 import { inRank, agentCounts, bubbleBadge, bubbleCount, bubbleName, bubbleSays, bubbleTip, answerFrom, type BubbleCount, type Counts } from './model';
 import { Minis } from './Minis';
@@ -242,21 +242,47 @@ function Side({ project, scope, home, world, at: coinsAt, right, captions = 'car
   // the coins' caps show their true key, ⌥⌘N: with ⌥ held beside their cards, with ⌥⌘ held alone (no cards; designer m_45787)
   const altMeta = useModHeld('AltMeta');
   const caps = alt || altMeta;
-  // a hover 400 ms: that coin's card alone, gone on leave (its tip, information only)
+  // a hover 150 ms: that coin's card alone (information only; designer m_46248, his m_46245: 400 was
+  // too slow); warm for 1 s once one showed, the next coin's at once, so sliding down the coins never
+  // waits; on leave a 100 ms grace (crossing the gap between coins doesn't blink), then an 80 ms fade
   const [hover, setHover] = useState<BubbleId | null>(null);
+  const [fading, setFading] = useState<BubbleId | null>(null);
   const hoverT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fadeT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const warmUntil = useRef(0);
+  const hoverNow = useRef<BubbleId | null>(null);
   const onHover = (b: BubbleId) => (on: boolean) => {
     clearTimeout(hoverT.current);
     if (!on) {
-      setHover(null);
+      hoverT.current = setTimeout(() => {
+        if (hoverNow.current !== null) {
+          warmUntil.current = Date.now() + CARD_WARM_MS;
+          setFading(hoverNow.current);
+          clearTimeout(fadeT.current);
+          fadeT.current = setTimeout(() => {
+            setFading(null);
+          }, CARD_OUT_MS);
+        }
+        hoverNow.current = null;
+        setHover(null);
+      }, CARD_GRACE_MS);
       return;
     }
-    hoverT.current = setTimeout(() => {
+    const show = () => {
+      clearTimeout(fadeT.current);
+      setFading(null);
+      hoverNow.current = b;
       setHover(b);
-    }, CARD_HOVER_MS);
+    };
+    if (hoverNow.current !== null || Date.now() < warmUntil.current) {
+      show();
+      return;
+    }
+    hoverT.current = setTimeout(show, CARD_HOVER_MS);
   };
   useEffect(() => () => {
     clearTimeout(hoverT.current);
+    clearTimeout(fadeT.current);
   }, []);
   const facts: CardFacts = { live, counts, artifacts, tasks, procs, watching: watching.map((a) => a.name), now };
   // no card over an open float: it is the coin's whole say
@@ -492,6 +518,7 @@ function Side({ project, scope, home, world, at: coinsAt, right, captions = 'car
         }} />
       ))}
       {carded.map((b) => <CoinCardView key={b} id={b} card={coinCard(b, facts)} top={tops.bubbles[b]} plain={captions === 'plain'} />)}
+      {fading !== null && !carded.includes(fading) && open === null && !mini && <CoinCardView key={`out-${fading}`} id={fading} card={coinCard(fading, facts)} top={tops.bubbles[fading]} plain={captions === 'plain'} out />}
       {open !== null && (
         <Float id={open} name={bubbleName(open)} top={tops.bubbles[open]} maxH={maxH} moving={leaving !== null} frameRef={frame}>
           <FloatLayer key={open} c={floatOf(open)} scrolls={fit.scrolls} />
