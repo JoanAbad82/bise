@@ -101,10 +101,11 @@ export function MeGroup({ look, set }: { look: Look; set: (l: Look) => void }) {
               );
             })}
           </Row>
-          {/* the accessory colour (designer m_48063): nothing on the head greys its dots, the row stays so nothing jumps */}
+          {/* the accessory colour (designer m_48063): nothing on the head greys its dots, none ringed (the
+              pick is kept, its ring back with a hat on, m_48402); the row stays so nothing jumps */}
           <Row label={settings.me_hat} testId="settings.me.hat" tip={bare ? settings.me_hat_no : undefined}>
             {HAT_COLORS.map((c, i) => (
-              <Dot key={c} color={c} on={look.hat === i} off={bare} tip={HAT_WORD[i] ?? ''} onClick={() => { set({ ...look, hat: i }); }} testId={`settings.me.hat.${String(i)}`} />
+              <Dot key={c} color={c} on={!bare && look.hat === i} off={bare} tip={HAT_WORD[i] ?? ''} onClick={() => { set({ ...look, hat: i }); }} testId={`settings.me.hat.${String(i)}`} />
             ))}
           </Row>
         </div>

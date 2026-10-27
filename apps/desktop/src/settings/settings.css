@@ -106,9 +106,11 @@
 .me .b-help { margin-top: var(--s-3); padding-left: var(--s-3); }
 .me-box { display: flex; gap: var(--s-4); align-items: flex-start; padding: var(--s-3); border-radius: var(--r-menu); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
 .me-big { flex: none; width: 88px; height: 88px; display: grid; place-items: center; }
-.me-rows { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
-.me-row { display: flex; align-items: center; gap: var(--s-3); min-height: var(--s-8); }
-.me-row-n { flex: none; width: 88px; font: var(--t-13) var(--font-ui); color: var(--c-text); }
+/* the label column sizes to its longest label, shared by every row (designer m_48402: 'Accessory
+   colour' on one line): each row is a subgrid of the rows' two columns */
+.me-rows { min-width: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); row-gap: var(--s-2); column-gap: var(--s-3); }
+.me-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--s-8); }
+.me-row-n { white-space: nowrap; font: var(--t-13) var(--font-ui); color: var(--c-text); }
 .me-row-c { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1); }
 .me-dot { width: var(--s-5); height: var(--s-5); border-radius: 50%; background: var(--me-dot); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
 .me-cut, .me-tile { display: grid; place-items: center; border-radius: var(--r-menu); }

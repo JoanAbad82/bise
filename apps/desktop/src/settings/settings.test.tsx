@@ -143,11 +143,13 @@ describe('Settings', () => {
     const p = ports();
     view('general', p);
     const dot = (i: number) => screen.getByTestId<HTMLButtonElement>(`settings.me.hat.${String(i)}`);
-    // nothing on the head: the row stays, its dots greyed and its tip says why; today's sky blue picked
-    expect(dot(0).getAttribute('aria-pressed')).toBe('true');
+    // nothing on the head: the row stays, its dots greyed, none ringed, and its tip says why
+    expect(dot(0).getAttribute('aria-pressed')).toBe('false');
     expect(dot(3).disabled).toBe(true);
     expect(screen.getByTestId('settings.me.hat').getAttribute('data-tip')).toBe(settings.me_hat_no);
     fireEvent.click(screen.getByTestId('settings.me.wear.beanie'));
+    // a hat on: today's sky blue ringed again
+    expect(dot(0).getAttribute('aria-pressed')).toBe('true');
     expect(dot(3).disabled).toBe(false);
     expect(screen.getByTestId('settings.me.hat').getAttribute('data-tip')).toBeNull();
     fireEvent.click(dot(3));
