@@ -37,21 +37,21 @@ export function useBimsLit(): Lit | null {
 }
 
 /**
- * How close the follow camera looks: 4.4x the fit (Gabriel, bims-fix: at 2.2x the bim was lost in
- * the room; he wants it and its desk filling a good part of the view, about twice that).
+ * How close the follow camera looks: 8.8x the fit (Gabriel, bims-fix: at 2.2x the bim was lost in
+ * the room, 4.4x then; his m_47408: twice that again, the bim and its desk fill the tile).
  */
-export const FOLLOW_ZOOM = 4.4;
+export const FOLLOW_ZOOM = 8.8;
 /** the follow camera's ease: about 300 ms to settle */
 const FOLLOW_TAU = 0.1;
 
 /**
- * The agent the office follows for the route on screen: an agent's thread in this project, but
- * main's (the default screen: the whole office stays) and an archived one's (no bim). Pure.
+ * The agent the office follows for the route on screen: an agent's thread in this project, main's
+ * too (his m_47407: talking to main looks at main's bim), but an archived one's (no bim). Pure.
  */
-export function followOf(route: { screen: string; project?: string; agent?: string }, project: string, agents: readonly { name: string; main: boolean; archived?: boolean }[]): string | null {
+export function followOf(route: { screen: string; project?: string; agent?: string }, project: string, agents: readonly { name: string; archived?: boolean }[]): string | null {
   if (route.screen !== 'thread' || route.project !== project || route.agent === undefined) return null;
   const a = agents.find((x) => x.name === route.agent);
-  return a === undefined || a.main || a.archived === true ? null : a.name;
+  return a === undefined || a.archived === true ? null : a.name;
 }
 
 /** The view centred on a point (u, v: fractions of the fit), `zoom` close (FOLLOW_ZOOM by default), held inside the fit. Pure. */

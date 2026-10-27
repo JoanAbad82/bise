@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@/proto';
 import type { Activity, Label, Motion, Office as OfficeMap, OfficeRenderer, Pose, Timeline } from './model';
 import { BimsSwitch, labelsSig, Office, tagOf, type Parts } from './Office';
+import { FOLLOW_ZOOM } from './focus';
 import { bimsView } from './view';
 import { readyMaps } from './maps';
 import { bims as bimsWords } from '@/proto/words_bims.gen';
@@ -431,12 +432,12 @@ describe('the follow camera (focus.ts)', () => {
       expect(zoom()).toBeCloseTo(2.2, 2);
       rerender(at(undefined));
       await run();
-      expect(zoom()).toBeCloseTo(4.4, 2);
+      expect(zoom()).toBeCloseTo(FOLLOW_ZOOM, 2);
       rerender(at(2.2));
       now += 100;
       await flush(1);
       // one step on: between the two, on its way back
-      expect(zoom()).toBeLessThan(4.4);
+      expect(zoom()).toBeLessThan(FOLLOW_ZOOM);
       expect(zoom()).toBeGreaterThan(2.2);
     } finally {
       clock.mockRestore();

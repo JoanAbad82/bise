@@ -326,7 +326,7 @@ export function Office({
   useEffect(() => {
     const was = followRef.current.target;
     if (follow === (was === null || was === 'fit' ? null : was.name)) return;
-    // another agent's thread: follow it; none (main's, bise's, a screen): back to the whole office if it followed one
+    // another agent's thread (main's too): follow it; none (bise's, a screen): back to the whole office if it followed one
     followRef.current = { target: follow !== null ? { name: follow } : was === null ? null : 'fit', at: 0 };
     kickRef.current();
   }, [follow]);

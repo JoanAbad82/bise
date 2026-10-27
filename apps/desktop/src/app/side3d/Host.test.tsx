@@ -726,7 +726,7 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(opened).toEqual([{ kind: 'office', project: ACME }]);
   });
 
-  it('the open agent\'s bim is followed (his m_47261): another agent picked, the tile goes to it; main\'s thread, the whole office', () => {
+  it('the open agent\'s bim is followed (his m_47261): another agent picked, the tile goes to it; main\'s thread, main\'s bim (his m_47407)', () => {
     tall(900);
     const { router } = side3d(1440);
     expect(office.follow.at(-1)).toBe('perf');
@@ -737,7 +737,7 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     act(() => {
       router.go({ screen: 'thread', project: ACME, agent: 'main' });
     });
-    expect(office.follow.at(-1)).toBeNull();
+    expect(office.follow.at(-1)).toBe('main');
   });
 
   it('an ask opened in place in the card: the tile looks at its bim while it is open, then back to the thread\'s (designer m_47300)', () => {

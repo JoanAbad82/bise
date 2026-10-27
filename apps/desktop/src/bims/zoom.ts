@@ -13,8 +13,11 @@ export interface Cam {
 }
 
 export const FIT: Cam = { zoom: 1, u: 0.5, v: 0.5 };
-/** his pinch's closest, past the follow camera's (focus.ts FOLLOW_ZOOM) */
-export const MAX_ZOOM = 6;
+/**
+ * his pinch's closest, past the follow camera's (focus.ts FOLLOW_ZOOM): one bim fills the view, the
+ * tile at its tallest too (his m_47411; render/camera.test.ts measures it)
+ */
+export const MAX_ZOOM = 24;
 /** a drag shorter than this (css px) is still a click */
 export const DRAG_PX = 4;
 /** how much one wheel pixel of a pinch zooms (Chromium sends a trackpad pinch as a ctrl wheel) */

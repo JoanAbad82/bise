@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
-import { FIT, zoomAt } from '../zoom';
-import { EL, fitSite, siteOf, toScreen, viewFit } from './camera';
+import { OUTER_W } from '@/app/side3d/layout';
+import { TILE_H } from '@/app/side3d/tilestate';
+import { FIT, MAX_ZOOM, zoomAt } from '../zoom';
+import { boxSite, EL, fitSite, siteOf, toScreen, viewFit } from './camera';
+import { HEAD_R, HEAD_Y } from './laptop';
 
 /** the prototype's office numbers for n agents (maps/loft.ts owns the real ones; these only size the site) */
 function officeFor(n: number): Office {
@@ -80,5 +83,17 @@ describe('camera fit', () => {
     // and the view never leaves the fit's rectangle
     expect(v.left).toBeGreaterThanOrEqual(f.left - 1e-9);
     expect(v.top).toBeLessThanOrEqual(f.top + 1e-9);
+  });
+
+  it('his pinch goes in until one bim fills the view: the tile (140 and 300 high) and the panel (his m_47411)', () => {
+    // a bim stands about its head's top tall, seen at EL: what the view's height must not pass
+    const bim = (HEAD_Y + HEAD_R) * Math.cos(EL) + 0.25;
+    for (const n of [2, 8, 14]) {
+      const site = siteOf(officeFor(n));
+      for (const f of [boxSite(site, OUTER_W, TILE_H), boxSite(site, OUTER_W, 300), fitSite(site, 900, 700)]) {
+        const v = viewFit(f, { zoom: MAX_ZOOM, u: 0.5, v: 0.5 });
+        expect(v.top - v.bottom).toBeLessThanOrEqual(bim);
+      }
+    }
   });
 });

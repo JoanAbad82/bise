@@ -14,8 +14,10 @@ describe('followOf', () => {
   it("follows an agent's thread in this project", () => {
     expect(followOf({ screen: 'thread', project: 'p', agent: 'perf' }, 'p', agents)).toBe('perf');
   });
-  it("never main's, an archived one's, another project's or another screen", () => {
-    expect(followOf({ screen: 'thread', project: 'p', agent: 'main' }, 'p', agents)).toBeNull();
+  it("follows main's too (his m_47407: talking to main looks at main's bim)", () => {
+    expect(followOf({ screen: 'thread', project: 'p', agent: 'main' }, 'p', agents)).toBe('main');
+  });
+  it("never an archived one's, another project's or another screen", () => {
     expect(followOf({ screen: 'thread', project: 'p', agent: 'old' }, 'p', agents)).toBeNull();
     expect(followOf({ screen: 'thread', project: 'q', agent: 'perf' }, 'p', agents)).toBeNull();
     expect(followOf({ screen: 'agents', project: 'p' }, 'p', agents)).toBeNull();
@@ -29,16 +31,17 @@ describe('the follow camera', () => {
     expect(corner.u).toBeCloseTo(0.5 / FOLLOW_ZOOM);
     expect(corner.v).toBeCloseTo(1 - 0.5 / FOLLOW_ZOOM);
   });
-  it('looks about twice as close as the first follow (his shot: the bim and its desk fill the view), within his pinch', () => {
-    expect(FOLLOW_ZOOM).toBeGreaterThanOrEqual(4);
-    expect(FOLLOW_ZOOM).toBeLessThanOrEqual(MAX_ZOOM);
+  it('looks twice as close as the 4.4x follow (his m_47408), with room for his pinch past it', () => {
+    expect(FOLLOW_ZOOM).toBe(8.8);
+    expect(FOLLOW_ZOOM).toBeLessThan(MAX_ZOOM);
   });
   it('eases there in about 300 ms, at once under reduced motion', () => {
     const to = aimAt(0.3, 0.6);
     expect(easeCam(FIT, to, 0.016, true)).toEqual(to);
     let c = FIT;
     for (let i = 0; i < 18; i++) c = easeCam(c, to, 1 / 60, false);
-    expect(Math.abs(c.zoom - to.zoom)).toBeLessThan(0.2);
+    // 300 ms: 95 % of the way there
+    expect(Math.abs(c.zoom - to.zoom)).toBeLessThan(0.06 * (to.zoom - FIT.zoom));
     for (let i = 0; i < 60; i++) c = easeCam(c, to, 1 / 60, false);
     expect(c).toEqual(to);
     expect(settled(c, to)).toBe(true);
