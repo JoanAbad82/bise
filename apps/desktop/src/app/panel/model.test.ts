@@ -9,7 +9,6 @@ import {
   withOpen,
   fitW,
   clampW,
-  closable,
   closeIn,
   closeOthers,
   dropGone,
@@ -24,7 +23,6 @@ import {
   nextLauncher,
   nextShell,
   openIn,
-  OVERVIEW,
   parseKept,
   pushClosed,
   pushRecent,
@@ -45,44 +43,41 @@ const agent = (name: string, project = 'acme'): TabWhat => ({ kind: 'thing', e: 
 const ids = (t: Tabs | undefined) => t?.list.map((x) => x.id);
 
 describe('the tab model: open', () => {
-  it('a fresh panel is Overview alone', () => {
-    expect(ids(FIRST)).toEqual(['overview']);
-    expect(FIRST.active).toBe('overview');
+  it('a fresh panel has no tab: the Overview left it for the outer card (page outer-side v2)', () => {
+    expect(ids(FIRST)).toEqual([]);
+    expect(FIRST.active).toBe('');
   });
   it('a new thing goes right after the tab in front and comes to the front', () => {
     let t = openIn(FIRST, art('a'));
     t = openIn(t, art('b'));
-    expect(ids(t)).toEqual(['overview', 'artifact:acme/a', 'artifact:acme/b']);
-    t = activate(t, 'overview');
+    expect(ids(t)).toEqual(['artifact:acme/a', 'artifact:acme/b']);
+    t = activate(t, 'artifact:acme/a');
     t = openIn(t, art('c'));
-    expect(ids(t)).toEqual(['overview', 'artifact:acme/c', 'artifact:acme/a', 'artifact:acme/b']);
+    expect(ids(t)).toEqual(['artifact:acme/a', 'artifact:acme/c', 'artifact:acme/b']);
     expect(t.active).toBe('artifact:acme/c');
   });
   it('an open thing comes to the front, never twice', () => {
     let t = openIn(openIn(FIRST, art('a')), art('b'));
     t = openIn(t, art('a'));
-    expect(ids(t)).toEqual(['overview', 'artifact:acme/a', 'artifact:acme/b']);
+    expect(ids(t)).toEqual(['artifact:acme/a', 'artifact:acme/b']);
     expect(t.active).toBe('artifact:acme/a');
   });
   it("a pick from New tab takes the launcher's place, as a browser's tab becomes the page", () => {
     let t = openIn(FIRST, nextLauncher(FIRST));
     expect(t.active).toBe('new:1');
     t = openIn(t, art('a'), 'new:1');
-    expect(ids(t)).toEqual(['overview', 'artifact:acme/a']);
+    expect(ids(t)).toEqual(['artifact:acme/a']);
   });
   it('a pick of an open thing from New tab closes the launcher', () => {
     let t = openIn(FIRST, art('a'));
     t = openIn(t, nextLauncher(t));
     t = openIn(t, art('a'), 'new:1');
-    expect(ids(t)).toEqual(['overview', 'artifact:acme/a']);
+    expect(ids(t)).toEqual(['artifact:acme/a']);
     expect(t.active).toBe('artifact:acme/a');
   });
-  it("a card's ▯ brings the one Overview to the front, of no project but the view's (his m_45581)", () => {
-    const t = openIn(openIn(FIRST, art('a')), { kind: 'overview' });
-    expect(t.list).toEqual([OVERVIEW, { id: 'artifact:acme/a', what: art('a') }]);
-    expect(t.active).toBe('overview');
-    // a record from before kept a pinned project: it reads as the view's Overview
-    expect(parseKept({ tabs: { list: [{ what: { kind: 'overview', project: 'shop' } }] } }).tabs.list).toEqual([OVERVIEW]);
+  it('a kept Overview tab, from before the outer card, is dropped on read', () => {
+    expect(parseKept({ tabs: { list: [{ what: { kind: 'overview', project: 'shop' } }, { what: { kind: 'launcher', n: 1 } }] } }).tabs).toEqual({ list: [{ id: 'new:1', what: { kind: 'launcher', n: 1 } }], active: 'new:1' });
+    expect(parseKept({ tabs: { list: [{ what: { kind: 'overview' } }] } }).tabs).toEqual(FIRST);
   });
   it('New tabs and shells are numbered by the first free number', () => {
     const t = openIn(openIn(FIRST, nextLauncher(FIRST)), { kind: 'terminal', project: 'acme', n: 0 });
@@ -106,23 +101,21 @@ describe('the tab model: close, reorder, step', () => {
   it('closing another tab keeps the one in front', () => {
     expect(closeIn(three, 'artifact:acme/a').active).toBe('artifact:acme/c');
   });
-  it('Overview, the home, never closes (no ×)', () => {
-    expect(closable('overview')).toBe(false);
-    expect(closable('artifact:acme/a')).toBe(true);
-    expect(closeIn(FIRST, 'overview')).toBe(FIRST);
-    expect(closeIn(three, 'overview')).toBe(three);
+  it('every tab closes; the last one leaves none in front', () => {
+    expect(closeIn(FIRST, 'nope')).toBe(FIRST);
+    const one = openIn(FIRST, art('a'));
+    expect(closeIn(one, 'artifact:acme/a')).toEqual({ list: [], active: '' });
   });
-  it('close others keeps that one and Overview', () => {
-    expect(ids(closeOthers(three, 'artifact:acme/a'))).toEqual(['overview', 'artifact:acme/a']);
-    expect(ids(closeOthers(three, 'overview'))).toEqual(['overview']);
+  it('close others keeps that one alone', () => {
+    expect(ids(closeOthers(three, 'artifact:acme/a'))).toEqual(['artifact:acme/a']);
   });
   it('a drag moves a tab to its place, the others keep their order', () => {
-    expect(ids(moveIn(three, 'artifact:acme/c', 0))).toEqual(['artifact:acme/c', 'overview', 'artifact:acme/a', 'artifact:acme/b']);
-    expect(ids(moveIn(three, 'overview', 9))).toEqual(['artifact:acme/a', 'artifact:acme/b', 'artifact:acme/c', 'overview']);
+    expect(ids(moveIn(three, 'artifact:acme/c', 0))).toEqual(['artifact:acme/c', 'artifact:acme/a', 'artifact:acme/b']);
+    expect(ids(moveIn(three, 'artifact:acme/a', 9))).toEqual(['artifact:acme/b', 'artifact:acme/c', 'artifact:acme/a']);
     expect(moveIn(three, 'nope', 0)).toBe(three);
   });
   it('⌘⇧] and ⌘⇧[ step round the ends', () => {
-    expect(stepIn(three, 1).active).toBe('overview');
+    expect(stepIn(three, 1).active).toBe('artifact:acme/a');
     expect(stepIn(three, -1).active).toBe('artifact:acme/b');
     expect(stepIn(FIRST, 1)).toBe(FIRST);
   });
@@ -132,15 +125,15 @@ describe('the tab model: six at most in the bar (HIG), the rest in the overflow 
   let many: Tabs = FIRST;
   for (const id of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) many = openIn(many, art(id));
   it('the first six show, the rest overflow', () => {
-    const t = activate(many, 'overview');
+    const t = activate(many, 'artifact:acme/a');
     const { shown, over } = shownOf(t);
     expect(shown).toHaveLength(6);
-    expect(over.map((x) => x.id)).toEqual(['artifact:acme/f', 'artifact:acme/g']);
+    expect(over.map((x) => x.id)).toEqual(['artifact:acme/g']);
   });
   it('the tab in front always shows: past the sixth it takes the sixth place', () => {
     const { shown, over } = shownOf(many);
     expect(shown.at(-1)?.id).toBe('artifact:acme/g');
-    expect(over.map((x) => x.id)).toEqual(['artifact:acme/e', 'artifact:acme/f']);
+    expect(over.map((x) => x.id)).toEqual(['artifact:acme/f']);
   });
   it('six or fewer: nothing overflows', () => {
     expect(shownOf(FIRST).over).toEqual([]);
@@ -156,8 +149,8 @@ describe('the tab model: six at most in the bar (HIG), the rest in the overflow 
     expect(fitTabs([180, 180], 1, 100)).toBe(1);
     // the one in front takes the last place: its own width counts there
     expect(fitTabs([64, 64, 64, 180], 3, 64 * 2 + 180 + 8)).toBe(3);
-    const t = activate(many, 'overview');
-    expect(shownOf(t, fitTabs([92, 120, 120], 0, 250)).shown.map((x) => x.id)).toEqual(['overview', 'artifact:acme/a']);
+    const t = activate(many, 'artifact:acme/a');
+    expect(shownOf(t, fitTabs([92, 120, 120], 0, 250)).shown.map((x) => x.id)).toEqual(['artifact:acme/a', 'artifact:acme/b']);
   });
 });
 
@@ -165,7 +158,7 @@ describe("the tab model: an agent's tabs go with the agent (a rename changes its
   const t = openIn(openIn(openIn(FIRST, agent('perf')), agent('docs')), { kind: 'thing', e: { kind: 'diff', project: 'acme', agent: 'perf' } });
   it('drops the tabs of agents no longer in the rows', () => {
     const out = dropGone(t, () => new Set(['main', 'docs']));
-    expect(ids(out)).toEqual(['overview', 'agent:acme/docs']);
+    expect(ids(out)).toEqual(['agent:acme/docs']);
   });
   it("keeps a project's tabs while its rows haven't come", () => {
     expect(dropGone(t, () => undefined)).toBe(t);
@@ -174,7 +167,6 @@ describe("the tab model: an agent's tabs go with the agent (a rename changes its
 
 describe('the panel width (page native-mac §6: 384; mockup 2: 480; mockup 4: 640)', () => {
   it('each kind of tab asks its width', () => {
-    expect(widthOf({ kind: 'overview' })).toBe('rows');
     expect(widthOf({ kind: 'launcher', n: 1 })).toBe('rows');
     expect(widthOf({ kind: 'terminal', project: 'acme', n: 0 })).toBe('shell');
     expect(widthOf(art('a'))).toBe('page');
@@ -222,11 +214,11 @@ describe('Recent', () => {
 });
 
 describe('the kept record (kept per window, read back after a reload)', () => {
-  it('a record without Overview gets it back first (the home)', () => {
-    expect(ids(parseKept({ tabs: { list: [{ what: { kind: 'launcher', n: 1 } }] } }).tabs)).toEqual(['overview', 'new:1']);
-    expect(parseKept({ tabs: { list: [{ what: { kind: 'launcher', n: 1, artifacts: true } }, { what: { kind: 'browser', n: 2 } }] } }).tabs.list.map((x) => x.what)).toEqual([{ kind: 'overview' }, { kind: 'launcher', n: 1, artifacts: true }, { kind: 'browser', n: 2 }]);
+  it('a record reads its tabs back as they were, none added', () => {
+    expect(ids(parseKept({ tabs: { list: [{ what: { kind: 'launcher', n: 1 } }] } }).tabs)).toEqual(['new:1']);
+    expect(parseKept({ tabs: { list: [{ what: { kind: 'launcher', n: 1, artifacts: true } }, { what: { kind: 'browser', n: 2 } }] } }).tabs.list.map((x) => x.what)).toEqual([{ kind: 'launcher', n: 1, artifacts: true }, { kind: 'browser', n: 2 }]);
   });
-  it('a broken or missing record reads folded, on Overview', () => {
+  it('a broken or missing record reads folded, with no tab', () => {
     expect(parseKept(undefined)).toEqual(FOLDED);
     expect(parseKept('x')).toEqual(FOLDED);
     expect(FOLDED.open).toBe(false);
@@ -243,7 +235,7 @@ describe('the kept record (kept per window, read back after a reload)', () => {
       recent: [{ kind: 'pr', project: 'acme', number: 6 }, { kind: 'pr' }],
     });
     expect(k.open).toBe(true);
-    expect(ids(k.tabs)).toEqual(['overview', 'artifact:acme/a']);
+    expect(ids(k.tabs)).toEqual(['artifact:acme/a']);
     expect(k.tabs.active).toBe('artifact:acme/a');
     expect(k.width).toBe(640);
     expect(k.dragged).toBe(true);
@@ -251,7 +243,7 @@ describe('the kept record (kept per window, read back after a reload)', () => {
   });
   it('a tab in front that is gone falls back to the first', () => {
     const k = parseKept({ tabs: { active: 'nope', list: [{ what: { kind: 'terminal', project: 'acme', n: 1 } }] } });
-    expect(k.tabs.active).toBe('overview');
+    expect(k.tabs.active).toBe('term:acme#1');
   });
   it('full width reads back only with the panel open (a folded one opens beside the thread)', () => {
     expect(parseKept({ open: true, full: true }).full).toBe(true);
@@ -298,15 +290,15 @@ describe('the closed tabs (⇧⌘T, his m_46187, as Chrome)', () => {
   const three = (): Tabs => [a, b, c].reduce((t, w) => openIn(t, w), FIRST);
   it('close two, reopen twice: the last closed first, each in its place and in front', () => {
     let t = three();
-    expect(t.list.map((x) => x.id)).toEqual(['overview', 'web:1', 'web:2', 'web:3']);
+    expect(t.list.map((x) => x.id)).toEqual(['web:1', 'web:2', 'web:3']);
     let stack = pushClosed([], t, ['web:2']);
     t = closeIn(t, 'web:2');
     stack = pushClosed(stack, t, ['web:1']);
     t = closeIn(t, 'web:1');
     const r1 = reopenIn(t, stack);
-    expect(r1?.tabs).toEqual({ list: [OVERVIEW, { id: 'web:1', what: a }, { id: 'web:3', what: c }], active: 'web:1' });
+    expect(r1?.tabs).toEqual({ list: [{ id: 'web:1', what: a }, { id: 'web:3', what: c }], active: 'web:1' });
     const r2 = reopenIn(r1?.tabs ?? t, r1?.stack ?? []);
-    expect(r2?.tabs.list.map((x) => x.id)).toEqual(['overview', 'web:1', 'web:2', 'web:3']);
+    expect(r2?.tabs.list.map((x) => x.id)).toEqual(['web:1', 'web:2', 'web:3']);
     expect(r2?.tabs.active).toBe('web:2');
     expect(reopenIn(r2?.tabs ?? t, r2?.stack ?? []), 'nothing left').toBeUndefined();
   });
@@ -319,11 +311,11 @@ describe('the closed tabs (⇧⌘T, his m_46187, as Chrome)', () => {
       t = r?.tabs ?? t;
       stack = r?.stack ?? [];
     }
-    expect(t.list.map((x) => x.id)).toEqual(['overview', 'web:1', 'web:2', 'web:3']);
+    expect(t.list.map((x) => x.id)).toEqual(['web:1', 'web:2', 'web:3']);
   });
-  it('Overview never goes on it; one open again by another door only comes to the front', () => {
+  it('an id not open never goes on it; one open again by another door only comes to the front', () => {
     const t = three();
-    expect(pushClosed([], t, ['overview'])).toEqual([]);
+    expect(pushClosed([], t, ['nope'])).toEqual([]);
     const stack = pushClosed([], t, ['web:1']);
     const r = reopenIn(activate(t, 'web:3'), stack);
     expect(r?.tabs.list).toEqual(t.list);

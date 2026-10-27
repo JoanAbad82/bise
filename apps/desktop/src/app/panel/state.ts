@@ -15,7 +15,7 @@ import { useLeftWidth } from '@/app/frame-state';
 import { iconKindOf } from '@/ds';
 import { useAllArtifacts } from '@/artifacts';
 import { armHandoff } from '@/composer/handoff';
-import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushClosed, pushRecent, reopenIn, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type Closed, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, artFit, clampShare, shareOf, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushClosed, pushRecent, reopenIn, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type Closed, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 import { isFlat, parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf, type PanelRec } from './scope';
 
 const KEY = 'panel';
@@ -206,8 +206,12 @@ export function usePanelFull(): boolean {
   return usePanelBox().full;
 }
 
-/** The bar's ▯ and ⌥⌘B (⌥⌘0): fold or unfold, on the tab he left in front. */
+/** The bar's ▯ and ⌥⌘B (⌥⌘0): fold or unfold, on the tab he left in front; no tab: a New tab (designer m_46177). */
 export function panelToggle(): void {
+  if (!state.open && state.tabs.list.length === 0) {
+    openLauncher();
+    return;
+  }
   set({ ...state, open: !state.open });
 }
 
@@ -313,7 +317,10 @@ function remember(ids: readonly string[]): void {
  */
 export function closeTabId(id: string, opts: { readonly remember?: boolean } = {}): void {
   if (opts.remember !== false) remember([id]);
-  setTabs(closeIn(state.tabs, id));
+  const tabs = closeIn(state.tabs, id);
+  // the last tab closed: the panel folds (the outer card comes back), nothing left to show
+  if (tabs.list.length === 0) set({ ...state, tabs, open: false });
+  else setTabs(tabs);
 }
 
 /**
@@ -358,10 +365,10 @@ export function stepTab(dir: 1 | -1): void {
   if (state.open) setTabs(stepIn(state.tabs, dir));
 }
 
-/** ⌘W on the panel: the tab in front closes; on Overview (the home, never closed) the panel folds. */
+/** ⌘W on the panel: the tab in front closes (the last one folds the panel); no tab: the panel folds. */
 export function closeActive(): void {
   if (!state.open) return;
-  if (closable(state.tabs.active)) closeTabId(state.tabs.active);
+  if (state.tabs.active !== '') closeTabId(state.tabs.active);
   else set({ ...state, open: false });
 }
 
@@ -381,22 +388,6 @@ export function resetWidth(): void {
   set({ ...state, width: FOLDED.width, dragged: false });
 }
 
-/** An Overview section a card asked for (nm-side's ▯ 'pin as a tab'): the Overview scrolls to it once. */
-export type OverviewSection = 'agents' | 'artifacts' | 'processes';
-let sectionAsk: OverviewSection | null = null;
-
-/** The Overview in front, scrolled to `section`. */
-export function openOverviewAt(section: OverviewSection): void {
-  sectionAsk = section;
-  openWhat({ kind: 'overview' });
-}
-
-/** The section asked, once: the Overview takes it and scrolls there. */
-export function takeSection(): OverviewSection | null {
-  const s = sectionAsk;
-  sectionAsk = null;
-  return s;
-}
 
 /** The rows came: the tabs of agents no longer in them go (model.ts dropGone). */
 export function dropGoneTabs(known: (project: string) => ReadonlySet<string> | undefined): void {

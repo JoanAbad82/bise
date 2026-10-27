@@ -14,7 +14,7 @@ import { BREATH } from '@/working/gust';
 import { StateMark } from '@/agents/AgentsScreen';
 import { WorkingMark } from './Marks';
 import { AgentEnd } from './Sidebar';
-import { AgentSign } from './RightBar';
+import { AgentSign } from './Marks';
 import { Store, StoreProvider } from '@/store';
 import { ComposerTab } from '@/thread/ComposerTab';
 

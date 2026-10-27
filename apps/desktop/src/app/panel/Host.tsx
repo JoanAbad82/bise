@@ -27,7 +27,6 @@ import { backFromFull, MAX_W, MIN_W, pastFull, SHARE_MAX, SHARE_MIN, type Tab } 
 import { useLeftWidth } from '@/app/frame-state';
 import { dropGoneArtTabs, dropGoneTabs, panelToggle, resetArtShare, resetWidth, setArtShare, setFull, setFullPreview, setWidth, useFrontArtKind, usePanelFit, usePanelFull, usePanelState, useScopeSnap } from './state';
 import { PANEL_FULL_KEY } from './keys';
-import { Overview } from './Overview';
 import { Launcher } from './Launcher';
 import { ThingTab } from './Thing';
 import { BlankBrowser } from './Browser';
@@ -117,8 +116,6 @@ function Body({ tab, shown }: { tab: Tab; shown: boolean }) {
   if (what.kind === 'terminal') return <TerminalTab project={what.project} n={what.n} shown={shown} />;
   if (!shown) return null;
   switch (what.kind) {
-    case 'overview':
-      return <Overview shown={shown} />;
     case 'launcher':
       return <Launcher tabId={tab.id} shown={shown} artifacts={what.artifacts === true} />;
     case 'browser':

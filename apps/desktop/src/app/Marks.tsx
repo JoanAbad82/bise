@@ -10,7 +10,7 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import type { Agent, ProjectRow } from '@/proto';
 import { useProjects, useStore } from '@/store';
-import { BiseMark, tipAttrs } from '@/ds';
+import { BiseMark, RowMark, tipAttrs } from '@/ds';
 import { biseMark, finished, KISS_HOLD_MS, KISS_MS, projectMark, type ProjectMarkKind } from './markstates';
 import { biseTip } from './tipwords';
 import { Breath, MarkBreath } from '@/working/Signs';
@@ -133,3 +133,36 @@ export function LiveBiseMark({ size = 14, testId }: { size?: number; testId?: st
   const m = biseMark(useProjects());
   return <BiseMark waits={m.waits > 0} working={m.working > 0} size={size} tip={biseTip(m.waits, m.working)} testId={testId} />;
 }
+
+/** An agent's mark in a row's 16 state column (r2-launcher #8, r2-img7: no glowing ball). */
+export type AgentMark = 'works' | 'asks' | 'failed' | 'done' | 'none';
+
+/**
+ * An agent's mark, the pre-native-mac row glyph drawn as the ds line marks (RowMark, as the
+ * thread's): at work main's breath (WorkingMark, his m_44714), asking '?' in the accent, failed the
+ * alert, done the check in ink; idle or stopped nothing. Its words stay in the tip. Pure.
+ */
+export function agentMark(g: string, working: boolean): AgentMark {
+  if (working) return 'works';
+  if (g === '?') return 'asks';
+  if (g === '✗') return 'failed';
+  if (g === '✓') return 'done';
+  return 'none';
+}
+
+/** An agent's mark drawn (agentMark). */
+export function AgentSign({ mark, testId }: { mark: AgentMark; testId: string }) {
+  switch (mark) {
+    case 'works':
+      return <WorkingMark testId={`${testId}.works`} />;
+    case 'asks':
+      return <RowMark icon="ask" tone="accent" />;
+    case 'failed':
+      return <RowMark icon="alert" tone="err" />;
+    case 'done':
+      return <RowMark icon="check" tone="plain" />;
+    case 'none':
+      return null;
+  }
+}
+

@@ -15,7 +15,7 @@ import type { AnswerAt } from '@/store/answered';
 import { panel } from '@/proto/words_panel.gen';
 import { side } from '@/proto/words_side.gen';
 import { markTip } from '../tipwords';
-import { AgentSign } from '../RightBar';
+import { AgentSign } from '../Marks';
 import { askInbox } from '../inboxAsk';
 import { useEntityMenu } from '../menus/use';
 import { roleWords, type BarRow, type ProjAgent } from '../barrows';

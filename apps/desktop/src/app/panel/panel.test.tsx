@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-// The tabbed panel drawn (native-mac-qa §7, §12's testids): folded by default, ▯ unfolds it on
-// Overview, '+' opens New tab whose rows act, × closes a tab, the last one folds the panel, a tab
+// The tabbed panel drawn (native-mac-qa §7, §12's testids): folded by default, ▯ unfolds it on its
+// tabs (none: a New tab; the Overview left it for the outer card, page outer-side v2), '+' opens New tab whose rows act, × closes a tab, the last one folds the panel, a tab
 // in front always shows past six.
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { useLayoutEffect } from 'react';
@@ -54,15 +54,15 @@ describe('the tabbed panel', () => {
     expect(v.getByTestId('app.panel').hasAttribute('inert')).toBe(true);
     expect(v.queryByTestId('app.right')).toBeNull();
   });
-  it('▯ unfolds it on Overview at 384, its tabs in its own top row; again folds it', () => {
+  it('▯ with no tab unfolds it on a New tab at 384 (designer m_46177), its tabs in its own top row; again folds it', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
-    expect(v.getByTestId('app.panel.tab.overview').getAttribute('aria-selected')).toBe('true');
+    expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
     expect(v.getByTestId('app.panel.top').contains(v.getByTestId('app.panel.tabs'))).toBe(true);
     expect(v.getByTestId('app.panel').contains(v.getByTestId('app.panel.top'))).toBe(true);
     expect(v.getByTestId('app.panel').style.width).toBe('384px');
     expect(v.getByTestId('app.panel').hasAttribute('inert')).toBe(false);
-    expect(v.getByTestId('app.right')).toBeTruthy();
+    expect(v.queryByTestId('app.right')).toBeNull();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByTestId('app.panel').style.width).toBe('0px');
   });
@@ -70,7 +70,7 @@ describe('the tabbed panel', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     fireEvent.click(v.getByTestId('app.panel.add'));
-    expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
+    expect(v.getByTestId('app.panel.tab.new:2').getAttribute('aria-selected')).toBe('true');
     expect(v.getByTestId('app.panel.launcher.search')).toBeTruthy();
     for (const k of ['artifacts', 'terminal', 'browser', 'office']) expect(v.getByTestId(`app.panel.launcher.${k}`)).toBeTruthy();
     expect(v.getByTestId('app.panel.launcher.terminal').textContent).toContain('⌃`');
@@ -79,12 +79,11 @@ describe('the tabbed panel', () => {
   it("New tab's Changes opens the agent in view's changes in its place", () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
-    fireEvent.click(v.getByTestId('app.panel.add'));
     fireEvent.click(v.getByTestId('app.panel.launcher.changes'));
     expect(v.queryByTestId('app.panel.tab.new:1')).toBeNull();
     expect(v.getByTestId(`app.panel.tab.diff:${ACME}/perf`).getAttribute('aria-selected')).toBe('true');
   });
-  it('openTab unfolds it on the thing; × closes it; Overview, the home, has no ×', () => {
+  it('openTab unfolds it on the thing; × closes it; the last one folds the panel', () => {
     const v = shell();
     act(() => {
       openTab({ kind: 'pr', project: ACME, number: 6 });
@@ -94,9 +93,8 @@ describe('the tabbed panel', () => {
     expect(tab.textContent).toContain('PR #6');
     expect(v.getByTestId('app.panel').style.width).toBe('640px');
     fireEvent.click(v.getByTestId(`app.panel.tab.pr:${ACME}/6.close`));
-    expect(v.getByTestId('app.panel.tab.overview').getAttribute('aria-selected')).toBe('true');
-    expect(v.queryByTestId('app.panel.tab.overview.close')).toBeNull();
-    expect(panelState.get().open).toBe(true);
+    expect(panelState.get().tabs.list).toEqual([]);
+    expect(panelState.get().open).toBe(false);
   });
   it('⇧⌘T (his m_46187, as Chrome): close two tabs, reopen twice, both come back in their place, the last closed first', () => {
     const v = shell();
@@ -106,19 +104,19 @@ describe('the tabbed panel', () => {
       openTab({ kind: 'pr', project: ACME, number: 8 });
     });
     const ids = () => panelState.get().tabs.list.map((t) => t.id);
-    const all = ['overview', `pr:${ACME}/6`, `pr:${ACME}/7`, `pr:${ACME}/8`];
+    const all = [`pr:${ACME}/6`, `pr:${ACME}/7`, `pr:${ACME}/8`];
     expect(ids()).toEqual(all);
     fireEvent.click(v.getByTestId(`app.panel.tab.pr:${ACME}/7.close`));
     fireEvent.click(v.getByTestId(`app.panel.tab.pr:${ACME}/6.close`));
     act(() => {
       panelToggle();
     });
-    expect(ids()).toEqual(['overview', `pr:${ACME}/8`]);
+    expect(ids()).toEqual([`pr:${ACME}/8`]);
     act(() => {
       reopenClosed();
     });
     expect(panelState.get().open, 'a folded panel unfolds on it').toBe(true);
-    expect(ids()).toEqual(['overview', `pr:${ACME}/6`, `pr:${ACME}/8`]);
+    expect(ids()).toEqual([`pr:${ACME}/6`, `pr:${ACME}/8`]);
     expect(v.getByTestId(`app.panel.tab.pr:${ACME}/6`).getAttribute('aria-selected')).toBe('true');
     act(() => {
       reopenClosed();
@@ -136,7 +134,7 @@ describe('the tabbed panel', () => {
       for (let n = 1; n <= 7; n++) openTab({ kind: 'commit', project: ACME, sha: `abcdef${String(n)}` });
     });
     expect(v.getAllByRole('tab')).toHaveLength(6);
-    expect(v.getByTestId('app.panel.over').textContent).toContain('2');
+    expect(v.getByTestId('app.panel.over').textContent).toContain('1');
     expect(v.getByTestId(`app.panel.tab.commit:${ACME}/abcdef7`)).toBeTruthy();
     expect(v.getByTestId(`app.panel.tab.commit:${ACME}/abcdef7`).getAttribute('aria-selected')).toBe('true');
   });
@@ -144,8 +142,8 @@ describe('the tabbed panel', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     expect(v.getByRole('tablist').getAttribute('aria-label')).toBe('Panel tabs');
-    const t = v.getByTestId('app.panel.tab.overview');
-    expect(t.getAttribute('aria-label')).toBe('Overview');
+    const t = v.getByTestId('app.panel.tab.new:1');
+    expect(t.getAttribute('aria-label')).toBe(panel.tab_new);
     // its whole title shows: no tip repeating it (ui-review m_42619 #5)
     fireEvent.pointerEnter(t);
     expect(t.getAttribute('data-tip')).toBeNull();

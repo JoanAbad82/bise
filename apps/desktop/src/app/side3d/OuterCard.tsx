@@ -16,7 +16,7 @@ import { useStore } from '@/store';
 import type { AnswerAt } from '@/store/answered';
 import { side } from '@/proto/words_side.gen';
 import { waitLen } from '@/thread/wake';
-import { AgentSign } from '../RightBar';
+import { AgentSign } from '../Marks';
 import { askInbox } from '../inboxAsk';
 import { useEntityMenu } from '../menus/use';
 import { roleWords, type BarRow, type ProjAgent } from '../barrows';

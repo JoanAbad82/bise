@@ -28,8 +28,6 @@ function lookOf(tab: Tab, projects: ReturnType<typeof useProjects>, arts: Return
   const project = what.kind === 'terminal' ? what.project : what.kind === 'thing' && 'project' in what.e ? what.e.project : undefined;
   const name = projects.find((p) => p.project === project)?.name ?? project ?? '';
   switch (what.kind) {
-    case 'overview':
-      return { title: panel.tab_overview, icon: null };
     case 'launcher':
       return { title: panel.tab_new, icon: <AppIcon name="browser" size={14} /> };
     case 'browser':

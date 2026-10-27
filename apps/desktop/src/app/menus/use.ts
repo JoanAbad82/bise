@@ -13,7 +13,6 @@ import type { BiseApi, PopupAt } from '@/shared/api';
 import { entityKey, type Entity } from '@/shared/entity';
 import { closeOtherTabs, closeTab, moveTab, openTab, tabEntity, tabMoveable } from '../panel/tabs';
 import { panelState } from '../panel/state';
-import { closable } from '../panel/model';
 import { isPinned, pin, pinsOf } from '../pins';
 import type { Prefs } from '@/settings/prefs';
 import { MAIN, type Route } from '../route';
@@ -33,7 +32,7 @@ export interface FactReads {
   readonly scheduled: (project: string) => readonly ScheduledTask[];
   readonly pinned: (project: string, agent: string) => boolean;
   readonly reply: (project: string, agent: string) => string | undefined;
-  /** a panel tab's thing (none: Overview, New tab, a terminal), whether it moves, closes (Overview never), whether others are open */
+  /** a panel tab's thing (none: New tab, a terminal), whether it moves, closes, whether others are open */
   readonly tab: (id: string) => { readonly inner: Entity | undefined; readonly moveable: boolean; readonly closable: boolean; readonly others: boolean };
 }
 
@@ -85,7 +84,7 @@ function readsOf(store: Store): FactReads {
     scheduled: (p) => store.scheduled(p),
     pinned: (p, a) => isPinned(pinsOf(store.prefs() as Prefs | null), p, a),
     reply: (p, a) => lastReply(store, p, a),
-    tab: (id) => ({ inner: tabEntity(id), moveable: tabMoveable(id), closable: closable(id), others: panelState.get().tabs.list.some((x) => x.id !== id && closable(x.id)) }),
+    tab: (id) => ({ inner: tabEntity(id), moveable: tabMoveable(id), closable: true, others: panelState.get().tabs.list.some((x) => x.id !== id) }),
   };
 }
 

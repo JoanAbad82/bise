@@ -5,16 +5,11 @@
 // from here too. The rules are model.ts's, the live state state.ts's. Owner: nm-panel.
 import type { Entity } from '@/shared/entity';
 import { panel } from '@/terminal/panel';
-import { closeOthersId, closeTabId, openOverviewAt, openWhat, panelState, type OverviewSection } from './state';
+import { closeOthersId, closeTabId, openWhat, panelState } from './state';
 
 /** Opens `e` in a tab of this window's panel (an open one comes to the front), unfolding the panel. */
 export function openTab(e: Entity): void {
   openWhat({ kind: 'thing', e });
-}
-
-/** The Overview in front, scrolled to `section` (a card's ▯ 'pin as a tab', nm-side): of the view, as the card's. */
-export function openOverview(section: OverviewSection): void {
-  openOverviewAt(section);
 }
 
 /** A tab's menu: Close. */
@@ -27,7 +22,7 @@ export function closeOtherTabs(id: string): void {
   closeOthersId(id);
 }
 
-/** The thing a tab shows, for its menu's own items (open in a new window...); undefined for Overview, New tab, a shell. */
+/** The thing a tab shows, for its menu's own items (open in a new window...); undefined for New tab, a shell. */
 export function tabEntity(id: string): Entity | undefined {
   const what = panelState.get().tabs.list.find((x) => x.id === id)?.what;
   return what?.kind === 'thing' ? what.e : undefined;

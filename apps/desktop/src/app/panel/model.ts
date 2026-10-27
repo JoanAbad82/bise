@@ -8,8 +8,6 @@ import { entityKey, type Entity } from '@/shared/entity';
 
 /** What a tab shows. */
 export type TabWhat =
-  /** what the right bar was: agents, archived, artifacts, scheduled, processes; always of the view (side.ts panelProject: a project's own, bise's every project's) */
-  | { readonly kind: 'overview' }
   /** New tab: the launcher (search, Open, Recent); `artifacts`: its picker of the latest artifacts (⌘P) */
   | { readonly kind: 'launcher'; readonly n: number; readonly artifacts?: true }
   /** a browser tab with no page yet: its address field takes an artifact's name or a URL (⌘L) */
@@ -20,30 +18,26 @@ export type TabWhat =
   | { readonly kind: 'thing'; readonly e: Entity };
 
 export interface Tab {
-  /** one per thing: 'overview', 'new:2', 'term:<project>#1', or the entity's key */
+  /** one per thing: 'new:2', 'term:<project>#1', or the entity's key */
   readonly id: string;
   readonly what: TabWhat;
 }
 
 export interface Tabs {
   readonly list: readonly Tab[];
-  /** the id of the tab in front (always one of list's) */
+  /** the id of the tab in front (one of list's; '' when the panel has no tab) */
   readonly active: string;
 }
 
 /** The tabs in the bar at most (HIG: « Avoid providing more than six tabs in a tab view »). */
 export const MAX_SHOWN = 6;
 
-export const OVERVIEW: Tab = { id: 'overview', what: { kind: 'overview' } };
-
-/** A fresh panel: Overview alone, in front. */
-export const FIRST: Tabs = { list: [OVERVIEW], active: OVERVIEW.id };
+/** A fresh panel: no tab (the Overview left the panel for the outer card, page outer-side v2); ▯ opens a New tab. */
+export const FIRST: Tabs = { list: [], active: '' };
 
 /** A tab's id from what it shows: the same thing is one tab. Pure. */
 export function tabIdOf(what: TabWhat): string {
   switch (what.kind) {
-    case 'overview':
-      return OVERVIEW.id;
     case 'launcher':
       return `new:${String(what.n)}`;
     case 'browser':
@@ -101,19 +95,13 @@ export function nextShell(t: Tabs, project: string): number {
   return n;
 }
 
-/** Overview is the panel's home (ui-review m_42482 #4): it never closes, it has no ×. Pure. */
-export function closable(id: string): boolean {
-  return id !== OVERVIEW.id;
-}
-
-/** Closes `id`: the tab in front goes to its right neighbour, else its left one; Overview stays. Pure. */
+/** Closes `id`: the tab in front goes to its right neighbour, else its left one; the last one leaves none. Pure. */
 export function closeIn(t: Tabs, id: string): Tabs {
   const i = t.list.findIndex((x) => x.id === id);
-  if (i < 0 || !closable(id)) return t;
+  if (i < 0) return t;
   const list = t.list.filter((x) => x.id !== id);
   if (t.active !== id) return { list, active: t.active };
-  const next = list[Math.min(i, list.length - 1)] as Tab;
-  return { list, active: next.id };
+  return { list, active: list[Math.min(i, list.length - 1)]?.id ?? '' };
 }
 
 /** What was in front before a tab came to the front (esc on an artifact goes back to it, app/escape.ts). */
@@ -132,11 +120,11 @@ export function closeBack(t: Tabs, id: string, before: Before | undefined): { re
   return { tabs: activate(tabs, before.active), open: before.open };
 }
 
-/** Every tab but `id` and Overview closed (a tab's menu: Close others). Pure. */
+/** Every tab but `id` closed (a tab's menu: Close others). Pure. */
 export function closeOthers(t: Tabs, id: string): Tabs {
   const keep = t.list.find((x) => x.id === id);
   if (keep === undefined) return t;
-  return { list: id === OVERVIEW.id ? [keep] : [OVERVIEW, keep].map((x) => t.list.find((y) => y.id === x.id) ?? x), active: keep.id };
+  return { list: [keep], active: keep.id };
 }
 
 /** A tab he closed and where it stood (its index then): ⇧⌘T (⌃⇧T) puts it back there, as Chrome. */
@@ -150,13 +138,13 @@ export const CLOSED_MAX = 25;
 
 /**
  * The closed stack after `ids` closed from `t` (one tab, or a menu's Close others): each with its
- * index, the leftmost on top so they come back in their order. Overview and an id not open: none.
+ * index, the leftmost on top so they come back in their order. An id not open: none.
  * Pure.
  */
 export function pushClosed(stack: readonly Closed[], t: Tabs, ids: readonly string[]): readonly Closed[] {
   const gone: Closed[] = [];
   t.list.forEach((tab, at) => {
-    if (closable(tab.id) && ids.includes(tab.id)) gone.push({ tab, at });
+    if (ids.includes(tab.id)) gone.push({ tab, at });
   });
   if (gone.length === 0) return stack;
   return [...stack, ...gone.reverse()].slice(-CLOSED_MAX);
@@ -455,10 +443,7 @@ function entityOf(x: unknown): Entity | undefined {
 function whatOf(x: unknown): TabWhat | undefined {
   if (!isObj(x)) return undefined;
   switch (x['kind']) {
-    case 'overview':
-      // a record from before kept the project a card pinned it to (stuck in every project, his
-      // m_45581): it reads as the Overview of the view
-      return { kind: 'overview' };
+    // 'overview' (a record from before the outer card, page outer-side v2): dropped on read
     case 'launcher':
       if (typeof x['n'] !== 'number') return undefined;
       return x['artifacts'] === true ? { kind: 'launcher', n: x['n'], artifacts: true } : { kind: 'launcher', n: x['n'] };
@@ -489,10 +474,8 @@ export function parseKept(raw: unknown): PanelKept {
     seen.add(tab.id);
     list.push(tab);
   }
-  // Overview is always there, the home (it never closes)
-  if (!seen.has(OVERVIEW.id)) list.unshift(OVERVIEW);
   const want = isObj(raw['tabs']) ? raw['tabs']['active'] : undefined;
-  const tabs: Tabs = { list, active: list.some((x) => x.id === want) ? (want as string) : (list[0] as Tab).id };
+  const tabs: Tabs = { list, active: list.some((x) => x.id === want) ? (want as string) : (list[0]?.id ?? '') };
   const width = typeof raw['width'] === 'number' ? clampW(raw['width']) : WIDTHS.rows;
   const recent = (Array.isArray(raw['recent']) ? (raw['recent'] as unknown[]) : []).map(entityOf).filter((e): e is Entity => e !== undefined).slice(0, RECENT_MAX);
   const shares: Record<string, number> = {};

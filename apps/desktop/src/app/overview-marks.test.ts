@@ -2,7 +2,7 @@
 // mark, never the glowing ball: at work the turning arc, asking '?' in the accent, failed the
 // alert, done the check, idle or stopped nothing.
 import { describe, expect, it } from 'vitest';
-import { agentMark } from './RightBar';
+import { agentMark } from './Marks';
 
 describe("Overview's agent marks", () => {
   it('maps the row glyph and its work to a line mark', () => {

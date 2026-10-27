@@ -14,7 +14,7 @@ import { useModHeld } from '@/app/held';
 import { panel } from '@/proto/words_panel.gen';
 import { useEntityMenu } from '@/app/menus/use';
 import { barGroundDoubleClick } from '@/app/barslot';
-import { closable, fitTabs, shownOf, TAB_GAP, type Tab } from './model';
+import { fitTabs, shownOf, TAB_GAP, type Tab } from './model';
 import { activateTab, closeTabId, moveTabTo, openLauncher, panelToggle, usePanelState } from './state';
 import { useTabLooks, type TabLook } from './look';
 import { PANEL_KEYS } from './keys';
@@ -103,7 +103,7 @@ export function PanelTabs({ end, start }: { end?: ReactNode; start?: ReactNode }
               <span key={t.id} className="pn-tab">
                 {l.icon}
                 <span className="pn-tab-t">{l.title}</span>
-                {closable(t.id) && (
+                {(
                   <span className="pn-tab-x">
                     <AppIcon name="close" size={14} />
                   </span>
@@ -214,7 +214,7 @@ function BarTab({ tab, look, on, dragging, onDragStart, onDropAt, onDragEnd }: {
     >
       {look.icon}
       <span className="pn-tab-t" ref={titleEl}>{look.title}</span>
-      {closable(tab.id) && <Press
+      {<Press
         look="pn-tab-x"
         aria-label={close}
         {...tipAttrs(close)}

@@ -30,7 +30,7 @@ describe('the record per project (pure)', () => {
     let rec = putView(switchTo(EMPTY_REC, 'p1'), a);
     rec = switchTo(rec, 'p2');
     expect(viewOf(rec).open).toBe(false);
-    expect(ids(viewOf(rec).tabs)).toEqual(['overview']);
+    expect(ids(viewOf(rec).tabs)).toEqual([]);
     const b = { ...viewOf(rec), open: true, tabs: openIn(FIRST, art('p2', 'b')) };
     rec = putView(rec, b);
     rec = switchTo(rec, 'p1');
@@ -60,7 +60,8 @@ describe('the record per project (pure)', () => {
     const rec = parseRec(flat, 'p1');
     expect(rec.at).toBe('p1');
     expect(viewOf(rec).open).toBe(true);
-    expect(viewOf(rec).tabs.active).toBe(viewOf(rec).tabs.list[1]?.id);
+    // its old Overview tab dropped on read (page outer-side v2)
+    expect(viewOf(rec).tabs.active).toBe(viewOf(rec).tabs.list[0]?.id);
     expect(viewOf(rec).width).toBe(500);
     expect(viewOf(rec).shares).toEqual({ sheet: 0.6 });
   });
@@ -79,7 +80,7 @@ describe('the record per project (pure)', () => {
     const t = openIn(openIn(FIRST, art('p1', 'a')), art('p1', 'b'));
     expect(ids(dropGoneArts(t, () => undefined))).toEqual(ids(t));
     const out = dropGoneArts(t, () => new Set(['b']));
-    expect(ids(out)).toEqual(['overview', 'artifact:p1/b']);
+    expect(ids(out)).toEqual(['artifact:p1/b']);
     expect(out.active).toBe('artifact:p1/b');
   });
 });

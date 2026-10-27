@@ -3,10 +3,10 @@
 // front of it (nm-panel's state: what the thread keeps beside it), the panel's Overview at a
 // section (nm-panel), a new agent (nm-frame's ⌘N), whose items it lists (side.ts panelProject, the
 // Overview's scope). Owner: nm-side.
-import { openOverview, openTab } from '@/app/panel/tabs';
+import { openTab } from '@/app/panel/tabs';
 import { useFrontArtKind, usePanelBox } from '@/app/panel/state';
 import { useLeftWidth } from '@/app/frame-state';
 import { newAgent } from '@/app/newagent';
 import { panelProject } from '@/app/side';
 
-export { newAgent, openOverview, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox };
+export { newAgent, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox };
