@@ -95,6 +95,15 @@ describe('sideLayout, the panel open: the width rule (folded-side v9)', () => {
     expect(sideLayout(1100, SIDE, true, 384, true, { over: true, full: false, threadMin: 560 })).toMatchObject({ coins: 'tabs', side: false });
     expect(sideLayout(1920, SIDE, true, 1624, true, { over: false, full: true, threadMin: 560 })).toMatchObject({ coins: 'tabs', side: false });
   });
+  it('the thread keeps its width under a sheet (ui-review m_47216): its column centred in the whole room, never in what the sheet leaves', () => {
+    // as place.ts asks it: a sheet's box is 0 wide, so its width comes undefined; 680 with the
+    // rail alone (the sidebar slides over) and with the sidebar docked
+    for (const left of [56, SIDE]) {
+      const room = 680 - left;
+      const l = sideLayout(680, left, true, undefined, true, { over: true, full: false, threadMin: THREAD_KEEPS.rows });
+      expect(l).toMatchObject({ coins: 'tabs', colW: Math.min(COL_W, room - 2 * MIN_LEFT), colLeft: left + MIN_LEFT });
+    }
+  });
   it('a page that shows no side: no coins anywhere, panel or not', () => {
     expect(sideLayout(1440, SIDE, false, undefined, false).coins).toBe('none');
     expect(sideLayout(1440, SIDE, true, 480, false).coins).toBe('none');

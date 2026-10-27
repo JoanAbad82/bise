@@ -127,12 +127,14 @@ function fit(room: number, band: number): { left: number; w: number } | null {
  * The panel open (folded-side v9, the width rule): the coins stay between the thread and the panel
  * (the world a 5th coin, the panel's left edge their right) while the window holds the left, the
  * thread's least, their 68 band and the panel; under that they go in the thread's header in place
- * of its status line; a sheet or a full-width panel covers the thread: the coins go in its tab row.
+ * of its status line; a sheet or a full-width panel covers the thread: the coins go in its tab row
+ * (under a sheet the thread keeps the whole room, its width as with the panel folded's room).
  * `compact` (side-mini, his m_46698): he picked the coins by hand, so the card never shows, even
  * with room for it; the rest falls back as without room. Pure.
  */
 export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, panelW: number = PANEL_W, shows = true, beside: Omit<PanelIn, 'open' | 'width'> = { over: false, full: false, threadMin: THREAD_KEEPS.rows }, compact = false): SideLayout => {
-  const room = Math.max(0, winW - sideW - (panelOpen ? panelW : 0));
+  // a sheet goes over the thread: the thread keeps the whole room under it (ui-review m_47216)
+  const room = Math.max(0, winW - sideW - (panelOpen && !beside.over ? panelW : 0));
   const centred = (coins: CoinsAt): SideLayout => {
     const w = Math.min(COL_W, Math.max(0, room - 2 * MIN_LEFT));
     return { colLeft: sideW + (room - w) / 2, colW: w, world: 'small', gutter: 0, side: false, coins, right: 0 };
