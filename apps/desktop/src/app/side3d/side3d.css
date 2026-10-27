@@ -923,15 +923,6 @@
 [data-theme="light"] .s3-tcard {
   --s3-tcard-sh: rgb(0 0 0 / 0.06);
 }
-/* D1: in the side's own room the caption is words only, the coin and its words one object (designer m_45869) */
-.s3-tcard[data-plain] {
-  max-width: 200px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
 .s3-tcard-name,
 .s3-tcard-line {
   display: block;
@@ -1327,4 +1318,187 @@
   padding: 0 var(--s-2) var(--s-1);
   font: 400 var(--f-meta);
   color: var(--c-text-3);
+}
+
+/* the outer card (page outer-side v2, his pick; OuterCard.tsx): the Overview out of the panel, 280
+   wide, 12 from the window's right edge, its top on the left side's top (the bar's 52), 12 above the
+   bottom; r 12, --c-raised, 1 px line, e-1; it scrolls inside when its sections pass its height */
+.s3-outer {
+  position: fixed;
+  top: var(--h-bar);
+  right: var(--s-3);
+  bottom: var(--s-3);
+  z-index: 15;
+  box-sizing: border-box;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-1) 0 var(--s-2);
+  overflow-y: auto;
+  border-radius: var(--r-3);
+  background: var(--c-raised);
+  border: 1px solid var(--c-line);
+  box-shadow: var(--e-1);
+}
+.s3-osec {
+  display: flex;
+  flex-direction: column;
+}
+/* a section's head, 36: its 3D object at 20, its name t-12/600 text-2, its count text-3, what waits in the accent, 'all ›' */
+.s3-ohead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  font: 400 var(--f-meta);
+  color: var(--c-text-3);
+}
+.s3-ohead-pic {
+  display: inline-flex;
+  flex: none;
+  width: 20px;
+  height: var(--h-kbd);
+}
+.s3-ohead-n {
+  font-variant-numeric: tabular-nums;
+}
+.s3-ohead-name {
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+.s3-ohead-loud {
+  color: var(--c-accent);
+  font-weight: 600;
+}
+.s3-ohead-all {
+  margin-left: auto;
+  color: var(--c-text-3);
+}
+.s3-ohead-all:hover {
+  color: var(--c-text);
+}
+/* an agent's line, 28: mark 16 · head 20 · name t-13 ink · age t-12 text-3 · PR t-12 mono · ψ 12, 8 apart */
+.s3-orows {
+  display: flex;
+  flex-direction: column;
+}
+.s3-orow {
+  margin: 0 var(--s-1);
+  border-radius: var(--r-2);
+}
+.s3-orow-open {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: var(--h-row-tight);
+  padding: 0 var(--s-3);
+  border-radius: var(--r-2);
+  text-align: left;
+}
+.s3-orow-open:hover {
+  background: var(--c-hover);
+}
+.s3-orow[data-here] {
+  background: var(--c-active);
+}
+.s3-orow[data-here][data-asks] {
+  background: color-mix(in srgb, var(--c-accent) 9%, transparent);
+}
+.s3-orow-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  color: var(--c-text-3);
+}
+.s3-orow-mark[data-tone='rest'] .s3-orow-g {
+  color: var(--c-text);
+}
+.s3-orow-mark[data-tone='err'] {
+  color: var(--c-err);
+}
+.s3-orow-key {
+  font: 500 var(--t-11)/16px var(--font-mono);
+  color: var(--c-text-2);
+}
+.s3-orow[data-asks] .s3-orow-key {
+  color: var(--c-accent);
+}
+.s3-orow-head {
+  display: inline-flex;
+  flex: none;
+  width: 20px;
+  height: var(--h-kbd);
+}
+.s3-orow-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 var(--f-ui);
+  color: var(--c-text);
+}
+.s3-orow[data-back] .s3-orow-name {
+  color: var(--c-text-2);
+}
+.s3-orow[data-back] .s3-orow-head {
+  opacity: 0.55;
+}
+.s3-orow-age {
+  flex: none;
+  font: 400 var(--f-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-3);
+}
+.s3-orow[data-asks] .s3-orow-age {
+  color: var(--c-accent);
+}
+.s3-orow-pr {
+  flex: none;
+  font: 400 var(--t-12)/16px var(--font-mono);
+  color: var(--c-text-3);
+}
+.s3-orow-pr:hover {
+  color: var(--c-text);
+}
+.s3-orow-wt {
+  flex: none;
+  width: 12px;
+  font: 400 var(--f-meta);
+  color: var(--c-text-3);
+  text-align: center;
+}
+/* an ask opened in place: its question t-12 text-2, its options (the float's buttons), 'answer…' */
+.s3-orow-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-3) var(--s-2) calc(var(--s-3) + var(--s-4) + var(--s-2));
+}
+.s3-orow-q {
+  font: 400 var(--f-meta);
+  color: var(--c-text-2);
+}
+.s3-orow-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.s3-omore {
+  margin: 0 var(--s-1);
+  padding: 0 var(--s-3);
+  min-height: var(--h-row-tight);
+  border-radius: var(--r-2);
+  font: 400 var(--f-meta);
+  color: var(--c-text-3);
+  text-align: left;
+}
+.s3-omore:hover {
+  background: var(--c-hover);
+  color: var(--c-text);
 }

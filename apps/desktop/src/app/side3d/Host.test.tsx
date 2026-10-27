@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@/proto';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { noClip } from '@/ds/noclip';
 import { side } from '@/proto/words_side.gen';
 import { artifact, artifacts, card, ev, projects, row } from '../../../tests/feature/inputs';
 import { createRouter, RouterContext } from '../router';
@@ -20,7 +19,7 @@ import { keyAction } from '../keys';
 import { SideHost, bubbleTops } from './Host';
 import { CARD_MAX, cardMaxH } from './layout';
 import { sideLayoutNow } from './place';
-import { GRACE_MS, HOVER_MS, beatPlace, hitBox } from './World';
+import { beatPlace, hitBox } from './World';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
 const office = vi.hoisted(() => ({
@@ -71,7 +70,7 @@ const agent = (name: string, over: Partial<Agent> = {}): Agent => ({
   name, dir: name, main: false, status: 'idle', archived: false, title: 'speed', purpose: '', since_ms: 0, waits: 0, watching: [], ...over,
 });
 
-function side3d(winW = 1440, onCommit?: () => void) {
+function side3d(winW = 1100, onCommit?: () => void) {
   const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   (window as unknown as { bise: unknown }).bise = { notify: { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined } };
   // 1440 wide: the world small (sideLayout), the rail and the sidebar on the left
@@ -107,7 +106,9 @@ function side3d(winW = 1440, onCommit?: () => void) {
 describe('the right side, folded', () => {
   it('the world and the four bubbles, each with its tip; the counts, none at 0; the agents\' two pills: active at the bottom, what waits for him on top in the accent (designer m_44986)', () => {
     const { v } = side3d();
-    expect(v.getByTestId('app.world')).toBeTruthy();
+    // the world a 5th coin while the card does not show (designer m_46218: never floating any more)
+    expect(v.getByTestId('app.bubble.world')).toBeTruthy();
+    expect(v.queryByTestId('app.world')).toBeNull();
     // each says what it counts to VoiceOver; its card is its tip (folded-side v9)
     for (const b of ['agents', 'artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.bubble.${b}`).getAttribute('aria-label')).toBeTruthy();
     // 2 working (1 of them asks): 2 active, plain; the project's inbox (1) on top, the accent
@@ -123,14 +124,6 @@ describe('the right side, folded', () => {
     expect(v.getByTestId('app.bubble.agents').getAttribute('aria-label')).toBe(
       side.bubble_tip({ name: side.agents, says: `${side.active({ n: 2 })} · ${side.waiting_you({ n: 1 })}` }),
     );
-  });
-
-  it('nothing clips the world, a bubble or a card on the way up', () => {
-    const { v } = side3d();
-    fireEvent.click(v.getByTestId('app.bubble.agents'));
-    noClip(v.getByTestId('app.world'));
-    noClip(v.getByTestId('app.bubble.agents'));
-    noClip(v.getByTestId('app.flyout.agents'));
   });
 
   it('the agents card: in the hub\'s rank, the asking one with its options; an option sends the inbox\'s pick from the thread in view', () => {
@@ -208,7 +201,7 @@ describe('the right side, folded', () => {
       expect(frame.hasAttribute('data-moving')).toBe(true);
       expect(frame.style.top).toBe(v.getByTestId('app.bubble.scheduled').style.top);
       expect(calls).toHaveLength(1);
-      expect(calls[0]?.[1]).toMatchObject({ top: `${String(bubbleTops('small').bubbles.scheduled)}px` });
+      expect(calls[0]?.[1]).toMatchObject({ top: `${String(bubbleTops('bubble').bubbles.scheduled)}px` });
       expect(calls[0]?.[0]).toHaveProperty('top');
       const old = v.getByTestId('app.flyout.agents.leaving');
       expect(old.hasAttribute('inert')).toBe(true);
@@ -445,12 +438,12 @@ describe('the right side, folded', () => {
     act(() => {
       router.go({ screen: 'thread', project: ACME, agent: 'perf' });
     });
-    expect(v.getByTestId('app.world')).toBeTruthy();
+    expect(v.getByTestId('app.bubble.world')).toBeTruthy();
   });
 
   it('the panel open beside the thread with room: the coins between, the panel\'s left edge their right, the world a 5th coin (folded-side v9)', () => {
     panel.open = true;
-    const { v } = side3d();
+    const { v } = side3d(1440);
     const s = v.getByTestId('app.side');
     expect(s.getAttribute('data-at')).toBe('between');
     expect(s.style.right).toBe('384px');
@@ -547,8 +540,8 @@ describe('the right side, folded', () => {
     fireEvent.click(v.getByTestId('app.bubble.processes'));
     const card = v.getByTestId('app.flyout.processes');
     expect(card.style.top).toBe(v.getByTestId('app.bubble.processes').style.top);
-    // happy-dom puts the side at 0: 900 - 16 - 392
-    expect(card.style.maxHeight).toBe(`${String(cardMaxH(0, 392, 900))}px`);
+    // happy-dom puts the side at 0: 900 - 16 - the processes coin's top (the world a 5th coin)
+    expect(card.style.maxHeight).toBe(`${String(cardMaxH(0, bubbleTops('bubble').bubbles.processes, 900))}px`);
     fireEvent.click(v.getByTestId('app.bubble.agents'));
     expect(v.getByTestId('app.flyout.agents').style.maxHeight).toBe(`${String(CARD_MAX)}px`);
   });
@@ -566,7 +559,7 @@ describe('the right side, folded', () => {
     });
     try {
       let commits = 0;
-      const { v } = side3d(1440, () => {
+      const { v } = side3d(1100, () => {
         commits++;
       });
       fireEvent.click(v.getByTestId('app.bubble.processes'));
@@ -583,70 +576,6 @@ describe('the right side, folded', () => {
     }
   });
 
-  it('grown on hover, the world gives its hit span to the office as its camera\'s input (the open map\'s pinch and drag); folded, none', () => {
-    vi.useFakeTimers();
-    try {
-      const { v } = side3d();
-      const last = () => office.cameraFrom.at(-1);
-      expect(last()).toBeNull();
-      fireEvent.pointerEnter(v.getByTestId('app.world'));
-      act(() => {
-        vi.advanceTimersByTime(HOVER_MS);
-      });
-      expect(last()).toBe(v.getByTestId('app.world.hit'));
-      fireEvent.pointerLeave(v.getByTestId('app.world'));
-      act(() => {
-        vi.advanceTimersByTime(GRACE_MS);
-      });
-      expect(last()).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('folded, the world is the whole map, whoever he talks to; grown, his pinch that cuts the map frames it; folding back eases it to fit (designer m_44998)', () => {
-    vi.useFakeTimers();
-    try {
-      office.follow.length = 0;
-      const { v } = side3d();
-      // he talks to acme's main (the composer's target): still no follow camera
-      act(() => {
-        vi.advanceTimersByTime(60_000);
-      });
-      expect(office.follow.length).toBeGreaterThan(0);
-      expect(office.follow.every((f) => f === null)).toBe(true);
-      const world = v.getByTestId('app.world');
-      expect(world.hasAttribute('data-framed')).toBe(false);
-      fireEvent.pointerEnter(world);
-      act(() => {
-        vi.advanceTimersByTime(HOVER_MS);
-      });
-      // grown at fit: no frame; his pinch cuts it: framed; back at fit: none
-      expect(world.hasAttribute('data-framed')).toBe(false);
-      act(() => {
-        office.zoomed?.(true);
-      });
-      expect(world.hasAttribute('data-framed')).toBe(true);
-      act(() => {
-        office.zoomed?.(false);
-      });
-      expect(world.hasAttribute('data-framed')).toBe(false);
-      act(() => {
-        office.zoomed?.(true);
-      });
-      const before = office.refit.at(-1) ?? 0;
-      fireEvent.pointerLeave(world);
-      act(() => {
-        vi.advanceTimersByTime(GRACE_MS);
-      });
-      // folded: the office asked back to fit, and never framed folded
-      expect(office.refit.at(-1)).toBe(before + 1);
-      expect(world.hasAttribute('data-framed')).toBe(false);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('a beat\'s label sits over its bim\'s head on the whole folded map, scaled 148 / 384; none found, over the island\'s middle', () => {
     expect(beatPlace({ x: 192, y: 96 }, 300)).toEqual({ x: 74, y: 37 });
     expect(beatPlace(null, 384)).toEqual({ x: 74, y: 74 });
@@ -655,5 +584,38 @@ describe('the right side, folded', () => {
   it('the bubbles under the world at 152, 80 apart, put whatever the world does; as a 5th bubble the world tops the stack', () => {
     expect(bubbleTops('small').bubbles).toEqual({ agents: 152, artifacts: 232, scheduled: 312, processes: 392 });
     expect(bubbleTops('bubble')).toEqual({ world: 40, bubbles: { agents: 120, artifacts: 200, scheduled: 280, processes: 360 } });
+  });
+});
+
+describe('the outer card (page outer-side v2, his pick)', () => {
+  it('the panel folded at 1440: the card, no coins; agents in the hub\'s rank, one line each; the asking one with its age in the accent', () => {
+    const { v } = side3d(1440);
+    expect(v.getByTestId('app.outer')).toBeTruthy();
+    expect(v.queryByTestId('app.bubble.agents')).toBeNull();
+    const rows = [...v.getByTestId('app.outer.agents.rows').querySelectorAll('.s3-orow')].map((e) => e.getAttribute('data-testid'));
+    expect(rows).toEqual([`app.outer.agents.${ACME}.main`, `app.outer.agents.${ACME}.perf`, `app.outer.agents.${ACME}.docs`]);
+    expect(v.getByTestId(`app.outer.agents.${ACME}.perf`).hasAttribute('data-asks')).toBe(true);
+    expect(v.getByTestId(`app.outer.agents.${ACME}.perf.age`)).toBeTruthy();
+    // at rest the line never grows: no question under it until a click
+    expect(v.queryByTestId(`app.outer.agents.${ACME}.perf.ask`)).toBeNull();
+    expect(v.getByTestId('app.outer.agents.loud').textContent).toContain(side.head_waits({ n: 1 }));
+    for (const s of ['artifacts', 'scheduled', 'processes']) expect(v.getByTestId(`app.outer.${s}`)).toBeTruthy();
+  });
+
+  it('a click on an asking line opens its ask in place, its options one click; on another line it opens that thread', () => {
+    const { v, does, router } = side3d(1440);
+    fireEvent.click(v.getByTestId(`app.outer.agents.${ACME}.perf`).querySelector('[data-row]') as HTMLElement);
+    expect(v.getByTestId(`app.outer.agents.${ACME}.perf.ask`).textContent).toContain('run rm -rf target?');
+    fireEvent.click(v.getByTestId(`app.outer.agents.${ACME}.perf.opt.1`));
+    expect(does).toHaveBeenCalledWith(expect.objectContaining({ i: 'pick', project: ACME, card: 7, n: 1 }));
+    fireEvent.click(v.getByTestId(`app.outer.agents.${ACME}.docs`).querySelector('[data-row]') as HTMLElement);
+    expect(router.get()).toMatchObject({ screen: 'thread', project: ACME, agent: 'docs' });
+  });
+
+  it('a panel open gives way: the card goes, the coins come back between the thread and the panel', () => {
+    panel.open = true;
+    const { v } = side3d(1440);
+    expect(v.queryByTestId('app.outer')).toBeNull();
+    expect(v.getByTestId('app.side').getAttribute('data-at')).toBe('between');
   });
 });

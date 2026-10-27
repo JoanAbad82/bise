@@ -1,5 +1,5 @@
-// src/app/side3d · the coins' cards (page folded-side v9, Gabriel's pick, designer m_45474; D1's
-// plain captions in the side's own room, designer m_45869): a
+// src/app/side3d · the coins' cards (page folded-side v9, Gabriel's pick, designer m_45474; quiet
+// cards, designer m_45869): a
 // coin's name and two quiet lines, 12 left of the coin, right-aligned, 232 wide at most, each line
 // cut with … . Information only (pointer-events none): a click is the coin's. ⌥ held alone 300 ms
 // shows the four at once, no stagger (in 120 ms, out 80 ms; reduced motion: no fade); a hover 400
@@ -35,14 +35,10 @@ function Line({ parts, n }: { parts: readonly CardPart[]; n: 1 | 2 }) {
   );
 }
 
-/**
- * One coin's caption, centred on its coin (`top` the coin's). `plain` (D1, the side's own room,
- * designer m_45869): words only, no fill, border or shadow, the coin and its words one object; else a
- * quiet card over the thread, the coin's own fill.
- */
-export function CoinCardView({ id, card, top, plain = false, out = false }: { id: BubbleId; card: CoinCard; top: number; plain?: boolean; out?: boolean }) {
+/** One coin's caption, centred on its coin (`top` the coin's): a quiet card in the coin's own fill (designer m_45869); `out`: fading out. */
+export function CoinCardView({ id, card, top, out = false }: { id: BubbleId; card: CoinCard; top: number; out?: boolean }) {
   return (
-    <div className="s3-tcard" data-plain={plain || undefined} data-out={out || undefined} style={{ top: top + COIN_MID }} aria-hidden="true" title={cardWords(card)} data-testid={out ? `app.bubble.${id}.card.out` : `app.bubble.${id}.card`}>
+    <div className="s3-tcard" data-out={out || undefined} style={{ top: top + COIN_MID }} aria-hidden="true" title={cardWords(card)} data-testid={out ? `app.bubble.${id}.card.out` : `app.bubble.${id}.card`}>
       <span className="s3-tcard-name">{card.name}</span>
       <Line parts={card.l1} n={1} />
       <Line parts={card.l2} n={2} />

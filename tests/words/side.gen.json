@@ -32,6 +32,11 @@
     "one": null,
     "text": "all scheduled ›"
   },
+  "side.all_short": {
+    "args": [],
+    "one": null,
+    "text": "all ›"
+  },
   "side.answer": {
     "args": [],
     "one": null,
@@ -186,6 +191,13 @@
     "one": null,
     "text": "all quiet"
   },
+  "side.head_waits": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} waits"
+  },
   "side.in_projects": {
     "args": [
       "n",
@@ -194,12 +206,24 @@
     "one": null,
     "text": "{n} in {p} projects"
   },
+  "side.in_worktree": {
+    "args": [],
+    "one": null,
+    "text": "works in a worktree"
+  },
   "side.listening": {
     "args": [
       "n"
     ],
     "one": null,
     "text": "{n} listening"
+  },
+  "side.more_agents": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "+ {n} more"
   },
   "side.new_agent": {
     "args": [],

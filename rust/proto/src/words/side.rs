@@ -74,6 +74,14 @@ crate::words! { side:
     /// the agents float, a row's state at its right edge (page agents-float v1):
     /// at work, the length of its turn
     row_working(len) = "working · {len}";
+    /// the outer card's section head, right: its full page (page outer-side v2)
+    all_short = "all ›";
+    /// the outer card's agents past its 15: they open the agents list
+    more_agents(n) = "+ {n} more";
+    /// the outer card's agents head, in the accent: the agents that ask him
+    head_waits(n) = "{n} waits";
+    /// the ψ at an agent row's right, its tip: it works in a worktree
+    in_worktree = "works in a worktree";
     /// a row's state: it asks him (the accent, the only pink)
     row_asks = "asks you";
     /// a row's state: another agent holds it (its line 2 says which)

@@ -1,7 +1,7 @@
 // sideLayout at the widths of plan §2 (1000, 1100, 1280, 1440, 1728, 1920), the panel open and closed.
 import { describe, expect, it } from 'vitest';
 import type { Route } from '../route';
-import { BETWEEN_BAND, BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, sideLayout, sideShows, SIDE_ROOM, THREAD_KEEPS, WORLD_BAND } from './layout';
+import { BETWEEN_BAND, BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, OUTER_BAND, OUTER_COL_MIN, sideLayout, sideShows, THREAD_KEEPS } from './layout';
 
 /** rail 56 + sidebar 240 */
 const SIDE = 296;
@@ -10,26 +10,22 @@ const SIDE = 296;
 const right = (winW: number, l: { colLeft: number; colW: number }) => winW - l.colLeft - l.colW;
 
 describe('sideLayout, the panel folded', () => {
-  it('1920, 1728 and 1440 (D1, designer m_45869): the side keeps its own 284, the column centred in what is left; plain captions', () => {
+  it('1920, 1728 and 1440 (page outer-side v2): the outer card, its 304 band kept, the column centred in what it leaves', () => {
     for (const w of [1920, 1728, 1440]) {
       const l = sideLayout(w, SIDE, false);
-      expect(l).toMatchObject({ colW: COL_W, world: 'small', gutter: SIDE_ROOM, side: true, coins: 'edge', captions: 'plain' });
-      expect(right(w, l) - SIDE_ROOM).toBe(l.colLeft - SIDE);
+      expect(l).toMatchObject({ colW: COL_W, gutter: OUTER_BAND, side: true, coins: 'card' });
+      expect(right(w, l) - OUTER_BAND).toBe(l.colLeft - SIDE);
     }
-    expect(sideLayout(1440, SIDE, false).colLeft).toBe(SIDE + 70);
   });
-  it('the column, its two 24 and the 284 just fit: D1; a px less: the captions are cards over the thread', () => {
-    const just = SIDE + COL_W + 2 * MIN_LEFT + SIDE_ROOM;
-    expect(sideLayout(just, SIDE, false)).toMatchObject({ captions: 'plain', colLeft: SIDE + MIN_LEFT });
-    expect(sideLayout(just - 1, SIDE, false)).toMatchObject({ captions: 'card', gutter: WORLD_BAND });
-    expect(sideLayout(1100, SIDE, false).captions).toBe('card');
-    expect(sideLayout(1440, SIDE, true, 480).captions).toBe('card');
+  it('the card while it leaves the column 480 and its two 24; a px less: the coins at the edge', () => {
+    const just = SIDE + OUTER_COL_MIN + 2 * MIN_LEFT + OUTER_BAND;
+    expect(sideLayout(just, SIDE, false)).toMatchObject({ coins: 'card', colW: OUTER_COL_MIN, colLeft: SIDE + MIN_LEFT });
+    expect(sideLayout(just - 1, SIDE, false).coins).toBe('edge');
+    expect(sideLayout(1440, SIDE, true, 480).coins).toBe('between');
   });
-  it('1280: centring would leave 132 on the right, so the column slides left and keeps the band', () => {
+  it('1280: the card still leaves a 680 column room: the column whole, centred in it', () => {
     const l = sideLayout(1280, SIDE, false);
-    expect(l).toMatchObject({ colW: COL_W, world: 'small', gutter: WORLD_BAND });
-    expect(right(1280, l)).toBe(WORLD_BAND);
-    expect(l.colLeft - SIDE).toBe(1280 - SIDE - COL_W - WORLD_BAND);
+    expect(l).toMatchObject({ colW: 632, coins: 'card', gutter: OUTER_BAND, colLeft: SIDE + MIN_LEFT });
   });
   it('1100: the world folds into a 5th bubble, then the column narrows, 24 from the sidebar', () => {
     const l = sideLayout(1100, SIDE, false);
@@ -37,22 +33,16 @@ describe('sideLayout, the panel folded', () => {
     expect(l.colW).toBe(1100 - SIDE - MIN_LEFT - BUBBLE_BAND);
     expect(right(1100, l)).toBe(BUBBLE_BAND);
   });
-  it('1100 with the sidebar hidden (the rail alone): the world fits again', () => {
+  it('1100 with the sidebar hidden (the rail alone): the card again', () => {
     const l = sideLayout(1100, 56, false);
-    expect(l).toMatchObject({ colW: COL_W, world: 'small' });
-    expect(right(1100, l)).toBeGreaterThanOrEqual(WORLD_BAND);
+    expect(l).toMatchObject({ colW: 692, coins: 'card' });
+    expect(right(1100, l)).toBe(OUTER_BAND + MIN_LEFT);
   });
   it('1000: the column narrows, never under the bubbles', () => {
     const l = sideLayout(1000, SIDE, false);
     expect(l.world).toBe('bubble');
     expect(right(1000, l)).toBe(BUBBLE_BAND);
     expect(l.colLeft).toBe(SIDE + MIN_LEFT);
-  });
-  it('the world as a bubble while the column still fits whole: slid left by the small band', () => {
-    // room 900: 720 + 172 + 24 = 916 does not fit, 720 + 92 + 24 = 836 does
-    const l = sideLayout(900 + SIDE, SIDE, false);
-    expect(l).toMatchObject({ colW: COL_W, world: 'bubble' });
-    expect(right(900 + SIDE, l)).toBe(BUBBLE_BAND);
   });
   it('never a negative width', () => {
     expect(sideLayout(200, SIDE, false).colW).toBe(0);
@@ -99,8 +89,9 @@ describe('sideLayout, the panel open: the width rule (folded-side v9)', () => {
     expect(sideLayout(1440, SIDE, false, undefined, false).coins).toBe('none');
     expect(sideLayout(1440, SIDE, true, 480, false).coins).toBe('none');
   });
-  it('the panel folded: the coins at the window\'s edge', () => {
-    for (const w of [1100, 1440, 1920]) expect(sideLayout(w, SIDE, false)).toMatchObject({ coins: 'edge', right: 0, side: true });
+  it('the panel folded: the outer card, or the coins at the window\'s edge when it leaves too little', () => {
+    for (const w of [1440, 1920]) expect(sideLayout(w, SIDE, false)).toMatchObject({ coins: 'card', right: 0, side: true });
+    expect(sideLayout(1100, SIDE, false)).toMatchObject({ coins: 'edge', right: 0, side: true });
   });
 });
 

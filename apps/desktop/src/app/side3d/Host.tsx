@@ -36,14 +36,15 @@ import { inRank, agentCounts, bubbleBadge, bubbleCount, bubbleName, bubbleSays, 
 import { Minis } from './Minis';
 import { BUBBLES, type BubbleId } from './objects';
 import { Bubble, WORLD_NAME } from './Bubbles';
-import { noGrow, World, WorldThumb } from './World';
+import { noGrow, WorldThumb } from './World';
 import { Empty, Float, FloatLayer, HeadButton, type FloatContent } from './Flyout';
 import { ArchivedFold, ArchivedRows, FloatAgents } from './FloatAgents';
+import { OuterAgents, OuterCard, OuterSection } from './OuterCard';
 import { useAgentRows } from '../agentrows';
 import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
-import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type Captions, type CoinsAt, type PanelIn } from './layout';
+import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
 import { newAgent, openOverview, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
 import { acrossSays, busyProjects, useListed } from './lists';
 import { barScope, inScope, scopeWords } from '../barscope';
@@ -63,10 +64,6 @@ const CARD_RIGHT = 68;
 const MINI_TOP = 8;
 const MINI_TOPS = { world: null, bubbles: { agents: MINI_TOP, artifacts: MINI_TOP, scheduled: MINI_TOP, processes: MINI_TOP } } as const;
 
-/** the world's top, px */
-const EDGE = 12;
-/** the world's right at the window's edge: the coins' column 8 further in (his m_46261, designer m_46267) */
-const EDGE_RIGHT = 20;
 /** the first bubble's top under the world (the big one floats over them: they never move), as the 5th bubble's stack */
 const TOP_SMALL = 152;
 const TOP_STACK = 40;
@@ -150,11 +147,11 @@ export function SideHost() {
   if (layout.coins === 'none' || project === '') return null;
   // whose items it lists: the Overview's scope (a project's own; bise's own every project's)
   const scope = panelProject(route, home, rows.filter((p) => !p.home).length) ?? project;
-  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} at={layout.coins} right={layout.right} captions={layout.captions} />;
+  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} at={layout.coins} right={layout.right} />;
 }
 
 /** `project`: where its acts go (the world, + new agent, + add); `scope`: whose items it lists ('' every project's); `at`: where the coins are, `right` their column's distance from the window's right edge. */
-function Side({ project, scope, home, world, at: coinsAt, right, captions = 'card' }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble'; at: CoinsAt; right: number; captions?: Captions }) {
+function Side({ project, scope, home, world, at: coinsAt, right }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble'; at: CoinsAt; right: number }) {
   const router = useRouter();
   const route = useRoute();
   const store = useStore();
@@ -402,7 +399,6 @@ function Side({ project, scope, home, world, at: coinsAt, right, captions = 'car
   const addPlace = useAddPlace(project);
   // a drop of files on the artifacts coin adds them there, as on the list (folded-side v9)
   const artDrop = useAddDropOn(addPlace);
-  const says = [side.at_desks({ n: live.length }), counts.asks > 0 ? side.asks({ n: counts.asks }) : ''].filter((s) => s !== '').join(' · ');
   // the agents float: the Overview's AGENTS and ARCHIVED rows (folded-side v9: A's floats take Overview's rows)
   const ov = useAgentRows(scope, alt);
   const [archivedOpen, setArchivedOpen] = useState(false);
@@ -489,6 +485,42 @@ function Side({ project, scope, home, world, at: coinsAt, right, captions = 'car
         };
     }
   };
+  // the panel folded with room for it: the outer card, the Overview out of the panel (page outer-side v2)
+  if (coinsAt === 'card') {
+    const two = 2;
+    const live = ov.live.filter((r) => r.kind === 'agent').length;
+    return (
+      <OuterCard>
+        <OuterSection id="agents" name={bubbleName('agents')} count={String(live)} {...(counts.asks > 0 ? { loud: side.head_waits({ n: counts.asks }) } : {})} onAll={() => {
+          router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
+        }}>
+          <OuterAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} here={here} now={now} groupOf={groupOf} onOpen={openRow} onOpenPr={openPr} onMore={() => {
+            router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
+          }} />
+        </OuterSection>
+        <OuterSection id="artifacts" name={bubbleName('artifacts')} count={String(artifacts.length)} onAll={() => {
+          router.go({ screen: 'artifacts', project: scope });
+        }}>
+          {artifacts.length === 0 ? <Empty>{artScope?.empty ?? side.no_artifacts}</Empty> : artifacts.slice(0, two).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />)}
+        </OuterSection>
+        <OuterSection id="scheduled" name={bubbleName('scheduled')} count={String(tasks.length + watching.length)} onAll={() => {
+          router.go({ screen: 'scheduled' });
+        }}>
+          {tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
+            <>
+              {tasks.slice(0, two).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} />)}
+              {watching.slice(0, Math.max(0, two - tasks.length)).map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />)}
+            </>
+          )}
+        </OuterSection>
+        <OuterSection id="processes" name={bubbleName('processes')} count={String(running.length)} onAll={() => {
+          router.go(all ? { screen: 'running' } : { screen: 'running', scope: { project } });
+        }}>
+          {running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, two).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} />)}
+        </OuterSection>
+      </OuterCard>
+    );
+  }
   return (
     <div className="s3-side" ref={root} data-world={world} data-at={coinsAt} style={coinsAt === 'between' ? { right } : undefined} data-testid="app.side">
       {mini && slot !== null && createPortal(
@@ -497,13 +529,6 @@ function Side({ project, scope, home, world, at: coinsAt, right, captions = 'car
           toggle(b);
         }} />,
         slot,
-      )}
-      {!mini && world !== 'bubble' && (
-        <div className="s3-world-at" style={{ top: EDGE, right: EDGE_RIGHT }}>
-          <World project={project} name={name} says={says} agents={ownLive} cards={ownCards} frozen={open !== null} onOpen={() => {
-            openTab({ kind: 'office', project });
-          }} />
-        </div>
       )}
       {!mini && tops.world !== null && (
         <Bubble id="world" count={null} tip={WORLD_NAME} open={false} top={tops.world}
@@ -519,8 +544,8 @@ function Side({ project, scope, home, world, at: coinsAt, right, captions = 'car
           toggle(b);
         }} />
       ))}
-      {carded.map((b) => <CoinCardView key={b} id={b} card={coinCard(b, facts)} top={tops.bubbles[b]} plain={captions === 'plain'} />)}
-      {fading !== null && !carded.includes(fading) && open === null && !mini && <CoinCardView key={`out-${fading}`} id={fading} card={coinCard(fading, facts)} top={tops.bubbles[fading]} plain={captions === 'plain'} out />}
+      {carded.map((b) => <CoinCardView key={b} id={b} card={coinCard(b, facts)} top={tops.bubbles[b]} />)}
+      {fading !== null && !carded.includes(fading) && open === null && !mini && <CoinCardView key={`out-${fading}`} id={fading} card={coinCard(fading, facts)} top={tops.bubbles[fading]} out />}
       {open !== null && (
         <Float id={open} name={bubbleName(open)} top={tops.bubbles[open]} maxH={maxH} moving={leaving !== null} frameRef={frame}>
           <FloatLayer key={open} c={floatOf(open)} scrolls={fit.scrolls} />
