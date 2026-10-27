@@ -398,6 +398,21 @@ body:has(.app-shell) {
   padding: 0 var(--s-2);
   color: var(--c-text-2);
 }
+/* spring-loaded (designer m_47386, app/spring.ts): a file dragged over a project's row takes the
+   selection tint (a drop target, not a passing hover); at the delay's end two blinks, tint off
+   100 ms / on 100 ms twice, then the project opens. No accent, no ring */
+.app-s-row.project[data-spring] {
+  background: var(--c-active);
+}
+.app-s-row.project[data-spring='blink'] {
+  animation: app-s-spring 400ms step-end forwards;
+}
+@keyframes app-s-spring {
+  0% { background: transparent; }
+  25% { background: var(--c-active); }
+  50% { background: transparent; }
+  75%, 100% { background: var(--c-active); }
+}
 .app-s-l1,
 .app-s-l2 {
   display: flex;

@@ -23,7 +23,7 @@ function sources(dir: string): Array<{ file: string; text: string }> {
 
 const ALL = sources(MAIN);
 /** Files that read systemPreferences without asking him anything (checked below, by method). */
-const READS = ['a11y.ts', 'tray.ts', 'windows.ts'];
+const READS = ['a11y.ts', 'a11y.ts', 'tray.ts', 'windows.ts'];
 
 /** The body around `at`: from the nearest function or method start before it. */
 function enclosing(text: string, at: number): string {
@@ -55,8 +55,10 @@ describe('an off-screen run asks him nothing (static)', () => {
     expect(idle.map((s) => s.file)).toEqual([join('update', 'run.ts')]);
     for (const s of idle) expect(s.before, 'systemIdleS returns the test file first in test mode').toMatch(/if \(testMode\) \{[\s\S]*return[\s\S]*\}\s*return $/);
     // the systemPreferences reads that ask nothing: reduced motion (the tray's, a11y.ts's, which test
-    // mode never reads) and the bar's double-click (windows.ts: macOS's AppleActionOnDoubleClick)
+    // mode never reads), Pointer Control's spring-loading (a11y.ts's global defaults) and the bar's
+    // double-click (windows.ts: macOS's AppleActionOnDoubleClick)
     expect(ALL.flatMap(({ file, text }) => (text.match(/systemPreferences\.\w+/g) ?? []).map((m) => `${file} ${m}`))).toEqual([
+      'a11y.ts systemPreferences.getUserDefault',
       'a11y.ts systemPreferences.getAnimationSettings',
       'tray.ts systemPreferences.getAnimationSettings',
       'windows.ts systemPreferences.getUserDefault',

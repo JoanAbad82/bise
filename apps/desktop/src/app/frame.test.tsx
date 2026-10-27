@@ -7,6 +7,8 @@ import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HINT_HOLD_MS } from './held';
 import { useShowsMainAtEnd } from './seen';
+import { BLINK_MS } from './spring';
+import { SPRING_DEFAULT_MS } from '@/shared/springing';
 import type { Agent, ProjectRow } from '@/proto';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
@@ -345,5 +347,61 @@ describe('the sidebar', () => {
     const { v } = frame({ screen: 'artifacts', project: '' }, [agent('main')]);
     expect(v.getByTestId('app.side.back')).toBeTruthy();
     expect(v.queryByTestId('app.side.list')).toBeNull();
+  });
+});
+
+describe('spring-loaded projects (his m_47378, designer m_47386)', () => {
+  const files = { dataTransfer: { types: ['Files'], dropEffect: 'none' } };
+
+  it('a file held over a project lights it, blinks at 0.5 s, then opens it; the drop is the window\'s', () => {
+    vi.useFakeTimers();
+    try {
+      const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+      const docs = v.getByTestId(`app.side.project.${DOCS}`);
+      const enter = fireEvent.dragEnter(docs, files);
+      // taken: the drag stays alive over the row
+      expect(enter).toBe(false);
+      expect(docs.getAttribute('data-spring')).toBe('hold');
+      act(() => {
+        fireEvent.dragOver(docs, files);
+        vi.advanceTimersByTime(SPRING_DEFAULT_MS);
+      });
+      expect(docs.getAttribute('data-spring')).toBe('blink');
+      expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'main' });
+      act(() => {
+        vi.advanceTimersByTime(BLINK_MS);
+      });
+      expect(router.get()).toEqual({ screen: 'thread', project: DOCS, agent: 'main' });
+      expect(docs.getAttribute('data-spring')).toBeNull();
+      expect(docs.getAttribute('aria-current')).toBe('page');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaving the row cancels; the project in view and a drag of text never spring', () => {
+    vi.useFakeTimers();
+    try {
+      const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+      const docs = v.getByTestId(`app.side.project.${DOCS}`);
+      const acme = v.getByTestId(`app.side.project.${ACME}`);
+      fireEvent.dragEnter(docs, files);
+      act(() => {
+        vi.advanceTimersByTime(SPRING_DEFAULT_MS - 100);
+        fireEvent.dragLeave(docs, { ...files, relatedTarget: null });
+        vi.advanceTimersByTime(5000);
+      });
+      expect(docs.getAttribute('data-spring')).toBeNull();
+      fireEvent.dragEnter(acme, files);
+      fireEvent.dragEnter(docs, { dataTransfer: { types: ['text/plain'], dropEffect: 'none' } });
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(acme.getAttribute('data-spring')).toBeNull();
+      expect(docs.getAttribute('data-spring')).toBeNull();
+      expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'main' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

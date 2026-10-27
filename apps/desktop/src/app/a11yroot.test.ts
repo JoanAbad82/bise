@@ -4,7 +4,7 @@ import { a11yAttrs, noVibrancy } from './a11yroot';
 
 describe('a11yAttrs', () => {
   it('sets each flag that is on and removes the others', () => {
-    expect(a11yAttrs({ reduceTransparency: true, reduceMotion: false, increaseContrast: true })).toEqual({
+    expect(a11yAttrs({ reduceTransparency: true, reduceMotion: false, increaseContrast: true, springing: { on: true, delayMs: 500 } })).toEqual({
       'data-reduce-transparency': '',
       'data-reduce-motion': null,
       'data-increase-contrast': '',

@@ -5,6 +5,7 @@
 // other chunks ask amb-core to add a member.
 
 import type { AppCmd, DraftHubCmd, HelperCmd, HelperEv, HubCmd } from '../proto';
+import type { Springing } from './springing';
 
 export interface BiseApi {
   /** process.platform of the main process ('darwin', 'win32', 'linux'). */
@@ -435,11 +436,13 @@ export interface PopupAt {
   readonly height: number;
 }
 
-/** macOS's accessibility settings that change how bise draws (window.bise.a11y). */
+/** macOS's accessibility settings that change how bise draws and acts (window.bise.a11y). */
 export interface A11y {
   readonly reduceTransparency: boolean;
   readonly reduceMotion: boolean;
   readonly increaseContrast: boolean;
+  /** Pointer Control's spring-loading: a drag held on a sidebar project opens it (shared/springing.ts) */
+  readonly springing: Springing;
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */

@@ -1,7 +1,8 @@
 // src/main · macOS's accessibility settings that change how bise draws (window.bise.a11y; bise fait
 // mac, plan native-mac-plan v4 §2): reduce transparency (no glass, no vibrancy, opaque grounds),
 // reduce motion (no animation, the world doesn't grow), increase contrast (stronger rules and
-// rings). Main reads them (nativeTheme, systemPreferences) and sends each change to every window
+// rings); and Pointer Control's spring-loading (on, its delay: the sidebar's spring-loaded
+// projects, app/spring.ts). Main reads them (nativeTheme, systemPreferences) and sends each change to every window
 // (index.ts); the shell sets them on <html> for ds/tokens.css's fallbacks, and the main window
 // drops its vibrancy for an opaque ground under reduce transparency (windows.ts, glass.ts).
 // macOS tells nativeTheme's 'updated' for transparency and contrast; reduce motion has no event,
@@ -10,13 +11,18 @@
 // Owner: nm-frame.
 import { app, nativeTheme, systemPreferences } from 'electron';
 import type { A11y } from '../shared/api';
+import { SPRING_DEFAULT_MS, springingOf } from '../shared/springing';
 
-/** Nothing reduced: what a test run and a non-Mac see. */
-export const A11Y_NONE: A11y = { reduceTransparency: false, reduceMotion: false, increaseContrast: false };
+/** Nothing reduced, spring-loading as macOS ships it: what a test run and a non-Mac see. */
+export const A11Y_NONE: A11y = { reduceTransparency: false, reduceMotion: false, increaseContrast: false, springing: { on: true, delayMs: SPRING_DEFAULT_MS } };
 
 /** Two readings say the same. Pure. */
 export const sameA11y = (a: A11y, b: A11y): boolean =>
-  a.reduceTransparency === b.reduceTransparency && a.reduceMotion === b.reduceMotion && a.increaseContrast === b.increaseContrast;
+  a.reduceTransparency === b.reduceTransparency &&
+  a.reduceMotion === b.reduceMotion &&
+  a.increaseContrast === b.increaseContrast &&
+  a.springing.on === b.springing.on &&
+  a.springing.delayMs === b.springing.delayMs;
 
 let testMode = false;
 
@@ -25,6 +31,9 @@ export function a11yTestMode(on: boolean): void {
   testMode = on;
 }
 
+/** A global default as a string ('' never set): a read, it asks him nothing. */
+const globalDefault = (key: string): string => systemPreferences.getUserDefault(key, 'string');
+
 /** The settings now. */
 export function a11yNow(): A11y {
   if (testMode || process.platform !== 'darwin') return A11Y_NONE;
@@ -32,6 +41,8 @@ export function a11yNow(): A11y {
     reduceTransparency: nativeTheme.prefersReducedTransparency,
     reduceMotion: systemPreferences.getAnimationSettings().prefersReducedMotion,
     increaseContrast: nativeTheme.shouldUseHighContrastColors,
+    // Pointer Control's spring-loading, read as strings so a never-set key is macOS's default (shared/springing.ts)
+    springing: springingOf(globalDefault('com.apple.springing.enabled'), globalDefault('com.apple.springing.delay')),
   };
 }
 

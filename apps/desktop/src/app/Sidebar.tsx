@@ -42,6 +42,7 @@ import { pinRowOf, projectRowOf, projectsOf, type RowEnd } from './siderows';
 import { BAR_GAP, BAR_H, BAR_W, weekBars, type DayBar, type ProjectFacts } from './projectfacts';
 import { newestOf, useLookedAt, useMarkSeen, useSeen } from './seen';
 import { useNow } from './clock';
+import { useSpring, type SpringRow } from './spring';
 import { projects } from '@/proto/words_projects.gen';
 import { waitsTip } from './tipwords';
 
@@ -125,7 +126,7 @@ function ProjectEnd({ facts, digit, testId }: { facts: ProjectFacts; digit: numb
  * then one plain sentence and its week; a quiet one is its name in text-2 and its age, one line.
  * No icon, no mark, no border: the words say it, the tip says it all.
  */
-function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, testId }: {
+function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, spring, testId }: {
   name: string;
   facts: ProjectFacts;
   on: boolean;
@@ -134,6 +135,8 @@ function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, t
   digit: number | undefined;
   onClick: () => void;
   onContextMenu: (e: MouseEvent<HTMLElement>) => void;
+  /** a file dragged over it: lit, then it blinks and opens (spring.ts) */
+  spring: SpringRow;
   testId: string;
 }) {
   return (
@@ -143,6 +146,8 @@ function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, t
       {...tipAttrs(facts.tip)}
       onClick={onClick}
       onContextMenu={onContextMenu}
+      {...spring.drag}
+      data-spring={spring.spring ?? undefined}
       data-testid={testId}
     >
       <span className="app-s-l1">
@@ -417,6 +422,11 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now }: 
     return true;
   });
   const id = `app.side.project.${p.project}`;
+  const go = () => {
+    router.go({ screen: 'thread', project: p.project, agent: MAIN });
+  };
+  // a file held over the row opens its project (spring.ts); the one in view never springs
+  const spring = useSpring(on, go);
   if (renaming) {
     const done = (name: string | null) => {
       setRenaming(false);
@@ -456,10 +466,9 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now }: 
       on={r.on}
       digit={r.digit}
       now={now}
-      onClick={() => {
-        router.go({ screen: 'thread', project: p.project, agent: MAIN });
-      }}
+      onClick={go}
       onContextMenu={menu.onContextMenu}
+      spring={spring}
       testId={id}
     />
   );
