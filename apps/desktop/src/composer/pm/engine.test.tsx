@@ -96,7 +96,7 @@ describe("(2) old drafts: nothing he typed is lost", () => {
       "bise.composer.v1.p/main",
       JSON.stringify({ draft, history: [sent], queue: [queued] }),
     );
-    const { getByTestId, a, onSend, onQueue } = await mount({ store });
+    const { getByTestId, a, onSend } = await mount({ store });
     expect(getByTestId("composer.field").textContent).toBe(
       "❝ 3why this order?",
     );
@@ -107,10 +107,7 @@ describe("(2) old drafts: nothing he typed is lost", () => {
     expect(onSend).toHaveBeenLastCalledWith(
       buildMessage(entrySegments(draft) ?? []),
     );
-    // the old queue went to the hub's queue once (issue 23), the history kept its old entries
-    expect(onQueue).toHaveBeenCalledTimes(1);
-    expect(onQueue).toHaveBeenCalledWith(buildMessage(entrySegments(queued) ?? []));
-    expect(store.getItem("bise.composer.v1.p/main") ?? "").not.toContain('"queue"');
+    // the history kept its old entries
     expect(load(store, "p/main").history[1]).toBe(sent);
   });
 

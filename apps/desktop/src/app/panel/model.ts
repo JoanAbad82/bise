@@ -445,7 +445,6 @@ function entityOf(x: unknown): Entity | undefined {
 function whatOf(x: unknown): TabWhat | undefined {
   if (!isObj(x)) return undefined;
   switch (x['kind']) {
-    // 'overview' (a record from before the outer card, page outer-side v2): dropped on read
     case 'launcher':
       if (typeof x['n'] !== 'number') return undefined;
       return x['artifacts'] === true ? { kind: 'launcher', n: x['n'], artifacts: true } : { kind: 'launcher', n: x['n'] };

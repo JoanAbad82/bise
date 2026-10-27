@@ -15,16 +15,13 @@ import { useLeftWidth } from '@/app/frame-state';
 import { iconKindOf } from '@/ds';
 import { useAllArtifacts } from '@/artifacts';
 import { armHandoff } from '@/composer/handoff';
-import { activate, artFit, clampShare, shareOf, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushClosed, pushRecent, reopenIn, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type Closed, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
-import { isFlat, parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf, type PanelRec } from './scope';
+import { activate, artFit, clampShare, shareOf, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, pushClosed, pushRecent, reopenIn, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type Closed, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf, type PanelRec } from './scope';
 
 const KEY = 'panel';
 
-/** The kept record as it was read; a flat one (from before the scope) waits for the first project in front. */
-let kept: unknown = keep.view(KEY);
-let rec: PanelRec = parseRec(kept);
-// TODO(panel-scope): a flat record shows as it was until the first project takes it
-let state: PanelKept = isFlat(kept) ? parseKept(kept) : viewOf(rec);
+let rec: PanelRec = parseRec(keep.view(KEY));
+let state: PanelKept = viewOf(rec);
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -48,12 +45,9 @@ function set(raw: PanelKept): void {
  */
 export function panelScope(project: string): void {
   if (project === '' || project === rec.at) return;
-  // TODO(panel-scope): a flat record from before becomes the panel of the first project in front
-  if (isFlat(kept)) rec = { ...parseRec(kept, project), recent: rec.recent, shares: rec.shares };
   // what he opened before any project was in front (a first launch) is the first project's
-  else if (rec.at === '' && rec.byProject[project] === undefined) rec = putView(switchTo(rec, project), state);
+  if (rec.at === '' && rec.byProject[project] === undefined) rec = putView(switchTo(rec, project), state);
   else rec = switchTo(rec, project);
-  kept = undefined;
   state = viewOf(rec);
   keep.setView(KEY, rec);
   emit();
@@ -126,9 +120,8 @@ export const panelState = {
   },
   /** tests only: back to a fresh window (`raw`: the kept record it starts from) */
   reset(raw?: unknown): void {
-    kept = raw;
     rec = parseRec(raw);
-    state = isFlat(raw) ? parseKept(raw) : viewOf(rec);
+    state = viewOf(rec);
     before.clear();
     closed.clear();
     emit();

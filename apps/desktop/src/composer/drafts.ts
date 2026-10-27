@@ -2,8 +2,7 @@
 // agent) and the messages he sent or put away (↑ brings them back, newest first, 50 kept). Kept in
 // the renderer's storage (amb-core m_9460: no core state), so a restart keeps them. A draft is the
 // editor's own JSON (chips included); history entries are the same JSON, so ↑ brings a chip back
-// as a chip. Queued messages are the hub's (issue 23): an older window's own queue key is read once
-// (takeOldQueue) to go to the hub, then dropped.
+// as a chip. Queued messages are the hub's (issue 23).
 //
 // Pure over a Storage-like store: the composer calls save() debounced (never per keystroke),
 // and at once on send, put-away and target switch.
@@ -47,23 +46,6 @@ export function load(store: Store, target: string): Saved {
 export function save(store: Store, target: string, s: Saved): void {
   if (s.draft === null && s.history.length === 0) store.removeItem(PREFIX + target);
   else store.setItem(PREFIX + target, JSON.stringify({ draft: s.draft, history: s.history }));
-}
-
-/** An older window's own queue for `target` (its entries, oldest first), taken out of the file:
- *  the caller sends them to the hub's queue in order; a second call finds none. */
-export function takeOldQueue(store: Store, target: string): string[] {
-  const raw = store.getItem(PREFIX + target);
-  if (raw === null) return [];
-  let q: string[] = [];
-  try {
-    const v: unknown = JSON.parse(raw);
-    const o = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
-    if (isStringArray(o.queue)) q = o.queue;
-  } catch {
-    return [];
-  }
-  if (q.length > 0) save(store, target, load(store, target));
-  return q;
 }
 
 /** A draft the composer can't read (an unknown entry format) is never dropped: its raw JSON goes

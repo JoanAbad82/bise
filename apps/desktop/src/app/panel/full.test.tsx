@@ -14,6 +14,7 @@ import { FloatHost } from '@/composer/float/Host';
 import { resetHandoff } from '@/composer/handoff';
 import { UnlessFull } from './Full';
 import { FOLDED } from './model';
+import { EMPTY_REC, putView, switchTo } from './scope';
 import { panelState, setFull, toggleFull } from './state';
 
 const P = 'acme-1a2b3c4d';
@@ -23,7 +24,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true });
   localStorage.clear();
   resetHandoff();
-  panelState.reset({ ...FOLDED, open: true });
+  panelState.reset(putView(switchTo(EMPTY_REC, P), { ...FOLDED, open: true }));
 });
 afterEach(cleanup);
 

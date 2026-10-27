@@ -69,26 +69,13 @@ export function pruneScopes(rec: PanelRec, projects: readonly string[]): PanelRe
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
 /**
- * A record from before the panel was per project: the window's one panel, its tabs at the top.
- * TODO(panel-scope): goes in desktop-v2026.10.22, once every window wrote a per-project record.
- */
-export function isFlat(raw: unknown): boolean {
-  return isObj(raw) && !isObj(raw['byProject']) && isObj(raw['tabs']);
-}
-
-/**
  * The kept record read back; each project's panel as parseKept reads it (anything unreadable
- * dropped). A flat record from before (isFlat) becomes the panel of `at`, the project the window
- * starts on, so his tabs stay across the update (TODO(panel-scope), architect m_45519 #3). Pure.
+ * dropped). Pure.
  */
 export function parseRec(raw: unknown, at = ''): PanelRec {
   if (!isObj(raw)) return at === '' ? EMPTY_REC : { ...EMPTY_REC, at };
   // the window's own part reads the same as a project's (parseKept), with no tabs
   const mine = parseKept({ recent: raw['recent'], shares: raw['shares'] });
-  if (isFlat(raw)) {
-    const flat = parseKept(raw);
-    return at === '' ? { ...EMPTY_REC, recent: flat.recent, shares: flat.shares } : { at, byProject: { [at]: scopedOf(flat) }, recent: flat.recent, shares: flat.shares };
-  }
   const byProject: Record<string, Scoped> = {};
   if (isObj(raw['byProject'])) for (const [p, k] of Object.entries(raw['byProject'])) if (p !== '' && isObj(k)) byProject[p] = scopedOf(parseKept(k));
   const was = typeof raw['at'] === 'string' ? raw['at'] : '';

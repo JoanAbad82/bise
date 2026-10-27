@@ -11,7 +11,7 @@ import { isImagePath } from './sources';
 import { colorLines, cssText, proseRuns } from './mdcolor';
 import { codeLines } from '@/thread/Code';
 import { buildMessage, chipStrip, fileChipName, isLongPaste, lineCount, nextChipNumber, type Chip, type Segment } from './message';
-import { load, remember, save, takeOldQueue, HISTORY_MAX, type Store } from './drafts';
+import { load, remember, save, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, enterSends, move, type Row } from './pick';
 import { enterMakesNewline, indent, item, newline, outdentAtStart, subwordLeft, subwordRight, type Op } from './mdlive';
 
@@ -202,15 +202,6 @@ describe('drafts', () => {
     st = remember(st, 'm55');
     expect(st.history.length).toBe(HISTORY_MAX);
     expect(st.history.slice(0, 2)).toEqual(['m55', 'm59']);
-  });
-  it("an older window's own queue is taken once, in order, and leaves the file (issue 23)", () => {
-    const s = memStore();
-    s.setItem('bise.composer.v1.t', JSON.stringify({ draft: '{"d":1}', history: ['h'], queue: ['a', 'b'] }));
-    expect(takeOldQueue(s, 't')).toEqual(['a', 'b']);
-    expect(takeOldQueue(s, 't')).toEqual([]);
-    expect(load(s, 't')).toEqual({ draft: '{"d":1}', history: ['h'] });
-    expect(JSON.parse(s.getItem('bise.composer.v1.t') ?? '{}')).not.toHaveProperty('queue');
-    expect(takeOldQueue(s, 'none')).toEqual([]);
   });
 });
 

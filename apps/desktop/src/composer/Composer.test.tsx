@@ -199,9 +199,6 @@ describe('the composer', () => {
     expect(ui.getByTestId('composer.field').textContent).toContain('café 👋 déjà');
     expect(ui.getByTestId('composer.field').textContent).toContain('ligne 2');
     expect(ui.getByTestId('composer.field').textContent).toContain('fin');
-    // an older window's queued one goes to the hub's queue once, whole (issue 23)
-    expect(onQueue).toHaveBeenCalledTimes(1);
-    expect(onQueue).toHaveBeenLastCalledWith(buildMessage([{ kind: 'text', text: 'après ça 🎉' }]));
     await act(async () => {
       ui.rerender(el(false)); // the turn ends: the window sends nothing itself (the hub does)
       await Promise.resolve();

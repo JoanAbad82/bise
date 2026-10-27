@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Route } from '@/app/route';
 import { dropGoneArts, FIRST, FOLDED, openIn, type TabWhat, type Tabs } from './model';
-import { EMPTY_REC, isFlat, parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf } from './scope';
+import { EMPTY_REC, parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf } from './scope';
 import { activateTab, closeTabBack, openWhat, panelScope, panelState, panelToggle, setArtShare, setWidth } from './state';
 
 const art = (project: string, id: string): TabWhat => ({ kind: 'thing', e: { kind: 'artifact', project, id } });
@@ -52,18 +52,6 @@ describe('the record per project (pure)', () => {
     expect(parseRec(JSON.parse(JSON.stringify(rec)))).toEqual(rec);
     expect(parseRec('junk')).toEqual(EMPTY_REC);
     expect(parseRec({ at: 'p1', byProject: { '': { open: true }, p2: 7 } }).byProject).toEqual({});
-  });
-  it('a flat record from before becomes the panel of the first project in front (TODO(panel-scope))', () => {
-    const flat = { open: true, tabs: { list: [{ what: { kind: 'overview' } }, { what: art('p1', 'a') }], active: 'artifact:p1/a' }, width: 500, dragged: true, recent: [], shares: { sheet: 0.6 } };
-    expect(isFlat(flat)).toBe(true);
-    expect(isFlat(parseRec(flat, 'p1'))).toBe(false);
-    const rec = parseRec(flat, 'p1');
-    expect(rec.at).toBe('p1');
-    expect(viewOf(rec).open).toBe(true);
-    // its old Overview tab dropped on read (page outer-side v2)
-    expect(viewOf(rec).tabs.active).toBe(viewOf(rec).tabs.list[0]?.id);
-    expect(viewOf(rec).width).toBe(500);
-    expect(viewOf(rec).shares).toEqual({ sheet: 0.6 });
   });
   it('a full projects list drops the panels of projects gone; an empty one drops nothing', () => {
     let rec = putView(switchTo(EMPTY_REC, 'p1'), { ...FOLDED, open: true });
@@ -143,13 +131,5 @@ describe('the live panel per project (state.ts)', () => {
     setArtShare('sheet', 0.66);
     panelScope('p2');
     expect(panelState.get().shares).toEqual({ sheet: 0.66 });
-  });
-  it('a flat record from before opens as the first project in front, his tabs kept', () => {
-    panelState.reset({ open: true, tabs: { list: [{ what: { kind: 'overview' } }, { what: art('p1', 'a') }], active: 'artifact:p1/a' }, width: 500, dragged: true, recent: [], shares: {} });
-    panelScope('p1');
-    expect(panelState.get().open).toBe(true);
-    expect(panelState.get().tabs.active).toBe('artifact:p1/a');
-    panelScope('p2');
-    expect(panelState.get().open).toBe(false);
   });
 });

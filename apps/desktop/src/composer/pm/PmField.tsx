@@ -38,7 +38,6 @@ import {
   load,
   remember,
   save,
-  takeOldQueue,
   type Saved,
   type Store,
 } from "../drafts";
@@ -976,13 +975,6 @@ export function PmField(p: PmFieldProps): JSX.Element {
     // the caret after a chip lights its row only; a hover lights both (the chip keeps no fill at rest)
     for (const el of dom.querySelectorAll<HTMLElement>(".b-chip[data-n]")) el.classList.toggle("lit", hoverN !== null && el.dataset.n === String(hoverN));
   }, [hoverN, chips]);
-
-  // ---- an older window's own queue (before the hub owned it, issue 23): to the hub's queue once,
-  // in order, then gone from the drafts file ----
-  const { store: oldStore, target: oldTarget } = p;
-  useEffect(() => {
-    for (const entry of takeOldQueue(oldStore, oldTarget)) props.current.queue(buildMessage(entrySegments(entry) ?? []));
-  }, [oldStore, oldTarget]);
 
   return (
     <>

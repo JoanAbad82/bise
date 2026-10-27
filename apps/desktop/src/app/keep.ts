@@ -241,13 +241,7 @@ export function useKeptText(id: string | null): readonly [string, (text: string)
 export const keptStorage = {
   getItem: (key: string): string | null => {
     const t = keep.text(`ls:${key}`);
-    if (t !== '') return t;
-    // what an older build kept in localStorage still reads (until it is written here)
-    try {
-      return (globalThis as { localStorage?: { getItem(k: string): string | null } }).localStorage?.getItem(key) ?? null;
-    } catch {
-      return null;
-    }
+    return t !== '' ? t : null;
   },
   setItem: (key: string, value: string): void => {
     keep.setText(`ls:${key}`, value);

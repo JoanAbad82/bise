@@ -26,7 +26,6 @@ describe('the list keeps what he reads when an older page comes in front', () =>
   });
   it('his place in keep: the row and its px from the top; an older build kept the row alone', () => {
     expect(placeOf({ key: 'e:14', off: -17 })).toEqual({ key: 'e:14', off: -17 });
-    expect(placeOf('e:14')).toEqual({ key: 'e:14', off: 0 });
     expect(placeOf({ key: 'e:14', off: Number.NaN })).toEqual({ key: 'e:14', off: 0 });
     expect(placeOf({ off: 3 })).toBeUndefined();
     expect(placeOf(undefined)).toBeUndefined();

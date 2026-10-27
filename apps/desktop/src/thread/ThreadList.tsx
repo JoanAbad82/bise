@@ -129,10 +129,9 @@ export function rowWhole(row: { top: number; bottom: number }, view: { top: numb
 /**
  * His place in a thread as keep.ts holds it: the key of the row he reads (the first one under the
  * top edge) and its top's px from that edge, so it comes back at the same y, back on the thread
- * after an artifact, ‹ › or a reload. An older build kept the key alone (no px). Pure.
+ * after an artifact, ‹ › or a reload. Pure.
  */
 export function placeOf(v: unknown): { key: string; off: number } | undefined {
-  if (typeof v === 'string') return { key: v, off: 0 };
   if (typeof v !== 'object' || v === null) return undefined;
   const { key, off } = v as { key?: unknown; off?: unknown };
   return typeof key === 'string' ? { key, off: typeof off === 'number' && Number.isFinite(off) ? off : 0 } : undefined;
