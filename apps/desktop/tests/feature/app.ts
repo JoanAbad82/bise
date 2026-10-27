@@ -23,3 +23,9 @@ export { libraryPage, sideShows, type SideShows } from '@/app/sideshows';
 export { projectsOf } from '@/app/siderows';
 // an artifact the list doesn't have: what the centre and the panel show (artifacts/gone.ts)
 export { centreOf, goneLinkOf, goneRoute, type ArtCentre, type GoneLink } from '@/artifacts/gone';
+// the outer card's width by its border (side3d/outerwidth.ts) on the window's keep, and the layout that draws it
+export { createKeep, type KeepStore } from '@/app/keep';
+export { createOuterWidth, type OuterWidth } from '@/app/side3d/outerwidth';
+export { sideLayout, type CoinsAt } from '@/app/side3d/layout';
+export { leftWidthOf } from '@/app/frame-state';
+export { SIDE } from '@/app/resize';

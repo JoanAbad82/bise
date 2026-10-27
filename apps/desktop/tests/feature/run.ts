@@ -10,6 +10,14 @@
 import {
   allItems,
   artifactGo,
+  createKeep,
+  createOuterWidth,
+  leftWidthOf,
+  sideLayout,
+  SIDE,
+  type CoinsAt,
+  type KeepStore,
+  type OuterWidth,
   centreOf,
   chipOpen,
   goneLinkOf,
@@ -66,6 +74,8 @@ export interface Feature {
     route(): Route;
     /** The left sidebar under its head for that route (app/sideshows.ts): his projects' names, the library's rows ('All artifacts', 'Recent', 'Unfiled', its folders; none while the library page is not mounted: its rows are that page's, artifacts/library.tsx), or the settings nav. */
     sidebar(): SidebarView;
+    /** The outer card at the window's right on a project's thread, the panel folded: where the coins are ('card' when it shows) and its width (side3d/layout.ts sideLayout over his kept width, outerwidth.ts). */
+    outerCard(): OuterCardView;
     /** An artifact opened by id: the centre (its maker's thread, the project's main when the list doesn't have it, nothing before the list came) and the panel (its view, or the gone lines' link and where it goes, or nothing yet) (artifacts/gone.ts). */
     artifact(project: string, id: string): ArtifactView;
   };
@@ -75,6 +85,12 @@ export interface Feature {
 export interface ArtifactView {
   readonly centre: ArtCentre;
   readonly panel: 'wait' | 'view' | { readonly gone: GoneLink; readonly to: Route };
+}
+
+/** The outer card: shown ('card') or the coins instead, and its width when shown. */
+export interface OuterCardView {
+  readonly coins: CoinsAt;
+  readonly width: number | null;
 }
 
 /** What the left sidebar lists. */
@@ -97,6 +113,14 @@ export function feature(now = 1_791_100_000_000): Feature {
   const latest = new Latest();
   let clock = now;
   let route: Route = { screen: 'inbox' };
+  // the window's own keep (keep.ts) on a storage a reload finds again; written at once
+  const disk = new Map<string, string>();
+  const storage: KeepStore = { getItem: (k) => disk.get(k) ?? null, setItem: (k, v) => { disk.set(k, v); } };
+  const keepOpen = (): OuterWidth => createOuterWidth(createKeep(storage, () => clock, (f) => { f(); return () => undefined; }));
+  let outer = keepOpen();
+  let win = 1440;
+  // the room the left takes: the rail and a docked sidebar at its default width (frame-state.ts)
+  const left = (): number => leftWidthOf(win, { hidden: false, width: SIDE.def });
   const open = (): Store => {
     const s = new Store(
       { send: (cmd) => { outbox.push(cmd); } },
@@ -157,6 +181,14 @@ export function feature(now = 1_791_100_000_000): Feature {
       case 'go':
         route = g.route;
         return;
+      case 'win':
+        win = g.width;
+        return;
+      case 'outer':
+        // the card's border (side3d/Host.tsx): a drag clamped to the room beside the left, a double-click back
+        if (g.want === null) outer.reset();
+        else outer.drag(g.want, win - left());
+        return;
     }
   };
 
@@ -183,6 +215,7 @@ export function feature(now = 1_791_100_000_000): Feature {
     },
     reload() {
       store = open();
+      outer = keepOpen();
       for (const e of latest.snapshot()) store.apply(e);
       return f;
     },
@@ -195,6 +228,10 @@ export function feature(now = 1_791_100_000_000): Feature {
       gallery: (place, only) => galleryView(allItems(store, only), place, clock),
       library: (project = '', projectName = '') => libraryView(store.folders(), allItems(store), project, projectName),
       route: () => route,
+      outerCard: () => {
+        const l = sideLayout(win, left(), false, undefined, true, undefined, false, outer.want());
+        return { coins: l.coins, width: l.coins === 'card' ? (l.outerW ?? null) : null };
+      },
       artifact: (project, id) => {
         const listed = store.artifacts(project);
         const a = listed.find((x) => x.id === id);

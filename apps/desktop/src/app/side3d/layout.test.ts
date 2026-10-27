@@ -1,7 +1,7 @@
 // sideLayout at the widths of plan §2 (1000, 1100, 1280, 1440, 1728, 1920), the panel open and closed.
 import { describe, expect, it } from 'vitest';
 import type { Route } from '../route';
-import { BETWEEN_BAND, BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, OUTER_BAND, OUTER_COL_MIN, sideLayout, sideShows, THREAD_KEEPS } from './layout';
+import { BETWEEN_BAND, BUBBLE_BAND, CARD_MAX, CARD_ROOM, cardMaxH, COL_W, MIN_LEFT, OUTER, OUTER_BAND, OUTER_COL_MIN, OUTER_W, sideLayout, sideShows, THREAD_KEEPS } from './layout';
 
 /** rail 56 + sidebar 240 */
 const SIDE = 296;
@@ -17,11 +17,22 @@ describe('sideLayout, the panel folded', () => {
       expect(right(w, l) - OUTER_BAND).toBe(l.colLeft - SIDE);
     }
   });
-  it('the card while it leaves the column 480 and its two 24; a px less: the coins at the edge', () => {
+  it('the card while it leaves the column 480 and its two 24, narrowing to 260 (designer m_48013); a px less: the coins at the edge', () => {
     const just = SIDE + OUTER_COL_MIN + 2 * MIN_LEFT + OUTER_BAND;
-    expect(sideLayout(just, SIDE, false)).toMatchObject({ coins: 'card', colW: OUTER_COL_MIN, colLeft: SIDE + MIN_LEFT });
-    expect(sideLayout(just - 1, SIDE, false).coins).toBe('edge');
+    expect(sideLayout(just, SIDE, false)).toMatchObject({ coins: 'card', colW: OUTER_COL_MIN, colLeft: SIDE + MIN_LEFT, outerW: OUTER_W });
+    expect(sideLayout(just - 1, SIDE, false)).toMatchObject({ coins: 'card', outerW: OUTER_W - 1, colW: OUTER_COL_MIN });
+    const least = just - (OUTER_W - OUTER.min);
+    expect(sideLayout(least, SIDE, false)).toMatchObject({ coins: 'card', outerW: OUTER.min, gutter: OUTER.min + 24 });
+    expect(sideLayout(least - 1, SIDE, false).coins).toBe('edge');
     expect(sideLayout(1440, SIDE, true, 480).coins).toBe('between');
+  });
+  it("his width (outerwidth.ts): drawn in 260-480 and never past the column's 480 + 2×24; with the coins picked, no card", () => {
+    expect(sideLayout(1920, SIDE, false, undefined, true, undefined, false, 400)).toMatchObject({ coins: 'card', outerW: 400, gutter: 424 });
+    expect(sideLayout(2560, SIDE, false, undefined, true, undefined, false, 900).outerW).toBe(OUTER.max);
+    expect(sideLayout(2560, SIDE, false, undefined, true, undefined, false, 10).outerW).toBe(OUTER.min);
+    const l = sideLayout(1300, SIDE, false, undefined, true, undefined, false, 480);
+    expect(l).toMatchObject({ outerW: 452, colW: OUTER_COL_MIN });
+    expect(sideLayout(1920, SIDE, false, undefined, true, undefined, true, 400).coins).not.toBe('card');
   });
   it('1280: the card (292, his m_47018) still leaves a 668 column room: the column whole, centred in it', () => {
     const l = sideLayout(1280, SIDE, false);

@@ -157,7 +157,9 @@ export type Gesture =
   | { readonly g: 'resend' | 'dismiss'; readonly project: string; readonly agent: string; readonly cid: number }
   | { readonly g: 'art'; readonly project: string; readonly id: string }
   | { readonly g: 'chip'; readonly card: Card }
-  | { readonly g: 'go'; readonly route: Route };
+  | { readonly g: 'go'; readonly route: Route }
+  | { readonly g: 'win'; readonly width: number }
+  | { readonly g: 'outer'; readonly want: number | null };
 
 export const answer = (project: string, card: number, reply: string, from?: Here): Gesture =>
   ({ g: 'answer', project, card, reply, ...(from === undefined ? {} : { from }) });
@@ -178,6 +180,12 @@ export const openArtifact = (project: string, id: string): Gesture => ({ g: 'art
 export const openChip = (c: Card): Gesture => ({ g: 'chip', card: c });
 /** He goes to that route (the rail, ⌘K, a link). */
 export const goTo = (route: Route): Gesture => ({ g: 'go', route });
+/** He makes the window this wide (the rail and a 240 sidebar on its left). */
+export const windowAt = (width: number): Gesture => ({ g: 'win', width });
+/** His drag (or ←/→) on the outer card's left border asks this width (the Splitter's want). */
+export const dragOuter = (want: number): Gesture => ({ g: 'outer', want });
+/** A double-click (or Enter) on the outer card's left border. */
+export const resetOuter = (): Gesture => ({ g: 'outer', want: null });
 /** He drops his failed message. */
 export const dismiss = (project: string, agent: string, cid: number): Gesture => ({ g: 'dismiss', project, agent, cid });
 

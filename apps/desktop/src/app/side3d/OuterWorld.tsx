@@ -1,5 +1,5 @@
 // src/app/side3d · the bims' world over the outer card (page outer-world v2, his pick #799): the
-// tile, the card's width (layout OUTER_W, 292) and as high as he left it (140 by default), r 12, the card's ring and e-1, its top
+// tile, the card's width (layout outerW, 292 by default) and as high as he left it (140 by default), r 12, the card's ring and e-1, its top
 // 12 under the bar (tilestate OUTER_TOP, inline; his m_46677); the project's office at its fit, live: a click on a bim opens its
 // thread; an agent's thread open (from the sidebar, the card or the bim), main's too, the camera centres on its bim and follows it,
 // 8.8x close (bims/focus followOf, FOLLOW_ZOOM, his m_47261, m_47407; his pinch or drag stops it until he opens another); an ask opened in place
@@ -35,6 +35,8 @@ export interface OuterTileProps {
   readonly cards: readonly Card[];
   /** its height now, css px */
   readonly h: number;
+  /** its width, the card's (layout outerW; 292 by default) */
+  readonly w?: number;
   /** the open agent's bim, the camera centres on it and follows it (bims/focus followOf); null: the whole office */
   readonly follow: string | null;
   /** a click on a bim: its thread */
@@ -62,7 +64,7 @@ export interface TownActs {
  * goes the frame after that office drew): the chrome fades in (data-landed; designer m_47950), and
  * FOLLOW_BEAT_MS later the camera eases to the followed bim (designer m_47972).
  */
-export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide, town = null, phase = null }: OuterTileProps & { readonly town?: TownActs | null; readonly phase?: TilePhase }) {
+export function OuterTile({ project, name, agents, cards, h, w = OUTER_W, follow, onOpen, onPickMap, onPanel, onHide, town = null, phase = null }: OuterTileProps & { readonly town?: TownActs | null; readonly phase?: TilePhase }) {
   const [docked, setDocked] = useState(phase === 'docking');
   if (phase === 'docking' && !docked) setDocked(true);
   // landed (the copy went the frame after the tile's office drew): the camera waits one beat, then finds the followed bim
@@ -83,7 +85,7 @@ export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onP
   }, [beat]);
   const waiting = phase === 'welcome';
   return (
-    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined} data-waiting={waiting || undefined} data-landing={phase === 'docking' || undefined} data-landed={(docked && phase === null) || undefined}>
+    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: w }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined} data-waiting={waiting || undefined} data-landing={phase === 'docking' || undefined} data-landed={(docked && phase === null) || undefined}>
       <span className="s3-otile-office">
         {waiting ? null : town !== null ? (
           <OuterTown h={h} acts={town} />
@@ -112,7 +114,7 @@ export const FOLLOW_BEAT_MS = 200;
 export const HANDLE_HOT_MS = 120;
 
 /** The gap between the tile and the card: a drag sets the tile's height (96 .. half the window), a double-click 140; ↑ ↓ by 8. */
-export function TileHandle({ h, winH, onHeight }: { h: number; winH: number; onHeight: (h: number) => void }) {
+export function TileHandle({ h, w = OUTER_W, winH, onHeight }: { h: number; w?: number; winH: number; onHeight: (h: number) => void }) {
   const at = useRef<{ readonly y: number; readonly h: number } | null>(null);
   const [hot, setHot] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -146,7 +148,7 @@ export function TileHandle({ h, winH, onHeight }: { h: number; winH: number; onH
     <div
       className="s3-ohandle"
       // its place: the 8 under the tile, following the height
-      style={{ top: OUTER_TOP + h, height: TILE_GAP, width: OUTER_W }}
+      style={{ top: OUTER_TOP + h, height: TILE_GAP, width: w }}
       role="separator"
       aria-orientation="horizontal"
       aria-label={side.tile_height}

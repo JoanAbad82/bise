@@ -1,5 +1,5 @@
 // src/app/side3d · the outer card (page outer-side v2, Gabriel's pick m_46173): the Overview out of
-// the panel, a card at the window's right (layout OUTER_W 292 wide, inline; 12 from the edges, the bar's included: its top
+// the panel, a card at the window's right (his width by its left border, layout outerW: 292 by default, 260-480, inline; 12 from the edges, the bar's included: its top
 // inline, tilestate OUTER_TOP + the tile's room), shown while the panel is folded and the room leaves the column 480 (layout 'card'); a panel
 // open gives way to the coins, then to the minis (Host). Its sections head in the folded side's
 // style: the section's 3D object at 20, its name, its count, 'all ›'. AGENTS: one line of 28 each,
@@ -324,7 +324,7 @@ export function scrollEdges(top: number, view: number, height: number): { readon
  * it), a 16 fade at each edge that has more. `tile`: the room the bims' tile and its handle take
  * above it (0: hidden).
  */
-export function OuterCard({ tile = 0, children }: { tile?: number; children: ReactNode }) {
+export function OuterCard({ tile = 0, w = OUTER_W, children }: { tile?: number; w?: number; children: ReactNode }) {
   const box = useRef<HTMLElement>(null);
   const [edges, setEdges] = useState({ above: false, below: false });
   const measure = () => {
@@ -336,7 +336,7 @@ export function OuterCard({ tile = 0, children }: { tile?: number; children: Rea
   // after each render: rows came or went ('+ N more', a new artifact), the window's height
   useLayoutEffect(measure);
   return (
-    <aside ref={box} className="s3-outer" style={{ top: OUTER_TOP + tile, width: OUTER_W }} onScroll={measure}
+    <aside ref={box} className="s3-outer" style={{ top: OUTER_TOP + tile, width: w }} onScroll={measure}
       data-above={edges.above || undefined} data-below={edges.below || undefined} data-tip-box="" data-testid="app.outer">
       {children}
     </aside>

@@ -248,6 +248,11 @@
     "one": null,
     "text": "nothing scheduled."
   },
+  "side.outer_width": {
+    "args": [],
+    "one": null,
+    "text": "Overview width"
+  },
   "side.processes": {
     "args": [],
     "one": null,

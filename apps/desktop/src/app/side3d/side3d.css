@@ -1354,7 +1354,7 @@
 }
 
 /* the outer card (page outer-side v2, his pick; OuterCard.tsx): the Overview out of the panel, 292
-   wide, 12 from the window's right edge, 12 under the bar, 12 above the bottom; r 12, --c-raised,
+   wide by default (260-480 by its left border), 12 from the window's right edge, 12 under the bar, 12 above the bottom; r 12, --c-raised,
    1 px line, e-1; one scroll for all its sections when they pass its height */
 .s3-outer {
   position: fixed;
@@ -1363,7 +1363,7 @@
   bottom: var(--s-3);
   z-index: 15;
   box-sizing: border-box;
-  /* width inline: layout OUTER_W (292, his m_47018, designer m_47025) */
+  /* width inline: layout outerW (292 by default, his m_47018, designer m_47025; 260-480 by its left border, designer m_48013) */
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
@@ -1599,7 +1599,7 @@
   right: var(--s-3);
   z-index: 15;
   box-sizing: border-box;
-  /* width inline: layout OUTER_W, the card's */
+  /* width inline: layout outerW, the card's */
   overflow: hidden;
   border-radius: var(--r-3);
   background: var(--c-raised);

@@ -131,6 +131,8 @@ crate::words! { side:
     tile_show = "Show the bims";
     /// the handle between the tile and the card: its VoiceOver name and tip
     tile_height = "drag to resize · double-click resets";
+    /// the card's left border he drags (and its tile's): its VoiceOver name
+    outer_width = "Overview width";
     /// the tile's VoiceOver name
     tile_name(project) = "{project}'s bims";
     /// a coin's card (⌥ held alone, or a hover; page folded-side v9), the

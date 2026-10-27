@@ -3,14 +3,14 @@
 // cursor col-resize; while dragging 2 px --c-text-2 and col-resize over the whole window (window
 // listeners); live resize, no ghost line; a double-click goes back to the default width. Keyboard:
 // a focusable separator, ←/→ move it 16 px, Enter goes back to the default. Owner: amb-win.
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 
 const HOVER_MS = 120;
 const STEP_PX = 16;
 
 export interface SplitterProps {
-  /** which column it resizes: the sidebar (its right border) or the right panel (its left border) */
-  readonly edge: 'side' | 'panel';
+  /** which column it resizes: the sidebar (its right border), the right panel or the outer card (their left border) */
+  readonly edge: 'side' | 'panel' | 'outer';
   /** the column's width now */
   readonly width: number;
   /** a drag or a key wants this width (the caller clamps it) */
@@ -19,14 +19,16 @@ export interface SplitterProps {
   readonly onReset: () => void;
   readonly label: string;
   readonly testId: string;
+  /** its place when its column says it inline (the outer card's: its top and right) */
+  readonly style?: CSSProperties;
 }
 
-export function Splitter({ edge, width, onWidth, onReset, label, testId }: SplitterProps) {
+export function Splitter({ edge, width, onWidth, onReset, label, testId, style }: SplitterProps) {
   const [hot, setHot] = useState(false);
   const [drag, setDrag] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const from = useRef<{ x: number; w: number } | null>(null);
-  // the panel's border moves left when it widens
+  // the panel's and the card's border moves left when they widen
   const sign = edge === 'side' ? 1 : -1;
   useEffect(
     () => () => {
@@ -92,6 +94,7 @@ export function Splitter({ edge, width, onWidth, onReset, label, testId }: Split
       onDoubleClick={onReset}
       onKeyDown={onKey}
       data-testid={testId}
+      {...(style === undefined ? {} : { style })}
     />
   );
 }

@@ -42,12 +42,17 @@ import { Empty, Float, FloatLayer, HeadButton, type FloatContent } from './Flyou
 import { ArchivedFold, ArchivedRows, FloatAgents } from './FloatAgents';
 import { OuterAgents, OuterCard, OuterList, OuterSection } from './OuterCard';
 import { OuterTile, TileHandle } from './OuterWorld';
-import { clampTile, outerWorld, TILE_GAP, useOuterWorld } from './tilestate';
+import { clampTile, OUTER_GAP, OUTER_TOP, outerWorld, TILE_GAP, useOuterWorld } from './tilestate';
+import { outerWidth } from './outerwidth';
+import { Splitter } from '../Splitter';
 import { useAgentRows } from '../agentrows';
 import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
-import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
+import { CARD_MAX, cardMaxH, OUTER_W, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
+
+/** half the border's 8 px hit area: it sits centred on the card's left edge */
+const SPLIT_HALF = 4;
 import { newAgent, openTab, panelFront, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
 import { acrossSays, busyProjects, useListed } from './lists';
 import { barScope, inScope, scopeWords } from '../barscope';
@@ -153,11 +158,11 @@ export function SideHost() {
   if (layout.coins === 'none' || project === '') return null;
   // whose items it lists: the Overview's scope (a project's own; bise's own every project's)
   const scope = panelProject(route, home, rows.filter((p) => !p.home).length) ?? project;
-  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} at={layout.coins} right={layout.right} />;
+  return <Side key={`${project}\u0000${scope}`} project={project} scope={scope} home={home} world={layout.world} at={layout.coins} right={layout.right} outerW={layout.outerW ?? OUTER_W} room={winW - leftW} />;
 }
 
-/** `project`: where its acts go (the world, + new agent, + add); `scope`: whose items it lists ('' every project's); `at`: where the coins are, `right` their column's distance from the window's right edge. */
-function Side({ project, scope, home, world, at: coinsAt, right }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble'; at: CoinsAt; right: number }) {
+/** `project`: where its acts go (the world, + new agent, + add); `scope`: whose items it lists ('' every project's); `at`: where the coins are, `right` their column's distance from the window's right edge; `outerW` the card's and its tile's width, `room` the window less the left (a drag on the card's border is clamped to it). */
+function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }: { project: string; scope: string; home: string; world: 'small' | 'big' | 'bubble'; at: CoinsAt; right: number; outerW: number; room: number }) {
   const router = useRouter();
   const route = useRoute();
   const store = useStore();
@@ -525,7 +530,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       <>
         {!tile.hidden && (
           <>
-            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH} follow={tileFollow} phase={tilePhase}
+            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH} w={outerW} follow={tileFollow} phase={tilePhase}
               onOpen={(agent) => {
                 router.go({ screen: 'thread', project, agent });
               }}
@@ -547,12 +552,21 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
                   router.go({ screen: 'thread', project: p, agent });
                 },
               } : null} />
-            <TileHandle h={tileH} winH={winH} onHeight={(h) => {
+            <TileHandle h={tileH} w={outerW} winH={winH} onHeight={(h) => {
               outerWorld.height(h, winH);
             }} />
           </>
         )}
-      <OuterCard key={scopeKey} tile={tileRoom}>
+      {/* his m_48003: the card and its tile resize together by their left border (designer m_48013) */}
+      <Splitter edge="outer" width={outerW} label={side.outer_width} testId="app.split.outer"
+        style={{ top: OUTER_TOP, right: OUTER_GAP + outerW - SPLIT_HALF }}
+        onWidth={(w) => {
+          outerWidth.drag(w, room);
+        }}
+        onReset={() => {
+          outerWidth.reset();
+        }} />
+      <OuterCard key={scopeKey} tile={tileRoom} w={outerW}>
         <OuterSection id="agents" name={bubbleName('agents')} count={String(live)} {...(counts.asks > 0 ? { loud: side.head_waits({ n: counts.asks }) } : {})} onAll={() => {
           router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
         }} {...(tile.hidden ? { onCube: () => {

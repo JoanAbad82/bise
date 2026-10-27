@@ -8,6 +8,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { sideLayout, type PanelIn, type SideLayout } from './layout';
 import { useSideCompact } from './sidepick';
+import { useOuterWant } from './outerwidth';
 
 /** a resize has ended when no resize event came for this long, ms */
 export const RESIZE_END_MS = 160;
@@ -17,7 +18,7 @@ const subs = new Set<() => void>();
 
 /** Put a new layout (SideHost's); its readers hear it only when a place changed. */
 export function setSideLayout(next: SideLayout): void {
-  if (next.colLeft === now.colLeft && next.colW === now.colW && next.world === now.world && next.gutter === now.gutter && next.side === now.side && next.coins === now.coins && next.right === now.right) return;
+  if (next.colLeft === now.colLeft && next.colW === now.colW && next.world === now.world && next.gutter === now.gutter && next.side === now.side && next.coins === now.coins && next.right === now.right && next.outerW === now.outerW) return;
   now = next;
   for (const f of [...subs]) f();
 }
@@ -55,13 +56,14 @@ export function onResizeEnd(cb: (w: number) => void): () => void {
   };
 }
 
-/** In SideHost: compute the layout at a resize's end, when the left width or the panel changes, when the route shows the side or not (layout sideShows), and when he picks the card or the coins (sidepick.ts). */
+/** In SideHost: compute the layout at a resize's end, when the left width or the panel changes, when the route shows the side or not (layout sideShows), when he picks the card or the coins (sidepick.ts), and live while he drags the card's border (outerwidth.ts). */
 export function useLayoutDriver(winW: number, leftW: number, panel: PanelIn, shows: boolean): void {
   const { open, width, over, full, threadMin } = panel;
   const compact = useSideCompact();
+  const outer = useOuterWant();
   useEffect(() => {
-    setSideLayout(sideLayout(winW, leftW, open, open && width > 0 ? width : undefined, shows, { over, full, threadMin }, compact));
-  }, [winW, leftW, open, width, over, full, threadMin, shows, compact]);
+    setSideLayout(sideLayout(winW, leftW, open, open && width > 0 ? width : undefined, shows, { over, full, threadMin }, compact, outer));
+  }, [winW, leftW, open, width, over, full, threadMin, shows, compact, outer]);
 }
 
 // ---- where the coins go when the thread has no room beside them (folded-side v9) ----

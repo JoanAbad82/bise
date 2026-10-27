@@ -854,6 +854,11 @@ body:has(.app-shell) {
 .app-split.panel {
   right: calc(var(--panel-w) - var(--s-1));
 }
+/* the outer card's and its tile's left edge (his m_48003, designer m_48013): top and right inline
+   (side3d/Host.tsx: the stack's top, the card's width), its bottom the card's */
+.app-split.outer {
+  bottom: var(--s-3);
+}
 .app-split::after {
   content: '';
   position: absolute;

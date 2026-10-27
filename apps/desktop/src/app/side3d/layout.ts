@@ -1,7 +1,7 @@
 // src/app/side3d · sideLayout: where the thread's column, the world and the bubbles go across the
 // window's width (plan native-mac-plan v4 §2, decision d3). The panel folded and the room holding a
-// readable column beside it: the outer card (page outer-side v2, his pick), 292 wide, 12 from the
-// window's edge, the column centred in what it leaves, unless he picked the coins by hand
+// readable column beside it: the outer card (page outer-side v2, his pick), 292 wide by default
+// and 260-480 by its left border (outerFit, outerwidth.ts), 12 from the window's edge, the column centred in what it leaves, unless he picked the coins by hand
 // (sidepick.ts). Else the column is centred when both sides
 // leave the world's band (148 + 20 + 12 = 180); else it slides left (24 from the sidebar at
 // least); else the world folds into a 5th bubble and the band drops to 100 (68 + 20 + 12); last,
@@ -73,13 +73,33 @@ export interface SideLayout {
   readonly coins: CoinsAt;
   /** the coins' column from the window's right edge, px: 0 at the edge, the panel's width between */
   readonly right: number;
+  /** the outer card's and its tile's width when the coins are 'card' (outerFit of his width) */
+  readonly outerW?: number;
 }
 
-/** The outer card (page outer-side v2) and the tile over it: their width (292, 12 more for the titles: his m_47018, designer m_47025; set inline), and the band it keeps with its two 12 */
+/** The outer card (page outer-side v2) and the tile over it: their width by default (292, 12 more for the titles: his m_47018, designer m_47025; set inline), and the band it keeps with its two 12 */
 export const OUTER_W = 292;
 export const OUTER_BAND = OUTER_W + 12 + 12;
 /** the least column the card leaves beside it; under it the coins come back at the window's edge */
 export const OUTER_COL_MIN = 480;
+/**
+ * The card's widths by its left border (his m_48003, designer m_48013): 292 by default, 260 at
+ * least (its rows drop their PR and ψ ends whole, the name cut last), 480 at most (past it a row's
+ * name and its end no longer read as one row; a big screen's room goes to the thread's air).
+ */
+export const OUTER = { def: OUTER_W, min: 260, max: 480 } as const;
+
+/**
+ * The card's width in `room` px (the window less the rail and the sidebar) for the width he wants:
+ * in OUTER's limits and never more than leaves the column its OUTER_COL_MIN and two MIN_LEFT; null
+ * when even OUTER.min does not (the coins come back). Pure.
+ */
+export function outerFit(room: number, want: number): number | null {
+  const most = Math.min(OUTER.max, room - 2 * 12 - OUTER_COL_MIN - 2 * MIN_LEFT);
+  if (most < OUTER.min) return null;
+  const w = Number.isFinite(want) ? Math.round(want) : OUTER.def;
+  return Math.min(most, Math.max(OUTER.min, w));
+}
 
 /** Where the coins are (folded-side v9, Gabriel's pick). */
 export type CoinsAt = 'card' | 'edge' | 'between' | 'header' | 'tabs' | 'none';
@@ -130,9 +150,10 @@ function fit(room: number, band: number): { left: number; w: number } | null {
  * of its status line; a sheet or a full-width panel covers the thread: the coins go in its tab row
  * (under a sheet the thread keeps the whole room, its width as with the panel folded's room).
  * `compact` (side-mini, his m_46698): he picked the coins by hand, so the card never shows, even
- * with room for it; the rest falls back as without room. Pure.
+ * with room for it; the rest falls back as without room. `outerWant`: the card's width he dragged
+ * (outerwidth.ts), drawn as outerFit lets it. Pure.
  */
-export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, panelW: number = PANEL_W, shows = true, beside: Omit<PanelIn, 'open' | 'width'> = { over: false, full: false, threadMin: THREAD_KEEPS.rows }, compact = false): SideLayout => {
+export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, panelW: number = PANEL_W, shows = true, beside: Omit<PanelIn, 'open' | 'width'> = { over: false, full: false, threadMin: THREAD_KEEPS.rows }, compact = false, outerWant: number = OUTER_W): SideLayout => {
   // a sheet goes over the thread: the thread keeps the whole room under it (ui-review m_47216)
   const room = Math.max(0, winW - sideW - (panelOpen && !beside.over ? panelW : 0));
   const centred = (coins: CoinsAt): SideLayout => {
@@ -148,11 +169,14 @@ export const sideLayout = (winW: number, sideW: number, panelOpen: boolean, pane
   }
   const edge = (l: { left: number; w: number }, world: WorldSize, gutter: number): SideLayout =>
     ({ colLeft: sideW + l.left, colW: l.w, world, gutter, side: true, coins: 'edge', right: 0 });
-  // the outer card (page outer-side v2): the column, at least 480, centred in what it leaves
-  const left = room - OUTER_BAND;
-  if (!compact && left >= OUTER_COL_MIN + 2 * MIN_LEFT) {
+  // the outer card (page outer-side v2): at his width while the room holds it (outerFit), the
+  // column, at least 480, centred in what it leaves
+  const card = compact ? null : outerFit(room, outerWant);
+  if (card !== null) {
+    const band = card + 12 + 12;
+    const left = room - band;
     const w = Math.min(COL_W, left - 2 * MIN_LEFT);
-    return { colLeft: sideW + (left - w) / 2, colW: w, world: 'small', gutter: OUTER_BAND, side: true, coins: 'card', right: 0 };
+    return { colLeft: sideW + (left - w) / 2, colW: w, world: 'small', gutter: band, side: true, coins: 'card', right: 0, outerW: card };
   }
   const small = fit(room, WORLD_BAND);
   if (small !== null) return edge(small, 'small', WORLD_BAND);
