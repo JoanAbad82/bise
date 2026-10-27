@@ -26,6 +26,7 @@ import { idTip } from './InboxCard';
 import { idOf } from './id';
 import { timeOf } from '@/artifacts/model';
 import { ALL, askersOf, closedMs, dayHead, heroFacts, jumpOf, jumpWords, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
+import { ArtText } from './artWords';
 import './past.css';
 
 /** A state filter's words. */
@@ -225,7 +226,7 @@ function WaitLine({ w, on, end, onPick, onAnswer }: { w: WaitRow; on: boolean; e
     <div className="ip-row" data-row={w.key}>
       <ListRow on={on} testId={`inbox.row.${w.key}`} tip={inbox.row_tip_wait}
         state={<RowMark icon="ask" tone="accent" label={w.glyph === '¶' ? inbox.row_mark_page : inbox.row_mark_question} />}
-        title={<><span className="ip-who">{w.title}</span><span className="ip-q">{w.question}</span></>}
+        title={<><span className="ip-who">{w.title}</span><span className="ip-q"><ArtText text={w.question} /></span></>}
         sub={end}
         end={on ? <RowAction onClick={onAnswer} tip={inbox.row_tip_wait} testId={`inbox.row.${w.key}.answer`}>{inbox.key_answer}</RowAction> : undefined}
         onClick={onPick} />
@@ -243,7 +244,7 @@ function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; projec
     <div className={`ip-row${answered ? '' : ' gone'}`} data-row={p.key}>
       <ListRow on={on} testId={`inbox.row.${p.key}`} tip={inbox.row_tip_past}
         state={answered ? <AppIcon name="check" size={14} /> : <AppIcon name="fold" size={14} />}
-        title={<><span className="ip-who">{shownName(r.asker)}</span><span className="ip-q">{r.question}</span></>}
+        title={<><span className="ip-who">{shownName(r.asker)}</span><span className="ip-q"><ArtText text={r.question} /></span></>}
         sub={<><span data-testid={`inbox.row.${p.key}.said`}>{r.line2}</span>{` · ${project}`}{ms > 0 && <span data-testid={`inbox.row.${p.key}.when`} {...tipAttrs(idTip(r.card))}>{` · ${timeOf(ms)}`}</span>}</>}
         onClick={onClick} />
     </div>
@@ -283,7 +284,7 @@ function Pane({ row, now, names, next, meta, onJump, onClose, onPage }: {
         <Press look="ip-p-close" onClick={onClose} aria-label={inbox.detail_close_label} data-tip={inbox.detail_close_tip} data-testid="inbox.detail.close"><AppIcon name="close" size={16} /></Press>
       </div>
       <div className="ip-p-body">
-        <div className="ip-d-q" data-testid="inbox.detail.question">{r.question}</div>
+        <div className="ip-d-q" data-testid="inbox.detail.question"><ArtText text={r.question} /></div>
         {r.options.length > 0 && (
           <ol className="ip-d-opts" data-testid="inbox.detail.options">
             {r.options.map((o, i) => (

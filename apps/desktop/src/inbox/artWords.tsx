@@ -38,6 +38,14 @@ function Name({ project, id, name, testId }: { project: string; id: string; name
   );
 }
 
+/** A line's words, its artifacts' names pink but not links: inside a row that opens on its own
+ *  click (the inbox page's ListRow, a button; its pane), never the raw `[name](artifact:id)`
+ *  (ui-review m_46410). No router needed. */
+export function ArtText({ text }: { text: string }) {
+  const pieces = artSplit(text);
+  return <>{pieces.map((p, i) => ('words' in p ? p.words : <ArtName key={i}>{p.name}</ArtName>))}</>;
+}
+
 /** A line's words, its artifacts' names pink and clickable; `<testId>.art.<id>` on each name. */
 export function ArtWords({ text, project, testId }: { text: string; project: string; testId: string }) {
   const pieces = artSplit(text);

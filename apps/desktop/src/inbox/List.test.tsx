@@ -155,6 +155,22 @@ describe('the inbox screen', () => {
     expect(rowsOf()).toHaveLength(4);
   });
 
+  it("draws a question's artifact link by its name, as the card does, never its markdown (ui-review m_46410)", () => {
+    const q = 'about [Perf notes](artifact:perf-notes@v2): which size?';
+    const card: Card = { id: 3, project: 'shop', kind: 'question', agent: 'search', question: q, options: [], urgent: false, since_ms: NOW - 12 * 60_000 };
+    const rec: InboxRecord = { card: 9, project: 'shop', asker: 'perf', kind: 'question', question: q, options: [], state: 'answered', said: 'M', where: { kind: 'inbox' }, asked_ms: at(0, 13, 58), at_ms: at(0, 14, 2), line2: 'you: M · in the inbox' };
+    render(<InboxView cards={[card]} records={[rec]} names={NAMES} projects={PROJECTS} now={NOW} ports={{ answer: () => undefined, jump: () => undefined }} />);
+    for (const id of ['inbox.row.w:shop/3', 'inbox.row.p:shop/9']) {
+      const line = screen.getByTestId(id);
+      expect(line.textContent).toContain('about Perf notes: which size?');
+      expect(line.textContent).not.toContain('](artifact:');
+      expect(line.querySelector('.b-artname')?.textContent).toBe('Perf notes');
+    }
+    // the pane, the question whole: the same
+    fireEvent.click(screen.getByTestId('inbox.row.p:shop/9.open'));
+    expect(screen.getByTestId('inbox.detail.question').textContent).toBe('about Perf notes: which size?');
+  });
+
   it('says so, once, when nothing is there or nothing matches (ds Empty)', () => {
     render(<InboxView cards={[]} records={[]} names={NAMES} projects={PROJECTS} now={NOW} ports={{ answer: () => undefined, jump: () => undefined }} />);
     expect(screen.getByTestId('inbox.empty').className).toBe('b-empty');
