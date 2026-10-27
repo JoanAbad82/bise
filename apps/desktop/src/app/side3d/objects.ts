@@ -35,9 +35,10 @@ export function objectAt(): { left: number; top: number; size: number; rise: num
 
 /**
  * What a picture shows: an object of the office, a bim's head (an agent's card; main's in his look,
- * bims/mine.ts, or in `look`: a choice of the bim picker, page bim-pick), or a bubble's own object (bubble3d.ts).
+ * bims/mine.ts, or in `look`: a choice of the bim picker, page bim-pick; `cut`: the hair swatch's
+ * crop, the head centred, render.ts cutPng), or a bubble's own object (bubble3d.ts).
  */
-export type Thing = { readonly obj: ObjId } | { readonly head: string; readonly main: boolean; readonly look?: Look } | { readonly bubble: BubbleId };
+export type Thing = { readonly obj: ObjId } | { readonly head: string; readonly main: boolean; readonly look?: Look; readonly cut?: boolean } | { readonly bubble: BubbleId };
 
 /** Each bubble's object: its own minimal model (bubble3d.ts: a bust, three sheets, an hourglass, a laptop). Pure. */
 export function bubbleThing(b: BubbleId): Thing {

@@ -112,11 +112,11 @@
 .me-dot { width: var(--s-5); height: var(--s-5); border-radius: 50%; background: var(--me-dot); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
 .me-cut, .me-tile { display: grid; place-items: center; border-radius: var(--r-menu); }
 .me-row-c.six { display: grid; grid-template-columns: repeat(6, var(--s-8)); }
-/* a hair swatch: the head only (designer m_46749): the coin's picture at 48 cropped in the 32 box,
-   its top on the box's top and 8 off each side, so the head (crown to chin, a little neck) fills ~28
-   and centres; the same crop for every cut */
+/* a hair swatch: the head only (designer m_46749): the coin's head at its 48 size, drawn in the 32 box
+   with its drawn box's centre on the box's centre (render.ts cutPng, bim-pick-center), so the ring
+   sits even around every cut; no CSS crop (the old one put the head 5 px low) */
 .me-cut { display: block; width: var(--s-8); height: var(--s-8); overflow: hidden; }
-.me-cut .me-pic { display: block; width: var(--s-12); height: var(--s-12); margin-left: calc(-1 * var(--s-2)); }
+.me-cut .me-pic { display: block; width: var(--s-8); height: var(--s-8); }
 .me-cut:hover, .me-tile:hover, .me-chip:hover:not(:disabled) { background: var(--c-hover); }
 .me-chip { height: var(--s-6); padding: 0 var(--s-2); border-radius: var(--r-menu); font: var(--t-12) var(--font-ui); color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line); }
 .me-chip:disabled { color: var(--c-text-3); }

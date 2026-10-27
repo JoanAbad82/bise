@@ -27,13 +27,13 @@ const HAIR_WORD: Record<Hair, string> = {
 const COLOR_WORD = [settings.color_black, settings.color_dark, settings.color_brown, settings.color_auburn, settings.color_blond, settings.color_lilac] as const;
 const WEAR_WORD: Record<Wear, string> = { none: settings.wear_none, cap: settings.wear_cap, beanie: settings.wear_beanie, headphones: settings.wear_headphones };
 
-/** main's head in a look, as the coin draws it (its head and shoulders) */
-function LookPic({ look, px }: { look: Look; px: number }) {
-  return <ThingPic thing={{ head: 'main', main: true, look }} px={px} tile="thread" className="me-pic" />;
+/** main's head in a look, as the coin draws it (its head and shoulders); `cut`: the hair swatch's, the head centred (render.ts cutPng) */
+function LookPic({ look, px, cut = false }: { look: Look; px: number; cut?: boolean }) {
+  return <ThingPic thing={{ head: 'main', main: true, look, cut }} px={px} tile="thread" className="me-pic" />;
 }
 
-/** the hair row's swatch: the coin's picture at 48, cropped to the head in its 32 box (ui-review m_46729 1, designer m_46749) */
-const CUT_PX = 48;
+/** the hair row's swatch: the coin's head at 48 (side3d/cut.ts CUT_K), its drawn box centred in the 32 box (ui-review m_46729 1, designer m_46749, bim-pick-center) */
+const CUT_PX = 32;
 
 /** a round swatch of one colour (a skin, a hair colour) */
 function Dot({ color, on, tip, onClick, testId }: { color: string; on: boolean; tip: string; onClick: () => void; testId: string }) {
@@ -71,7 +71,7 @@ export function MeGroup({ look, set }: { look: Look; set: (l: Look) => void }) {
           <Row label={settings.me_hair} testId="settings.me.hair" grid>
             {HAIRS.map((h) => (
               <Press key={h} look={look.hair === h ? 'me-cut on' : 'me-cut'} aria-label={HAIR_WORD[h]} aria-pressed={look.hair === h} onClick={() => { set(withHair(look, h)); }} data-testid={`settings.me.hair.${h}`} {...tipAttrs(HAIR_WORD[h])}>
-                <LookPic look={withHair(look, h)} px={CUT_PX} />
+                <LookPic look={withHair(look, h)} px={CUT_PX} cut />
               </Press>
             ))}
           </Row>

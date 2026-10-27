@@ -18,7 +18,7 @@ export function thingKey(t: Thing, px: number, night: boolean, outfit: string): 
   const lit = night ? 'night' : 'day';
   if ('obj' in t) return `obj:${t.obj}:${String(px)}:${lit}`;
   if ('bubble' in t) return `bubble:${t.bubble}:${String(px)}:${lit}`;
-  return `head:${t.main ? 'main' : t.head}:${outfit}:${String(px)}:${lit}`;
+  return `${t.cut === true ? 'cut' : 'head'}:${t.main ? 'main' : t.head}:${outfit}:${String(px)}:${lit}`;
 }
 
 const drawn = new Map<string, string>();
@@ -45,7 +45,7 @@ const outfitOf = (r: Render | null, t: Thing): string => (r === null || !('head'
 function draw(r: Render, t: Thing, px: number, night: boolean): string {
   if ('obj' in t) return r.objectPng(t.obj, px);
   if ('bubble' in t) return r.bubblePng(t.bubble, px, night);
-  return r.headPng(t.head, t.main, px, night, lookFor(t));
+  return t.cut === true ? r.cutPng(t.head, t.main, px, night, lookFor(t)) : r.headPng(t.head, t.main, px, night, lookFor(t));
 }
 
 function pump(r: Render): void {
