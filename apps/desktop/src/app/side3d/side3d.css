@@ -1067,6 +1067,11 @@
    13/500, the computer mark, its ring with its % from 70, its PR's number) and line 2 (its job in
    one line, t-12 text-3, red when it failed), then its state at the right edge (.s3-arow-state).
    An ask: its options and 'answer…' under it. A ψ head: its branch text-2, 'N agents' text-3. */
+/* the rows' box (useCalm: the pointer over it holds the order): no box of its own, the float lays
+   the rows out as before */
+.s3-arows {
+  display: contents;
+}
 .s3-arow {
   display: flex;
   flex-direction: column;

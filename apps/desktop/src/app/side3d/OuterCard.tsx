@@ -31,6 +31,9 @@ import { OptButton } from './FlyoutAgents';
 import { askButtons, pickIntent } from './model';
 import { bubbleThing, type BubbleId } from './objects';
 import { groupParts } from './lists';
+import { useCalm } from './useCalm';
+
+const keyOfLine = (x: { readonly r: BarRow }): string => x.r.key;
 import { OUTER_TOP } from './tilestate';
 import { OUTER_W } from './layout';
 import { canLess, FIRST_AGENTS, FIRST_ROWS, headLift, moreOf, useShown } from './outerrows';
@@ -119,9 +122,11 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
     bimsLit.set(null, 'row');
   }, []);
   const linked = (r: BarRow): boolean => bims !== null && r.project === bims && r.agent !== undefined && r.main !== true;
+  // the order holds under the pointer and slides when it moves (useCalm, designer m_47454)
+  const calm = useCalm(rows, keyOfLine, box);
   return (
-    <div ref={box} className="s3-orows" data-testid="app.outer.agents.rows">
-      {rows.slice(0, shown).map(({ r, pr, wt }) => {
+    <div ref={box} className="s3-orows" {...calm.bind} data-testid="app.outer.agents.rows">
+      {calm.rows.slice(0, shown).map(({ r, pr, wt }) => {
         const a = byKey.get(`${r.project}/${r.agent ?? ''}`);
         const card = sortCards(cards.filter((c) => c.agent === r.agent && c.project === r.project))[0];
         return (
@@ -210,7 +215,7 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
   const b = card === undefined ? null : askButtons(card);
   return (
     <div className="s3-orow" data-asks={asks || undefined} data-here={here || undefined} data-back={st?.back === true || undefined} data-open={open || undefined}
-      data-lit={lit || undefined} onContextMenu={menu.onContextMenu} data-testid={id}
+      data-lit={lit || undefined} data-calm={r.key} onContextMenu={menu.onContextMenu} data-testid={id}
       onPointerEnter={onLit && (() => {
         onLit(true);
       })}

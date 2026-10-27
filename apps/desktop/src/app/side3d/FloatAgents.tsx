@@ -7,6 +7,7 @@
 // first two options in one click and 'answer…'. A worktree two agents share: its 'ψ <branch> · N
 // agents' head with its PR, its agents under it; an open PR with no agent its own row. The foot
 // folds ARCHIVED open ('▸ 3 archived'). Owner: nm-side.
+import { useRef } from 'react';
 import type { Agent, Card } from '@/proto';
 import { AppIcon, Press, Ring, tipAttrs } from '@/ds';
 import { sortCards } from '@/inbox/order';
@@ -23,6 +24,9 @@ import { ThingPic } from './Bubbles';
 import { askButtons, pickIntent } from './model';
 import { groupParts } from './lists';
 import { OptButton } from './FlyoutAgents';
+import { useCalm } from './useCalm';
+
+const keyOfRow = (r: BarRow): string => r.key;
 
 /** a row's test id in the float: the Overview's own, under the float's ('app.flyout.agents.agent.perf'), never the same id twice in the window */
 export const floatId = (r: BarRow): string =>
@@ -54,15 +58,18 @@ const COMPOSER_FIELD = '[data-testid="composer.field"]';
 /** The agents float's rows. */
 export function FloatAgents({ live, agents, cards, at, onOpen, onOpenPr, groupOf, onHandoff }: FloatAgentsProps) {
   const byKey = new Map(agents.map((x) => [`${x.project}/${x.a.name}`, x.a]));
+  // the order holds under the pointer and slides when it moves (useCalm, designer m_47454)
+  const box = useRef<HTMLDivElement>(null);
+  const calm = useCalm(live, keyOfRow, box);
   return (
-    <>
-      {live.map((r) => {
+    <div ref={box} className="s3-arows" {...calm.bind} data-testid="app.flyout.agents.rows">
+      {calm.rows.map((r) => {
         if (r.kind === 'group' || r.kind === 'orphan') return <HeadRow key={r.key} r={r} members={live.filter((m) => m.kind === 'agent' && m.group === r.group).length} onOpen={onOpen} onOpenPr={onOpenPr} />;
         const a = byKey.get(`${r.project}/${r.agent ?? ''}`);
         const card = sortCards(cards.filter((c) => c.agent === r.agent && c.project === r.project))[0];
         return <AgentRow key={r.key} r={r} a={a} card={card} at={at} onOpen={onOpen} onOpenPr={onOpenPr} group={groupOf?.(r.project)} onHandoff={onHandoff} />;
       })}
-    </>
+    </div>
   );
 }
 
@@ -93,7 +100,7 @@ function AgentRow({ r, a, card, at, onOpen, onOpenPr, group, onHandoff }: { r: B
   const job = asks ? card.question : st?.l2 !== undefined ? st.l2 : group !== undefined && a !== undefined ? roleWords(a.note || a.title || a.purpose) : r.sub;
   const who = `${r.name} · ${group !== undefined && a !== undefined ? roleWords(a.note || a.title || a.purpose) : r.sub}`;
   return (
-    <div className="s3-arow" data-asks={asks || undefined} data-back={st?.back === true || undefined} data-group={r.group} onContextMenu={menu.onContextMenu} data-testid={id}>
+    <div className="s3-arow" data-asks={asks || undefined} data-back={st?.back === true || undefined} data-group={r.group} data-calm={r.key} onContextMenu={menu.onContextMenu} data-testid={id}>
       <Press look="s3-arow-open" aria-label={r.title} onClick={() => {
         onOpen(r);
       }} data-row="">
@@ -162,7 +169,7 @@ function HeadRow({ r, members, onOpen, onOpenPr }: { r: BarRow; members: number;
   return (
     <Press look="s3-arow-group" aria-label={r.title} {...tipAttrs(r.title)} onClick={() => {
       onOpen(r);
-    }} data-row="" data-orphan={r.kind === 'orphan' || undefined} data-testid={id}>
+    }} data-row="" data-orphan={r.kind === 'orphan' || undefined} data-calm={r.key} data-testid={id}>
       <span className="s3-arow-g" aria-hidden="true">{r.kind === 'group' ? r.glyph : <AppIcon name="branch" size={14} />}</span>
       <span className="s3-arow-gname">{r.name}</span>
       {r.kind === 'group' && members > 0 && <span className="s3-arow-gn">{panel.tip_agents({ n: members })}</span>}
