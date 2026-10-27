@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { side } from '@/proto/words_side.gen';
-import { OuterHead } from './OuterCard';
+import { panel } from '@/proto/words_panel.gen';
+import { lineTip, OuterHead } from './OuterCard';
 
 // the head's 3D picture needs WebGL: a picture that never draws
 vi.mock('./Bubbles', () => ({ ThingPic: () => <span /> }));
@@ -36,5 +37,20 @@ describe('an artifact chip in a side row (his m_47004)', () => {
     const chip = getComputedStyle(v.getByTestId('chip'));
     expect(chip.boxSizing).toBe('border-box');
     expect(chip.maxWidth).toBe('100%');
+  });
+});
+
+describe('an agent line\'s tip (native-lead m_47965)', () => {
+  it('main at rest says what it is: its name · team lead', () => {
+    expect(lineTip({ name: 'bise', main: true }, '')).toBe(`bise · ${panel.role_lead}`);
+  });
+
+  it('while it works, its job\'s words, main too', () => {
+    expect(lineTip({ name: 'bise', main: true }, 'merging the docs')).toBe('bise · merging the docs');
+    expect(lineTip({ name: 'perf' }, 'speed')).toBe('perf · speed');
+  });
+
+  it('another agent with no words: its name', () => {
+    expect(lineTip({ name: 'perf' }, '')).toBe('perf');
   });
 });

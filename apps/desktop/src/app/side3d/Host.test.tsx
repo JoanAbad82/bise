@@ -24,6 +24,7 @@ import { sideLayoutNow } from './place';
 import { beatPlace, hitBox } from './World';
 import { outerWorld, TILE_H, TILE_MIN } from './tilestate';
 import { welcoming } from '@/welcome/shown';
+import { FOLLOW_BEAT_MS } from './OuterWorld';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
 const office = vi.hoisted(() => ({
@@ -794,14 +795,24 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
       expect(office.follow.at(-1)).toBeNull();
       expect(tile.hasAttribute('data-landing')).toBe(true);
       expect(tile.hasAttribute('data-landed')).toBe(false);
+      vi.useFakeTimers();
       act(() => {
         landed();
       });
-      expect(office.follow.at(-1)).toBe('perf');
       expect(tile.hasAttribute('data-landing')).toBe(false);
       expect(tile.hasAttribute('data-landed')).toBe(true);
       expect(v.getByTestId('app.outer.world.hide')).toBeTruthy();
+      // one fixed beat after the draw, then the camera finds the bim (designer m_47972)
+      act(() => {
+        vi.advanceTimersByTime(FOLLOW_BEAT_MS - 1);
+      });
+      expect(office.follow.at(-1)).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(office.follow.at(-1)).toBe('perf');
     } finally {
+      vi.useRealTimers();
       gone();
       landed();
     }

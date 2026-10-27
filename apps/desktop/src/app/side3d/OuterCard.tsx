@@ -20,6 +20,7 @@ import { sortCards } from '@/inbox/order';
 import { useStore } from '@/store';
 import type { AnswerAt } from '@/store/answered';
 import { side } from '@/proto/words_side.gen';
+import { panel } from '@/proto/words_panel.gen';
 import { waitLen } from '@/thread/wake';
 import { AgentSign } from '../Marks';
 import { askInbox } from '../inboxAsk';
@@ -202,6 +203,12 @@ interface LineProps {
   readonly onLit: ((on: boolean) => void) | undefined;
 }
 
+/** A line's tip: its name and its job's words; main at rest says what it is, 'team lead' (native-lead m_47965). Pure. */
+export function lineTip(r: Pick<BarRow, 'name' | 'main'>, job: string): string {
+  if (job !== '') return `${r.name} · ${job}`;
+  return r.main === true ? `${r.name} · ${panel.role_lead}` : r.name;
+}
+
 /** One agent's line: mark · head · name · age · PR · ψ; an ask opens in place under it. */
 function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle, onOpen, onOpenPr, lit, onLit }: LineProps) {
   const store = useStore();
@@ -222,7 +229,7 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
       onPointerLeave={onLit && (() => {
         onLit(false);
       })}>
-      <Press look="s3-orow-open" aria-label={r.title} aria-expanded={asks ? open : undefined} {...tipAttrs(job === '' ? r.name : `${r.name} · ${job}`, undefined, 'left')} onClick={() => {
+      <Press look="s3-orow-open" aria-label={r.title} aria-expanded={asks ? open : undefined} {...tipAttrs(lineTip(r, job), undefined, 'left')} onClick={() => {
         if (asks) onToggle();
         else onOpen(r);
       }} data-row="">

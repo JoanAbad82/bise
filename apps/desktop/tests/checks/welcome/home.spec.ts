@@ -17,6 +17,7 @@ import path from 'node:path';
 import { PNG } from 'pngjs';
 import { test, expect, FakeCore, Recorder, launchDesktop, pngBytes, type Session } from '../../harness';
 import { thread } from '../../../src/proto/words_thread.gen';
+import { panel } from '../../../src/proto/words_panel.gen';
 import { hub_ev } from '../../../src/proto/fixtures.gen';
 import type { Card, HubEv } from '../../../src/proto';
 
@@ -121,9 +122,10 @@ for (const width of [1400, 1100, 800]) {
         }
         // one office on screen (native-lead m_47920): the outer card's tile draws no office beside it
         await expect(page.getByTestId('app.outer.world').getByTestId('app.right.bims'), "the card's office stays closed while the welcome's shows").toHaveCount(0);
-        // main's row in the outer card (the right bar's agents since bise fait mac)
-        // its line is mark · head · name · age (OuterCard AgentLine): no role words since the right bar went
-        if (width > 800) await expect(page.getByTestId(`app.outer.agents.${P}.main`)).toBeVisible();
+        // main's row in the outer card (the right bar's agents since bise fait mac; the card shows at
+        // 1400, the side folds into coins at 1100): its line is mark · head · name · age, and at rest
+        // its tip says what it is, 'bise · team lead' (OuterCard lineTip; native-lead m_47965)
+        if (width >= 1400) await expect(page.getByTestId(`app.outer.agents.${P}.main`).locator('[data-row]')).toHaveAttribute('data-tip', new RegExp(`· ${panel.role_lead}$`));
         await page.waitForTimeout(1200);
         save(`${String(width)}-${theme}-1-first-open.png`, await shown(s), `${String(width)} ${theme} · first open`);
 
@@ -208,10 +210,13 @@ for (const theme of ['light', 'dark'] as const) {
         });
         expect(spills, 'the welcome spills out of its slot').toBe(false);
         // the office gives way first (designer m_38760): the ideas whole over the inbox, and while
-        // the office shows the slot doesn't scroll
-        const idea = await s.page.getByTestId('composer.home.idea.2').boundingBox();
-        if (idea === null) throw new Error('no box for the last idea');
-        expect(idea.y + idea.height, 'the ideas end over the inbox block').toBeLessThanOrEqual(Math.min(inbox.y, slot.y + slot.height) + 0.5);
+        // the office shows the slot doesn't scroll. The ideas are the empty home's: under a line of
+        // main's there is no home (composer/home/rule.ts homeShows), so no ideas
+        if (!mainLines) {
+          const idea = await s.page.getByTestId('composer.home.idea.2').boundingBox();
+          if (idea === null) throw new Error('no box for the last idea');
+          expect(idea.y + idea.height, 'the ideas end over the inbox block').toBeLessThanOrEqual(Math.min(inbox.y, slot.y + slot.height) + 0.5);
+        } else await expect(s.page.getByTestId('composer.home.idea.0')).toHaveCount(0);
         const office = await s.page.getByTestId('welcome').getAttribute('data-room');
         if (office !== 'none') {
           const scrolls = await s.page.getByTestId('thread.first').evaluate((el) => el.scrollHeight > el.clientHeight + 1);
