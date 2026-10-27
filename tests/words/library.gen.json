@@ -508,6 +508,31 @@
     "one": null,
     "text": "recent first"
   },
+  "library.recent_row_all": {
+    "args": [],
+    "one": null,
+    "text": "all"
+  },
+  "library.recent_row_all_tip": {
+    "args": [],
+    "one": null,
+    "text": "open Recent: every artifact, newest first"
+  },
+  "library.recent_row_back": {
+    "args": [],
+    "one": null,
+    "text": "newer"
+  },
+  "library.recent_row_next": {
+    "args": [],
+    "one": null,
+    "text": "older"
+  },
+  "library.recent_row_tip": {
+    "args": [],
+    "one": null,
+    "text": "the newest artifacts, whatever their folder"
+  },
   "library.say": {
     "args": [],
     "one": null,

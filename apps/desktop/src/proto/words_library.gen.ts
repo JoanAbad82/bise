@@ -44,6 +44,16 @@ export const library = {
   scope_hint: (a: { example: string | number }): string => "type a name in the search: \"in:" + String(a.example) + "\"",
   /** the scope chip's × */
   scope_clear: (a: { project: string | number }): string => "show every project, not only " + String(a.project),
+  /** its count's tip */
+  recent_row_tip: "the newest artifacts, whatever their folder",
+  /** its link to the Recent place, `all ›` */
+  recent_row_all: "all",
+  /** that link's tip */
+  recent_row_all_tip: "open Recent: every artifact, newest first",
+  /** the ‹ on the row's hover: its tip and VoiceOver name */
+  recent_row_back: "newer",
+  /** the › on the row's hover: its tip and VoiceOver name */
+  recent_row_next: "older",
   /** the tiles' sort on all artifacts */
   recent_first: "recent first",
   /** a theme's header, `412 artifacts from 15 tasks` (`tasks`: tasks_n) */

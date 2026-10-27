@@ -4,7 +4,7 @@
 // banner (ds PageBanner, the bims filing desk as its vignette) scrolls away with the page; then the
 // toolbar over the list (Toolbar.tsx, sticky: the kinds the place holds, the project scope or
 // 'in:<project>' typed; cards or a list, the search, + add), the place he is in, and the archived
-// ones' faint row under it: all artifacts (the themes as big tiles, then every artifact by day), recent, unfiled, a theme
+// ones' faint row under it: all artifacts (the Recent row of the 20 newest, Recent.tsx; the themes as big tiles, then every artifact by day), recent, unfiled, a theme
 // (its task folders as small tiles, then its cards), a task's folder (its cards by day). The
 // library (Column.tsx) draws in the window's sidebar (ArtLibrary, library.tsx: this page publishes
 // its props there); with no sidebar library, in the page's 200 px column (under 900 px folded into
@@ -51,6 +51,7 @@ import { BigTile, FolderListRow, SmallTile } from './Tiles';
 import { cardDrag, FLASH_MS, TOAST_MS, useBrief, useDrop } from './drag';
 import { folderCmd, moveCmd, type FolderOp } from './ops';
 import { useBannerGutter } from './hero/vignettes';
+import { RecentRow } from './Recent';
 import { LiveVignette } from './hero/Live';
 import './artifacts.css';
 import './folders.css';
@@ -448,6 +449,9 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       const themes = lib.themes.filter((t) => eff === '' || (counts.get(t.id)?.n ?? 0) > 0);
       return (
         <>
+          {/* the 20 newest, whatever their folder (page art-recent): the scope and the kind chip apply */}
+          <RecentRow items={shown} lib={lib} now={now} list={view === 'list'} onOpen={openIt}
+            onAll={() => { setAt({ at: 'recent' }); }} testId="artifacts.recent" />
           {themes.length > 0 && (
             <>
               <GroupLabel tip={library.recent_first} testId="artifacts.sect.folders">{library.folders}</GroupLabel>

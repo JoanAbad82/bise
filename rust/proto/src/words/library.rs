@@ -54,6 +54,18 @@ crate::words! { library:
     /// the scope chip's ×
     scope_clear(project) = "show every project, not only {project}";
 
+    // ---- the Recent row on all artifacts (page art-recent): the 20 newest, whatever their folder
+    /// its count's tip
+    recent_row_tip = "the newest artifacts, whatever their folder";
+    /// its link to the Recent place, `all ›`
+    recent_row_all = "all";
+    /// that link's tip
+    recent_row_all_tip = "open Recent: every artifact, newest first";
+    /// the ‹ on the row's hover: its tip and VoiceOver name
+    recent_row_back = "newer";
+    /// the › on the row's hover: its tip and VoiceOver name
+    recent_row_next = "older";
+
     // ---- tiles and headers
     /// the tiles' sort on all artifacts
     recent_first = "recent first";
