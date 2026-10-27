@@ -10,6 +10,7 @@
 // no chips. Only the rows in view are drawn, the others are gaps of their height (paletteWindow.ts,
 // cmdk-perf): a one-letter query can match a thousand rows. Owner: amb-web (lead m_11864), in amb-win's shell.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
 import { caretAtEnd, keep, useKeptText } from '@/app/keep';
 import type { Ev } from '@/store/store';
@@ -151,15 +152,21 @@ export function Palette({ onClose }: { onClose: () => void }) {
     document.querySelector(`[data-testid="app.palette.item.${String(cur)}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [cur]);
   // only the rows in view are drawn (paletteWindow.ts): the box's measures and scroll, read after
-  // each render (a state change only when they moved), and on a resize
+  // each render (a state change only when they moved), on a resize, and on a scroll at once
+  // (flushSync: the rows are there before the frame paints, ui-review m_46875)
   const body = useRef<HTMLDivElement>(null);
   const [m, setM] = useState<Measures>(UNMEASURED);
-  const [box, setBox] = useState({ top: 0, view: 0 });
+  const [box, setBox] = useState<{ top: number; view: number; dir: -1 | 0 | 1 }>({ top: 0, view: 0, dir: 0 });
   const readBox = useCallback(() => {
     const b = body.current;
     if (b === null) return;
-    setBox((x) => (x.top === b.scrollTop && x.view === b.clientHeight ? x : { top: b.scrollTop, view: b.clientHeight }));
+    const top = b.scrollTop;
+    const view = b.clientHeight;
+    setBox((x) => (x.top === top && x.view === view ? x : { top, view, dir: top > x.top ? 1 : top < x.top ? -1 : x.dir }));
   }, []);
+  const onScroll = useCallback(() => {
+    flushSync(readBox);
+  }, [readBox]);
   useLayoutEffect(() => {
     const b = body.current;
     if (b === null) return;
@@ -181,7 +188,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
       ro.disconnect();
     };
   }, [readBox]);
-  const parts = windowOf({ sizes: list.groups.map((g) => g.hits.length), askRow, m, scrollTop: box.top, view: box.view, cur });
+  const parts = windowOf({ sizes: list.groups.map((g) => g.hits.length), askRow, m, scrollTop: box.top, view: box.view, cur, dir: box.dir });
 
   const open = (h: Hit | undefined, restore = false) => {
     if (h === undefined) return;
@@ -287,7 +294,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
             </Press>
           ))}
         </div>
-        <div ref={body} className="app-k-body" role="listbox" aria-label="results" onScroll={readBox}>
+        <div ref={body} className="app-k-body" role="listbox" aria-label="results" onScroll={onScroll}>
           {list.mode === 'blank' && (
             <div className="app-k-empty" data-testid="app.palette.blank">
               <p>{PW.blank}</p>

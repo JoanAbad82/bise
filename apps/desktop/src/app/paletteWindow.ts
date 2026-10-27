@@ -17,7 +17,9 @@ export interface Measures {
 /** What it draws before it measured (happy-dom, the first frame): 32 px rows, about one screen. */
 export const UNMEASURED: Measures = { row: 32, head: 28, pad: 4 };
 
-/** Rows drawn above and below the view. */
+/** Rows drawn above and below the view, at least: a whole view's height is drawn each side, and
+ * one more on the side it scrolls to (ui-review m_46875: a fast wheel jumps 900 px a step, and
+ * the browser can paint the new place before the window follows). */
 export const OVERSCAN = 8;
 
 /** A group's rows, in order: drawn ones (`from`..`to`, excluded) and gaps of `rows` rows. */
@@ -34,13 +36,16 @@ export interface WindowIn {
   readonly view: number;
   /** the selected row's flat index (the ask row counts as 0 when there is one) */
   readonly cur: number;
+  /** where it last scrolled: -1 up, 1 down, 0 not yet */
+  readonly dir?: -1 | 0 | 1;
 }
 
 /** Each group's parts, in order. */
 export function windowOf(w: WindowIn): Part[][] {
   const view = w.view > 0 ? w.view : 720;
-  const top = w.scrollTop - OVERSCAN * w.m.row;
-  const bottom = w.scrollTop + view + OVERSCAN * w.m.row;
+  const over = Math.max(OVERSCAN * w.m.row, w.view);
+  const top = w.scrollTop - over - (w.dir === -1 ? view : 0);
+  const bottom = w.scrollTop + view + over + (w.dir === 1 ? view : 0);
   let y = w.m.pad + (w.askRow ? w.m.row : 0);
   let flat = w.askRow ? 1 : 0;
   return w.sizes.map((n) => {
