@@ -6,6 +6,7 @@
 // Owner: amb-core.
 import { useEffect } from 'react';
 import { openAtAnchor } from '@/artifacts/Open';
+import { openTab } from '@/app/panel/tabs';
 import { useStore } from '@/store';
 import type { Effect, FxName } from '@/store/machine/types';
 import type { BiseApi } from '@/shared/api';
@@ -22,7 +23,9 @@ export function runEffect(e: Effect, router: Router, bise: Pick<BiseApi, FxName>
   switch (e.out) {
     case 'nav':
       if (e.to.at !== null) openAtAnchor(`${e.to.project}/${e.to.artifact}`, e.to.at);
-      router.go(navRoute(e.to));
+      // a card's chip: the panel's tab only, the thread and its open card stay (his m_47572)
+      if (e.tab === true) openTab({ kind: 'artifact', project: e.to.project, id: e.to.artifact });
+      else router.go(navRoute(e.to));
       return;
     case 'fx':
       void bise?.[e.fx.fx](...e.fx.args);

@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { takeAnchor } from '@/artifacts/Open';
 import { createRouter } from './router';
 import { runEffect } from './edge';
+import { tabEntity } from './panel/tabs';
+import { panelState } from './panel/state';
 
 describe('the edge', () => {
   it("a nav opens the artifact's view, at the block it names (the view reads it once)", () => {
@@ -19,6 +21,15 @@ describe('the edge', () => {
     runEffect({ out: 'nav', to: { project: 'acme', artifact: 'plan', at: null } }, router, undefined);
     expect(router.get()).toEqual({ screen: 'artifacts', project: 'acme', id: 'plan' });
     expect(takeAnchor('acme/plan')).toBeNull();
+  });
+
+  it("a tab's nav (a card's chip) opens it in the panel's tab at its block, and moves nothing", () => {
+    panelState.reset();
+    const router = createRouter({ screen: 'thread', project: 'acme', agent: 'main' });
+    runEffect({ out: 'nav', to: { project: 'acme', artifact: 'issue-15', at: 'm-pr16' }, tab: true }, router, undefined);
+    expect(router.get()).toEqual({ screen: 'thread', project: 'acme', agent: 'main' });
+    expect(tabEntity(panelState.get().tabs.active)).toEqual({ kind: 'artifact', project: 'acme', id: 'issue-15' });
+    expect(takeAnchor('acme/issue-15')).toBe('m-pr16');
   });
 
   it("an fx calls window.bise's method with its arguments, and moves nothing", () => {

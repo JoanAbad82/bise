@@ -11,6 +11,7 @@ import {
   allItems,
   artifactGo,
   centreOf,
+  chipOpen,
   goneLinkOf,
   goneRoute,
   type ArtCentre,
@@ -105,7 +106,8 @@ export function feature(now = 1_791_100_000_000): Feature {
     // the app's edge (app/edge.tsx) runs these; here they are recorded, as sent() records commands
     s.onEffect((e) => {
       ran.push(e);
-      if (e.out === 'nav') route = navRoute(e.to);
+      // a tab's open (a card's chip) leaves the route where it is (app/edge.tsx)
+      if (e.out === 'nav' && e.tab !== true) route = navRoute(e.to);
     });
     return s;
   };
@@ -144,6 +146,12 @@ export function feature(now = 1_791_100_000_000): Feature {
         const plan = artifactGo(store.artifacts(g.project).find((x) => x.id === g.id), g.project, g.id);
         if (plan.browser !== undefined) ran.push({ out: 'fx', fx: { fx: 'openExternal', args: [plan.browser] } });
         else route = plan.route;
+        return;
+      }
+      case 'chip': {
+        // the card's chip and ⌘O (inbox/Block.tsx openPage): the app's own intent for it
+        const intent = chipOpen(g.card);
+        if (intent !== null) store.do(intent);
         return;
       }
       case 'go':

@@ -17,6 +17,8 @@ export { libraryView, type LibraryView } from '@/artifacts/folders';
 export type { Route } from '@/app/route';
 export { navRoute } from '@/app/edge';
 export { artifactGo } from '@/artifacts/leave';
+// a card's chip (and ⌘O): the intent the inbox block does (inbox/Block.tsx)
+export { chipOpen } from '@/inbox/about';
 export { libraryPage, sideShows, type SideShows } from '@/app/sideshows';
 export { projectsOf } from '@/app/siderows';
 // an artifact the list doesn't have: what the centre and the panel show (artifacts/gone.ts)

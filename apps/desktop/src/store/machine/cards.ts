@@ -187,7 +187,7 @@ function does(s: CardsState, f: HubFacts, intent: Intent, at: number): Step {
       return does(s, f, { i: "answer", project, card, reply: String(n), ...(from !== undefined ? { from } : {}) }, at);
     }
     case "open":
-      return [s, opens(f, intent.project, intent.act)];
+      return [s, opens(f, intent.project, intent.act, intent.tab === true)];
     case "retry_card": {
       // what he sent, sent again; none known: nothing, the card stays his
       const a = refusedOf(s.refused, intent.project, intent.card)?.attempt;
@@ -224,7 +224,8 @@ function actOf(f: HubFacts, project: string, card: number, n: number): OptAct | 
  * What an act does (optPlan.ts), concrete: the artifact's view beside the thread (at its block),
  * a browser-only artifact or a link in his browser, the app's sign-in; nothing sent to the hub.
  */
-function opens(f: HubFacts, project: string, act: OptAct): Output[] {
+/** `tab`: the artifact in the panel's tab only, the window stays where it is (a card's chip, his m_47572). */
+function opens(f: HubFacts, project: string, act: OptAct, tab = false): Output[] {
   const listed = f.artifacts[project] ?? NONE;
   const plan = optPlan(act, (id) => listed.some((a) => a.id === id));
   switch (plan.t) {
@@ -232,7 +233,8 @@ function opens(f: HubFacts, project: string, act: OptAct): Output[] {
       // one that opens nowhere in the window (a PR, a link: artifacts/model.ts leaves) goes to his browser
       const a = listed.find((x) => x.id === plan.id);
       if (a !== undefined && leaves(a)) return [{ out: "fx", fx: { fx: "openExternal", args: [a.url] } }];
-      return [{ out: "nav", to: { project, artifact: plan.id, at: plan.at } }];
+      const to = { project, artifact: plan.id, at: plan.at };
+      return [tab ? { out: "nav", to, tab: true } : { out: "nav", to }];
     }
     case "url":
       return [{ out: "fx", fx: { fx: "openExternal", args: [plan.url] } }];

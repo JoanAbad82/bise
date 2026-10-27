@@ -6,6 +6,7 @@
 import type { Card, OptAct } from '@/proto';
 import type { ArtLink, CardPage } from '@/proto/rows';
 import { inbox } from '@/proto/words_inbox.gen';
+import type { Intent } from '@/store/machine/types';
 
 /** A page's link as an artifact link: kind page, its item or block as the anchor. */
 export function pageLink(p: CardPage): ArtLink {
@@ -42,4 +43,12 @@ export function aboutWords(a: ArtLink): { title: string; meta: string } {
 /** The act that opens it: in the app beside the thread at its block, else its url. */
 export function openAct(a: ArtLink): OptAct {
   return { act: 'open', artifact: a.id, at: blockOf(a), url: a.url ?? null };
+}
+
+/** His click on a card's chip (or ⌘O): it in the panel's tab only, at its block (his m_47572): the
+ * window stays on its thread and the card stays open as it was, to answer once he has read it; one
+ * that leaves goes to his browser. Null: the card is about nothing. */
+export function chipOpen(c: Pick<Card, 'project' | 'artifact' | 'page'>): Intent | null {
+  const a = aboutOf(c);
+  return a == null ? null : { i: 'open', project: c.project, act: openAct(a), tab: true };
 }

@@ -156,6 +156,7 @@ export type Gesture =
   | { readonly g: 'open'; readonly project: string; readonly agent: string }
   | { readonly g: 'resend' | 'dismiss'; readonly project: string; readonly agent: string; readonly cid: number }
   | { readonly g: 'art'; readonly project: string; readonly id: string }
+  | { readonly g: 'chip'; readonly card: Card }
   | { readonly g: 'go'; readonly route: Route };
 
 export const answer = (project: string, card: number, reply: string, from?: Here): Gesture =>
@@ -173,6 +174,8 @@ export const open = (project: string, agent = 'main'): Gesture => ({ g: 'open', 
 export const resend = (project: string, agent: string, cid: number): Gesture => ({ g: 'resend', project, agent, cid });
 /** He clicks an artifact's name (an inbox item's line, a thread's chip, the right side's list). */
 export const openArtifact = (project: string, id: string): Gesture => ({ g: 'art', project, id });
+/** He clicks the artifact chip of an open card (or ⌘O on it): what it is about. */
+export const openChip = (c: Card): Gesture => ({ g: 'chip', card: c });
 /** He goes to that route (the rail, ⌘K, a link). */
 export const goTo = (route: Route): Gesture => ({ g: 'go', route });
 /** He drops his failed message. */

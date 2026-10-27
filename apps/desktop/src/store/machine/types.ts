@@ -45,7 +45,13 @@ export type Intent =
   /** his option `n` of a card: its act when the hub's row gives it one (nothing sent), else his answer */
   | { readonly i: "pick"; readonly project: string; readonly card: number; readonly n: number; readonly from?: AnswerFrom }
   /** an act the hub gave (a page's chip, a page answer's jump): open it, nothing sent */
-  | { readonly i: "open"; readonly project: string; readonly act: OptAct }
+  | {
+      readonly i: "open";
+      readonly project: string;
+      readonly act: OptAct;
+      /** in the panel's tab only, the window stays where it is (a card's chip: its card stays open to answer) */
+      readonly tab?: true;
+    }
   /** his words to an agent: shown at once as sending, then sent (none while the core is down) */
   | {
       readonly i: "send";
@@ -100,7 +106,8 @@ export interface ArtifactAt {
 export type Output =
   | { readonly out: "cmd"; readonly cmd: CoreCmd }
   | ({ readonly out: "keep" } & Keep)
-  | { readonly out: "nav"; readonly to: ArtifactAt }
+  /** to the artifact's view beside its maker's thread; `tab`: in the panel's tab, the route stays */
+  | { readonly out: "nav"; readonly to: ArtifactAt; readonly tab?: true }
   | { readonly out: "fx"; readonly fx: Fx };
 
 /**

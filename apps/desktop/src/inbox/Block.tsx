@@ -30,13 +30,12 @@ import { withRefused, type InboxItem } from './listed';
 import { cardKeyOf, fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
 import { ArtWords } from './artWords';
 import { InboxZero, useInboxZero } from './Zero';
-import { useOptAct } from './optAct';
 import { pruneCardDrafts } from './drafts';
 import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
 import { answerTip } from '@/app/tipwords';
 import './inbox.css';
-import { aboutOf, openAct } from './about';
+import { aboutOf, chipOpen } from './about';
 import { inboxScope, inScope, othersWaiting } from './scope';
 import { useRouter } from '@/app/router';
 
@@ -370,7 +369,6 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const ctrl = useModHeld('Control');
   const rows = useProjects();
   const store = useStore();
-  const doAct = useOptAct();
   // the cards he answered or closed, from any view: the store's one set (acted.ts), never this block's
   const acted = useActed();
   const gone = useMemo(() => actedKeys(acted), [acted]);
@@ -593,13 +591,12 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const leave = () => {
     openTo(null);
   };
-  // a card linked to a page (notif-artifact, designer m_26560): its chip or 'o' opens the page beside
-  // the thread at its block, the act an option's --open takes (optAct.ts); nothing sent, it stays
+  // a card linked to a page (notif-artifact, designer m_26560): its chip or ⌘O opens it in the panel's
+  // tab at its block, and only that (his m_47572): the thread stays, this card stays open as it is
+  // (its composer and his words too), nothing sent
   const openPage = (c: Card) => {
-    const a = aboutOf(c);
-    if (a == null) return;
-    store.keepOpen({ project: c.project, card: c.id });
-    doAct(c.project, openAct(a));
+    const intent = chipOpen(c);
+    if (intent !== null) store.do(intent);
   };
   const pick = (c: Card, n: number) => {
     // a closed card picks nothing: its options are dim

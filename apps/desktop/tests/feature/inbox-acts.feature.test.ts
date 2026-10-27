@@ -3,7 +3,7 @@
 // picking it opens that, sends nothing, and the item stays. Typed inputs in; the inbox's view, the
 // commands sent and the effects run out. Nothing else is read.
 import { describe, expect, it } from 'vitest';
-import { card, ev, pick, projects, row } from './inputs';
+import { card, ev, goTo, openChip, pick, projects, row } from './inputs';
 import { feature } from './run';
 
 const ACME = 'acme-1a2b3c4d';
@@ -59,5 +59,22 @@ describe('an option the window does itself', () => {
     gone.does(pick(ACME, 540, 1));
     expect(gone.effects()).toEqual([{ out: 'fx', fx: { fx: 'openExternal', args: [`${PAGE}#m-pr16`] } }]);
     expect(gone.sent()).toEqual([]);
+  });
+});
+
+// his m_47572: the chip of an open card (and ⌘O) opens what it is about in the panel only; the
+// window stays on the thread he is in, the card stays open to answer once he has read it
+describe("a card's artifact chip", () => {
+  const sketch = { id: 'commode', kind: 'image', title: 'commode cannée sous l’escalier', v: 1, url: null, at: null };
+  const asks = card({ project: ACME, id: 612, agent: 'paint-canvas', question: 'sous l’escalier, un placard ?', artifact: sketch });
+  const listed = ev('artifacts', { project: ACME, items: [{ id: 'commode', kind: 'image', title: sketch.title, agent: 'appart-3d', url: '', version: 1, at_ms: 1_791_100_000_000, new: false }] });
+
+  it('opens it in the panel only: the thread he is in stays, the card stays, nothing sent', () => {
+    const here = { screen: 'thread', project: ACME, agent: 'main' } as const;
+    const w = feature().given(projects(acme(asks)), listed).does(goTo(here), openChip(asks));
+    expect(w.effects()).toEqual([{ out: 'nav', to: { project: ACME, artifact: 'commode', at: null }, tab: true }]);
+    expect(w.view.route()).toEqual(here);
+    expect(ids(w.view.inbox())).toEqual([`${ACME}-612`]);
+    expect(w.sent()).toEqual([]);
   });
 });
