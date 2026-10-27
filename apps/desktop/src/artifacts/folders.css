@@ -117,14 +117,18 @@
 /* search's no-result page and the results' column */
 .art-none,.art-results{min-width:0}
 
-/* what floats: the selection bar, the toast, the ghost, a menu's point */
-.art-selbar{position:absolute;left:50%;bottom:var(--s-5);z-index:30;transform:translateX(-50%);display:flex;align-items:center;gap:var(--s-1);height:var(--s-10);padding:0 var(--s-1) 0 var(--s-4);border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-2);white-space:nowrap;font-size:var(--t-13)}
+/* what floats: the selection bar, the toast, the ghost, a menu's point. The bar and the toast 16
+   over the floating composer, on its live top (--float-now, composer/float/room.ts; the pill at rest
+   while unset): never under it, focused, open or mid-fold (selbar-float, designer m_48326). The bar
+   comes up 8 from just above the pill */
+.art-selbar{position:absolute;left:50%;bottom:calc(var(--float-bottom) + var(--float-now, var(--float-h)) + var(--s-4));z-index:30;transform:translateX(-50%);animation:art-selbar-in var(--d-fast) var(--ease-out);display:flex;align-items:center;gap:var(--s-1);height:var(--s-10);padding:0 var(--s-1) 0 var(--s-4);border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-2);white-space:nowrap;font-size:var(--t-13)}
 .art-selbar .n{margin-right:var(--s-2);font-weight:600;color:var(--c-text)}
 .art-selbar .sep{width:1px;height:var(--s-5);margin:0 var(--s-1);background:var(--c-line)}
 .art-selbar-a{display:inline-flex;align-items:center;gap:var(--s-2);height:var(--h-control-sm);padding:0 var(--s-2);border-radius:var(--r-1);color:var(--c-text)}
 .art-selbar-a:hover{background:var(--c-hover)}
 .art-selbar-a .k{font-family:var(--font-mono);font-size:var(--t-11);color:var(--c-text-3)}
-.art-toast{position:absolute;left:50%;bottom:var(--s-5);z-index:30;transform:translateX(-50%)}
+@keyframes art-selbar-in{from{opacity:0;transform:translate(-50%,var(--s-2))}to{opacity:1;transform:translate(-50%,0)}}
+.art-toast{position:absolute;left:50%;bottom:calc(var(--float-bottom) + var(--float-now, var(--float-h)) + var(--s-4));z-index:30;transform:translateX(-50%)}
 .art-ghost{position:fixed;top:0;left:0;padding:0;border-radius:var(--r-2);transform:translateX(-200vw) rotate(-4deg);box-shadow:var(--e-2);overflow:visible}
 .art-ghost > :first-child{display:block;width:100%;aspect-ratio:16/10;border-radius:var(--r-2);overflow:hidden}
 .art-ghost-n{position:absolute;top:calc(-1 * var(--s-2));right:calc(-1 * var(--s-2));min-width:var(--s-5);height:var(--s-5);padding:0 var(--s-1);border-radius:var(--s-3);background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-12);font-weight:600;line-height:20px;text-align:center}
