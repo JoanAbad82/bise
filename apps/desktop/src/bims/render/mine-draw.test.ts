@@ -3,7 +3,7 @@
 // (only main's, only on a change), the coin's head key changes with it, and makeBim draws his own
 // cuts and keeps main's :* under any hair. Fixtures only.
 import { describe, expect, it } from 'vitest';
-import type { Mesh } from 'three';
+import { Mesh, type Object3D } from 'three';
 import { agent, mainAgent } from '../fixtures';
 import { layoutOf } from '../maps';
 import { makeOfficeScene } from './office-scene';
@@ -43,11 +43,11 @@ describe('his bim, drawn', () => {
   });
 
   it("draws his own cuts as hair, and main's :* and chain under them", () => {
-    const meshes = (l: Look | null): Mesh[] => {
+    const meshes = (l: Look | null): Object3D[] => {
       const b = makeBim('main', true, STYLE, mainOutfit(l), undefined, false);
-      const out: Mesh[] = [];
+      const out: Object3D[] = [];
       b.group.traverse((o) => {
-        if ((o as Mesh).isMesh) out.push(o as Mesh);
+        if (o instanceof Mesh) out.push(o);
       });
       return out;
     };
@@ -55,7 +55,7 @@ describe('his bim, drawn', () => {
     const pig = meshes(PIGTAILS);
     expect(pig.filter((m) => m.userData.hair === true).length).toBeGreaterThan(8);
     // the :* (two dots and three bars) and the chain: the same count of body meshes as today's main
-    const body = (ms: Mesh[]): number => ms.filter((m) => m.parent?.name === 'body').length;
+    const body = (ms: Object3D[]): number => ms.filter((m) => m.parent?.name === 'body').length;
     expect(body(pig)).toBe(body(today));
   });
 });

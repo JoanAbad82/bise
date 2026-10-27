@@ -134,7 +134,7 @@ describe('Settings', () => {
     fireEvent.click(screen.getByTestId('settings.me.hair.pigtails'));
     // pigtails take no hat: the cap goes, the hats grey
     expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 1, wear: 'none' } });
-    expect((screen.getByTestId('settings.me.wear.cap') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId<HTMLButtonElement>('settings.me.wear.cap').disabled).toBe(true);
     fireEvent.click(screen.getByTestId('settings.me.color.5'));
     expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 5, wear: 'none' } });
   });

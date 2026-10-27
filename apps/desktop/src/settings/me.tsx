@@ -32,8 +32,8 @@ function LookPic({ look, px }: { look: Look; px: number }) {
   return <ThingPic thing={{ head: 'main', main: true, look }} px={px} tile="thread" className="me-pic" />;
 }
 
-/** the hair row's swatch: the coin's picture drawn larger, cropped to the head (ui-review m_46729 1) */
-const CUT_PX = 44;
+/** the hair row's swatch: the coin's picture at 48, cropped to the head in its 32 box (ui-review m_46729 1, designer m_46749) */
+const CUT_PX = 48;
 
 /** a round swatch of one colour (a skin, a hair colour) */
 function Dot({ color, on, tip, onClick, testId }: { color: string; on: boolean; tip: string; onClick: () => void; testId: string }) {
