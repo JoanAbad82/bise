@@ -33,10 +33,12 @@ const found = (): Found[] => {
   if (e?.ev !== 'found') throw new Error('fixture');
   return e.items;
 };
-const ports = (): OnboardingPorts & { sent: AppCmd[]; log: string[] } => {
+/** `looks`: his bim's look kept on leaving hello (page bim-pick), apart so the steps' own commands read alone */
+const ports = (): OnboardingPorts & { sent: AppCmd[]; looks: AppCmd[]; log: string[] } => {
   const sent: AppCmd[] = [];
+  const looks: AppCmd[] = [];
   const log: string[] = [];
-  return { sent, log, send: (c) => sent.push(c), done: () => log.push('done') };
+  return { sent, looks, log, send: (c) => (c.cmd === 'prefs_set' && c.key === 'bim' ? looks : sent).push(c), done: () => log.push('done') };
 };
 
 /** The model step's check that works (ChatGPT, signed in in the fixture): its pick, then the answer. */
@@ -103,7 +105,28 @@ describe('Onboarding', () => {
     expect(screen.queryByTestId('setup.perms')).toBeNull();
     fireEvent.click(screen.getByTestId('setup.skip'));
     expect(p.sent).toEqual([{ cmd: 'prefs_set', key: 'onboarded', value: true }]);
+    // he left hello without picking: his bim got one of the ready-made looks (page bim-pick)
+    expect(p.looks).toHaveLength(1);
     expect(p.log.at(-1)).toBe('done');
+  });
+
+  it("hello offers 12 ready-made looks for his bim (page bim-pick): a click keeps it in prefs' bim; none picked, start keeps one at random", () => {
+    let p = ports();
+    const { unmount } = render(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} />);
+    const tiles = screen.getByTestId('setup.me').querySelectorAll('button');
+    expect(tiles.length).toBe(12);
+    fireEvent.click(screen.getByTestId('setup.me.3'));
+    expect(p.looks).toEqual([{ cmd: 'prefs_set', key: 'bim', value: { skin: 4, hair: 'braids', color: 0, wear: 'none' } }]);
+    expect(screen.getByTestId('setup.me.3').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByTestId('setup.next'));
+    expect(p.looks).toHaveLength(1);
+    unmount();
+    p = ports();
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    render(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} />);
+    fireEvent.click(screen.getByTestId('setup.next'));
+    vi.restoreAllMocks();
+    expect(p.looks).toEqual([{ cmd: 'prefs_set', key: 'bim', value: { skin: 0, hair: 'short', color: 4, wear: 'none' } }]);
   });
 
   it('the model step waits for a key that works (live check), then goes on; esc goes a level, then a step back', () => {

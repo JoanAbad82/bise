@@ -9,8 +9,8 @@
 // hems, a pocket, strings, buttons, the eyes' catchlights: userData.near) is baked twice, near and
 // far, and detail() swaps them by how big the bim is on screen (nearAt). Its materials are its own,
 // so it fades (reduced motion) and goes grey (stopped); the clay light is claylight.ts's.
-import { type BufferGeometry, Color, CylinderGeometry, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, MeshStandardMaterial, type Object3D, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three';
-import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Cut, type Kind, type Outfit } from './palette';
+import { type BufferGeometry, Color, ConeGeometry, CylinderGeometry, Group, LatheGeometry, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, MeshStandardMaterial, type Object3D, Quaternion, SphereGeometry, TorusGeometry, Vector2, Vector3 } from 'three';
+import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Cut, type Kind, type Outfit, type Own } from './palette';
 import { HAT_K, HEAD_R, HEAD_Y } from './laptop';
 import { bakePart } from './merge';
 import { GREY_MIX, clayLit, partsMaterial, warmth } from './claylight';
@@ -19,6 +19,9 @@ import type { Style } from './style';
 import type { Wear } from './maps/look';
 
 type Mat = MeshLambertMaterial | MeshBasicMaterial;
+
+const WHITE = new Color('#ffffff');
+const UP = new Vector3(0, 1, 0);
 
 export interface Bim {
   readonly name: string;
@@ -182,6 +185,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     return m;
   };
   const shade = (hex: string, k: number): string => '#' + new Color(hex).multiplyScalar(k).getHexString();
+  /** a colour lifted toward white by k (the light a cut catches on its dome) */
+  const lift = (hex: string, k: number): string => '#' + new Color(hex).lerp(WHITE, k).getHexString();
 
   const g = new Group();
   const body = new Group();
@@ -410,16 +415,24 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     };
     switch (cut) {
       case 'long': {
-        // parted in the middle, the back to the nape, and a curtain each side of the face falling past the jaw toward the shoulders, in front of the ears (never round to the hood)
+        // one smooth fall (page bim-pick, designer m_46559; Gabriel: the old curtains were ugly): the
+        // dome parted in the middle, then a lathe round the sides from the temples to just over the
+        // shoulders, open on the face and on the back below the nape (the hood stays clear), thinning
+        // toward its ends that turn out a little; the back down to the nape; a lighter band on the dome
         dome();
         parting();
         const GAP = 1.9;
-        // thin at the back (she lies on it on a pillow, her head at the bed's end)
-        const r = R + 0.008;
-        shell(r, top, 2.08, GAP);
+        shell(R + 0.008, top, 2.08, GAP);
         nape(GAP);
-        // the curtains: long and flat, from the temples past the jaw toward the shoulder's top, flaring a little
-        for (const sx of [-1, 1]) lobe(0.1, sx * 0.235, -0.115, 0.13, hm, [0.36, 1.4, 0.8]).rotation.z = sx * 0.14;
+        // [radius, y, thickness] down the fall; under a crown it starts under the rim
+        const y0 = crowned ? -0.01 : 0.1;
+        const FALL: readonly (readonly [number, number, number])[] = [[R + 0.02, y0, 0.042], [R + 0.024, Math.min(y0, 0.0) - 0.0001, 0.042], [R + 0.026, -0.08, 0.04], [R + 0.032, -0.16, 0.034], [R + 0.04, -0.215, 0.026], [R + 0.052, -0.245, 0.016]];
+        const pts = [...FALL.map(([r, y]) => new Vector2(r, y)), ...[...FALL].reverse().map(([r, y, t]) => new Vector2(r - t, y + 0.004))];
+        // round the sides only, from the face's edge to behind the ears: never round to the hood
+        const OPEN = 0.82;
+        const SIDE = 0.38;
+        for (const p0 of [OPEN, -OPEN - SIDE]) hair(add(new LatheGeometry(pts, 16, p0, SIDE), hm, head, 0, 0, -0.01));
+        if (!crowned) hair(add(new SphereGeometry(R + 0.019, 28, 4, 0, Math.PI * 2, Math.PI * 0.12, Math.PI * 0.07), mat(lift(o.hair, 0.12)), head, 0, 0.02, -0.015)).rotation.x = -0.12;
         break;
       }
       case 'ponytail':
@@ -520,6 +533,82 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     }
   };
   if (o.cut) herHair(o.cut, o.hat === 'cap' || o.hat === 'capback' || o.hat === 'beanie', o.hat === 'headphones');
+  // his own bim's cuts (page bim-pick, designer m_46521 and m_46559), in the head's space, on a bare head
+  const ownHair = (own: Own): void => {
+    const hm = mat(o.hair);
+    const hair = (m: Mesh): Mesh => {
+      m.userData.hair = true;
+      return m;
+    };
+    /** the hair's top: a shell over the skull to t1, its front edge off the brows */
+    const dome = (r: number, t1: number, m: Mat = hm): Mesh => {
+      const d = hair(add(new SphereGeometry(r, 28, 12, 0, Math.PI * 2, 0, t1), m, head, 0, 0.02, -0.015));
+      d.rotation.x = -0.12;
+      return d;
+    };
+    const ball = (r: number, m: Mat, x: number, y: number, z: number, s: readonly [number, number, number] = [1, 1, 1]): Mesh => {
+      const b = hair(add(new SphereGeometry(r, 14, 10), m, head, x, y, z));
+      b.scale.set(...s);
+      return b;
+    };
+    switch (own) {
+      case 'afro':
+        // a round silhouette about 1.3x the head's width, its top well above the crown, behind the face (designer m_46521 2)
+        ball(0.29, hm, 0, 0.16, -0.1, [1.1, 0.97, 0.97]);
+        break;
+      case 'topbun':
+        // the short cut and a bun standing clear above the crown, more than a quarter of the head (designer m_46521 3)
+        hairOn();
+        ball(0.125, hm, 0, 0.36, -0.06, [1, 0.95, 1]);
+        break;
+      case 'pigtails': {
+        // two tails high on the sides, sticking out and bouncing down, a tie at each foot
+        dome(R + 0.012, Math.PI * 0.43);
+        const tie = mat(o.hatColor);
+        for (const sx of [-1, 1]) {
+          ball(0.035, tie, sx * 0.25, 0.1, -0.04);
+          const T: readonly (readonly [number, number, number, number])[] = [[0.31, 0.11, -0.05, 0.065], [0.37, 0.06, -0.06, 0.07], [0.41, -0.02, -0.06, 0.065], [0.42, -0.1, -0.05, 0.055]];
+          for (const [x, y, z, r] of T) ball(r, hm, sx * x, y, z, [1, 1.1, 1]);
+        }
+        break;
+      }
+      case 'mohawk': {
+        // a crest of tall lobes from the brow to the back of the crown, the sides shaved: a short fuzz,
+        // the hair colour at ~30 % over the skin (designer m_46559)
+        const fuzz = mat('#' + new Color(o.skin).lerp(new Color(o.hair), 0.3).getHexString());
+        hair(add(new SphereGeometry(R + 0.006, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.44), fuzz, head, 0, 0.01, -0.02)).rotation.x = -0.15;
+        const N = 6;
+        for (let i = 0; i < N; i++) {
+          const a = -0.38 + (i / (N - 1)) * 1.75;
+          ball(0.075, hm, 0, Math.cos(a) * (R + 0.04), -Math.sin(a) * (R + 0.04), [0.5, 1.7, 0.9]).rotation.x = -a;
+        }
+        break;
+      }
+      case 'spiky': {
+        // spikes of a few lengths out of a hair cap over the skull's top (designer m_46559)
+        dome(R + 0.014, Math.PI * 0.47);
+        const S: readonly (readonly [number, number, number])[] = [[0, 0, 0.2], [0.5, 0, 0.17], [0.5, 1.25, 0.23], [0.5, 2.5, 0.18], [0.5, -1.25, 0.21], [0.5, -2.5, 0.16], [0.85, 0.6, 0.19], [0.85, -0.6, 0.22], [0.85, 1.9, 0.17], [0.85, -1.9, 0.2]];
+        for (const [t, ph, len] of S) {
+          const dir = new Vector3(Math.sin(t) * Math.sin(ph), Math.cos(t), Math.sin(t) * Math.cos(ph) - 0.2).normalize();
+          const k = R + len / 5;
+          hair(add(new ConeGeometry(0.07, len, 10), hm, head, dir.x * k, dir.y * k + 0.02, dir.z * k)).quaternion.setFromUnitVectors(UP, dir);
+        }
+        break;
+      }
+    }
+  };
+  if (o.own) ownHair(o.own);
+  /** main's :* on the chest in the neon's yellow (bims.md) and its gold chain */
+  const markOn = (): void => {
+    const neon = mat(DAY.neon, 0.35);
+    add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.58, 0.215);
+    add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.47, 0.215);
+    for (let i = 0; i < 3; i++) add(style.box(0.11, 0.025, 0.02), neon, body, 0.05, 0.525, 0.215).rotation.z = (i * Math.PI) / 3;
+    // the chain hangs as a thin U from the collar, its lowest point over the :* (designer m_41390 2),
+    // leaning back with the chest so it lies on the hoodie
+    const chain = add(new TorusGeometry(0.08, 0.011, 6, 18, Math.PI), mat(WORLD.gold, 0.2), body, 0, 0.735, 0.148);
+    chain.rotation.set(-0.5, 0, Math.PI, 'XYZ');
+  };
   // hair and hats
   /** what is worn on the head, not the head or its hair (a cap, a beanie, a headset): the view laws measure a head without it (heads.testkit.ts) */
   const worn = (m: Mesh): Mesh => {
@@ -554,7 +643,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       // a headset (Gabriel: « cette barre orange est sensé etre un casque audio? »): a band that
       // follows the head's curve over its hair from ear to ear, a cup in its hat colour on each
       // ear over a dark cushion, and a small mic arm from the left cup to the mouth (over her own hair when she has a cut)
-      if (!o.cut) add(style.cap(0.226, 0.4), mat(o.hair), hat, 0, 0.02, -0.02);
+      if (!o.cut && !o.own) add(style.cap(0.226, 0.4), mat(o.hair), hat, 0, 0.02, -0.02);
       const ink = mat(WORLD.dark);
       const BR = 0.262;
       const SEGS = 7;
@@ -578,20 +667,15 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       worn(add(style.ball(0.026), ink, hat, to.x, to.y, to.z));
       break;
     }
-    case 'main': {
-      // main: the ink hoodie, its :* on the chest in the neon's yellow (bims.md), a gold chain
+    case 'main':
+      // main: short hair, and its :* and chain (markOn)
       hairOn();
-      const neon = mat(DAY.neon, 0.35);
-      add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.58, 0.215);
-      add(style.box(0.05, 0.05, 0.02), neon, body, -0.06, 0.47, 0.215);
-      for (let i = 0; i < 3; i++) add(style.box(0.11, 0.025, 0.02), neon, body, 0.05, 0.525, 0.215).rotation.z = (i * Math.PI) / 3;
-      // the chain hangs as a thin U from the collar, its lowest point over the :* (designer m_41390 2),
-      // leaning back with the chest so it lies on the hoodie
-      const chain = add(new TorusGeometry(0.08, 0.011, 6, 18, Math.PI), mat(WORLD.gold, 0.2), body, 0, 0.735, 0.148);
-      chain.rotation.set(-0.5, 0, Math.PI, 'XYZ');
+      markOn();
       break;
-    }
   }
+
+  // his own bim wears main's :* and chain under any hair or hat (look.ts mainOutfit)
+  if (o.mark === true && o.hat !== 'main') markOn();
 
   const arms: Group[] = [];
   const legs: Group[] = [];

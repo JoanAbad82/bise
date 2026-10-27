@@ -512,6 +512,36 @@
     "one": null,
     "text": "Claude plan found in Claude Code. Max and Team include monthly API credits bise can use: {cli} login anthropic shows how."
   },
+  "settings.color_auburn": {
+    "args": [],
+    "one": null,
+    "text": "auburn"
+  },
+  "settings.color_black": {
+    "args": [],
+    "one": null,
+    "text": "black"
+  },
+  "settings.color_blond": {
+    "args": [],
+    "one": null,
+    "text": "blond"
+  },
+  "settings.color_brown": {
+    "args": [],
+    "one": null,
+    "text": "brown"
+  },
+  "settings.color_dark": {
+    "args": [],
+    "one": null,
+    "text": "dark brown"
+  },
+  "settings.color_lilac": {
+    "args": [],
+    "one": null,
+    "text": "lilac"
+  },
   "settings.cu_apps": {
     "args": [],
     "one": null,
@@ -1441,6 +1471,66 @@
     "one": null,
     "text": "{path} · git · {when}"
   },
+  "settings.hair_afro": {
+    "args": [],
+    "one": null,
+    "text": "afro"
+  },
+  "settings.hair_bob": {
+    "args": [],
+    "one": null,
+    "text": "bob"
+  },
+  "settings.hair_braids": {
+    "args": [],
+    "one": null,
+    "text": "braids"
+  },
+  "settings.hair_buns": {
+    "args": [],
+    "one": null,
+    "text": "two buns"
+  },
+  "settings.hair_curls": {
+    "args": [],
+    "one": null,
+    "text": "curls"
+  },
+  "settings.hair_long": {
+    "args": [],
+    "one": null,
+    "text": "long"
+  },
+  "settings.hair_mohawk": {
+    "args": [],
+    "one": null,
+    "text": "mohawk"
+  },
+  "settings.hair_pigtails": {
+    "args": [],
+    "one": null,
+    "text": "pigtails"
+  },
+  "settings.hair_ponytail": {
+    "args": [],
+    "one": null,
+    "text": "ponytail"
+  },
+  "settings.hair_short": {
+    "args": [],
+    "one": null,
+    "text": "short"
+  },
+  "settings.hair_spiky": {
+    "args": [],
+    "one": null,
+    "text": "spiky"
+  },
+  "settings.hair_topbun": {
+    "args": [],
+    "one": null,
+    "text": "top bun"
+  },
   "settings.key_add": {
     "args": [],
     "one": null,
@@ -1805,6 +1895,48 @@
     "one": null,
     "text": "on Max or Team?"
   },
+  "settings.me_color": {
+    "args": [],
+    "one": null,
+    "text": "Hair colour"
+  },
+  "settings.me_hair": {
+    "args": [],
+    "one": null,
+    "text": "Hair"
+  },
+  "settings.me_label": {
+    "args": [],
+    "one": null,
+    "text": "Your bim"
+  },
+  "settings.me_skin": {
+    "args": [],
+    "one": null,
+    "text": "Skin"
+  },
+  "settings.me_skin_n": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "skin {n} of 6"
+  },
+  "settings.me_sub": {
+    "args": [],
+    "one": null,
+    "text": "how you look in the office and on your coin"
+  },
+  "settings.me_wear": {
+    "args": [],
+    "one": null,
+    "text": "On the head"
+  },
+  "settings.me_wear_no": {
+    "args": [],
+    "one": null,
+    "text": "not with this hair"
+  },
   "settings.minutes": {
     "args": [
       "n"
@@ -2018,6 +2150,23 @@
     ],
     "one": null,
     "text": "{provider} says this key is wrong: “{said}”"
+  },
+  "settings.onb_me": {
+    "args": [],
+    "one": null,
+    "text": "pick your bim. it sits in your office and on your coin."
+  },
+  "settings.onb_me_look": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "look {n} of 12"
+  },
+  "settings.onb_me_more": {
+    "args": [],
+    "one": null,
+    "text": "you can change every detail later in Settings › General."
   },
   "settings.onb_mic_lost": {
     "args": [],
@@ -5046,5 +5195,25 @@
     "args": [],
     "one": null,
     "text": "the language of your voice"
+  },
+  "settings.wear_beanie": {
+    "args": [],
+    "one": null,
+    "text": "beanie"
+  },
+  "settings.wear_cap": {
+    "args": [],
+    "one": null,
+    "text": "cap"
+  },
+  "settings.wear_headphones": {
+    "args": [],
+    "one": null,
+    "text": "headset"
+  },
+  "settings.wear_none": {
+    "args": [],
+    "one": null,
+    "text": "nothing"
   }
 }

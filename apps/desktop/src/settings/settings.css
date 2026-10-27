@@ -98,3 +98,28 @@
 /* the test app's row: nothing to act on, so its title in text-2 and its sub in text-3 (designer m_24597) */
 .settings-update.is-test .b-gi .l span.settings-update-t { color: var(--c-text-2); }
 .settings-update.is-test .b-gi .l > span:not(.settings-update-t) { color: var(--c-text-3); }
+/* settings › general › Your bim (me.tsx, page bim-pick, designer m_46521): his bim near at the left,
+   the four rows at its right in the group's box; a picked swatch, cut, hat or ready-made look gets
+   an ink ring (never the accent); a hat the hair can't take is greyed */
+.me { margin-bottom: var(--gap-section); }
+.me .b-help { margin-top: var(--s-3); padding-left: var(--s-3); }
+.me-box { display: flex; gap: var(--s-4); align-items: flex-start; padding: var(--s-3); border-radius: var(--r-menu); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.me-big { flex: none; width: 88px; height: 88px; display: grid; place-items: center; }
+.me-rows { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.me-row { display: flex; align-items: center; gap: var(--s-3); min-height: var(--s-8); }
+.me-row-n { flex: none; width: 88px; font: var(--t-13) var(--font-ui); color: var(--c-text); }
+.me-row-c { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1); }
+.me-dot { width: var(--s-5); height: var(--s-5); border-radius: 50%; background: var(--me-dot); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+.me-cut, .me-tile { display: grid; place-items: center; border-radius: var(--r-menu); }
+.me-row-c.six { display: grid; grid-template-columns: repeat(6, var(--s-8)); }
+/* a hair swatch: the head only, its picture larger than the 28 box and cropped to the head's top */
+.me-cut { width: var(--s-8); height: var(--s-8); overflow: hidden; }
+.me-cut .me-pic { width: 44px; height: 44px; margin-top: var(--s-1); }
+.me-cut:hover, .me-tile:hover, .me-chip:hover:not(:disabled) { background: var(--c-hover); }
+.me-chip { height: var(--s-6); padding: 0 var(--s-2); border-radius: var(--r-menu); font: var(--t-12) var(--font-ui); color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line); }
+.me-chip:disabled { color: var(--c-text-3); }
+.me-dot.on, .me-cut.on, .me-tile.on, .me-chip.on { box-shadow: 0 0 0 2px var(--c-ink); }
+.me-dot:focus-visible, .me-cut:focus-visible, .me-tile:focus-visible, .me-chip:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+.me-ready { display: grid; grid-template-columns: repeat(6, var(--s-16)); gap: var(--s-2); justify-content: center; margin: var(--s-4) 0 var(--s-2); }
+.me-tile { width: var(--s-16); height: var(--s-16); box-shadow: inset 0 0 0 1px var(--c-line); }
+.me-more { margin: 0 0 var(--s-4); text-align: center; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }

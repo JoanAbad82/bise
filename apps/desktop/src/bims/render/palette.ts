@@ -110,6 +110,9 @@ export type Hat = (typeof HATS)[number];
  */
 export const CUTS = ['long', 'ponytail', 'braids', 'bob', 'buns', 'curls'] as const;
 export type Cut = (typeof CUTS)[number];
+/** his own bim's cuts beyond the women's (look.ts, page bim-pick): drawn for his bim only (bim.ts ownHair), never in an agent's seeded look */
+export const OWN = ['afro', 'topbun', 'pigtails', 'mohawk', 'spiky'] as const;
+export type Own = (typeof OWN)[number];
 /** what a woman wears on her head: bare, or a hat that sits right on her cut (never sunk into it, never over hair on the ears under a headset) */
 export type HeadWear = 'bare' | 'cap' | 'capback' | 'beanie' | 'headphones';
 /** a woman's cut and what she wears over it (herHair's, or a look set over her name's: the hero's cast) */
@@ -175,6 +178,10 @@ export interface Outfit {
   readonly hat: Hat | HeadWear | 'main';
   /** a woman's hair (about half the bims, from a hash of its own); null: the hat says its hair, as before */
   readonly cut: Cut | null;
+  /** his own bim's cut (look.ts mainOutfit): drawn in the head's space, its hat slot bare or a headset */
+  readonly own?: Own | null;
+  /** main's :* and gold chain on a hat slot that holds his hair or his hat (look.ts mainOutfit); hat 'main' draws them itself */
+  readonly mark?: boolean;
   /** what it wears over its torso (`hoodie` the main colour); main's is always the hoodie */
   readonly kind: Kind;
   /** the outfit's second colour (a sweater's bands, a tee's print, a puffer's sleeves): never the hoodie's */

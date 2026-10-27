@@ -22,7 +22,8 @@ import { keep } from './keep';
 import { noteWindowKey, useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
-import { useProjects, useStore } from '@/store';
+import { usePrefs, useProjects, useStore } from '@/store';
+import { setMyLook } from '@/bims/mine';
 import { useFnVoice } from '@/voicemode';
 import { SettingsScreen } from '@/settings';
 import { useSetupFirstOpens } from '@/settings/setup-first';
@@ -106,9 +107,20 @@ export function App() {
     <RouterContext value={router}>
       {/* the store's machine's effects run here, the one edge (edge.tsx) */}
       <StoreEdge />
+      <MyLook />
       <Shell />
     </RouterContext>
   );
+}
+
+/** His bim's look (prefs' `bim`, page bim-pick) handed to what draws it: the coin and the office (bims/mine.ts). */
+function MyLook(): null {
+  const prefs = usePrefs();
+  const v = prefs !== null && typeof prefs === 'object' && !Array.isArray(prefs) ? prefs.bim : undefined;
+  useEffect(() => {
+    setMyLook(v);
+  }, [v]);
+  return null;
 }
 
 /**

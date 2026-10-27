@@ -17,10 +17,12 @@ import type { ProviderCheck } from '@/settings';
 import { PayStep } from './PayStep';
 import { afterSignIn, PAY_START, ready, upOf, type PayState } from './pay';
 import {
-  back, baseName, choose as choose_, chosenTicked, filterFound, finish, firstSend, fnAct, ideas, next, pick, pickChosen, START, stepOf, STEPS, ticked, tickedNames,
+  back, baseName, choose as choose_, chosenTicked, filterFound, finish, firstSend, fnAct, ideas, lookCmd, lookOnLeave, next, pick, pickChosen, START, stepOf, STEPS, ticked, tickedNames,
   type OnbState,
 } from './model';
 import type { Perms } from './perms';
+import { ReadyLooks } from '@/settings/me';
+import type { Look } from '@/bims/render/look';
 import { settings } from '@/proto/words.gen';
 import './setup.css';
 
@@ -63,6 +65,17 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [st, setSt] = useState<OnbState>(START);
+  // his bim's ready-made look picked on hello (page bim-pick); none: one at random when he leaves hello
+  const [me, setMe] = useState<Look | null>(null);
+  const pickMe = (l: Look) => {
+    setMe(l);
+    ports.send(lookCmd(l));
+  };
+  const leaveHello = () => {
+    if (stepOf(st) !== 'hello') return;
+    const l = lookOnLeave(me, Math.random());
+    if (l !== null) pickMe(l);
+  };
   // the projects step's filter over the found repos
   const [q, setQ] = useState('');
   // the helper's fn acts fold into the state as they come (keyed on n, never re-applied)
@@ -102,6 +115,7 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
     if (r.done) ports.done();
   };
   const go = () => {
+    leaveHello();
     run(next(s, { signedIn: ok, found, now }));
   };
   const at = stepOf(s);
@@ -120,7 +134,11 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
           title={settings.onb_hello_title}
           sub={settings.onb_hello_sub}
           cta={{ text: settings.onb_start, onClick: go, testId: 'setup.next' }}
-        />
+        >
+          <div className="s">{settings.onb_me}</div>
+          <ReadyLooks on={me} pick={pickMe} />
+          <div className="me-more">{settings.onb_me_more}</div>
+        </Onb>
       );
       break;
     case 'model':
@@ -291,7 +309,7 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
             </Act>
           )}
         </span>
-        <Act onClick={() => { run(finish(s)); }} testId={at === 'first' ? 'setup.open' : 'setup.skip'}>
+        <Act onClick={() => { leaveHello(); run(finish(s)); }} testId={at === 'first' ? 'setup.open' : 'setup.skip'}>
           {at === 'first' ? settings.onb_open : settings.onb_skip}
         </Act>
       </div>

@@ -1,7 +1,8 @@
 // src/app/side3d · the right side's three side, loaded only by import('./render') from cache.ts
 // (the entry chunk never holds three): an office object through the plugins place's iconOf (the
 // same offscreen view, the office's day sun, its contact shadow; read, never changed), and a bim's
-// head and shoulders through makeBim (the same bim as the world's: its outfit from its name, the
+// head and shoulders through makeBim (the same bim as the world's: its outfit from its name, main's
+// in his look (bims/mine.ts, page bim-pick), the
 // clay of the day), standing, turned to the camera, in the office's iso view under the same sun,
 // on a transparent ground; and a bubble's own object (bubble3d.ts) in the same view, light and sun,
 // placed by its drawn box (no floor: the coin draws the plate's shadow). Each a PNG data URL `px`
@@ -15,7 +16,8 @@ import type { ObjId } from '@/bims/render/objects/ids';
 import { makeBim } from '@/bims/render/bim';
 import { RIGHT, UP, type Fit } from '@/bims/render/camera';
 import { HEAD_Y } from '@/bims/render/laptop';
-import { DAY, NIGHT, outfitOf } from '@/bims/render/palette';
+import { DAY, NIGHT, outfitOf, type Outfit } from '@/bims/render/palette';
+import { type Look, mainOutfit } from '@/bims/render/look';
 import { rigOf } from '@/bims/render/pose';
 import { STYLE } from '@/bims/render/style';
 import { makeView, type View } from '@/bims/render/view';
@@ -27,9 +29,12 @@ export function objectPng(obj: ObjId, px: number): string {
   return iconOf({ obj, glass: false }, px);
 }
 
-/** A bim's outfit as a signature: the heads' cache key (cache.ts), so redone outfits draw again (plan d6). */
-export function outfitSig(name: string, main: boolean): string {
-  return JSON.stringify(outfitOf(name, main));
+/** A bim's outfit: main's with his look on it (page bim-pick; null: today's), any other's from its name. */
+const outfitFor = (name: string, main: boolean, look: Look | null): Outfit => (main ? mainOutfit(look) : outfitOf(name, main));
+
+/** A bim's outfit as a signature: the heads' cache key (cache.ts), so redone outfits and his new look draw again (plan d6). */
+export function outfitSig(name: string, main: boolean, look: Look | null): string {
+  return JSON.stringify(outfitFor(name, main, look));
 }
 
 /** the office's sun, from the room's front left (plugins/render.ts's) */
@@ -79,13 +84,13 @@ function squareFit(b: Box3, size: number): Fit {
   return { target, left: cx - half, right: cx + half, top: cy + half, bottom: cy - half, scale: (2 * half) / size, widthPx: size, heightPx: size };
 }
 
-/** A bim's head and shoulders: `name`'s outfit (main: bise's), by day or by night. */
-export function headPng(name: string, main: boolean, px: number, night: boolean): string {
+/** A bim's head and shoulders: `name`'s outfit (main: his own bim, in his look), by day or by night. */
+export function headPng(name: string, main: boolean, px: number, night: boolean, look: Look | null): string {
   const v = theView();
   lightOffice(v.hemi, v.sun, night ? NIGHT : DAY, { x0: -1, W: 2, D: 2 } as unknown as LightBox, STYLE);
   v.sun.position.set(SUN.x, SUN.y, SUN.z);
   v.sun.target.position.set(0, 0, 0);
-  const bim = makeBim(name, main, STYLE);
+  const bim = makeBim(name, main, STYLE, outfitFor(name, main, look));
   bim.detail(true);
   bim.daylight(night ? 0 : 1);
   bim.apply(rigOf({ pose: standing(), t: 30, main, phase: 0, reduced: true }));

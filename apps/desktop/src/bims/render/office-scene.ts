@@ -20,6 +20,7 @@ import { climbRig } from './climb';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
 import { MAIN_HOODIE, WORLD, hash, outfitOf, paletteOf, type HerHair, type Outfit, type Palette } from './palette';
+import { type Look as MyLook, mainOutfit, sameLook } from './look';
 import { buildWorld, castShadows, lightDesk, type DeskHandles, type World } from './world';
 import { NO_GROW, growSig, type Grow } from '../growth';
 import { cozyAt } from '../cozy';
@@ -69,6 +70,8 @@ export interface OfficeScene {
   readonly root: Group;
   /** the office changed (an agent came or left, another map): its world again */
   setOffice(office: Office, agents: readonly Agent[]): void;
+  /** his own bim's look (page bim-pick; null: today's main): main's bim made again when it changed */
+  setMine(look: MyLook | null): void;
   /**
    * The growth and the theme as `look` says: the world built again when they changed (true: it
    * was, the ground may be wider).
@@ -196,6 +199,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   let eclipsed = false;
   let eggDecor: EggDecor | null = null;
   let april = false;
+  /** his bim's look (setMine): main's outfit; null today's */
+  let mine: MyLook | null = null;
   // the project's growth as drawn now (growth.ts), and the unlock moment's crew
   let grow: Grow = NO_GROW;
   let growKey = growSig(NO_GROW);
@@ -306,7 +311,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     let b = bims.get(name);
     if (!b) {
       const look = mapLook();
-      b = makeBim(name, main, style, aprilOutfit(name, main) ?? outfitWithHead(name, main, o.head?.(name)), main ? undefined : (w) => look.wear?.(w));
+      const outfit = main && mine !== null ? mainOutfit(mine) : (aprilOutfit(name, main) ?? outfitWithHead(name, main, o.head?.(name)));
+      b = makeBim(name, main, style, outfit, main ? undefined : (w) => look.wear?.(w));
       if (style.shadows) castShadows(b.group);
       b.group.visible = false;
       bims.set(name, b);
@@ -704,6 +710,15 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     },
     feet(name, out) {
       return shown(name)?.feet(out) ?? null;
+    },
+    setMine(look) {
+      if (sameLook(look, mine)) return;
+      mine = look;
+      // main's bim goes; the next frame's ensureBim makes it again in the new look, where it was
+      for (const a of agents) {
+        const b = a.main ? bims.get(a.name) : undefined;
+        if (b) { root.remove(b.group); b.dispose(); bims.delete(a.name); }
+      }
     },
     names: () => [...bims.keys()],
     body: (name) => bims.get(name)?.group ?? null,

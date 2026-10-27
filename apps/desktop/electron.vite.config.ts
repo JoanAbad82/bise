@@ -40,8 +40,9 @@ function bimsBudget(): Plugin {
   // three-free modules of render/ the entry chunk may hold: objects/ids.ts (the plugins' objects, a
   // prefs pick), and what the office driver's placement of the objects reads (corners.ts): the
   // objects' feet, the decor's places (decor.ts) and the camera's axes (camera.ts). three itself
-  // still fails the entry chunk (the check below), whoever pulls it in.
-  const FREE = ['/src/bims/render/objects/ids.ts', '/src/bims/render/objects/feet.ts', '/src/bims/render/decor.ts', '/src/bims/render/camera.ts'];
+  // still fails the entry chunk (the check below), whoever pulls it in. His bim's look (look.ts, page
+  // bim-pick) and the palette it reads (no imports) are drawn by the settings' and onboarding's pickers.
+  const FREE = ['/src/bims/render/objects/ids.ts', '/src/bims/render/objects/feet.ts', '/src/bims/render/decor.ts', '/src/bims/render/camera.ts', '/src/bims/render/palette.ts', '/src/bims/render/look.ts'];
   const threeFree = (id: string): boolean => FREE.some((f) => id.endsWith(f));
   const ours = (id: string): boolean => three(id) || (id.includes('/src/bims/render/') && !threeFree(id));
   const doors = [

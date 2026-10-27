@@ -26,6 +26,7 @@ import { applyLight } from './sky-light';
 import { blendAt, blending, lightOf, retarget, sameSky, type Blend, type Light } from '../sky';
 import { louder } from './pose';
 import { makeOfficeScene } from './office-scene';
+import { myLook, onMyLook } from '../mine';
 import { makeView } from './view';
 import { ghostBox } from './ghost';
 
@@ -85,6 +86,11 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
   const view = makeView(canvas, { shadowAuto: true, transparent: opts?.transparent === true });
   const office = makeOfficeScene(STYLE);
   view.scene.add(office.root);
+  // his bim's look (page bim-pick): main's bim in it now and at every new pick
+  office.setMine(myLook());
+  const stopMine = onMyLook(() => {
+    office.setMine(myLook());
+  });
   /** the whole site fitted to the canvas, and what shows through his camera (fit = base at FIT) */
   let base: Fit | null = null;
   let fit: Fit | null = null;
@@ -303,6 +309,7 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
       view.onLost(cb);
     },
     dispose() {
+      stopMine();
       view.scene.remove(office.root);
       office.dispose();
       view.dispose();

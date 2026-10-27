@@ -10,6 +10,12 @@ crate::words! { settings:
     onb_hello_sub = "i run your projects with a team of agents, and i only ask you what needs you.";
     /// onboarding: the hello step's button
     onb_start = "start";
+    /// onboarding, hello: the line over the ready-made looks (page bim-pick)
+    onb_me = "pick your bim. it sits in your office and on your coin.";
+    /// onboarding, hello: under the looks
+    onb_me_more = "you can change every detail later in Settings › General.";
+    /// onboarding, hello: a ready-made look's name (its tip and VoiceOver)
+    onb_me_look(n) = "look {n} of 12";
     /// fn's permissions sheet (the capsule, his first fn hold with one missing): its title
     onb_perms_title = "to hear you from any app";
     /// fn's permissions sheet: its line

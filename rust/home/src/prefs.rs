@@ -77,7 +77,18 @@ pub fn keep_days(prefs: Option<&Value>) -> u64 {
 
 /// The top keys of `prefs.json` the window may set (`prefs_set`,
 /// architect m_9130): anything else is refused, never written.
-pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims", AUTO_UPDATE];
+pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims", "bim", AUTO_UPDATE];
+
+/// `bim`: what his own bim looks like (the desktop's onboarding and
+/// settings › general, page bim-pick): `{skin, hair, color, wear}`, skin
+/// and color small indexes, hair and wear short slugs. The looks are the
+/// desktop's drawing table (bims/look.ts: an unknown one draws today's),
+/// never listed here; only the shape is checked. Set whole, never a part.
+fn bim_look(v: &Value) -> bool {
+    let slug = |s: Option<&Value>| s.and_then(Value::as_str).is_some_and(|s| (1..=24).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'-'));
+    let small = |n: Option<&Value>| n.and_then(Value::as_u64).is_some_and(|n| n < 32);
+    v.as_object().is_some_and(|o| o.len() == 4 && small(o.get("skin")) && small(o.get("color")) && slug(o.get("hair")) && slug(o.get("wear")))
+}
 
 /// `bims.map.<hub id>`: the office's map he picked for that project (the
 /// desktop's /bims, architect m_28589). Only that path, the id with
@@ -123,6 +134,7 @@ fn typed(key: &str, v: &Value) -> Result<(), String> {
         // the desktop app's update channel (release::DesktopChannel)
         "desktop_channel" => v.as_str().is_some_and(|c| ["stable", "beta"].contains(&c)),
         "excluded_apps" => v.as_array().is_some_and(|a| a.iter().all(Value::is_string)),
+        "bim" => bim_look(v),
         _ => true,
     };
     if ok {
@@ -157,7 +169,7 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
         if !value.is_null() {
             typed(top, &value)?;
         }
-    } else if ["onboarded", "theme", "shots_keep_days", "excluded_apps", "desktop_channel"].contains(&top) {
+    } else if ["onboarded", "theme", "shots_keep_days", "excluded_apps", "desktop_channel", "bim"].contains(&top) {
         return Err(format!("{top} has no {}", parts[1..].join(".")));
     }
     let mut out = if obj.is_object() { obj.clone() } else { Value::Object(Default::default()) };

@@ -6,7 +6,7 @@
 // a crown above its rim); no skull through a shell of hair; nothing over the eyes. A failure names the
 // cut, the headwear, the outfit, the pose and the frame (hair.testkit.ts hairMeasure).
 import { describe, expect, it } from 'vitest';
-import { CUT_WEARS, KINDS, hairMeasure } from './hair.testkit';
+import { CUT_WEARS, KINDS, OWN_WEARS, hairMeasure } from './hair.testkit';
 import { posesOf } from './outfits.testkit';
 import type { Rot } from './pose';
 
@@ -24,7 +24,8 @@ const ANGLES = ((): { rot: Rot; at: string }[] => {
 })();
 
 describe('her hair', () => {
-  for (const { cut, hat } of CUT_WEARS) {
+  // his own bim's cuts too (page bim-pick): the afro, the top bun, the pigtails, the mohawk, the spiky
+  for (const { cut, hat } of [...CUT_WEARS, ...OWN_WEARS]) {
     it(`${cut} · ${hat}: never through the torso, the headwear, the skull or over the eyes`, () => {
       const bad: string[] = [];
       for (const kind of KINDS) {

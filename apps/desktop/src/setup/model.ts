@@ -12,6 +12,7 @@
 // his words to bise first. The permissions are not a step: the capsule asks
 // them the first time he holds fn (perms.ts).
 import type { AppCmd, Found } from '@/proto';
+import { anyLook, prefOf, type Look } from '@/bims/render/look';
 import { settings } from '@/proto/words.gen';
 
 export const STEPS = ['hello', 'model', 'projects', 'first'] as const;
@@ -111,6 +112,14 @@ export function next(s: OnbState, c: Ctx): { s: OnbState; cmds: AppCmd[]; done: 
   const n = { ...s, at: s.at + 1 };
   if (stepOf(n) === 'projects' && c.found.length === 0) cmds.push({ cmd: 'found_scan' });
   return { s: n, cmds, done: false };
+}
+
+/** His bim's look kept (prefs' `bim`, page bim-pick): what a ready-made look's click sends. */
+export const lookCmd = (l: Look): AppCmd => ({ cmd: 'prefs_set', key: 'bim', value: prefOf(l) });
+
+/** Leaving hello (start or skip) with no look picked: a ready-made one at random, never always the same (page bim-pick); null: he picked one. */
+export function lookOnLeave(me: Look | null, rand: number): Look | null {
+  return me === null ? anyLook(rand) : null;
 }
 
 /** skip, or the last step: onboarded true, then bise. */

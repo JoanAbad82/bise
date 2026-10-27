@@ -3,10 +3,12 @@
 // bims-budget checks it), drawn once per thing, size and theme and kept for the window's life;
 // asked a few per frame so opening a card never stalls. A head's key carries its outfit (render
 // outfitSig, read once the renderer is loaded): when the outfits are redone (bims-clay-2,
-// bims-outfit-review; plan d6) the key changes and the heads draw again. A draw that fails (a lost
+// bims-outfit-review; plan d6) or he picks a new look for his bim (bims/mine.ts) the key changes and the heads draw again. A draw that fails (a lost
 // context, too many on a page) shows the plain tile and is tried again RETRY_MS later; only a
 // renderer that cannot load keeps the tiles for good. Owner: nm-side.
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { myLook, onMyLook } from '@/bims/mine';
+import type { Look } from '@/bims/render/look';
 import type { Thing } from './objects';
 
 type Render = typeof import('./render');
@@ -34,13 +36,16 @@ let pumping = false;
 /** how long a frame may spend drawing, ms */
 const BUDGET_MS = 8;
 
-const outfitOf = (r: Render | null, t: Thing): string => (r === null || !('head' in t) ? '' : r.outfitSig(t.head, t.main));
+/** main's head: the look the picture asks for, else his own now */
+const lookFor = (t: { readonly main: boolean; readonly look?: Look }): Look | null => (t.main ? (t.look ?? myLook()) : null);
+
+const outfitOf = (r: Render | null, t: Thing): string => (r === null || !('head' in t) ? '' : r.outfitSig(t.head, t.main, lookFor(t)));
 
 /** one thing's picture, through the loaded renderer */
 function draw(r: Render, t: Thing, px: number, night: boolean): string {
   if ('obj' in t) return r.objectPng(t.obj, px);
   if ('bubble' in t) return r.bubblePng(t.bubble, px, night);
-  return r.headPng(t.head, t.main, px, night);
+  return r.headPng(t.head, t.main, px, night, lookFor(t));
 }
 
 function pump(r: Render): void {
@@ -85,6 +90,8 @@ function ask(t: Thing, px: number, night: boolean, done: () => void): void {
 /** The thing's picture as a data URL once drawn; null: not yet, or never (the plain tile). */
 export function useThingPng(t: Thing | null, px: number): string | null {
   const night = useNight();
+  // his bim's look (page bim-pick): a new one changes main's key, so its head draws again
+  useSyncExternalStore(onMyLook, myLook);
   const key = t === null ? null : thingKey(t, px, night, outfitOf(loaded, t));
   // bumped when an asked picture comes back (drawn, or failed and its pause over): the render reads
   // `drawn` again, and asks again when it is still missing

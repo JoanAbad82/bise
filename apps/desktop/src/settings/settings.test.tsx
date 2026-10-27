@@ -120,6 +120,25 @@ describe('Settings', () => {
     expect(screen.getByTestId('settings.pref.quiet.call').getAttribute('aria-checked')).toBe('false');
   });
 
+  it("his bim's look (page bim-pick): general shows it first; a pick is kept in prefs' bim at once, a hat the hair can't take greyed", () => {
+    const p = ports();
+    view('general', p);
+    expect(screen.getByTestId('settings.me')).toBeTruthy();
+    // never picked: today's main (the light skin, short dark hair)
+    expect(screen.getByTestId('settings.me.skin.1').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('settings.me.hair.short').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByTestId('settings.me.skin.5'));
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'short', color: 1, wear: 'none' } });
+    expect(screen.getByTestId('settings.me.skin.5').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByTestId('settings.me.wear.cap'));
+    fireEvent.click(screen.getByTestId('settings.me.hair.pigtails'));
+    // pigtails take no hat: the cap goes, the hats grey
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 1, wear: 'none' } });
+    expect((screen.getByTestId('settings.me.wear.cap') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTestId('settings.me.color.5'));
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 5, wear: 'none' } });
+  });
+
   it('esc goes back; an unknown page is general', () => {
     const p = ports();
     view('nope', p);

@@ -208,6 +208,13 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert_eq!(prefs::set_dotted(&o, "desktop_channel", json!("beta")).unwrap()["desktop_channel"], json!("beta"));
     assert!(prefs::set_dotted(&o, "desktop_channel", json!("nightly")).is_err());
     assert!(prefs::set_dotted(&o, "desktop_channel.x", json!(true)).is_err());
+    // his own bim's look (page bim-pick): set whole, its four fields in their shape, nothing else
+    let look = json!({"skin": 3, "hair": "pigtails", "color": 1, "wear": "none"});
+    assert_eq!(prefs::set_dotted(&o, "bim", look.clone()).unwrap()["bim"], look);
+    assert!(prefs::set_dotted(&o, "bim", json!({"skin": 3, "hair": "Pigtails!", "color": 1, "wear": "none"})).is_err(), "hair a slug");
+    assert!(prefs::set_dotted(&o, "bim", json!({"skin": 3, "hair": "short", "color": 1})).is_err(), "all four fields");
+    assert!(prefs::set_dotted(&o, "bim", json!({"skin": 99, "hair": "short", "color": 1, "wear": "cap"})).is_err(), "a small index");
+    assert!(prefs::set_dotted(&o, "bim.skin", json!(2)).is_err(), "never a part");
     // the office's map per project (the desktop's /bims): bims.map.<hub id> = a slug, nothing else
     let m = prefs::set_dotted(&o, "bims.map.harness-3abb2bd8", json!("kyoto")).unwrap();
     assert_eq!(m["bims"], json!({"map": {"harness-3abb2bd8": "kyoto"}}));

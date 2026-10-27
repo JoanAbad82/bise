@@ -5,6 +5,7 @@
 // any other process the rack; timer hourglass, watch telescope). Decided from typed state (the
 // hub's kind, a process's url and ports), never from words. Three-free: ids only (bims/render/objects
 // ids.ts); cache.ts draws them. Pure. Owner: nm-side.
+import type { Look } from '@/bims/render/look';
 import type { ObjId } from '@/bims/render/objects/ids';
 import type { Proc } from '@/proto';
 
@@ -32,8 +33,11 @@ export function objectAt(): { left: number; top: number; size: number; rise: num
   return { left: (COIN.disc - size) / 2, top: COIN.base - size, size, rise: COIN.box.h - COIN.base };
 }
 
-/** What a picture shows: an object of the office, a bim's head (an agent's card), or a bubble's own object (bubble3d.ts). */
-export type Thing = { readonly obj: ObjId } | { readonly head: string; readonly main: boolean } | { readonly bubble: BubbleId };
+/**
+ * What a picture shows: an object of the office, a bim's head (an agent's card; main's in his look,
+ * bims/mine.ts, or in `look`: a choice of the bim picker, page bim-pick), or a bubble's own object (bubble3d.ts).
+ */
+export type Thing = { readonly obj: ObjId } | { readonly head: string; readonly main: boolean; readonly look?: Look } | { readonly bubble: BubbleId };
 
 /** Each bubble's object: its own minimal model (bubble3d.ts: a bust, three sheets, an hourglass, a laptop). Pure. */
 export function bubbleThing(b: BubbleId): Thing {

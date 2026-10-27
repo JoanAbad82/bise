@@ -185,4 +185,65 @@ crate::words! { settings:
     keychain_on = "on: your keys and sign-ins are in the macOS keychain.";
     /// keys page: they are in files
     keychain_off = "off: they're in files in ~/.bise. same switch as /keychain in the terminal.";
+    /// general: his own bim's group (page bim-pick): what his bim in the office and on its coin looks like
+    me_label = "Your bim";
+    /// general, your bim: the group's line
+    me_sub = "how you look in the office and on your coin";
+    /// your bim: the skin row
+    me_skin = "Skin";
+    /// your bim: the hair row
+    me_hair = "Hair";
+    /// your bim: the hair colour row
+    me_color = "Hair colour";
+    /// your bim: what it wears on its head
+    me_wear = "On the head";
+    /// your bim: a choice greyed out because the hair can't take it (its tip)
+    me_wear_no = "not with this hair";
+    /// your bim: a skin's tip, light to dark (1 to 6)
+    me_skin_n(n) = "skin {n} of 6";
+    /// a hair cut: today's short
+    hair_short = "short";
+    /// a hair cut
+    hair_afro = "afro";
+    /// a hair cut: a bun on top
+    hair_topbun = "top bun";
+    /// a hair cut
+    hair_long = "long";
+    /// a hair cut
+    hair_ponytail = "ponytail";
+    /// a hair cut
+    hair_braids = "braids";
+    /// a hair cut
+    hair_bob = "bob";
+    /// a hair cut: two buns
+    hair_buns = "two buns";
+    /// a hair cut
+    hair_curls = "curls";
+    /// a hair cut
+    hair_pigtails = "pigtails";
+    /// a hair cut
+    hair_mohawk = "mohawk";
+    /// a hair cut
+    hair_spiky = "spiky";
+    /// a hair colour
+    color_black = "black";
+    /// a hair colour
+    color_dark = "dark brown";
+    /// a hair colour
+    color_brown = "brown";
+    /// a hair colour
+    color_auburn = "auburn";
+    /// a hair colour
+    color_blond = "blond";
+    /// a hair colour
+    color_lilac = "lilac";
+    /// on the head: nothing
+    wear_none = "nothing";
+    /// on the head
+    wear_cap = "cap";
+    /// on the head
+    wear_beanie = "beanie";
+    /// on the head: a headset
+    wear_headphones = "headset";
 }
+

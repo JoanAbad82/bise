@@ -7,6 +7,8 @@ import { useState, type ReactNode } from 'react';
 import type { AppCmd, JsonValue } from '@/proto';
 import { Act, Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/ds';
 import { Accounts } from './accounts';
+import { MeGroup } from './me';
+import { TODAY, lookOf, prefOf } from '@/bims/render/look';
 import { Roles } from './roles';
 import { Approvals } from './approvals';
 import { modelRow, needsSetup } from './hold';
@@ -17,7 +19,7 @@ import { Computer } from './computer';
 import { capsOf, chromeCase, homeOf } from './chrome';
 import { checks, SetupCheck } from './check';
 import { KEY_SECTIONS } from './keys';
-import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
+import { appName, excludedApps, flag, getPref, knownApps, num, str, type Prefs } from './prefs';
 import type { SettingsData, SettingsPorts } from './Settings';
 import type { NotifyAuth } from '@/shared/api';
 import { settings } from '@/proto/words.gen';
@@ -97,6 +99,13 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       const on = Math.max(0, themes.indexOf(theme === 'auto' ? 'system' : (theme as (typeof themes)[number])));
       return (
         <>
+        {/* his bim's look first (page bim-pick, his pick A): the coin and the office follow at once */}
+        <MeGroup
+          look={lookOf(getPref(prefs, 'bim')) ?? TODAY}
+          set={(l) => {
+            setPref('bim', prefOf(l));
+          }}
+        />
         <Group
           title={settings.theme_label}
           testId="settings.general"

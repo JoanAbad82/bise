@@ -7,7 +7,7 @@
 import { Matrix4, Mesh, Object3D, SphereGeometry, Vector3 } from 'three';
 import { type Bim, hangPitch, makeBim } from './bim';
 import { HAT_K, HEAD_R } from './laptop';
-import { CUTS, CUT_HATS, type Cut, type HeadWear, KINDS, type Kind, outfitOf } from './palette';
+import { CUTS, CUT_HATS, type Cut, type HeadWear, KINDS, type Kind, OWN, type Own, outfitOf } from './palette';
 import type { Rot } from './pose';
 import { STYLE } from './style';
 import { deepIn, type Volume, volumeOf } from './outfits.testkit';
@@ -18,8 +18,13 @@ export const CUT_WEARS: readonly { readonly cut: Cut; readonly hat: HeadWear }[]
 /** the name whose colours the sheets and the law dress every cut in (its hair, hat and outfit colours) */
 const NAME = 'bim-3';
 
-export function herBim(cut: Cut, hat: HeadWear, kind: Kind, merge = false): Bim {
-  return makeBim(NAME, false, STYLE, { ...outfitOf(NAME, false), cut, hat, kind }, undefined, merge);
+/** his own bim's cuts (page bim-pick), bare-headed: they take no hat (look.ts wearsFor) */
+export const OWN_WEARS: readonly { readonly cut: Own; readonly hat: HeadWear }[] = OWN.map((cut) => ({ cut, hat: 'bare' }));
+
+export function herBim(cut: Cut | Own, hat: HeadWear, kind: Kind, merge = false): Bim {
+  const own = (OWN as readonly string[]).includes(cut);
+  const o = own ? { cut: null, own: cut as Own } : { cut: cut as Cut };
+  return makeBim(NAME, false, STYLE, { ...outfitOf(NAME, false), ...o, hat, kind }, undefined, merge);
 }
 
 const meshesUnder = (o: Object3D, keep: (m: Mesh) => boolean, stop: ReadonlySet<Object3D> = new Set()): Mesh[] => {
@@ -99,7 +104,7 @@ export interface HairMeasure {
   dispose(): void;
 }
 
-export function hairMeasure(cut: Cut, hat: HeadWear, kind: Kind): HairMeasure {
+export function hairMeasure(cut: Cut | Own, hat: HeadWear, kind: Kind): HairMeasure {
   const b = herBim(cut, hat, kind);
   const head = part(b, 'head');
   b.group.updateMatrixWorld(true);
