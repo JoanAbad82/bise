@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@/proto';
 import type { Activity, Label, Motion, Office as OfficeMap, OfficeRenderer, Pose, Timeline } from './model';
 import { BimsSwitch, labelsSig, Office, tagOf, type Parts } from './Office';
-import { FOLLOW_ZOOM } from './focus';
+import { bimsLit, FOLLOW_ZOOM } from './focus';
 import { bimsView } from './view';
 import { readyMaps } from './maps';
 import { bims as bimsWords } from '@/proto/words_bims.gen';
@@ -319,6 +319,42 @@ describe('the hover card (Gabriel: multi-line, easy to read)', () => {
     expect(screen.getByTestId('app.right.bims.pill.perf').dataset.pill).toBe('asks');
     expect(screen.getByTestId('app.right.bims.card.state.perf').textContent).toBe('working');
     expect(screen.getByTestId('app.right.bims.card.title.perf').textContent).toBe('signup 4.1 s to 0.9 s');
+  });
+  // Gabriel m_48440, designer m_48444: the card over the tile hid the very bim the row points at
+  it('a row hovered lights its bim and never opens its card; a hover on the bim itself does, after the delay', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const r = fakeRenderer();
+      const { parts } = fakeParts(r);
+      const labelsOf = vi.spyOn(parts, 'labelsOf');
+      mount(parts);
+      await flush(2);
+      const last = () => labelsOf.mock.calls.at(-1) as unknown as [readonly { name: string; lit?: boolean }[], { hover: string | null }];
+      act(() => {
+        bimsLit.set({ name: 'perf', from: 'row' });
+      });
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      await flush(2);
+      expect(last()[0].find((f) => f.name === 'perf')?.lit).toBe(true);
+      expect(last()[1].hover).toBeNull();
+      act(() => {
+        bimsLit.set(null, 'row');
+      });
+      // on the bim itself (x < 50 picks perf): its card after the delay
+      const office = screen.getByTestId('app.right.bims');
+      office.getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 120, width: 320, height: 120, x: 0, y: 0, toJSON: () => ({}) });
+      fireEvent.pointerMove(office, { clientX: 10, clientY: 10 });
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      await flush(2);
+      expect(last()[1].hover).toBe('perf');
+    } finally {
+      bimsLit.set(null);
+      vi.useRealTimers();
+    }
   });
 });
 

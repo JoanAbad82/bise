@@ -1,6 +1,6 @@
 // The link between the AGENTS rows and the office (Gabriel: hovering a row lights its bim; bims
 // m_28199): which agent is lit now and from where ('row': the pointer on its row, the office rings
-// its bim and shows its card after the tip's delay; 'bim': the pointer on the bim, its row gets the
+// its bim, no card (m_48440); 'bim': the pointer on the bim, its row gets the
 // rows' hover tint). One store per window, not kept. And the follow camera (Gabriel: with an
 // agent's thread open the office zooms on its bim and follows it as it walks): where to aim and how
 // to get there. Pure but the store. Owner: bims-hover.

@@ -752,24 +752,14 @@ export function Office({
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   const dragged = useRef(false);
   const [dragging, setDragging] = useState(false);
-  // his pointer on an AGENTS row (focus.ts): the halo under its bim at once, its card after the
-  // tip's delay (warm after one closed), so a sweep down the list never flashes a card per row
+  // his pointer on an AGENTS row (focus.ts): the halo under its bim, never its card (Gabriel
+  // m_48440, designer m_48444: the card over the tile hid the very bim the row points at; the row
+  // already says its name). The card comes only from a hover on the bim itself.
   const lit = useBimsLit();
   const rowLit = lit?.from === 'row' ? lit.name : null;
   useEffect(() => {
     live.current.lit = rowLit;
     kickRef.current();
-    clearTimeout(hoverTimer.current);
-    pending.current = rowLit;
-    if (rowLit === null) {
-      setHover(null);
-      return;
-    }
-    if (Date.now() < warmUntil.current) setHover(rowLit);
-    else
-      hoverTimer.current = setTimeout(() => {
-        setHover(rowLit);
-      }, HOVER_MS);
   }, [rowLit]);
   /** a drag's start (a press while zoomed); the holder leaves out its buttons and pills */
   const dragDown = (e: { readonly button: number; readonly pointerId: number; readonly clientX: number; readonly clientY: number }) => {
