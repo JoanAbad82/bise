@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
-import { cardKeyOf, fitRows, rowWords, stripKey } from './stripRows';
+import { cardKeyOf, fitRows, openOnKey, rowWords, stripKey } from './stripRows';
 
 const card = (id: number, rank: number, project = 'acme', question = `q${String(id)}`): Card => ({
   id,
@@ -67,5 +67,15 @@ describe("the keys on an open card (cardKeyOf)", () => {
     expect(cardKeyOf(k('Backspace', { metaKey: true }), c, null)).toEqual({ t: 'close' });
     expect(cardKeyOf(k('Escape'), c, null)).toEqual({ t: 'later' });
     expect(cardKeyOf(k('2', { ctrlKey: true }), c, null)).toBeNull();
+  });
+
+  it('⌘O opens what a card is about, and only on a card about something (openOnKey)', () => {
+    const k = (k_: string, mods: Partial<Record<'metaKey' | 'ctrlKey' | 'altKey', boolean>> = {}) => ({ key: k_, metaKey: false, ctrlKey: false, altKey: false, ...mods });
+    const about: Card = { ...card(1, 0), artifact: { id: 'commode', kind: 'image', title: 'commode' } };
+    expect(openOnKey(k('o', { metaKey: true }), about)).toBe(true);
+    expect(openOnKey(k('O', { metaKey: true }), about)).toBe(true);
+    expect(openOnKey(k('o'), about)).toBe(false);
+    expect(openOnKey(k('o', { metaKey: true, ctrlKey: true }), about)).toBe(false);
+    expect(openOnKey(k('o', { metaKey: true }), { ...card(1, 0), artifact: null, page: null })).toBe(false);
   });
 });

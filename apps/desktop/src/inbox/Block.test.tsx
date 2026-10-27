@@ -9,6 +9,8 @@ import { replay, Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
 import { emitAction } from '@/app/menu';
 import { StoreEdge } from '@/app/edge';
+import { tabEntity } from '@/app/panel/tabs';
+import { panelState } from '@/app/panel/state';
 import type { Card } from '@/proto';
 import { answeringOf, asksNotify, cutWords, headWords, InboxBlock, openInbox, projectWord, type Answering, type Here } from './Block';
 import { PICKED_MS } from './InboxCard';
@@ -191,6 +193,20 @@ describe('the inbox block (b2)', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, bubbles: true }));
     });
     expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
+  });
+
+  it("⌘O with his words in the answer field opens what the card is about in the panel's tab; the card stays open (designer m_47680)", () => {
+    panelState.reset();
+    mount({ project: P, agent: 'perf' }, withCards(2, { 9: { artifact: { id: 'commode', kind: 'image', title: 'commode cannée' } } }));
+    fireEvent.click(screen.getByTestId('inbox.block.row.2'));
+    const field = document.createElement('textarea');
+    field.value = 'the caned one';
+    document.body.appendChild(field);
+    fireEvent.keyDown(field, { key: 'o', metaKey: true });
+    expect(tabEntity(panelState.get().tabs.active)).toEqual({ kind: 'artifact', project: P, id: 'commode' });
+    expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
+    expect(field.value).toBe('the caned one');
+    field.remove();
   });
 
   it('⌘I (openInbox) opens the first item; a notification click (openInbox at a card) that card', () => {

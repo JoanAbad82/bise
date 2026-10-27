@@ -157,4 +157,17 @@ describe("src/ds", () => {
     fireEvent.keyDown(n, { key: "Enter" });
     expect(named).toHaveBeenCalledTimes(2);
   });
+
+  it("a chip that keeps its title's head (designer m_47680): the first letters never cut, the rest apart, the whole title in its tip", () => {
+    const { getByTestId } = render(<ArtChip title="commode cannée sous l'escalier" meta="image · v1" keep={12} testId="k" />);
+    const chip = getByTestId("k");
+    expect(chip.className).toBe("b-artchip fit");
+    expect(chip.querySelector(".b-artchip-head")?.textContent).toBe("↗ commode cann");
+    expect(chip.querySelector(".b-artchip-rest")?.textContent).toBe("ée sous l'escalier");
+    expect(chip.getAttribute("data-tip")).toBe("commode cannée sous l'escalier");
+    expect(chip.querySelector(".b-artchip-meta")?.textContent).toBe("image · v1");
+    // a title as short as the head has no rest
+    const { getByTestId: by } = render(<ArtChip title="plan" keep={12} testId="s" />);
+    expect(by("s").querySelector(".b-artchip-rest")).toBeNull();
+  });
 });

@@ -92,20 +92,37 @@ export interface ArtChipProps {
   state?: "hover";
   onClick?: MouseEventHandler<HTMLButtonElement>;
   testId?: string;
+  /** narrow, a string title keeps its first `keep` letters before '…' and the meta drops whole
+   * before the title is cut, the whole title in its tip (designer m_47680: the inbox card's chip) */
+  keep?: number;
 }
 /**
  * An artifact as one chip (desktop-agents-bar §5): its glyph and title in --c-accent on a 10 %
  * accent tint, r 6, 24 px high, 8 px sides; kind and version in the same pink at 70 %; hover 16 %.
  */
-export function ArtChip({ title, glyph = "↗", meta, open = false, state, onClick, testId }: ArtChipProps) {
+export function ArtChip({ title, glyph = "↗", meta, open = false, state, onClick, testId, keep }: ArtChipProps) {
+  const fit = keep !== undefined && typeof title === "string" ? keptHead(title, keep) : null;
   return (
-    <button type="button" className={cx("b-artchip", open && "open", state === "hover" && "is-hover")} onClick={onClick}
-      data-testid={testId} data-open={open || undefined}>
-      <span className="b-artchip-title">{glyph} {title}</span>
+    <button type="button" className={cx("b-artchip", open && "open", state === "hover" && "is-hover", fit !== null && "fit")} onClick={onClick}
+      data-testid={testId} data-open={open || undefined} {...(fit !== null ? tipAttrs(title as string) : {})}>
+      {fit === null ? (
+        <span className="b-artchip-title">{glyph} {title}</span>
+      ) : (
+        <span className="b-artchip-title">
+          <span className="b-artchip-head">{`${glyph} ${fit.head}`}</span>
+          {fit.rest !== "" && <span className="b-artchip-rest">{fit.rest}</span>}
+        </span>
+      )}
       {meta != null && meta !== "" && <span className="b-artchip-meta">{meta}</span>}
       {open && <span className="b-artchip-open">open</span>}
     </button>
   );
+}
+
+/** A title's first `n` letters (never cut) and the rest (cut with '…' when narrow). Pure. */
+export function keptHead(title: string, n: number): { readonly head: string; readonly rest: string } {
+  const cs = Array.from(title);
+  return { head: cs.slice(0, n).join(""), rest: cs.slice(n).join("") };
 }
 
 export interface ArtNameProps {

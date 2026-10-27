@@ -27,7 +27,7 @@ import { isUpdate } from '@/shared/update';
 import { askedBiseUpdate } from '@/app/UpdateLine';
 import { freeWords, markOf, pickWaits, takesWords } from './model';
 import { withRefused, type InboxItem } from './listed';
-import { cardKeyOf, fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
+import { cardKeyOf, fitRows, openOnKey, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
 import { ArtWords } from './artWords';
 import { InboxZero, useInboxZero } from './Zero';
 import { pruneCardDrafts } from './drafts';
@@ -678,6 +678,14 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
         openTo(cardKey(next));
         return;
       }
+      // ⌘O: what it is about in the panel, even with his words in the answer field (designer m_47680):
+      // the card says it there, and ⌘O types nothing
+      if (openOnKey(e, openCard)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openPage(openCard);
+        return;
+      }
       if (typing(e.target)) return;
       // ↑↓ and ctrl+↑↓: the previous / next item, no wrap (the TUI's arrow_mods: none or ctrl)
       if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.metaKey && !e.altKey && !e.shiftKey) {
@@ -696,7 +704,6 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
       if (k.t === 'later') openTo(null);
       else if (k.t === 'on') onTo(k.n);
       else if (k.t === 'pick') pick(openCard, k.n);
-      else if (k.t === 'page') openPage(openCard);
       else close(openCard);
     };
   });

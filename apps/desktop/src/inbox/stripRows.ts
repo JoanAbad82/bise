@@ -97,14 +97,18 @@ export function rowWords(c: Card): RowWords {
   return { who, cmd: first !== '', what: lines.length > 1 ? inbox.cmd_lines({ first, n: lines.length }) : first, note };
 }
 
-type CardKey = { t: 'pick' | 'on'; n: number } | { t: 'close' } | { t: 'later' } | { t: 'page' };
+type CardKey = { t: 'pick' | 'on'; n: number } | { t: 'close' } | { t: 'later' };
+
+/** ⌘O on an open card about an artifact: open it beside (notif-artifact), his words typed or not
+ * (designer m_47680: ⌘O types nothing). Pure. */
+export function openOnKey(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey'>, c: Pick<Card, 'artifact' | 'page'>): boolean {
+  return e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'o' && aboutOf(c) != null;
+}
 
 /** A key on the open card (no words typed): its act, or none. Pure. */
 export function cardKeyOf(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>, c: Card, on: number | null): CardKey | null {
   if (e.key === 'Escape') return { t: 'later' };
   if (e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Backspace') return { t: 'close' };
-  // ⌘O: a page's item opens its page beside (notif-artifact); no bare letter takes an empty composer
-  if (e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'o' && aboutOf(c) != null) return { t: 'page' };
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
   const ns = c.options.map((o) => o.n);
   if (/^[1-9]$/.test(e.key) && ns.includes(Number(e.key))) return { t: 'pick', n: Number(e.key) };

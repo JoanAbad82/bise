@@ -256,13 +256,16 @@ function shownAgent(agent: string): string {
   return agent === 'main' ? 'bise' : agent;
 }
 
+/** Narrow, the chip's title keeps this many letters before '…'; its meta drops first (designer m_47680). */
+export const CHIP_KEEP = 12;
+
 /** What it is about under the question (designer m_26560, m_26776; card-links: any artifact): the
  * artifact chip, '⌘O open beside' at its right. */
 function PageChip({ about, open, id }: { about: ArtLink; open: (() => void) | undefined; id: string }) {
   const w = aboutWords(about);
   return (
     <div className="ic-page" data-testid={`${id}.page`}>
-      <ArtChip title={w.title} meta={w.meta} {...(open ? { onClick: open } : {})} testId={`${id}.page.chip`} />
+      <ArtChip title={w.title} meta={w.meta} keep={CHIP_KEEP} {...(open ? { onClick: open } : {})} testId={`${id}.page.chip`} />
       {open && (
         <Act onClick={open} testId={`${id}.page.open`}>
           <Kbd>⌘O</Kbd>
