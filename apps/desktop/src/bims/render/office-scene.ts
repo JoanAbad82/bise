@@ -15,6 +15,7 @@ import { cameraStart, viewPoint, flightAt, glideAt, makePlane, planFlight, planG
 import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, REACH_S, awayOf, heldAt } from './catch';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { idleFrame, idleRig } from './idle';
+import { aliveOf, newCrowd } from './alive';
 import { restAt, type NapRest } from './nap';
 import { skateRig } from './skate';
 import { climbRig } from './climb';
@@ -224,6 +225,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   const rigs = new Map<string, Rig>();
   /** s from the last frame until the next resting bim's idle move (render/idle.ts); null: none */
   let wakeIdle: number | null = null;
+  /** the standing bims' stances (render/alive.ts): no two start a change at once */
+  const crowd = newCrowd();
   /** his planes in flight, by bim and when it left ('name@12.30'): the mesh, its plan; each ends on its own catch */
   /** each flight's plan: the app's (zigzag and loop) or the film's paper glide (pose.plane.glide) */
   const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan | GlidePlan; glide: boolean; big: number }>();
@@ -630,6 +633,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       // the resting bims' idle moves (render/idle.ts): none under reduced motion or drawn too small
       const { plan: idle, wake } = idleFrame(frames, t, { reduced: look.reduced, scale: fit.scale, bedAt });
       wakeIdle = wake;
+      crowd.begin(t);
       for (const f of frames) {
         const b = ensureBim(f.name, f.main);
         b.detail(near);
@@ -641,7 +645,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         // or a climber on the gym's wall (climb.ts), the same way
         const skater = look.reduced ? null : park ? skateRig(f.name, f.pose, park, b.outfit.phase) : gym ? climbRig(f.name, f.pose, gym) : null;
         const still = idle.get(f.name);
-        const posed = rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt });
+        // a standing bim breathes and shifts its weight (render/alive.ts), under its rare idle moves
+        const posed = aliveOf(crowd, f, rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt }), t, { reduced: look.reduced, scale: fit.scale, skater: skater !== null });
         const rig = eggRig(skater ?? (still ? idleRig(posed, still) : posed), f.egg ?? null);
         b.apply(rig);
         if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) {
@@ -659,6 +664,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         motion = louder(motion, rig.motion);
         onRig?.(f, rig, skater !== null);
       }
+      crowd.end();
       for (const [name, b] of bims) if (!seen.has(name)) b.group.visible = false;
       shownLast.clear();
       for (const name of seen) shownLast.add(name);

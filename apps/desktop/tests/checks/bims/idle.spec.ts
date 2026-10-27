@@ -5,7 +5,9 @@
 //       0 WebGL frames; its only motion is the sleepers' z's (a CSS loop, 7.5 fps at most);
 //   (2) the office closed: no renderer, no frame, no animation of the bims' left running;
 //   (3) the window hidden: 0 frames and the z's paused, the office open with typing bims;
-//   (4) the office open with typing bims (the fixture's): the loop's ~8 fps, never the display's.
+//   (4) the office open with typing bims (the fixture's): the loop's ~8 fps, never the display's;
+//   (5) a crowd of done bims standing at rest: they breathe at the loop's ~8 fps (bim-alive), never
+//       the display's; under reduced motion 0 frames.
 // It also writes what else animates in the window (document.getAnimations()) to
 // .harness-cache/bims-shots/idle-animations.json: what keeps the compositor busy when it isn't
 // the bims. Owner: bims-fix.
@@ -105,5 +107,30 @@ test('(3)(4) typing bims loop at ~8 fps; hidden, 0 frames and the z\'s paused', 
     await setHidden(s.page, false);
   } finally {
     await s.close();
+  }
+});
+
+/** done bims, more than the terrace has deck chairs: a crowd standing at rest (his m_48065's shot); a new office (stage 0: no park, so none goes skating) */
+const NEW = { jobs_done: 0, days_used: 0, artifacts_made: 0 };
+const CROWD = snap([
+  agent('main', { main: true, place_id: '', status: 'idle' }),
+  ...['signup-perf', 'dark-mode', 'login-test', 'nightly', 'pricing', 'empty-state', 'onboarding', 'deploy', 'cookie', 'search', 'changelog', 'release'].map((n) => agent(n, { status: 'done' })),
+]);
+
+test('(5) a crowd standing at rest breathes at the loop\'s ~8 fps (bim-alive); reduced motion, 0 frames', async () => {
+  for (const reduced of [false, true]) {
+    const { s } = await open(CROWD, { reduced, growth: NEW });
+    try {
+      await showOffice(s);
+      await settle(s, 800, 8000);
+      const fps = (await framesIn(s, IDLE_MS)) / (IDLE_MS / 1000);
+      if (reduced) expect(fps, 'reduced motion: a resting crowd draws nothing').toBe(0);
+      else {
+        expect(fps, 'standing bims: never still').toBeGreaterThan(4);
+        expect(fps, 'standing bims: the loop, ~8 fps, never the display rate').toBeLessThan(12);
+      }
+    } finally {
+      await s.close();
+    }
   }
 });
