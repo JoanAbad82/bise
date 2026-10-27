@@ -10,6 +10,7 @@ import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 import { side } from '@/proto/words_side.gen';
 import { artifact, artifacts, card, ev, projects, row } from '../../../tests/feature/inputs';
+import { bimsLit } from '@/bims/focus';
 import { createRouter, RouterContext } from '../router';
 import { emitAction } from '../menu';
 import { HINT_HOLD_MS } from '../held';
@@ -723,6 +724,41 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(v.getByTestId('app.outer.world.panel').getAttribute('aria-label')).toBe(side.tile_panel);
     fireEvent.click(v.getByTestId('app.outer.world.panel'));
     expect(opened).toEqual([{ kind: 'office', project: ACME }]);
+  });
+
+  it('the open agent\'s bim is followed (his m_47261): another agent picked, the tile goes to it; main\'s thread, the whole office', () => {
+    tall(900);
+    const { router } = side3d(1440);
+    expect(office.follow.at(-1)).toBe('perf');
+    act(() => {
+      router.go({ screen: 'thread', project: ACME, agent: 'docs' });
+    });
+    expect(office.follow.at(-1)).toBe('docs');
+    act(() => {
+      router.go({ screen: 'thread', project: ACME, agent: 'main' });
+    });
+    expect(office.follow.at(-1)).toBeNull();
+  });
+
+  it('a bim hovered tints its row in the card, a row hovered lights its bim (bims/focus, his m_47261)', () => {
+    tall(900);
+    const { v } = side3d(1440);
+    const row = v.getByTestId(`app.outer.agents.${ACME}.docs`);
+    expect(row.hasAttribute('data-lit')).toBe(false);
+    act(() => {
+      bimsLit.set({ name: 'docs', from: 'bim' });
+    });
+    expect(row.hasAttribute('data-lit')).toBe(true);
+    act(() => {
+      bimsLit.set(null, 'bim');
+    });
+    expect(row.hasAttribute('data-lit')).toBe(false);
+    fireEvent.pointerEnter(row);
+    expect(bimsLit.get()).toEqual({ name: 'docs', from: 'row' });
+    // the row lit from itself takes no tint of its own: its hover already shows
+    expect(row.hasAttribute('data-lit')).toBe(false);
+    fireEvent.pointerLeave(row);
+    expect(bimsLit.get()).toBeNull();
   });
 
   it('a tall tile folds nothing: each section keeps its rows, the card scrolls as a whole (designer m_46693)', () => {

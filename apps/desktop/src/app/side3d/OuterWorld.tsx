@@ -1,7 +1,8 @@
 // src/app/side3d · the bims' world over the outer card (page outer-world v2, his pick #799): the
 // tile, the card's width (layout OUTER_W, 292) and as high as he left it (140 by default), r 12, the card's ring and e-1, its top
 // 12 under the bar (tilestate OUTER_TOP, inline; his m_46677); the project's office at its fit, live: a click on a bim opens its
-// thread, a pinch zooms inside, the office's own 'Loft ⌄' chip bottom left and '⤢ fit' bottom right
+// thread; an agent's thread open (from the sidebar, the card or the bim), the camera centres on its bim and follows it, back to the
+// fit on main's (bims/focus followOf, his m_47261; his pinch or drag stops it until he opens another); a pinch zooms inside, the office's own 'Loft ⌄' chip bottom left and '⤢ fit' bottom right
 // while zoomed. On hover two 24 px buttons top right: '⤢' the world in the panel's Office tab, '×'
 // hides the tile (tilestate.ts keeps it per window). Under it, the 8 px gap to the card is the
 // handle: row-resize, a 2 px text-3 line after 120 ms of hover (the panel's signed handle), a drag
@@ -24,6 +25,8 @@ export interface OuterTileProps {
   readonly cards: readonly Card[];
   /** its height now, css px */
   readonly h: number;
+  /** the open agent's bim, the camera centres on it and follows it (bims/focus followOf); null: the whole office */
+  readonly follow: string | null;
   /** a click on a bim: its thread */
   readonly onOpen: (agent: string) => void;
   /** his pick in the map chip */
@@ -35,11 +38,11 @@ export interface OuterTileProps {
 }
 
 /** The tile: the office, '⤢' and '×' on hover. */
-export function OuterTile({ project, name, agents, cards, h, onOpen, onPickMap, onPanel, onHide }: OuterTileProps) {
+export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide }: OuterTileProps) {
   return (
     <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={side.tile_name({ project: name })} data-testid="app.outer.world">
       <span className="s3-otile-office">
-        <WorldOffice project={project} agents={agents} cards={cards} fill onOpen={onOpen} onPickMap={onPickMap} />
+        <WorldOffice project={project} agents={agents} cards={cards} fill follow={follow} onOpen={onOpen} onPickMap={onPickMap} />
       </span>
       <span className="s3-otile-acts">
         <Press look="s3-otile-btn" aria-label={side.tile_panel} {...tipAttrs(side.tile_panel)} onClick={onPanel} data-testid="app.outer.world.panel">⤢</Press>

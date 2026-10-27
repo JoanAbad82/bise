@@ -56,6 +56,7 @@ import { useAgents, useCards, useProjects, useStore } from '@/store';
 import { useAllArtifacts } from '@/artifacts';
 import { AddButton, useAddDropOn, useAddPlace } from '@/artifacts/Drops';
 import { useAllScheduled } from '@/scheduled';
+import { followOf } from '@/bims/focus';
 import { mapPrefKey } from '@/bims/maps/ids';
 import { isRunning, useAllProcesses } from '@/running';
 import { side } from '@/proto/words_side.gen';
@@ -499,7 +500,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       <>
         {!tile.hidden && (
           <>
-            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH}
+            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH} follow={followOf(route, project, ownLive)}
               onOpen={(agent) => {
                 router.go({ screen: 'thread', project, agent });
               }}
@@ -523,7 +524,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
         }} {...(tile.hidden ? { onCube: () => {
           outerWorld.hide(false);
         } } : {})}>
-          <OuterAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} here={here} now={now} groupOf={groupOf} onOpen={openRow} onOpenPr={openPr} />
+          <OuterAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} here={here} now={now} groupOf={groupOf} onOpen={openRow} onOpenPr={openPr} bims={tile.hidden ? null : project} />
         </OuterSection>
         <OuterList id="artifacts" name={bubbleName('artifacts')} count={String(artifacts.length)} onAll={() => {
           router.go({ screen: 'artifacts', project: scope });

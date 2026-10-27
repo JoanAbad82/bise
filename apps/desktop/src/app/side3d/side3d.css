@@ -1428,7 +1428,8 @@
   border-radius: var(--r-2);
   text-align: left;
 }
-.s3-orow-open:hover {
+.s3-orow-open:hover,
+.s3-orow[data-lit]:not([data-here]) .s3-orow-open {
   background: var(--c-hover);
 }
 .s3-orow[data-here] {

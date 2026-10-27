@@ -5,12 +5,14 @@
 // style: the section's 3D object at 20, its name, its count, 'all ›'. AGENTS: one line of 28 each,
 // in the hub's rank: its mark (the bar's language, ⌥N while ⌥ is held, an ask's in the accent),
 // its head at 20, its name, its age while it works or asks, its PR, its ψ when it has its own
-// worktree; idle and done step back. A click opens its thread; an ask's click opens it in place,
+// worktree; idle and done step back. A row of the tile's project and its bim light each other (bims/focus,
+// his m_47261): the row hovered rings its bim, the bim hovered gives its row the hover tint. A click opens its thread; an ask's click opens it in place,
 // its options and 'answer…' / 'write to perf…' under it. The other sections keep the floats' rows
 // (FlyoutLists). Each section shows its first rows (Agents 10, the others 5), then '+ N more' adds
 // 50 (outerrows.ts); an empty one keeps its empty line. The card scrolls as a whole, a 16 fade at
 // the edge that has more, macOS's overlay scrollbar. Owner: nm-side.
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { bimsLit, useBimsLit } from '@/bims/focus';
 import { flushSync } from 'react-dom';
 import type { Card } from '@/proto';
 import { AppIcon, Press, tipAttrs } from '@/ds';
@@ -69,6 +71,8 @@ export interface OuterAgentsProps {
   readonly groupOf?: (project: string) => string | undefined;
   readonly onOpen: (r: BarRow) => void;
   readonly onOpenPr: (r: BarRow) => void;
+  /** the project whose office the tile shows (its rows and its bims light each other, bims/focus); null: no tile */
+  readonly bims: string | null;
 }
 
 /** The agents' rows past their worktree heads: each with its PR (its own, or its shared worktree's) and whether it works in a worktree. Pure. */
@@ -83,11 +87,18 @@ export function outerRows(live: readonly BarRow[], agents: readonly ProjAgent[])
 }
 
 /** AGENTS in the card: its first 10 lines, then '+ N more' adds 50. */
-export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpen, onOpenPr }: OuterAgentsProps) {
+export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpen, onOpenPr, bims }: OuterAgentsProps) {
   const rows = outerRows(live, agents);
   const byKey = new Map(agents.map((x) => [`${x.project}/${x.a.name}`, x.a]));
   const [open, setOpen] = useState<string | null>(null);
   const { shown, more, less } = useShown(FIRST_AGENTS);
+  // the row <-> bim link (bims/focus): a bim hovered tints its row; a row hovered lights its bim
+  const lit = useBimsLit();
+  const litBim = lit?.from === 'bim' ? lit.name : null;
+  useEffect(() => () => {
+    bimsLit.set(null, 'row');
+  }, []);
+  const linked = (r: BarRow): boolean => bims !== null && r.project === bims && r.agent !== undefined && r.main !== true;
   return (
     <div className="s3-orows" data-testid="app.outer.agents.rows">
       {rows.slice(0, shown).map(({ r, pr, wt }) => {
@@ -96,6 +107,10 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
         return (
           <AgentLine key={r.key} r={r} pr={pr} wt={wt} job={a === undefined ? r.sub : roleWords(a.note || a.title || a.purpose)} card={card} at={at} now={now}
             here={here.project === r.project && here.agent === r.agent} group={groupOf?.(r.project)} open={open === r.key}
+            lit={linked(r) && r.agent === litBim}
+            onLit={linked(r) ? (on) => {
+              bimsLit.set(on ? { name: r.agent ?? '', from: 'row' } : null, 'row');
+            } : undefined}
             onToggle={() => {
               setOpen((o) => (o === r.key ? null : r.key));
             }} onOpen={onOpen} onOpenPr={onOpenPr} />
@@ -156,10 +171,14 @@ interface LineProps {
   readonly onToggle: () => void;
   readonly onOpen: (r: BarRow) => void;
   readonly onOpenPr: (r: BarRow) => void;
+  /** its bim is hovered in the tile: the rows' hover tint */
+  readonly lit: boolean;
+  /** the pointer comes on the row (true) or leaves it: its bim lights; none, the row has no bim in the tile */
+  readonly onLit: ((on: boolean) => void) | undefined;
 }
 
 /** One agent's line: mark · head · name · age · PR · ψ; an ask opens in place under it. */
-function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle, onOpen, onOpenPr }: LineProps) {
+function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle, onOpen, onOpenPr, lit, onLit }: LineProps) {
   const store = useStore();
   const menu = useEntityMenu({ kind: 'agent', project: r.project, agent: r.agent ?? '' });
   const st = r.state;
@@ -171,7 +190,13 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
   const b = card === undefined ? null : askButtons(card);
   return (
     <div className="s3-orow" data-asks={asks || undefined} data-here={here || undefined} data-back={st?.back === true || undefined} data-open={open || undefined}
-      onContextMenu={menu.onContextMenu} data-testid={id}>
+      data-lit={lit || undefined} onContextMenu={menu.onContextMenu} data-testid={id}
+      onPointerEnter={onLit && (() => {
+        onLit(true);
+      })}
+      onPointerLeave={onLit && (() => {
+        onLit(false);
+      })}>
       <Press look="s3-orow-open" aria-label={r.title} aria-expanded={asks ? open : undefined} {...tipAttrs(job === '' ? r.name : `${r.name} · ${job}`, undefined, 'left')} onClick={() => {
         if (asks) onToggle();
         else onOpen(r);

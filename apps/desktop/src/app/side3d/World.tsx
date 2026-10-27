@@ -176,10 +176,12 @@ interface OfficeCam {
   readonly onPickMap?: (map: MapId) => void;
   /** the office fills its holder's box, whole and centred (the outer tile) */
   readonly fill?: boolean;
+  /** the bim the camera follows (the outer tile: the open agent's, bims/focus followOf); none: the whole map (the coins' world) */
+  readonly follow?: string | null;
 }
 
-/** The project's office as the world draws it: its map, its plugins' objects, its growth; never a follow camera (the whole map). */
-export function WorldOffice({ project, agents, cards, cameraFrom = null, headRef, onZoomed, refit, onOpen, onPickMap, fill = false }: OfficeOf & OfficeCam) {
+/** The project's office as the world draws it: its map, its plugins' objects, its growth; a follow camera only when given one. */
+export function WorldOffice({ project, agents, cards, cameraFrom = null, headRef, onZoomed, refit, onOpen, onPickMap, fill = false, follow = null }: OfficeOf & OfficeCam) {
   const places = usePlaces(project);
   const growth = useGrowth(project);
   const prefs = usePrefs() as Prefs | null;
@@ -189,7 +191,7 @@ export function WorldOffice({ project, agents, cards, cameraFrom = null, headRef
   const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
   return (
     <Office project={project} agents={agents} cards={cards} places={places} objects={objects} growth={growth} map={map}
-      parts={bimsParts} transparent fill={fill} onOpen={onOpen ?? (() => undefined)} {...(onPickMap === undefined ? {} : { onPickMap })} follow={null} cameraFrom={cameraFrom} headRef={headRef} onZoomed={onZoomed} refit={refit} />
+      parts={bimsParts} transparent fill={fill} onOpen={onOpen ?? (() => undefined)} {...(onPickMap === undefined ? {} : { onPickMap })} follow={follow} cameraFrom={cameraFrom} headRef={headRef} onZoomed={onZoomed} refit={refit} />
   );
 }
 
