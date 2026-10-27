@@ -36,9 +36,13 @@ const jsonl = (file: string) => readFileSync(file, 'utf8').split(String.fromChar
 const world = process.env.BISE_HARNESS_CORE_EVENTS;
 // The fixtures' `broken` (a core with no runtime: no hub can start) is not part of the healthy
 // world: a test that wants it sends it (app/keep, app/core-line went red with its ▲ line on).
+// Nor the fixtures' `machine_update` (a bise update 'updating', e2b68728b): a still machine updates
+// nothing, and its running line outranks the core's done one in the one status pill, so it hid
+// 'bise is back.' (native/crash red since e2b68728b, bisected by desk-checks).
+const NOT_HEALTHY = new Set(['broken', 'machine_update']);
 const all = world === 'none' ? []
   : world ? jsonl(world)
-  : [...jsonl(path.join(FIXTURES, 'core_ev.jsonl')), ...jsonl(path.join(FIXTURES, 'hub_ev.jsonl'))].filter((l) => parse(l).ev !== 'broken');
+  : [...jsonl(path.join(FIXTURES, 'core_ev.jsonl')), ...jsonl(path.join(FIXTURES, 'hub_ev.jsonl'))].filter((l) => !NOT_HEALTHY.has(parse(l).ev ?? ''));
 // A restart (FakeCore.exit: the app's main spawns the stub again) sends the start world again, but
 // never the hub's one-shot ask: a `confirm` goes to the connection whose command asked it, and a
 // real core restart is a new connection, so it is gone (app/keep-all :166 red: the replayed
