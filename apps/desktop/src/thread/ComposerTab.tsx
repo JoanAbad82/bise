@@ -6,19 +6,23 @@
 // the context ring, or the screen's own words ('esc to bise instead', the approvals flash). His
 // words answering a card (or another agent's @name, an open artifact): the label alone in the
 // accent, '↳ answering search · …' (answerFit). His words to an agent that is not main: 'to perf'
-// first, in the accent, always kept (his ask m_44704). Items that don't fit go whole (tab.ts stripFit),
-// measured on a resize or new words, never per keystroke (the composer is memoised). Owner:
-// nm-composer.
+// first, in the accent, always kept (his ask m_44704); main's 'to bise' text-2. That name is a
+// picker of the project's live agents (his m_47126, designer m_47129: tab.ts agentPicks); a bare
+// strip's name stays a label (the card or the artifact decides who). Items that don't fit go whole,
+// the project first (tab.ts stripFit), measured on a resize or new words, never per keystroke (the
+// composer is memoised). Owner: nm-composer.
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Agent } from '@/proto';
 import { AppIcon, PickerPop, PickerTrigger, Ring, RowMark, tipAttrs } from '@/ds';
-import { useFlow, usePlaces, useProjects } from '@/store';
+import { useAgents, useFlow, usePlaces, useProjects } from '@/store';
 import { placeOf as placeOfAgent, tilde, worktreeParts } from '@/app/barplaces';
-import { WorkingMark } from '@/app/Marks';
+import { AgentSign, WorkingMark } from '@/app/Marks';
 import { useNow } from '@/app/clock';
 import { composer } from '../proto/words.gen';
-import { answerFit, contextOf, RING_CLEAR_PCT, ringTip, stripFit, stripState, tabPlace, type StripFit, type TabPlace, type TabWords } from './tab';
+import { agentPicks, answerFit, contextOf, RING_CLEAR_PCT, ringTip, stripFit, stripState, tabPlace, type AgentPick, type StripFit, type TabPlace, type TabWords } from './tab';
 import { waitLen } from './wake';
+import { composerWords } from './head';
+import { shownName } from '@/agents/model';
 
 /** his home folder, for '~/…' in the tips (main's window.bise.home) */
 const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
@@ -49,6 +53,14 @@ export function useTabWords(label: string, place: TabPlace | undefined, context:
 export interface StripProject {
   readonly id: string;
   readonly onPick?: ((project: string) => void) | undefined;
+}
+
+/** The strip's addressee: the agent his words go to ('to perf', whatever the label's rest says),
+ *  and what picking another one does (none: a label, as under an open artifact, which decides who). */
+export interface StripAgent {
+  readonly project: string;
+  readonly agent: string;
+  readonly onPick?: ((agent: string) => void) | undefined;
 }
 
 const ALL: StripFit = { project: true, state: true, end: true };
@@ -149,11 +161,76 @@ function ProjectItem({ project, shown, testId }: { project: StripProject; shown:
   );
 }
 
-export function ComposerTab({ words, mark, end, project, bare = false, newPlace = false, to = false, at, testId }: {
+/** The addressee's segment ('to perf ⌄', his m_47126): the accent when his words go to an agent
+ *  that is not main, main's text-2; with `onPick`, a button that opens the project's live agents
+ *  (designer m_47129: bise first, each with its state's sign, the current one checked). Always kept. */
+function AgentItem({ label, accent, who, testId }: { label: string; accent: boolean; who: StripAgent | undefined; testId: string }) {
+  const agents = useAgents(who?.project ?? '');
+  const now = useNow();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const cls = accent ? 'it to acc' : 'it to';
+  const pick = who?.onPick;
+  if (who === undefined || pick === undefined) {
+    return (
+      <span className={cls} data-item="to" data-testid={`${testId}.to`}>
+        <span className="nm">{label}</span>
+      </span>
+    );
+  }
+  const rows = open ? agentPicks(agents, now) : [];
+  return (
+    <>
+      <PickerTrigger ref={trigger} extra={`${cls} cmp-ctx-pick`} open={open} label={composer.ctx_agent_pick({ agent: label.replace(/^to /u, '') })}
+        tip={composer.ctx_agent_pick({ agent: label.replace(/^to /u, '') })} testId={`${testId}.to`}
+        onClick={() => {
+          setOpen((o) => !o);
+        }}>
+        <span className="nm">{label}</span>
+      </PickerTrigger>
+      {open && (
+        <PickerPop
+          anchor={trigger}
+          box=".box"
+          side="above"
+          align="start"
+          title={composer.ctx_agents}
+          groups={[{ id: 'agents', rows: rows.map((r) => ({ id: r.name, name: r.shown, text: r.shown, current: r.name === who.agent, ...(r.sign === '' ? {} : { glyph: <PickSign sign={r.sign} testId={`${testId}.to.pick.${r.name}.sign`} /> }), testId: `${testId}.to.pick.${r.name}` })) }]}
+          onPick={(id) => {
+            setOpen(false);
+            if (id !== who.agent) pick(id);
+          }}
+          onClose={() => {
+            setOpen(false);
+          }}
+          testId={`${testId}.to.menu`}
+        />
+      )}
+    </>
+  );
+}
+
+/** An agent's state in the picker's glyph column, as the sidebar draws it: main's breath, the ask
+ *  mark in the accent, the alert, the check; a pause's '…' as its text. */
+function PickSign({ sign, testId }: { sign: Exclude<AgentPick['sign'], ''>; testId: string }) {
+  if (sign === '…') return <span data-testid={testId} data-sign={sign}>…</span>;
+  const mark = sign === '∿' ? 'works' : sign === '?' ? 'asks' : sign === '✗' ? 'failed' : 'done';
+  return (
+    <span className="cmp-ctx-sign" data-testid={testId} data-sign={sign}>
+      <AgentSign mark={mark} testId={testId} />
+    </span>
+  );
+}
+
+export function ComposerTab({ words, mark, end, project, who, bare = false, newPlace = false, to = false, asks = false, at, testId }: {
   words: TabWords;
   /** his words go to an agent that is not main (pinkState's quiet, or an open item only its options
    *  decide): 'to perf' first, in the accent; bare, the label's rest text-3 (designer m_44890) */
   to?: boolean;
+  /** bare, an open question from main: the box stays plain, the label in the accent (designer m_47129) */
+  asks?: boolean;
+  /** the addressee and its picker (not bare); none: its name a label */
+  who?: StripAgent | undefined;
   /** after the label's first part (bare): the addressee's working gust */
   mark?: ReactNode;
   /** the right end instead of the context ring */
@@ -210,9 +287,11 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
         return;
       }
       setEndIn(true);
-      const w = { project: nat(q('[data-item="project"]')), state: nat(q('[data-item="state"]')), branch: nat(q('[data-item="branch"]')), end: nat(q('[data-item="end"]')) };
+      // the project's item is its picker's button when it has one: read by its test id, never a
+      // data-item the ds button doesn't carry (his m_47126: the fit never dropped it)
+      const w = { project: nat(q(`[data-testid="${testId}.project"]`)), state: nat(q('[data-item="state"]')), branch: nat(q('[data-item="branch"]')), end: nat(q('[data-item="end"]')) };
       // 'to perf' always stays: the rest fits in what it leaves
-      const toEl = q('[data-item="to"]');
+      const toEl = q(`[data-testid="${testId}.to"]`);
       const next = stripFit({ avail: inner - (toEl === null ? 0 : nat(toEl) + gap), gap, ...w });
       setFit((f) => (f.project === next.project && f.state === next.state && f.end === next.end ? f : next));
       // the label is only drawn bare; a plain strip never cuts one
@@ -225,7 +304,7 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
     return () => {
       ro.disconnect();
     };
-  }, [key, words.label, words.whole, bare, to]);
+  }, [key, words.label, words.whole, bare, to, testId]);
   const endEl =
     end !== undefined ? (
       <span className={endIn && fit.end ? 'end' : 'end gone'} data-item="end" data-testid={`${testId}.end`} aria-hidden={!(endIn && fit.end) || undefined}>
@@ -246,7 +325,7 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   if (bare) {
     return (
       <span ref={ref} className="cmp-ctx bare" data-testid={testId}>
-        <span className={to ? 'lbl to' : 'lbl'} data-item="label" data-testid={`${testId}.to`}>
+        <span className={to ? 'lbl to' : asks ? 'lbl ask' : 'lbl'} data-item="label" data-testid={`${testId}.to`}>
           <MarkedLabel label={cut ?? words.label} mark={mark} />
         </span>
         {endEl}
@@ -259,13 +338,10 @@ export function ComposerTab({ words, mark, end, project, bare = false, newPlace 
   const lands = flow === 'trunk' && branch !== undefined ? composer.ctx_lands({ branch: projectBranch ?? 'main' }) : null;
   return (
     <span ref={ref} className="cmp-ctx" data-testid={testId}>
-      {/* his words go to an agent that is not main: 'to perf' first, in the accent, as main's tab
-          had it (agent-target, designer m_28208; his ask m_44704: clear at a glance) */}
-      {to && (
-        <span className="it to" data-item="to" data-testid={`${testId}.to`}>
-          <span className="nm">{words.label}</span>
-        </span>
-      )}
+      {/* whom his words go to, first: 'to perf' in the accent, as main's tab had it (agent-target,
+          designer m_28208; his ask m_44704: clear at a glance), main's 'to bise' text-2; a picker
+          of the project's agents (his m_47126) */}
+      <AgentItem label={who === undefined ? words.label : composerWords(shownName(who.agent)).label} accent={to} who={who} testId={testId} />
       {project !== undefined && <ProjectItem project={project} shown={fit.project} testId={testId} />}
       {/* where 'local' was (his m_44719: the only option, no control): the addressee's state while
           it runs, main's breath and how long, or the ask mark in the accent; nothing when idle */}

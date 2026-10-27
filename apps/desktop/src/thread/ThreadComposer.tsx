@@ -394,7 +394,14 @@ export const ThreadComposer = memo(function ThreadComposer({
     router.go({ screen: 'thread', project: p, agent: MAIN });
   }, [router]);
   const stripProject = useMemo(() => strip ?? { id: project, onPick: goProject }, [strip, project, goProject]);
-  const tabEl = <ComposerTab words={tabWords} bare={bare || atTo !== null} to={toAccent(ps, atTo, answer)} at={me} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} project={stripProject} newPlace={placeOnly || home} testId="composer.ctx" />;
+  // the strip's addressee: its picker opens another agent's thread of this project (his m_47126);
+  // the draft stays with the thread it was typed in (its own target). Under an open artifact the
+  // artifact decides who: its name a label (designer m_47129)
+  const aboutOpen = about !== undefined;
+  const stripAgent = useMemo(() => ({ project, agent, ...(aboutOpen ? {} : { onPick: (a: string) => {
+    router.go({ screen: 'thread', project, agent: a });
+  } }) }), [project, agent, router, aboutOpen]);
+  const tabEl = <ComposerTab words={tabWords} bare={bare || atTo !== null} to={toAccent(ps, atTo)} asks={ps.asks} who={stripAgent} at={me} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} project={stripProject} newPlace={placeOnly || home} testId="composer.ctx" />;
   // the one notice at the strip's right (noticeOf): it goes at his first key in the frame (esc
   // too), at any send or command, a note also after LINE_MS; never outlives his next message,
   // never moves the composer (designer m_29135)
@@ -497,12 +504,11 @@ export interface CardAt {
 
 /**
  * The strip's 'to perf' in the accent (his m_44704, designer m_44890): his words go to an agent
- * that is not main, at rest (pinkState's quiet, no @name lead), or as the open item's free text
- * ('to perf · the approval waits for 1 or 2', a closed question): never main's, never while the
- * item's own pink says it (a question answered). Pure.
+ * that is not main with the border alone (pinkState's quiet): at rest with no @name lead, or as an
+ * open item's free text ('to perf · the approval waits for 1 or 2', a closed question); never
+ * main's, never while a question's own full pink says it. Pure.
  */
-export function toAccent(ps: { pink: boolean; quiet: boolean }, atTo: string | null, answer: CardAt | null): boolean {
-  if (answer !== null) return !ps.pink && answer.asker !== undefined && answer.asker !== MAIN;
+export function toAccent(ps: { quiet: boolean }, atTo: string | null): boolean {
   return ps.quiet && atTo === null;
 }
 

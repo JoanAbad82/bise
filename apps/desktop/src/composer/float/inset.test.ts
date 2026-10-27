@@ -52,14 +52,15 @@ describe("the floating composer's history", () => {
 });
 
 // his m_46152: answering a card, the float's box drew its accent border square (the box has no
-// radius in the glass). It takes the glass's radius in each state, inside the glass's edge.
+// radius in the glass). It takes the glass's radius in each state, inside the glass's edge. An agent
+// that is not main draws the same border (his m_47126: quiet too).
 describe("the floating composer's answer border", () => {
   it("follows the glass's corners: r 16 focused or open, r 22 at rest, an inset ring", () => {
     const glass = rule(floatCss, ".cmp-float[data-state='open']");
-    const ans = rule(floatCss, '.cmp-float .b-composer .box.ans:not(.quiet):focus-within');
+    const ans = rule(floatCss, '.cmp-float .b-composer .box.ans:focus-within');
     expect(ans.get('border-radius')).toBe(glass.get('border-radius'));
     expect(ans.get('box-shadow')).toBe('inset 0 0 0 1.5px var(--c-accent)');
-    const rest = rule(floatCss, ".cmp-float[data-state='rest'] .b-composer .box.ans:not(.quiet)");
+    const rest = rule(floatCss, ".cmp-float[data-state='rest'] .b-composer .box.ans");
     expect(rest.get('border-radius')).toBe(rule(floatCss, '.cmp-float').get('border-radius'));
   });
 });

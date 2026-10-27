@@ -441,6 +441,10 @@ crate::words! { composer:
     ctx_project_pick(project) = "{project} · pick another project";
     /// the project picker's title
     ctx_projects = "Projects";
+    /// the strip's addressee picker ('to perf ⌄', his m_47126): its tip and name
+    ctx_agent_pick(agent) = "to {agent} · talk to another agent";
+    /// the addressee picker's title
+    ctx_agents = "Agents";
     /// the floating composer's addressee ('to bise ⌄')
     float_to(agent) = "to {agent}";
     /// the addressee picker's title

@@ -477,6 +477,18 @@
     "one": null,
     "text": "go to an agent"
   },
+  "composer.ctx_agent_pick": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "to {agent} · talk to another agent"
+  },
+  "composer.ctx_agents": {
+    "args": [],
+    "one": null,
+    "text": "Agents"
+  },
   "composer.ctx_branch_tip": {
     "args": [
       "branch"

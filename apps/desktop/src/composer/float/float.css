@@ -177,14 +177,15 @@
   box-shadow: inset 0 1px 0 var(--c-line);
 }
 /* answering a card: the box's 1.5 px accent border follows the glass's corners (his m_46152: it
-   was square, the box has no radius of its own here), inside the glass's edge, never over it */
-.cmp-float .b-composer .box.ans:not(.quiet),
-.cmp-float .b-composer .box.ans:not(.quiet):focus-within,
-.cmp-float .b-composer .box.ans:not(.quiet).is-focus {
+   was square, the box has no radius of its own here), inside the glass's edge, never over it; an
+   agent that is not main too (his m_47126) */
+.cmp-float .b-composer .box.ans,
+.cmp-float .b-composer .box.ans:focus-within,
+.cmp-float .b-composer .box.ans.is-focus {
   border-radius: var(--r-4);
   box-shadow: inset 0 0 0 1.5px var(--c-accent);
 }
-.cmp-float[data-state='rest'] .b-composer .box.ans:not(.quiet) {
+.cmp-float[data-state='rest'] .b-composer .box.ans {
   border-radius: var(--r-5);
 }
 /* the composer's one-off notice (the hub's flow hint, a refused command) is its box's head: never

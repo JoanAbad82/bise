@@ -398,6 +398,10 @@ export const composer = {
   ctx_project_pick: (a: { project: string | number }): string => String(a.project) + " · pick another project",
   /** the project picker's title */
   ctx_projects: "Projects",
+  /** the strip's addressee picker ('to perf ⌄', his m_47126): its tip and name */
+  ctx_agent_pick: (a: { agent: string | number }): string => "to " + String(a.agent) + " · talk to another agent",
+  /** the addressee picker's title */
+  ctx_agents: "Agents",
   /** the floating composer's addressee ('to bise ⌄') */
   float_to: (a: { agent: string | number }): string => "to " + String(a.agent),
   /** the addressee picker's title */

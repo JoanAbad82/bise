@@ -2,12 +2,16 @@
 // the box's first row, where his words go: the project, the addressee's state while it runs
 // (stripState: 'working · 3 min', 'waits for you'; nothing idle) and the branch in mono, and on the
 // right the context ring or the screen's own words.
-// Short, it drops whole items: the right end first, then the state, then the project; the branch
-// stays (stripFit). Answering a card: '↳ answering search · <question>' and 'esc to bise instead'
-// on the right; short, the question goes first, then that end; '↳ answering search' never goes
-// (answerFit). Which states make it pink (an item, words opening with another agent's @name, an
-// open artifact, an agent that is not main): pinkState.
+// Short, it drops whole items: the project first, then the right end, then the state; the branch
+// stays and 'to perf' never goes (stripFit). Answering a card: '↳ answering search · <question>'
+// and 'esc to bise instead' on the right; short, the question goes first, then that end;
+// '↳ answering search' never goes (answerFit). Which states make it pink (an item, words opening
+// with another agent's @name, an open artifact, an agent that is not main): pinkState. The
+// addressee picker's rows: agentPicks.
 // Pure: ComposerTab.tsx draws and measures it. Owner: nm-composer.
+import type { Agent } from '@/proto';
+import { liveOf, rankedOf, shownName } from '@/agents/model';
+import { signOf } from '@/app/side';
 import { composer } from '../proto/words.gen';
 import { MAIN } from '../app/route';
 
@@ -81,9 +85,10 @@ export interface StripFit {
 }
 
 /**
- * The strip's items that fit in `avail` px, each whole or not at all: the right end goes first,
- * then the state, then the project; the branch always stays (its own css cut past that). `gap` is
- * the space between two items (16); a width of 0 is an item that isn't there. Pure.
+ * The strip's items that fit in `avail` px, each whole or not at all: the project goes first (the
+ * sidebar already says it, his m_47126), then the right end, then the state; the branch always
+ * stays (its own css cut past that). `avail` is what 'to perf' leaves: it never goes. `gap` is the
+ * space between two items (16); a width of 0 is an item that isn't there. Pure.
  */
 export function stripFit(w: { avail: number; gap: number; project: number; state: number; branch: number; end: number }): StripFit {
   const sum = (on: StripFit): number => {
@@ -92,8 +97,8 @@ export function stripFit(w: { avail: number; gap: number; project: number; state
   };
   const tries: StripFit[] = [
     { project: true, state: true, end: true },
-    { project: true, state: true, end: false },
-    { project: true, state: false, end: false },
+    { project: false, state: true, end: true },
+    { project: false, state: true, end: false },
   ];
   for (const t of tries) if (sum(t) <= w.avail) return t;
   return { project: false, state: false, end: false };
@@ -159,6 +164,36 @@ export function answerFit(label: string, room: number, endW: number, width: (s: 
   return { label: keeps(alone) ? alone : head, end: false };
 }
 
+/** A row of the strip's addressee picker: the agent, the name the window gives it, its state's
+ *  sign as the sidebar draws it ('?' asks him, '∿' works, '…' paused or waiting, '✓' done, '✗'
+ *  failed; '' at rest). */
+export interface AgentPick {
+  readonly name: string;
+  readonly shown: string;
+  readonly sign: '?' | '∿' | '…' | '✓' | '✗' | '';
+}
+
+/**
+ * The strip's addressee picker's rows (his m_47126, designer m_47129): the project's live agents,
+ * main first ('bise'), then the others in the hub's rank (the sidebar's ⌥ order), each with its
+ * state's sign. Archived agents never. Pure.
+ */
+export function agentPicks(agents: readonly Agent[], now: number): AgentPick[] {
+  const live = liveOf(agents);
+  const rank = rankedOf(live);
+  const at = (a: Agent) => rank.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+  return live
+    .map((a, i) => ({ a, i }))
+    .sort((x, y) => at(x.a) - at(y.a) || x.i - y.i)
+    .map(({ a }) => ({ name: a.name, shown: shownName(a.name), sign: pickSign(signOf(a, now).g) }));
+}
+
+function pickSign(g: string): AgentPick['sign'] {
+  if (g === '?' || g === '∿' || g === '✓' || g === '✗') return g;
+  if (g === '…' || g === '⋯') return '…';
+  return '';
+}
+
 /** What makes the composer pink, and its border's tip; `tip` undefined: plain. */
 export interface PinkState {
   readonly pink: boolean;
@@ -167,22 +202,31 @@ export interface PinkState {
   readonly bare: boolean;
   /** the label's part after its head whole or gone (the pink artifact's '· about “…”') */
   readonly whole: boolean;
-  /** lines only, the tab on its plain fill (an agent that is not main, designer m_28208) */
+  /** the border alone, no head tint, the send plain until he types (an agent that is not main,
+   *  designer m_28208; the border his m_47126) */
   readonly quiet: boolean;
+  /** main's open question: the box plain (his words go to main), its label still in the accent
+   *  (designer m_47129) */
+  readonly asks: boolean;
 }
+
+const PLAIN: PinkState = { pink: false, tip: undefined, bare: false, whole: false, quiet: false, asks: false };
 
 /**
  * The composer's one pink state (composer-target A's accent tab, 1.5 px border and send), whoever
- * sets it. An open item wins: a question pink with its tip, a closed one or an approval plain.
- * Then an open artifact: its maker's pink (`aboutPink`, art-target), main's or an archived maker's
- * plain. Then a thread or a bottom block whose words go to an agent that is not main (agent-target,
- * his ask: he wrote to the wrong agent without seeing it): pink in lines only (`quiet`: no fill,
- * designer m_28208), its place and context kept. Voice
- * typing stays plain, as art-target. His words opening with `@<agent>` (at-start, thread/lead.ts),
- * read only with no item and no artifact open: that agent's pink, bare, with `leadTip`. Pure.
+ * sets it. The rule (his m_47126): the border is pink whenever his words go to an agent that is not
+ * the project's main, never for main. An open item wins: a question pink with its tip (main's
+ * plain, its label in the accent: `asks`), a closed one or an approval the border alone when its
+ * asker is not main, else plain. Then an open artifact: its maker's pink (`aboutPink`, art-target),
+ * main's or an archived maker's plain. Then a thread or a bottom block whose words go to an agent
+ * that is not main (agent-target, his ask: he wrote to the wrong agent without seeing it): the
+ * border alone (`quiet`: no head tint, designer m_28208, m_47129), its place and context kept.
+ * Voice typing stays plain, as art-target. His words opening with `@<agent>` (at-start,
+ * thread/lead.ts), read only with no item and no artifact open: that agent's pink, bare, with
+ * `leadTip`. Pure.
  */
 export function pinkState(o: {
-  answer: { closed?: boolean; free?: 'deny' | 'steer'; tip?: string } | null;
+  answer: { asker?: string; closed?: boolean; free?: 'deny' | 'steer'; tip?: string } | null;
   /** the border's tip while his words open with another agent's `@name` (lead.ts); undefined: they don't */
   leadTip?: string | undefined;
   aboutPink: string | undefined;
@@ -191,14 +235,17 @@ export function pinkState(o: {
   voiceTyping: boolean;
   otherTip: (agent: string) => string;
 }): PinkState {
-  if (o.answer !== null) {
-    const pink = o.answer.closed !== true && o.answer.free === undefined;
-    return { pink, tip: o.answer.tip, bare: true, whole: false, quiet: false };
+  const a = o.answer;
+  if (a !== null) {
+    const toMain = a.asker === MAIN;
+    if (a.closed !== true && a.free === undefined) return toMain ? { ...PLAIN, bare: true, asks: true } : { ...PLAIN, pink: true, tip: a.tip, bare: true };
+    if (a.asker === undefined || toMain) return { ...PLAIN, bare: true };
+    return { ...PLAIN, pink: true, tip: o.otherTip(a.asker), bare: true, quiet: true };
   }
-  if (o.leadTip !== undefined) return { pink: true, tip: o.leadTip, bare: true, whole: false, quiet: false };
-  if (o.aboutPink !== undefined) return { pink: true, tip: o.aboutPink, bare: true, whole: true, quiet: false };
-  if (o.about || o.voiceTyping || o.agent === MAIN) return { pink: false, tip: undefined, bare: false, whole: false, quiet: false };
-  return { pink: true, tip: o.otherTip(o.agent), bare: false, whole: false, quiet: true };
+  if (o.leadTip !== undefined) return { ...PLAIN, pink: true, tip: o.leadTip, bare: true };
+  if (o.aboutPink !== undefined) return { ...PLAIN, pink: true, tip: o.aboutPink, bare: true, whole: true };
+  if (o.about || o.voiceTyping || o.agent === MAIN) return PLAIN;
+  return { ...PLAIN, pink: true, tip: o.otherTip(o.agent), quiet: true };
 }
 
 /** The context as the hub says it ('42k · 17%', or named 'context 42k · 17%'): its tokens and its
