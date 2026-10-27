@@ -8,7 +8,7 @@ import { allColours } from './palette';
 describe('his bim look', () => {
   it('reads back every look it writes, and nothing else', () => {
     for (const hair of HAIRS) for (const wear of wearsFor(hair)) {
-      const l = { skin: 4, hair, color: 5, wear };
+      const l = { skin: 4, hair, color: 5, wear, hat: 2 };
       expect(lookOf(prefOf(l))).toEqual(l);
     }
     expect(lookOf(undefined)).toBeNull();
