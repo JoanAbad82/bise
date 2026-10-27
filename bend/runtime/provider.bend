@@ -485,7 +485,7 @@ def img_cap() -> Nat:
 
 def img_dir() -> IO(String):
   do IO<String>:
-    +d : String <- P.env_path("BEND_IMAGE_DIR", "/.bend-harness/images")
+    +d : String <- P.env_path("BEND_IMAGE_DIR", "/.bise/images")
     IO.pure(String, String.append(d, "/"))
 
 def head_of(r: Result<&1, &1, U32 & String, String>) -> String:

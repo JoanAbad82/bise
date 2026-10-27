@@ -195,7 +195,7 @@ const COMPUTER_TS: &str = include_str!("computer.ts");
 fn computer_loaded() -> bool {
     let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let run = var("BEND_RUN_DIR")
-        .or_else(|| var("HOME").map(|h| format!("{h}/.bend-harness/run")))
+        .or_else(|| var("HOME").map(|h| format!("{h}/.bise/run")))
         .unwrap_or_default();
     let port = var("BEND_REPL_PORT").unwrap_or_else(|| "0".to_string());
     let index = std::fs::read_to_string(format!("{run}/{port}/plugins/mcp-index.txt")).unwrap_or_default();

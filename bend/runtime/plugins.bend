@@ -25,13 +25,12 @@ import ./proc.bend as Proc
 
 # ---- the session's files: $BEND_RUN_DIR/<repl port>/ ----
 # The harness exports BEND_RUN_DIR (bise_home: ~/.bise/run, private) and
-# creates it 0700; without it (an old harness, a bare REPL), the legacy
-# $HOME/.bend-harness/run.
+# creates it 0700; without it (a bare REPL), $HOME/.bise/run.
 
 def run_dir.pick(e: Bool, +run: String, +home: String) -> String:
   match e:
     case True{}:
-      String.append(home, "/.bend-harness/run")
+      String.append(home, "/.bise/run")
     case False{}:
       run
 

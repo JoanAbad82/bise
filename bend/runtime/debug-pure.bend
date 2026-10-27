@@ -1,7 +1,7 @@
 # runtime/debug-pure.bend — the session debug log, pure side.
 #
 # Every live session keeps a debug directory (BEND_DEBUG_DIR, set by the
-# parent: ~/.bend-harness/sessions/<id>.debug/). The REPL appends one
+# parent: ~/.bise/sessions/<id>.debug/). The REPL appends one
 # JSON object per line to events.jsonl: a breadcrumb for every obs and
 # tool annotation it sends the client, and an incident for every
 # provider attempt that failed (with the request and the raw reply saved
