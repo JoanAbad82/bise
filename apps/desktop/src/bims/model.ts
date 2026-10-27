@@ -512,8 +512,8 @@ export interface BimFrame {
   readonly pose: Pose;
   /** the easter egg it plays now (eggs.ts), on top of its pose; absent: none */
   readonly egg?: BimEgg;
-  /** a soft halo on the floor under it (focus.ts): its row hovered, or the bim the office follows */
-  readonly lit?: boolean;
+  /** a ring on the floor under it (focus.ts, render/halo.ts): 'row' its row hovered (reads at any zoom), 'follow' the bim the office follows (soft) */
+  readonly lit?: 'row' | 'follow';
 }
 
 /** The look of the moment: the app's theme (day light, night dark), reduced motion (no loops, fades for walks). */

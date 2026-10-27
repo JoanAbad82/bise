@@ -268,7 +268,8 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       const pk = c.forced !== undefined ? forcedPokes(c.forced?.pokes, reduced) : pokesAt(pokes, frames, t, reduced);
       const played = frames.map((f) => {
         const e = pk.get(f.name) ?? eg.bims.get(f.name);
-        const lit = f.name === a.lit || f.name === a.follow;
+        // its row hovered wins over the follow: the row's ring is the one he looks for
+        const lit: BimFrame['lit'] = f.name === a.lit ? 'row' : f.name === a.follow ? 'follow' : undefined;
         return e === undefined ? (lit ? { ...f, lit } : f) : { ...f, egg: e, ...(lit ? { lit } : {}) };
       });
       // the office grows: what it draws, and the unlock moment while it lasts

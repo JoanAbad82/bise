@@ -1,6 +1,6 @@
 // One office as a scene (page town-live p2, architect m_28994): its world (world.ts, its map's look
 // and growth), one bim per BimFrame posed by pose.ts (bim.ts), his paper planes (plane.ts), the
-// halo under a lit bim, the office's eggs (eggdecor.ts) and the unlock moment's crew (unlock.ts),
+// ring under a lit bim (halo.ts), the office's eggs (eggdecor.ts) and the unlock moment's crew (unlock.ts),
 // all in one group in the office's own units. No renderer, no camera, no light: the minimap
 // (render/index.ts) draws it through its view, the town places one per project. frame() poses it
 // for time t and says how the loop must run next (Motion); the caller renders. The sky's lamps and
@@ -35,6 +35,7 @@ import { makePoofs, type Poof } from './poofs';
 import type { Style } from './style';
 import type { ObjectsLayer } from './objects-layer';
 import { NO_CORNERS, type Corners } from '../corners';
+import { HALO, ROW_RING, ringOf } from './halo';
 
 /** the length on screen (css px) the loop and the zigzag are sized for, its office length for that; the shadow's own length (plane.ts) */
 const LOOP_PX = 12;
@@ -61,8 +62,6 @@ const unit = (a: V3): V3 => {
 };
 /** how much of the eclipse's violet goes into the backdrop */
 const ECLIPSE_MIX = 0.45;
-/** the lit bim's halo on the floor (focus.ts; bims m_28199): the text's colour at low alpha, never the accent */
-const HALO = { inner: 0.34, outer: 0.5, alpha: 0.28, day: '#1d1a17', night: '#f3ede4' } as const;
 
 /** what a frame says of each bim it posed (the headless checks' trace, render/index.ts) */
 export type OnRig = (f: BimFrame, rig: Rig, skating: boolean) => void;
@@ -235,10 +234,13 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   const tmp = new Vector3();
   const basis = new Matrix4();
   const axis = [new Vector3(), new Vector3(), new Vector3()] as const;
-  // the halo under a lit bim (focus.ts): one ring, flat on the floor, shown under each lit bim's feet
+  // the ring under a lit bim (focus.ts, halo.ts): flat on the floor under its feet; the followed
+  // bim's soft one, a hovered row's line that reads at any zoom (sized to the fit each frame)
   const haloGeo = new RingGeometry(HALO.inner, HALO.outer, 40);
   haloGeo.rotateX(-Math.PI / 2);
   const haloMat = new MeshBasicMaterial({ color: HALO.day, transparent: true, opacity: HALO.alpha, depthWrite: false });
+  const rowMat = new MeshBasicMaterial({ color: HALO.day, transparent: true, opacity: ROW_RING.alpha, depthWrite: false });
+  let rowGeo: { inner: number; outer: number; geo: RingGeometry } = { inner: HALO.inner, outer: HALO.outer, geo: new RingGeometry(HALO.inner, HALO.outer, 48) };
   const halos = new Map<string, Mesh>();
   // a bim that comes in while the office is open pops in (Gabriel's review, main m_31507: the hero and
   // the app): from the scale of nothing, a little past its size, settled in APPEAR_S. The ones there
@@ -539,15 +541,32 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     return out;
   }
 
-  function drawHalos(frames: readonly BimFrame[], isNight: boolean): void {
-    haloMat.color.set(isNight ? HALO.night : HALO.day);
+  /** a hovered row's ring at `scale` (halo.ts ringOf): made again only when the zoom changes its size */
+  function rowGeoAt(scale: number): RingGeometry {
+    const r = ringOf('row', scale);
+    if (rowGeo.inner === r.inner && rowGeo.outer === r.outer) return rowGeo.geo;
+    rowGeo.geo.dispose();
+    const geo = new RingGeometry(r.inner, r.outer, 48);
+    geo.rotateX(-Math.PI / 2);
+    rowGeo = { inner: r.inner, outer: r.outer, geo };
+    return geo;
+  }
+
+  function drawHalos(frames: readonly BimFrame[], isNight: boolean, scale: number): void {
+    const ink = isNight ? HALO.night : HALO.day;
+    haloMat.color.set(ink);
+    rowMat.color.set(ink);
     const lit = new Set<string>();
     for (const f of frames) {
       const rig = rigs.get(f.name);
-      if (f.lit !== true || !rig) continue;
+      if (f.lit === undefined || !rig) continue;
       lit.add(f.name);
+      const geo = f.lit === 'row' ? rowGeoAt(scale) : haloGeo;
+      const mat = f.lit === 'row' ? rowMat : haloMat;
       let h = halos.get(f.name);
-      if (!h) { h = new Mesh(haloGeo, haloMat); h.renderOrder = 1; halos.set(f.name, h); root.add(h); }
+      if (!h) { h = new Mesh(geo, mat); h.renderOrder = 1; halos.set(f.name, h); root.add(h); }
+      h.geometry = geo;
+      h.material = mat;
       h.position.set(rig.x, 0.02, rig.z);
       h.visible = rig.opacity > 0.05;
     }
@@ -673,7 +692,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       while (poofList.length > 0 && (poofList[0]?.t0 ?? t) + POOF_S <= t) poofList.shift();
       if (poofs.draw(t, poofList, fit.scale)) motion = 'walk';
       // the halo reads on the floor as lit: the night's (light) when the lamps are on, in the office
-      drawHalos(frames, themed ? look.night : (lamps ?? 0) >= 0.5);
+      drawHalos(frames, themed ? look.night : (lamps ?? 0) >= 0.5, fit.scale);
       lightDesks();
       for (const [name, d] of world.desks) seatChair(d.chair, rigs.get(name)?.seat);
       if (drawPlanes(t, frames, fit, !look.night, look.reduced, look.planeFrom, look.planesUp === true)) motion = 'walk';
@@ -760,6 +779,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       halos.clear();
       haloGeo.dispose();
       haloMat.dispose();
+      rowGeo.geo.dispose();
+      rowMat.dispose();
     },
   };
 }

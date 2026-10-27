@@ -69,12 +69,12 @@ describe('office-driver: one office brain', () => {
     expect(d.step(clock(T + 3 + UNLOCK_WALK + UNLOCK_LABEL), NO_ATTENTION)?.look.unlock).toBeUndefined();
   });
 
-  it('the row under his pointer and the followed bim get a halo', () => {
+  it("the row under his pointer gets the row's ring, the followed bim its own; the row wins on the followed one", () => {
     const d = makeDriver(parts);
     d.rows(snap, crew, 'loft');
-    const s = d.step(clock(T), { ...NO_ATTENTION, lit: 'ada', follow: 'bob' });
-    const lit = s?.played.filter((f) => f.lit === true).map((f) => f.name).sort();
-    expect(lit).toEqual(['ada', 'bob']);
+    const litOf = (s: ReturnType<typeof d.step>) => Object.fromEntries((s?.played ?? []).filter((f) => f.lit !== undefined).map((f) => [f.name, f.lit]));
+    expect(litOf(d.step(clock(T), { ...NO_ATTENTION, lit: 'ada', follow: 'bob' }))).toEqual({ ada: 'row', bob: 'follow' });
+    expect(litOf(d.step(clock(T + 1), { ...NO_ATTENTION, lit: 'bob', follow: 'bob' }))).toEqual({ bob: 'row' });
   });
 
   it('stale: only when an activity changes', () => {

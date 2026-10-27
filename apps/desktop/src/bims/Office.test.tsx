@@ -329,7 +329,7 @@ describe('the hover card (Gabriel: multi-line, easy to read)', () => {
       const labelsOf = vi.spyOn(parts, 'labelsOf');
       mount(parts);
       await flush(2);
-      const last = () => labelsOf.mock.calls.at(-1) as unknown as [readonly { name: string; lit?: boolean }[], { hover: string | null }];
+      const last = () => labelsOf.mock.calls.at(-1) as unknown as [readonly { name: string; lit?: string }[], { hover: string | null }];
       act(() => {
         bimsLit.set({ name: 'perf', from: 'row' });
       });
@@ -337,7 +337,7 @@ describe('the hover card (Gabriel: multi-line, easy to read)', () => {
         vi.advanceTimersByTime(2000);
       });
       await flush(2);
-      expect(last()[0].find((f) => f.name === 'perf')?.lit).toBe(true);
+      expect(last()[0].find((f) => f.name === 'perf')?.lit).toBe('row');
       expect(last()[1].hover).toBeNull();
       act(() => {
         bimsLit.set(null, 'row');
