@@ -7,6 +7,7 @@ import { cleanup, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { Agent } from '@/proto';
 import { side } from '@/proto/words_side.gen';
 import { panel } from '@/proto/words_panel.gen';
 import { jobOf, lineTip, OuterHead } from './OuterCard';
