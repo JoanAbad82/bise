@@ -61,6 +61,8 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
       scrollback: 5000,
       // its ground is the box's (--c-raised): xterm draws none of its own
       allowTransparency: true,
+      // the first error's ink is a decoration, xterm's experimental API: it throws without this
+      allowProposedApi: true,
       theme: themeOf(),
     });
     const fitter = new FitAddon();
@@ -76,16 +78,22 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
       const cols = Math.max(1, d.cols);
       if (cols !== term.cols || d.rows !== term.rows) term.resize(cols, Math.max(1, d.rows));
     };
+    // where the view sat when it opened on the first error: he scrolls away, the sub says its lines again
+    let errView: number | null = null;
     // scrolled up from its end: 'jump to end ↓'
     const scrolled = term.onScroll(() => {
       const b = term.buffer.active;
       setUp(b.viewportY < b.baseY);
+      if (errView !== null && b.viewportY !== errView) {
+        errView = null;
+        err.current?.(false);
+      }
     });
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
-    // the first error's line, in the error ink (designer m_47812): that line only, the rest keeps
-    // the program's own colours; drawn again when the theme changes
+    // the first error's line, in the error ink (designer m_47812): that line and its wrapped rows
+    // only, the rest keeps the program's own colours; drawn again when the theme changes
     let errAt: number | null = null;
     let errMark: { dispose: () => void } | undefined;
     const markErr = () => {
@@ -93,8 +101,14 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
       errMark = undefined;
       if (errAt === null) return;
       const b = term.buffer.active;
-      const marker = term.registerMarker(errAt - (b.baseY + b.cursorY));
-      errMark = term.registerDecoration({ marker, width: term.cols, foregroundColor: cssVar('--p-err') || '#ff5a52' });
+      let height = 1;
+      while (b.getLine(errAt + height)?.isWrapped === true) height++;
+      try {
+        const marker = term.registerMarker(errAt - (b.baseY + b.cursorY));
+        errMark = term.registerDecoration({ marker, width: term.cols, height, foregroundColor: cssVar('--p-err') || '#ff5a52' });
+      } catch {
+        // its ink is a nicety: the jump to it and the sub still hold
+      }
     };
     // his theme changes while it is open (the system's, or the app's data-theme): its ink follows
     const retheme = () => {
@@ -121,6 +135,7 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
         const at = firstError(text);
         if (at !== null) {
           term.scrollToLine(Math.max(0, at - 1));
+          errView = b.viewportY;
           errAt = at;
           markErr();
         }

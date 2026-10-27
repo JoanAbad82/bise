@@ -8,23 +8,29 @@ import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 
 const made: { lines: string[]; scrolled: number[]; disposed: boolean; inked: { line: number; color: string | undefined }[] }[] = [];
+const scrolls: { scrollBy: (y: number) => void }[] = [];
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     cols = 80;
     rows = 24;
     t = { lines: [] as string[], scrolled: [] as number[], disposed: false, inked: [] as { line: number; color: string | undefined }[] };
-    buffer = { active: { length: 0, viewportY: 0, baseY: 0, cursorY: 0, getLine: (i: number) => ({ translateToString: () => this.t.lines[i] ?? '' }) } };
+    buffer = { active: { length: 0, viewportY: 0, baseY: 0, cursorY: 0, getLine: (i: number) => ({ isWrapped: false, translateToString: () => this.t.lines[i] ?? '' }) } };
     // the cursor sits on the last line (no scroll in the mock: baseY 0)
     registerMarker(offset: number) { return { line: this.buffer.active.length - 1 + offset }; }
+    // xterm's experimental API: it throws without allowProposedApi (ui-review m_47820's grey line)
     registerDecoration(o: { marker: { line: number }; foregroundColor?: string }) {
+      if (this.options['allowProposedApi'] !== true) throw new Error('You must set the allowProposedApi option to true to use proposed API');
       this.t.inked.push({ line: o.marker.line, color: o.foregroundColor });
       return { dispose() {} };
     }
-    options: Record<string, unknown> = {};
-    constructor() { made.push(this.t); }
+    options: Record<string, unknown>;
+    scrolledBy: (() => void) | null = null;
+    constructor(o: Record<string, unknown> = {}) { this.options = { ...o }; made.push(this.t); scrolls.push(this); }
     loadAddon() {}
     open() {}
-    onScroll() { return { dispose() {} }; }
+    onScroll(fn: () => void) { this.scrolledBy = fn; return { dispose() {} }; }
+    /** he scrolls the view to row `y` */
+    scrollBy(y: number) { this.buffer.active.viewportY = y; this.scrolledBy?.(); }
     resize() {}
     write(b: Uint8Array | string, cb?: () => void) {
       const s = typeof b === 'string' ? b : new TextDecoder().decode(b);
@@ -48,7 +54,7 @@ vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { ret
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 const { Output } = await import('./Output');
 
-afterEach(() => { cleanup(); made.length = 0; });
+afterEach(() => { cleanup(); made.length = 0; scrolls.length = 0; });
 
 function setup() {
   const cmds: CoreCmd[] = [];
@@ -87,5 +93,8 @@ describe("a process's output", () => {
     // that line only, in the error ink (designer m_47812): '  ✘ checkout › pays' is line 2
     expect(made[0]?.inked.map((x) => x.line)).toEqual([2]);
     expect(made[0]?.inked[0]?.color).toMatch(/^#[0-9a-f]{6}$/iu);
+    // he scrolls away from it: the sub goes back to its lines (designer m_47822)
+    act(() => { scrolls[0]?.scrollBy(5); });
+    expect(onErr).toHaveBeenLastCalledWith(false);
   });
 });
