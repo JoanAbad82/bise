@@ -1,11 +1,11 @@
-// A project row's facts (Gabriel's H1, designer m_44783): the sentence's rule as a table (failed /
+// A project row's facts (Gabriel's H1, designer m_44783, m_48464): the sentence's rule as a table (failed /
 // working + new artifacts / news / unread / waits / quiet), the pill or the age, the quiet row, the
 // week sliding for a stopped hub, its day bars and their tips, and the fallback with no pulse.
 import { describe, expect, it } from 'vitest';
 import type { News, ProjectRow, Pulse } from '@/proto';
 import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
-import { BUCKET_MS, BUCKETS, daysBack, daysOf, projectFacts, since, weekBars, weekOf, workWords } from './projectfacts';
+import { BUCKET_MS, BUCKETS, daysBack, daysOf, projectFacts, rowBars, since, weekBars, weekOf, workWords } from './projectfacts';
 import { waitsTip, workingTip } from './tipwords';
 
 const H = 3_600_000;
@@ -37,7 +37,7 @@ describe('the sentence, the first that applies', () => {
 
   it('a scheduled run ahead is news until it runs; a past one is not', () => {
     const ahead = facts(pulse({ news: news({ kind: 'scheduled', id: 't', name: 'nightly' }, NOW + 5 * H) }), 0, 0, NOW);
-    expect(ahead.sentence?.text.startsWith(projects.next_run({ when: '' }))).toBe(true);
+    expect(ahead.sentence.text.startsWith(projects.next_run({ when: '' }))).toBe(true);
     expect(facts(pulse({ news: news({ kind: 'scheduled', id: 't', name: 'nightly' }, NOW - H) }), 0, 0, SEEN).quiet).toBe(true);
   });
 
@@ -49,10 +49,17 @@ describe('the sentence, the first that applies', () => {
 });
 
 describe('a quiet project', () => {
-  it('nothing works, waits or is new since he looked: one line, its age, no sentence, no week', () => {
+  it('nothing works, waits or is new since he looked: its age, its last news (seen) as line 2, its week', () => {
     const p = pulse({ news: news({ kind: 'landed', agent: 'brush', sha: 'abc', target: 'main' }, NOW - 5 * H), artifacts_at: [NOW - 5 * H], said_at: [NOW - 6 * H] });
     const f = facts(p, 0, 0, NOW - 4 * H);
-    expect(f).toEqual({ quiet: true, pill: null, age: '2 h', sentence: null, week: null, tip: `${common.all_quiet} · ${projects.last_activity({ age: '2 h' })}`, unread: false });
+    expect(f).toEqual({ quiet: true, pill: null, age: '2 h', sentence: { text: projects.landed({ agent: 'brush', target: 'main' }), err: false }, week: daysOf(week), tip: `${common.all_quiet} · ${projects.last_activity({ age: '2 h' })}`, unread: false });
+  });
+
+  it("a seen failure says itself in text-3, no alarm; a scheduled run gone by or no news at all: 'all quiet'", () => {
+    expect(facts(pulse({ news: news({ kind: 'failed', agent: 'migrate' }, NOW - 5 * H) }), 0, 0, NOW).sentence).toEqual({ text: projects.failed({ agent: 'migrate' }), err: false });
+    expect(facts(pulse({ news: news({ kind: 'scheduled', id: 't', name: 'nightly' }, NOW - H) }), 0, 0, NOW).sentence).toEqual({ text: common.all_quiet, err: false });
+    expect(facts(pulse(), 0, 0, NOW).sentence).toEqual({ text: common.all_quiet, err: false });
+    expect(facts(null, 0, 0).sentence).toEqual({ text: common.all_quiet, err: false });
   });
 
   it('never looked: everything of the week is new', () => {
@@ -78,8 +85,15 @@ describe('no pulse yet (a hub that does not send it)', () => {
     expect(facts(null, 0, 0)).toMatchObject({ quiet: true, age: null });
   });
 
-  it('a week still counting: no sparkline yet', () => {
+  it('a week still counting: not known yet', () => {
     expect(facts(pulse({ counting: true }), 1, 0).week).toBeNull();
+  });
+
+  it("a week not known draws 7 flat stubs, each tipped 'no agent work in the last 7 days' (designer m_48464)", () => {
+    const bars = rowBars(null, NOW);
+    expect(bars).toHaveLength(7);
+    expect(bars.every((b) => b.h === 1 && b.tip === projects.week_idle)).toBe(true);
+    expect(rowBars(daysOf(week), NOW)).toEqual(weekBars(daysOf(week), NOW));
   });
 });
 

@@ -77,6 +77,11 @@
     "one": null,
     "text": "{n} unread"
   },
+  "projects.week_idle": {
+    "args": [],
+    "one": null,
+    "text": "no agent work in the last 7 days"
+  },
   "projects.week_tip": {
     "args": [],
     "one": null,

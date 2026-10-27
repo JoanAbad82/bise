@@ -39,7 +39,7 @@ import { LiveBiseMark, WorkingMark } from './Marks';
 import { usePinned, type Pin } from './pins';
 import { addProject } from './addProject';
 import { pinRowOf, projectRowOf, projectsOf, type RowEnd } from './siderows';
-import { BAR_GAP, BAR_H, BAR_W, weekBars, type DayBar, type ProjectFacts } from './projectfacts';
+import { BAR_GAP, BAR_H, BAR_W, rowBars, type DayBar, type ProjectFacts } from './projectfacts';
 import { newestOf, useLookedAt, useMarkSeen, useSeen } from './seen';
 import { useNow } from './clock';
 import { useSpring, type SpringRow } from './spring';
@@ -87,10 +87,11 @@ function barPath(b: DayBar): string {
  * A project's week (H1, designer m_45992): 7 day bars in 40 x 12, text-3, today's in text-2; the
  * row's hover wakes them all to text-2, the bar under the pointer goes to ink and its tip (its day,
  * its work) shows instead of the row's, off the row as the row's own (clear 'outer', ui-review
- * m_46014). Each bar's hover column is its full height and half of each gap beside it.
+ * m_46014). Each bar's hover column is its full height and half of each gap beside it. A week not
+ * known yet: 7 flat stubs (rowBars), so every row draws the same week.
  */
-function Week({ week, now, testId }: { week: readonly number[]; now: number; testId: string }) {
-  const bars = weekBars(week, now);
+function Week({ week, now, testId }: { week: readonly number[] | null; now: number; testId: string }) {
+  const bars = rowBars(week, now);
   const width = bars.length * (BAR_W + BAR_GAP) - BAR_GAP;
   return (
     <svg className="app-s-week" viewBox={`0 0 ${String(width)} ${String(BAR_H)}`} role="img" aria-label={projects.week_tip} data-testid={testId}>
@@ -123,8 +124,9 @@ function ProjectEnd({ facts, digit, testId }: { facts: ProjectFacts; digit: numb
 
 /**
  * A project's row, Gabriel's H1 (designer m_44783): two calm lines, its name and its pill or age,
- * then one plain sentence and its week; a quiet one is its name in text-2 and its age, one line.
- * No icon, no mark, no border: the words say it, the tip says it all.
+ * then one plain sentence and its week. Every project draws these same two lines at the same
+ * height, busy or not (his m_48450, designer m_48464): a quiet one is its name in text-2, its last
+ * news (else 'all quiet') and its week, flat stubs while unknown. No icon, no mark, no border: the words say it, the tip says it all.
  */
 function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, spring, testId }: {
   name: string;
@@ -157,14 +159,12 @@ function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, s
           <ProjectEnd facts={facts} digit={digit} testId={testId} />
         </span>
       </span>
-      {facts.sentence !== null && (
-        <span className="app-s-l2">
-          <span className={`app-s-say${facts.sentence.err ? ' err' : ''}`} data-testid={`${testId}.say`}>
-            {facts.sentence.text}
-          </span>
-          {facts.week !== null && <Week week={facts.week} now={now} testId={`${testId}.week`} />}
+      <span className="app-s-l2">
+        <span className={`app-s-say${facts.sentence.err ? ' err' : ''}`} data-testid={`${testId}.say`}>
+          {facts.sentence.text}
         </span>
-      )}
+        <Week week={facts.week} now={now} testId={`${testId}.week`} />
+      </span>
     </Press>
   );
 }

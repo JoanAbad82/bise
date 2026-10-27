@@ -33,15 +33,15 @@ export interface Sentence {
 }
 
 export interface ProjectFacts {
-  /** one line: nothing works, nothing waits, nothing new since he looked */
+  /** nothing works, nothing waits, nothing new since he looked: its name in text-2, the same two lines */
   readonly quiet: boolean;
   /** what waits on him (the inbox's count), the accent pill; null: the age shows instead */
   readonly pill: number | null;
   /** the age of its last activity ('now', '40 min', '2 d'); null when the hub has not said */
   readonly age: string | null;
-  /** line 2's words; null on a quiet row */
-  readonly sentence: Sentence | null;
-  /** the week's busy time, 7 days (3 buckets each) ending with now's; null while unknown or on a quiet row */
+  /** line 2's words, on every row: a quiet one's is its last news, else 'all quiet' */
+  readonly sentence: Sentence;
+  /** the week's busy time, 7 days (3 buckets each) ending with now's; null while unknown (rowBars draws flat stubs) */
   readonly week: readonly number[] | null;
   /** the row's tip: everything at once */
   readonly tip: string;
@@ -113,8 +113,11 @@ export function projectFacts(c: {
   const news = fresh ? newsWords(n, now) : null;
   const quiet = working === 0 && waits === 0 && arts === 0 && unread === 0 && news === null;
   const busy = [...(working > 0 ? [projects.working({ n: working })] : []), ...(arts > 0 ? [projects.new_artifacts({ n: arts })] : [])];
-  const sentence: Sentence | null = quiet
-    ? null
+  // a quiet row says its last news all the same, seen or not, in text-3 (a seen failure is no alarm);
+  // a scheduled run gone by is no news; nothing known: 'all quiet' (designer m_48464)
+  const old = n !== null && (n.what.kind !== 'scheduled' || n.at_ms > now) ? newsWords(n, now) : null;
+  const sentence: Sentence = quiet
+    ? { text: old?.text ?? common.all_quiet, err: false }
     : news?.err === true
       ? news
       : busy.length > 0
@@ -138,7 +141,7 @@ export function projectFacts(c: {
     pill: waits > 0 ? waits : null,
     age,
     sentence,
-    week: quiet || pulse === null || pulse.counting ? null : daysOf(weekOf(pulse, now)),
+    week: pulse === null || pulse.counting ? null : daysOf(weekOf(pulse, now)),
     tip: tip.join(' · '),
     unread: unread > 0,
   };
@@ -212,4 +215,14 @@ export function weekBars(week: readonly number[], now: number, tz?: string): Day
       tip: v > 0 ? projects.day_work({ day, work: workWords(v) }) : projects.day_idle({ day }),
     };
   });
+}
+
+/**
+ * A row's 7 day bars, on every row (his m_48450): its week's, or while the week is unknown (no
+ * pulse yet, still counting) 7 flat stubs, as an idle day draws, each tipped 'no agent work in the
+ * last 7 days' (designer m_48464), so the slot always reads as a week. Pure.
+ */
+export function rowBars(week: readonly number[] | null, now: number, tz?: string): DayBar[] {
+  if (week !== null) return weekBars(week, now, tz);
+  return weekBars(new Array<number>(7).fill(0), now, tz).map((b) => ({ ...b, tip: projects.week_idle }));
 }

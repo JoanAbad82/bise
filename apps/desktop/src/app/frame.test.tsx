@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The frame of mockup 1, drawn from the store: the rail's places (the current one marked, inbox's
 // dot only while something waits), the sidebar's projects (round 2: one row each, no agent under
-// it; round 3, H1: its name and pill or age, its sentence, a quiet one on one line; ⌘ held its
+// it; round 3, H1: its name and pill or age, its sentence, a quiet one the same two lines; ⌘ held its
 // digit), its head bise, Search ⌘K, New project ⌘N (no New agent row).
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -93,7 +93,7 @@ describe('the sidebar', () => {
     });
   }
 
-  it("H1: a project's pill, its sentence, its tip; a quiet one is one line with no sentence", () => {
+  it("H1: a project's pill, its sentence, its tip; a quiet one draws the same two lines", () => {
     const working = [agent('main', { status: 'working' }), agent('perf', { status: 'working' })];
     const waits = frame({ screen: 'bise' }, working, [], { cards: null as never, waits: 1 }).v;
     expect(waits.getByTestId(`app.side.project.${ACME}.pill`).textContent).toBe('1');
@@ -102,10 +102,14 @@ describe('the sidebar', () => {
     expect(waits.getByTestId(`app.side.project.${ACME}`).getAttribute('data-tip')).toBe(`acme · ${workingTip(2)} · ${waitsTip(1)}`);
     // no marks: the words say it
     expect(waits.getByTestId(`app.side.project.${ACME}`).querySelector('.wk-sign, svg:not(.app-s-week)')).toBeNull();
-    // docs: nothing works or waits, no pulse yet: quiet, one line
+    // docs: nothing works or waits, no pulse yet: quiet, and the same parts as acme's (his m_48450):
+    // 'all quiet' and a week of 7 flat stubs
     const docs = waits.getByTestId(`app.side.project.${DOCS}`);
     expect(docs.classList.contains('quiet')).toBe(true);
-    expect(waits.queryByTestId(`app.side.project.${DOCS}.say`)).toBeNull();
+    const parts = (el: Element) => [...el.querySelectorAll('.app-s-l1, .app-s-l2, .app-s-say, .app-s-week, .app-s-day')].map((e) => e.getAttribute('class')?.replace(' today', ''));
+    expect(parts(docs)).toEqual(parts(waits.getByTestId(`app.side.project.${ACME}`)));
+    expect(waits.getByTestId(`app.side.project.${DOCS}.say`).textContent).toBe(common.all_quiet);
+    expect(waits.getByTestId(`app.side.project.${DOCS}.week.0`).getAttribute('data-tip')).toBe(projects.week_idle);
     expect(docs.getAttribute('data-tip')).toBe(common.all_quiet);
   });
 

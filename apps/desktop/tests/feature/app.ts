@@ -20,7 +20,9 @@ export { artifactGo } from '@/artifacts/leave';
 // a card's chip (and ⌘O): the intent the inbox block does (inbox/Block.tsx)
 export { chipOpen } from '@/inbox/about';
 export { libraryPage, sideShows, type SideShows } from '@/app/sideshows';
-export { projectsOf } from '@/app/siderows';
+export { projectsOf, projectRowOf } from '@/app/siderows';
+export { projectWaiting } from '@/inbox/waiting';
+export { rowBars } from '@/app/projectfacts';
 // an artifact the list doesn't have: what the centre and the panel show (artifacts/gone.ts)
 export { centreOf, goneLinkOf, goneRoute, type ArtCentre, type GoneLink } from '@/artifacts/gone';
 // the outer card's width by its border (side3d/outerwidth.ts) on the window's keep, and the layout that draws it

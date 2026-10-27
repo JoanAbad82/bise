@@ -390,12 +390,9 @@ body:has(.app-shell) {
 .app-s-row.project + .app-s-row.project {
   margin-top: var(--s-1);
 }
-/* a quiet one: nothing works, waits or is new since he looked: its name in text-2 and its age, one line */
-.app-s-row.project.quiet {
-  flex-direction: row;
-  align-items: center;
-  height: var(--h-row);
-  padding: 0 var(--s-2);
+/* a quiet one: nothing works, waits or is new since he looked: its name in text-2, the same two
+   lines at the same height as every row (his m_48450, designer m_48464); line 2 stays text-3 */
+.app-s-row.project.quiet .app-s-l1 {
   color: var(--c-text-2);
 }
 /* spring-loaded (designer m_47386, app/spring.ts): a file dragged over a project's row takes the
@@ -419,9 +416,6 @@ body:has(.app-shell) {
   align-items: center;
   gap: var(--s-2);
   min-width: 0;
-}
-.app-s-row.quiet .app-s-l1 {
-  flex: 1;
 }
 .app-s-l2 {
   font: 400 var(--f-meta);

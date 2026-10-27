@@ -30,6 +30,9 @@ import {
   Latest,
   navRoute,
   projectsOf,
+  projectRowOf,
+  projectWaiting,
+  rowBars,
   sideShows,
   Store,
   threadKey,
@@ -74,6 +77,8 @@ export interface Feature {
     route(): Route;
     /** The left sidebar under its head for that route (app/sideshows.ts): his projects' names, the library's rows ('All artifacts', 'Recent', 'Unfiled', its folders; none while the library page is not mounted: its rows are that page's, artifacts/library.tsx), or the settings nav. */
     sidebar(): SidebarView;
+    /** The sidebar's project rows (app/siderows.ts projectRowOf, as Sidebar.tsx draws them), `seen`: when he last looked at each project (none: never). */
+    projectRows(seen?: Readonly<Record<string, number>>): readonly ProjectRowView[];
     /** The outer card at the window's right on a project's thread, the panel folded: where the coins are ('card' when it shows) and its width (side3d/layout.ts sideLayout over his kept width, outerwidth.ts). */
     outerCard(): OuterCardView;
     /** An artifact opened by id: the centre (its maker's thread, the project's main when the list doesn't have it, nothing before the list came) and the panel (its view, or the gone lines' link and where it goes, or nothing yet) (artifacts/gone.ts). */
@@ -97,6 +102,16 @@ export interface OuterCardView {
 export interface SidebarView {
   readonly shows: SideShows;
   readonly rows: readonly string[];
+}
+
+/** A project row of the sidebar: its name, quiet or not, line 2's sentence and its week's bar count. */
+export interface ProjectRowView {
+  readonly name: string;
+  readonly quiet: boolean;
+  /** line 2's words ('' when the row draws no line 2) */
+  readonly say: string;
+  /** line 2's day bars (0 when the row draws none) */
+  readonly bars: number;
 }
 
 /** The library's rows, in the column's order (artifacts/Column.tsx): its words are the column's, the test reads only their count and the folders' paths. */
@@ -246,6 +261,13 @@ export function feature(now = 1_791_100_000_000): Feature {
         const scope = route.screen === 'artifacts' ? route.project : '';
         return { shows, rows: libraryPage(route) ? libraryRows(libraryView(store.folders(), allItems(store), scope, '')) : [] };
       },
+      projectRows: (seen = {}) =>
+        projectsOf(store.projects()).flatMap((p, index) => {
+          const waits = projectWaiting(store.inboxItems(), p);
+          const r = projectRowOf({ p, agents: store.agents(p.project), waits, index, on: false, cmd: false, seen: seen[p.project], now: clock });
+          if (r.kind !== 'project') return [];
+          return [{ name: p.name, quiet: r.facts.quiet, say: r.facts.sentence.text, bars: rowBars(r.facts.week, clock).length }];
+        }),
     },
   };
   return f;

@@ -33,6 +33,9 @@ crate::words! { projects:
     day_work(day, work) = "{day} · {work} of agent work";
     /// a day bar's tip, a day its agents did not work ('sat 24 oct · no agent work')
     day_idle(day) = "{day} · no agent work";
+    /// a day bar's tip while the week is not known yet (no pulse, still
+    /// counting): every bar a flat stub (designer m_48464)
+    week_idle = "no agent work in the last 7 days";
     /// the inbox pill's tip ('2 in your inbox')
     pill_tip(n) = "{n} in your inbox";
 }
