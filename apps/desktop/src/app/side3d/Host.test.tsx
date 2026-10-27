@@ -25,6 +25,9 @@ import { beatPlace, hitBox } from './World';
 import { outerWorld, TILE_H, TILE_MIN } from './tilestate';
 import { welcoming } from '@/welcome/shown';
 import { FOLLOW_BEAT_MS } from './OuterWorld';
+import { panelState } from '../panel/state';
+import { openTab as openPanelTab } from '../panel/tabs';
+import '../escape';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
 const office = vi.hoisted(() => ({
@@ -184,6 +187,30 @@ describe('the right side, folded', () => {
     expect(v.getByTestId('app.bubble.agents').getAttribute('aria-expanded')).toBe('true');
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(v.queryByTestId('app.flyout.agents')).toBeNull();
+  });
+
+  it('a click in a float that navigates closes it, so one esc with nothing in focus closes the artifact in front (native-lead m_48053); one that acts in place keeps it', () => {
+    panelState.reset();
+    const { v, router } = side3d();
+    act(() => {
+      openPanelTab({ kind: 'artifact', project: ACME, id: 'a2' });
+    });
+    fireEvent.click(v.getByTestId('app.bubble.agents'));
+    // the archived fold acts in place: the float stays
+    fireEvent.click(v.getByTestId('app.flyout.agents.archived'));
+    const old = v.getByTestId('app.flyout.agents.archived.rows').querySelector<HTMLElement>('[data-row]');
+    expect(old).not.toBeNull();
+    fireEvent.click(old as HTMLElement);
+    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'old' });
+    expect(v.queryByTestId('app.flyout.agents')).toBeNull();
+    // the window's one esc, the focus on nothing: the artifact's tab closes (escape.ts 7), the route stays
+    (document.activeElement as HTMLElement | null)?.blur();
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(panelState.get().tabs.list.some((t) => t.id === `artifact:${ACME}/a2`)).toBe(false);
+    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'old' });
+    panelState.reset();
   });
 
   it('⌥⌘1-⌥⌘4 are the bubbles: the key gives the screen action, the side opens its card', () => {

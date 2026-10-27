@@ -116,16 +116,18 @@ export interface FloatProps {
   readonly frameRef: Ref<HTMLElement>;
   /** its layer now, then the leaving one while it moves */
   readonly children: ReactNode;
+  /** a click in it, before its row's own act and after it (SideHost: a row that navigates closes it) */
+  readonly onClicked?: { readonly before: () => void; readonly after: () => void };
 }
 
 /**
  * The one float (designer m_44975, m_44990): a frame that stays mounted from one bubble to
  * another; Host moves it (its top and height, 240 ms) and swaps its layers.
  */
-export function Float({ id, name, top, maxH, moving, frameRef, children }: FloatProps) {
+export function Float({ id, name, top, maxH, moving, frameRef, children, onClicked }: FloatProps) {
   return (
     <section ref={frameRef} className="s3-card" style={{ top, maxHeight: maxH }} data-foot="" data-moving={moving || undefined} data-tip-box=""
-      role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
+      role="dialog" aria-label={name} data-testid={`app.flyout.${id}`} onClickCapture={onClicked?.before} onClick={onClicked?.after}>
       {children}
     </section>
   );

@@ -1378,6 +1378,9 @@ if (mode === 'rows2') {
       .then(() => page.locator('[data-testid="artifact.page"]').first().waitFor({ state: 'detached', timeout: 5000 })).then(() => true, () => false);
     const closedAt1100 = byEsc || byX === true;
     Object.assign(sheet, { by_esc: byEsc, by_x: byX });
+    // escape.ts's step 7/8 must run with nothing in focus too (native-lead m_48021: a bug today,
+    // its own row so the maker's row stays green on the sheet's ✕)
+    step('esc with nothing in focus closes an artifact sheet at 1100', byEsc, { by_esc: byEsc, by_x: byX });
     await page.mouse.move(1, 400);
     const narrow = await measure();
     await shot('archived-maker-1100');

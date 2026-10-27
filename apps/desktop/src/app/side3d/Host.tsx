@@ -15,7 +15,8 @@
 // (folded) or ⌥⌘1-⌥⌘4 (keys.ts) toggle it (by its key, its first row takes the focus); from one
 // bubble to another the same float moves to its new place and size in 240 ms, its content
 // crossfading (moveFrames, designer m_44990; reduced motion: a 120 ms fade in place); ⌥ held shows each bubble's key; ↑ ↓ walk the rows,
-// ⏎ opens one; esc closes it (the focus back on its bubble), a click outside too. Places, in px
+// ⏎ opens one; esc closes it (the focus back on its bubble), a click outside too, and a click in it
+// that navigates (a thread, a page, a tab opened: native-lead m_48053). Places, in px
 // under the bar: the world 12 from the top and the right edge; the bubbles 12 from the right, 152
 // from the top, 80 apart (44 + 36), never moving (the big world floats over them, designer
 // m_42536); with the world folded into a bubble, it is the stack's first, at 40; a card 68 from
@@ -47,7 +48,7 @@ import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
-import { newAgent, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
+import { newAgent, openTab, panelFront, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
 import { acrossSays, busyProjects, useListed } from './lists';
 import { barScope, inScope, scopeWords } from '../barscope';
 import { alarms } from '@/thread/wake';
@@ -425,6 +426,24 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
     if (r.kind === 'orphan' && r.branch !== undefined) router.go({ screen: 'branch', project: r.project, branch: r.branch });
     else if (r.agent !== undefined) router.go({ screen: 'review', project: r.project, agent: r.agent });
   };
+  // a click in the float that navigates (a row opens a thread, a page, an artifact or a task's tab; a
+  // foot's 'all … ›') closes it, so his next esc goes to what it opened, never to the float left
+  // over it (native-lead m_48053); a click that acts in place (an answer, a restore, the archived
+  // fold) keeps it. One rule here, for every float's rows: where he is before the click, then after
+  const clickFrom = useRef<string | null>(null);
+  const whereNow = () => `${JSON.stringify(router.get())} ${panelFront() ?? ''}`;
+  const floatClicked = {
+    before: () => {
+      clickFrom.current = whereNow();
+    },
+    after: () => {
+      const from = clickFrom.current;
+      clickFrom.current = null;
+      if (from === null || from === whereNow()) return;
+      setOpen(null);
+      setLeaving(null);
+    },
+  };
   const running = procs.filter((x) => isRunning(x.p));
   // bise's own lists every project's (designer m_45706): each row says its project ('acme › perf'),
   // each head counts across them ('6 working in 3 projects'); in a project, neither
@@ -587,7 +606,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       {carded.map((b) => <CoinCardView key={b} id={b} card={coinCard(b, facts)} top={tops.bubbles[b]} />)}
       {fading !== null && !carded.includes(fading) && open === null && !mini && <CoinCardView key={`out-${fading}`} id={fading} card={coinCard(fading, facts)} top={tops.bubbles[fading]} out />}
       {open !== null && (
-        <Float id={open} name={bubbleName(open)} top={tops.bubbles[open]} maxH={maxH} moving={leaving !== null} frameRef={frame}>
+        <Float id={open} name={bubbleName(open)} top={tops.bubbles[open]} maxH={maxH} moving={leaving !== null} frameRef={frame} onClicked={floatClicked}>
           <FloatLayer key={open} c={floatOf(open)} scrolls={fit.scrolls} />
           {leaving !== null && leaving !== open && <FloatLayer key={`leaving-${leaving}`} c={floatOf(leaving)} leaving />}
         </Float>
