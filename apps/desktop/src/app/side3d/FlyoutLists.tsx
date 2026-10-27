@@ -92,7 +92,7 @@ export function typed(p: Pick<Proc, 'cmd' | 'cwd'>): string {
 
 /** a process row's command line, command and port, for the port's fit (portfit.ts) */
 function procBoxes(el: HTMLElement): PortBoxes {
-  return { line: el.querySelector('.s3-row-l1'), cmd: el.querySelector('.s3-cmd'), port: el.querySelector('.s3-port') };
+  return { line: el.querySelector('.s3-row-lines'), cmd: el.querySelector('.s3-row-l1'), port: el.querySelector('.s3-port') };
 }
 
 export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: string }) {
@@ -114,7 +114,7 @@ export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: s
         <>
           {/* its port as a link that opens the page, never the row (folded-side v9, the Overview's port link) */}
           {u !== null && (
-            <span className="s3-port" role="link" aria-label={u.label} {...tipAttrs(u.label)} data-short={full ? undefined : ''} onClick={(e) => {
+            <span className="s3-port" role="link" aria-label={u.label} {...tipAttrs(full ? undefined : u.label)} data-short={full ? undefined : ''} onClick={(e) => {
               e.stopPropagation();
               void (window as Partial<Window>).bise?.openExternal(u.url);
             }} data-testid={`app.flyout.processes.${x.project}.${p.agent}.${p.id}.port`}>

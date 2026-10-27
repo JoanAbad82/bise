@@ -39,22 +39,26 @@ const PROC: Proc = {
   ports: [5242], url: 'http://localhost:5242/', state: { is: 'running' }, cpu: 0, rss_mb: 10, procs: 1, out: 'bg',
 };
 
-function row(lineW: number) {
+function row(lineW: number, cmd = PROC.cmd) {
   const core: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   const store = new Store(core);
   const v = render(
     <StoreProvider store={store}>
-      <ProcRow x={{ project: 'acme', projectName: 'acme', p: PROC }} now={60_000} />
+      <ProcRow x={{ project: 'acme', projectName: 'acme', p: { ...PROC, cmd } }} now={60_000} />
     </StoreProvider>,
   );
   const box = v.getByTestId('app.flyout.processes.acme.perf.bg1');
-  const line = box.querySelector('.s3-row-l1') as HTMLElement;
-  const cmd = box.querySelector('.s3-cmd') as HTMLElement;
-  Object.defineProperty(line, 'clientWidth', { value: lineW, configurable: true });
-  // mono, 7 px a character
-  Object.defineProperty(cmd, 'scrollWidth', { value: 7 * cmd.textContent.length, configurable: true });
+  // as Chromium lays it out: the lines' column takes the row's room, the command's line box its
+  // words (mono, 7 px a character), the command's inline span measures 0 (ui-review m_46955), the
+  // port's box its words
+  const lines = box.querySelector('.s3-row-lines') as HTMLElement;
+  const l1 = box.querySelector('.s3-row-l1') as HTMLElement;
+  Object.defineProperty(lines, 'clientWidth', { value: lineW, configurable: true });
+  Object.defineProperty(l1, 'clientWidth', { value: Math.min(lineW, 7 * l1.textContent.length), configurable: true });
+  Object.defineProperty(l1, 'scrollWidth', { value: 7 * l1.textContent.length, configurable: true });
+  Object.defineProperty(box.querySelector('.s3-cmd') as HTMLElement, 'scrollWidth', { value: 0, configurable: true });
   const port = v.getByTestId('app.flyout.processes.acme.perf.bg1.port');
-  Object.defineProperty(port, 'scrollWidth', { value: 7 * port.textContent.length, configurable: true });
+  Object.defineProperty(port, 'offsetWidth', { value: 7 * port.textContent.length, configurable: true });
   return { v, box, port };
 }
 
@@ -80,11 +84,28 @@ describe('a process row\'s port', () => {
     expect(port.textContent).toBe(':5242');
   });
 
-  it('hovered with no room: the short form stays', () => {
+  it('hovered with no room: the short form stays (a long command at 280: ui-review m_46955 saw it inverted)', () => {
     const { box, port } = row(164);
     act(() => {
       fireEvent.pointerEnter(box);
     });
     expect(port.textContent).toBe(':5242');
+  });
+
+  it('a short command (\'vite\', 28) beside the full form: it shows on hover and on the row\'s focus, without a tip repeating it', () => {
+    const { box, port } = row(120, 'vite');
+    act(() => {
+      fireEvent.pointerEnter(box);
+    });
+    expect(port.textContent).toBe('localhost:5242');
+    expect(port.hasAttribute('data-tip')).toBe(false);
+    act(() => {
+      fireEvent.pointerLeave(box);
+    });
+    expect(port.textContent).toBe(':5242');
+    act(() => {
+      fireEvent.focusIn(box.querySelector('[data-row]') as HTMLElement);
+    });
+    expect(port.textContent).toBe('localhost:5242');
   });
 });

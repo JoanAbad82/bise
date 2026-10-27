@@ -33,7 +33,9 @@ export function fullGrows(shortW: number, shortLen: number, fullLen: number): nu
 
 /** What the row's elements measure with the short form drawn. */
 export interface PortBoxes {
+  /** the row's lines column: the room the command has beside the port */
   readonly line: HTMLElement | null;
+  /** the command's own line box (overflow hidden): its scrollWidth is the command's whole width */
   readonly cmd: HTMLElement | null;
   readonly port: HTMLElement | null;
 }
@@ -51,7 +53,9 @@ export function usePortFull(row: RefObject<HTMLElement | null>, pick: (el: HTMLE
     const on = () => {
       const { line, cmd, port } = pick(el);
       if (line === null || cmd === null || port === null) return;
-      const grows = fullGrows(port.scrollWidth, port.textContent.length, full.length);
+      // the lines' column takes what the row leaves (flex 1); the command's own box shrinks to its
+      // words, its scrollWidth their whole width (an inline span's would be 0: ui-review m_46955)
+      const grows = fullGrows(port.offsetWidth, port.textContent.length, full.length);
       setShown(portFits(line.clientWidth - grows, cmd.scrollWidth, cmd.textContent.length));
     };
     const off = (e: Event) => {
