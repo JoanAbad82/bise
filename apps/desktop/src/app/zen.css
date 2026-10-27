@@ -20,7 +20,7 @@
     transition: none;
   }
 }
-.app-shell :is(.app-title, .b-side, .app-rb, .b-composer .keys, .b-composer .row) {
+.app-shell :is(.app-title, .b-side, .app-rb, .b-composer .keys, .b-composer .box > .row) {
   --c-text: color-mix(in srgb, var(--p-text), transparent var(--zen));
   --c-ink: color-mix(in srgb, var(--p-text), transparent var(--zen));
   --c-text-2: color-mix(in srgb, var(--p-dim), transparent var(--zen));

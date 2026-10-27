@@ -23,8 +23,8 @@
 .b-composer .box.ans:not(.quiet) .send:not(.stop){background:var(--c-accent);color:var(--c-on-ink)}
 .b-composer .box.ans:not(.quiet) .send.off{opacity:.5}
 .b-composer .box .line{display:flex;align-items:flex-start;gap:var(--gap-inline);min-width:0;padding:var(--s-3) var(--s-4) var(--s-2)}
-.b-composer .box .row{display:flex;align-items:center;gap:var(--s-1);box-sizing:border-box;height:var(--s-10);padding:0 var(--s-2) var(--s-1);min-width:0}
-.b-composer .box .row .sp{flex:1;min-width:0}
+.b-composer .box>.row{display:flex;align-items:center;gap:var(--s-1);box-sizing:border-box;height:var(--s-10);padding:0 var(--s-2) var(--s-1);min-width:0}
+.b-composer .box>.row>.sp{flex:1;min-width:0}
 .b-composer .in{flex:1;font:var(--f-read)}
 .b-composer .in .ph{color:var(--c-text-3)}
 .b-composer .in .cur{display:inline-block;width:2px;height:1.1em;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
