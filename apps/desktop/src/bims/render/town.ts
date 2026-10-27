@@ -449,7 +449,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
 
   function applyFit(): void {
     if (!plan || size.w <= 0) return;
-    base = townFit(plan, size.w, size.maxH, opts.box === true);
+    base = townFit(plan, size.w, size.maxH, opts.box === true, opts.pad ?? 0);
     applyView();
   }
 

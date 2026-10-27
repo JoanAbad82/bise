@@ -16,9 +16,9 @@ export function townSite(plan: TownPlan): Site {
   return { ...plan.lawn, yLow: -1.35, yHigh: 3.0 };
 }
 
-/** The town fitted to the width (its height follows, at most maxH); `box`: whole in a widthPx × maxH canvas (the hero). Pure. */
-export function townFit(plan: TownPlan, widthPx: number, maxH: number, box = false): Fit {
-  return box ? boxSite(townSite(plan), widthPx, maxH) : fitSite(townSite(plan), widthPx, maxH);
+/** The town fitted to the width (its height follows, at most maxH); `box`: whole in a widthPx × maxH canvas (the hero, the outer tile), `pad` px clear on each side. Pure. */
+export function townFit(plan: TownPlan, widthPx: number, maxH: number, box = false, pad = 0): Fit {
+  return box ? boxSite(townSite(plan), widthPx, maxH, pad) : fitSite(townSite(plan), widthPx, maxH);
 }
 
 /** room before and after the town's ground on the camera's line (its roofs, a tree past the lawn's edge) */

@@ -48,6 +48,8 @@ type Phase = 'town' | 'in' | 'swapIn' | 'office' | 'swapOut' | 'out';
 const DIVE_KEY = 'bims.town.dive';
 /** no height bound: the town as tall as its width asks */
 const TALL = 4000;
+/** in a bound box, css px clear between the board's tips and each edge (0-1 px read as cut: designer m_47775) */
+const BOX_PAD = 8;
 /** the gap between a sign's parts (office.css .bims-sign: var(--s-1)) */
 const SIGN_GAP = 4;
 /** offices baked again per frame at most (page town-live: ~85 ms each, the town fills in) */
@@ -474,7 +476,7 @@ export function Town({
       .then((make) => {
         if (gone) return;
         // a bound box (the outer tile): the canvas is that whole box, the town whole and centred in it, never a strip at its top
-        const made = maxHRef.current < TALL ? make(cv, { box: true }) : make(cv);
+        const made = maxHRef.current < TALL ? make(cv, { box: true, pad: BOX_PAD }) : make(cv);
         r = made;
         rRef.current = made;
         made.onLost(() => {

@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { agent, mainAgent } from '../fixtures';
 import { layoutOf } from '../maps';
 import { growOf } from '../growth';
-import { BACK, DIST } from '../render/camera';
+import { BACK, DIST, toScreen } from '../render/camera';
 import { rngOf, townPlan, type TownSite } from './plan';
 import { siteOf, townSeed } from './ground';
-import { diveFit, townDepth, townFit } from './camera';
+import { diveFit, townDepth, townFit, townSite } from './camera';
 
 const JOBS = [0, 3, 15, 60, 150, 1000];
 const DAYS = [0, 3, 14, 60, 365];
@@ -50,6 +50,23 @@ describe('town camera', () => {
     const plan = townPlan(ss, townSeed(ss.map((x) => x.id)));
     const town = townFit(plan, 292, 300, true);
     expect([town.widthPx, town.heightPx]).toEqual([292, 300]);
+    // 8 px clear round the board at both heights (designer m_47775: 0-1 px read as cut)
+    for (const h of [140, 300]) {
+      const f = townFit(plan, 292, h, true, 8);
+      expect([f.widthPx, f.heightPx]).toEqual([292, h]);
+      const s = townSite(plan);
+      const xs: number[] = [];
+      const ys: number[] = [];
+      for (const x of [s.x0, s.x1]) for (const y of [s.yLow, s.yHigh]) for (const z of [s.z0, s.z1]) {
+        const p = toScreen(f, { x, y, z });
+        xs.push(p.x);
+        ys.push(p.y);
+      }
+      expect(Math.min(...xs), `${String(h)}: left`).toBeGreaterThanOrEqual(8 - 1e-6);
+      expect(Math.max(...xs), `${String(h)}: right`).toBeLessThanOrEqual(284 + 1e-6);
+      expect(Math.min(...ys), `${String(h)}: top`).toBeGreaterThanOrEqual(8 - 1e-6);
+      expect(Math.max(...ys), `${String(h)}: bottom`).toBeLessThanOrEqual(h - 8 + 1e-6);
+    }
     const p = plan.offices[1];
     if (p === undefined) throw new Error('no office');
     // the free dive: its natural height; bound: the tile's, the office centred in it

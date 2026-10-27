@@ -77,6 +77,8 @@ export interface TownOpts {
   readonly allLive?: boolean;
   /** the canvas is the whole width × height asked (setSize's maxHeightPx), the town whole and centred in it */
   readonly box?: boolean;
+  /** with `box`: css px kept clear round the town on each side (the outer tile: 8, designer m_47775) */
+  readonly pad?: number;
   /** the sky behind the town, by theme (the page's paper, so the canvas has no edge); absent: the palette's */
   readonly sky?: { readonly day: string; readonly night: string };
   /** at night, the light's strength times this (the hero on a dark page: bims m_31057); absent: 1 */
