@@ -472,7 +472,8 @@ export function Town({
       .load()
       .then((make) => {
         if (gone) return;
-        const made = make(cv);
+        // a bound box (the outer tile): the canvas is that whole box, the town whole and centred in it, never a strip at its top
+        const made = maxHRef.current < TALL ? make(cv, { box: true }) : make(cv);
         r = made;
         rRef.current = made;
         made.onLost(() => {
@@ -633,6 +634,8 @@ export function Town({
           growth={project.growth}
           map={project.map}
           parts={parts.office}
+          // a bound box: the dived Office fills it, whole and centred (the dive ends on that framing: camera.ts diveFit)
+          fill={maxH < TALL}
           onOpen={(agent) => {
             onOpenAgent(project.id, agent);
           }}

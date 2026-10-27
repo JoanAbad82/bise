@@ -52,7 +52,12 @@ export function officeSiteIn(p: Placed, o: Office, widthPx: number): Site {
   return { ...s, x0: s.x0 + p.x, x1: s.x1 + p.x, z0: s.z0 + p.z, z1: s.z1 + p.z };
 }
 
-/** The dived fit: the office's own (Office.tsx's renderer fits it to the width, at most 4000 px high). Pure. */
-export function diveFit(p: Placed, o: Office, widthPx: number): Fit {
-  return fitSite(officeSiteIn(p, o, widthPx), widthPx, 4000);
+/**
+ * The dived fit: the office's own (Office.tsx's renderer fits it to the width, at most 4000 px high);
+ * in a bound box (`boxH` > 0: the outer tile, its Office `fill`) the office whole and centred in
+ * widthPx × boxH, as a filled Office opens. Pure.
+ */
+export function diveFit(p: Placed, o: Office, widthPx: number, boxH = 0): Fit {
+  const site = officeSiteIn(p, o, widthPx);
+  return boxH > 0 ? boxSite(site, widthPx, boxH) : fitSite(site, widthPx, 4000);
 }

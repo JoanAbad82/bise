@@ -629,7 +629,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     diveFit(id, widthPx) {
       const p = placedOf(id);
       const o = spots.get(id)?.scene.office();
-      return p && o ? diveFit(p, o, widthPx) : null;
+      // a bound box (opts.box): the office whole in that box, as its filled Office opens
+      return p && o ? diveFit(p, o, widthPx, opts.box === true ? size.maxH : 0) : null;
     },
     setView(f) {
       view = f;

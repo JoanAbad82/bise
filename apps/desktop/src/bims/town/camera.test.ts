@@ -8,7 +8,7 @@ import { growOf } from '../growth';
 import { BACK, DIST } from '../render/camera';
 import { rngOf, townPlan, type TownSite } from './plan';
 import { siteOf, townSeed } from './ground';
-import { townDepth, townFit } from './camera';
+import { diveFit, townDepth, townFit } from './camera';
 
 const JOBS = [0, 3, 15, 60, 150, 1000];
 const DAYS = [0, 3, 14, 60, 365];
@@ -42,5 +42,22 @@ describe('town camera', () => {
       }
     }
     expect(bad.slice(0, 6), `${String(n)} projects`).toEqual([]);
+  });
+
+  it('in a bound box (the outer tile) the town and the dive fill it whole, centred: no empty band under them (ui-review m_47669)', () => {
+    const office = layoutOf([mainAgent(), agent('perf'), agent('docs')]);
+    const ss = Array.from({ length: 6 }, (_, i) => siteOf(`p${String(i)}`, office, growOf({ jobs_done: 15, days_used: 14, artifacts_made: 0 }), i === 0));
+    const plan = townPlan(ss, townSeed(ss.map((x) => x.id)));
+    const town = townFit(plan, 292, 300, true);
+    expect([town.widthPx, town.heightPx]).toEqual([292, 300]);
+    const p = plan.offices[1];
+    if (p === undefined) throw new Error('no office');
+    // the free dive: its natural height; bound: the tile's, the office centred in it
+    const free = diveFit(p, office, 292);
+    expect(free.heightPx).toBeLessThan(300);
+    const bound = diveFit(p, office, 292, 300);
+    expect([bound.widthPx, bound.heightPx]).toEqual([292, 300]);
+    expect(bound.target.x).toBeCloseTo(free.target.x, 6);
+    expect(bound.target.z).toBeCloseTo(free.target.z, 6);
   });
 });
