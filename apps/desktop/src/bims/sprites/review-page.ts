@@ -46,6 +46,9 @@ function standRig(): Rig {
   return { ...r, x: 0, z: 0, dir: 0, y: 0, body: [0, 0, 0], head: [0, 0, 0], armL: [0, 0, 0.12], armR: [0, 0, -0.12], legL: 0, legR: 0, eyes: 1, mouth: 'smile', props: NO_PROPS, opacity: 1, grey: 0 };
 }
 
+/** the coin's head (app/side3d/render.ts LEVEL, not exported: keep the two the same) */
+const COIN_HEAD = [-0.2, 0, 0] as const;
+
 /** the coin's standing visitor, turned to the camera (app/side3d/render.ts standing) */
 const FACE = Math.PI / 4;
 function coinPose(): Pose {
@@ -144,6 +147,7 @@ function drawRow(r: Row, size: number): HTMLCanvasElement {
   const night = r.light === 'night';
   const pal = night ? NIGHT : DAY;
   const v = sharedView();
+  camReset();
   const bim = bimOf(d);
   bim.daylight(night ? 0 : 1);
   castShadows(bim.group);
@@ -178,7 +182,8 @@ function drawRow(r: Row, size: number): HTMLCanvasElement {
     v.renderer.setSize(size, size, false);
     v.look(fit);
   } else if (cam === 'coin' || cam === 'swatch') {
-    bim.apply(rigOf({ pose: coinPose(), t: 30, main: d.main, phase: 0, reduced: true }));
+    // the coin's head looks up (app/side3d/render.ts LEVEL, bim-3d's f1 fix): a cap's peak leaves the eyes
+    bim.apply({ ...rigOf({ pose: coinPose(), t: 30, main: d.main, phase: 0, reduced: true }), head: COIN_HEAD });
     bim.detail(true);
     bim.group.updateMatrixWorld(true);
     const head = headOf(bim);
@@ -219,9 +224,18 @@ function sharedView(): View {
   const v = makeView(document.createElement('canvas'), { shadowAuto: true, transparent: true });
   v.renderer.setPixelRatio(1);
   v.sky('#000000');
+  const { near, far } = v.camera;
+  camReset = (): void => {
+    // the back view moves the camera in close (near 0.1, far 30): the iso views' look() keeps its own depth
+    v.camera.near = near;
+    v.camera.far = far;
+    v.camera.up.set(0, 1, 0);
+    v.camera.updateProjectionMatrix();
+  };
   shared = v;
   return v;
 }
+let camReset = (): void => undefined;
 
 /** one finding of the automatic checks on a row */
 export interface Issue {
@@ -315,7 +329,10 @@ export function checkRow(r: Row): Issue[] {
   for (const m of hidden) m.removeFromParent();
   // two faces of one colour in one plane flicker unseen: only two colours fight
   const colourOf = (n: string): string => n.slice(n.lastIndexOf('#'));
-  const clashes = coplanarClashes(bim.group, 0.002, 4e-5, 'same').filter((c) => colourOf(c.a) !== colourOf(c.b));
+  // and the hair's nape over the collar ring is a moving tangent contact (bim-3d m_48623: 206 frames, any
+  // radius moves it to another): facets lining up, never a flicker; not counted
+  const nape = (a: string, b: string): boolean => a.startsWith('head/hair') && b.startsWith('body/worn Torus');
+  const clashes = coplanarClashes(bim.group, 0.002, 4e-5, 'same').filter((c) => colourOf(c.a) !== colourOf(c.b) && !nape(c.a, c.b) && !nape(c.b, c.a));
   if (clashes.length > 0) {
     const area = clashes.reduce((s, c) => s + c.area, 0);
     out.push({ check: 'zfight', n: clashes.length, note: `coplanar: ${clashes.slice(0, 4).map((c) => `${c.a} x ${c.b} (${(c.area * 1e4).toFixed(1)} cm²)`).join(', ')}${clashes.length > 4 ? ` +${String(clashes.length - 4)}` : ''} · ${(area * 1e4).toFixed(1)} cm²` });
