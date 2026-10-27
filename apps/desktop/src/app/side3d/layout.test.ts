@@ -44,6 +44,16 @@ describe('sideLayout, the panel folded', () => {
     expect(right(1000, l)).toBe(BUBBLE_BAND);
     expect(l.colLeft).toBe(SIDE + MIN_LEFT);
   });
+  it('compact by hand (his m_46698): the coins at the edge however wide, the column centred beside their 180 band', () => {
+    for (const w of [1920, 1728, 1440]) {
+      const l = sideLayout(w, SIDE, false, undefined, true, undefined, true);
+      expect(l).toMatchObject({ coins: 'edge', world: 'small', gutter: 180, side: true, colW: COL_W });
+    }
+    // narrow windows fall back the same with or without the pick
+    for (const w of [1100, 1000]) expect(sideLayout(w, SIDE, false, undefined, true, undefined, true)).toEqual(sideLayout(w, SIDE, false));
+    // the panel open: the pick changes nothing
+    expect(sideLayout(1440, SIDE, true, 480, true, undefined, true)).toEqual(sideLayout(1440, SIDE, true, 480));
+  });
   it('never a negative width', () => {
     expect(sideLayout(200, SIDE, false).colW).toBe(0);
   });

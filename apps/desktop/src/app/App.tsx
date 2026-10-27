@@ -59,6 +59,9 @@ import { useTheme } from '@/theme';
 import { HELP_EVENT, keyAction, menuEcho, typingIn, type FrameAction } from './keys';
 import { emitAction, useMenuAction } from './menu';
 import { outerWorld, useOuterWorld } from './side3d/tilestate';
+import { cardFits, sideCompact, useSideCompact } from './side3d/sidepick';
+import { sideShows } from './side3d/layout';
+import { useLeftWidth, useWindowWidth } from './frame-state';
 import { TerminalPanel } from '@/terminal/Terminal';
 import { AddSheetHost } from '@/settings/AddSheet';
 import { pickerPort } from '@/settings/picker';
@@ -272,6 +275,10 @@ function Shell() {
   useMenuAction('panelFull', () => {
     if (!menuEcho(frameKeyAt.panelFull, Date.now())) toggleFull();
   });
+  // View › Compact Side / Show Side Card (side-mini, designer m_46706): the outer card or the coins, kept per window
+  useMenuAction('sideCard', sideCompact.toggle);
+  const sideIsCompact = useSideCompact();
+  const sideCardCant = !cardFits(useWindowWidth(), useLeftWidth(), sideShows(route));
   // the View menu's labels flip with the two sides (main/agentmenu.ts rebuilds on a change)
   const panelOpen = usePanelState().open;
   const panelFull = usePanelFull();
@@ -281,8 +288,8 @@ function Shell() {
   useEffect(() => {
     // a component test's window.bise may be a partial fake, and the page outside Electron has none
     const bise = (window as Partial<Window>).bise as Partial<Window['bise']> | undefined;
-    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen, artifact: artifactShown, panelFull, panelFullCan: !panelSheet, ...(bimsHidden ? { bimsHidden } : {}) });
-  }, [sidebarShown, panelOpen, artifactShown, panelFull, panelSheet, bimsHidden]);
+    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen, artifact: artifactShown, panelFull, panelFullCan: !panelSheet, ...(bimsHidden ? { bimsHidden } : {}), ...(sideIsCompact ? { sideCompact: true } : {}), ...(sideCardCant ? { sideCardCant } : {}) });
+  }, [sidebarShown, panelOpen, artifactShown, panelFull, panelSheet, bimsHidden, sideIsCompact, sideCardCant]);
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
   // R8: a /model the core holds for its provider opens that provider's setup (amb-home)

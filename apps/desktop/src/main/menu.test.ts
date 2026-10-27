@@ -193,12 +193,27 @@ describe('menuTarget (qa-native m_9724)', () => {
     expect(menuTarget('panelFull', false)).toEqual({ send: 'focused' });
   });
 
-  it("View: Hide the Bims / Show the Bims under Panel Full Width, as the focused window's tile is (outer-world v2, his pick #799), the window's own", () => {
-    const fourth = (sides?: { sidebar: boolean; panel: boolean; bimsHidden?: boolean }) => {
+  it("View: Compact Side / Show Side Card under Panel Full Width, no key, dimmed when the window holds no card (side-mini, designer m_46706), the window's own", () => {
+    const fourth = (sides?: { sidebar: boolean; panel: boolean; sideCompact?: boolean; sideCardCant?: boolean }) => {
       const sent: MenuAction[] = [];
       const t = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: (a) => sent.push(a), ...(sides ? { sides } : {}) });
       const sub = (t.find((m) => m.label === 'View')?.submenu ?? []) as MenuItemConstructorOptions[];
       const i = sub[3];
+      (i?.click as (() => void) | undefined)?.();
+      return [i?.label, i?.accelerator, i?.enabled, sent];
+    };
+    expect(fourth()).toEqual(['Compact Side', undefined, true, ['sideCard']]);
+    expect(fourth({ sidebar: true, panel: false, sideCompact: true })).toEqual(['Show Side Card', undefined, true, ['sideCard']]);
+    expect(fourth({ sidebar: true, panel: false, sideCardCant: true })[2]).toBe(false);
+    expect(menuTarget('sideCard', false)).toEqual({ send: 'focused' });
+  });
+
+  it("View: Hide the Bims / Show the Bims under Compact Side, as the focused window's tile is (outer-world v2, his pick #799), the window's own", () => {
+    const fourth = (sides?: { sidebar: boolean; panel: boolean; bimsHidden?: boolean }) => {
+      const sent: MenuAction[] = [];
+      const t = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: (a) => sent.push(a), ...(sides ? { sides } : {}) });
+      const sub = (t.find((m) => m.label === 'View')?.submenu ?? []) as MenuItemConstructorOptions[];
+      const i = sub[4];
       (i?.click as (() => void) | undefined)?.();
       return [i?.label, i?.accelerator, sent];
     };

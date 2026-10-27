@@ -22,6 +22,8 @@ const PARTS = {
   // the bar
   sidebar: ["M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M9 4v16"],
   panel: ["M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M15 4v16"],
+  // the right side's card or coins (side-mini, designer m_46706): the sidebar's glyph mirrored, its column narrow
+  "side-card": ["M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M17 4v16"],
   back: ["M19 12H5M12 19l-7-7 7-7"],
   forward: ["M5 12h14M12 5l7 7-7 7"],
   plus: ["M12 5v14M5 12h14"],

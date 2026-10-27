@@ -1,5 +1,6 @@
 // The window's frame (bise fait mac, page native-mac §6, mockup 1): one bar across the top (Bar:
-// the lights' room, the sidebar button, ‹ ›, the title and its subtitle, the page's slot, ▯ through
+// the lights' room, the sidebar button, ‹ ›, the title and its subtitle, the page's slot, the right
+// side's card-or-coins button (side3d/sidepick.ts), ▯ through
 // <BarTabs/>, nm-panel's; the open panel's tabs sit in the same row over its column, app.css),
 // the width classes (under 1000 px the
 // sidebar slides over the window with a 45% scrim, esc or a click outside closes it), and whether
@@ -28,7 +29,9 @@ import { CoinSlot } from "./side3d/Minis";
 import { useEscLayer } from "./escape";
 import { BarTabs } from "./panel/BarTabs";
 import { BarSlot, barGroundDoubleClick, TitleSlot } from "./barslot";
-import { frameLeft, useLeft } from "./frame-state";
+import { frameLeft, useLeft, useLeftWidth, useWindowWidth } from "./frame-state";
+import { sideShows } from "./side3d/layout";
+import { cardFits, sideCompact, useSideCompact } from "./side3d/sidepick";
 import { SIDE, sideWidthOf, UNFOLD_PX } from "./resize";
 import { crumbOf, NARROW_PX, PANEL_OPEN_PX } from "./side";
 import { barTitleOf, stateFactOf, windowTitleOf, type StateFact } from "./title";
@@ -473,9 +476,34 @@ export function Bar({ frame: state }: { frame: FrameState }) {
       </StatusSlot>
       {/* the page's search and action (barslot.tsx: a page's <InBar>) */}
       <BarSlot />
+      {/* the right side's form by hand, left of the panel's ▯ (side-mini, designer m_46706) */}
+      <SideCardButton />
       {/* the panel's tabs and its ▯ (nm-panel's mount point) */}
       <BarTabs />
     </header>
+  );
+}
+
+/**
+ * The outer card or the compact coins, by his hand (side3d/sidepick.ts): pressed while the card
+ * shows; with the panel open it still sets the pick, seen when the panel folds; dimmed when the
+ * window holds no card ('no room'); gone on a page that shows no side (layout sideShows).
+ */
+function SideCardButton() {
+  const route = useRoute();
+  const compact = useSideCompact();
+  const shows = sideShows(route);
+  const fits = cardFits(useWindowWidth(), useLeftWidth(), shows);
+  if (!shows) return null;
+  return (
+    <BarButton
+      icon="side-card"
+      label={!fits ? frame.side_no_room : compact ? frame.side_card : frame.side_compact}
+      pressed={fits && !compact}
+      disabled={!fits}
+      onClick={sideCompact.toggle}
+      testId="app.bar.sidecard"
+    />
   );
 }
 

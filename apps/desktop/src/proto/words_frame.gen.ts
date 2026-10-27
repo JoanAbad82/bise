@@ -28,6 +28,12 @@ export const frame = {
   hide_sidebar: "Hide sidebar",
   /** the same button while the sidebar is hidden */
   show_sidebar: "Show sidebar",
+  /** the bar's right-side button, left of the panel's, while the outer card shows: the coins in its place (side-mini, designer m_46706) */
+  side_compact: "Compact side",
+  /** the same button while he picked the coins */
+  side_card: "Show side card",
+  /** the same button dimmed: the window too narrow for the card */
+  side_no_room: "No room for the side card at this width",
   /** the bar's back arrow (⌘[) */
   back: "Back",
   /** the bar's forward arrow (⌘]) */

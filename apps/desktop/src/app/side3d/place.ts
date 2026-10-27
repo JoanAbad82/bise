@@ -3,10 +3,11 @@
 // window's width, the left width (rail + sidebar) and the tabbed panel, and puts it here; the
 // readers subscribe (useSideLayout). Designer's condition (m_42050): it is computed again only at
 // a resize's end (RESIZE_END_MS after the last resize event), when the sidebar or the panel
-// folds, or when he goes to a page that shows no side (layout sideShows), never while he types or
+// folds, when he picks the card or the coins (sidepick.ts), or when he goes to a page that shows no side (layout sideShows), never while he types or
 // scrolls. Owner: nm-side.
 import { useEffect, useSyncExternalStore } from 'react';
 import { sideLayout, type PanelIn, type SideLayout } from './layout';
+import { useSideCompact } from './sidepick';
 
 /** a resize has ended when no resize event came for this long, ms */
 export const RESIZE_END_MS = 160;
@@ -54,12 +55,13 @@ export function onResizeEnd(cb: (w: number) => void): () => void {
   };
 }
 
-/** In SideHost: compute the layout at a resize's end, when the left width or the panel changes, and when the route shows the side or not (layout sideShows). */
+/** In SideHost: compute the layout at a resize's end, when the left width or the panel changes, when the route shows the side or not (layout sideShows), and when he picks the card or the coins (sidepick.ts). */
 export function useLayoutDriver(winW: number, leftW: number, panel: PanelIn, shows: boolean): void {
   const { open, width, over, full, threadMin } = panel;
+  const compact = useSideCompact();
   useEffect(() => {
-    setSideLayout(sideLayout(winW, leftW, open, open && width > 0 ? width : undefined, shows, { over, full, threadMin }));
-  }, [winW, leftW, open, width, over, full, threadMin, shows]);
+    setSideLayout(sideLayout(winW, leftW, open, open && width > 0 ? width : undefined, shows, { over, full, threadMin }, compact));
+  }, [winW, leftW, open, width, over, full, threadMin, shows, compact]);
 }
 
 // ---- where the coins go when the thread has no room beside them (folded-side v9) ----

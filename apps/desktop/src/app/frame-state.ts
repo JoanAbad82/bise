@@ -64,7 +64,8 @@ export function leftWidthOf(win: number, l: Left): number {
   return RAIL_W + (win >= NARROW_PX && !l.hidden ? l.width : 0);
 }
 
-function useWindowWidth(): number {
+/** The window's width, live. */
+export function useWindowWidth(): number {
   return useSyncExternalStore(
     (cb) => {
       window.addEventListener('resize', cb);

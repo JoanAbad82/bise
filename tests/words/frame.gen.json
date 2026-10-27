@@ -99,6 +99,21 @@
     "one": null,
     "text": "Show sidebar"
   },
+  "frame.side_card": {
+    "args": [],
+    "one": null,
+    "text": "Show side card"
+  },
+  "frame.side_compact": {
+    "args": [],
+    "one": null,
+    "text": "Compact side"
+  },
+  "frame.side_no_room": {
+    "args": [],
+    "one": null,
+    "text": "No room for the side card at this width"
+  },
   "frame.sidebar_width": {
     "args": [],
     "one": null,
