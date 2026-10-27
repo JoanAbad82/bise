@@ -17,7 +17,7 @@ import type { Card } from '@/proto';
 import { threadKey, useAgents, useCards, useCoreState, useProjects, useStore, useThreadOrder, useTyping } from '@/store';
 import { usePartialText } from '@/shared/partial';
 import { useMenuAction } from '@/app/menu';
-import { useRoute, useRouter } from '@/app/router';
+import { useRoute } from '@/app/router';
 import { InBar } from '@/app/barslot';
 import { useEntityMenu } from '@/app/menus/use';
 import { MAIN } from '@/app/route';
@@ -267,25 +267,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       }
     }
   };
-  // a project's main: its counts (tui-parity W2), else the agent's line
-  const all = useAgents(project);
-  const counts = agent === 'main' ? countsOf(all) : '';
-  const router = useRouter();
-  // the counts open the agents list (bar A.2: the TUI's /agents and panel)
-  const countsLink =
-    counts === '' ? null : (
-      <a
-        href="#agents"
-        className="th-agents-link"
-        onClick={(e) => {
-          e.preventDefault();
-          router.go({ screen: 'agents', project });
-        }}
-        data-testid="thread.agents"
-      >
-        {counts}
-      </a>
-    );
   // designer's v6 (5): an agent whose thread has nothing of its own yet (his first message at most) is starting
   const order = useThreadOrder(tkey);
   // once it writes (a streamed reply, live.ts) it isn't starting any more, even between the
@@ -328,7 +309,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} data-about={artifact !== undefined || undefined} data-dim={(artifact !== undefined && me?.archived === true) || undefined} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture} style={column}>
         {inView && ours && (
           <InBar>
-            {agent === MAIN && countsLink}
             <MoreButton menu={menu} testId="thread.more" />
           </InBar>
         )}
@@ -460,14 +440,6 @@ export function codeToCopy(doc: Document): string | undefined {
 }
 
 /** The list: entries by pos, then his sends not confirmed yet. */
-/** "3 agents · 1 at work · 2 waiting": a project's live agents (main out). Pure. */
-export function countsOf(agents: readonly { main: boolean; archived: boolean; status: string; waits: number }[]): string {
-  const live = agents.filter((a) => !a.main && !a.archived);
-  if (live.length === 0) return '';
-  const work = live.filter((a) => a.status === 'working').length;
-  const waits = agents.reduce((n, a) => n + a.waits, 0);
-  return [`${String(live.length)} ${live.length === 1 ? 'agent' : 'agents'}`, work > 0 ? `${String(work)} at work` : '', waits > 0 ? `${String(waits)} waiting for you` : ''].filter(Boolean).join(' · ');
-}
 
 /** An archived agent's thread is history only (tui-parity C47): no composer, a way to restore it. */
 function History({ project, agent }: { project: string; agent: string }) {

@@ -10,7 +10,7 @@ import { Markdown, langOf } from './Markdown';
 import { newAtEnd } from './ThreadList';
 import { cardLine, EntryRow, foldOf, NOTICE_MARK, thoughtFor, toAgentName, type RowCtx } from './rows';
 import { onOpenInbox } from '@/inbox/Block';
-import { countsOf, ThreadScreen } from './ThreadScreen';
+import { ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 import { createFolds, FoldsContext } from './folds';
 
@@ -81,11 +81,6 @@ describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
     expect(v.queryByTestId('composer')).toBeNull();
     fireEvent.click(v.getByTestId('thread.restore'));
     expect(cmds.at(-1)).toEqual({ cmd: 'unarchive', project: P, agent: 'old' });
-  });
-
-  it("W2: a project main's counts", () => {
-    expect(countsOf([ag('main', { waits: 1 }), ag('a', { status: 'working' }), ag('b', { waits: 1 }), ag('c', { archived: true })])).toBe('2 agents · 1 at work · 2 waiting for you');
-    expect(countsOf([ag('main')])).toBe('');
   });
 
   it('W5: agents grouped by where they work, a shared worktree first, the shared folder last, what they run under their agent', () => {

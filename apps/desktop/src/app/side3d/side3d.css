@@ -236,6 +236,11 @@
   --s3-coin-shadow: rgb(0 0 0 / .12);
   --s3-plate-shadow: rgb(0 0 0 / .18);
 }
+/* at the window's edge the coins' column stands 8 further in (20 from the edge, his m_46261,
+   designer m_46267: the card's air); between the thread and the panel they keep their 12 */
+.s3-side[data-at='edge'] {
+  --s3-edge: var(--s-5);
+}
 .s3-bubble {
   /* the coin's side, px */
   --s3-coin-h: 3px;
@@ -243,8 +248,8 @@
   /* its own stacking context: its pills stack inside the coin, so the grown world (z 1) draws over
      the whole coin, pills too (ui-review m_45360) */
   z-index: 0;
-  /* on the world's right edge: the objects and the pills keep 24 from the 92 band's left (d3) */
-  right: var(--s-3);
+  /* on the world's right edge: the objects and the pills keep 24 from the band's left (d3) */
+  right: var(--s3-edge, var(--s-3));
   box-sizing: border-box;
   width: var(--bubble);
   height: var(--bubble);
@@ -418,7 +423,7 @@
 .s3-card {
   position: absolute;
   box-sizing: border-box;
-  right: calc(var(--s-3) + var(--bubble) + var(--s-3));
+  right: calc(var(--s3-edge, var(--s-3)) + var(--bubble) + var(--s-3));
   width: var(--w-flyout);
   display: flex;
   flex-direction: column;
@@ -878,7 +883,7 @@
   --s3-tcard-sh: rgb(0 0 0 / 0.3);
   position: absolute;
   z-index: 2;
-  right: calc(var(--s-3) + var(--bubble) + var(--s-3));
+  right: calc(var(--s3-edge, var(--s-3)) + var(--bubble) + var(--s-3));
   box-sizing: border-box;
   max-width: 232px;
   display: flex;

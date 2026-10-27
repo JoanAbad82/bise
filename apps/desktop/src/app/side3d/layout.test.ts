@@ -29,7 +29,7 @@ describe('sideLayout, the panel folded', () => {
     const l = sideLayout(1280, SIDE, false);
     expect(l).toMatchObject({ colW: COL_W, world: 'small', gutter: WORLD_BAND });
     expect(right(1280, l)).toBe(WORLD_BAND);
-    expect(l.colLeft - SIDE).toBe(92);
+    expect(l.colLeft - SIDE).toBe(1280 - SIDE - COL_W - WORLD_BAND);
   });
   it('1100: the world folds into a 5th bubble, then the column narrows, 24 from the sidebar', () => {
     const l = sideLayout(1100, SIDE, false);

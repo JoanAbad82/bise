@@ -63,8 +63,10 @@ const CARD_RIGHT = 68;
 const MINI_TOP = 8;
 const MINI_TOPS = { world: null, bubbles: { agents: MINI_TOP, artifacts: MINI_TOP, scheduled: MINI_TOP, processes: MINI_TOP } } as const;
 
-/** the world's top and right, px */
+/** the world's top, px */
 const EDGE = 12;
+/** the world's right at the window's edge: the coins' column 8 further in (his m_46261, designer m_46267) */
+const EDGE_RIGHT = 20;
 /** the first bubble's top under the world (the big one floats over them: they never move), as the 5th bubble's stack */
 const TOP_SMALL = 152;
 const TOP_STACK = 40;
@@ -497,7 +499,7 @@ function Side({ project, scope, home, world, at: coinsAt, right, captions = 'car
         slot,
       )}
       {!mini && world !== 'bubble' && (
-        <div className="s3-world-at" style={{ top: EDGE, right: EDGE }}>
+        <div className="s3-world-at" style={{ top: EDGE, right: EDGE_RIGHT }}>
           <World project={project} name={name} says={says} agents={ownLive} cards={ownCards} frozen={open !== null} onOpen={() => {
             openTab({ kind: 'office', project });
           }} />

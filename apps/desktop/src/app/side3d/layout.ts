@@ -3,8 +3,8 @@
 // the room holds the column, its two 24 margins and the side's own 284, the side keeps that band and
 // the column is centred in what is left: its captions are plain words, never over the thread. Else
 // the column is centred when both sides
-// leave the world's band (148 + 12 + 12 = 172); else it slides left (24 from the sidebar at
-// least); else the world folds into a 5th bubble and the band drops to 92 (68 + 12 + 12); last,
+// leave the world's band (148 + 20 + 12 = 180); else it slides left (24 from the sidebar at
+// least); else the world folds into a 5th bubble and the band drops to 100 (68 + 20 + 12); last,
 // the column narrows. The tabbed panel open (folded-side v9, the width rule): the coins stay
 // between the thread and the panel (a 68 band, the world a 5th coin) while the window holds them,
 // else they go in the thread's header as minis, and over a sheet or a full-width panel in its tab
@@ -64,7 +64,7 @@ export interface SideLayout {
   readonly colW: number;
   /** how the world shows (never 'big' here: the hover grows it over the page, the layout stays) */
   readonly world: WorldSize;
-  /** the band the right side keeps free at the window's right edge (172, or 92 with the world as a bubble; 0 when the panel is open) */
+  /** the band the right side keeps free at the window's right edge (180, or 100 with the world as a bubble: the coins 20 from the edge, his m_46261; 0 when the panel is open) */
   readonly gutter: number;
   /** the world and the bubbles show at the right of the thread (at the window's edge, or between the thread and the panel) */
   readonly side: boolean;
@@ -105,10 +105,10 @@ export interface PanelIn {
 export const COL_W = 720;
 /** the least room left of the column once it slid */
 export const MIN_LEFT = 24;
-/** the world's band: 148 + 12 + 12 */
-export const WORLD_BAND = 172;
-/** the band with the world as a 5th bubble: its 68 object + 12 + 12 */
-export const BUBBLE_BAND = 92;
+/** the world's band: 148 + 20 (the coins' column 8 in, his m_46261) + 12 */
+export const WORLD_BAND = 180;
+/** the band with the world as a 5th bubble: its 68 object + 20 + 12 */
+export const BUBBLE_BAND = 100;
 /** the panel's width when its owner says none (--w-panel) */
 export const PANEL_W = 384;
 
