@@ -30,6 +30,7 @@ pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
 pub use self::hubs::{not_started, HUB_LACKS, LINGER, START};
+#[cfg(test)]
 pub use self::leases::LISTS_LEASE;
 pub use self::dictate::DICTATE_MAX;
 #[cfg(test)]
