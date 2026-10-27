@@ -10,13 +10,30 @@ fn temp(name: &str) -> std::path::PathBuf {
     d
 }
 
+/// Version `i`'s bytes: a size of its own. The store tells a new version
+/// by `<bytes>:<mtime ms>`, and "bytes 1" then "bytes 2" (same size)
+/// written in the same millisecond read as unchanged: no version 2, and
+/// the_desktop_door_records_a_sent_note went red now and then (main
+/// m_48277). A size per version never depends on the clock.
+fn version_bytes(i: u64) -> String {
+    format!("bytes {}", "x".repeat(i as usize))
+}
+
+/// Write version `i` with one fixed mtime for every version: only its
+/// size can tell it apart, so a test that leaned on the clock is red.
+fn write_version(path: &std::path::Path, i: u64) {
+    std::fs::write(path, version_bytes(i)).unwrap();
+    let f = std::fs::File::options().write(true).open(path).unwrap();
+    f.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000)).unwrap();
+}
+
 /// An artifact `q3.xlsx` by t1 with `n` versions, at 100, 200, ...
 fn artifact(d: &std::path::Path, n: u64) -> String {
     let arts = crate::artifacts::Store::new(d);
     let work = d.join("work");
     let mut id = String::new();
     for i in 1..=n {
-        std::fs::write(work.join("q3.xlsx"), format!("bytes {i}")).unwrap();
+        write_version(&work.join("q3.xlsx"), i);
         let a = crate::artifacts::Add { target: "q3.xlsx".into(), title: None, kind: None, agent: "t1".into(), by: "t1".into(), cwd: work.to_string_lossy().to_string(), known_only: false, ..Default::default() };
         id = arts.add(&a, i * 100).unwrap().meta.id;
     }
@@ -134,8 +151,7 @@ fn the_browser_door_drafts_sends_and_reads_back() {
     }
     assert_eq!(body(&req(&p, "GET", &format!("/a/{id}/notes"), json!(null)))["notes"][0]["status"], "sent");
     // the maker answers with v2: done in v2
-    std::thread::sleep(std::time::Duration::from_millis(2));
-    std::fs::write(d.join("work/q3.xlsx"), "bytes 2").unwrap();
+    write_version(&d.join("work/q3.xlsx"), 2);
     let a = crate::artifacts::Add { target: "q3.xlsx".into(), title: None, kind: None, agent: "t1".into(), by: "t1".into(), cwd: d.join("work").to_string_lossy().to_string(), known_only: false, ..Default::default() };
     crate::artifacts::Store::new(&d).add(&a, crate::util::now_ms() + 10).unwrap();
     let n = &body(&req(&p, "GET", &format!("/a/{id}/notes"), json!(null)))["notes"][0];

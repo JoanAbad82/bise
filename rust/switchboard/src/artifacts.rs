@@ -20,6 +20,13 @@
 //! A site's localStorage, `<id>/storage.json`, is crate::artifacts_storage's
 //! (the page server writes it, under its lock).
 //!
+//! A new version is told by the file's `sig`, `<bytes>:<mtime ms>`
+//! ([`Version::sig`]). Known limit: a rewrite of the same size within
+//! the same millisecond keeps the sig, so it makes no new version. Two
+//! saves of one file within 1 ms are rare, so no content hash is taken
+//! on every add; a test that writes versions gives each its own size
+//! (pages/artifact/notes_tests.rs, `write_version`).
+//!
 //! Plain functions over the state folder; the daemon's thread is the only
 //! writer, so there is no lock.
 

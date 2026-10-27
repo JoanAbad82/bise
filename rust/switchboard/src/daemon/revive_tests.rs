@@ -33,6 +33,24 @@ fn free_port() -> u16 {
     std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port()
 }
 
+/// An agent's server listens: waited on its own life, not on the clock.
+/// `until(10, up)` went red at load 14 in side-resize's quick gate (python
+/// took over 10 s to bind; green alone, main m_48294). True once it
+/// listens; false as soon as it died without listening. The 300 s only
+/// stops a server that hangs alive without ever binding.
+fn listens(port: u16, server: &mut std::process::Child) -> bool {
+    let t0 = Instant::now();
+    loop {
+        if up(port) {
+            return true;
+        }
+        if !matches!(server.try_wait(), Ok(None)) || t0.elapsed() > Duration::from_secs(300) {
+            return up(port);
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 fn until(secs: u64, f: impl Fn() -> bool) -> bool {
     let t0 = Instant::now();
     while t0.elapsed() < Duration::from_secs(secs) {
@@ -109,8 +127,8 @@ fn a_dev_server_stopped_with_its_agent_starts_again_on_open() {
     std::fs::write(app.join("serve.py"), DEV).unwrap();
     let port = free_port();
     let p = port.to_string();
-    let server = agent_server(&["python3", "serve.py", &p], &app);
-    assert!(until(10, || up(port)), "the agent's server listens");
+    let mut server = agent_server(&["python3", "serve.py", &p], &app);
+    assert!(listens(port, &mut server), "the agent's server listens");
     let store = Store::new(&state);
     let link = format!("http://127.0.0.1:{port}/");
     let id = add_link(&store, &link, &app);
@@ -140,8 +158,8 @@ fn a_dev_server_stopped_with_its_agent_starts_again_on_open() {
     let other = d.join("work/other");
     std::fs::create_dir_all(&other).unwrap();
     std::fs::write(other.join("index.html"), "theirs").unwrap();
-    let theirs = agent_server(&["python3", "-m", "http.server", &p, "--bind", "127.0.0.1"], &other);
-    assert!(until(10, || up(port)));
+    let mut theirs = agent_server(&["python3", "-m", "http.server", &p, "--bind", "127.0.0.1"], &other);
+    assert!(listens(port, &mut theirs));
     let r = get(&pages, &format!("/a/{id}/live"));
     assert_eq!((r.status, r.location.is_none()), (502, true));
     assert!(text(&r).contains(&format!("port {port} is used by another server")) && text(&r).contains(other.to_str().unwrap()), "{}", text(&r));
@@ -165,8 +183,8 @@ fn a_static_site_is_copied_and_opens_from_the_copy_once_its_folder_is_gone() {
     std::fs::write(site.join("index.html"), "<h1>static bims</h1><link rel=stylesheet href=style.css>").unwrap();
     std::fs::write(site.join("style.css"), "h1{color:red}").unwrap();
     let port = free_port();
-    let server = agent_server(&["python3", "-m", "http.server", &port.to_string(), "--bind", "127.0.0.1"], &site);
-    assert!(until(10, || up(port)));
+    let mut server = agent_server(&["python3", "-m", "http.server", &port.to_string(), "--bind", "127.0.0.1"], &site);
+    assert!(listens(port, &mut server));
     let store = Store::new(&state);
     let link = format!("http://127.0.0.1:{port}/");
     let id = add_link(&store, &link, &site);

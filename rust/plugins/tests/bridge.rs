@@ -205,7 +205,7 @@ fn limits_filter_tools_bound_calls_and_late_servers_join() {
         plugins.join("hello-plugin/mcp.json"),
         r#"{"mcpServers":{
             "off":{"command":"python3","args":["-B","${PLUGIN_ROOT}/server.py"],"disabled_tools":["shout"]},
-            "nap":{"command":"python3","args":["-B","${PLUGIN_ROOT}/server.py"],"env":{"HELLO_NAP":"3"},"tool_timeout_sec":1},
+            "nap":{"command":"python3","args":["-B","${PLUGIN_ROOT}/server.py"],"env":{"HELLO_NAP":"60"},"tool_timeout_sec":1},
             "slow":{"command":"sh","args":["-c","sleep 8; exec python3 -B \"$0\"","${PLUGIN_ROOT}/server.py"],"startup_timeout_sec":30},
             "gone":{"command":"python3","enabled":false}}}"#,
     )
@@ -259,7 +259,11 @@ fn limits_filter_tools_bound_calls_and_late_servers_join() {
     let t2 = Instant::now();
     let (_, b) = post(&mut r, &format!("{}/hello-plugin/nap", token), call);
     assert!(b.contains("no answer to tools/call within 1s"), "{}", b);
-    assert!(t2.elapsed() < Duration::from_millis(2500), "{:?}", t2.elapsed());
+    // the bridge's own words prove its 1 s bound fired; the time only shows
+    // it never waited for the server: the server naps 60 s, so the bound is
+    // half of that, far from any load (it was 2.5 s against a 3 s nap, and
+    // took 2.53 and 3.46 s under load in agents' quick gates, main m_48277)
+    assert!(t2.elapsed() < Duration::from_secs(30), "the bridge waited for the server's 60 s nap: {:?}", t2.elapsed());
     // the slow one joins the index (its shout collides with nap's: nap
     // keeps it, plugin order; the slow server's entry is there anyway)
     let t0 = Instant::now();
