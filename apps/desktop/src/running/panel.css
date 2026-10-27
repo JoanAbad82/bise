@@ -4,9 +4,9 @@
 .pn-screen.pp > * { flex: none; min-height: auto; }
 
 /* the head, 28 high: its title, its pill, its actions on the right */
-.pp-head { display: flex; align-items: center; gap: var(--s-2); min-width: 0; min-height: 28px; }
+.pp-head { display: flex; align-items: center; gap: var(--s-2); min-width: 0; min-height: var(--h-control-sm); }
 .pp-title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 var(--t-15) var(--font-ui); color: var(--c-text); }
-.pp-pill { flex: none; display: inline-flex; align-items: center; gap: var(--s-1); height: 20px; padding: 0 var(--s-2); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pp-pill { flex: none; display: inline-flex; align-items: center; gap: var(--s-1); height: var(--s-5); padding: 0 var(--s-2); border-radius: var(--s-3); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pp-pill.dim .pp-glyph { color: var(--c-text-3); }
 .pp-pill.ink .pp-glyph { color: var(--c-text); }
 .pp-pill.err .pp-glyph { color: var(--c-err); }
@@ -14,13 +14,13 @@
 @keyframes pp-breathe { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .pp-glyph.breathe { animation: none; } }
 .pp-acts { flex: none; margin-left: auto; display: flex; gap: var(--s-1); }
-.pp-act { height: 28px; padding: 0 var(--s-2); border: 0; border-radius: var(--r-2); background: transparent; font: var(--t-13) var(--font-ui); color: var(--c-text-2); white-space: nowrap; }
+.pp-act { height: var(--h-control-sm); padding: 0 var(--s-2); border: 0; border-radius: var(--r-2); background: transparent; font: var(--t-13) var(--font-ui); color: var(--c-text-2); white-space: nowrap; }
 .pp-act:hover { background: var(--c-hover); color: var(--c-text); }
 .pp-act.ask { color: var(--c-err); box-shadow: inset 0 0 0 1px currentColor; }
 
 /* who started it, where, when: 4 under the head */
 .pp-meta { margin: var(--s-1) 0 0; font: var(--t-13) var(--font-ui); color: var(--c-text-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pp-agent { display: inline; border: 0; padding: 0; background: none; font: inherit; color: var(--c-text-2); cursor: pointer; }
+.pp-agent { display: inline; border: 0; padding: 0; background: none; font: inherit; color: var(--c-text-2); }
 .pp-agent:hover { color: var(--c-text); text-decoration: underline; text-underline-offset: 2px; }
 
 /* the whole command, never cut: on the code blocks' ground, r 8, 12 in; its folder under it; copy on hover */
@@ -28,7 +28,7 @@
 .pp-cmd pre { margin: 0; font: 12px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: calc(10 * 18px); overflow-y: auto; }
 .pp-cmd pre code { font: inherit; }
 .pp-cwd { margin: var(--s-1) 0 0; font: var(--t-12) var(--font-ui); color: var(--c-text-3); overflow-wrap: anywhere; }
-.pp-copy { height: 24px; padding: 0 var(--s-2); border: 0; border-radius: var(--r-1); background: var(--c-bg, var(--p-bg)); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.pp-copy { height: var(--h-seg-in); padding: 0 var(--s-2); border: 0; border-radius: var(--r-1); background: var(--c-bg, var(--p-bg)); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
 .pp-copy:hover { color: var(--c-text); }
 .pp-cmd > .pp-copy { position: absolute; top: var(--s-2); right: var(--s-2); opacity: 0; transition: opacity 120ms; }
 .pp-cmd:hover > .pp-copy, .pp-cmd > .pp-copy:focus-visible { opacity: 1; }
@@ -44,7 +44,7 @@
 .pp-graph, .pp-listen { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
 .pp-glabel { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 .pp-gval { font: var(--t-12) var(--font-ui); color: var(--c-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pp-graph svg { display: block; width: 100%; height: 40px; overflow: visible; }
+.pp-graph svg { display: block; width: 100%; height: calc(var(--s-8) + var(--s-2)); overflow: visible; }
 .pp-base { stroke: var(--c-line); stroke-width: 1; }
 .pp-area { fill: var(--c-line); stroke: none; }
 .pp-line { fill: none; stroke: var(--c-text-2); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }

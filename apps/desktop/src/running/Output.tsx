@@ -39,6 +39,9 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
   const store = useStore();
   const host = useRef<HTMLDivElement>(null);
   const held = useRef<Xterm | null>(null);
+  const count = useRef(onLines);
+  const err = useRef(openOnError);
+  const scan = useRef<(() => void) | null>(null);
   // it printed something (its quiet line goes), he scrolled up from its end (the jump shows)
   const [said, setSaid] = useState(false);
   const [up, setUp] = useState(false);
@@ -92,7 +95,21 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
     let state = START;
     let lines = 0;
     let partial = false;
-    let opened = openOnError === undefined;
+    let loaded = false;
+    let scanned = false;
+    // a failed one opens on its first error (designer's process-panel): once what it kept is in,
+    // and once it is known to have failed (it may fail while the tab is open)
+    scan.current = () => {
+      if (scanned || !loaded || err.current === undefined) return;
+      scanned = true;
+      term.write('', () => {
+        const b = term.buffer.active;
+        const text = Array.from({ length: b.length }, (_, i) => b.getLine(i)?.translateToString(true) ?? '');
+        const at = firstError(text);
+        if (at !== null) term.scrollToLine(Math.max(0, at - 1));
+        err.current?.(at !== null);
+      });
+    };
     const off = store.onEvent((ev) => {
       if (ev.ev !== 'proc_out' || ev.project !== project || ev.agent !== agent || ev.id !== id) return;
       const s = take(state, { at: ev.at, bytes: bytesOf(ev.data), end: ev.end });
@@ -102,25 +119,17 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
         lines += newlines(b);
         partial = b.length > 0 ? b[b.length - 1] !== 10 : partial;
       }
-      if (s.write.length > 0) onLines?.(lines + (partial ? 1 : 0));
+      if (s.write.length > 0) count.current?.(lines + (partial ? 1 : 0));
       if (printed(state)) setSaid(true);
       if (s.ask !== null) store.command({ cmd: 'proc_out', project, agent, id, from: s.ask });
-      // all of what it kept is in: a failed one opens on its first error (designer's process-panel)
-      if (!opened && s.ask === null && state.next !== null && state.next >= ev.end) {
-        opened = true;
-        term.write('', () => {
-          const b = term.buffer.active;
-          const text = Array.from({ length: b.length }, (_, i) => b.getLine(i)?.translateToString(true) ?? '');
-          const at = firstError(text);
-          if (at !== null) term.scrollToLine(Math.max(0, at - 1));
-          openOnError?.(at !== null);
-        });
+      if (s.ask === null && state.next !== null && state.next >= ev.end) {
+        loaded = true;
+        scan.current?.();
       }
     });
     store.command({ cmd: 'proc_out', project, agent, id });
-    if (live) store.command({ cmd: 'proc_follow', project, agent, id, on: true });
     return () => {
-      if (live) store.command({ cmd: 'proc_follow', project, agent, id, on: false });
+      scan.current = null;
       off();
       ro.disconnect();
       scheme.removeEventListener('change', retheme);
@@ -130,9 +139,23 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
       onTerm?.(null);
       term.dispose();
     };
-    // onLines and openOnError are read when bytes come, never a reason to start again
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, project, agent, id, none, live, onTerm]);
+    // one terminal per process: it ending under the open tab keeps what it printed (ui-review
+    // m_47784: a new terminal there asked again and showed nothing); only the follow stops
+  }, [store, project, agent, id, none, onTerm]);
+  // the follow, while it runs (after the first ask above: effects run in order)
+  useEffect(() => {
+    if (none || !live) return;
+    store.command({ cmd: 'proc_follow', project, agent, id, on: true });
+    return () => {
+      store.command({ cmd: 'proc_follow', project, agent, id, on: false });
+    };
+  }, [store, project, agent, id, none, live]);
+  // the latest callbacks, read when bytes come; a failure known now: its first error in view
+  useEffect(() => {
+    count.current = onLines;
+    err.current = openOnError;
+    scan.current?.();
+  }, [onLines, openOnError]);
   if (none) {
     if (empty !== undefined) return <>{empty}</>;
     return (
