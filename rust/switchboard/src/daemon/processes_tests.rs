@@ -48,6 +48,7 @@ fn running_bg(s: &mut State, rc: Option<&str>) -> Key {
         rss_mb: 300,
         procs: 2,
         out: OutKind::Bg,
+        fd1: None,
     };
     let k = (row.agent.clone(), row.id.clone());
     s.running.insert(k.clone(), Seen { row, dir: "perf".into(), src: Src::File(bg.join("3.out")), bg: Some(bg), pids: vec![GONE] });

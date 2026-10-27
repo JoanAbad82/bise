@@ -10,9 +10,7 @@ import { PrsScreen } from '@/review/PrsScreen';
 import { PluginsScreen } from '@/plugins';
 import { SkillTab } from '@/plugins/SkillTab';
 import { ScheduledScreen } from '@/scheduled';
-import { Output } from '@/running/Output';
-import { isRunning, quietWords, stateOf, useAllProcesses } from '@/running';
-import { useState } from 'react';
+import { ProcPanel } from '@/running/Panel';
 import { useProjects } from '@/store';
 import { MAIN } from '@/app/route';
 import { Browser } from './Browser';
@@ -78,15 +76,7 @@ export function ThingTab({ e, tabId }: { e: Exclude<Entity, { kind: 'tab' }>; ta
   }
 }
 
-/** A process's output, live while it runs (running/'s Output, as the processes page draws it). */
+/** A process: its title and state, who started it, its command, its resources, its output (running/Panel.tsx). */
 function ProcTab({ project, agent, id }: { project: string; agent: string; id: string }) {
-  const x = useAllProcesses(project).find((y) => y.p.agent === agent && y.p.id === id);
-  const [now] = useState(() => Date.now());
-  return (
-    <div className="pn-screen pn-proc" data-testid="app.panel.process">
-      {x !== undefined && (
-        <Output project={project} agent={agent} id={id} none={x.p.out === 'none' || x.p.out === 'unknown'} live={isRunning(x.p)} quiet={quietWords(x.p, stateOf(x.p), now)} />
-      )}
-    </div>
-  );
+  return <ProcPanel project={project} agent={agent} id={id} />;
 }

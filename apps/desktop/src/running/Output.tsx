@@ -5,12 +5,13 @@
 // end ↓' at its bottom right. Long lines wrap at the box's width (designer m_41694 #9). Nothing
 // printed yet: `quiet`'s line where its first line will be, on the same box, so nothing moves when
 // bytes come (#10). No output kept: one dim line instead. Owner: procs-desktop.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Terminal as Xterm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useStore } from '@/store';
-import { bytesOf, printed, START, take } from './out';
+import { bytesOf, newlines, printed, START, take } from './out';
+import { firstError } from './procview';
 import { Press } from '@/ds';
 import { running } from '@/proto/words_running.gen';
 
@@ -22,13 +23,19 @@ export interface OutputProps {
   readonly none: boolean;
   /** follow it while it runs */
   readonly live: boolean;
-  /** the words while it has printed nothing (model quietWords) */
-  readonly quiet: string;
+  /** what it shows while it has printed nothing (model quietWords; the panel's dashed frame) */
+  readonly quiet: ReactNode;
+  /** what it shows when no output is kept (the panel's why); none: the screen's dim line */
+  readonly empty?: ReactNode;
+  /** how many lines it has printed, as they come (the panel's 'N lines') */
+  readonly onLines?: (n: number) => void;
+  /** a failed one: once its kept output is in, its first error at the top (firstError); `found` says whether one was */
+  readonly openOnError?: (found: boolean) => void;
   /** ⌘C with a selection: copy it (the screen's key) */
   readonly onTerm?: (term: Xterm | null) => void;
 }
 
-export function Output({ project, agent, id, none, live, quiet, onTerm }: OutputProps) {
+export function Output({ project, agent, id, none, live, quiet, empty, onLines, openOnError, onTerm }: OutputProps) {
   const store = useStore();
   const host = useRef<HTMLDivElement>(null);
   const held = useRef<Xterm | null>(null);
@@ -83,13 +90,32 @@ export function Output({ project, agent, id, none, live, quiet, onTerm }: Output
     const themed = new MutationObserver(retheme);
     themed.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     let state = START;
+    let lines = 0;
+    let partial = false;
+    let opened = openOnError === undefined;
     const off = store.onEvent((ev) => {
       if (ev.ev !== 'proc_out' || ev.project !== project || ev.agent !== agent || ev.id !== id) return;
       const s = take(state, { at: ev.at, bytes: bytesOf(ev.data), end: ev.end });
       state = s.state;
-      for (const b of s.write) term.write(b);
+      for (const b of s.write) {
+        term.write(b);
+        lines += newlines(b);
+        partial = b.length > 0 ? b[b.length - 1] !== 10 : partial;
+      }
+      if (s.write.length > 0) onLines?.(lines + (partial ? 1 : 0));
       if (printed(state)) setSaid(true);
       if (s.ask !== null) store.command({ cmd: 'proc_out', project, agent, id, from: s.ask });
+      // all of what it kept is in: a failed one opens on its first error (designer's process-panel)
+      if (!opened && s.ask === null && state.next !== null && state.next >= ev.end) {
+        opened = true;
+        term.write('', () => {
+          const b = term.buffer.active;
+          const text = Array.from({ length: b.length }, (_, i) => b.getLine(i)?.translateToString(true) ?? '');
+          const at = firstError(text);
+          if (at !== null) term.scrollToLine(Math.max(0, at - 1));
+          openOnError?.(at !== null);
+        });
+      }
     });
     store.command({ cmd: 'proc_out', project, agent, id });
     if (live) store.command({ cmd: 'proc_follow', project, agent, id, on: true });
@@ -104,8 +130,11 @@ export function Output({ project, agent, id, none, live, quiet, onTerm }: Output
       onTerm?.(null);
       term.dispose();
     };
+    // onLines and openOnError are read when bytes come, never a reason to start again
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, project, agent, id, none, live, onTerm]);
   if (none) {
+    if (empty !== undefined) return <>{empty}</>;
     return (
       <p className="run-none" data-testid="running.out.none">
         {running.no_output}

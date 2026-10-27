@@ -136,4 +136,111 @@ crate::words! { running:
     find_tip = "find · ⌘F";
     /// the state filter, for VoiceOver (bise fait mac's segmented filter)
     filter_label = "show";
+
+    // ---- the desktop's process panel (app/panel ProcPanel, designer's page process-panel; the
+    // glyphs ∿ ✓ ✗ – · before the pills are the client's)
+    /// the pill while it runs: `running · 4 min`
+    pill_running(age) = "running · {age}";
+    /// the pill, it ended well: `exit 0 · ran 2 min 14 s`
+    pill_ok(rc, dur) = "exit {rc} · ran {dur}";
+    /// the pill, it failed: `exit 1 · after 38 s`
+    pill_failed(rc, dur) = "exit {rc} · after {dur}";
+    /// the pill, he stopped it: `stopped by you · 14:21`
+    pill_by_you(at) = "stopped by you · {at}";
+    /// the pill, it stopped with its agent: `stopped with perf · 14:21`
+    pill_with(agent, at) = "stopped with {agent} · {at}";
+    /// the pill, it ended and its code isn't known
+    pill_no_rc = "ended · no exit code";
+    /// the running pill's tip
+    tip_running = "running: bise checks it every 2 s while this is open";
+    /// the exit 0 pill's tip
+    tip_ok = "exit 0: the command ended well";
+    /// a failed pill's tip: `exit 1: the command reported a failure`
+    tip_failed(rc) = "exit {rc}: the command reported a failure";
+    /// the stopped by you pill's tip
+    tip_by_you = "you stopped it from bise";
+    /// the stopped with its agent pill's tip: `it stopped when perf stopped, …`
+    tip_with(agent) = "it stopped when {agent} stopped, or when its hub quit";
+    /// the no exit code pill's tip
+    tip_no_rc = "it ended, but bise couldn't read its exit code (it ran outside its agent's commands)";
+    /// the meta line's start, before the agent's name (clickable: its thread)
+    meta_by = "started by";
+    /// the meta line, where it runs: `in acme › perf`
+    meta_in(place) = "in {place}";
+    /// the meta line, when it ended: `ended 13:42`
+    meta_ended(at) = "ended {at}";
+    /// the meta line, how long a stopped one ran: `ran 23 min`
+    meta_ran(dur) = "ran {dur}";
+    /// the meta line, its tree: `3 processes`
+    meta_procs(n) = one "{n} process" | "{n} processes";
+    /// the command's folder, under it: `in ~/acme/docs`
+    cmd_in(cwd) = "in {cwd}";
+    /// the command's copy, on hover
+    copy = "copy";
+    /// copied
+    copied = "copied";
+    /// the resources' head
+    resources = "Resources";
+    /// beside it while it runs
+    resources_live = "every 2 s · the last 2 min";
+    /// beside it once it ended (the curves at half)
+    resources_ended = "while it ran";
+    /// the curves' and the port's labels
+    label_cpu = "CPU";
+    /// the memory curve's label
+    label_memory = "Memory";
+    /// the port's label
+    label_listening = "Listening";
+    /// it listens on no port
+    listening_none = "none";
+    /// a curve's numbers while it runs: `12 % · peak 64 %`
+    now_peak_pct(now, peak) = "{now} % · peak {peak} %";
+    /// once it ended: `peak 380 %`
+    peak_pct(peak) = "peak {peak} %";
+    /// memory: `412 MB · peak 520 MB`
+    now_peak_mem(now, peak) = "{now} · peak {peak}";
+    /// memory once it ended: `peak 1.2 GB`
+    peak_mem(peak) = "peak {peak}";
+    /// a point's tip on a curve: `64 % · 14:05:12`
+    point(v, at) = "{v} · {at}";
+    /// the output's head
+    output = "Output";
+    /// beside it while it runs
+    output_follows = "follows the end";
+    /// beside it once it ended: `1,284 lines`
+    output_lines(n) = one "{n} line" | "{n} lines";
+    /// beside it when it failed: the output opened on its first error
+    output_first_error = "scrolled to the first error";
+    /// why no output is kept (by where its stdout points, Fd1, and its command)
+    why_tmux = "No output kept: it writes to a tmux session, not to a file bise can read.";
+    /// under the tmux why, before its command
+    todo_tmux = "To see it, attach to the session in a terminal:";
+    /// the tmux line's command: `tmux attach -t docs`
+    tmux_attach(name) = "tmux attach -t {name}";
+    /// the tmux line's button
+    copy_command = "copy the command";
+    /// its command sends its output to /dev/null (or fd 1 is /dev/null)
+    why_null = "No output kept: it throws its output away (> /dev/null).";
+    /// its command pipes into a program: `… (| grep).`
+    why_pipe_to(prog) = "No output kept: its output goes into another program (| {prog}).";
+    /// fd 1 is a pipe, the program not known
+    why_pipe = "No output kept: its output goes into another program.";
+    /// under a pipe's why
+    todo_pipe = "Only what that program shows would be readable, and it writes nowhere either.";
+    /// fd 1 is a terminal (not tmux)
+    why_tty = "No output kept: it writes to a terminal, not to a file bise can read.";
+    /// fd 1 is a socket
+    why_socket = "No output kept: it writes to a network connection.";
+    /// no fd 1
+    why_closed = "No output kept: it has nowhere to write.";
+    /// where fd 1 points isn't known
+    why_unknown = "No output kept: it doesn't write to a file bise can read.";
+    /// a running one that printed nothing yet
+    empty_yet = "Nothing printed yet.";
+    /// under it: `Running for 40 s. …`
+    todo_yet(age) = "Running for {age}. Its output shows here as soon as it writes.";
+    /// one that ended without printing
+    silent_ended = "It ended without printing anything.";
+    /// the panel when its hub no longer lists it (gone past 24 h, or its hub away)
+    gone = "This process isn't listed anymore: it ended more than a day ago, or its project's hub isn't running.";
 }

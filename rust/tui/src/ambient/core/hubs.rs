@@ -39,6 +39,7 @@
 //! connection's `home_call`, whose answers are not read).
 
 use super::hub_rpc::{Read, RpcConn};
+use super::leases::{Leases, SCREEN};
 use super::*;
 use crate::ambient::projects::{self, Checkout, Facts};
 use bise_home::projects::Row;
@@ -186,17 +187,14 @@ pub(super) struct Hubs {
     /// why bise's own (home) hub couldn't start, until it's up: the home
     /// row's `down` (its connection is the core's `hub`, not a `Conn`)
     pub(super) home_down: Option<String>,
-    /// the window's running screen holds every running hub until then
-    /// (`processes_all`): a lease the screen renews, so no hold outlives
-    /// its screen, its window or this core (architect m_38378)
-    lists: Option<Instant>,
+    /// who watches the processes lists (`processes_all`): the running
+    /// screen holds every running hub, a process's panel its project's;
+    /// leases their windows renew, so no hold outlives its screen, its
+    /// window or this core (architect m_38378, m_47406; core/leases.rs)
+    lists: Leases,
     /// update-flow: the machine's line the window last got (`bise_update`)
     bise_sent: Option<Option<bise_proto::rows::BiseUpdate>>,
 }
-
-/// How long the running screen's hold lasts after its window last said
-/// `processes_all {on: true}` (the screen says it again every 10 s).
-pub const LISTS_LEASE: Duration = Duration::from_secs(30);
 
 /// The rows the running screen holds: the projects whose hub runs, never
 /// one that would have to start (a stopped hub killed its processes).
@@ -552,40 +550,51 @@ impl Core {
         if close {
             self.hold_at(now);
         }
-        // the running screen's lease ran out (its window closed or went
-        // quiet): its holds and its hubs' watches go
-        if self.hubs.lists.is_some_and(|u| u <= now) {
-            self.processes_all_at(false, now);
-        }
-    }
-
-    /// `processes_all {on}`: the window's running screen shown (again,
-    /// renewing its lease) or left.
-    pub(super) fn processes_all(&mut self, on: bool) {
-        self.processes_all_at(on, Instant::now());
-    }
-
-    fn processes_all_at(&mut self, on: bool, now: Instant) {
-        // a lease set, run out or not: its end (the tick's) still lets go
-        let was = self.hubs.lists.is_some();
-        self.hubs.lists = on.then(|| now + LISTS_LEASE);
-        if on == was {
-            return;
-        }
-        // the hubs held for it now, then each welcomed one asked (or told
-        // to stop watching); one welcomed later is asked at its welcome
-        self.hold_at(now);
-        let ids: Vec<String> = self.hubs.conns.iter().filter(|(_, c)| c.welcomed).map(|(id, _)| id.clone()).collect();
-        for id in ids {
-            if let Some(c) = self.hubs.conns.get_mut(&id) {
-                c.send(&json!({"cmd": "processes", "project": id, "watch": on}), None);
+        // a list's lease ran out (its window closed or went quiet): its
+        // holds and its hubs' watches go
+        if self.hubs.lists.any() {
+            // what was watched: every hold, its time come or not
+            let before = self.watched_now(None);
+            if self.hubs.lists.expire(now) {
+                self.relist(before, now);
             }
         }
     }
 
-    /// Whether the running screen's lease holds.
-    fn listing(&self, now: Instant) -> bool {
-        self.hubs.lists.is_some_and(|u| u > now)
+    /// `processes_all {on, by, project}`: a list holder (the running
+    /// screen, every project; a process's panel, its project) shown
+    /// (again, renewing its lease) or left.
+    pub(super) fn processes_all(&mut self, on: bool, by: Option<String>, project: Option<String>) {
+        self.processes_all_at(on, by.as_deref().unwrap_or(SCREEN), project, Instant::now());
+    }
+
+    fn processes_all_at(&mut self, on: bool, by: &str, project: Option<String>, now: Instant) {
+        // a hold set, run out or not, was watched (its end, the tick's, still lets go)
+        let before = self.watched_now(None);
+        self.hubs.lists.set(by, on, project, now);
+        self.relist(before, now);
+    }
+
+    /// Each welcomed hub: whether a holder watches it (`at` none: any
+    /// hold set, its time come or not).
+    fn watched_now(&self, at: Option<Instant>) -> BTreeMap<String, bool> {
+        self.hubs.conns.iter().filter(|(_, c)| c.welcomed).map(|(id, _)| (id.clone(), self.hubs.lists.covers(id, at))).collect()
+    }
+
+    /// The holds again, then each welcomed hub whose watch changed since
+    /// `before` asked (or told to stop watching); one welcomed later is
+    /// asked at its welcome.
+    fn relist(&mut self, before: BTreeMap<String, bool>, now: Instant) {
+        self.hold_at(now);
+        for (id, was) in before {
+            let on = self.hubs.lists.covers(&id, Some(now));
+            if on == was {
+                continue;
+            }
+            if let Some(c) = self.hubs.conns.get_mut(&id) {
+                c.send(&json!({"cmd": "processes", "project": id, "watch": on}), None);
+            }
+        }
     }
 
     /// The window's subscriptions and voice mode's thread.
@@ -632,10 +641,17 @@ impl Core {
 
     fn hold_at(&mut self, now: Instant) {
         let mut want = held(&self.hubs.rows, self.hubs.shown.as_deref(), &self.all_subs());
-        // the running screen: every hub that runs, never one to start
-        if self.listing(now) && self.hubs.shown.is_some() {
+        // the running screen: every hub that runs; a process's panel: its
+        // project's if it runs; never one to start
+        if self.hubs.shown.is_some() {
             if let Some(p) = self.hubs.ports.as_ref() {
-                want.extend(listed(&self.hubs.rows, |path| (p.facts.running)(path)));
+                let running = listed(&self.hubs.rows, |path| (p.facts.running)(path));
+                if self.hubs.lists.all(now) {
+                    want.extend(running);
+                } else {
+                    let one = self.hubs.lists.projects(now);
+                    want.extend(running.into_iter().filter(|id| one.contains(id)));
+                }
             }
         }
         // a folder gone: never its hub (it would start on a missing
@@ -818,8 +834,9 @@ impl Core {
                 for agent in agents {
                     c.send(&json!({"cmd": "subscribe", "project": id, "agent": agent}), None);
                 }
-                // the running screen is open: this hub's list too, watched
-                if self.hubs.lists.is_some_and(|u| u > Instant::now()) {
+                // the running screen (or a panel on this project) is open:
+                // this hub's list too, watched
+                if self.hubs.lists.covers(id, Some(Instant::now())) {
                     c.send(&json!({"cmd": "processes", "project": id, "watch": true}), None);
                 }
                 // the commands that waited for it, in order; a hub

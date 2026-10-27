@@ -42,6 +42,7 @@
 {"cmd":"shown","projects":["bise-home-00000000","acme-1a2b3c4d"]}
 {"cmd":"processes_all","on":true}
 {"cmd":"processes_all","on":false}
+{"cmd":"processes_all","on":true,"by":"panel:acme-1a2b3c4d/perf/bg3.1791100100","project":"acme-1a2b3c4d"}
 {"cmd":"talk_start"}
 {"cmd":"talk_start","page":{"id":"q3-notes","url":"http://127.0.0.1:47438/p/q3-notes"}}
 {"cmd":"talk_end"}

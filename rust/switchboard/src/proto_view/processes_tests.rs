@@ -96,7 +96,7 @@ fn a_row_sums_its_tree_and_names_its_url_and_output() {
     let by: BTreeMap<u32, &Row> = rows.iter().map(|r| (r.pid, r)).collect();
     let t = &trees(&rows, HUB, &[agent("perf", &[101], &[(3, 200, "pnpm dev")])], 100)[..2];
     let ports: BTreeMap<u32, Vec<u16>> = [(201, vec![24678, 5173]), (200, vec![5173])].into();
-    let files: BTreeMap<u32, Files> = [(200, Files { cwd: Some("/w/perf".into()), out: None }), (300, Files { cwd: None, out: Some("/w/nohup.out".into()) })].into();
+    let files: BTreeMap<u32, Files> = [(200, Files { cwd: Some("/w/perf".into()), out: None, fd1: Some(Fd1::File) }), (300, Files { cwd: None, out: Some("/w/nohup.out".into()), fd1: Some(Fd1::File) })].into();
     let http: BTreeSet<u16> = [5173].into();
     let found = Found { ports: &ports, files: &files, http: &http };
     let bg = row(&t[0], &by, &found).unwrap();
@@ -108,6 +108,10 @@ fn a_row_sums_its_tree_and_names_its_url_and_output() {
     let mut none = t[1].clone();
     none.root = 310;
     assert_eq!(row(&none, &by, &Found { ports: &ports, files: &BTreeMap::new(), http: &http }).unwrap().out, OutKind::None);
+    assert_eq!((bg.fd1, d.fd1), (Some(Fd1::File), Some(Fd1::File)), "the row carries where its root's stdout points");
+    let tty: BTreeMap<u32, Files> = [(310, Files { cwd: None, out: None, fd1: Some(Fd1::Tty) })].into();
+    let t3 = row(&none, &by, &Found { ports: &ports, files: &tty, http: &http }).unwrap();
+    assert_eq!((t3.out, t3.fd1), (OutKind::None, Some(Fd1::Tty)));
     // a port that never answered HTTP is no link: no url, its port stays
     let quiet = row(&t[0], &by, &Found { ports: &ports, files: &files, http: &BTreeSet::new() }).unwrap();
     assert_eq!((quiet.ports, quiet.url), (vec![5173, 24678], None));
@@ -139,9 +143,23 @@ fn ps_and_lsof_parse() {
     assert_eq!(ports, [(4242, vec![5173, 24678]), (4243, vec![8000])].into(), "sorted, once each, ipv6 too, by pid");
     assert!(lsof_ports("").is_empty());
     let files = lsof_files("p300\nfcwd\ntDIR\nn/w/perf\nf1\ntREG\nn/w/nohup.out\np301\nfcwd\ntDIR\nn/w\nf1u\ntCHR\nn/dev/ttys001\np302\nf1w\ntREG\nn/dev/null\n");
-    assert_eq!(files[&300], Files { cwd: Some("/w/perf".into()), out: Some("/w/nohup.out".into()) });
-    assert_eq!(files[&301], Files { cwd: Some("/w".into()), out: None }, "a tty is no file to read");
-    assert_eq!(files[&302].out, None);
+    assert_eq!(files[&300], Files { cwd: Some("/w/perf".into()), out: Some("/w/nohup.out".into()), fd1: Some(Fd1::File) });
+    assert_eq!(files[&301], Files { cwd: Some("/w".into()), out: None, fd1: Some(Fd1::Tty) }, "a tty is no file to read");
+    assert_eq!((files[&302].out.clone(), files[&302].fd1), (None, Some(Fd1::Null)));
+}
+
+#[test]
+fn fd1_says_where_stdout_points() {
+    // macOS lsof -F lines: a pipe, /dev/null as a CHR, a unix socket, a pid with no fd 1
+    let files = lsof_files("p400\nfcwd\ntDIR\nn/w\nf1w\ntPIPE\nn->0x1234\np401\nf1u\ntCHR\nn/dev/null\np402\nf1u\ntunix\nn->0x99\np403\nfcwd\ntDIR\nn/w\np404\nf1w\ntFIFO\nnpipe\np405\nf1u\ntKQUEUE\nncount=0\n");
+    let got: Vec<(u32, Option<Fd1>)> = files.iter().map(|(p, f)| (*p, f.fd1)).collect();
+    assert_eq!(
+        got,
+        [(400, Some(Fd1::Pipe)), (401, Some(Fd1::Null)), (402, Some(Fd1::Socket)), (403, Some(Fd1::Closed)), (404, Some(Fd1::Pipe)), (405, Some(Fd1::Unknown))]
+    );
+    assert!(files.values().all(|f| f.out.is_none()), "only a regular file is read");
+    assert_eq!(fd1_of("IPv4", "127.0.0.1:5000"), Fd1::Socket);
+    assert_eq!(fd1_of("CHR", "/dev/ttys004"), Fd1::Tty);
 }
 
 #[test]
@@ -169,6 +187,7 @@ fn proc_row(agent: &str, id: &str, ports: &[u16]) -> Proc {
         rss_mb: 9,
         procs: 2,
         out: OutKind::Bg,
+        fd1: None,
     }
 }
 

@@ -17,7 +17,10 @@ ports that answers HTTP; none when no port does: a port that is not a web
 page never opens an empty browser tab), `name`
 (a known server command), `state` (`running`, `exited {rc?}`,
 `stopped_by_you`, `stopped_with`), `ended_ms`, the tree's `cpu`, `rss_mb`,
-`procs`, and `out` (`bg`, `file`, `none`). Each agent row carries `procs`
+`procs`, `out` (`bg`, `file`, `none`: how bise can read its output) and
+`fd1` (where the root's stdout points: `tty`, `pipe`, `null`, `file`,
+`socket`, `closed`; from the same lsof line as `cwd`, no scan of its own;
+architect m_47406). Each agent row carries `procs`
 (its running count) and `procs_port` (their lowest port).
 
 The wire: `processes {watch?}` -> `processes` (also `hub/processes` to every
@@ -82,6 +85,30 @@ last part: `python3 -m http.server 8000`), where it runs (its folder past
 the project's root, or its worktree's name: `apps/web`, `perf/site`; never
 a home path), then `localhost:<port> ↗` as a link when its hub found HTTP
 there, else its port plain (`:9229`).
+
+## The side panel
+
+A process opened in a tab (`app/panel/Thing.tsx` -> `running/Panel.tsx`,
+designer's page process-panel; the words and choices are the pure
+`running/procview.ts`): its title (its server name, else what it runs:
+`cargo test`, `mdbook serve`) and state pill (`∿ running · 4 min`,
+`✓ exit 0 · ran 2 min 14 s`, `✗ exit 1 · after 38 s`, `– stopped by you ·
+14:21`, `· ended · no exit code`), who started it (the agent, a link to
+its thread), where and when, its whole command highlighted with its folder,
+CPU and memory curves over the last 2 min, its port, then its output (a
+failed one opens on its first error). No output kept: one sentence says why,
+from its command (a tmux session, `> /dev/null`, `| prog`) then `fd1`, and
+one what to do (`tmux attach -t docs`, to copy).
+
+Its samples are the panel's own state: one per `processes` row its hub
+sends while it is watched, 60 at most, gone with the panel; an ended one
+keeps its curves at half ("while it ran"), one never measured shows none.
+While it runs the panel holds its project's hub watched with its own lease:
+`processes_all {on, by: "panel:<project>/<agent>/<id>", project}`, said
+again every 10 s. The core keeps one lease per holder (`core/leases.rs`):
+the running screen (`by` absent) covers every project, a panel its own; a
+hub is watched while a live holder covers it, so the screen leaving never
+ends a panel's watch.
 
 ## How a row ends
 

@@ -535,11 +535,6 @@
   padding: var(--s-2);
 }
 
-/* a process's output in its tab: the output fills it, 8 in */
-.pn-proc {
-  padding: var(--s-2);
-}
-
 /* the centre while an artifact's maker's thread loads */
 .app-art-wait {
   flex: 1;

@@ -10,7 +10,7 @@
 //! `/proc/net/tcp` is not read (later, if lsof is often missing there).
 
 use bise_peer::table::Proc as PeerProc;
-use bise_proto::rows::{OutKind, Proc, ProcKind, ProcState};
+use bise_proto::rows::{Fd1, OutKind, Proc, ProcKind, ProcState};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// How long an ended row stays.
@@ -158,30 +158,51 @@ pub fn lsof_ports(out: &str) -> BTreeMap<u32, Vec<u16>> {
 }
 
 /// Where a process runs and writes (`lsof -nP -a -p <pids> -d cwd,1
-/// -Fpftn`): its working folder, and its stdout when that is a regular
-/// file (a tty, a pipe, /dev/null: none).
+/// -Fpftn`): its working folder, its stdout when that is a regular
+/// file (a tty, a pipe, /dev/null: none), and where its stdout points
+/// (`fd1`: closed when lsof lists the pid without an fd 1).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Files {
     pub cwd: Option<String>,
     pub out: Option<String>,
+    pub fd1: Option<Fd1>,
 }
 
 pub fn lsof_files(out: &str) -> BTreeMap<u32, Files> {
     lsof_by_pid(out)
         .into_iter()
         .map(|(pid, files)| {
-            let mut f = Files::default();
+            let mut f = Files { fd1: Some(Fd1::Closed), ..Files::default() };
             for (fd, ty, n) in files {
                 match fd.as_str() {
                     "cwd" => f.cwd = Some(n),
                     // `1w`, `1u`: stdout, its mode after the number
-                    d if d.trim_end_matches(|c: char| c.is_ascii_alphabetic()) == "1" && ty == "REG" && n != "/dev/null" => f.out = Some(n),
+                    d if d.trim_end_matches(|c: char| c.is_ascii_alphabetic()) == "1" => {
+                        let to = fd1_of(&ty, &n);
+                        if to == Fd1::File {
+                            f.out = Some(n);
+                        }
+                        f.fd1 = Some(to);
+                    }
                     _ => {}
                 }
             }
             (pid, f)
         })
         .collect()
+}
+
+/// What an lsof file line (its `t` type, its `n` name) says fd 1 points at.
+pub fn fd1_of(ty: &str, name: &str) -> Fd1 {
+    match ty {
+        "CHR" if name == "/dev/null" => Fd1::Null,
+        "CHR" => Fd1::Tty,
+        "REG" if name == "/dev/null" => Fd1::Null,
+        "REG" => Fd1::File,
+        "PIPE" | "FIFO" => Fd1::Pipe,
+        "unix" | "IPv4" | "IPv6" | "sock" => Fd1::Socket,
+        _ => Fd1::Unknown,
+    }
 }
 
 /// What a server command is, when it is one bise knows ("dev server",
@@ -430,6 +451,7 @@ pub fn row(t: &Tree, rows: &BTreeMap<u32, &Row>, found: &Found) -> Option<Proc> 
         rss_mb: (rss / 1024) as u32,
         procs: t.pids.len() as u32,
         out,
+        fd1: files.and_then(|f| f.fd1),
     })
 }
 

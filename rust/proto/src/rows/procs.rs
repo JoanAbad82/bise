@@ -61,6 +61,29 @@ pub enum OutKind {
     Unknown,
 }
 
+/// Where the root's stdout (fd 1) points, from the scan's lsof line: true
+/// of every row (a bg job's is its `.out` file). The app says why no
+/// output is kept by this, never by text (architect m_47406).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum Fd1 {
+    /// a terminal (a tty): what it prints goes to a screen bise can't read
+    Tty,
+    /// a pipe: another process reads it
+    Pipe,
+    /// `/dev/null`: thrown away
+    Null,
+    /// a regular file
+    File,
+    /// a socket
+    Socket,
+    /// no fd 1: it closed its output
+    Closed,
+    #[serde(other)]
+    Unknown,
+}
+
 /// One process tree an agent left running, or one that ended in the last
 /// 24 h. Its key is (`agent`, `id`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -103,6 +126,11 @@ pub struct Proc {
     #[serde(default)]
     pub procs: u32,
     pub out: OutKind,
+    /// where the root's stdout points, when the scan read it (an ended
+    /// row keeps its last)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub fd1: Option<Fd1>,
 }
 
 impl Proc {
@@ -125,5 +153,7 @@ mod tests {
         assert_eq!(serde_json::from_value::<ProcKind>(json!({"is": "container"})).unwrap(), ProcKind::Unknown);
         assert_eq!(serde_json::from_value::<ProcState>(json!({"is": "paused", "at": 1})).unwrap(), ProcState::Unknown);
         assert_eq!(serde_json::from_value::<OutKind>(json!("pipe")).unwrap(), OutKind::Unknown);
+        assert_eq!(serde_json::to_value(Fd1::Null).unwrap(), json!("null"));
+        assert_eq!(serde_json::from_value::<Fd1>(json!("kqueue")).unwrap(), Fd1::Unknown);
     }
 }

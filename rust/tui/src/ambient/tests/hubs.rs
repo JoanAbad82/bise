@@ -562,6 +562,32 @@ fn the_running_screen_holds_the_running_hubs_only_and_never_past_its_lease() {
     }
 }
 
+/// A process's panel (proc-panel, architect m_47406) holds its own lease on
+/// its project only: the running screen leaving keeps that hub watched,
+/// and the panel's own off (or its lease's end) ends it.
+#[test]
+fn a_process_panel_keeps_its_hub_watched_when_the_screen_leaves() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world_running(&mut t, &["mail"]);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    w.welcome(&mut t, "home");
+    typed(&mut t, json!({"cmd": "processes_all", "on": true}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}));
+    // the panel on one of home's processes: home is watched already, nothing more said
+    typed(&mut t, json!({"cmd": "processes_all", "on": true, "by": "panel:home/perf/bg3", "project": "home"}));
+    // the screen leaves: home stays watched for the panel
+    typed(&mut t, json!({"cmd": "processes_all", "on": false}));
+    typed(&mut t, json!({"cmd": "processes_all", "on": false, "by": "panel:home/perf/bg3"}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}), "only the panel's off ends home's watch");
+    // the panel alone, then its lease runs out
+    typed(&mut t, json!({"cmd": "processes_all", "on": true, "by": "panel:home/perf/bg3", "project": "home"}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}));
+    t.core.tick(Instant::now() + crate::ambient::core::LISTS_LEASE + Duration::from_secs(1));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}), "the panel's lease ran out");
+}
+
 #[test]
 fn a_command_to_a_project_not_held_connects_delivers_then_lets_go() {
     // decision m_8720, amb-tools' run 3: bise's dock answers telemetry's

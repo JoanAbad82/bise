@@ -64,5 +64,12 @@ export function bytesOf(b64: string): Uint8Array {
   return out;
 }
 
+/** How many line ends a chunk holds. */
+export function newlines(b: Uint8Array): number {
+  let n = 0;
+  for (const x of b) if (x === 10) n++;
+  return n;
+}
+
 /** It has printed something: a byte was written. */
 export const printed = (s: OutState): boolean => s.next !== null && s.next > 0;

@@ -197,8 +197,20 @@ pub enum AppCmd {
     /// while on, the core asks every project hub that runs for its
     /// `processes` (watched: again every 2 s) and holds those hubs, never
     /// starting one (a stopped hub killed its processes); off, the window
-    /// gone or a new core: the holds and the watches go (architect m_38378)
-    ProcessesAll { on: bool },
+    /// gone or a new core: the holds and the watches go (architect m_38378).
+    /// `by`: which holder (none: the running screen); a process's panel is
+    /// `panel:<project>/<agent>/<id>` with its `project`, so it watches that
+    /// hub only and the screen's off never ends its watch (architect
+    /// m_47406)
+    ProcessesAll {
+        on: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        by: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        project: Option<String>,
+    },
     /// fn held (the helper's talk): the core opens the mic and starts a
     /// talk to main; `page`: a note talk on that bise page instead, its
     /// words to the page, never to main (docs/ambient-pages.md §4.1)

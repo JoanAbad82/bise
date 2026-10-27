@@ -453,6 +453,13 @@ export type ProcState = { "is": "running" } | { "is": "exited", rc?: number, } |
 export type OutKind = "bg" | "file" | "none" | "unknown";
 
 /**
+ * Where the root's stdout (fd 1) points, from the scan's lsof line: true
+ * of every row (a bg job's is its `.out` file). The app says why no
+ * output is kept by this, never by text (architect m_47406).
+ */
+export type Fd1 = "tty" | "pipe" | "null" | "file" | "socket" | "closed" | "unknown";
+
+/**
  * One process tree an agent left running, or one that ended in the last
  * 24 h. Its key is (`agent`, `id`).
  */
@@ -496,7 +503,12 @@ ended_ms?: number | null,
  * the tree's sum, from the hub's last scan (0 once ended): cpu in
  * percent of one core, resident memory in MB, how many processes
  */
-cpu: number, rss_mb: number, procs: number, out: OutKind, };
+cpu: number, rss_mb: number, procs: number, out: OutKind, 
+/**
+ * where the root's stdout points, when the scan read it (an ended
+ * row keeps its last)
+ */
+fd1?: Fd1, };
 
 /**
  * A worktree of the project's repo: an agent's, or one of his own (the

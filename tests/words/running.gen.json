@@ -19,6 +19,28 @@
     "one": null,
     "text": "by {agent}"
   },
+  "running.cmd_in": {
+    "args": [
+      "cwd"
+    ],
+    "one": null,
+    "text": "in {cwd}"
+  },
+  "running.copied": {
+    "args": [],
+    "one": null,
+    "text": "copied"
+  },
+  "running.copy": {
+    "args": [],
+    "one": null,
+    "text": "copy"
+  },
+  "running.copy_command": {
+    "args": [],
+    "one": null,
+    "text": "copy the command"
+  },
   "running.count_listening": {
     "args": [
       "n"
@@ -42,6 +64,11 @@
     "args": [],
     "one": null,
     "text": "nothing ran in the background today."
+  },
+  "running.empty_yet": {
+    "args": [],
+    "one": null,
+    "text": "Nothing printed yet."
   },
   "running.ended_ago": {
     "args": [
@@ -86,6 +113,11 @@
     "args": [],
     "one": null,
     "text": "running · dev servers · background"
+  },
+  "running.gone": {
+    "args": [],
+    "one": null,
+    "text": "This process isn't listed anymore: it ended more than a day ago, or its project's hub isn't running."
   },
   "running.group": {
     "args": [
@@ -135,6 +167,26 @@
     "one": null,
     "text": "↓ follows the end   / find   o open   s stop   esc back"
   },
+  "running.label_cpu": {
+    "args": [],
+    "one": null,
+    "text": "CPU"
+  },
+  "running.label_listening": {
+    "args": [],
+    "one": null,
+    "text": "Listening"
+  },
+  "running.label_memory": {
+    "args": [],
+    "one": null,
+    "text": "Memory"
+  },
+  "running.listening_none": {
+    "args": [],
+    "one": null,
+    "text": "none"
+  },
   "running.mark_ended": {
     "args": [],
     "one": null,
@@ -146,6 +198,39 @@
     ],
     "one": null,
     "text": "ended, exit {rc}"
+  },
+  "running.meta_by": {
+    "args": [],
+    "one": null,
+    "text": "started by"
+  },
+  "running.meta_ended": {
+    "args": [
+      "at"
+    ],
+    "one": null,
+    "text": "ended {at}"
+  },
+  "running.meta_in": {
+    "args": [
+      "place"
+    ],
+    "one": null,
+    "text": "in {place}"
+  },
+  "running.meta_procs": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} process",
+    "text": "{n} processes"
+  },
+  "running.meta_ran": {
+    "args": [
+      "dur"
+    ],
+    "one": null,
+    "text": "ran {dur}"
   },
   "running.no_output": {
     "args": [],
@@ -169,6 +254,22 @@
     "one": null,
     "text": "not opened: nothing answers at localhost:{port} yet."
   },
+  "running.now_peak_mem": {
+    "args": [
+      "now",
+      "peak"
+    ],
+    "one": null,
+    "text": "{now} · peak {peak}"
+  },
+  "running.now_peak_pct": {
+    "args": [
+      "now",
+      "peak"
+    ],
+    "one": null,
+    "text": "{now} % · peak {peak} %"
+  },
   "running.open": {
     "args": [],
     "one": null,
@@ -181,6 +282,42 @@
     "one": null,
     "text": "opening localhost:{port}"
   },
+  "running.output": {
+    "args": [],
+    "one": null,
+    "text": "Output"
+  },
+  "running.output_first_error": {
+    "args": [],
+    "one": null,
+    "text": "scrolled to the first error"
+  },
+  "running.output_follows": {
+    "args": [],
+    "one": null,
+    "text": "follows the end"
+  },
+  "running.output_lines": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} line",
+    "text": "{n} lines"
+  },
+  "running.peak_mem": {
+    "args": [
+      "peak"
+    ],
+    "one": null,
+    "text": "peak {peak}"
+  },
+  "running.peak_pct": {
+    "args": [
+      "peak"
+    ],
+    "one": null,
+    "text": "peak {peak} %"
+  },
   "running.pick_one": {
     "args": [],
     "one": null,
@@ -192,6 +329,57 @@
     ],
     "one": null,
     "text": "pid {pid}"
+  },
+  "running.pill_by_you": {
+    "args": [
+      "at"
+    ],
+    "one": null,
+    "text": "stopped by you · {at}"
+  },
+  "running.pill_failed": {
+    "args": [
+      "rc",
+      "dur"
+    ],
+    "one": null,
+    "text": "exit {rc} · after {dur}"
+  },
+  "running.pill_no_rc": {
+    "args": [],
+    "one": null,
+    "text": "ended · no exit code"
+  },
+  "running.pill_ok": {
+    "args": [
+      "rc",
+      "dur"
+    ],
+    "one": null,
+    "text": "exit {rc} · ran {dur}"
+  },
+  "running.pill_running": {
+    "args": [
+      "age"
+    ],
+    "one": null,
+    "text": "running · {age}"
+  },
+  "running.pill_with": {
+    "args": [
+      "agent",
+      "at"
+    ],
+    "one": null,
+    "text": "stopped with {agent} · {at}"
+  },
+  "running.point": {
+    "args": [
+      "v",
+      "at"
+    ],
+    "one": null,
+    "text": "{v} · {at}"
   },
   "running.port_short": {
     "args": [
@@ -219,6 +407,21 @@
     "one": null,
     "text": "running for {age} · nothing printed yet"
   },
+  "running.resources": {
+    "args": [],
+    "one": null,
+    "text": "Resources"
+  },
+  "running.resources_ended": {
+    "args": [],
+    "one": null,
+    "text": "while it ran"
+  },
+  "running.resources_live": {
+    "args": [],
+    "one": null,
+    "text": "every 2 s · the last 2 min"
+  },
   "running.running_for": {
     "args": [
       "age"
@@ -238,6 +441,11 @@
     "args": [],
     "one": null,
     "text": "search"
+  },
+  "running.silent_ended": {
+    "args": [],
+    "one": null,
+    "text": "It ended without printing anything."
   },
   "running.state_running": {
     "args": [],
@@ -287,12 +495,24 @@
     "one": null,
     "text": "{id} · started {at} · {cwd}"
   },
+  "running.tip_by_you": {
+    "args": [],
+    "one": null,
+    "text": "you stopped it from bise"
+  },
   "running.tip_detached": {
     "args": [
       "agent"
     ],
     "one": null,
     "text": "started outside {agent}'s commands (a script or nohup)"
+  },
+  "running.tip_failed": {
+    "args": [
+      "rc"
+    ],
+    "one": null,
+    "text": "exit {rc}: the command reported a failure"
   },
   "running.tip_no_cwd": {
     "args": [
@@ -302,10 +522,56 @@
     "one": null,
     "text": "{id} · started {at}"
   },
+  "running.tip_no_rc": {
+    "args": [],
+    "one": null,
+    "text": "it ended, but bise couldn't read its exit code (it ran outside its agent's commands)"
+  },
+  "running.tip_ok": {
+    "args": [],
+    "one": null,
+    "text": "exit 0: the command ended well"
+  },
+  "running.tip_running": {
+    "args": [],
+    "one": null,
+    "text": "running: bise checks it every 2 s while this is open"
+  },
   "running.tip_thread_row": {
     "args": [],
     "one": null,
     "text": "open its output"
+  },
+  "running.tip_with": {
+    "args": [
+      "agent"
+    ],
+    "one": null,
+    "text": "it stopped when {agent} stopped, or when its hub quit"
+  },
+  "running.tmux_attach": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "tmux attach -t {name}"
+  },
+  "running.todo_pipe": {
+    "args": [],
+    "one": null,
+    "text": "Only what that program shows would be readable, and it writes nowhere either."
+  },
+  "running.todo_tmux": {
+    "args": [],
+    "one": null,
+    "text": "To see it, attach to the session in a terminal:"
+  },
+  "running.todo_yet": {
+    "args": [
+      "age"
+    ],
+    "one": null,
+    "text": "Running for {age}. Its output shows here as soon as it writes."
   },
   "running.url": {
     "args": [
@@ -343,5 +609,47 @@
     ],
     "one": null,
     "text": "{agent} · {project}"
+  },
+  "running.why_closed": {
+    "args": [],
+    "one": null,
+    "text": "No output kept: it has nowhere to write."
+  },
+  "running.why_null": {
+    "args": [],
+    "one": null,
+    "text": "No output kept: it throws its output away (> /dev/null)."
+  },
+  "running.why_pipe": {
+    "args": [],
+    "one": null,
+    "text": "No output kept: its output goes into another program."
+  },
+  "running.why_pipe_to": {
+    "args": [
+      "prog"
+    ],
+    "one": null,
+    "text": "No output kept: its output goes into another program (| {prog})."
+  },
+  "running.why_socket": {
+    "args": [],
+    "one": null,
+    "text": "No output kept: it writes to a network connection."
+  },
+  "running.why_tmux": {
+    "args": [],
+    "one": null,
+    "text": "No output kept: it writes to a tmux session, not to a file bise can read."
+  },
+  "running.why_tty": {
+    "args": [],
+    "one": null,
+    "text": "No output kept: it writes to a terminal, not to a file bise can read."
+  },
+  "running.why_unknown": {
+    "args": [],
+    "one": null,
+    "text": "No output kept: it doesn't write to a file bise can read."
   }
 }

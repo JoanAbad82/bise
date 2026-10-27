@@ -15,6 +15,7 @@ mod home;
 mod home_switch;
 mod hubs;
 mod index;
+mod leases;
 mod library;
 mod picks;
 mod voice_answer;
@@ -28,7 +29,8 @@ pub use self::computer::{peer_hub, ComputerPorts};
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
-pub use self::hubs::{not_started, HUB_LACKS, LINGER, LISTS_LEASE, START};
+pub use self::hubs::{not_started, HUB_LACKS, LINGER, START};
+pub use self::leases::LISTS_LEASE;
 pub use self::dictate::DICTATE_MAX;
 #[cfg(test)]
 pub use self::shot::SHOT_GONE;
@@ -523,7 +525,7 @@ impl Core {
                 self.shown(projects);
                 self.app_start();
             }
-            Cmd::ProcessesAll { on } => self.processes_all(on),
+            Cmd::ProcessesAll { on, by, project } => self.processes_all(on, by, project),
             Cmd::Folders { op } => self.folders(op),
             Cmd::FoldersMove { items, folder } => self.folders_move(items, folder),
             Cmd::Typed(v) => self.typed_cmd(v),
