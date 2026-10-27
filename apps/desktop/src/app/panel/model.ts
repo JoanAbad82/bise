@@ -252,10 +252,12 @@ export function dropGone(t: Tabs, known: (project: string) => ReadonlySet<string
  * is gone goes, quietly). `known(project)` is the ids of a project whose artifacts came, undefined
  * while they did not (its tabs wait). Pure.
  */
-export function dropGoneArts(t: Tabs, known: (project: string) => ReadonlySet<string> | undefined): Tabs {
+export function dropGoneArts(t: Tabs, known: (project: string) => ReadonlySet<string> | undefined, here?: { readonly project: string; readonly id: string }): Tabs {
   let out: Tabs = t;
   for (const x of t.list) {
     if (x.what.kind !== 'thing' || x.what.e.kind !== 'artifact') continue;
+    // the route's own artifact stays: its tab says it isn't in the list any more (artifacts/gone.ts)
+    if (here !== undefined && x.what.e.project === here.project && x.what.e.id === here.id) continue;
     const ids = known(x.what.e.project);
     if (ids !== undefined && !ids.has(x.what.e.id)) out = closeIn(out, x.id);
   }

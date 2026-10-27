@@ -402,6 +402,6 @@ export function dropGoneTabs(known: (project: string) => ReadonlySet<string> | u
 }
 
 /** A project's artifacts came: the tabs of its artifacts no longer in them go, quietly (model.ts dropGoneArts). */
-export function dropGoneArtTabs(known: (project: string) => ReadonlySet<string> | undefined): void {
-  setTabs(dropGoneArts(state.tabs, known));
+export function dropGoneArtTabs(known: (project: string) => ReadonlySet<string> | undefined, here?: { readonly project: string; readonly id: string }): void {
+  setTabs(dropGoneArts(state.tabs, known, here));
 }

@@ -39,7 +39,8 @@ export function PanelHost() {
   const { width, over } = usePanelFit();
   const [dragging, setDragging] = useState(false);
   useDropGone(s.tabs.list);
-  useDropGoneArts(s.tabs.list);
+  const route = useRoute();
+  useDropGoneArts(s.tabs.list, route.screen === 'artifacts' && route.project !== '' && route.id !== undefined ? { project: route.project, id: route.id } : undefined);
   const box = useRef<HTMLElement>(null);
   useSheetOut(s.open && over, box);
   const front = s.tabs.list.find((t) => t.id === s.tabs.active);
@@ -240,24 +241,28 @@ function Border({ width, onDrag, artKind, full, canFull }: { width: number; onDr
 
 /**
  * The tabs of an artifact that left its project's list go, quietly (panel-scope): each project an
- * artifact tab names is read from the store once its artifacts came; never before.
+ * artifact tab names is read from the store once its artifacts came; never before. `here`: the
+ * route's own artifact, which stays to say it isn't in the list any more (artifacts/gone.ts).
  */
-function useDropGoneArts(list: readonly Tab[]): void {
+function useDropGoneArts(list: readonly Tab[], here: { project: string; id: string } | undefined): void {
   const store = useStore();
+  const hp = here?.project;
+  const hid = here?.id;
   const names = list.flatMap((t) => (t.what.kind === 'thing' && t.what.e.kind === 'artifact' ? [t.what.e.project] : []));
   const key = [...new Set(names)].join('\n');
   useEffect(() => {
     if (key === '') return;
     const ps = key.split('\n');
+    const keep = hp === undefined || hid === undefined ? undefined : { project: hp, id: hid };
     const check = () => {
-      dropGoneArtTabs((p) => (store.artifactsCame(p) ? new Set(store.artifacts(p).map((a) => a.id)) : undefined));
+      dropGoneArtTabs((p) => (store.artifactsCame(p) ? new Set(store.artifacts(p).map((a) => a.id)) : undefined), keep);
     };
     check();
     const offs = ps.map((p) => store.subscribe(`artifacts:${p}`, check));
     return () => {
       for (const off of offs) off();
     };
-  }, [store, key]);
+  }, [store, key, hp, hid]);
 }
 
 /**

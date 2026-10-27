@@ -71,6 +71,15 @@ describe('the record per project (pure)', () => {
     expect(ids(out)).toEqual(['artifact:p1/b']);
     expect(out.active).toBe('artifact:p1/b');
   });
+
+  it("the route's own artifact stays though the list doesn't have it: its tab says so (artifacts/gone.ts, ui-review m_46724)", () => {
+    const t = openIn(openIn(FIRST, art('p1', 'a')), art('p1', 'gone'));
+    const here = dropGoneArts(t, () => new Set(['a']), { project: 'p1', id: 'gone' });
+    expect(ids(here)).toEqual(ids(t));
+    expect(here.active).toBe('artifact:p1/gone');
+    // he went elsewhere: it goes, as any other
+    expect(ids(dropGoneArts(t, () => new Set(['a'])))).not.toContain('artifact:p1/gone');
+  });
 });
 
 describe('the live panel per project (state.ts)', () => {
