@@ -244,10 +244,10 @@ if (mode === 'first') {
   // the sidebar's '+ add a project' opens amb-home's add sheet in place (amb-win a83184e3), as he
   // does; when it doesn't, settings › projects and its own 'add a project'
   const sheet = page.locator('[data-testid="settings.add"]').first();
-  let opened = await click('add a project (sidebar)', page.locator('[data-testid="app.sidebar.add"]').first());
+  let opened = await click('add a project (sidebar)', page.locator('[data-testid="app.side.add"]').first());
   let shown = opened && await sheet.waitFor({ timeout: 10000 }).then(() => true, () => false);
   if (!shown) {
-    await click('open settings', page.locator('[data-testid="app.sidebar.settings"]').first());
+    await click('open settings', page.locator('[data-testid="app.rail.settings"]').first());
     const root = page.locator('[data-testid="settings.root"]').first();
     await root.waitFor({ timeout: 8000 }).catch(() => {});
     await click('settings › projects', root.getByText('projects', { exact: true }).first());
@@ -447,7 +447,7 @@ if (mode === 'cut') {
   const onCon = (m: ConsoleMessage) => net.push({ ev: 'console', type: m.type(), text: m.text().slice(0, 300), url: m.location()?.url?.slice(0, 200) });
   const onPerr = (e: Error) => net.push({ ev: 'pageerror', text: String(e).slice(0, 300) });
   page.on('request', onReq); page.on('response', onRes); page.on('requestfailed', onFail); page.on('console', onCon); page.on('pageerror', onPerr);
-  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  await click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first());
   const item = page.locator('[data-testid="artifacts.list"]').getByText('proof-html').first();
   const opened = await click('select proof-html', item);
   if (opened) await page.keyboard.press('Enter');
@@ -655,7 +655,7 @@ if (mode === 'rows2') {
     await page.waitForTimeout(800);
     const second = {
       artifact_reopened: (await pageEl.count()) > 0,
-      went_up_to_bise: (await page.locator('[data-testid="app.sidebar.bise"][aria-current]').count()) > 0,
+      went_up_to_bise: (await page.locator('[data-testid="app.side.bise"][aria-current]').count()) > 0,
       words: await fieldText(),
       label: await lbl(),
     };
@@ -674,7 +674,7 @@ if (mode === 'rows2') {
   await closeArtifact();
   // back / forward: harness -> artifacts -> ⌘[ harness -> ⌘] artifacts; esc from harness' main goes up to bise
   await harness();
-  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  await click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first());
   await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 8000 }).catch(() => {});
   await page.keyboard.press('Meta+BracketLeft');
   const wentBack = await until(async () => ((await page.locator('[data-testid="artifacts.list"]').count()) === 0 && /harness/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), 5000, 300);
@@ -684,7 +684,7 @@ if (mode === 'rows2') {
   await harness();
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
   await page.keyboard.press('Escape');
-  const upToBise = await until(async () => (/every project|to bise\s*$/m.test((await text('[data-testid="app.main"]')) ?? '') || (await page.locator('[data-testid="app.sidebar.bise"][aria-current]').count()) > 0 ? true : null), 5000, 300);
+  const upToBise = await until(async () => (/every project|to bise\s*$/m.test((await text('[data-testid="app.main"]')) ?? '') || (await page.locator('[data-testid="app.side.bise"][aria-current]').count()) > 0 ? true : null), 5000, 300);
   await shot('esc-up');
   step("esc from a project's main goes up to bise", !!upToBise, ((await text('[data-testid="app.main"]')) ?? '').slice(0, 200));
   // the working row while an agent works (a slow turn), then a short thought with its words
@@ -750,14 +750,14 @@ if (mode === 'rows2') {
   await shot('short-thought');
   step('a short thought: its row is there and opens to its words', !!words, { rows: nRows, text: nRows ? ((await last.textContent().catch(() => '')) ?? '').slice(0, 200) : '' });
   // the inbox block in bise's thread: another project's item answered there; ⌘I opens it in place
-  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
   // a long reply in bise's own thread, so it scrolls for the block's height row (1c5659b8 run: the
   // thread was empty, nothing scrolled)
   // regress-25e5: a path naming a project routes these words there (fx.ts), and the rows below
   // read a reply that never comes to bise's thread
-  // the project rows only (app.sidebar.project.<id>, not their parts), their first line: the name
-  const projects = (await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
-    .filter((r) => /^app\.sidebar\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''))
+  // the project rows only (app.side.project.<id>, not their parts), their first line: the name
+  const projects = (await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.side.project."]')]
+    .filter((r) => /^app\.side\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''))
     .map((r) => ((r instanceof HTMLElement ? r.innerText : '') ?? '').split(String.fromCharCode(10))[0]?.trim() ?? '')).catch((): string[] => [])).filter(Boolean);
   const hits = named(FX, projects);
   step("the files the words carry name no world project (else bise's thread routes them there)", projects.length > 0 && hits.length === 0, { fx: FX, projects, named: hits });
@@ -818,10 +818,10 @@ if (mode === 'rows2') {
   // place behind), ⌘] under › (one ahead), ⌘I on the inbox head; released, all gone. A quick ⌘: none.
   const hintsNow = () => page.evaluate(() => {
     const t = (s: string) => document.querySelector(s)?.textContent?.trim() ?? null;
-    const rows = [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')].filter((r) => /^app\.sidebar\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''));
+    const rows = [...document.querySelectorAll('[data-testid^="app.side.project."]')].filter((r) => /^app\.side\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''));
     return {
       n: document.querySelectorAll('.app-keyhint').length,
-      bise: t('[data-testid="app.sidebar.bise.hint"]'),
+      bise: t('[data-testid="app.side.bise.hint"]'),
       projects: rows.map((r) => ({ name: (r.textContent ?? '').trim().slice(0, 24), hint: r.querySelector('.app-keyhint')?.textContent?.trim() ?? null, count: !!r.querySelector('.app-cnt') })),
       back: t('[data-testid="app.title.back.hint"]'), forward: t('[data-testid="app.title.forward.hint"]'), inbox: t('[data-testid="inbox.block.hint"]'),
     };
@@ -855,7 +855,7 @@ if (mode === 'rows2') {
   step('hold ⌘ after ⌘[: ⌘] on the forward arrow, gone on release', behind.held?.forward === '⌘]' && behind.released?.n === 0, behind);
   await page.keyboard.press('Meta+BracketRight');
   await page.waitForTimeout(800);
-  if (!(await page.locator('[data-testid="app.sidebar.bise"][aria-current]').count())) await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  if (!(await page.locator('[data-testid="app.side.bise"][aria-current]').count())) await click('bise', page.locator('[data-testid="app.side.bise"]').first());
   // ⌘I is the native menu's accelerator (src/main/menu.ts): CDP keys go to the page and never reach
   // the menu, so off-screen it can't be pressed. ⌃1 (the block's own key) opens the same item in place.
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
@@ -890,7 +890,7 @@ if (mode === 'rows2') {
     + em('mail-lucas', 'lucas@acme.test') + em('mail-marc', 'marc@acme.test');
   await harness();
   await say(`[[bash: printf '%s' '${draftsHtml}' > rel-proof.html && sb page publish rel-proof.html --id rel-proof --title '${DRAFTS}']]`);
-  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
   const draftsRow = page.locator('[data-testid^="inbox.block.row."]', { hasText: DRAFTS }).first();
   // the card by its page's title: its words say 'send these 2 emails?' since the k-pick cards
   // (1de5fc75f), no 'draft' in them
@@ -932,7 +932,7 @@ if (mode === 'rows2') {
     await new Promise((r) => setTimeout(r, 400));
   };
   await harness();
-  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  await click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first());
   const onList = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
   // his no-swipe (316c1391c): a sideways swipe never walks, either way (it took him away from his
   // words); ⌘[ ⌘], the side buttons and ‹ › walk. Fingers right, then left: still on /artifacts
@@ -990,7 +990,7 @@ if (mode === 'rows2') {
   await page.waitForTimeout(600);
   await shot('w1100-frame');
   at1100.frame = { overflow: await overflow(), panel: (await page.locator('[data-testid="app.panel"]').count()) > 0 };
-  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
   await page.locator('[data-testid^="inbox.block"]').first().waitFor({ timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(600);
   await shot('w1100-inbox');
@@ -1009,14 +1009,14 @@ if (mode === 'rows2') {
     await shot(`w1100-${name}`);
     at1100[name] = { overflow: await overflow(), there };
   };
-  await screen1100('artifacts', () => click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first()), '[data-testid="artifacts.screen"]');
-  await screen1100('scheduled', () => click('scheduled', page.locator('[data-testid="app.sidebar.scheduled"]').first()), null);
+  await screen1100('artifacts', () => click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first()), '[data-testid="artifacts.screen"]');
+  await screen1100('scheduled', () => click('scheduled', page.locator('[data-testid="app.rail.scheduled"]').first()), null);
   await screen1100('log', async () => { await harness(); await say('/log'); }, '[data-testid="log.list"]');
   await screen1100('changes', async () => { await harness(); await say('/diff'); }, '[data-testid="changes.screen"], [data-testid="review.screen"]');
   await page.keyboard.press('Escape');
   await screen1100('palette', async () => { await harness(); await page.keyboard.press('Meta+k'); }, '[data-testid="app.palette"]');
   await page.keyboard.press('Escape');
-  await screen1100('settings', () => click('settings', page.locator('[data-testid="app.sidebar.settings"]').first()), '[data-testid="settings.root"]');
+  await screen1100('settings', () => click('settings', page.locator('[data-testid="app.rail.settings"]').first()), '[data-testid="settings.root"]');
   const menuBtn = page.locator('[data-testid="settings.root"] [aria-haspopup]').first();
   const hasMenu = (await menuBtn.count()) > 0;
   if (hasMenu) await screen1100('settings-menu', () => click('a settings menu', menuBtn), '[role="menu"], [role="listbox"]');
@@ -1024,7 +1024,7 @@ if (mode === 'rows2') {
   // b51422c0's batch (ambient-lead m_21481): settings' key field and its caption, the terminal
   // panel, a thread with a tool row and a code block, the selection tint and a quote chip
   // the key row lives on the keys page (accounts.tsx), not the page settings opens on
-  await click('settings', page.locator('[data-testid="app.sidebar.settings"]').first());
+  await click('settings', page.locator('[data-testid="app.rail.settings"]').first());
   const keysNav = page.locator('[data-testid="settings.nav.keys"]').first();
   if (await keysNav.waitFor({ timeout: 5000 }).then(() => true, () => false)) await click('settings keys', keysNav);
   const keyAdd = page.locator('[data-testid="settings.key.add"]').first();
@@ -1092,7 +1092,7 @@ if (mode === 'rows2') {
   await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
   // scroll up right after a thread opens stays up (dae80774: the list goes to its end once, then
   // leaves him where he scrolled)
-  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  await click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first());
   await page.waitForTimeout(500);
   await harness();
   const listBox = await page.locator('[data-testid="thread.list"]').first().boundingBox({ timeout: 5000 }).catch(() => null);
@@ -1322,7 +1322,7 @@ async function rowsE812(harness: () => Promise<unknown>, say: (words: string) =>
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
   const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
-  const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const bise = () => click('bise', page.locator('[data-testid="app.side.bise"]').first());
   const HP = process.env.AS_HE_DOES_HARNESS ?? null;
   const GHW = process.env.AS_HE_DOES_GH_WORLD ?? null;
   const git = async (args: string[]) => {
@@ -1330,11 +1330,11 @@ async function rowsE812(harness: () => Promise<unknown>, say: (words: string) =>
     try { return execFileSync('git', ['-C', HP ?? '.', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; }
   };
   // the projects of the sidebar but bise and harness: {id, name}
-  const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
-    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
+  const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.side.project."]')]
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.side.project.'.length), name: (e.querySelector('.nm, .app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
     .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
   const openProject = async (id: string) => {
-    await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
+    await page.locator(`[data-testid="app.side.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(800);
   };
   // a card's words anywhere a card shows (the inbox block, a strip, the dock), never his asides
@@ -1443,7 +1443,7 @@ async function rowsF2A7(harness: () => Promise<unknown>, say: (words: string) =>
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
   const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
-  const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const bise = () => click('bise', page.locator('[data-testid="app.side.bise"]').first());
   const field = page.locator('[data-testid="composer.field"]:visible').first();
   const clear = async () => {
     await field.click({ timeout: 3000 }).catch(() => {});
@@ -1460,11 +1460,11 @@ async function rowsF2A7(harness: () => Promise<unknown>, say: (words: string) =>
     if (s === 'SIGSTOP') HELD.add(p); else HELD.delete(p);
     try { process.kill(p, s); } catch { /* gone */ }
   });
-  const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
-    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
+  const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.side.project."]')]
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.side.project.'.length), name: (e.querySelector('.nm, .app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
     .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
   const openProject = async (id: string) => {
-    await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
+    await page.locator(`[data-testid="app.side.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(800);
   };
   const reload = async () => {
@@ -1569,8 +1569,9 @@ async function rowsF2A7(harness: () => Promise<unknown>, say: (words: string) =>
   // answer-in-thread A (787e6ee82): an answer to another project's card takes the window to that
   // project's thread at his answer, the hub's row there ('answered from <where>' under his bubble);
   // no window aside in the thread he answered from (store/answered.ts)
-  const harnessPid = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
-    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), t: (e.textContent ?? '').trim() }))
+  const harnessPid = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.side.project."]')]
+    // its name alone (.nm, nm-frame b06021770): the row's whole text runs on into its pill ('harness3 10 unread')
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.side.project.'.length), t: (e.querySelector('.nm, .app-side-name, .name')?.textContent ?? e.textContent ?? '').trim() }))
     .find((p) => p.id && !p.id.includes('.') && /^\W*harness\b/.test(p.t))?.id ?? null).catch(() => null);
   const HID = await harnessPid();
   const inHarness = () => page.locator('[data-testid="thread.screen"]').first().getAttribute('data-project', { timeout: 1000 }).then((x) => x === HID, () => false);
@@ -1767,7 +1768,7 @@ async function fileChips(harness: () => Promise<unknown>) {
   await fresh(`[[bash: sb notify '${Q}`);
   for (const l of ['1. cold', "2. warm']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
   await page.keyboard.press('Enter');
-  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
   const row = page.locator('[data-testid^="inbox.block.row."]', { hasText: 'zqbench' }).first();
   const card = page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: 'zqbench' }).first();
   // the block draws its first items only: an item under '+ N more' is listed too (ambient-lead m_22076),
