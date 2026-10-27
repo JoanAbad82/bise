@@ -46,6 +46,8 @@ export function useSideCompact(): boolean {
 const reduced = (): boolean => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let swapTimers: ReturnType<typeof setTimeout>[] = [];
+/** the toggle's count: a swap a newer toggle replaced never flips */
+let swaps = 0;
 
 /** what leaves: the card and its tile, or the coins at the edge */
 const CARD_SEL = '.s3-outer, .s3-otile';
@@ -57,15 +59,19 @@ const EASE_IN = 'cubic-bezier(.4, 0, 1, 1)';
  * The leaving form's move, played on the elements still there (Web Animations: a CSS rule keyed on
  * the root never played on the mounted card, ui-review m_46834): the card slides 8 toward the edge,
  * the coins 8 up, both fading, 160 ms; reduced motion the crossfade's half, no slide. They unmount
- * when the pick flips, at its end. The coming form's move is sidepick.css's, on its mount.
+ * when the pick flips, once these have finished (never on a timer: a busy frame after the click
+ * started them late and the flip cut them whole, ui-review m_46880). The coming form's move is
+ * sidepick.css's, on its mount.
  */
-function leave(sel: string, what: 'card' | 'coins', how: 'full' | 'reduced'): void {
+function leave(sel: string, what: 'card' | 'coins', how: 'full' | 'reduced'): Animation[] {
   const slide = what === 'card' ? 'translateX(8px)' : 'translateY(-8px)';
   const frames: Keyframe[] = how === 'full' ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: slide }] : [{ opacity: 1 }, { opacity: 0 }];
+  const played: Animation[] = [];
   for (const el of document.querySelectorAll<HTMLElement>(sel)) {
     if (typeof el.animate !== 'function') continue;
-    el.animate(frames, { duration: SWAP_OUT_MS[how], easing: how === 'full' ? EASE_IN : 'linear', fill: 'forwards' });
+    played.push(el.animate(frames, { duration: SWAP_OUT_MS[how], easing: how === 'full' ? EASE_IN : 'linear', fill: 'forwards' }));
   }
+  return played;
 }
 
 export const sideCompact = {
@@ -85,16 +91,20 @@ export const sideCompact = {
     const to = next ? 'to-coins' : 'to-card';
     root.dataset['sideSwap'] = to;
     if (how === 'reduced') root.dataset['sideSwapReduced'] = to;
-    leave(next ? CARD_SEL : COINS_SEL, next ? 'card' : 'coins', how);
-    swapTimers.push(
-      setTimeout(() => {
-        set(next);
-      }, SWAP_OUT_MS[how]),
-      setTimeout(() => {
-        delete root.dataset['sideSwap'];
-        delete root.dataset['sideSwapReduced'];
-      }, SWAP_MS[how]),
-    );
+    const swap = ++swaps;
+    const played = leave(next ? CARD_SEL : COINS_SEL, next ? 'card' : 'coins', how);
+    const flip = (): void => {
+      if (swap !== swaps) return;
+      set(next);
+      swapTimers.push(
+        setTimeout(() => {
+          delete root.dataset['sideSwap'];
+          delete root.dataset['sideSwapReduced'];
+        }, SWAP_MS[how] - SWAP_OUT_MS[how]),
+      );
+    };
+    if (played.length === 0) swapTimers.push(setTimeout(flip, SWAP_OUT_MS[how]));
+    else void Promise.allSettled(played.map((a) => a.finished)).then(flip);
   },
   /** tests: forget what this run read (keep.ts holds what is kept) */
   reset: (): void => {
