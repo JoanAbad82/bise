@@ -14,7 +14,10 @@ vi.mock('@xterm/xterm', () => ({
     cols = 80;
     rows = 24;
     t = { lines: [] as string[], scrolled: [] as number[], disposed: false, inked: [] as { line: number; color: string | undefined }[] };
-    buffer = { active: { length: 0, viewportY: 0, baseY: 0, cursorY: 0, getLine: (i: number) => ({ isWrapped: false, translateToString: () => this.t.lines[i] ?? '' }) } };
+    // what it printed, line by line; its rows are those lines cut at `cols` (a cut row isWrapped)
+    logical: string[] = [];
+    wrapped: boolean[] = [];
+    buffer = { active: { length: 0, viewportY: 0, baseY: 0, cursorY: 0, getLine: (i: number) => ({ isWrapped: this.wrapped[i] === true, translateToString: () => this.t.lines[i] ?? '' }) } };
     // the cursor sits on the last line (no scroll in the mock: baseY 0)
     registerMarker(offset: number) { return { line: this.buffer.active.length - 1 + offset }; }
     // xterm's experimental API: it throws without allowProposedApi (ui-review m_47820's grey line)
@@ -36,12 +39,21 @@ vi.mock('@xterm/xterm', () => ({
       const s = typeof b === 'string' ? b : new TextDecoder().decode(b);
       if (s !== '') {
         const parts = s.split('\n');
-        if (this.t.lines.length === 0) this.t.lines.push('');
-        const end = this.t.lines.length - 1;
-        this.t.lines[end] = `${this.t.lines[end] ?? ''}${parts[0] ?? ''}`;
-        for (const p of parts.slice(1)) this.t.lines.push(p);
-        this.buffer.active.length = this.t.lines.length;
-        this.buffer.active.cursorY = this.t.lines.length - 1;
+        if (this.logical.length === 0) this.logical.push('');
+        const end = this.logical.length - 1;
+        this.logical[end] = `${this.logical[end] ?? ''}${parts[0] ?? ''}`;
+        for (const p of parts.slice(1)) this.logical.push(p);
+        const rows: string[] = [];
+        this.wrapped = [];
+        for (const l of this.logical) {
+          for (let at = 0; at === 0 || at < l.length; at += this.cols) {
+            rows.push(l.slice(at, at + this.cols));
+            this.wrapped.push(at > 0);
+          }
+        }
+        this.t.lines = rows;
+        this.buffer.active.length = rows.length;
+        this.buffer.active.cursorY = rows.length - 1;
       }
       cb?.();
     }
@@ -96,5 +108,21 @@ describe("a process's output", () => {
     // he scrolls away from it: the sub goes back to its lines (designer m_47822)
     act(() => { scrolls[0]?.scrollBy(5); });
     expect(onErr).toHaveBeenLastCalledWith(false);
+  });
+
+  it("inks a long error line's soft-wrapped rest too, never the program's next line (designer m_47845)", () => {
+    const { store, emit } = setup();
+    const draw = (live: boolean) => (
+      <StoreProvider store={store}>
+        <Output project="acme" agent="perf" id="bg2" none={false} live={live} quiet="" {...(live ? {} : { openOnError: vi.fn() })} />
+      </StoreProvider>
+    );
+    const r = render(draw(true));
+    // 'Error: …' is 100 characters at 80 columns: rows 1 and 2; 'old < 2s' then is a line of its own
+    const long = `Error: expect(locator).toBeVisible() failed after waiting for the pay button to be ${'x'.repeat(16)}`;
+    act(() => { emit(out(`Running 1 test\n${long}\nold < 2s\n`)); });
+    r.rerender(draw(false));
+    expect(made[0]?.lines.slice(0, 4)).toEqual(['Running 1 test', long.slice(0, 80), long.slice(80), 'old < 2s']);
+    expect(made[0]?.inked.map((x) => x.line)).toEqual([1, 2]);
   });
 });

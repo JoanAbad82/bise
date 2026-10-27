@@ -95,17 +95,23 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
     // the first error's line, in the error ink (designer m_47812): that line and its wrapped rows
     // only, the rest keeps the program's own colours; drawn again when the theme changes
     let errAt: number | null = null;
-    let errMark: { dispose: () => void } | undefined;
+    let errMarks: { dispose: () => void }[] = [];
     const markErr = () => {
-      errMark?.dispose();
-      errMark = undefined;
+      for (const m of errMarks) m.dispose();
+      errMarks = [];
       if (errAt === null) return;
       const b = term.buffer.active;
-      let height = 1;
-      while (b.getLine(errAt + height)?.isWrapped === true) height++;
+      // one decoration per row: xterm inks a decoration's foreground on its marker's row only, so a
+      // wrapped rest ('old < 2s', ui-review m_47843) gets its own
+      let rows = 1;
+      while (b.getLine(errAt + rows)?.isWrapped === true) rows++;
+      const ink = cssVar('--p-err') || '#ff5a52';
       try {
-        const marker = term.registerMarker(errAt - (b.baseY + b.cursorY));
-        errMark = term.registerDecoration({ marker, width: term.cols, height, foregroundColor: cssVar('--p-err') || '#ff5a52' });
+        for (let i = 0; i < rows; i++) {
+          const marker = term.registerMarker(errAt + i - (b.baseY + b.cursorY));
+          const d = term.registerDecoration({ marker, width: term.cols, foregroundColor: ink });
+          if (d !== undefined) errMarks.push(d);
+        }
       } catch {
         // its ink is a nicety: the jump to it and the sub still hold
       }
@@ -162,7 +168,7 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
     store.command({ cmd: 'proc_out', project, agent, id });
     return () => {
       scan.current = null;
-      errMark?.dispose();
+      for (const m of errMarks) m.dispose();
       off();
       ro.disconnect();
       scheme.removeEventListener('change', retheme);
