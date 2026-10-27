@@ -144,8 +144,9 @@ for (const width of [1400, 1100, 800]) {
         const t0 = frames[0]?.t ?? 0;
         const mid = frames.find((f) => f.t - t0 >= 200) ?? frames[Math.floor(frames.length / 2)];
         if (mid !== undefined) save(`${String(width)}-${theme}-2-mid-dock.png`, PNG.sync.read(pngBytes(mid)), `${String(width)} ${theme} · mid-dock (~200 ms after ⏎)`);
-        // docked: the office now in the outer card's tile (the right bar's, before bise fait mac)
-        if (width > 800) await expect(page.getByTestId('app.outer.world').getByTestId('app.right.bims')).toBeVisible({ timeout: 5000 });
+        // docked: the office now in the outer card's tile (the right bar's, before bise fait mac; the
+        // card shows at 1400, at 1100 the side is coins and the dock a crossfade)
+        if (width >= 1400) await expect(page.getByTestId('app.outer.world').getByTestId('app.right.bims')).toBeVisible({ timeout: 5000 });
         await page.waitForTimeout(800);
         save(`${String(width)}-${theme}-3-after.png`, await shown(s), `${String(width)} ${theme} · after the dock`);
       } finally {

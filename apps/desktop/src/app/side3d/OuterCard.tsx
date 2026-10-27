@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { bimsLit, useBimsLit } from '@/bims/focus';
 import { flushSync } from 'react-dom';
-import type { Card } from '@/proto';
+import type { Agent, Card } from '@/proto';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { sortCards } from '@/inbox/order';
 import { useStore } from '@/store';
@@ -131,7 +131,7 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
         const a = byKey.get(`${r.project}/${r.agent ?? ''}`);
         const card = sortCards(cards.filter((c) => c.agent === r.agent && c.project === r.project))[0];
         return (
-          <AgentLine key={r.key} r={r} pr={pr} wt={wt} job={a === undefined ? r.sub : roleWords(a.note || a.title || a.purpose)} card={card} at={at} now={now}
+          <AgentLine key={r.key} r={r} pr={pr} wt={wt} job={a === undefined ? r.sub : jobOf(a)} card={card} at={at} now={now}
             here={here.project === r.project && here.agent === r.agent} group={groupOf?.(r.project)} open={open === r.key}
             lit={linked(r) && r.agent === litBim}
             onLit={linked(r) ? (on) => {
@@ -201,6 +201,11 @@ interface LineProps {
   readonly lit: boolean;
   /** the pointer comes on the row (true) or leaves it: its bim lights; none, the row has no bim in the tile */
   readonly onLit: ((on: boolean) => void) | undefined;
+}
+
+/** An agent's job words: what it does now, else its title, else its purpose; never main's purpose (main at rest is the team lead, barrows.ts). Pure. */
+export function jobOf(a: Pick<Agent, 'main' | 'note' | 'title' | 'purpose'>): string {
+  return roleWords(a.note || a.title || (a.main ? '' : a.purpose));
 }
 
 /** A line's tip: its name and its job's words; main at rest says what it is, 'team lead' (native-lead m_47965). Pure. */

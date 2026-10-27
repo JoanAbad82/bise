@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { side } from '@/proto/words_side.gen';
 import { panel } from '@/proto/words_panel.gen';
-import { lineTip, OuterHead } from './OuterCard';
+import { jobOf, lineTip, OuterHead } from './OuterCard';
 
 // the head's 3D picture needs WebGL: a picture that never draws
 vi.mock('./Bubbles', () => ({ ThingPic: () => <span /> }));
@@ -52,5 +52,21 @@ describe('an agent line\'s tip (native-lead m_47965)', () => {
 
   it('another agent with no words: its name', () => {
     expect(lineTip({ name: 'perf' }, '')).toBe('perf');
+  });
+});
+
+describe('an agent line\'s job words', () => {
+  const a = (over: Partial<Pick<Agent, 'main' | 'note' | 'title' | 'purpose'>>) => ({ main: false, title: '', purpose: '', ...over });
+
+  it('main at rest never says its purpose: no job, so its tip is the team lead', () => {
+    const main = a({ main: true, purpose: 'orchestrator: routes the requests' });
+    expect(jobOf(main)).toBe('');
+    expect(lineTip({ name: 'bise', main: true }, jobOf(main))).toBe(`bise · ${panel.role_lead}`);
+  });
+
+  it('main working: its note; another agent: its title, else its purpose', () => {
+    expect(jobOf(a({ main: true, note: 'merging the docs', purpose: 'orchestrator' }))).toBe('merging the docs');
+    expect(jobOf(a({ title: 'speed', purpose: 'make it fast' }))).toBe('speed');
+    expect(jobOf(a({ purpose: 'make it fast' }))).toBe('make it fast');
   });
 });
