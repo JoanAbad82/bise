@@ -204,7 +204,7 @@
     "one": null,
     "text": "{n} listening"
   },
-  "side.more_agents": {
+  "side.more_rows": {
     "args": [
       "n"
     ],

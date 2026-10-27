@@ -72,8 +72,8 @@ crate::words! { side:
     row_working(len) = "working · {len}";
     /// the outer card's section head, right: its full page (page outer-side v2)
     all_short = "all ›";
-    /// the outer card's agents past its 15: they open the agents list
-    more_agents(n) = "+ {n} more";
+    /// the outer card, under a section's rows: n more of them show (50 at most a click)
+    more_rows(n) = "+ {n} more";
     /// the outer card's agents head, in the accent: the agents that ask him
     head_waits(n) = "{n} waits";
     /// the ψ at an agent row's right, its tip: it works in a worktree

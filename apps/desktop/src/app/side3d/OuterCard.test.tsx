@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The outer card's section head with side3d.css, read back with getComputedStyle: happy-dom has no
-// layout, so 'all ›' staying on one line is what the stylesheet gives it: no wrap and no shrink, the
-// summary before it takes the cut (his m_46681: 'all' over '›' beside a long title). Mutation:
+// layout, so 'all ›' staying on one line is what the stylesheet gives it: no wrap and no shrink (his
+// m_46681: 'all' over '›' beside a long title). Mutation:
 // side3d.css's .s3-ohead-all without white-space: nowrap or flex: none turns this red.
 import { cleanup, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
@@ -21,14 +21,11 @@ beforeAll(() => {
 afterEach(cleanup);
 
 describe('the outer card\'s head', () => {
-  it('\'all ›\' stays on one line beside a long summary: it never wraps nor shrinks, the summary takes the ellipsis', () => {
-    const v = render(<OuterHead id="artifacts" name="Artifacts" count="1145" sum={'tes artifacts, rangés par dossier et par projet '.repeat(3)} onAll={() => undefined} />);
-    const all = v.getByTestId('app.outer.artifacts.all');
+  it('\'all ›\' stays on one line beside a full head: it never wraps nor shrinks', () => {
+    const v = render(<OuterHead id="agents" name="Agents" count="1145" loud={side.head_waits({ n: 12 })} onAll={() => undefined} />);
+    const all = v.getByTestId('app.outer.agents.all');
     expect(all.textContent).toBe(side.all_short);
     expect(getComputedStyle(all).whiteSpace).toBe('nowrap');
     expect(getComputedStyle(all).flexShrink).toBe('0');
-    const sum = getComputedStyle(v.getByTestId('app.outer.artifacts.sum'));
-    expect(sum.textOverflow).toBe('ellipsis');
-    expect(sum.minWidth).toMatch(/^0(px)?$/);
   });
 });

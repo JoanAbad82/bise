@@ -6,9 +6,11 @@
 // in the hub's rank: its mark (the bar's language, ⌥N while ⌥ is held, an ask's in the accent),
 // its head at 20, its name, its age while it works or asks, its PR, its ψ when it has its own
 // worktree; idle and done step back. A click opens its thread; an ask's click opens it in place,
-// its options and 'answer…' / 'write to perf…' under it. 15 at most, then '+ N more'. The other
-// sections keep the floats' rows (FlyoutLists). Owner: nm-side.
-import { useState, type ReactNode } from 'react';
+// its options and 'answer…' / 'write to perf…' under it. The other sections keep the floats' rows
+// (FlyoutLists). Each section shows its first rows (Agents 10, the others 5), then '+ N more' adds
+// 50 (outerrows.ts); an empty one keeps its empty line. The card scrolls as a whole, a 16 fade at
+// the edge that has more, macOS's overlay scrollbar. Owner: nm-side.
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card } from '@/proto';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { sortCards } from '@/inbox/order';
@@ -26,9 +28,8 @@ import { askButtons, pickIntent } from './model';
 import { bubbleThing, type BubbleId } from './objects';
 import { groupParts } from './lists';
 import { OUTER_TOP } from './tilestate';
+import { FIRST_AGENTS, FIRST_ROWS, moreOf, useShown } from './outerrows';
 
-/** the agents shown before '+ N more' (15 fit a 900 high window with the other sections) */
-export const OUTER_AGENTS = 15;
 /** an agent's head in the card, css px */
 export const OUTER_HEAD_PX = 20;
 
@@ -36,7 +37,7 @@ export const OUTER_HEAD_PX = 20;
 const COMPOSER_FIELD = '[data-testid="composer.field"]';
 
 /** A section's head: its 3D object, its name, its count (and what waits on him, in the accent), 'all ›'. */
-export function OuterHead({ id, name, count, loud, sum, onAll, onCube }: { id: BubbleId; name: string; count: string; loud?: string; sum?: string; onAll: () => void; onCube?: () => void }) {
+export function OuterHead({ id, name, count, loud, onAll, onCube }: { id: BubbleId; name: string; count: string; loud?: string; onAll: () => void; onCube?: () => void }) {
   return (
     <header className="s3-ohead" data-testid={`app.outer.${id}.head`}>
       <span className="s3-ohead-pic" aria-hidden="true">
@@ -45,7 +46,6 @@ export function OuterHead({ id, name, count, loud, sum, onAll, onCube }: { id: B
       <b className="s3-ohead-name">{name}</b>
       {count !== '' && <span className="s3-ohead-n">{count}</span>}
       {loud !== undefined && loud !== '' && <span className="s3-ohead-loud" data-testid={`app.outer.${id}.loud`}>· {loud}</span>}
-      {sum !== undefined && sum !== '' && <span className="s3-ohead-sum" data-testid={`app.outer.${id}.sum`}>· {sum}</span>}
       <Press look="s3-ohead-all" onClick={onAll} data-testid={`app.outer.${id}.all`}>{side.all_short}</Press>
       {onCube !== undefined && (
         <Press look="s3-ohead-cube" aria-label={side.tile_show} {...tipAttrs(side.tile_show)} onClick={onCube} data-testid={`app.outer.${id}.cube`}>
@@ -67,7 +67,6 @@ export interface OuterAgentsProps {
   readonly groupOf?: (project: string) => string | undefined;
   readonly onOpen: (r: BarRow) => void;
   readonly onOpenPr: (r: BarRow) => void;
-  readonly onMore: () => void;
 }
 
 /** The agents' rows past their worktree heads: each with its PR (its own, or its shared worktree's) and whether it works in a worktree. Pure. */
@@ -81,15 +80,15 @@ export function outerRows(live: readonly BarRow[], agents: readonly ProjAgent[])
   });
 }
 
-/** AGENTS in the card: 15 lines at most, then '+ N more'. */
-export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpen, onOpenPr, onMore }: OuterAgentsProps) {
+/** AGENTS in the card: its first 10 lines, then '+ N more' adds 50. */
+export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpen, onOpenPr }: OuterAgentsProps) {
   const rows = outerRows(live, agents);
   const byKey = new Map(agents.map((x) => [`${x.project}/${x.a.name}`, x.a]));
   const [open, setOpen] = useState<string | null>(null);
-  const more = rows.length - OUTER_AGENTS;
+  const [shown, more] = useShown(FIRST_AGENTS);
   return (
     <div className="s3-orows" data-testid="app.outer.agents.rows">
-      {rows.slice(0, OUTER_AGENTS).map(({ r, pr, wt }) => {
+      {rows.slice(0, shown).map(({ r, pr, wt }) => {
         const a = byKey.get(`${r.project}/${r.agent ?? ''}`);
         const card = sortCards(cards.filter((c) => c.agent === r.agent && c.project === r.project))[0];
         return (
@@ -100,12 +99,18 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
             }} onOpen={onOpen} onOpenPr={onOpenPr} />
         );
       })}
-      {more > 0 && (
-        <Press look="s3-omore" onClick={onMore} data-testid="app.outer.agents.more">
-          {side.more_agents({ n: more })}
-        </Press>
-      )}
+      <MoreRow id="agents" n={moreOf(shown, rows.length)} onMore={more} />
     </div>
+  );
+}
+
+/** '+ N more' under a section's rows: a click shows N more; none when all show. */
+function MoreRow({ id, n, onMore }: { id: BubbleId; n: number; onMore: () => void }) {
+  if (n === 0) return null;
+  return (
+    <Press look="s3-omore" onClick={onMore} data-testid={`app.outer.${id}.more`}>
+      {side.more_rows({ n })}
+    </Press>
   );
 }
 
@@ -189,24 +194,60 @@ function Mark({ g, id }: { g: string; id: string }): ReactNode {
   return <span className="s3-orow-g">{g}</span>;
 }
 
-/** One section of the card: its head and its rows. */
-export function OuterSection({ id, name, count, loud, sum, onAll, onCube, children }: { id: BubbleId; name: string; count: string; loud?: string; sum?: string; onAll: () => void; onCube?: () => void; children?: ReactNode }) {
+interface SectionProps {
+  readonly id: BubbleId;
+  readonly name: string;
+  readonly count: string;
+  readonly loud?: string;
+  readonly onAll: () => void;
+  readonly onCube?: () => void;
+}
+
+/** One section of the card: its head and what is under it (Agents: OuterAgents). */
+export function OuterSection({ id, name, count, loud, onAll, onCube, children }: SectionProps & { children?: ReactNode }) {
   return (
     <section className="s3-osec" data-testid={`app.outer.${id}`}>
-      <OuterHead id={id} name={name} count={count} {...(loud === undefined ? {} : { loud })} {...(sum === undefined ? {} : { sum })} onAll={onAll} {...(onCube === undefined ? {} : { onCube })} />
+      <OuterHead id={id} name={name} count={count} {...(loud === undefined ? {} : { loud })} onAll={onAll} {...(onCube === undefined ? {} : { onCube })} />
       {children}
     </section>
   );
 }
 
-/**
- * The card: its sections, scrolling inside when they pass its height. `tile`: the room the bims'
- * tile and its handle take above it (0: hidden); `scrolls`: past the heads alone, the agents' list
- * scrolls inside (tilestate.ts outerFold).
- */
-export function OuterCard({ tile = 0, scrolls = false, children }: { tile?: number; scrolls?: boolean; children: ReactNode }) {
+/** A section of rows: its first 5, then '+ N more' adds 50; `rows(n)` draws the first n; none: its empty line. */
+export function OuterList({ total, rows, empty, ...head }: SectionProps & { total: number; rows: (n: number) => ReactNode; empty: ReactNode }) {
+  const [shown, more] = useShown(FIRST_ROWS);
   return (
-    <aside className="s3-outer" style={{ top: OUTER_TOP + tile }} data-scrolls={scrolls || undefined} data-testid="app.outer">
+    <OuterSection {...head}>
+      {total === 0 ? empty : rows(shown)}
+      <MoreRow id={head.id} n={moreOf(shown, total)} onMore={more} />
+    </OuterSection>
+  );
+}
+
+/** Where the card's scroll is: more above, more below; each edge with more fades. Pure. */
+export function scrollEdges(top: number, view: number, height: number): { readonly above: boolean; readonly below: boolean } {
+  return { above: top > 0, below: top + view < height - 1 };
+}
+
+/**
+ * The card: its sections, one scroll for all when they pass its height (no list scrolls inside
+ * it), a 16 fade at each edge that has more. `tile`: the room the bims' tile and its handle take
+ * above it (0: hidden).
+ */
+export function OuterCard({ tile = 0, children }: { tile?: number; children: ReactNode }) {
+  const box = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ above: false, below: false });
+  const measure = () => {
+    const el = box.current;
+    if (el === null) return;
+    const next = scrollEdges(el.scrollTop, el.clientHeight, el.scrollHeight);
+    setEdges((e) => (e.above === next.above && e.below === next.below ? e : next));
+  };
+  // after each render: rows came or went ('+ N more', a new artifact), the window's height
+  useLayoutEffect(measure);
+  return (
+    <aside ref={box} className="s3-outer" style={{ top: OUTER_TOP + tile }} onScroll={measure}
+      data-above={edges.above || undefined} data-below={edges.below || undefined} data-testid="app.outer">
       {children}
     </aside>
   );

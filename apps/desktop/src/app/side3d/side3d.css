@@ -843,6 +843,23 @@
   font: var(--f-meta);
   color: var(--c-text-3);
 }
+/* a sub line of parts (FlyoutLists Parts, designer m_46744): one 16 line; a part with no room wraps
+   under it, out of sight, so each shows whole or not at all, the last (the age) first to go; the
+   first alone, when even it has no room, takes the ellipsis */
+.s3-parts {
+  display: flex;
+  flex-wrap: wrap;
+  height: 16px;
+  overflow: hidden;
+}
+.s3-parts > span {
+  white-space: pre;
+}
+.s3-parts > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .s3-row-end {
   display: inline-flex;
   align-items: center;
@@ -1321,8 +1338,8 @@
 }
 
 /* the outer card (page outer-side v2, his pick; OuterCard.tsx): the Overview out of the panel, 280
-   wide, 12 from the window's right edge, its top on the left side's top (the bar's 52), 12 above the
-   bottom; r 12, --c-raised, 1 px line, e-1; it scrolls inside when its sections pass its height */
+   wide, 12 from the window's right edge, 12 under the bar, 12 above the bottom; r 12, --c-raised,
+   1 px line, e-1; one scroll for all its sections when they pass its height */
 .s3-outer {
   position: fixed;
   /* top inline (OuterCard: tilestate OUTER_TOP, 12 under the bar, + the tile and its 8 handle when it shows) */
@@ -1645,25 +1662,16 @@
 .s3-ohead-cube:hover {
   background: var(--c-hover);
 }
-/* the other sections folded to their head (outer-world v2 give-way): the summary after the name */
-.s3-ohead-sum {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* the card scrolls as a whole (designer m_46693): a 16 fade at each edge that has more (OuterCard
+   data-above / data-below), macOS's overlay scrollbar, none drawn */
+.s3-outer[data-above] {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--s-4));
 }
-/* past the heads alone the agents' list scrolls inside the card, a 16 px fade at its foot */
-.s3-outer[data-scrolls] {
-  overflow: hidden;
+.s3-outer[data-below] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-4)), transparent);
 }
-.s3-outer[data-scrolls] .s3-osec[data-testid='app.outer.agents'] {
-  flex: 1;
-  min-height: 0;
-}
-.s3-outer[data-scrolls] .s3-orows {
-  overflow-y: auto;
-  min-height: 0;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+.s3-outer[data-above][data-below] {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--s-4), #000 calc(100% - var(--s-4)), transparent);
 }
 /* the office's corner chips inside the tile (designer m_46580): the bims head's map chip (--c-bg, a
    1 px line, r 6), 8 in from the corners; the map chip on hover at every height, as ⤢ and × */

@@ -721,28 +721,76 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(opened).toEqual([{ kind: 'office', project: ACME }]);
   });
 
-  it('the give-way: a tall tile folds the other sections to their head with a one-line summary', () => {
-    tall(900);
-    const { v } = side3d(1440);
-    // 3 agents: at 140 everything holds its rows
-    expect(v.queryByTestId('app.outer.artifacts.sum')).toBeNull();
-    expect(v.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(2);
-    act(() => {
-      outerWorld.height(438, 900);
-    });
-    // 900 - 64 - 12 - 446 = 378: room for one row each (the agents' 3 lines first)
-    expect(v.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(1);
-    expect(v.queryByTestId('app.outer.artifacts.sum')).toBeNull();
-    cleanup();
+  it('a tall tile folds nothing: each section keeps its rows, the card scrolls as a whole (designer m_46693)', () => {
     tall(800);
+    outerWorld.height(400, 800);
+    const { v } = side3d(1440);
+    expect(v.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(2);
+    expect(v.getByTestId('app.outer.processes').textContent).toContain(side.no_processes);
+    expect(v.queryByTestId('app.outer.artifacts.more')).toBeNull();
+  });
+});
+
+describe('the outer card\'s rows: Agents 10, the others 5, then \'+ N more\' adds 50 (his m_46685, m_46687)', () => {
+  const tall = (h: number) => {
+    Object.defineProperty(window, 'innerHeight', { value: h, configurable: true });
+  };
+  const crowd = (store: Store, agents: number, arts: number) => {
     act(() => {
-      outerWorld.height(388, 800);
+      // the thread in view is perf's: the card's artifacts are its own
+      store.apply(ev('agents', { project: ACME, agents: [agent('main', { main: true }), agent('perf', { status: 'working', rank: 1 }), ...Array.from({ length: agents - 2 }, (_, i) => agent(`a${String(i)}`, { status: 'working', rank: i + 2 }))] }));
+      store.apply(artifacts(ACME, ...Array.from({ length: arts }, (_, i) => artifact({ id: `x${String(i)}`, kind: 'page', title: `page ${String(i)}`, agent: 'perf', new: false }))));
     });
-    const low = side3d(1440).v;
-    // 800 - 64 - 12 - 396 = 328: the heads alone, their summary after the name
-    expect(low.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(0);
-    expect(low.getByTestId('app.outer.artifacts.sum').textContent).toContain('PR #6');
-    expect(low.getByTestId('app.outer').hasAttribute('data-scrolls')).toBe(false);
+  };
+  const lines = (v: ReturnType<typeof render>, id: string) => v.getByTestId(`app.outer.${id}`).querySelectorAll(id === 'agents' ? '.s3-orow' : '.s3-row').length;
+
+  it('Agents shows its first 10 then \'+ 3 more\'; a click shows all 13 and the row goes', () => {
+    tall(900);
+    const { v, store } = side3d(1440);
+    crowd(store, 13, 0);
+    expect(lines(v, 'agents')).toBe(10);
+    expect(v.getByTestId('app.outer.agents.more').textContent).toBe(side.more_rows({ n: 3 }));
+    fireEvent.click(v.getByTestId('app.outer.agents.more'));
+    expect(lines(v, 'agents')).toBe(13);
+    expect(v.queryByTestId('app.outer.agents.more')).toBeNull();
+  });
+
+  it('Artifacts with 62: its first 5, \'+ 50 more\', then 55 and \'+ 7 more\', then all 62', () => {
+    tall(900);
+    const { v, store } = side3d(1440);
+    crowd(store, 3, 62);
+    expect(lines(v, 'artifacts')).toBe(5);
+    expect(v.getByTestId('app.outer.artifacts.more').textContent).toBe(side.more_rows({ n: 50 }));
+    fireEvent.click(v.getByTestId('app.outer.artifacts.more'));
+    expect(lines(v, 'artifacts')).toBe(55);
+    expect(v.getByTestId('app.outer.artifacts.more').textContent).toBe(side.more_rows({ n: 7 }));
+    fireEvent.click(v.getByTestId('app.outer.artifacts.more'));
+    expect(lines(v, 'artifacts')).toBe(62);
+    expect(v.queryByTestId('app.outer.artifacts.more')).toBeNull();
+    // 'all ›' still opens the full screen
+    expect(v.getByTestId('app.outer.artifacts.all')).toBeTruthy();
+  });
+
+  it('5 or fewer: no \'more\' row; none: the empty line', () => {
+    tall(900);
+    const { v, store } = side3d(1440);
+    crowd(store, 3, 5);
+    expect(lines(v, 'artifacts')).toBe(5);
+    expect(v.queryByTestId('app.outer.artifacts.more')).toBeNull();
+    expect(v.queryByTestId('app.outer.processes.more')).toBeNull();
+    expect(v.getByTestId('app.outer.processes').textContent).toContain(side.no_processes);
+  });
+
+  it('back to the first rows when the card remounts (a panel opened and folded again)', () => {
+    tall(900);
+    const { v, store } = side3d(1440);
+    crowd(store, 3, 62);
+    fireEvent.click(v.getByTestId('app.outer.artifacts.more'));
+    expect(lines(v, 'artifacts')).toBe(55);
+    cleanup();
+    const again = side3d(1440);
+    crowd(again.store, 3, 62);
+    expect(lines(again.v, 'artifacts')).toBe(5);
   });
 
   it('a panel open: the tile and the card give way to the coins; folded again, both come back at the tile\'s height', () => {

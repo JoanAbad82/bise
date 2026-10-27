@@ -68,10 +68,19 @@ export function ArtifactRow({ it, now, group }: { it: Item; now: number; group?:
 
 /** where a process listens, its age: 'perf · localhost:5173 · 2 h'; `linked`: its end shows the
  * page's link already, so the port is said once (designer m_46263: whole or dropped, never cut) */
-function procSub(p: Proc, now: number, group?: string, linked = false): string {
+function procSub(p: Proc, now: number, group?: string, linked = false): readonly string[] {
   const s = stateOf(p);
   const where = linked ? '' : (urlWords(p, s)?.row ?? portWords(p, s));
-  return [groupWords(group, p.agent), where, ago(p.started_ms, now)].filter((x) => x !== '').join(' · ');
+  return [groupWords(group, p.agent), where, ago(p.started_ms, now)].filter((x) => x !== '');
+}
+
+/** A sub line of parts, each whole or dropped from the end (the age first), never cut mid-word; the first alone takes an ellipsis (designer m_46744). */
+function Parts({ parts }: { parts: readonly string[] }) {
+  return (
+    <span className="s3-parts">
+      {parts.map((s, i) => <span key={i}>{i === 0 ? s : ` · ${s}`}</span>)}
+    </span>
+  );
 }
 
 /** a process's command as he typed it ('python3 -m http.server 47977'), never the system's process name; its program by name, a 'cd <its folder> &&' gone (running/model rowCmd) */
@@ -89,7 +98,7 @@ export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: s
     <SideRow
       pic={<ThingPic thing={{ obj: procObj(p) }} px={ROW_PX} tile="terminal" />}
       title={<span className="s3-cmd">{typed(p)}</span>}
-      sub={procSub(p, now, group, u !== null)}
+      sub={<Parts parts={procSub(p, now, group, u !== null)} />}
       end={
         <>
           {/* its port as a link that opens the page, never the row (folded-side v9, the Overview's port link) */}
