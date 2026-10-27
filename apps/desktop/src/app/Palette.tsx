@@ -7,8 +7,9 @@
 // ⏎ asks bise (a sentence: 'ask bise' is the first row, what it names one row down, main m_12973,
 // the spotlight's rule from src/search's asksBise); esc closes. Its own field: the composer keeps its draft.
 // Bise fait mac keeps main's palette whole (r2-palette, Gabriel m_44243): its glyphs, its rows,
-// no chips. Owner: amb-web (lead m_11864), in amb-win's shell.
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+// no chips. Only the rows in view are drawn, the others are gaps of their height (paletteWindow.ts,
+// cmdk-perf): a one-letter query can match a thousand rows. Owner: amb-web (lead m_11864), in amb-win's shell.
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
 import { caretAtEnd, keep, useKeptText } from '@/app/keep';
 import type { Ev } from '@/store/store';
@@ -18,6 +19,7 @@ import { useGoArtifact } from '@/artifacts/leave';
 import { PAGES } from '@/settings';
 import { useNow } from './clock';
 import { askInbox } from './inboxAsk';
+import { UNMEASURED, windowOf, type Measures } from './paletteWindow';
 import { HELP_EVENT } from './keys';
 import { appPages } from './pages';
 import { MAIN, parseRoute } from './route';
@@ -148,6 +150,38 @@ export function Palette({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     document.querySelector(`[data-testid="app.palette.item.${String(cur)}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [cur]);
+  // only the rows in view are drawn (paletteWindow.ts): the box's measures and scroll, read after
+  // each render (a state change only when they moved), and on a resize
+  const body = useRef<HTMLDivElement>(null);
+  const [m, setM] = useState<Measures>(UNMEASURED);
+  const [box, setBox] = useState({ top: 0, view: 0 });
+  const readBox = useCallback(() => {
+    const b = body.current;
+    if (b === null) return;
+    setBox((x) => (x.top === b.scrollTop && x.view === b.clientHeight ? x : { top: b.scrollTop, view: b.clientHeight }));
+  }, []);
+  useLayoutEffect(() => {
+    const b = body.current;
+    if (b === null) return;
+    const row = b.querySelector<HTMLElement>('.app-k-row')?.offsetHeight ?? 0;
+    const head = b.querySelector<HTMLElement>('.app-k-head')?.offsetHeight ?? 0;
+    const pad = parseFloat(getComputedStyle(b).paddingTop) || 0;
+    setM((x) => {
+      const n = { row: row > 0 ? row : x.row, head: head > 0 ? head : x.head, pad };
+      return n.row === x.row && n.head === x.head && n.pad === x.pad ? x : n;
+    });
+    readBox();
+  }, [list, readBox]);
+  useEffect(() => {
+    const b = body.current;
+    if (b === null || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(readBox);
+    ro.observe(b);
+    return () => {
+      ro.disconnect();
+    };
+  }, [readBox]);
+  const parts = windowOf({ sizes: list.groups.map((g) => g.hits.length), askRow, m, scrollTop: box.top, view: box.view, cur });
 
   const open = (h: Hit | undefined, restore = false) => {
     if (h === undefined) return;
@@ -206,7 +240,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
     }
   };
 
-  let k = askRow ? 1 : 0;
+  // each group's first row's flat index (the ask row is 0 when there is one)
+  const firsts = list.groups.reduce<number[]>((acc, _g, i) => [...acc, i === 0 ? (askRow ? 1 : 0) : (acc[i - 1] ?? 0) + (list.groups[i - 1]?.hits.length ?? 0)], []);
   return (
     <div
       className="app-palette"
@@ -252,7 +287,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
             </Press>
           ))}
         </div>
-        <div className="app-k-body" role="listbox" aria-label="results">
+        <div ref={body} className="app-k-body" role="listbox" aria-label="results" onScroll={readBox}>
           {list.mode === 'blank' && (
             <div className="app-k-empty" data-testid="app.palette.blank">
               <p>{PW.blank}</p>
@@ -288,7 +323,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
               <span className="rt">{cur === 0 && <span className="hint"><Pairs text={PW.hintAsk} /></span>}</span>
             </div>
           )}
-          {list.groups.map((g) => (
+          {list.groups.map((g, gi) => {
+            const first = firsts[gi] ?? 0;
+            return (
             <div key={g.id} role="group" aria-label={g.label} data-testid={`app.palette.group.${g.id}`}>
               <div className="app-k-head">
                 <span>{g.label}</span>
@@ -296,8 +333,11 @@ export function Palette({ onClose }: { onClose: () => void }) {
                 <span className="sp" />
                 <span className="x">{scope === 'all' && g.id === 'agents' && sel !== undefined && g.hits.includes(sel) ? PW.tabOnly : ''}</span>
               </div>
-              {g.hits.map((h) => {
-                const n = k++;
+              {(parts[gi] ?? []).flatMap((p, pi) =>
+                'gap' in p
+                  ? [<div key={`gap.${String(pi)}`} aria-hidden style={{ height: p.gap * m.row }} />]
+                  : g.hits.slice(p.draw[0], p.draw[1]).map((h, j) => {
+                const n = first + p.draw[0] + j;
                 const on = n === cur;
                 return (
                   <div
@@ -332,9 +372,11 @@ export function Palette({ onClose }: { onClose: () => void }) {
                     </span>
                   </div>
                 );
-              })}
+              }),
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
         <div className="app-k-keys" data-testid="app.palette.keys">
           <Pairs text={keyLine(list, sel, scope)} />

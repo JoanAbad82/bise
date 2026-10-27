@@ -133,4 +133,23 @@ describe("what ⏎ does with a typed line: main's decision m_12973, the spotligh
     expect(ids).toContain('agent.sf.checkout-v1');
     expect(ids.indexOf('agent.sf.checkout')).toBeLessThan(ids.indexOf('agent.sf.checkout-v1'));
   });
+
+  it('a keystroke over many artifacts makes no new date formatter per row (cmdk-perf: 0.5 ms each)', () => {
+    // mutation: dayTime back to `new Intl.DateTimeFormat` per call turns this red (thousands made)
+    const many: SearchData = { ...D, artifacts: Array.from({ length: 500 }, (_, k) => ({ project: 'sf', id: `a${String(k)}`, title: `report ${String(k)}`, kind: 'page', what: 'page', agent: 'perf', at_ms: NOW - k * 3_600_000 })) };
+    const real = Intl.DateTimeFormat;
+    let made = 0;
+    Intl.DateTimeFormat = new Proxy(real, {
+      construct(t, args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+        made++;
+        return new t(...args);
+      },
+    });
+    try {
+      for (const q of ['r', 're', 'rep']) expect(flatHits(searchList(many, q, 'artifacts', NOW, 'Europe/Paris')).length).toBe(500);
+    } finally {
+      Intl.DateTimeFormat = real;
+    }
+    expect(made).toBeLessThanOrEqual(4);
+  });
 });

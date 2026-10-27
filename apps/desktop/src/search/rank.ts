@@ -167,11 +167,12 @@ const wordsOf = (s: string): string[] => s.split(/[^\p{L}\p{N}]+/u).filter((w) =
 export function wordScore(w: string, field: string): number {
   const f = field.toLowerCase();
   if (w === '' || f === '') return 0;
+  // every match below is inside the field: most fields don't hold the word, they cost one scan
+  if (!f.includes(w)) return 0;
   if (f === w) return HOW.whole;
   if (f.startsWith(w)) return HOW.start;
   if (wordsOf(f).some((x) => x.startsWith(w))) return HOW.word;
-  if (f.includes(w)) return HOW.inside;
-  return 0;
+  return HOW.inside;
 }
 
 export interface Fields {
@@ -268,17 +269,38 @@ export function since(ms: number, now: number): string {
   return ago(ms, now);
 }
 
+// The formatters, made once per time zone: a new Intl.DateTimeFormat costs about 0.5 ms, and a
+// keystroke in ⌘K formats every artifact that matches (cmdk-perf: 2000 artifacts were 1 s).
+type Fmt = 'day' | 'clock' | 'weekday' | 'date';
+const FMT: Record<Fmt, Intl.DateTimeFormatOptions> = {
+  day: { year: 'numeric', month: '2-digit', day: '2-digit' },
+  clock: { hour: '2-digit', minute: '2-digit', hour12: false },
+  weekday: { weekday: 'short' },
+  date: { day: 'numeric', month: 'short' },
+};
+const fmts = new Map<string, Intl.DateTimeFormat>();
+function fmt(f: Fmt, tz?: string): Intl.DateTimeFormat {
+  const key = `${f}|${tz ?? ''}`;
+  let x = fmts.get(key);
+  if (x === undefined) {
+    x = new Intl.DateTimeFormat('en-GB', { ...FMT[f], timeZone: tz });
+    fmts.set(key, x);
+  }
+  return x;
+}
+
 /** '14:02' today, 'yesterday', 'mon' this week, else '12 oct'. */
 export function dayTime(ms: number, now: number, tz?: string): string {
   if (ms <= 0) return '';
-  const day = (t: number) => new Intl.DateTimeFormat('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz }).format(t);
-  if (day(ms) === day(now)) return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(ms);
-  if (day(ms) === day(now - 86_400_000)) return 'yesterday';
-  if (now - ms < 6 * 86_400_000) return new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: tz }).format(ms).toLowerCase();
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: tz }).format(ms).toLowerCase();
+  const day = (t: number) => fmt('day', tz).format(t);
+  const d = day(ms);
+  if (d === day(now)) return clock(ms, tz);
+  if (d === day(now - 86_400_000)) return 'yesterday';
+  if (now - ms < 6 * 86_400_000) return fmt('weekday', tz).format(ms).toLowerCase();
+  return fmt('date', tz).format(ms).toLowerCase();
 }
 
-const clock = (ms: number, tz?: string): string => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(ms);
+const clock = (ms: number, tz?: string): string => fmt('clock', tz).format(ms);
 
 function agentHit(a: SearchAgent, pname: string, now: number): Hit {
   const waiting = !a.archived && a.waits > 0;
