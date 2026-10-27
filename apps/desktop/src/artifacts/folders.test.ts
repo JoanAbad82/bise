@@ -113,7 +113,7 @@ describe('the library', () => {
   });
 
   it('routes a place and back', () => {
-    for (const at of [{ at: 'all' }, { at: 'recent' }, { at: 'unfiled' }, { at: 'folder', id: 'f-view' }] as const) {
+    for (const at of [{ at: 'all' }, { at: 'recent' }, { at: 'unfiled' }, { at: 'archived' }, { at: 'folder', id: 'f-view' }] as const) {
       expect(atOfPath(atPath(at))).toEqual(at);
     }
   });

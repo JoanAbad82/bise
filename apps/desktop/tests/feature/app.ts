@@ -19,3 +19,5 @@ export { navRoute } from '@/app/edge';
 export { artifactGo } from '@/artifacts/leave';
 export { libraryPage, sideShows, type SideShows } from '@/app/sideshows';
 export { projectsOf } from '@/app/siderows';
+// an artifact the list doesn't have: what the centre and the panel show (artifacts/gone.ts)
+export { centreOf, goneLinkOf, goneRoute, type ArtCentre, type GoneLink } from '@/artifacts/gone';

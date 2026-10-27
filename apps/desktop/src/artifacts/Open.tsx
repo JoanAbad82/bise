@@ -32,6 +32,7 @@ import { tilde } from '@/app/barplaces';
 import type { SaveResult } from '@/shared/api';
 import { putInDraft } from './put';
 import { useAboutWords } from './maker';
+import { goneLinkOf, goneRoute } from './gone';
 import { takeVersion, useArtifactLinks } from './links';
 import './artifacts.css';
 
@@ -462,13 +463,29 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead, bare
     </IconButton>
   );
   if (it === undefined) {
+    // its list came without it: say so, at the content's edge, with a way on (artifacts/gone.ts);
+    // before the list came, nothing yet
+    const came = store.artifactsCame(project);
+    const link = goneLinkOf(store.artifacts(project));
     return (
-      <section className="art-open" data-testid="artifact.open" onKeyDown={onKeyDown}>
-        <div className="art-open-head">
-          <span className="art-open-title" />
-          <span className="art-open-end">{x}</span>
-        </div>
-        <div className="art-empty" data-testid="artifact.missing">this artifact isn't in the list any more.</div>
+      <section className="art-open" data-testid="artifact.open" data-bare={bare || undefined} onKeyDown={onKeyDown}>
+        {!bare && (
+          <div className="art-open-head">
+            <span className="art-open-title" />
+            <span className="art-open-end">{x}</span>
+          </div>
+        )}
+        {came && (
+          <div className="art-gone" data-testid="artifact.missing">
+            <p className="art-gone-line">{panel.art_gone}</p>
+            <p className="art-gone-on">
+              {link === 'archived' && `${panel.art_gone_maybe} · `}
+              <Press look="art-gone-link" onClick={() => { router.go(goneRoute(project, link)); }} data-testid="artifact.missing.link">
+                {link === 'archived' ? panel.art_gone_archived : panel.art_gone_library}
+              </Press>
+            </p>
+          </div>
+        )}
       </section>
     );
   }

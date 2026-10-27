@@ -25,16 +25,18 @@ export type At =
   | { readonly at: 'all' }
   | { readonly at: 'recent' }
   | { readonly at: 'unfiled' }
-  | { readonly at: 'folder'; readonly id: string };
+  | { readonly at: 'folder'; readonly id: string }
+  /** the archived ones, every folder's ('a' toggles it; an artifact gone from the list links here, gone.ts) */
+  | { readonly at: 'archived' };
 
 export const AT_ALL: At = { at: 'all' };
 
-/** The route's tail for a place ('', 'recent', 'unfiled', 'f/<id>') and back. Pure. */
+/** The route's tail for a place ('', 'recent', 'unfiled', 'archived', 'f/<id>') and back. Pure. */
 export function atPath(at: At): string {
   return at.at === 'all' ? '' : at.at === 'folder' ? `f/${at.id}` : at.at;
 }
 export function atOfPath(p: string): At {
-  if (p === 'recent' || p === 'unfiled') return { at: p };
+  if (p === 'recent' || p === 'unfiled' || p === 'archived') return { at: p };
   if (p.startsWith('f/') && p.length > 2) return { at: 'folder', id: p.slice(2) };
   return AT_ALL;
 }
@@ -110,6 +112,8 @@ export function itemsAt(lib: Library, items: readonly Item[], at: At): Item[] {
   const sorted = [...items].sort((x, y) => y.a.at_ms - x.a.at_ms);
   switch (at.at) {
     case 'all':
+    case 'archived':
+      // archived: the page hands the archived ones in (Screen.tsx splitArchived)
       return sorted;
     case 'recent':
       return sorted.slice(0, RECENT_N);
@@ -191,6 +195,7 @@ export function pathOf(lib: Library, id: string): string {
 export function crumbOf(lib: Library, at: At): { name: string; at: At }[] {
   switch (at.at) {
     case 'all':
+    case 'archived':
       return [];
     case 'recent':
       return [{ name: library.recent, at }];

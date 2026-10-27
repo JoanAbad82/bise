@@ -47,6 +47,26 @@
     "one": null,
     "text": "{n} archived"
   },
+  "panel.art_gone": {
+    "args": [],
+    "one": null,
+    "text": "this artifact isn't in the list any more."
+  },
+  "panel.art_gone_archived": {
+    "args": [],
+    "one": null,
+    "text": "show archived ›"
+  },
+  "panel.art_gone_library": {
+    "args": [],
+    "one": null,
+    "text": "open the library ›"
+  },
+  "panel.art_gone_maybe": {
+    "args": [],
+    "one": null,
+    "text": "it may be archived"
+  },
   "panel.artifacts": {
     "args": [],
     "one": null,

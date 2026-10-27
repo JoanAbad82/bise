@@ -10,6 +10,11 @@
 import {
   allItems,
   artifactGo,
+  centreOf,
+  goneLinkOf,
+  goneRoute,
+  type ArtCentre,
+  type GoneLink,
   galleryView,
   libraryPage,
   libraryView,
@@ -60,7 +65,15 @@ export interface Feature {
     route(): Route;
     /** The left sidebar under its head for that route (app/sideshows.ts): his projects' names, the library's rows ('All artifacts', 'Recent', 'Unfiled', its folders; none while the library page is not mounted: its rows are that page's, artifacts/library.tsx), or the settings nav. */
     sidebar(): SidebarView;
+    /** An artifact opened by id: the centre (its maker's thread, the project's main when the list doesn't have it, nothing before the list came) and the panel (its view, or the gone lines' link and where it goes, or nothing yet) (artifacts/gone.ts). */
+    artifact(project: string, id: string): ArtifactView;
   };
+}
+
+/** What the window shows for an artifact's route. */
+export interface ArtifactView {
+  readonly centre: ArtCentre;
+  readonly panel: 'wait' | 'view' | { readonly gone: GoneLink; readonly to: Route };
 }
 
 /** What the left sidebar lists. */
@@ -174,6 +187,13 @@ export function feature(now = 1_791_100_000_000): Feature {
       gallery: (place, only) => galleryView(allItems(store, only), place, clock),
       library: (project = '', projectName = '') => libraryView(store.folders(), allItems(store), project, projectName),
       route: () => route,
+      artifact: (project, id) => {
+        const listed = store.artifacts(project);
+        const a = listed.find((x) => x.id === id);
+        const came = store.artifactsCame(project);
+        const link = goneLinkOf(listed);
+        return { centre: centreOf(came, a), panel: a !== undefined ? 'view' : came ? { gone: link, to: goneRoute(project, link) } : 'wait' };
+      },
       sidebar: () => {
         const shows = sideShows(route);
         if (shows === 'projects') return { shows, rows: projectsOf(store.projects()).map((p) => p.name) };

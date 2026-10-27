@@ -370,6 +370,14 @@ crate::words! { panel:
     addr_out = "Open in your browser";
     /// the bar's button over an artifact's tab: the artifact in a window of its own
     addr_window = "Open in a window";
+    /// an artifact's tab whose id the list no longer has: its first line (designer m_46415)
+    art_gone = "this artifact isn't in the list any more.";
+    /// its second line when the project has archived artifacts, before the link
+    art_gone_maybe = "it may be archived";
+    /// the link after it: the library's archived list
+    art_gone_archived = "show archived ›";
+    /// its second line when the project has nothing archived: the link to the library
+    art_gone_library = "open the library ›";
 
     // ---- the Overview tab's sections (bise fait mac, mockup 1): the head's '…' menu
 }

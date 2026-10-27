@@ -35,7 +35,7 @@ import { itemsOf, ownerOf, topOf, whenOf, type Card, type Place, type Stack } fr
 import { Thumb } from './thumbs';
 import { keyOf, revealPathOf, splitArchived, type Item } from './model';
 import {
-  atOfPath, atPath, chipOf, chipsOf, countsOf, coverOf, crumbOf, folderLine, inFolder, itemsAt, libraryFacts, libraryOf,
+  AT_ALL, atOfPath, atPath, chipOf, chipsOf, countsOf, coverOf, crumbOf, folderLine, inFolder, itemsAt, libraryFacts, libraryOf,
   nameOf, parseQuery, pathOf, projectOfTyped, rememberMove, searchItems, titlePath, type At, type ChipKind, type Library,
 } from './folders';
 import { FolderColumn, type Editing } from './Column';
@@ -106,7 +106,15 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const [editing, setEditing] = useState<Editing>(null);
   const [over, setOver] = useState<Over>(null);
   const [stack, setStack] = useState<Stack | null>(null);
-  const [archivedOn, setArchivedOn] = useState(false);
+  // the archived ones are a place of the route ('archived'): 'a' and the toggle switch it in place
+  // (no history step, as the toggle was; a new route remounts the page, as a click on a library
+  // row), a gone artifact's link opens it (gone.ts)
+  const [archivedOn, setArchivedRaw] = useState(at.at === 'archived');
+  const setArchivedOn = (on: boolean) => {
+    setArchivedRaw(on);
+    const path = atPath(on ? { at: 'archived' } : AT_ALL);
+    router.replace(path === '' ? { screen: 'artifacts', project: scope } : { screen: 'artifacts', project: scope, at: path });
+  };
   const [recent, setRecent] = useState<string[]>(readRecent);
   const [flash, setFlash] = useBrief<string>(FLASH_MS);
   const [toast, setToast] = useBrief<string>(TOAST_MS);
@@ -651,6 +659,7 @@ function placeOf(lib: Library, at: At, searching: boolean, items: readonly Item[
   switch (at.at) {
     case 'all':
     case 'recent':
+    case 'archived':
       return { kind: 'recent', folderOf: (it) => { const f = lib.folderOf(it); return f === null ? '' : pathOf(lib, f); } };
     case 'unfiled':
       return { kind: 'unfiled' };

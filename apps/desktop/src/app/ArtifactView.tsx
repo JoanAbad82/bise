@@ -9,9 +9,10 @@
 import { useEffect } from 'react';
 import { FRAME_KINDS } from '@/artifacts/frameNote';
 import { useAboutWords, useAllArtifacts } from '@/artifacts';
-import { useProjects } from '@/store';
+import { centreOf } from '@/artifacts/gone';
+import { useProjects, useStore } from '@/store';
 import { ThreadScreen } from '@/thread/ThreadScreen';
-import type { Route } from './route';
+import { MAIN, type Route } from './route';
 import { openTab } from './panel/tabs';
 
 /** The artifact this route opens in the window, if any: a project's artifact by id. Pure. */
@@ -38,6 +39,9 @@ export function ArtifactThread({ project, id }: { project: string; id: string })
   const words = useAboutWords(project, id);
   // the project's name in a head, never its workspace id (designer m_20453)
   const name = useProjects().find((p) => p.project === project)?.name;
+  // its list came without it: the project's main, never a blank centre (artifacts/gone.ts)
+  const centre = centreOf(useStore().artifactsCame(project), it?.a);
+  if (centre.c === 'main') return <ThreadScreen key={`${project}/${MAIN}`} project={project} agent={MAIN} {...(name === undefined ? {} : { projectName: name })} />;
   if (it === undefined || words === undefined) return <div className="app-art-wait" data-testid="artifact.thread.wait" />;
   // the maker's own thread, archived or not (dim then, '↺ restore' in its head); only the composer
   // goes to the project's main when the maker is archived (words.agent)
