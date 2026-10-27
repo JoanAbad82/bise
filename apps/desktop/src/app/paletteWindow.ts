@@ -18,8 +18,8 @@ export interface Measures {
 export const UNMEASURED: Measures = { row: 32, head: 28, pad: 4 };
 
 /** Rows drawn above and below the view, at least: a whole view's height is drawn each side, and
- * one more on the side it scrolls to (ui-review m_46875: a fast wheel jumps 900 px a step, and
- * the browser can paint the new place before the window follows). */
+ * two steps more on the side it scrolls to (ui-review m_46875: a fast wheel jumps 900 px a step,
+ * and the browser can paint the new place before the window follows). */
 export const OVERSCAN = 8;
 
 /** A group's rows, in order: drawn ones (`from`..`to`, excluded) and gaps of `rows` rows. */
@@ -38,14 +38,19 @@ export interface WindowIn {
   readonly cur: number;
   /** where it last scrolled: -1 up, 1 down, 0 not yet */
   readonly dir?: -1 | 0 | 1;
+  /** how far its last scroll step went (px): a wheel's next step goes about as far */
+  readonly step?: number;
 }
 
 /** Each group's parts, in order. */
 export function windowOf(w: WindowIn): Part[][] {
   const view = w.view > 0 ? w.view : 720;
   const over = Math.max(OVERSCAN * w.m.row, w.view);
-  const top = w.scrollTop - over - (w.dir === -1 ? view : 0);
-  const bottom = w.scrollTop + view + over + (w.dir === 1 ? view : 0);
+  // the side it scrolls to: two steps ahead, a step at least a view (ui-review m_46901: a 900 px
+  // step over one view ahead still showed a band at the foot on some frames)
+  const ahead = 2 * Math.max(view, w.step ?? 0);
+  const top = w.scrollTop - over - (w.dir === -1 ? ahead : 0);
+  const bottom = w.scrollTop + view + over + (w.dir === 1 ? ahead : 0);
   let y = w.m.pad + (w.askRow ? w.m.row : 0);
   let flat = w.askRow ? 1 : 0;
   return w.sizes.map((n) => {

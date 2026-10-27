@@ -156,13 +156,13 @@ export function Palette({ onClose }: { onClose: () => void }) {
   // (flushSync: the rows are there before the frame paints, ui-review m_46875)
   const body = useRef<HTMLDivElement>(null);
   const [m, setM] = useState<Measures>(UNMEASURED);
-  const [box, setBox] = useState<{ top: number; view: number; dir: -1 | 0 | 1 }>({ top: 0, view: 0, dir: 0 });
+  const [box, setBox] = useState<{ top: number; view: number; dir: -1 | 0 | 1; step: number }>({ top: 0, view: 0, dir: 0, step: 0 });
   const readBox = useCallback(() => {
     const b = body.current;
     if (b === null) return;
     const top = b.scrollTop;
     const view = b.clientHeight;
-    setBox((x) => (x.top === top && x.view === view ? x : { top, view, dir: top > x.top ? 1 : top < x.top ? -1 : x.dir }));
+    setBox((x) => (x.top === top && x.view === view ? x : { top, view, dir: top > x.top ? 1 : top < x.top ? -1 : x.dir, step: Math.abs(top - x.top) }));
   }, []);
   const onScroll = useCallback(() => {
     flushSync(readBox);
@@ -188,7 +188,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
       ro.disconnect();
     };
   }, [readBox]);
-  const parts = windowOf({ sizes: list.groups.map((g) => g.hits.length), askRow, m, scrollTop: box.top, view: box.view, cur, dir: box.dir });
+  const parts = windowOf({ sizes: list.groups.map((g) => g.hits.length), askRow, m, scrollTop: box.top, view: box.view, cur, dir: box.dir, step: box.step });
 
   const open = (h: Hit | undefined, restore = false) => {
     if (h === undefined) return;

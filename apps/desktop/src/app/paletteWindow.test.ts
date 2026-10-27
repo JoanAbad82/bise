@@ -1,5 +1,5 @@
 // ⌘K draws only the rows in view (paletteWindow.ts). Mutations: the selected row's run dropped,
-// the head's height left out of the group's top, the view-high overscan or the scroll side's extra
+// the head's height left out of the group's top, the view-high overscan or the scroll side's two steps
 // view dropped: each turns this red.
 import { describe, expect, it } from 'vitest';
 import { windowOf, type Measures, type Part } from './paletteWindow';
@@ -34,17 +34,20 @@ describe('⌘K draws the rows in view, gaps keep the rest in place', () => {
     expect(drawn(g)).not.toContain(509 + ROWS + 2);
   });
 
-  it('a fast scroll finds rows ready: one more view on the side it scrolls to', () => {
+  it('a fast scroll finds rows ready: two steps (a view at least) more on the side it scrolls to', () => {
     const top = 4 + 28 + 500 * 32;
-    const at = (dir: -1 | 0 | 1) => {
-      const [g] = windowOf({ sizes: [1000], askRow: false, m: M, scrollTop: top, view: VIEW, cur: 500, dir });
+    const at = (dir: -1 | 0 | 1, step = 0) => {
+      const [g] = windowOf({ sizes: [1000], askRow: false, m: M, scrollTop: top, view: VIEW, cur: 500, dir, step });
       if (g === undefined) throw new Error('no group');
       return drawn(g);
     };
-    expect(at(1)).toContain(509 + 2 * ROWS);
+    expect(at(1)).toContain(509 + 3 * ROWS);
     expect(at(1)).not.toContain(500 - ROWS - 1);
-    expect(at(-1)).toContain(500 - 2 * ROWS);
+    expect(at(-1)).toContain(500 - 3 * ROWS);
     expect(at(-1)).not.toContain(509 + ROWS + 2);
+    // a wheel step of 900 px, more than the view: two of them ahead
+    expect(at(1, 900)).toContain(509 + ROWS + Math.floor((2 * 900) / M.row));
+    expect(at(-1, 900)).toContain(500 - ROWS - Math.floor((2 * 900) / M.row));
   });
 
   it('the selected row is drawn even far from the view (its scrollIntoView finds it)', () => {
