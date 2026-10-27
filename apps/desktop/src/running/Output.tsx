@@ -84,9 +84,22 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
+    // the first error's line, in the error ink (designer m_47812): that line only, the rest keeps
+    // the program's own colours; drawn again when the theme changes
+    let errAt: number | null = null;
+    let errMark: { dispose: () => void } | undefined;
+    const markErr = () => {
+      errMark?.dispose();
+      errMark = undefined;
+      if (errAt === null) return;
+      const b = term.buffer.active;
+      const marker = term.registerMarker(errAt - (b.baseY + b.cursorY));
+      errMark = term.registerDecoration({ marker, width: term.cols, foregroundColor: cssVar('--p-err') || '#ff5a52' });
+    };
     // his theme changes while it is open (the system's, or the app's data-theme): its ink follows
     const retheme = () => {
       term.options.theme = themeOf();
+      markErr();
     };
     const scheme = window.matchMedia('(prefers-color-scheme: dark)');
     scheme.addEventListener('change', retheme);
@@ -106,7 +119,11 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
         const b = term.buffer.active;
         const text = Array.from({ length: b.length }, (_, i) => b.getLine(i)?.translateToString(true) ?? '');
         const at = firstError(text);
-        if (at !== null) term.scrollToLine(Math.max(0, at - 1));
+        if (at !== null) {
+          term.scrollToLine(Math.max(0, at - 1));
+          errAt = at;
+          markErr();
+        }
         err.current?.(at !== null);
       });
     };
@@ -130,6 +147,7 @@ export function Output({ project, agent, id, none, live, quiet, empty, onLines, 
     store.command({ cmd: 'proc_out', project, agent, id });
     return () => {
       scan.current = null;
+      errMark?.dispose();
       off();
       ro.disconnect();
       scheme.removeEventListener('change', retheme);

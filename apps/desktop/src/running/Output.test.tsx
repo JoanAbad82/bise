@@ -7,13 +7,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 
-const made: { lines: string[]; scrolled: number[]; disposed: boolean }[] = [];
+const made: { lines: string[]; scrolled: number[]; disposed: boolean; inked: { line: number; color: string | undefined }[] }[] = [];
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     cols = 80;
     rows = 24;
-    t = { lines: [] as string[], scrolled: [] as number[], disposed: false };
-    buffer = { active: { length: 0, viewportY: 0, baseY: 0, getLine: (i: number) => ({ translateToString: () => this.t.lines[i] ?? '' }) } };
+    t = { lines: [] as string[], scrolled: [] as number[], disposed: false, inked: [] as { line: number; color: string | undefined }[] };
+    buffer = { active: { length: 0, viewportY: 0, baseY: 0, cursorY: 0, getLine: (i: number) => ({ translateToString: () => this.t.lines[i] ?? '' }) } };
+    // the cursor sits on the last line (no scroll in the mock: baseY 0)
+    registerMarker(offset: number) { return { line: this.buffer.active.length - 1 + offset }; }
+    registerDecoration(o: { marker: { line: number }; foregroundColor?: string }) {
+      this.t.inked.push({ line: o.marker.line, color: o.foregroundColor });
+      return { dispose() {} };
+    }
     options: Record<string, unknown> = {};
     constructor() { made.push(this.t); }
     loadAddon() {}
@@ -29,6 +35,7 @@ vi.mock('@xterm/xterm', () => ({
         this.t.lines[end] = `${this.t.lines[end] ?? ''}${parts[0] ?? ''}`;
         for (const p of parts.slice(1)) this.t.lines.push(p);
         this.buffer.active.length = this.t.lines.length;
+        this.buffer.active.cursorY = this.t.lines.length - 1;
       }
       cb?.();
     }
@@ -77,5 +84,8 @@ describe("a process's output", () => {
     expect(cmds.filter((c) => c.cmd === 'proc_out').length).toBe(1);
     expect(made[0]?.scrolled).toEqual([1]);
     expect(onErr).toHaveBeenCalledWith(true);
+    // that line only, in the error ink (designer m_47812): '  ✘ checkout › pays' is line 2
+    expect(made[0]?.inked.map((x) => x.line)).toEqual([2]);
+    expect(made[0]?.inked[0]?.color).toMatch(/^#[0-9a-f]{6}$/iu);
   });
 });

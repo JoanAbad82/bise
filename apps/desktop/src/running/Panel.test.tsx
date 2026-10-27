@@ -71,6 +71,10 @@ describe('the process panel', () => {
     expect(screen.getByTestId('proc.pill').textContent).toBe('✗exit 1 · after 1 min');
     expect(screen.getByTestId('running.out').getAttribute('data-error')).toBe('true');
     expect(screen.queryByTestId('proc.resources')).toBeNull();
+    // one sample only: no curve to draw, so no empty plot either (designer m_47812)
+    cleanup();
+    draw(proc({ state: { is: 'exited', rc: 1 }, ended_ms: NOW - 3 * MIN }), samples.slice(0, 1));
+    expect(screen.queryByTestId('proc.resources')).toBeNull();
   });
 
   it('no output kept: says why and what to do, with the command to copy', () => {

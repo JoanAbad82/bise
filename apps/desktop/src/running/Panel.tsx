@@ -174,7 +174,8 @@ function CopyButton({ text, onCopy, label = running.copy, testId }: { text: stri
 
 /** CPU and memory over the last 2 min, its port; ended: the curve at half with 'while it ran'; never measured: nothing. */
 function Resources({ p, live, samples }: { p: ProcItem['p']; live: boolean; samples: readonly Sample[] }) {
-  if (!live && samples.length === 0) return null;
+  // ended with no curve to show (under 2 samples): the section goes, never an empty plot (designer m_47812)
+  if (!live && samples.length < 2) return null;
   const cpu = samples.map((s) => s.cpu);
   const mb = samples.map((s) => s.mb);
   const last = samples.at(-1);
