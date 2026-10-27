@@ -128,15 +128,32 @@ describe('Settings', () => {
     expect(screen.getByTestId('settings.me.skin.1').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('settings.me.hair.short').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByTestId('settings.me.skin.5'));
-    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'short', color: 1, wear: 'none' } });
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'short', color: 1, wear: 'none', hat: 0 } });
     expect(screen.getByTestId('settings.me.skin.5').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByTestId('settings.me.wear.cap'));
     fireEvent.click(screen.getByTestId('settings.me.hair.pigtails'));
     // pigtails take no hat: the cap goes, the hats grey
-    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 1, wear: 'none' } });
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 1, wear: 'none', hat: 0 } });
     expect(screen.getByTestId<HTMLButtonElement>('settings.me.wear.cap').disabled).toBe(true);
     fireEvent.click(screen.getByTestId('settings.me.color.5'));
-    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 5, wear: 'none' } });
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 5, hair: 'pigtails', color: 5, wear: 'none', hat: 0 } });
+  });
+
+  it("his bim's accessory colour (bim-hat-colour): greyed with nothing on the head, kept in prefs' bim once he wears one", () => {
+    const p = ports();
+    view('general', p);
+    const dot = (i: number) => screen.getByTestId<HTMLButtonElement>(`settings.me.hat.${String(i)}`);
+    // nothing on the head: the row stays, its dots greyed and its tip says why; today's sky blue picked
+    expect(dot(0).getAttribute('aria-pressed')).toBe('true');
+    expect(dot(3).disabled).toBe(true);
+    expect(screen.getByTestId('settings.me.hat').getAttribute('data-tip')).toBe(settings.me_hat_no);
+    fireEvent.click(screen.getByTestId('settings.me.wear.beanie'));
+    expect(dot(3).disabled).toBe(false);
+    expect(screen.getByTestId('settings.me.hat').getAttribute('data-tip')).toBeNull();
+    fireEvent.click(dot(3));
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'bim', value: { skin: 1, hair: 'short', color: 1, wear: 'beanie', hat: 3 } });
+    expect(dot(3).getAttribute('aria-pressed')).toBe('true');
+    expect(dot(0).getAttribute('aria-pressed')).toBe('false');
   });
 
   it('esc goes back; an unknown page is general', () => {

@@ -1,7 +1,7 @@
 // His bim's look (page bim-pick): the pref reads back what was written, the ready-made looks keep
 // designer's rules (m_46521 5), a hat only where the hair takes it, and main's outfit carries the look.
 import { describe, expect, it } from 'vitest';
-import { COLORS, HAIRS, READY, SKINS, TODAY, WEARS, anyLook, lookOf, mainOutfit, prefOf, sameLook, wearsFor, withHair } from './look';
+import { COLORS, HAIRS, HAT_COLORS, READY, SKINS, TODAY, WEARS, anyLook, lookOf, mainOutfit, prefOf, sameLook, wearsFor, withHair } from './look';
 import { CUTS, OWN, outfitOf } from './palette';
 import { allColours } from './palette';
 
@@ -16,7 +16,23 @@ describe('his bim look', () => {
     expect(lookOf({ skin: 0, hair: 'fez', color: 0, wear: 'none' })).toBeNull();
     expect(lookOf({ skin: 0, hair: 'short', color: 0, wear: 'crown' })).toBeNull();
     // a hat the hair can't take (an older build's pick): bare-headed
-    expect(lookOf({ skin: 0, hair: 'curls', color: 0, wear: 'cap' })).toEqual({ skin: 0, hair: 'curls', color: 0, wear: 'none' });
+    expect(lookOf({ skin: 0, hair: 'curls', color: 0, wear: 'cap' })).toEqual({ skin: 0, hair: 'curls', color: 0, wear: 'none', hat: 0 });
+  });
+
+  it('keeps the accessory colour; a look from before it, or one this build does not know, wears the sky blue', () => {
+    for (let hat = 0; hat < HAT_COLORS.length; hat++) {
+      const l = { ...TODAY, wear: 'cap' as const, hat };
+      expect(lookOf(prefOf(l))).toEqual(l);
+      expect(mainOutfit(l).hatColor).toBe(HAT_COLORS[hat]);
+    }
+    expect(HAT_COLORS[0]).toBe('#6cb4ee');
+    expect(lookOf({ skin: 0, hair: 'short', color: 0, wear: 'beanie' })?.hat).toBe(0);
+    expect(lookOf({ skin: 0, hair: 'short', color: 0, wear: 'beanie', hat: 99 })?.hat).toBe(0);
+    expect(lookOf({ skin: 0, hair: 'short', color: 0, wear: 'beanie', hat: 'red' })?.hat).toBe(0);
+    // every place his bim shows goes through mainOutfit: the headset's cups and a cut's hat too
+    expect(mainOutfit({ ...TODAY, wear: 'headphones', hat: 2 })).toMatchObject({ hat: 'headphones', hatColor: HAT_COLORS[2] });
+    expect(mainOutfit({ ...TODAY, hair: 'long', wear: 'beanie', hat: 4 })).toMatchObject({ cut: 'long', hat: 'beanie', hatColor: HAT_COLORS[4] });
+    expect(sameLook({ ...TODAY, hat: 1 }, { ...TODAY, hat: 2 })).toBe(false);
   });
 
   it('puts a hat only where the hair takes it, and drops it when the hair changes', () => {
@@ -40,7 +56,7 @@ describe('his bim look', () => {
 
   it('dresses main in his look, keeping its ink hoodie, :* and chain', () => {
     expect(mainOutfit(null)).toEqual(outfitOf('main', true));
-    const l = { skin: 5, hair: 'pigtails', color: 4, wear: 'none' } as const;
+    const l = { skin: 5, hair: 'pigtails', color: 4, wear: 'none', hat: 0 } as const;
     const o = mainOutfit(l);
     expect(o).toMatchObject({ skin: SKINS[5], hair: COLORS[4], own: 'pigtails', cut: null, hat: 'bare', mark: true, hoodie: outfitOf('main', true).hoodie, kind: 'hoodie' });
     expect(mainOutfit({ ...l, hair: 'long', wear: 'beanie' })).toMatchObject({ cut: 'long', own: null, hat: 'beanie', mark: true });
@@ -51,6 +67,6 @@ describe('his bim look', () => {
 
   it('draws only colours the world already may (never the accent or the error red)', () => {
     const ok = new Set(allColours());
-    for (const c of [...SKINS, ...COLORS]) expect(ok.has(c), c).toBe(true);
+    for (const c of [...SKINS, ...COLORS, ...HAT_COLORS]) expect(ok.has(c), c).toBe(true);
   });
 });

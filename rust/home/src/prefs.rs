@@ -98,14 +98,22 @@ fn seen_key(parts: &[&str], v: &Value) -> Result<(), String> {
 }
 
 /// `bim`: what his own bim looks like (the desktop's onboarding and
-/// settings › general, page bim-pick): `{skin, hair, color, wear}`, skin
-/// and color small indexes, hair and wear short slugs. The looks are the
+/// settings › general, page bim-pick): `{skin, hair, color, wear, hat}`,
+/// skin, color and hat (the accessory's colour) small indexes, hair and
+/// wear short slugs; a look without `hat` (picked before the accessory
+/// colour) is one too, its hat today's sky blue. The looks are the
 /// desktop's drawing table (bims/look.ts: an unknown one draws today's),
 /// never listed here; only the shape is checked. Set whole, never a part.
 fn bim_look(v: &Value) -> bool {
     let slug = |s: Option<&Value>| s.and_then(Value::as_str).is_some_and(|s| (1..=24).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'-'));
     let small = |n: Option<&Value>| n.and_then(Value::as_u64).is_some_and(|n| n < 32);
-    v.as_object().is_some_and(|o| o.len() == 4 && small(o.get("skin")) && small(o.get("color")) && slug(o.get("hair")) && slug(o.get("wear")))
+    v.as_object().is_some_and(|o| {
+        let hat = match o.get("hat") {
+            None => o.len() == 4,
+            h => o.len() == 5 && small(h),
+        };
+        hat && small(o.get("skin")) && small(o.get("color")) && slug(o.get("hair")) && slug(o.get("wear"))
+    })
 }
 
 /// `bims.map.<hub id>`: the office's map he picked for that project (the

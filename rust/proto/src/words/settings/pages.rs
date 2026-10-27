@@ -199,6 +199,10 @@ crate::words! { settings:
     me_wear = "On the head";
     /// your bim: a choice greyed out because the hair can't take it (its tip)
     me_wear_no = "not with this hair";
+    /// your bim: the colour of what it wears on its head (cap, beanie, headset; designer m_48063)
+    me_hat = "Accessory colour";
+    /// your bim, accessory colour: the row's tip when its dots are greyed (nothing on the head)
+    me_hat_no = "Nothing on the head to colour";
     /// your bim: a skin's tip, light to dark (1 to 6)
     me_skin_n(n) = "skin {n} of 6";
     /// a hair cut: today's short
@@ -237,6 +241,18 @@ crate::words! { settings:
     color_blond = "blond";
     /// a hair colour
     color_lilac = "lilac";
+    /// an accessory colour: today's, the default
+    hat_sky = "sky blue";
+    /// an accessory colour
+    hat_orange = "orange";
+    /// an accessory colour
+    hat_green = "green";
+    /// an accessory colour
+    hat_yellow = "yellow";
+    /// an accessory colour
+    hat_lilac = "lilac";
+    /// an accessory colour
+    hat_teal = "teal";
     /// on the head: nothing
     wear_none = "nothing";
     /// on the head

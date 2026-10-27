@@ -13,7 +13,8 @@ describe('my look', () => {
       heard++;
     });
     setMyLook({ skin: 2, hair: 'mohawk', color: 3, wear: 'none' });
-    expect(myLook()).toEqual({ skin: 2, hair: 'mohawk', color: 3, wear: 'none' });
+    // a look picked before the accessory colour: its hat sky blue
+    expect(myLook()).toEqual({ skin: 2, hair: 'mohawk', color: 3, wear: 'none', hat: 0 });
     setMyLook({ skin: 2, hair: 'mohawk', color: 3, wear: 'none' });
     expect(heard).toBe(1);
     setMyLook(undefined);

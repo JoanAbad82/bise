@@ -1531,6 +1531,36 @@
     "one": null,
     "text": "top bun"
   },
+  "settings.hat_green": {
+    "args": [],
+    "one": null,
+    "text": "green"
+  },
+  "settings.hat_lilac": {
+    "args": [],
+    "one": null,
+    "text": "lilac"
+  },
+  "settings.hat_orange": {
+    "args": [],
+    "one": null,
+    "text": "orange"
+  },
+  "settings.hat_sky": {
+    "args": [],
+    "one": null,
+    "text": "sky blue"
+  },
+  "settings.hat_teal": {
+    "args": [],
+    "one": null,
+    "text": "teal"
+  },
+  "settings.hat_yellow": {
+    "args": [],
+    "one": null,
+    "text": "yellow"
+  },
   "settings.key_add": {
     "args": [],
     "one": null,
@@ -1904,6 +1934,16 @@
     "args": [],
     "one": null,
     "text": "Hair"
+  },
+  "settings.me_hat": {
+    "args": [],
+    "one": null,
+    "text": "Accessory colour"
+  },
+  "settings.me_hat_no": {
+    "args": [],
+    "one": null,
+    "text": "Nothing on the head to colour"
   },
   "settings.me_label": {
     "args": [],

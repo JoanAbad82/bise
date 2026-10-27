@@ -121,6 +121,8 @@
 .me-cut:hover, .me-tile:hover, .me-chip:hover:not(:disabled) { background: var(--c-hover); }
 .me-chip { height: var(--s-6); padding: 0 var(--s-2); border-radius: var(--r-menu); font: var(--t-12) var(--font-ui); color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line); }
 .me-chip:disabled { color: var(--c-text-3); }
+/* an accessory colour with nothing on the head (designer m_48063): 40 %, no pick */
+.me-dot:disabled { opacity: 0.4; cursor: default; }
 .me-dot.on, .me-cut.on, .me-tile.on, .me-chip.on { box-shadow: 0 0 0 2px var(--c-ink); }
 .me-dot:focus-visible, .me-cut:focus-visible, .me-tile:focus-visible, .me-chip:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
 .me-ready { display: grid; grid-template-columns: repeat(6, var(--s-16)); gap: var(--s-2); justify-content: center; margin: var(--s-4) 0 var(--s-2); }

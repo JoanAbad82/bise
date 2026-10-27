@@ -231,6 +231,12 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert!(prefs::set_dotted(&o, "bim", json!({"skin": 3, "hair": "short", "color": 1})).is_err(), "all four fields");
     assert!(prefs::set_dotted(&o, "bim", json!({"skin": 99, "hair": "short", "color": 1, "wear": "cap"})).is_err(), "a small index");
     assert!(prefs::set_dotted(&o, "bim.skin", json!(2)).is_err(), "never a part");
+    // the accessory's colour (bim-hat-colour): a fifth small index; a look without it still sets
+    let hat = json!({"skin": 3, "hair": "short", "color": 1, "wear": "cap", "hat": 4});
+    assert_eq!(prefs::set_dotted(&o, "bim", hat.clone()).unwrap()["bim"], hat);
+    assert!(prefs::set_dotted(&o, "bim", json!({"skin": 3, "hair": "short", "color": 1, "wear": "cap", "hat": 99})).is_err(), "hat a small index");
+    assert!(prefs::set_dotted(&o, "bim", json!({"skin": 3, "hair": "short", "color": 1, "wear": "cap", "hat": "red"})).is_err(), "hat an index");
+    assert!(prefs::set_dotted(&o, "bim", json!({"skin": 3, "hair": "short", "color": 1, "wear": "cap", "tie": 2})).is_err(), "nothing else");
     // the office's map per project (the desktop's /bims): bims.map.<hub id> = a slug, nothing else
     let m = prefs::set_dotted(&o, "bims.map.harness-3abb2bd8", json!("kyoto")).unwrap();
     assert_eq!(m["bims"], json!({"map": {"harness-3abb2bd8": "kyoto"}}));

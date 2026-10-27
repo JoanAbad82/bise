@@ -116,7 +116,7 @@ describe('Onboarding', () => {
     const tiles = screen.getByTestId('setup.me').querySelectorAll('button');
     expect(tiles.length).toBe(12);
     fireEvent.click(screen.getByTestId('setup.me.3'));
-    expect(p.looks).toEqual([{ cmd: 'prefs_set', key: 'bim', value: { skin: 4, hair: 'braids', color: 0, wear: 'none' } }]);
+    expect(p.looks).toEqual([{ cmd: 'prefs_set', key: 'bim', value: { skin: 4, hair: 'braids', color: 0, wear: 'none', hat: 0 } }]);
     expect(screen.getByTestId('setup.me.3').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByTestId('setup.next'));
     expect(p.looks).toHaveLength(1);
@@ -126,7 +126,7 @@ describe('Onboarding', () => {
     render(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} />);
     fireEvent.click(screen.getByTestId('setup.next'));
     vi.restoreAllMocks();
-    expect(p.looks).toEqual([{ cmd: 'prefs_set', key: 'bim', value: { skin: 0, hair: 'short', color: 4, wear: 'none' } }]);
+    expect(p.looks).toEqual([{ cmd: 'prefs_set', key: 'bim', value: { skin: 0, hair: 'short', color: 4, wear: 'none', hat: 0 } }]);
   });
 
   it('the model step waits for a key that works (live check), then goes on; esc goes a level, then a step back', () => {

@@ -12,7 +12,7 @@ import { mainOutfit, type Look } from './look';
 import { STYLE } from './style';
 import { outfitSig } from '@/app/side3d/render';
 
-const PIGTAILS: Look = { skin: 5, hair: 'pigtails', color: 4, wear: 'none' };
+const PIGTAILS: Look = { skin: 5, hair: 'pigtails', color: 4, wear: 'none', hat: 0 };
 
 describe('his bim, drawn', () => {
   it('the office makes main again in his new look, the others untouched, nothing on the same look', () => {
