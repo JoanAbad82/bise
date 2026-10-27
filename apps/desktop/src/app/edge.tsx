@@ -9,14 +9,20 @@ import { openAtAnchor } from '@/artifacts/Open';
 import { useStore } from '@/store';
 import type { Effect, FxName } from '@/store/machine/types';
 import type { BiseApi } from '@/shared/api';
+import { routeOfOpen, type Route } from './route';
 import { useRouter, type Router } from './router';
+
+/** The route a move goes to: the artifact's view beside its maker's thread. Pure. */
+export function navRoute(to: Extract<Effect, { out: 'nav' }>['to']): Route {
+  return routeOfOpen({ project: to.project, what: 'artifact', id: to.artifact });
+}
 
 /** Runs one effect: a move through `router`, a call on `bise` (none: a test with no window.bise). */
 export function runEffect(e: Effect, router: Router, bise: Pick<BiseApi, FxName> | undefined): void {
   switch (e.out) {
     case 'nav':
       if (e.to.at !== null) openAtAnchor(`${e.to.project}/${e.to.artifact}`, e.to.at);
-      router.go({ screen: 'artifacts', project: e.to.project, id: e.to.artifact });
+      router.go(navRoute(e.to));
       return;
     case 'fx':
       void bise?.[e.fx.fx](...e.fx.args);

@@ -4,7 +4,7 @@
 // in src/proto/fixtures.gen.ts (rust/proto/fixtures), never a hand-kept value, so a proto change
 // breaks a builder or a test at typecheck and the compiler shows what to fix. Test-only (never in
 // the bundle): a feature test imports this and run.ts, nothing else of the app (eslint).
-import type { AnswerResult, Artifact, Card, Folder, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, SendReason } from './app';
+import type { AnswerResult, Artifact, Card, Folder, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, Route, SendReason } from './app';
 import { core_ev, hub_ev } from './app';
 
 export type Ev = HubEv | CoreEv;
@@ -154,7 +154,9 @@ export type Gesture =
   | { readonly g: 'pick'; readonly project: string; readonly card: number; readonly n: number; readonly from?: Here }
   | { readonly g: 'send'; readonly project: string; readonly agent: string; readonly text: string; readonly mode?: Mode; readonly parts?: readonly Part[] }
   | { readonly g: 'open'; readonly project: string; readonly agent: string }
-  | { readonly g: 'resend' | 'dismiss'; readonly project: string; readonly agent: string; readonly cid: number };
+  | { readonly g: 'resend' | 'dismiss'; readonly project: string; readonly agent: string; readonly cid: number }
+  | { readonly g: 'art'; readonly project: string; readonly id: string }
+  | { readonly g: 'go'; readonly route: Route };
 
 export const answer = (project: string, card: number, reply: string, from?: Here): Gesture =>
   ({ g: 'answer', project, card, reply, ...(from === undefined ? {} : { from }) });
@@ -169,6 +171,10 @@ export const send = (project: string, agent: string, text: string, opts: { reado
 export const open = (project: string, agent = 'main'): Gesture => ({ g: 'open', project, agent });
 /** 'try again' on his failed message (its row's cid, as the row shows it). */
 export const resend = (project: string, agent: string, cid: number): Gesture => ({ g: 'resend', project, agent, cid });
+/** He clicks an artifact's name (an inbox item's line, a thread's chip, the right side's list). */
+export const openArtifact = (project: string, id: string): Gesture => ({ g: 'art', project, id });
+/** He goes to that route (the rail, ⌘K, a link). */
+export const goTo = (route: Route): Gesture => ({ g: 'go', route });
 /** He drops his failed message. */
 export const dismiss = (project: string, agent: string, cid: number): Gesture => ({ g: 'dismiss', project, agent, cid });
 

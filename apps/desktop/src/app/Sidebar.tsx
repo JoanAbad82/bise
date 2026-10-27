@@ -10,8 +10,9 @@
 // held, its ⌘1-9 digit: siderows.ts and projectfacts.ts decide, this draws; the project in view is
 // marked seen (seen.ts). Its head stays, its list scrolls;
 // a right click on a pin or a project opens its menu (useEntityMenu, nm-menus'). On the artifacts
-// library (decision d2) it shows '← Projects' and the library (artifacts' ArtLibrary) at the same
-// width, a 160 ms crossfade. Owner: r3-projects this round (nm-frame's, archived).
+// library page (decision d2) it shows '← Projects' and the library (artifacts' ArtLibrary) at the
+// same width, a 160 ms crossfade; an artifact open in a panel keeps the projects (sideshows.ts says
+// which, his m_46395). Owner: r3-projects this round (nm-frame's, archived).
 //
 // Each project row and each pin read their own project's agents (useAgents): an event re-renders
 // the row it touches, never the sidebar, and a thread's entries never do.
@@ -29,6 +30,7 @@ import { useEntityMenu } from './menus/use';
 import { useEntityAction } from './menus/actions';
 import { MAIN, projectOf } from './route';
 import { useRoute, useRouter } from './router';
+import { sideShows } from './sideshows';
 import { useKeptScroll } from './keep';
 import { useModHeld } from './held';
 import { LiveBiseMark, WorkingMark } from './Marks';
@@ -207,12 +209,14 @@ function Label({ children, end, testId }: { children: string; end?: ReactNode; t
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const route = useRoute();
   const router = useRouter();
-  // d2: the artifacts library takes the projects' place on artifacts, at the same width
-  const library = route.screen === 'artifacts';
+  // d2: the artifacts library takes the projects' place on the library page, at the same width; an
+  // artifact open in a panel keeps his projects (sideshows.ts)
+  const shows = sideShows(route);
+  const library = shows === 'library';
   return (
     <aside className="app-side" data-testid="app.sidebar" data-library={library || undefined}>
       {/* on settings the sidebar is the settings nav alone (designer m_44447) */}
-      {route.screen !== 'settings' && (
+      {shows !== 'settings' && (
         <div className="app-s-head">
           <BiseRow />
           <Row kind="top" icon="search" name={frame.search} end={<kbd>{PLACE_KEYS.search}</kbd>} onClick={onSearch} testId="app.side.search" />
@@ -229,8 +233,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         </div>
       )}
       {/* the swap is a crossfade (app.css .app-s-swap): a new key fades the other list in */}
-      <div className="app-s-swap" key={library ? 'library' : route.screen === 'settings' ? 'settings' : 'projects'}>
-        {library ? <LibraryList /> : route.screen === 'settings' ? <SettingsNav /> : <ProjectList />}
+      <div className="app-s-swap" key={shows}>
+        {shows === 'library' ? <LibraryList /> : shows === 'settings' ? <SettingsNav /> : <ProjectList />}
       </div>
     </aside>
   );

@@ -7,7 +7,28 @@
 // Today the window is the Store: its port is an outbox (a sink: it answers nothing and holds no
 // state; the hub's answers come in through given()). When state-machine's step lands (fast-try
 // p4), the outbox becomes step's outputs and only this file changes, never a test.
-import { allItems, galleryView, libraryView, Latest, Store, threadKey, type AnswerFrom, type CardView, type Effect, type InboxItem, type LibraryView, type Pending, type Place } from './app';
+import {
+  allItems,
+  artifactGo,
+  galleryView,
+  libraryPage,
+  libraryView,
+  Latest,
+  navRoute,
+  projectsOf,
+  sideShows,
+  Store,
+  threadKey,
+  type AnswerFrom,
+  type CardView,
+  type Effect,
+  type InboxItem,
+  type LibraryView,
+  type Pending,
+  type Place,
+  type Route,
+  type SideShows,
+} from './app';
 import type { Cmd, Gesture, Here, Input } from './inputs';
 
 export interface Feature {
@@ -35,8 +56,21 @@ export interface Feature {
     gallery(place: Place, only?: string): readonly CardView[];
     /** The artifacts library under a project scope ('' every project): the hero's facts, each folder's count ('14 of 74') and new ones, unfiled's count (artifacts/folders.ts libraryView over the store's folders and hooks.ts allItems). */
     library(project?: string, projectName?: string): LibraryView;
+    /** Where the window is: the route its moves went to (an option's nav, a click on an artifact's name), the inbox at the start. */
+    route(): Route;
+    /** The left sidebar under its head for that route (app/sideshows.ts): his projects' names, the library's rows ('All artifacts', 'Recent', 'Unfiled', its folders; none while the library page is not mounted: its rows are that page's, artifacts/library.tsx), or the settings nav. */
+    sidebar(): SidebarView;
   };
 }
+
+/** What the left sidebar lists. */
+export interface SidebarView {
+  readonly shows: SideShows;
+  readonly rows: readonly string[];
+}
+
+/** The library's rows, in the column's order (artifacts/Column.tsx): its words are the column's, the test reads only their count and the folders' paths. */
+const libraryRows = (v: LibraryView): string[] => ['all', 'recent', 'unfiled', ...v.folders.map((f) => f.path)];
 
 /** Where an answer was made, as the window's views pass it to the store. */
 const fromOf = (here: Here): AnswerFrom => (here === 'inbox' ? { at: null, inbox: true } : { at: here });
@@ -48,6 +82,7 @@ export function feature(now = 1_791_100_000_000): Feature {
   const kept = new Map<string, unknown>();
   const latest = new Latest();
   let clock = now;
+  let route: Route = { screen: 'inbox' };
   const open = (): Store => {
     const s = new Store(
       { send: (cmd) => { outbox.push(cmd); } },
@@ -55,7 +90,10 @@ export function feature(now = 1_791_100_000_000): Feature {
     );
     s.setCore('up');
     // the app's edge (app/edge.tsx) runs these; here they are recorded, as sent() records commands
-    s.onEffect((e) => ran.push(e));
+    s.onEffect((e) => {
+      ran.push(e);
+      if (e.out === 'nav') route = navRoute(e.to);
+    });
     return s;
   };
   let store = open();
@@ -87,6 +125,16 @@ export function feature(now = 1_791_100_000_000): Feature {
         return;
       case 'dismiss':
         store.dismiss(threadKey(g.project, g.agent), g.cid);
+        return;
+      case 'art': {
+        // a click on an artifact's name (artifacts/leave.ts useGoArtifact): his browser, or the window's route
+        const plan = artifactGo(store.artifacts(g.project).find((x) => x.id === g.id), g.project, g.id);
+        if (plan.browser !== undefined) ran.push({ out: 'fx', fx: { fx: 'openExternal', args: [plan.browser] } });
+        else route = plan.route;
+        return;
+      }
+      case 'go':
+        route = g.route;
         return;
     }
   };
@@ -125,6 +173,14 @@ export function feature(now = 1_791_100_000_000): Feature {
       pending: (project, agent) => store.pending(threadKey(project, agent)),
       gallery: (place, only) => galleryView(allItems(store, only), place, clock),
       library: (project = '', projectName = '') => libraryView(store.folders(), allItems(store), project, projectName),
+      route: () => route,
+      sidebar: () => {
+        const shows = sideShows(route);
+        if (shows === 'projects') return { shows, rows: projectsOf(store.projects()).map((p) => p.name) };
+        if (shows === 'settings') return { shows, rows: ['settings'] };
+        const scope = route.screen === 'artifacts' ? route.project : '';
+        return { shows, rows: libraryPage(route) ? libraryRows(libraryView(store.folders(), allItems(store), scope, '')) : [] };
+      },
     },
   };
   return f;

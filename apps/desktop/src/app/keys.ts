@@ -18,6 +18,7 @@ import type { At } from '@/artifacts/folders';
 import { liveOf, rankedOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { projectsOf } from './siderows';
+import { sideShows } from './sideshows';
 import { panelKeyOf, type PanelKey } from './panel/keys';
 
 /** A window event that opens the key list (the composer's /help and /shortcuts). */
@@ -100,7 +101,7 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   if (n !== undefined && only('meta')) {
     if (n === 0) return { go: { screen: 'bise' } };
     // the artifacts library in view: ⌘1-9 are its rows, as the projects' in their place (designer m_45492)
-    const lib = c.route.screen === 'artifacts' ? c.library?.() : undefined;
+    const lib = sideShows(c.route) === 'library' ? c.library?.() : undefined;
     if (lib !== undefined) {
       const at = lib[n - 1];
       return at === undefined ? undefined : { library: at };

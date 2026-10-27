@@ -13,3 +13,9 @@ export type { Effect } from '@/store/machine/types';
 export { allItems } from '@/artifacts/hooks';
 export { galleryView, type CardView, type Place } from '@/artifacts/gallery';
 export { libraryView, type LibraryView } from '@/artifacts/folders';
+// the window's route after a move (an option's nav effect, a click on an artifact's name) and what the sidebar shows for it
+export type { Route } from '@/app/route';
+export { navRoute } from '@/app/edge';
+export { artifactGo } from '@/artifacts/leave';
+export { libraryPage, sideShows, type SideShows } from '@/app/sideshows';
+export { projectsOf } from '@/app/siderows';

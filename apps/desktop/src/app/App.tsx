@@ -429,6 +429,7 @@ function ScreenOf({ route }: { route: Route }) {
       // every project's (project ''), one project's, or one artifact open (amb-kit's src/artifacts)
       // a project's artifact by id: the maker's thread in the centre, the artifact in a panel tab
       // (ArtifactView.tsx ArtifactRoute)
+      // the library page (sideshows.ts libraryPage): the sidebar shows its library, the page publishes its rows
       if (route.id === undefined) return <ArtifactsScreen project={route.project} at={route.at} />;
       return route.project === '' ? <ArtifactOpen project={route.project} id={route.id} /> : <ArtifactRoute project={route.project} id={route.id} />;
     case 'scheduled':
