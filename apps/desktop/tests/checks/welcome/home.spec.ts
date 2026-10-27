@@ -17,7 +17,6 @@ import path from 'node:path';
 import { PNG } from 'pngjs';
 import { test, expect, FakeCore, Recorder, launchDesktop, pngBytes, type Session } from '../../harness';
 import { thread } from '../../../src/proto/words_thread.gen';
-import { panel } from '../../../src/proto/words_panel.gen';
 import { hub_ev } from '../../../src/proto/fixtures.gen';
 import type { Card, HubEv } from '../../../src/proto';
 
@@ -123,7 +122,8 @@ for (const width of [1400, 1100, 800]) {
         // one office on screen (native-lead m_47920): the outer card's tile draws no office beside it
         await expect(page.getByTestId('app.outer.world').getByTestId('app.right.bims'), "the card's office stays closed while the welcome's shows").toHaveCount(0);
         // main's row in the outer card (the right bar's agents since bise fait mac)
-        if (width > 800) await expect(page.getByTestId(`app.outer.agents.${P}.main`)).toContainText(panel.role_lead);
+        // its line is mark · head · name · age (OuterCard AgentLine): no role words since the right bar went
+        if (width > 800) await expect(page.getByTestId(`app.outer.agents.${P}.main`)).toBeVisible();
         await page.waitForTimeout(1200);
         save(`${String(width)}-${theme}-1-first-open.png`, await shown(s), `${String(width)} ${theme} · first open`);
 

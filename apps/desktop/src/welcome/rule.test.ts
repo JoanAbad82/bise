@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_ORDER, type ThreadOrder } from '@/store/types';
 import { introShows, welcomeShows } from './rule';
 import { moveOf } from './dock';
-import { officeRoom } from './room';
+import { officeRoom, wordsHeight } from './room';
 
 const view = (o: Partial<ThreadOrder>): ThreadOrder => ({ ...EMPTY_ORDER, loaded: true, ...o });
 
@@ -65,6 +65,17 @@ describe('officeRoom: the office gives way first (designer m_38760)', () => {
     expect(officeRoom(461.5, 330, 12)).toBeNull();
     expect(officeRoom(462, 330, 12)).toBe(120);
     expect(officeRoom(300, 330, 12)).toBeNull();
+  });
+});
+
+describe('wordsHeight: what stacks with the office', () => {
+  it('the empty home over it, the legend and the lead under it, and the gaps between them', () => {
+    expect(wordsHeight([180, 150, 90], 12)).toBe(444);
+  });
+
+  it('one block: no gap; none: 0', () => {
+    expect(wordsHeight([200], 12)).toBe(200);
+    expect(wordsHeight([], 12)).toBe(0);
   });
 });
 

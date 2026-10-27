@@ -778,6 +778,35 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     }
   });
 
+  it('the welcome docking: the tile\'s office mounts at its fit under the flying copy, its chrome held; landed, the camera eases to the open thread\'s bim and the chrome comes (designer m_47950)', () => {
+    tall(900);
+    const gone = welcoming.add(ACME);
+    const landed = welcoming.dock(ACME);
+    try {
+      const { v } = side3d(1440);
+      const tile = v.getByTestId('app.outer.world');
+      expect(tile.querySelector('[data-testid="office"]')).toBeNull();
+      act(() => {
+        gone();
+      });
+      // in flight: the office drawn whole, no follow, no data-landed yet
+      expect(tile.querySelector('[data-testid="office"]')).toBeTruthy();
+      expect(office.follow.at(-1)).toBeNull();
+      expect(tile.hasAttribute('data-landing')).toBe(true);
+      expect(tile.hasAttribute('data-landed')).toBe(false);
+      act(() => {
+        landed();
+      });
+      expect(office.follow.at(-1)).toBe('perf');
+      expect(tile.hasAttribute('data-landing')).toBe(false);
+      expect(tile.hasAttribute('data-landed')).toBe(true);
+      expect(v.getByTestId('app.outer.world.hide')).toBeTruthy();
+    } finally {
+      gone();
+      landed();
+    }
+  });
+
   it('a welcome in another project leaves this project\'s tile live', () => {
     tall(900);
     const gone = welcoming.add(HOME);

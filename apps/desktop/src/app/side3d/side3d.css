@@ -1697,28 +1697,40 @@
 .s3-outer[data-above][data-below] {
   mask-image: linear-gradient(to bottom, transparent, #000 var(--s-4), #000 calc(100% - var(--s-4)), transparent);
 }
-/* the welcome docking into the tile (OuterTile data-landing, designer m_47929): the live office
-   mounts under the welcome's flying copy (welcome/dock.ts DOCK_MS, 400), its names, pills and chips
-   come in after the landing, 120 ms; under reduced motion no flight, the office fades in (400) */
+/* the welcome docking into the tile (OuterTile, welcome/dock.ts; designer m_47929, m_47950): while
+   its copy flies in and holds (data-landing) the live office draws at its fit under it with no fade
+   of its own, so the copy goes in one frame onto the same picture, and its names, pills and chips
+   wait; landed (data-landed) they come in, 120 ms. Reduced motion: the copy stays in the centre,
+   the tile's office hidden until it drew, then both swap in 120 ms */
 @keyframes s3-otile-land {
   from {
     opacity: 0;
   }
 }
-.s3-otile[data-landing] .bims-overlay,
-.s3-otile[data-landing] .bims-label,
-.s3-otile[data-landing] .bims-pill,
-.s3-otile[data-landing] .bims-level,
+.s3-otile[data-landing] .bims-office > .bims-canvas {
+  transition: none;
+}
+.s3-otile[data-landing] .bims-office > .bims-overlay,
 .s3-otile[data-landing] .bims-chip {
-  animation: s3-otile-land 120ms ease-out 400ms backwards;
+  visibility: hidden;
+}
+.s3-otile[data-landed] .bims-office > .bims-overlay,
+.s3-otile[data-landed] .bims-chip {
+  animation: s3-otile-land 120ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .s3-otile[data-landing] .s3-otile-office {
-    animation: s3-otile-land 400ms ease-in-out;
+    opacity: 0;
+  }
+  .s3-otile[data-landed] .s3-otile-office {
+    animation: s3-otile-land 120ms ease-out;
   }
 }
 :root[data-reduce-motion] .s3-otile[data-landing] .s3-otile-office {
-  animation: s3-otile-land 400ms ease-in-out;
+  opacity: 0;
+}
+:root[data-reduce-motion] .s3-otile[data-landed] .s3-otile-office {
+  animation: s3-otile-land 120ms ease-out;
 }
 /* the office's corner chips inside the tile (designer m_46580): the bims head's map chip (--c-bg, a
    1 px line, r 6), 8 in from the corners; the map chip on hover at every height, as ⤢ and × */

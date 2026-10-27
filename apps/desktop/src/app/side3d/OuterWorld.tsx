@@ -21,6 +21,7 @@ import { bims } from '@/proto/words_bims.gen';
 import { Town } from '@/bims/town/Town';
 import { townParts } from '@/bims/town/feed';
 import { useTownProjects } from '@/bims/town/useTown';
+import type { TilePhase } from '@/welcome/shown';
 import { WorldOffice } from './World';
 import { clampTile, OUTER_TOP, TILE_GAP, TILE_H, TILE_MIN, tileMax } from './tilestate';
 import { OUTER_W } from './layout';
@@ -54,21 +55,23 @@ export interface TownActs {
 
 /**
  * The tile: the office (on bise's own the town), '⤢' (the office alone: no town tab) and '×' on hover.
- * `waiting`: a new project's welcome holds the office in main's thread (welcome/shown.ts; one office
- * on screen, native-lead m_47921): the frame alone at its place, its ground and line, no office and
- * no buttons (designer m_47929). When the welcome docks, the office mounts under its flying copy
- * (welcome/dock.ts) and `data-landing` stays: its labels, pills and chips come in after the landing.
+ * `phase` (welcome/shown.ts): 'welcome', a new project's welcome holds the office in main's thread
+ * (one office on screen, native-lead m_47921): the frame alone at its place, its ground and line, no
+ * office and no buttons (designer m_47929). 'docking', its copy flies in (welcome/dock.ts): the
+ * office mounts at its fit under it, no follow, its chrome held (data-landing). Landed: the camera
+ * eases to the followed bim and the chrome fades in (data-landed; designer m_47950).
  */
-export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide, town = null, waiting = false }: OuterTileProps & { readonly town?: TownActs | null; readonly waiting?: boolean }) {
-  const [waited, setWaited] = useState(waiting);
-  if (waiting && !waited) setWaited(true);
+export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide, town = null, phase = null }: OuterTileProps & { readonly town?: TownActs | null; readonly phase?: TilePhase }) {
+  const [docked, setDocked] = useState(phase === 'docking');
+  if (phase === 'docking' && !docked) setDocked(true);
+  const waiting = phase === 'welcome';
   return (
-    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined} data-waiting={waiting || undefined} data-landing={(waited && !waiting) || undefined}>
+    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined} data-waiting={waiting || undefined} data-landing={phase === 'docking' || undefined} data-landed={(docked && phase === null) || undefined}>
       <span className="s3-otile-office">
         {waiting ? null : town !== null ? (
           <OuterTown h={h} acts={town} />
         ) : (
-          <WorldOffice project={project} agents={agents} cards={cards} fill follow={follow} onOpen={onOpen} onPickMap={onPickMap} />
+          <WorldOffice project={project} agents={agents} cards={cards} fill follow={phase === 'docking' ? null : follow} onOpen={onOpen} onPickMap={onPickMap} />
         )}
       </span>
       {!waiting && <span className="s3-otile-acts">

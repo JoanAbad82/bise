@@ -7,7 +7,7 @@ import { tileTarget } from './dock';
 const put = (testId: string, box: { left: number; top: number; width: number; height: number }) => {
   const el = document.createElement('section');
   el.setAttribute('data-testid', testId);
-  el.getBoundingClientRect = () => ({ ...box, right: box.left + box.width, bottom: box.top + box.height, x: box.left, y: box.top, toJSON: () => box }) as DOMRect;
+  el.getBoundingClientRect = () => ({ ...box, right: box.left + box.width, bottom: box.top + box.height, x: box.left, y: box.top, toJSON: () => box });
   document.body.append(el);
   return el;
 };

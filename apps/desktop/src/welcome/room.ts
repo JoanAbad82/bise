@@ -10,6 +10,11 @@ export const OFFICE_MIN_H = 120;
  * take, `words` the height of its words (legend, message, ideas), `gap` the space between the
  * office and the words.
  */
+/** the height of what stacks with the office (the empty home over it, the legend and the lead's message under it): each one's, and the gaps between them */
+export function wordsHeight(heights: readonly number[], gap: number): number {
+  return heights.reduce((n, h) => n + h, 0) + gap * Math.max(0, heights.length - 1);
+}
+
 export function officeRoom(slot: number, words: number, gap: number): number | null {
   const room = Math.floor(slot - words - gap);
   return room < OFFICE_MIN_H ? null : room;

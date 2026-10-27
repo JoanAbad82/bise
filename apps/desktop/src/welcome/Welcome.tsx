@@ -20,9 +20,9 @@ import { mapOf, mapPrefKey } from '@/bims/maps/ids';
 import { getPref, type Prefs } from '@/settings/prefs';
 import { LiveBiseMark } from '@/app/Marks';
 import { welcomeShows } from './rule';
-import { officeRoom } from './room';
+import { officeRoom, wordsHeight } from './room';
 import { welcoming } from './shown';
-import { fly, tileTarget } from './dock';
+import { fly, tileDrawn, tileTarget } from './dock';
 import { Pictures } from './Pictures';
 import './welcome.css';
 
@@ -68,7 +68,14 @@ export function Welcome({ project, name, head, rootRef, mapRef, snapRef, docking
   const map = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
   const [state, setState] = useState<OfficeState>('loading');
   // the outer card's tile stays an empty frame while this one shows (welcome/shown.ts)
-  useEffect(() => (docking ? undefined : welcoming.add(project)), [project, docking]);
+  // it lets go two frames late, so its copy's flight is on the compositor before the tile's office mounts
+  useEffect(() => {
+    if (docking) return undefined;
+    const gone = welcoming.add(project);
+    return () => {
+      requestAnimationFrame(() => requestAnimationFrame(gone));
+    };
+  }, [project, docking]);
   const ownRoot = useRef<HTMLDivElement>(null);
   const root = rootRef ?? ownRoot;
   const words = useRef<HTMLDivElement>(null);
@@ -140,18 +147,22 @@ function useOfficeRoom(root: RefObject<HTMLDivElement | null>, words: RefObject<
       const height = centred
         ? slot.clientHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)
         : place.clientHeight - (list?.querySelector<HTMLElement>('[data-virtuoso-scroller]')?.scrollHeight ?? list?.scrollHeight ?? 0) - parseFloat(s.marginBottom);
-      const next = officeRoom(height, said.offsetHeight, parseFloat(getComputedStyle(el).rowGap) || 0);
+      // the empty home over the office counts (composer/home; since bise fait mac), not only its words
+      const gap = parseFloat(getComputedStyle(el).rowGap) || 0;
+      const others = [...el.children].filter((c): c is HTMLElement => c !== map.current && c instanceof HTMLElement);
+      const next = officeRoom(height, wordsHeight(others.map((c) => c.offsetHeight), gap), gap);
       setRoom((was) => (was === next ? was : next));
     };
     measure();
     const seen = new ResizeObserver(measure);
     seen.observe(place);
     seen.observe(said);
+    for (const c of el.children) if (c !== map.current && c !== said) seen.observe(c);
     if (list !== null) seen.observe(list);
     return () => {
       seen.disconnect();
     };
-  }, [root, words, centred]);
+  }, [root, words, map, centred]);
   // the drawn office's shape (the renderer sets its height at its width)
   const shown = room !== null;
   useLayoutEffect(() => {
@@ -224,7 +235,8 @@ export function WelcomeSlot({ tkey, project, head }: { tkey: string; project: st
     if (!leaving) return;
     const el = root.current;
     if (el !== null) {
-      fly(el, map.current, snap.current, () => tileTarget(document), reducedMotion());
+      // the tile's office at its fit, its chrome held, until the copy gave way to it (shown.ts)
+      fly(el, map.current, snap.current, () => tileTarget(document), () => tileDrawn(document), reducedMotion(), welcoming.dock(project));
     }
     // its copy flies now: the welcome itself goes at the next frame, the thread takes the centre
     const raf = requestAnimationFrame(() => {
@@ -233,7 +245,7 @@ export function WelcomeSlot({ tkey, project, head }: { tkey: string; project: st
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [leaving]);
+  }, [leaving, project]);
   // no welcome (main has agents already): the home alone, in the slot's centre
   if (!shows && !leaving) return head == null ? null : <div className="th-first th-home" data-testid="thread.first">{head}</div>;
   const centred = view.order.length === 0;
