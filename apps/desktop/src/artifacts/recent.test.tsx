@@ -24,7 +24,7 @@ const FOLDERS = [docs, perf];
 describe('the Recent row', () => {
   it('takes the 20 newest by creation, across folders and projects, newest first', () => {
     const many = Array.from({ length: 30 }, (_, i) =>
-      item(i % 2 === 0 ? 'acme' : 'web', art(`a${String(i)}`, { created_ms: NOW - i * MIN, folder: i % 3 === 0 ? 'f-perf' : null })));
+      item(i % 2 === 0 ? 'acme' : 'web', art(`a${String(i)}`, { created_ms: NOW - i * MIN, ...(i % 3 === 0 ? { folder: 'f-perf' } : {}) })));
     const row = recentOf([...many].reverse());
     expect(row).toHaveLength(RECENT_ROW_N);
     expect(row.map((it) => it.a.id).slice(0, 3)).toEqual(['a0', 'a1', 'a2']);
