@@ -44,6 +44,8 @@ export function dimsOf(poses: readonly string[]): readonly Dim[] {
     { name: 'hatc', values: [...HAT_COLORS] },
     { name: 'frame', values: ['0', '1', '2'] },
     { name: 'light', values: ['day', 'night'] },
+    // bim-alive's life layer (render/alive.ts): an agent standing at rest breathes and shifts its weight
+    { name: 'life', values: ['still', 'alive'] },
   ];
 }
 
@@ -55,6 +57,9 @@ export function validRow(r: Row): boolean {
   if (r.cam !== undefined && r.pose !== undefined && (STANDING_CAMS as readonly string[]).includes(r.cam) !== (r.pose === 'stand')) return false;
   if (r.pose === 'stand' && r.frame !== undefined && r.frame !== '0') return false;
   if (r.cam === 'swatch' && r.head !== undefined && !isMain(r.head)) return false;
+  // the life layer: never on main, never on the coin's or the swatch's standing bim (the side draws them still)
+  if (r.life === 'alive' && r.head !== undefined && isMain(r.head)) return false;
+  if (r.life === 'alive' && r.cam !== undefined && (STANDING_CAMS as readonly string[]).includes(r.cam)) return false;
   return true;
 }
 
@@ -93,7 +98,7 @@ export function dress(r: Row): Dressed {
 
 /** a row's short id: its values in the dimensions' order, for file names and the page */
 export function rowId(r: Row): string {
-  return ['head', 'pose', 'frame', 'kind', 'skin', 'hair', 'hatc', 'cam', 'light']
+  return ['head', 'pose', 'frame', 'kind', 'skin', 'hair', 'hatc', 'cam', 'light', 'life']
     .map((k) => r[k] ?? '-')
     .join('|')
     .replace(/#/g, '')

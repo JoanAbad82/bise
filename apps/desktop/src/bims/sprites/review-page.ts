@@ -21,8 +21,9 @@ import { makeView, type View } from '../render/view';
 import { castShadows, lightOffice } from '../render/world';
 import type { Pose } from '../model';
 import { cutPng, headPng } from '@/app/side3d/render';
+import { aliveRig, aliveSeed, stanceAt, stands } from '../render/alive';
 import type { Row } from './pairwise';
-import { type Cam, type Dressed, dimsOf, dress, rowId, validRow } from './review-space';
+import { type Cam, type Dressed, REVIEW_NAME, dimsOf, dress, rowId, validRow } from './review-space';
 import { pairwise } from './pairwise';
 
 /** the loop phase every reviewed bim moves at (the turnaround's) */
@@ -53,13 +54,24 @@ function coinPose(): Pose {
   return { x: 0, z: 0, dir: FACE, moving: false, since: 30, seg: { t: 0, act, sig: act.k, spot, path: { pts: [spot], seg: [], len: 0 }, speed: 2.4, from: null } };
 }
 
-/** the rig a row draws: its pose at its frame (0, 1/3, 2/3 of the loop), or standing */
+/** the rig a row draws: its pose at its frame (0, 1/3, 2/3 of the loop), or standing; alive: bim-alive's layer on it */
 export function rigOfRow(r: Row, main: boolean): Rig {
+  return r.life === 'alive' && !main ? lifeOn(poseRig(r, main), Number(r.frame ?? 0)) : poseRig(r, main);
+}
+
+function poseRig(r: Row, main: boolean): Rig {
   if (r.pose === 'stand' || r.pose === undefined) return standRig();
   const frames = rigsOf(main).get(r.pose);
   if (!frames || frames.length === 0) throw new Error(`no pose ${r.pose}`);
   const i = Math.min(frames.length - 1, Math.floor((Number(r.frame ?? 0) * frames.length) / 3));
   return frames[i] as Rig;
+}
+
+/** bim-alive's layer at its widest (render/alive.ts aliveRig): frame n holds the name's stance n, the breath out, half, in; only on a bim that stands */
+function lifeOn(rig: Rig, n: number): Rig {
+  if (!stands(rig)) return rig;
+  const st = stanceAt(aliveSeed(REVIEW_NAME), n + 1);
+  return aliveRig(rig, { ...st, breath: n / 2, k: 1, shifting: false }, true);
 }
 
 function bimOf(d: Dressed, merge = true): Bim {
@@ -131,10 +143,7 @@ function drawRow(r: Row, size: number): HTMLCanvasElement {
   const cam = (r.cam ?? 'office') as Cam;
   const night = r.light === 'night';
   const pal = night ? NIGHT : DAY;
-  const canvas = document.createElement('canvas');
-  const v = makeView(canvas, { shadowAuto: true, transparent: true });
-  v.renderer.setPixelRatio(1);
-  v.sky('#000000');
+  const v = sharedView();
   const bim = bimOf(d);
   bim.daylight(night ? 0 : 1);
   castShadows(bim.group);
@@ -182,16 +191,36 @@ function drawRow(r: Row, size: number): HTMLCanvasElement {
     bim.apply(rigOfRow(r, d.main));
     bim.detail(true);
     bim.group.rotation.y = -2.35;
-    frontView(v, size, 1.0, 0.66);
+    // framed on the posed bim (a gag's arms and props reach wide), never under the turnaround's 1 unit
+    bim.group.updateMatrixWorld(true);
+    const box = new Box3().setFromObject(bim.group, true);
+    const half = Math.max(1.0, (Math.max(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z) / 2) * 1.1);
+    frontView(v, size, half, (box.min.y + box.max.y) / 2);
   }
   v.render();
   const out = document.createElement('canvas');
   out.width = size;
   out.height = size;
   v.copyTo(out);
+  v.scene.remove(root);
   bim.dispose();
-  v.dispose();
   return out;
+}
+
+/**
+ * One view for every row (as app/side3d/render.ts keeps one): a view a row would open one WebGL
+ * context each, and a long sheet runs past the browser's ~16, losing the oldest (main's coins
+ * came out empty in a 1,000-row pass, and drew alone).
+ */
+let shared: View | null = null;
+function sharedView(): View {
+  if (shared !== null && !shared.lost()) return shared;
+  shared?.dispose();
+  const v = makeView(document.createElement('canvas'), { shadowAuto: true, transparent: true });
+  v.renderer.setPixelRatio(1);
+  v.sky('#000000');
+  shared = v;
+  return v;
 }
 
 /** one finding of the automatic checks on a row */
@@ -229,7 +258,7 @@ function labelMeshes(root: Object3D): void {
 /** what geometry says of a row: the same for every colour, camera and light, so kept by its shape */
 export function checkRow(r: Row): Issue[] {
   const d = dress(r);
-  const shape = [r.head, r.kind, r.pose, r.frame, d.main ? 'main' : 'agent'].join('|');
+  const shape = [r.head, r.kind, r.pose, r.frame, r.life, d.main ? 'main' : 'agent'].join('|');
   const had = geoCache.get(shape);
   if (had) return had;
   const out: Issue[] = [];
@@ -402,7 +431,7 @@ async function sheet(rows: readonly Row[], title: string, size: number, cols: nu
     const head = (r.head ?? '').replace(/^(m|w|me):/, '');
     ctx.fillText(`${String(i + 1)} ${head} · ${r.pose ?? ''}${r.frame && r.frame !== '0' ? `@${r.frame}` : ''}`, x + 4, y + size + 13);
     ctx.fillStyle = '#7a736b';
-    ctx.fillText(`${r.cam ?? ''} · ${r.kind ?? ''} · s${r.skin ?? ''} h${r.hair ?? ''} ${r.hatc ?? ''} · ${r.light ?? ''}`, x + 4, y + size + 27);
+    ctx.fillText(`${r.cam ?? ''} · ${r.kind ?? ''} · s${r.skin ?? ''} h${r.hair ?? ''} ${r.hatc ?? ''} · ${r.light ?? ''}${r.life === 'alive' ? ' · alive' : ''}`, x + 4, y + size + 27);
     if (issues.length > 0) {
       ctx.fillStyle = bad.length > 0 ? '#d1495b' : '#b07a10';
       ctx.fillText(issues.map((x) => x.check).join(' '), x + 4, y + size + 41);
