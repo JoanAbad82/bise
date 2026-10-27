@@ -12,11 +12,6 @@
     "one": null,
     "text": "it has ended already."
   },
-  "running.bar": {
-    "args": [],
-    "one": null,
-    "text": "Processes"
-  },
   "running.by": {
     "args": [
       "agent"

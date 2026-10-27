@@ -61,26 +61,12 @@
     "one": null,
     "text": "Artifacts"
   },
-  "side.asks": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "{n} asking"
-  },
   "side.asks_tip": {
     "args": [
       "agent"
     ],
     "one": null,
     "text": "{agent} asks you something"
-  },
-  "side.at_desks": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "{n} at their desks"
   },
   "side.bubble_none": {
     "args": [],
@@ -261,11 +247,6 @@
     "args": [],
     "one": null,
     "text": "nothing scheduled."
-  },
-  "side.pin_tab": {
-    "args": [],
-    "one": null,
-    "text": "open as a tab"
   },
   "side.processes": {
     "args": [],

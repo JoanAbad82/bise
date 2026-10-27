@@ -130,20 +130,10 @@ crate::words! { panel:
     wt_said_on(said, g) = "{said} · {g} worktree on ";
 
     // ---- the desktop's right bar
-    /// the Overview tab's agents label (sentence case, bise fait mac §6)
-    bar_agents = "Agents";
-    /// the Overview tab's archived agents label
-    bar_archived = "Archived";
-    /// the Overview tab's artifacts label
-    bar_artifacts = "Artifacts";
-    /// the Overview tab's scheduled tasks and watches label
-    bar_scheduled = "Scheduled";
     /// a long section's next page, more than a page left
     show_more_left(n, left) = "show {n} more · {left} left";
     /// a long section's last page
     show_more(n) = "show {n} more";
-    /// back to the cap
-    show_less = "show less";
     /// AGENTS' next page when more than a page is folded: after 'show 50 more', text-3 (designer m_39151)
     more_of(left) = "of {left}";
     /// AGENTS' folded agents at rest (idle or done), text-3
@@ -160,12 +150,8 @@ crate::words! { panel:
     more_tip_plus(n) = "+ {n}";
     /// a new artifact's chip
     new_chip = "new";
-    /// a browser-only artifact's mark
-    opens_in_browser = "↗ opens in your browser";
     /// an alarm's end
     until(at) = "until {at}";
-    /// the bar's label for screen readers
-    bar_label(name) = "what happens in {name}";
     /// ARTIFACTS on a sub-agent's thread
     scope_by(agent) = "by {agent}";
     /// its tip
@@ -298,8 +284,6 @@ crate::words! { panel:
     tray_more(n) = "{n} more in bise";
 
     // ---- the desktop's tabbed panel (bise fait mac, page native-mac §4 #2, mockups 1-4)
-    /// the panel's first tab: what the right bar was (agents, archived, artifacts, scheduled, processes)
-    tab_overview = "Overview";
     /// a tab of the launcher ('+', ⌘T), and its VoiceOver name
     tab_new = "New tab";
     /// a shell's tab: the project it runs in
@@ -388,10 +372,4 @@ crate::words! { panel:
     addr_window = "Open in a window";
 
     // ---- the Overview tab's sections (bise fait mac, mockup 1): the head's '…' menu
-    /// a section's '…': its full list (the 'all ›' it replaces)
-    ov_show_all = "Show all";
-    /// the artifacts section's '…' and '+': a file of his into the project's artifacts
-    ov_add_file = "Add a file…";
-    /// a section label's tip: its words and how many rows it has
-    ov_label_tip(label, n) = "{label} · {n}";
 }

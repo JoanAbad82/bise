@@ -64,33 +64,6 @@
     "one": null,
     "text": "asks you"
   },
-  "panel.bar_agents": {
-    "args": [],
-    "one": null,
-    "text": "Agents"
-  },
-  "panel.bar_archived": {
-    "args": [],
-    "one": null,
-    "text": "Archived"
-  },
-  "panel.bar_artifacts": {
-    "args": [],
-    "one": null,
-    "text": "Artifacts"
-  },
-  "panel.bar_label": {
-    "args": [
-      "name"
-    ],
-    "one": null,
-    "text": "what happens in {name}"
-  },
-  "panel.bar_scheduled": {
-    "args": [],
-    "one": null,
-    "text": "Scheduled"
-  },
   "panel.bise": {
     "args": [],
     "one": null,
@@ -388,29 +361,6 @@
     "one": null,
     "text": "{rev} on trial"
   },
-  "panel.opens_in_browser": {
-    "args": [],
-    "one": null,
-    "text": "↗ opens in your browser"
-  },
-  "panel.ov_add_file": {
-    "args": [],
-    "one": null,
-    "text": "Add a file…"
-  },
-  "panel.ov_label_tip": {
-    "args": [
-      "label",
-      "n"
-    ],
-    "one": null,
-    "text": "{label} · {n}"
-  },
-  "panel.ov_show_all": {
-    "args": [],
-    "one": null,
-    "text": "Show all"
-  },
   "panel.panel_full_back": {
     "args": [],
     "one": null,
@@ -618,11 +568,6 @@
     "one": null,
     "text": "only {agent}'s scheduled tasks and alarms · all › shows {project}'s"
   },
-  "panel.show_less": {
-    "args": [],
-    "one": null,
-    "text": "show less"
-  },
   "panel.show_more": {
     "args": [
       "n"
@@ -705,11 +650,6 @@
     ],
     "one": null,
     "text": "Office · {project}"
-  },
-  "panel.tab_overview": {
-    "args": [],
-    "one": null,
-    "text": "Overview"
   },
   "panel.tab_pr": {
     "args": [

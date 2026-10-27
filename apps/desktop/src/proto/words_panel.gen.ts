@@ -118,20 +118,10 @@ export const panel = {
   wt_no_branch: (a: { who: string | number }): string => String(a.who) + ", no branch",
   /** a mark's tip: the PR's or the land's words, then its branch */
   wt_said_on: (a: { said: string | number; g: string | number }): string => String(a.said) + " · " + String(a.g) + " worktree on ",
-  /** the Overview tab's agents label (sentence case, bise fait mac §6) */
-  bar_agents: "Agents",
-  /** the Overview tab's archived agents label */
-  bar_archived: "Archived",
-  /** the Overview tab's artifacts label */
-  bar_artifacts: "Artifacts",
-  /** the Overview tab's scheduled tasks and watches label */
-  bar_scheduled: "Scheduled",
   /** a long section's next page, more than a page left */
   show_more_left: (a: { n: string | number; left: string | number }): string => "show " + String(a.n) + " more · " + String(a.left) + " left",
   /** a long section's last page */
   show_more: (a: { n: string | number }): string => "show " + String(a.n) + " more",
-  /** back to the cap */
-  show_less: "show less",
   /** AGENTS' next page when more than a page is folded: after 'show 50 more', text-3 (designer m_39151) */
   more_of: (a: { left: string | number }): string => "of " + String(a.left),
   /** AGENTS' folded agents at rest (idle or done), text-3 */
@@ -148,12 +138,8 @@ export const panel = {
   more_tip_plus: (a: { n: string | number }): string => "+ " + String(a.n),
   /** a new artifact's chip */
   new_chip: "new",
-  /** a browser-only artifact's mark */
-  opens_in_browser: "↗ opens in your browser",
   /** an alarm's end */
   until: (a: { at: string | number }): string => "until " + String(a.at),
-  /** the bar's label for screen readers */
-  bar_label: (a: { name: string | number }): string => "what happens in " + String(a.name),
   /** ARTIFACTS on a sub-agent's thread */
   scope_by: (a: { agent: string | number }): string => "by " + String(a.agent),
   /** its tip */
@@ -276,8 +262,6 @@ export const panel = {
   tray_on_branch: (a: { branch: string | number }): string => "on " + String(a.branch),
   /** the projects left out of the menu, and where they are (a click opens bise) */
   tray_more: (a: { n: string | number }): string => String(a.n) + " more in bise",
-  /** the panel's first tab: what the right bar was (agents, archived, artifacts, scheduled, processes) */
-  tab_overview: "Overview",
   /** a tab of the launcher ('+', ⌘T), and its VoiceOver name */
   tab_new: "New tab",
   /** a shell's tab: the project it runs in */
@@ -358,10 +342,4 @@ export const panel = {
   addr_out: "Open in your browser",
   /** the bar's button over an artifact's tab: the artifact in a window of its own */
   addr_window: "Open in a window",
-  /** a section's '…': its full list (the 'all ›' it replaces) */
-  ov_show_all: "Show all",
-  /** the artifacts section's '…' and '+': a file of his into the project's artifacts */
-  ov_add_file: "Add a file…",
-  /** a section label's tip: its words and how many rows it has */
-  ov_label_tip: (a: { label: string | number; n: string | number }): string => String(a.label) + " · " + String(a.n),
 } as const;

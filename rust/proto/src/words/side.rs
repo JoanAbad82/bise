@@ -22,8 +22,6 @@ crate::words! { side:
     bubble_none = "nothing";
     /// a count of working agents (a bubble's tip, the agents card's head)
     working(n) = "{n} working";
-    /// a count of agents that ask him something
-    asks(n) = "{n} asking";
     /// a count of new artifacts
     new_count(n) = "{n} new";
     /// a count of artifacts (the artifacts bubble's tip)
@@ -54,8 +52,6 @@ crate::words! { side:
     all_processes = "all processes ›";
     /// the scheduled card's foot: its full page
     all_scheduled = "all scheduled ›";
-    /// a card's head button: the same thing as a tab of the panel
-    pin_tab = "open as a tab";
     /// the agents card's head '+': a new agent
     new_agent = "new agent";
     /// an agent's bubble in the agents card: it asks him something
@@ -119,8 +115,6 @@ crate::words! { side:
     no_processes = "nothing running.";
     /// the scheduled card with nothing in it
     no_scheduled = "nothing scheduled.";
-    /// the world's legend: how many bims sit at their desks
-    at_desks(n) = "{n} at their desks";
     /// the world's VoiceOver name, and its click's tip
     world_open(project) = "open {project}'s office in a tab";
     /// the world's legend's '↗', its tip
