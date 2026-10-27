@@ -265,8 +265,10 @@ function PageChip({ about, open, id }: { about: ArtLink; open: (() => void) | un
   const w = aboutWords(about);
   return (
     <div className="ic-page" data-testid={`${id}.page`}>
-      <ArtChip title={w.title} meta={w.meta} keep={CHIP_KEEP} {...(open ? { onClick: open } : {})} testId={`${id}.page.chip`} />
+      <ArtChip title={w.title} meta={w.meta} keep={CHIP_KEEP} tip={chipTip(w.title, open !== undefined)} {...(open ? { onClick: open } : {})} testId={`${id}.page.chip`} />
       {open && (
+        // a key hint is whole or gone (designer m_47764): too narrow, it wraps to the row's hidden
+        // second line (inbox.css .ic-page), never clipped; the chip's tip still says the key
         <Act onClick={open} testId={`${id}.page.open`}>
           <Kbd>⌘O</Kbd>
           {inbox.key_open_beside}
@@ -274,6 +276,11 @@ function PageChip({ about, open, id }: { about: ArtLink; open: (() => void) | un
       )}
     </div>
   );
+}
+
+/** The chip's tip: its whole title, and the key when it opens ('<title> · ⌘O open beside', designer m_47764). Pure. */
+export function chipTip(title: string, opens: boolean): string {
+  return opens ? `${title} · ⌘O ${inbox.key_open_beside}` : title;
 }
 
 /** '1', '1 2', '1–3' */

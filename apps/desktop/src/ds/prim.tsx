@@ -95,16 +95,19 @@ export interface ArtChipProps {
   /** narrow, a string title keeps its first `keep` letters before '…' and the meta drops whole
    * before the title is cut, the whole title in its tip (designer m_47680: the inbox card's chip) */
   keep?: number;
+  /** its tip (a kept chip's default: the whole title) */
+  tip?: string;
 }
 /**
  * An artifact as one chip (desktop-agents-bar §5): its glyph and title in --c-accent on a 10 %
  * accent tint, r 6, 24 px high, 8 px sides; kind and version in the same pink at 70 %; hover 16 %.
  */
-export function ArtChip({ title, glyph = "↗", meta, open = false, state, onClick, testId, keep }: ArtChipProps) {
+export function ArtChip({ title, glyph = "↗", meta, open = false, state, onClick, testId, keep, tip }: ArtChipProps) {
   const fit = keep !== undefined && typeof title === "string" ? keptHead(title, keep) : null;
+  const tipped = tip ?? (fit !== null ? (title as string) : undefined);
   return (
     <button type="button" className={cx("b-artchip", open && "open", state === "hover" && "is-hover", fit !== null && "fit")} onClick={onClick}
-      data-testid={testId} data-open={open || undefined} {...(fit !== null ? tipAttrs(title as string) : {})}>
+      data-testid={testId} data-open={open || undefined} {...tipAttrs(tipped)}>
       {fit === null ? (
         <span className="b-artchip-title">{glyph} {title}</span>
       ) : (

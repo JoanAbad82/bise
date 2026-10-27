@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Store, StoreProvider } from '@/store';
-import { age, idTip, InboxCard, PICKED_MS } from './InboxCard';
+import { age, chipTip, idTip, InboxCard, PICKED_MS } from './InboxCard';
 import { inbox } from '@/proto/words_inbox.gen';
 import type { InboxItem } from './listed';
 
@@ -102,5 +102,30 @@ describe("the card head: one mark, no id (designer m_45259, m_45255)", () => {
     // bise's own items have no hub number: no tip
     head({ ...card, id: -1 });
     expect(screen.getByTestId('h.age').getAttribute('data-tip')).toBeNull();
+  });
+});
+
+describe("the chip's row (designer m_47764)", () => {
+  it("'⌘O open beside' is one whole hint, its key also in the chip's tip; a card that doesn't open has neither", () => {
+    const about: InboxItem = { ...card, artifact: { id: 'commode', kind: 'image', title: "commode cannée sous l'escalier", v: 1 } };
+    render(
+      <StoreProvider store={new Store(null)}>
+        <InboxCard card={about} acts={{ pick: () => undefined, openPage: () => undefined }} now={1791100060000} testId="c" />
+      </StoreProvider>,
+    );
+    // whole: one act, the key and its words together, the row's last child (it wraps away whole, inbox.css)
+    const hint = screen.getByTestId('c.page.open');
+    expect(hint.textContent).toBe(`⌘O${inbox.key_open_beside}`);
+    expect(screen.getByTestId('c.page').lastElementChild).toBe(hint);
+    expect(screen.getByTestId('c.page.chip').getAttribute('data-tip')).toBe(chipTip("commode cannée sous l'escalier", true));
+    expect(chipTip('plan', true)).toBe(`plan · ⌘O ${inbox.key_open_beside}`);
+    cleanup();
+    render(
+      <StoreProvider store={new Store(null)}>
+        <InboxCard card={about} acts={{ pick: () => undefined }} now={1791100060000} testId="c" />
+      </StoreProvider>,
+    );
+    expect(screen.queryByTestId('c.page.open')).toBeNull();
+    expect(screen.getByTestId('c.page.chip').getAttribute('data-tip')).toBe("commode cannée sous l'escalier");
   });
 });
