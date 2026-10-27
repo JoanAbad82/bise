@@ -205,12 +205,19 @@ for (const theme of THEMES) {
 
         // last (it moves three cards): the bar and the undo toast on the floating composer's axis,
         // within 1 px, 16 over its top (selbar-float; ui-review m_48524: the toast sat 13.5 px right)
+        // measured once its rise is over (the bar's 8 px, the toast's b-rise): their resting place
         const axis = async (testId: string) => {
+          await id(page, testId).evaluate(async (el) => {
+            await Promise.all(el.getAnimations({ subtree: true }).filter((a) => a.effect?.getTiming().iterations !== Infinity).map((a) => a.finished));
+          });
           const b = await id(page, testId).boundingBox();
           if (b === null) throw new Error(`${testId}: no box`);
           return { x: b.x + b.width / 2, bottom: b.y + b.height, top: b.y };
         };
+        // a folder with cards (the page is still on the empty one)
         await id(page, 'artifacts.search.input').fill('');
+        await go('artifacts.col.f.f-agentview');
+        await expect(cards.nth(2)).toBeVisible();
         await cards.nth(0).click({ modifiers: ['Meta'] });
         await cards.nth(1).click({ modifiers: ['Meta'] });
         await cards.nth(2).click({ modifiers: ['Meta'] });
@@ -224,7 +231,11 @@ for (const theme of THEMES) {
         await page.keyboard.press('Enter');
         await expect(id(page, 'artifacts.toast')).toBeVisible();
         const toast = await axis('artifacts.toast');
-        expect(Math.abs(toast.x - pill.x), 'the undo toast on the pill axis').toBeLessThanOrEqual(1);
+        const boxes = await id(page, 'artifacts.toast').evaluate((el) => {
+          const r = (e: Element | null) => { const b = e?.getBoundingClientRect(); return b === undefined ? null : [b.x, b.width]; };
+          return JSON.stringify({ toast: r(el), wrap: r(el.parentElement), wrapCss: el.parentElement === null ? null : getComputedStyle(el.parentElement).width });
+        });
+        expect(Math.abs(toast.x - pill.x), `the undo toast on the pill axis (${String(pill.x)}; ${boxes})`).toBeLessThanOrEqual(1);
         expect(pill.top - toast.bottom, 'the undo toast 16 over the pill').toBeGreaterThanOrEqual(15);
       } finally {
         await s.close();
