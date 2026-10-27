@@ -56,7 +56,7 @@ export function AttachList({ chips, lit, onLit, onRemove, onOpen, home, testId }
           <span className="nm">{name}</span>
           {info !== "" && <span className="in3">{info}</span>}
           <span className="x">
-            <IconButton size="row" label={`remove ${String(c.n)}`} onClick={(e) => { e.stopPropagation(); onRemove(c.n); }} testId={`${testId}.attach.${String(c.n)}.remove`}>✕</IconButton>
+            <IconButton size="row" label={`Remove ${String(c.n)}`} onClick={(e) => { e.stopPropagation(); onRemove(c.n); }} testId={`${testId}.attach.${String(c.n)}.remove`}>✕</IconButton>
           </span>
         </div>
       ))}
