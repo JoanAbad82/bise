@@ -10,12 +10,12 @@ import { editCounts } from './entry';
 const LEFT = 296;
 
 describe('the column from the sideLayout', () => {
-  it('1920, panel folded: 720 centred in the room the world leaves, its text 672, 24 in', () => {
+  it('1920, panel folded: 720 centred in the room the side leaves, its text 672, 24 in', () => {
     const lay = sideLayout(1920, LEFT, false);
     const p = columnPlace(lay, LEFT, 1920 - LEFT);
     expect(p).toEqual({ x: Math.round(lay.colLeft - LEFT + 24), w: 672 });
-    // centred in the screen (the world's band fits either side at 1920)
-    expect(p?.x).toBe(Math.round((1920 - LEFT - 720) / 2 + 24));
+    // centred in what the side's own band leaves (folded-side D1, designer m_45869)
+    expect(p?.x).toBe(Math.round((1920 - LEFT - lay.gutter - 720) / 2 + 24));
   });
 
   it('1440: the column slides left of the bims\' world, never under it', () => {
@@ -32,9 +32,9 @@ describe('the column from the sideLayout', () => {
     const lay = sideLayout(1920, LEFT, true, 384);
     const p = columnPlace(lay, LEFT, 1920 - LEFT - 384);
     expect(p).toEqual({ x: Math.round((1920 - LEFT - 384 - 720) / 2 + 24), w: 672 });
-    // short of room (1440): the column narrows to keep 24 each side
+    // short of room (1440): the column narrows, 24 from the left, the coins' 68 band kept before the panel (folded-side v9)
     const narrow = sideLayout(1440, LEFT, true, 384);
-    expect(columnPlace(narrow, LEFT, 1440 - LEFT - 384)).toEqual({ x: 48, w: 1440 - LEFT - 384 - 48 - 48 });
+    expect(columnPlace(narrow, LEFT, 1440 - LEFT - 384)).toEqual({ x: 48, w: 1440 - LEFT - 384 - 24 - narrow.gutter - 48 });
   });
 
   it("a thread the layout doesn't describe (in the panel's tab, at the window's right): the CSS's centred column", () => {
