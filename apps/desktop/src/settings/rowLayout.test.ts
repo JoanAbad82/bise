@@ -47,9 +47,9 @@ describe('a settings row', () => {
     expect(rule(dsCss, '.b-settings .b-gi>.v').get('text-overflow')).toBe('ellipsis');
   });
 
-  it('with a picker, is two columns: the label 240 to 320, the control 16 after it (designer m_48077)', () => {
-    expect(rule(dsCss, '.b-settings .b-gi:has(.b-select)').get('column-gap')).toBe('var(--s-4)');
-    expect(rule(dsCss, '.b-settings .b-gi:has(.b-select)>.l').get('max-width')).toBe('var(--w-setting-label-max)');
+  it('with any control, is two columns: the label 240 to 320, the control 16 after it (designer m_48077, m_48146)', () => {
+    expect(rule(dsCss, '.b-settings .b-gi:has(>.l+*)').get('column-gap')).toBe('var(--s-4)');
+    expect(rule(dsCss, '.b-settings .b-gi:has(>.l+*)>.l').get('max-width')).toBe('var(--w-setting-label-max)');
     expect(px('--w-setting-label-max')).toBe(320);
   });
 

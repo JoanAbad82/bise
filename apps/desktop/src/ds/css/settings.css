@@ -49,10 +49,11 @@
 .b-settings .b-gi>.l{flex:1 1 var(--w-setting-label)}
 .b-settings .b-gi>:not(.l){max-width:100%}
 .b-settings .b-gi>.v{overflow:hidden;text-overflow:ellipsis}
-/* a row with a picker (a role's model and efforts) is two columns: the label 240 to 320, the
-   control 16 after it, left-aligned, so a wide page gives the control room, not air between them */
-.b-settings .b-gi:has(.b-select){column-gap:var(--s-4)}
-.b-settings .b-gi:has(.b-select)>.l{max-width:var(--w-setting-label-max)}
+/* a row with a control (a picker, a switch, a button, a value) is two columns, one rule for the
+   page (designer m_48077, m_48146): the label 240 to 320, the control 16 after it, left-aligned, so
+   a wide page gives the control room, not air between them; a row of words alone keeps the width */
+.b-settings .b-gi:has(>.l+*){column-gap:var(--s-4)}
+.b-settings .b-gi:has(>.l+*)>.l{max-width:var(--w-setting-label-max)}
 .b-settings .b-gi .l span{font-size:var(--t-12);line-height:var(--s-4)}
 .b-settings .b-group.is-list .b-gi:first-child{border-radius:var(--r-menu) var(--r-menu) 0 0}
 .b-settings .b-group.is-list .b-gi:last-child{border-radius:0 0 var(--r-menu) var(--r-menu)}
