@@ -6,6 +6,7 @@
 // import empty, so they are read from disk), as composer/float/inset.test.ts.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { updatesShown } from './pages';
 
 const read = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const dsCss = read('../ds/css/settings.css');
@@ -67,5 +68,23 @@ describe('a settings page', () => {
     expect(page.get('margin')).toBe('0 auto');
     expect(px('--w-settings-page')).toBeGreaterThan(640);
     expect(px('--w-settings-page')).toBeLessThanOrEqual(960);
+  });
+});
+
+describe("a settings page's text edge (designer m_48227)", () => {
+  it('the lead, every help line and the sign-in line start 12 in, as the group heads and the labels', () => {
+    expect(rule(dsCss, '.b-settings .b-gt').get('padding')).toBe('0 var(--s-3) var(--s-2)');
+    expect(rule(dsCss, '.b-settings-lead').get('padding')).toBe('0 var(--s-3)');
+    expect(rule(dsCss, '.b-settings .b-help').get('padding')).toBe('0 var(--s-3)');
+    expect(rule(settingsCss, '.settings-signing').get('padding')).toBe('0 var(--s-3)');
+  });
+});
+
+describe("general's auto-update card", () => {
+  it("takes the 'Updates' head only when no update group above has it", () => {
+    expect(updatesShown({ appUpdate: null, dist: null })).toBe(false);
+    const info = { version: null, updated: null };
+    expect(updatesShown({ appUpdate: null, dist: { state: { state: 'none' }, info, readAt: 0 } })).toBe(false);
+    expect(updatesShown({ appUpdate: null, dist: { state: { state: 'none' }, info: { ...info, version: 'desktop-v2026.10.1' }, readAt: 0 } })).toBe(true);
   });
 });

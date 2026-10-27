@@ -14,7 +14,7 @@ import { Approvals } from './approvals';
 import { modelRow, needsSetup } from './hold';
 import { Projects } from './projects';
 import { UpdateGroup, updateRow } from './update';
-import { DistUpdateGroup } from './appupdate';
+import { DistUpdateGroup, distRow } from './appupdate';
 import { Computer } from './computer';
 import { capsOf, chromeCase, homeOf } from './chrome';
 import { checks, SetupCheck } from './check';
@@ -44,6 +44,14 @@ export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
  * one thing it does for each state. 'never' asks; 'asked' and 'off' only System Settings can change
  * (macOS asks once), so they open it; 'on' does nothing. null (no notify api, not known yet): no row. Pure.
  */
+/** Whether the general page shows an update group (UpdateGroup or DistUpdateGroup, each titled
+ * 'Updates'): when it doesn't, the auto-update card takes that head. Pure. */
+export function updatesShown(data: Pick<SettingsData, 'appUpdate' | 'dist'>): boolean {
+  if (updateRow(data.appUpdate ?? null, null) !== null) return true;
+  if (!data.dist) return false;
+  return distRow(data.dist.state, data.dist.info.version) !== null;
+}
+
 export function notifyRow(auth: NotifyAuth | null): { sub: string; act: 'ask' | 'open' | null; button: string } | null {
   switch (auth) {
     case null:
@@ -145,8 +153,13 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
             ports={ports.dist}
           />
         )}
-        {/* update-flow (Gabriel's pick, designer m_45087): bise's own updates, off by default */}
-        <Group testId="settings.general.bise" items={[tg('auto_update', settings.auto_update, settings.auto_update_sub, false)]} />
+        {/* update-flow (Gabriel's pick, designer m_45087): bise's own updates, off by default; it
+            takes the 'Updates' head when no update group above has it (designer m_48227) */}
+        <Group
+          title={updatesShown(data) ? undefined : settings.update_title}
+          testId="settings.general.bise"
+          items={[tg('auto_update', settings.auto_update, settings.auto_update_sub, false)]}
+        />
         </>
       );
     }
