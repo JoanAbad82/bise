@@ -38,7 +38,7 @@ import { composer } from '@/proto/words.gen';
 import { floatTarget, type FloatTo } from './target';
 import { floatNext, type FloatEvent, type FloatState } from './state';
 import { useFloatFit } from './useFit';
-import { useFloatNow } from './room';
+import { useFloatNow, useFloatX } from './room';
 import './float.css';
 
 const NOOP = (): void => undefined;
@@ -174,6 +174,8 @@ function Float({ to: def, about }: { to: FloatTo; about?: FloatAbout }) {
   // centred on the content's column, not the window (nm-side's one sideLayout, page native-mac §6);
   // on the panel in full width
   const floatLeft = useFloatLeft();
+  // its axis for what floats over the page's foot, centred on it (room.ts)
+  useFloatX(floatLeft);
   const listRef = useRef<ThreadListHandle | null>(null);
   return (
     // data-pick-anchor: the composer's / @ $ list floats from the whole glass, never over its head (ui-review m_44570)

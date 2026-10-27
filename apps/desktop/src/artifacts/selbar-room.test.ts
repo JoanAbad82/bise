@@ -57,11 +57,22 @@ describe("the selection bar and the undo toast over the floating composer's pill
   for (const sel of ['.art-selbar', '.art-toast']) {
     it(`${sel}'s bottom clears the pill's top, the float's 16 gap over it`, () => {
       const r = rule(foldersCss, sel);
-      expect(r.get('position')).toBe('absolute');
+      // fixed, as the float: its bottom and its axis are the window's, as the float's
+      expect(r.get('position')).toBe(float.get('position'));
       const bottom = px(r.get('bottom') ?? '');
       expect(bottom).toBeGreaterThanOrEqual(pillTop + px('var(--s-4)'));
       // and it follows the float's live height (composer/float/room.ts): focused, open or mid-fold
       expect(r.get('bottom')).toContain('var(--float-now');
+      // centred on the pill's axis, not the window's (designer m_48460: 148 px apart at 1400)
+      expect(r.get('left')).toMatch(/^var\(--float-x\b/u);
+      expect(r.get('transform')).toBe(float.get('transform'));
     });
   }
+
+  it("the bar's fill is solid (the tips'), so the cards under it never read through", () => {
+    // focused, the float is taller and the bar rises over the cards' title row (ui-review m_48454)
+    const bar = rule(foldersCss, '.art-selbar');
+    expect(bar.get('background')).toBe('var(--c-solid)');
+    expect(bar.get('border')).toBe('1px solid var(--c-line)');
+  });
 });
