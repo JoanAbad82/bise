@@ -6,6 +6,9 @@
 // list (AttachList) with the real stylesheets, read back with getComputedStyle (happy-dom lays
 // nothing out: the box is what the cascade gives it). Mutation: ds/css/composer.css's
 // `.box>.row` back to `.box .row` turns this red (height 40px, padding-bottom 4px).
+// The image row's 16 px thumbnail stays in the row's flow (ui-review m_46777: it sat 34 px up, over
+// row 1's number): its class was `th`, and artifacts/thumbs/thumbs.css's global `.th` puts a box
+// absolute, inset 0. Mutation: AttachList's `sg thumb` back to `sg th` turns it red (absolute).
 import { cleanup, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,7 +17,7 @@ import { ComposerFrame } from '@/ds';
 import type { Chip } from '../message';
 import { AttachList } from './AttachList';
 
-const css = ['../../ds/tokens.css', '../../ds/css/composer.css', '../../ds/css/controls.css', '../composer.css', '../../app/zen.css'];
+const css = ['../../ds/tokens.css', '../../ds/css/composer.css', '../../ds/css/controls.css', '../composer.css', '../../app/zen.css', '../../artifacts/thumbs/thumbs.css'];
 
 beforeAll(() => {
   const style = document.createElement('style');
@@ -23,7 +26,7 @@ beforeAll(() => {
 });
 afterEach(cleanup);
 
-const img: Chip = { kind: 'image', n: 1, path: '/Users/g/Desktop/logo.png', name: '[Image #1]', w: 1200, h: 630, bytes: 84_000 };
+const img: Chip = { kind: 'image', n: 1, path: '/Users/g/Desktop/logo.png', name: '[Image #1]', w: 1200, h: 630, bytes: 84_000, thumb: 'data:image/png;base64,iVBORw0KGgo=' };
 const file: Chip = { kind: 'file', n: 2, path: '/Users/g/Desktop/notes.txt', bytes: 2_900 };
 
 describe("an attachment row's ✕ in the composer's box", () => {
@@ -42,7 +45,17 @@ describe("an attachment row's ✕ in the composer's box", () => {
         .toEqual({ height: '24px', width: '24px', padding: '0px', radius: '6px', display: 'inline-flex' });
       expect(Number.parseFloat(x.height)).toBeLessThan(Number.parseFloat(row.height));
     }
+    // lit alone (the caret next to its chip, right after a drop) never shows the ✕: hover or focus
+    // only (designer m_46780). Mutation: composer.css's '.b-attach-row.lit .x' back turns it red.
+    expect(v.getByTestId('composer.attach.1').classList.contains('lit')).toBe(true);
+    expect(getComputedStyle(v.getByTestId('composer.attach.1.remove').parentElement as HTMLElement).visibility).toBe('hidden');
     // the composer's own bar keeps its 40 px row
     expect(getComputedStyle(v.getByTestId('composer.row')).height).toBe('40px');
+    // the image's thumbnail: a 16 px box in the row's flow, never placed over the list
+    const pic = v.getByTestId('composer.attach.1').querySelector('img');
+    expect(pic).not.toBeNull();
+    const t = getComputedStyle(pic as HTMLImageElement);
+    // (happy-dom gives '' for a position no rule sets: static)
+    expect({ position: t.position || 'static', width: t.width, height: t.height }).toEqual({ position: 'static', width: '16px', height: '16px' });
   });
 });

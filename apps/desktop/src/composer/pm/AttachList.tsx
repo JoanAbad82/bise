@@ -69,8 +69,8 @@ export function AttachList({ chips, lit, onLit, onRemove, onOpen, home, testId }
 
 /** The terminal's signs (❝ a quote, ▤ a paste, ▯ a file) or the 16 px thumbnail of an image or a file's icon. */
 function Sign({ c }: { c: Chip }): JSX.Element {
-  if (c.kind === "image" && c.thumb !== undefined) return <img className="sg th" src={c.thumb} alt="" draggable={false} />;
-  if (c.kind === "file" && c.icon !== undefined) return <img className="sg th" src={c.icon} alt="" draggable={false} />;
+  if (c.kind === "image" && c.thumb !== undefined) return <img className="sg thumb" src={c.thumb} alt="" draggable={false} />;
+  if (c.kind === "file" && c.icon !== undefined) return <img className="sg thumb" src={c.icon} alt="" draggable={false} />;
   const g = c.kind === "quote" || c.kind === "anchor" ? "❝" : c.kind === "paste" ? "▤" : c.kind === "image" ? "▣" : "▯";
   return <span className="sg" aria-hidden="true">{g}</span>;
 }

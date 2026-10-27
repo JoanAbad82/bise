@@ -253,7 +253,8 @@
   height: 16px;
   color: var(--c-text-2);
 }
-.b-composer .b-attach-row .sg.th {
+/* .thumb, never .th: artifacts/thumbs/thumbs.css's .th is global (absolute, inset 0) */
+.b-composer .b-attach-row .sg.thumb {
   border-radius: 3px;
   object-fit: cover;
 }
@@ -278,8 +279,10 @@
   margin-left: auto;
   visibility: hidden;
 }
-.b-composer .b-attach-row.lit .x,
-.b-composer .b-attach-row:hover .x {
+/* ✕ on the pointer's hover or the keyboard's focus only, never from 'lit' alone: the caret next to
+   its chip lights the row, the ✕ stays away (designer m_46780) */
+.b-composer .b-attach-row:hover .x,
+.b-composer .b-attach-row:focus-within .x {
   visibility: visible;
 }
 .b-composer-strip .k {
