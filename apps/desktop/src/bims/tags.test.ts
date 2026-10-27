@@ -146,4 +146,9 @@ describe('hoverCardAt: never over its bim (designer m_27920, m_47532)', () => {
     const at = must(placeTags([{ name: 'perf', x: c.x, y: c.y, w: card.w, h: card.h, pill: true, rank: 0 }], 292, 140).at.get('perf'));
     expect(at).toEqual({ left: CARD_CORNER, top: CARD_CORNER, lead: false });
   });
+  it('its head past the top (24x on a 300 tile: held at the edge, its feet unknown): the corner too (ui-review m_47648)', () => {
+    expect(hoverCardAt({ x: 146, y: 24, feet: 24, edge: 'up' }, card.w, card.h, 300)).toEqual({ x: CARD_CORNER + card.w / 2, y: CARD_CORNER + card.h });
+    // a bim off to a side keeps the card by its edge arrow
+    expect(hoverCardAt({ x: 4, y: 150, feet: 150, edge: 'left' }, card.w, card.h, 300)).toEqual({ x: 4, y: 150 });
+  });
 });

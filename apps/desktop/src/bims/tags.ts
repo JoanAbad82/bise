@@ -50,9 +50,11 @@ export const CARD_CORNER = 8;
  * Where the hover card goes, never over its bim (designer m_27920, m_47532): over its head (x, y:
  * the head's top, feet: its feet's), under its feet when it would leave the top, and in the
  * office's top-left corner, CARD_CORNER in, when the bim fills the office (a close zoom: neither
- * fits). The anchor placeTags takes (x its centre, y its bottom). Pure.
+ * fits, or its head is past the top: edge 'up', its body below in the view). The anchor placeTags
+ * takes (x its centre, y its bottom). Pure.
  */
-export function hoverCardAt(head: { readonly x: number; readonly y: number; readonly feet: number }, w: number, h: number, boxH: number): { readonly x: number; readonly y: number } {
+export function hoverCardAt(head: { readonly x: number; readonly y: number; readonly feet: number; readonly edge?: string }, w: number, h: number, boxH: number): { readonly x: number; readonly y: number } {
+  if (head.edge === 'up') return { x: CARD_CORNER + w / 2, y: CARD_CORNER + h };
   if (head.y - h >= TAG_INSET) return { x: head.x, y: head.y };
   const under = head.feet + CARD_GAP;
   if (boxH <= 0 || under + h <= boxH - TAG_INSET) return { x: head.x, y: under + h };

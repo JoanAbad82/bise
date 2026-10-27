@@ -570,8 +570,9 @@ export function Office({
       for (const [name, l] of shown) {
         const h = r.headOf(name);
         if (h !== null) heads.current.set(name, h);
-        else if (l.pill !== null && box !== null) {
-          // a '?' / '✗' whose bim is out of the frame stays at its nearest edge, an arrow towards it (bims m_28199)
+        else if ((l.pill !== null || l.mode === 'hover') && box !== null) {
+          // a '?' / '✗' whose bim is out of the frame stays at its nearest edge, an arrow towards it (bims m_28199);
+          // the hover card too, so its head past the top (a close zoom) sends it to the corner (tags.ts hoverCardAt)
           const s = r.spotOf(name);
           if (s === null) continue;
           const e = edgeOf(s.x, s.y, box.clientWidth, box.clientHeight, TAG_INSET);
