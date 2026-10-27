@@ -126,18 +126,36 @@ pub const SELECT_TAG: &str = "<script src=\"/kit/site-select.js\"></script>";
 /// still draws (art-viewer, architect m_25527).
 pub const STORAGE_TAG: &str = "<script src=\"/kit/storage.js\"></script>";
 
+/// The id of the inert JSON block that carries a site's kept localStorage
+/// (crate::artifacts_storage) to kit/storage.js, just before
+/// [`STORAGE_TAG`] (web-storage, architect m_46151).
+pub const SEED_ID: &str = "bise-storage";
+
+/// The seed block for `kept`: `<script type="application/json">`, never run,
+/// every `<` in it written `\u003c` so no value can close it. Empty when
+/// nothing is kept.
+pub fn seed_block(kept: &crate::artifacts_storage::Kept) -> String {
+    if kept.is_empty() {
+        return String::new();
+    }
+    let json = serde_json::to_string(kept).unwrap_or_else(|_| "{}".into()).replace('<', "\\u003c");
+    format!("<script type=\"application/json\" id=\"{SEED_ID}\">{json}</script>")
+}
+
 /// The one rule for what an html page of a copy gets (architect m_24172,
-/// m_25527): [`STORAGE_TAG`] always, before the page's own scripts (just
-/// inside its `<head>`, else its `<html>`, else after its doctype, else
-/// at its start); [`SELECT_TAG`] before its last `</body>` (or at its
-/// end) only on the `framed` path. The kept copy never changes; the rest
-/// of the bytes as they are.
-pub fn tagged(html: &[u8], framed: bool) -> Vec<u8> {
+/// m_25527, m_46151): [`seed_block`] of `kept` then [`STORAGE_TAG`] always,
+/// before the page's own scripts (just inside its `<head>`, else its
+/// `<html>`, else after its doctype, else at its start); [`SELECT_TAG`]
+/// before its last `</body>` (or at its end) only on the `framed` path.
+/// The kept copy never changes; the rest of the bytes as they are.
+pub fn tagged(html: &[u8], framed: bool, kept: &crate::artifacts_storage::Kept) -> Vec<u8> {
     let lower: Vec<u8> = html.iter().map(u8::to_ascii_lowercase).collect();
     let first = after_open(&lower, b"<head").or_else(|| after_open(&lower, b"<html")).or_else(|| after_open(&lower, b"<!doctype")).unwrap_or(0);
     let end = if framed { lower.windows(7).rposition(|w| w == b"</body>").unwrap_or(html.len()).max(first) } else { html.len() };
-    let mut out = Vec::with_capacity(html.len() + STORAGE_TAG.len() + SELECT_TAG.len());
+    let seed = seed_block(kept);
+    let mut out = Vec::with_capacity(html.len() + seed.len() + STORAGE_TAG.len() + SELECT_TAG.len());
     out.extend_from_slice(&html[..first]);
+    out.extend_from_slice(seed.as_bytes());
     out.extend_from_slice(STORAGE_TAG.as_bytes());
     out.extend_from_slice(&html[first..end]);
     if framed {
@@ -344,6 +362,7 @@ pub fn ctype(path: &str) -> Option<&'static str> {
 mod tests {
     use super::*;
     use crate::artifacts::Version as ArtVersion;
+    use crate::artifacts_storage::Kept;
     use crate::pages::store::Version;
 
     fn page(id: &str, at: u64) -> PageMeta {
@@ -471,7 +490,7 @@ mod tests {
         assert_eq!(framed(&["docs", "framed"]), (false, &["docs", "framed"][..]), "only at the start");
         // the last </body> (one in a script's string comes before it)
         let two = b"<script>'</body>'</script></body>";
-        assert!(String::from_utf8(tagged(two, true)).unwrap().ends_with(&format!("{SELECT_TAG}</body>")));
+        assert!(String::from_utf8(tagged(two, true, &Kept::new())).unwrap().ends_with(&format!("{SELECT_TAG}</body>")));
     }
 
     /// architect m_25527: the one table of what an html copy gets. The
@@ -492,7 +511,23 @@ mod tests {
             ("", true, format!("{s}{x}")),
         ];
         for (page, framed, want) in cases {
-            assert_eq!(String::from_utf8(tagged(page.as_bytes(), framed)).unwrap(), want, "{page} framed={framed}");
+            assert_eq!(String::from_utf8(tagged(page.as_bytes(), framed, &Kept::new())).unwrap(), want, "{page} framed={framed}");
         }
+    }
+
+    /// architect m_46151: a kept localStorage goes in as an inert JSON block
+    /// just before the storage tag; no value can close the block.
+    #[test]
+    fn a_kept_storage_goes_in_inert_before_the_storage_tag() {
+        let kept = Kept::from([("rent".to_string(), "</script><script>alert(1)</script>".to_string())]);
+        let out = String::from_utf8(tagged(b"<html><head><script>localStorage</script></head>", false, &kept)).unwrap();
+        let block = seed_block(&kept);
+        assert_eq!(out, format!("<html><head>{block}{STORAGE_TAG}<script>localStorage</script></head>"));
+        assert!(block.starts_with("<script type=\"application/json\" id=\"bise-storage\">"));
+        let inner = block.trim_start_matches(|c| c != '>').trim_start_matches('>').trim_end_matches("</script>");
+        assert!(!inner.contains('<'), "no '<' inside: {inner}");
+        let back: Kept = serde_json::from_str(inner).unwrap();
+        assert_eq!(back, kept, "the value round-trips");
+        assert_eq!(seed_block(&Kept::new()), "", "nothing kept, no block");
     }
 }

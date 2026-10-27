@@ -19,12 +19,15 @@
 //!   artifact ([`notes`]; the POSTs through [`post`], server.rs's `/api`
 //!   arm, after its token and origin checks);
 //! - `POST /api/a/<id>/save`: his edits in the xlsx grid, the file and its
-//!   next version ([`save`], decided and written by the hub).
+//!   next version ([`save`], decided and written by the hub);
+//! - `POST /api/a/<id>/storage`: a site's localStorage, kept for every
+//!   version ([`storage`], web-storage).
 
 pub mod events;
 pub mod live;
 pub mod notes;
 pub mod save;
+pub mod storage;
 pub mod view;
 
 use super::server::Response;
@@ -57,6 +60,7 @@ pub fn post(pages: &Pages, segs: &[&str], body: &[u8]) -> Option<Response> {
         ["api", "a", id, "notes"] if valid_id(id) => notes::post_notes(pages, id, body),
         ["api", "a", id, "send"] if valid_id(id) => notes::post_send(pages, id),
         ["api", "a", id, "save"] if valid_id(id) => save::post(pages, id, body),
+        ["api", "a", id, "storage"] if valid_id(id) => storage::post(pages, id, body),
         _ => return None,
     })
 }

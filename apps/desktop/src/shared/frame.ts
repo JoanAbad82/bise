@@ -16,4 +16,6 @@
 //   (PINCH_FORWARD; useFrameNote.ts)
 // - room: {room}, how far the zoomed page can still pan each way, null at fit, window -> frame
 //   (useFrameNote.ts; PINCH_FORWARD takes it only from its parent)
-export const FRAME_KINDS = { anchor: 'anchor', esc: 'esc', zoom: 'zoom', fit: 'fit', size: 'size', pinch: 'pinch', pan: 'pan', room: 'room' } as const;
+// - storage: {local}, a site copy's localStorage, site frame -> bise's viewer (kit/storage.js ->
+//   kit/office/site.js -> the hub; web-storage). The viewer takes it: the window never reads it.
+export const FRAME_KINDS = { anchor: 'anchor', esc: 'esc', zoom: 'zoom', fit: 'fit', size: 'size', pinch: 'pinch', pan: 'pan', room: 'room', storage: 'site-storage' } as const;

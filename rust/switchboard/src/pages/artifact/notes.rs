@@ -34,7 +34,7 @@ pub fn stream_key(id: &str) -> String {
     format!("a/{id}")
 }
 
-fn arts(pages: &Pages) -> crate::artifacts::Store {
+pub(crate) fn arts(pages: &Pages) -> crate::artifacts::Store {
     crate::artifacts::Store::new(pages.store.dir.parent().unwrap_or(&pages.store.dir))
 }
 

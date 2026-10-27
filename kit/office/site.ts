@@ -10,8 +10,12 @@
 // Pure helper (exported for office/sdk/test/viewer.test.ts): readSelect.
 
 import { foot } from "/kit/office/viewer.js";
+import { FRAME } from "/kit/office/frame.js";
 
 const MAX = 300;
+/** The most a site keeps (keys and values, in UTF-16 units: under the hub's 5 MB of bytes for
+ * ASCII; the hub checks its own bytes again, artifacts_storage::MAX_BYTES). */
+const MAX_STORAGE = 5 * 1024 * 1024;
 // the frame's script says hello on each page: none after this long, it was kept out
 const HELLO_MS = 4000;
 const W = { keptOut: "notes can't go on this site: its own rules block bise." };
@@ -23,6 +27,7 @@ type SiteMsg = {
   bise?: unknown; anchor?: { kind?: unknown; block?: unknown; quote?: unknown } | null; quote?: unknown;
   rect?: { x?: unknown; y?: unknown; w?: unknown; h?: unknown } | null; found?: unknown;
   key?: unknown; ctrlKey?: unknown; metaKey?: unknown; altKey?: unknown; isComposing?: unknown;
+  local?: unknown;
 };
 type Picked = { anchor: Anchor; quote: string; rect: AnchorRect | null };
 
@@ -35,6 +40,51 @@ export function readSelect(d: SiteMsg | null | undefined): Picked | null {
   const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && Math.abs(v) < 1e5;
   const rect = r && num(r.x) && num(r.y) && num(r.w) && num(r.h) ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
   return { anchor: { kind: "block", block: a.block, ...(quote ? { quote } : {}) }, quote: str(d!.quote) || quote, rect };
+}
+
+/** A `site-storage` message's map read again (kit/storage.js posts the site's whole
+ * localStorage): its string values only, null when it isn't an object or is over 5 MB. */
+export function readStorage(local: unknown): Record<string, string> | null {
+  if (!local || typeof local !== "object" || Array.isArray(local)) return null;
+  const out: Record<string, string> = {};
+  let size = 0;
+  for (const [k, v] of Object.entries(local)) {
+    if (typeof v !== "string") continue;
+    size += k.length + v.length;
+    if (size > MAX_STORAGE) return null;
+    out[k] = v;
+  }
+  return out;
+}
+
+/** The localStorage a message carries when it is a `site-storage` from `frame` (the site's frame
+ * this viewer made), read again; null for any other source, kind or shape. */
+export function storageOf(source: unknown, data: unknown, frame: unknown): Record<string, string> | null {
+  if (source === null || source !== frame || !data || typeof data !== "object") return null;
+  const d: SiteMsg = data;
+  return d.bise === FRAME.storage ? readStorage(d.local) : null;
+}
+
+/** What sends a site's localStorage to the hub (POST /api/a/<id>/storage, web-storage, architect
+ * m_46151): at most one request in flight, the newest map after it, never a stale one last.
+ * `send` does the request; returned: what takes each map the frame posted. */
+export function storageSender(send: (local: Record<string, string>) => Promise<unknown>) {
+  let next: Record<string, string> | null = null;
+  let busy = false;
+  const pump = () => {
+    if (busy || !next) return;
+    const local = next;
+    next = null;
+    busy = true;
+    void send(local).catch(() => {}).finally(() => {
+      busy = false;
+      pump();
+    });
+  };
+  return (local: Record<string, string>) => {
+    next = local;
+    pump();
+  };
 }
 
 export async function draw(root: HTMLElement, _bytes: Uint8Array | null, info: OfficeInfo) {
@@ -67,10 +117,23 @@ export async function draw(root: HTMLElement, _bytes: Uint8Array | null, info: O
     onFound: null,
   };
   const main = document.getElementById("bise-office");
+  const token = (document.querySelector<HTMLMetaElement>('meta[name="bise-token"]') || ({} as { content?: string })).content || "";
+  const keep = storageSender((local) =>
+    fetch(`/api/a/${encodeURIComponent(info.id)}/storage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Bise-Token": token },
+      body: JSON.stringify({ local }),
+      // the panel may close right after his last edit
+      keepalive: true,
+    }),
+  );
   window.addEventListener("message", (e) => {
     if (e.source !== frame.contentWindow || !e.data || typeof e.data !== "object") return;
     const d: SiteMsg = e.data;
-    if (d.bise === "site-hello") {
+    const local = storageOf(e.source, d, frame.contentWindow);
+    if (local) {
+      keep(local);
+    } else if (d.bise === "site-hello") {
       alive = true;
       // a new page of the site: its marks again
       if (lastMarks.length) frame.contentWindow!.postMessage({ bise: "site-marks", marks: lastMarks }, "*");

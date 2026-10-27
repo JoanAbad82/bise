@@ -258,9 +258,20 @@ notes: the page's notes system with an artifact as its target
 - Every html page of a copy, plain or framed, gets `kit/storage.js` first
   (`site::tagged`, architect m_25527): the sandbox's opaque origin makes
   `localStorage`/`sessionStorage` throw, so a page whose script read one at
-  its top level stopped before it drew; the shim gives an in-memory one, for
-  that load only. indexedDB and cookies still throw. The kept copy never
-  changes.
+  its top level stopped before it drew; the shim gives an in-memory one.
+  The kept copy never changes.
+- A site's localStorage is kept by the hub (web-storage, architect
+  m_46151): `<state>/artifacts/<id>/storage.json` (`artifacts_storage.rs`,
+  strings only, 5 MB at most), shared by every version like one origin.
+  Each html page of the copy comes with it as an inert
+  `<script type="application/json" id="bise-storage">` before
+  `kit/storage.js`, which reads it at load; each write posts the whole map
+  to bise's viewer (`site-storage`, kit/office/site.js), which sends it to
+  `POST /api/a/<id>/storage` (token, like the notes). So his edits come
+  back after a reload, a new panel, an app restart, in any browser that
+  opens the viewer. Not kept: a copy opened alone in a tab (no viewer:
+  its writes stay in memory for that load), sessionStorage (in memory, per
+  load); indexedDB and cookies still throw.
 - Not yet: the row's `detail` counts a page's open notes only; an
   artifact's open notes are not counted on its row.
 

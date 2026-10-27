@@ -398,7 +398,11 @@ fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     };
     let at = format!("a/{id}/{v}/{}", rest.join("/"));
     match std::fs::read(&path) {
-        Ok(body) if ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::tagged(&body, select), csp: super::site::ARTIFACT_CSP, location: None },
+        Ok(body) if ctype.starts_with("text/html") => {
+            // its kept localStorage, every version's (artifacts_storage, web-storage)
+            let kept = crate::artifacts_storage::read(&super::artifact::notes::arts(pages), id);
+            Response { status: 200, ctype, body: super::site::tagged(&body, select, &kept), csp: super::site::ARTIFACT_CSP, location: None }
+        }
         Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP, location: None },
         Err(_) => Response::missing(&format!("no such file: {at}")),
     }

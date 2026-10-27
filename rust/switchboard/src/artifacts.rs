@@ -17,6 +17,9 @@
 //! the library (`bise_home::library`) is [`resolve_folders`], for this
 //! hub's rows and another project's ([`rows_of`]).
 //!
+//! A site's localStorage, `<id>/storage.json`, is crate::artifacts_storage's
+//! (the page server writes it, under its lock).
+//!
 //! Plain functions over the state folder; the daemon's thread is the only
 //! writer, so there is no lock.
 
@@ -756,6 +759,12 @@ impl Store {
             t(b).cmp(&t(a)).then(a.id.cmp(&b.id))
         });
         out
+    }
+
+    /// `<state>/artifacts/<id>/storage.json`: a site's localStorage, every
+    /// version's (crate::artifacts_storage, its one writer).
+    pub fn storage_path(&self, id: &str) -> PathBuf {
+        self.dir().join(id).join("storage.json")
     }
 
     /// One artifact by id (`artifact:<id>`).

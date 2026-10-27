@@ -10,7 +10,11 @@
 //
 // Pure helper (exported for office/sdk/test/viewer.test.ts): readSelect.
 import { foot } from "/kit/office/viewer.js";
+import { FRAME } from "/kit/office/frame.js";
 const MAX = 300;
+/** The most a site keeps (keys and values, in UTF-16 units: under the hub's 5 MB of bytes for
+ * ASCII; the hub checks its own bytes again, artifacts_storage::MAX_BYTES). */
+const MAX_STORAGE = 5 * 1024 * 1024;
 // the frame's script says hello on each page: none after this long, it was kept out
 const HELLO_MS = 4000;
 const W = { keptOut: "notes can't go on this site: its own rules block bise." };
@@ -24,6 +28,53 @@ export function readSelect(d) {
     const num = (v) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) < 1e5;
     const rect = r && num(r.x) && num(r.y) && num(r.w) && num(r.h) ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
     return { anchor: { kind: "block", block: a.block, ...(quote ? { quote } : {}) }, quote: str(d.quote) || quote, rect };
+}
+/** A `site-storage` message's map read again (kit/storage.js posts the site's whole
+ * localStorage): its string values only, null when it isn't an object or is over 5 MB. */
+export function readStorage(local) {
+    if (!local || typeof local !== "object" || Array.isArray(local))
+        return null;
+    const out = {};
+    let size = 0;
+    for (const [k, v] of Object.entries(local)) {
+        if (typeof v !== "string")
+            continue;
+        size += k.length + v.length;
+        if (size > MAX_STORAGE)
+            return null;
+        out[k] = v;
+    }
+    return out;
+}
+/** The localStorage a message carries when it is a `site-storage` from `frame` (the site's frame
+ * this viewer made), read again; null for any other source, kind or shape. */
+export function storageOf(source, data, frame) {
+    if (source === null || source !== frame || !data || typeof data !== "object")
+        return null;
+    const d = data;
+    return d.bise === FRAME.storage ? readStorage(d.local) : null;
+}
+/** What sends a site's localStorage to the hub (POST /api/a/<id>/storage, web-storage, architect
+ * m_46151): at most one request in flight, the newest map after it, never a stale one last.
+ * `send` does the request; returned: what takes each map the frame posted. */
+export function storageSender(send) {
+    let next = null;
+    let busy = false;
+    const pump = () => {
+        if (busy || !next)
+            return;
+        const local = next;
+        next = null;
+        busy = true;
+        void send(local).catch(() => { }).finally(() => {
+            busy = false;
+            pump();
+        });
+    };
+    return (local) => {
+        next = local;
+        pump();
+    };
 }
 export async function draw(root, _bytes, info) {
     root.classList.add("office-site");
@@ -55,11 +106,23 @@ export async function draw(root, _bytes, info) {
         onFound: null,
     };
     const main = document.getElementById("bise-office");
+    const token = (document.querySelector('meta[name="bise-token"]') || {}).content || "";
+    const keep = storageSender((local) => fetch(`/api/a/${encodeURIComponent(info.id)}/storage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Bise-Token": token },
+        body: JSON.stringify({ local }),
+        // the panel may close right after his last edit
+        keepalive: true,
+    }));
     window.addEventListener("message", (e) => {
         if (e.source !== frame.contentWindow || !e.data || typeof e.data !== "object")
             return;
         const d = e.data;
-        if (d.bise === "site-hello") {
+        const local = storageOf(e.source, d, frame.contentWindow);
+        if (local) {
+            keep(local);
+        }
+        else if (d.bise === "site-hello") {
             alive = true;
             // a new page of the site: its marks again
             if (lastMarks.length)

@@ -190,7 +190,7 @@ test("image.js loads its zoom and the frame's kinds", async () => {
   const { boxPct } = await helpers("image.js");
   assert.equal(typeof boxPct, "function");
   const { FRAME } = await import(pathToFileURL(join(root, "kit", "office", "frame.js")).href);
-  assert.deepEqual(FRAME, { anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size", pinch: "pinch", pan: "pan", room: "room" });
+  assert.deepEqual(FRAME, { anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size", pinch: "pinch", pan: "pan", room: "room", storage: "site-storage" });
 });
 
 test("a site's selection is read again before it counts (architect m_24172)", async () => {
@@ -205,6 +205,33 @@ test("a site's selection is read again before it counts (architect m_24172)", as
   assert.equal(long.quote.length, 300);
   assert.equal(long.rect, null);
   assert.deepEqual(Object.keys(long.anchor).sort(), ["block", "kind", "quote"], "nothing else the site put in it");
+});
+
+test("a site's localStorage reaches the hub only from its own frame, read again (web-storage, architect m_46151)", async () => {
+  const { storageOf, storageSender } = await helpers("site.js");
+  const frame = { name: "the site's frame" };
+  const other = { name: "another frame" };
+  const msg = { bise: "site-storage", local: { budget: "{\"rent\":900}", n: 3 } };
+  assert.deepEqual(storageOf(frame, msg, frame), { budget: "{\"rent\":900}" }, "its strings only");
+  assert.equal(storageOf(other, msg, frame), null, "another frame's post is ignored");
+  assert.equal(storageOf(null, msg, null), null, "no frame: nothing");
+  assert.equal(storageOf(frame, { bise: "site-select", local: {} }, frame), null, "another kind");
+  assert.equal(storageOf(frame, { bise: "site-storage", local: ["x"] }, frame), null, "not a map");
+  assert.equal(storageOf(frame, { bise: "site-storage", local: { x: "y".repeat(5 * 1024 * 1024) } }, frame), null, "over 5 MB");
+  // one request at a time, the newest map last: a slow POST never lands after a newer one
+  const sent: Record<string, string>[] = [];
+  const done: (() => void)[] = [];
+  const keep = storageSender((local: Record<string, string>) => {
+    sent.push(local);
+    return new Promise<void>((r) => done.push(r));
+  });
+  keep({ v: "1" });
+  keep({ v: "2" });
+  keep({ v: "3" });
+  assert.deepEqual(sent, [{ v: "1" }], "one in flight");
+  done.shift()!();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(sent, [{ v: "1" }, { v: "3" }], "then the newest, the stale one skipped");
 });
 
 // pdf-notes: a pdf's notes (kit/notes-anchors.js's pdf, kit/office/pdf.js), architect m_24668

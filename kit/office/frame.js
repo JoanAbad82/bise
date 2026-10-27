@@ -17,4 +17,7 @@
 //   (PINCH_FORWARD; useFrameNote.ts)
 // - room: {room}, how far the zoomed page can still pan each way, null at fit, window -> frame
 //   (PINCH_FORWARD takes it only from window.parent)
-export const FRAME = Object.freeze({ anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size", pinch: "pinch", pan: "pan", room: "room" });
+// - storage: {local}, a site copy's whole localStorage after a write, site frame -> bise's viewer
+//   (kit/storage.js, which writes the kind as a literal; office/site.js sends it to the hub,
+//   web-storage, architect m_46151). Never reaches the window: the viewer takes it.
+export const FRAME = Object.freeze({ anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size", pinch: "pinch", pan: "pan", room: "room", storage: "site-storage" });

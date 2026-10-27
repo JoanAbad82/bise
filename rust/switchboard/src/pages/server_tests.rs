@@ -535,3 +535,49 @@ fn a_video_copy_is_served_by_its_byte_ranges() {
     assert!(h.starts_with("HTTP/1.1 403 "), "another Host: refused as any route: {h}");
     let _ = std::fs::remove_dir_all(d);
 }
+
+/// web-storage (architect m_46151): a site's localStorage, kept by the
+/// hub. The viewer POSTs it with the token (none: 403); each html page of
+/// the copy, plain or framed, any version, comes seeded with it; a '</script'
+/// value can't close the seed; non-strings dropped; over 5 MB refused.
+#[test]
+fn a_sites_storage_is_kept_by_the_hub_and_seeds_every_version() {
+    let (p, d) = pages();
+    let work = d.join("work");
+    std::fs::create_dir_all(&work).unwrap();
+    std::fs::write(work.join("budget.html"), b"<html><head><script>localStorage</script></head><body>v1</body></html>").unwrap();
+    let arts = crate::artifacts::Store::new(&d);
+    let add = |at: u64| {
+        let a = crate::artifacts::Add { target: "budget.html".into(), title: Some("budget".into()), agent: "main".into(), by: "main".into(), cwd: work.to_string_lossy().to_string(), ..Default::default() };
+        arts.add(&a, at).unwrap()
+    };
+    add(10);
+    let (tok, o) = (p.token.clone(), "http://127.0.0.1:47123");
+    let seed = |path: &str| {
+        let t = text(&get(&p, path));
+        let open = format!("<script type=\"application/json\" id=\"{}\">", super::super::site::SEED_ID);
+        t.split_once(open.as_str()).map(|(_, rest)| {
+            let (json, _) = rest.split_once("</script>").unwrap();
+            assert!(rest.contains(super::super::site::STORAGE_TAG), "the shim right after: {t}");
+            serde_json::from_str::<Value>(json).unwrap()
+        })
+    };
+    assert_eq!(seed("/a/budget/1/budget.html"), None, "nothing kept: no seed");
+    let local = json!({"rent": "</script><script>alert(1)</script>", "n": 3});
+    assert_eq!(post(&p, "/api/a/budget/storage", None, Some(o), json!({ "local": local })).status, 403, "no token");
+    assert_eq!(post(&p, "/api/a/nope/storage", Some(&tok), Some(o), json!({ "local": {} })).status, 404);
+    assert_eq!(post(&p, "/api/a/budget/storage", Some(&tok), Some(o), json!({ "local": "x" })).status, 400);
+    let r = post(&p, "/api/a/budget/storage", Some(&tok), Some(o), json!({ "local": local }));
+    assert_eq!(r.status, 200, "{}", text(&r));
+    let want = json!({"rent": "</script><script>alert(1)</script>"});
+    assert_eq!(seed("/a/budget/1/budget.html"), Some(want.clone()), "the plain copy, non-strings dropped");
+    assert_eq!(seed("/a/budget/1/framed/budget.html"), Some(want.clone()), "framed");
+    // a new version: the same storage, like one origin
+    std::fs::write(work.join("budget.html"), b"<html><head></head><body>v2</body></html>").unwrap();
+    assert_eq!(add(20).meta.current().unwrap().v, 2);
+    assert_eq!(seed("/a/budget/2/framed/budget.html"), Some(want.clone()), "v2 shares it");
+    let big = json!({ "local": {"x": "y".repeat(crate::artifacts_storage::MAX_BYTES + 1)} });
+    assert_eq!(post(&p, "/api/a/budget/storage", Some(&tok), Some(o), big).status, 413, "over 5 MB");
+    assert_eq!(seed("/a/budget/2/budget.html"), Some(want), "kept as it was");
+    let _ = std::fs::remove_dir_all(d);
+}
