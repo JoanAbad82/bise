@@ -104,6 +104,26 @@ def main():
             h = open(base + ".holder").read()
             check(h.startswith("pid ") and app in h, "free: holder %s %r" % (base, h))
 
+        # a world that does not build (no shape.json in this HOME, ahd-rows: 95143c0dabcd's quick run
+        # went on, opened an empty home's first run and read as 18 app reds): exit 2 with the reason,
+        # before any fake provider or app. The stand-in has a main and its own bundle id, never opened.
+        built = os.path.join(t, "built cand.app")
+        os.makedirs(os.path.join(built, "Contents", "MacOS"))
+        exe = os.path.join(built, "Contents", "MacOS", "bise cand")
+        with open(exe, "w") as f:
+            print("#!/bin/sh", "exit 0", sep=os.linesep, file=f)
+        os.chmod(exe, 0o755)
+        with open(os.path.join(built, "Contents", "Info.plist"), "w") as f:
+            print('<?xml version="1.0" encoding="UTF-8"?>', '<plist version="1.0"><dict>'
+                  '<key>CFBundleExecutable</key><string>bise cand</string>'
+                  '<key>CFBundleIdentifier</key><string>dev.bise.test.cand-lock</string></dict></plist>', sep=os.linesep, file=f)
+        r = subprocess.run(["bash", CAND, os.path.join(t, "out-build"), built], env=dict(env, AS_HE_DOES_PYTHON=sys.executable),
+                           capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        o = r.stdout + r.stderr
+        check(r.returncode == 2 and "the world did not build" in o and "realshape.py snapshot" in o and "fake provider" not in o
+              and "open:" not in o and not os.path.exists(os.path.join(world, "fake", "fake.pid")),
+              "no shape.json: stops before the app: %s %s" % (r.returncode, o))
+
         # two runs on one candidate: the 2nd refused, naming the 1st's pid and how to stop it (by pid)
         p = start(app, 30)
         pid = inner_pid()

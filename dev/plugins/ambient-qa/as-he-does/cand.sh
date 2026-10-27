@@ -267,11 +267,20 @@ T0=$(date +%s)
 rm -f $O/BREACH $O/stop $O/pids.txt $O/hubs-steps.jsonl $O/hubs-outside.txt $O/smoke.json $O/smoke-verdict.json
 say "his app before: $(hispids)" | tee $O/his.txt
 $RS libsnap --out $O/before.json
+# a world that did not build stops the run (ahd-rows): 95143c0dabcd's quick run went on with no
+# shape.json, the candidate opened on an empty home's first run ('hi. i'm bise.') and every row from
+# 'sidebar' on read as 18 app reds. Nothing is started yet: exit 2 with the reason, no gate to stop.
 if [ -n "$SMOKE" ]; then
-  $RS smoke-world --root $G/w | tail -8
+  $RS smoke-world --root $G/w > $O/world-build.log 2>&1; wrc=$?
 else
   # rebuilt at every run's start (emptied first): a killed run's leftovers never reach the next
-  $RS build --root $G/w | tail -8
+  $RS build --root $G/w > $O/world-build.log 2>&1; wrc=$?
+fi
+tail -8 $O/world-build.log
+if [ $wrc != 0 ]; then
+  say "the world did not build (rc $wrc, $O/world-build.log): no candidate opened, no row run"
+  [ -n "$SMOKE" ] || [ -f "$HOME/.bise/gate/real-shape/shape.json" ] || say "no ~/.bise/gate/real-shape/shape.json: make it once with '$P $HERE/../realshape.py snapshot' (reads his state read-only)"
+  exit 2
 fi
 # every model request in a line (the quote row reads it), in the world, never /tmp's default
 export FAKE_LOG=$G/fake/requests.jsonl AS_HE_DOES_FAKE_LOG=$G/fake/requests.jsonl
