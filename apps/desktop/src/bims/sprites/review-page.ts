@@ -7,7 +7,7 @@
 // or far from the bim, two faces in one plane (z-fight), hair through the headwear, the skull, the
 // eyes or the torso (hair.testkit), arms through the torso (outfits.testkit). Contact sheets put the
 // rows side by side with their findings. Studios only, never the app. Owner: bim-review.
-import { Box3, Group, Mesh, type Object3D, Vector3 } from 'three';
+import { Box3, Group, Material, Mesh, type Object3D, Vector3 } from 'three';
 import { type Bim, makeBim } from '../render/bim';
 import { RIGHT, UP, type Fit } from '../render/camera';
 import { coplanarClashes } from '../render/coplanar';
@@ -213,12 +213,13 @@ function visibleIn(o: Object3D, root: Object3D): boolean {
 
 /** names each unnamed mesh by its part (the nearest named group), its shape and its colour: the findings read them */
 function labelMeshes(root: Object3D): void {
-  root.traverse((o) => {
-    if (!(o instanceof Mesh) || o.name) return;
+  root.traverse((x) => {
+    if (!(x instanceof Mesh) || x.name) return;
+    const o = x as Mesh;
     let part = '';
     for (let p: Object3D | null = o.parent; p && !part; p = p.parent) part = p.name;
     const geo = o.geometry.type.replace('Geometry', '').replace('Buffer', '') || 'mesh';
-    const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+    const mat: Material | undefined = Array.isArray(o.material) ? o.material[0] : o.material;
     const col = mat && 'color' in mat ? `#${(mat as { color: { getHexString(): string } }).color.getHexString()}` : '';
     const tag = o.userData.hair === true ? 'hair ' : o.userData.worn === true ? 'worn ' : '';
     o.name = `${part || 'bim'}/${tag}${geo}${col}`;
@@ -250,10 +251,10 @@ export function checkRow(r: Row): Issue[] {
     if (!(o instanceof Mesh) || !visibleIn(o, bim.group)) return;
     const m = o as Mesh;
     if (m.matrixWorld.elements.some((x) => !Number.isFinite(x))) nan++;
-    const mat = m.material;
-    if (!mat || (Array.isArray(mat) && (mat.length === 0 || mat.some((x) => !x)))) noMat++;
+    const mats: readonly unknown[] = Array.isArray(m.material) ? m.material : [m.material];
+    if (mats.length === 0 || mats.some((x) => !(x instanceof Material))) noMat++;
+    if (!m.geometry.hasAttribute('position')) return;
     const pos = m.geometry.getAttribute('position');
-    if (!pos) return;
     let far = 0;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);

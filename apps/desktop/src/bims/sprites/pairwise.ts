@@ -32,7 +32,9 @@ function rng(seed: number): () => number {
   };
 }
 
-const key = (i: number, a: string, j: number, b: string): string => `${String(i)}\u0001${a}\u0002${String(j)}\u0001${b}`;
+/** a pair's key: `i¦a§j¦b` (no value holds ¦ or §) */
+const key = (i: number, a: string, j: number, b: string): string => `${String(i)}¦${a}§${String(j)}¦${b}`;
+const SPLIT = /[¦§]/;
 
 /** every pair two dimensions' values make that a valid row may hold, as keys */
 function pairsOf(dims: readonly Dim[], valid: Valid): Set<string> {
@@ -79,7 +81,7 @@ export function pairwise(dims: readonly Dim[], valid: Valid, seed = 1): Pairwise
   const index = new Map(dims.map((d, i) => [d.name, i]));
   while (left.size > 0) {
     const first = left.values().next().value as string;
-    const [ia, a, ib, b] = first.split(/[\u0001\u0002]/) as [string, string, string, string];
+    const [ia, a, ib, b] = first.split(SPLIT) as [string, string, string, string];
     const di = dims[Number(ia)] as Dim;
     const dj = dims[Number(ib)] as Dim;
     const row: Record<string, string> = { [di.name]: a, [dj.name]: b };
@@ -130,7 +132,7 @@ export function missingPairs(dims: readonly Dim[], valid: Valid, rows: readonly 
   const skip = new Set(unreachable);
   const out: string[] = [];
   for (const p of want) {
-    const [ia, a, ib, b] = p.split(/[\u0001\u0002]/) as [string, string, string, string];
+    const [ia, a, ib, b] = p.split(SPLIT) as [string, string, string, string];
     const s = `${(dims[Number(ia)] as Dim).name}=${a} & ${(dims[Number(ib)] as Dim).name}=${b}`;
     if (!skip.has(s)) out.push(s);
   }
@@ -139,16 +141,15 @@ export function missingPairs(dims: readonly Dim[], valid: Valid, rows: readonly 
 
 /** the full product's valid rows, one by one (the background sweep walks it in shards) */
 export function* product(dims: readonly Dim[], valid: Valid): Generator<Row> {
-  const walk = function* (i: number, row: Record<string, string>): Generator<Row> {
+  const walk = function* (i: number, row: Row): Generator<Row> {
     if (i === dims.length) {
-      yield { ...row };
+      yield row;
       return;
     }
     const d = dims[i] as Dim;
     for (const v of d.values) {
-      row[d.name] = v;
-      if (valid(row)) yield* walk(i + 1, row);
-      delete row[d.name];
+      const next = { ...row, [d.name]: v };
+      if (valid(next)) yield* walk(i + 1, next);
     }
   };
   yield* walk(0, {});

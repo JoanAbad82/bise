@@ -56,9 +56,7 @@ try {
   await page.waitForFunction(() => 'review' in globalThis, null, { timeout: 120_000 }).catch(() => {
     throw new Error(`the review page did not load: ${errors.join('; ')}`);
   });
-  const R = (): Review => (globalThis as unknown as { review: Review }).review;
   const all = await page.evaluate((s) => (globalThis as unknown as { review: Review }).review.rows(s), seed);
-  void R;
   let rows = given ? (JSON.parse(readFileSync(given, 'utf8')) as Row[]) : all.rows;
   if (only) rows = rows.filter((r) => Object.values(r).join('|').includes(only));
   if (limit > 0) rows = rows.slice(0, limit);
