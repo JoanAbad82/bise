@@ -113,14 +113,16 @@ export interface ArtNameProps {
   state?: "hover";
   onClick?: () => void;
   testId?: string;
+  /** punctuation follows it (':', ',', '.'...): no right side, the mark hugs the name as after any word (designer m_47295) */
+  tight?: boolean;
 }
 /**
  * An artifact's name inside a line of text (an answer, a note, an inbox line; desktop-agents-bar
  * §5): the chip's highlight inline, 4 px sides, wrapping with its words; a link when it opens.
  */
-export function ArtName({ children, state, onClick, testId }: ArtNameProps) {
+export function ArtName({ children, state, onClick, testId, tight }: ArtNameProps) {
   return (
-    <span className={cx("b-artname", state === "hover" && "is-hover")} role={onClick ? "link" : undefined} tabIndex={onClick ? 0 : undefined}
+    <span className={cx("b-artname", state === "hover" && "is-hover", tight === true && "tight")} role={onClick ? "link" : undefined} tabIndex={onClick ? 0 : undefined}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onClick(); } } : undefined}
       data-testid={testId}>

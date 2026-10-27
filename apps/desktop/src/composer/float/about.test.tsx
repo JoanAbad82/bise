@@ -16,13 +16,13 @@ import { panelState } from '@/app/panel/state';
 import { aboutText } from '@/thread/about';
 import { FloatHost } from './Host';
 
-/** what the field was given last: its placeholder, its pink, and its send */
-let field: { placeholder?: string; answering?: boolean; onSend?: (out: { text: string }) => void } = {};
+/** what the field was given last: its placeholder, its pink, its notice line and its send */
+let field: { placeholder?: string; answering?: boolean; line?: unknown; onSend?: (out: { text: string }) => void } = {};
 
 vi.mock('@/composer', () => ({
   // the field is the composer's own (its tests); here a stand-in that keeps its props
-  Composer: (p: { placeholder?: string; answering?: boolean; onSend?: (out: { text: string }) => void; testId?: string }) => {
-    Object.assign(field, { placeholder: p.placeholder, answering: p.answering, onSend: p.onSend });
+  Composer: (p: { placeholder?: string; answering?: boolean; line?: unknown; onSend?: (out: { text: string }) => void; testId?: string }) => {
+    Object.assign(field, { placeholder: p.placeholder, answering: p.answering, line: p.line, onSend: p.onSend });
     return <div data-testid={p.testId} />;
   },
   useComposerSources: () => ({ agents: [], skills: [], commands: [], files: () => Promise.resolve([]), saveImage: () => Promise.resolve(null) }),
@@ -61,7 +61,7 @@ function mount(archived = false) {
       </RouterContext>
     </StoreProvider>,
   );
-  return { ...v, sent };
+  return { ...v, sent, store };
 }
 
 const send = (text: string) => {
@@ -87,5 +87,17 @@ describe('the float over an artifact in front of the full-width panel', () => {
     expect(field.answering).toBeFalsy();
     send('who made this?');
     expect(v.sent).toContainEqual(expect.objectContaining({ project: P, agent: 'main', text: aboutText(PAGE, 'who made this?') }));
+  });
+
+  it("the hub's plain line (a flow hint) stays the thread's: not on the float over an artifact; a refusal still shows (designer m_47289)", () => {
+    const v = mount();
+    act(() => {
+      v.store.apply({ ev: 'notice', project: P, text: 'flow: lands on main · straight to main, tested commits' });
+    });
+    expect(field.line ?? null).toBeNull();
+    act(() => {
+      v.store.apply({ ev: 'error', project: P, cmd: 'slash', text: 'no such command' });
+    });
+    expect(field.line).toEqual(expect.objectContaining({ level: 'err' }));
   });
 });

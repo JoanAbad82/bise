@@ -242,7 +242,8 @@ function Float({ to: def, about }: { to: FloatTo; about?: FloatAbout }) {
         onEscape={onEscape}
         onReady={NOOP}
         onSent={onSent}
-        hubNotes
+        // the hub's plain line (a flow hint) is the thread's: never on the float over an artifact (designer m_47289)
+        hubNotes={about === undefined}
         floating
       />
     </div>

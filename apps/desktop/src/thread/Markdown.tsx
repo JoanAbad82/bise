@@ -36,6 +36,12 @@ export function keptUrl(url: string): string {
   return artifactOf(url) === undefined ? defaultUrlTransform(url) : url;
 }
 
+/** Punctuation right after a link in the source (`text` at `end`): an artifact chip's mark hugs it
+ *  as after any word (designer m_47295). Pure. */
+export function punctAfter(text: string, end: number | undefined): boolean {
+  return end !== undefined && /^[:,.;?!)…]/u.test(text.slice(end));
+}
+
 const plugins = [remarkGfm];
 
 /** The bits of an mdast node the breaks plugin reads. */
@@ -168,11 +174,12 @@ export const Markdown = memo(function Markdown({
         </code>
       );
     },
-    a({ href, children }) {
+    a({ href, children, node }) {
       const art = artifactOf(href);
       if (art !== undefined) {
         return (
           <ArtName
+            tight={punctAfter(text, node?.position?.end.offset)}
             onClick={
               onArtifact === undefined
                 ? undefined

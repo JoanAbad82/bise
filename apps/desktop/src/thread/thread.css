@@ -861,6 +861,10 @@ button.th-turn-line:focus-visible {
   font: 500 var(--f-ui);
   vertical-align: baseline;
 }
+/* punctuation right after it ('about [chip]: …'): the mark hugs the name (designer m_47295) */
+.th-screen .b-artname.tight {
+  padding-right: 0;
+}
 /* the bar's title, renamed in place (the menu's Rename, Rename.tsx): the title's own font */
 .th-rename {
   width: calc(var(--s-16) * 3);

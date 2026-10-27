@@ -74,11 +74,13 @@
 .cmp-float:has(> .art-give) > :not(.art-give) {
   opacity: 0.2;
 }
-/* 'to bise ⌄': the ds PickerTrigger's chip in the head's 13/500 */
+/* 'to bise ⌄': the ds PickerTrigger's chip, text-2 at 400 as the docked strip's 'to bise'
+   (composer-target's rule: main never stands out, designer m_47289) */
 .cmp-float .hd .cmp-float-to {
   min-width: 0;
   font: inherit;
-  color: inherit;
+  font-weight: 400;
+  color: var(--c-text-2);
 }
 /* 'to perf ⌄': his words go to an agent that is not main, in the accent (his ask m_44704) */
 .cmp-float .hd .cmp-float-to.other {
@@ -194,11 +196,18 @@
 .cmp-float .b-composer .box {
   flex-wrap: wrap;
 }
+/* border-box: its 100% holds its padding, so a notice cuts with its '…' inside it, never past the
+   box's right edge (designer m_47289) */
 .cmp-float .b-composer .box > .head {
   order: -1;
   flex: 1 0 100%;
+  box-sizing: border-box;
   min-width: 0;
   padding: var(--s-2) var(--s-2) 0;
+}
+/* the notice from its start, its words right after the mark, never a lone '·' out in the row */
+.cmp-float .b-composer .box > .head > .notice {
+  justify-content: flex-start;
 }
 .cmp-float[data-state='rest'] .b-composer .box > .head {
   display: none;

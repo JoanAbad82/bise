@@ -82,6 +82,7 @@ button.b-chip:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
 .b-artchip-meta{flex:none;color:color-mix(in srgb,var(--c-accent) 70%,transparent);font-size:var(--t-12)}
 .b-artchip-open{flex:none;color:var(--c-text-3);font-size:var(--t-11)}
 .b-artname{padding:0 var(--s-1);border-radius:var(--r-1);background:color-mix(in srgb,var(--c-accent) 10%,transparent);color:var(--c-accent);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.b-artname.tight{padding-right:0}
 .b-artchip:focus-visible,.b-artname:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
 /* kind 'part': a part of his message under its words (designer m_17969): the artifact chip's look,
    1 px line, r 9, text-2, never the accent; an image's words in ink beside its 16 px thumb */
