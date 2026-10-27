@@ -294,6 +294,29 @@ if [ "$mode" = seed-path ]; then
   from="$(seed_from)"; [ -n "$from" ] || exit 1
   echo "$from"; exit 0
 fi
+if [ "$mode" = seed ]; then
+  # bise.toml [worktree] setup: a new task worktree's rust/target starts as an
+  # APFS clone of the warm seed (~3 s, 0 bytes) before any cargo runs there.
+  # side-resize's first bare 'cargo test' made a cold 6 GB rust/target that
+  # its quick gate then built on for 21 min (main m_48101; architect m_48124:
+  # the repo's hook, not the hub). The hub runs setup inside worktree_create,
+  # which daemon/place_work.rs calls off the hub's loop (hub-loop 3a): a slow
+  # clone holds only that placement. A failed setup fails the spawn
+  # (worktree.rs prepare returns Err), so this never fails: no seed, a clone
+  # that fails, a target already there, CARGO_TARGET_DIR set: a line, exit 0.
+  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo "$(dirname "$0")/..")" || exit 0
+  t=rust/target
+  if [ -n "${CARGO_TARGET_DIR:-}" ] || [ -e "$t" ] || [ ! -d rust ]; then
+    echo "seed: nothing to do (${CARGO_TARGET_DIR:+CARGO_TARGET_DIR set}${CARGO_TARGET_DIR:-$t there or no rust/})"; exit 0
+  fi
+  from="$(seed_from 2>/dev/null)"
+  if [ -n "$from" ] && cp -cR "$from" "$t.tmp" 2>/dev/null && mv "$t.tmp" "$t"; then
+    echo "seed: $t, a clone of the warm seed $(basename "$from")"
+  else
+    rm -rf "$t.tmp"; echo "seed: no warm seed to clone in $(seeds_dir): the first cargo here builds cold"
+  fi
+  exit 0
+fi
 if [ "$mode" = new ] || [ "$mode" = done ]; then
   # BISE-230: a task's folder <home>/worktrees/<project-id>/<name>/, like
   # the hub's own task worktrees: the worktree (<repo>/), its cargo target
@@ -425,6 +448,46 @@ if [ "$mode" = light ]; then
 fi
 [ "$mode" = stop ] && { gate_stop "$(cd "$(dirname "$0")/.." && pwd)"; exit 0; }
 case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|light|new [name]|done [name]|wait <file|pid>|stop]" >&2; exit 2 ;; esac
+# ---- every gate of an agent goes through heavy-run's queue, one gate a tree
+# (main m_48101: at 21:55 his Mac sat at load 93/12 on battery; side-resize's
+# and esc-sheet's quick gates ran tests/gate.sh by hand, outside heavy-run,
+# cold cargo and vitest with no slot, no load hold, no disk reserve, and
+# esc-sheet's tree ran two gates at once). Not for a gate under a live gate
+# (a test's), nor a land check (the hub's land queue runs those one by one).
+gate_self="$(cd "$(dirname "$0")" && pwd)/gate.sh"
+gate_outer=""
+[ -n "${BISE_GATE_RUN:-}" ] && [ "$BISE_GATE_RUN" != $$ ] && [ -n "${BISE_GATE_START:-}" ] \
+  && [ "$(proc_start "$BISE_GATE_RUN")" = "$BISE_GATE_START" ] && gate_outer=1
+if [ "$mode" != land ] && [ -z "$gate_outer" ] && [ -z "${GATE_NO_HEAVY:-}" ]; then
+  # one gate a tree: a second one in the same tree refuses at once, naming the
+  # first (it would build and test the same files twice at once)
+  gate_tree="$(cd "$(dirname "$0")/.." && pwd -P)"
+  if [ "${GATE_TREE_LOCKED:-}" != "$gate_tree" ]; then
+    gl="${BISE_HOME:-$HOME/.bise}/gate/locks"; mkdir -p "$gl" 2>/dev/null
+    tl="$gl/tree-$(printf %s "$gate_tree" | shasum | cut -c1-16).lock"
+    # -k: the file stays (one inode for every taker; without it a release
+    # deletes it and two gates can each lock their own new file). One take,
+    # -t 0: a mark the run writes tells lockf's own 75 (taken) from the gate's
+    # rc (architect m_48124: a probe, then a second take, raced)
+    mk="$tl.started.$$"; rm -f "$mk"
+    /usr/bin/lockf -k -t 0 "$tl" /bin/bash -c ': >"$2"; echo "pid $$ $3 since $(date "+%F %T")" >"$1.holder"; shift 3; export GATE_TREE_LOCKED="$1"; shift; exec /bin/bash "$@"' \
+      _ "$tl" "$mk" "$mode" "$gate_tree" "$gate_self" "$@" 2>/dev/null
+    rc=$?
+    if [ ! -e "$mk" ]; then
+      echo "gate: a gate already runs in this tree ($(cat "$tl.holder" 2>/dev/null || echo "$gate_tree")): wait for it (tests/gate.sh wait) or stop it (tests/gate.sh stop), then run again"
+      echo "GATE $mode FAILED: one gate a tree"; exit 1
+    fi
+    rm -f "$mk"
+    exit $rc
+  fi
+  # the queue: heavy-run gives the slot, holds it while the Mac is busy and on
+  # a low battery, reserves the disk; a docs-only quick runs at once (its light lane)
+  hr="${GATE_HEAVY_RUN:-$HOME/.bise/run/heavy-run}"
+  if [ -z "${HEAVY_SLOT:-}" ] && [ -x "$hr" ]; then
+    echo "gate: $mode goes through heavy-run's queue ($hr; GATE_NO_HEAVY=1 skips it)"
+    exec "$hr" "$gate_self" "$@"
+  fi
+fi
 cd "$(dirname "$0")/.."
 root="$PWD"
 # a linked worktree has a .git file (the shared checkout a directory); a
@@ -750,7 +813,9 @@ desktop_check() {
   elif (cd "$root/apps/desktop" && pnpm -s check) >"$log" 2>&1; then echo "ok   desktop_check ($((SECONDS - s))s)"; return 0; fi
   echo "FAIL desktop_check"
   grep -E "error|Error|FAIL|✗|×" "$log" | head -30
-  cp "$log" "$gdir/sb-gate-desktop_check.log"; echo "log: $gdir/sb-gate-desktop_check.log"
+  # one name a tree's gate (the agent's), never shared: side-resize's red overwrote
+  # fast-loop's under the one name (2026-10-27 22:31)
+  cp "$log" "$gdir/sb-gate-desktop_check-${SB_AGENT:-$$}.log"; echo "log: $gdir/sb-gate-desktop_check-${SB_AGENT:-$$}.log"
   return 1
 }
 # ---- land (docs/issues/28): `gate.sh land <base> <head>`, run by `sb land`
@@ -942,6 +1007,7 @@ python3 -B "$root/tests/desktop_pick_test.py" >/dev/null || { python3 -B "$root/
 # every build that ships a runtime checks it is whole for the viewer (the xlsx grid; xlsx-fix)
 python3 -B "$root/tests/gate_sweep_test.py" >/dev/null || { python3 -B "$root/tests/gate_sweep_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/keep_logs_test.py" >/dev/null || { python3 -B "$root/tests/keep_logs_test.py"; echo "GATE quick FAILED"; exit 1; }
+python3 -B "$root/tests/gate_queue_test.py" >/dev/null || { python3 -B "$root/tests/gate_queue_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/runtime_check_test.py" >/dev/null || { python3 -B "$root/tests/runtime_check_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 if [ -d "$root/apps/desktop" ]; then
@@ -962,11 +1028,11 @@ mkdir -p "$cache"
 fail() {  # <name> <log>: the failures, the log kept
   # the tests' sb-core gone: that line alone, not every test it failed
   if sbcore_gone "${SB_CORE_BIN:-}"; then
-    cp "$2" "$gdir/sb-gate-$1.log"; echo "log of $1: $gdir/sb-gate-$1.log"; exit 1
+    cp "$2" "$gdir/sb-gate-$1-${SB_AGENT:-$$}.log"; echo "log of $1: $gdir/sb-gate-$1-${SB_AGENT:-$$}.log"; exit 1
   fi
   echo "FAIL $1"
   grep -E "^test .* FAILED|panicked|^error|^warning|^failures:|^Location|^Error" "$2" | head -30
-  cp "$2" "$gdir/sb-gate-$1.log"; echo "log: $gdir/sb-gate-$1.log"; exit 1
+  cp "$2" "$gdir/sb-gate-$1-${SB_AGENT:-$$}.log"; echo "log: $gdir/sb-gate-$1-${SB_AGENT:-$$}.log"; exit 1
 }
 hash_of() {  # <dirs/files...>: one hash of the .bend files' names and contents
   (cd "$root" && find "$@" -name '*.bend' -type f 2>/dev/null | sort | while read -r f; do echo "$f"; cat "$f"; done) | shasum | cut -c1-16
