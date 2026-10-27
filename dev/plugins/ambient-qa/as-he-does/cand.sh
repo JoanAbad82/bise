@@ -391,6 +391,14 @@ if [ "${AS_HE_DOES_ONLY:-}" = quick ]; then
   wrapup
   say "done (quick)"; exit 0
 fi
+if [ "${AS_HE_DOES_ONLY:-}" = modes ]; then
+  # a port's dev loop (asd-full): only the driver modes named in AS_HE_DOES_MODES, in order, on
+  # one launch (e.g. 'cut rows2', 'cut probe'), then the usual stop and gates; never a verdict
+  for m in ${AS_HE_DOES_MODES:-cut}; do drive $m; done
+  stopcand; breach; libgate first-stop
+  wrapup
+  say "done (modes: ${AS_HE_DOES_MODES:-cut})"; exit 0
+fi
 if [ -n "$SMOKE" ]; then
   # the smoke (fast-try p3): the driver's prelude (pill, banner, sidebar), the core up, one message
   # and its answer; then the clean quit (stopcand: 0 left or a breach) and the closing gates

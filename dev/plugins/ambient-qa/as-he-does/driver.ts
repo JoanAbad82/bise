@@ -126,6 +126,35 @@ const click = async (name: string, loc: Locator) => {
   try { await loc.click({ timeout: 8000 }); return true; }
   catch (e) { step(name, false, String(e).slice(0, 240)); return false; }
 };
+// a project's sidebar row by its name (.nm, nm-frame): the row's whole text runs on into its pill
+// and its ⌘ digit ('harness⌘11 new artifact'), so never getByText on the row
+const projectRow = (name: string) => page.locator('[data-testid^="app.side.project."]')
+  .filter({ has: page.locator('.nm', { hasText: new RegExp(`^${name}$`) }) }).first();
+// open a project's main as he does: its sidebar row. On a library page (artifacts) the sidebar
+// shows the library and '← Projects' (app.side.back) first: back to the projects, then the row
+const openProject = async (name: string, label = `open ${name}`) => {
+  const row = projectRow(name);
+  if (!(await row.isVisible().catch(() => false))) {
+    await page.locator('[data-testid="app.side.back"]').first().click({ timeout: 3000 })
+      .catch(() => page.locator('[data-testid="app.rail.bise"]').first().click({ timeout: 3000 }).catch(() => {}));
+    await row.waitFor({ timeout: 5000 }).catch(() => {});
+  }
+  return click(label, row);
+};
+// an open artifact's ✕: its panel tab's close since native-mac (app.panel.tab.artifact:<p>/<id>.close,
+// 'Close tab · ⌘W'), the artifact head's own before
+const ART_CLOSE = '[data-testid="artifact.close"], [data-testid^="app.panel.tab.artifact:"][data-testid$=".close"]';
+// the project's shell: a panel tab since native-mac, the bottom panel before
+const TERM_SEL = '[data-testid="terminal.panel"], [data-testid^="app.panel.body.term:"]';
+// bise's row (⌘0), the same way: from a library page, '← Projects' first
+const openBise = async () => {
+  const row = page.locator('[data-testid="app.side.bise"]').first();
+  if (!(await row.isVisible().catch(() => false))) {
+    await page.locator('[data-testid="app.side.back"]').first().click({ timeout: 3000 }).catch(() => {});
+    await row.waitFor({ timeout: 5000 }).catch(() => {});
+  }
+  return click('bise', row);
+};
 // the window can go away under a pass (7e691aef's rerun: the candidate quit at 07:48:09, rows2 then
 // crashed in page.waitForTimeout): say it as a red step and end the pass, never an uncaught error
 let ending = false;
@@ -167,7 +196,8 @@ await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 200
     const s = await page.evaluate(() => {
       const r = (sel: string) => document.querySelector(sel)?.getBoundingClientRect() ?? null;
       const p = r('[data-testid="app.core"]');
-      const bar = r('[data-testid="app.title.panel"]') ?? r('[data-testid="app.title.sidebar"]');
+      // the title bar: app.bar since native-mac (nm-frame), its toggles before
+      const bar = r('[data-testid="app.bar"]') ?? r('[data-testid="app.title.panel"]') ?? r('[data-testid="app.title.sidebar"]');
       const m = r('[data-testid="app.main"]');
       return { p: p && p.width > 0 ? { top: p.top, bottom: p.bottom } : null, barBottom: bar ? bar.bottom : null, mainTop: m ? Math.round(m.top) : null,
         words: document.querySelector('[data-testid="app.core"]')?.textContent?.trim().slice(0, 80) ?? null };
@@ -314,7 +344,7 @@ if (mode === 'smoke') {
 }
 if (mode === 'first' || mode === 'smoke') {
   // a message to a project's main, and its answer
-  await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await openProject('harness');
   const composer = page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   const typed = await click('the composer', composer);
   if (typed) {
@@ -347,7 +377,7 @@ if (mode === 'first' || mode === 'smoke') {
 const closeArtifact = async () => {
   const pg = page.locator('[data-testid="artifact.page"]').first();
   if (!(await pg.count().catch(() => 0))) return;
-  await page.locator('[data-testid="artifact.close"]').first().click({ timeout: 3000 }).catch(() => page.keyboard.press('Escape'));
+  await page.locator(ART_CLOSE).first().click({ timeout: 3000 }).catch(() => page.keyboard.press('Escape'));
   await pg.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
 };
 
@@ -372,7 +402,7 @@ if (mode === 'cut') {
     }
     return true;
   };
-  await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await openProject('harness');
   const html = "<html><body style='margin:0;background:#2e8b57'><h1 style='color:#fff;font:40px sans-serif'>proof html</h1></body></html>";
   const seed = [
     'set up the proof rows',
@@ -430,7 +460,7 @@ if (mode === 'cut') {
   // /agents and /archived
   const lists: [string, string, string | null][] = [['/agents', 'keeper', 'gone'], ['/archived', 'gone', null]];
   for (const [cmd, want, not] of lists) {
-    await click('back to harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+    await openProject('harness', 'back to harness');
     await say(cmd);
     const t = await until(async () => { const s = await text('[data-testid="app.main"]'); return s && s.includes(want) ? s : null; }, 20000, 1000);
     await shot(cmd.slice(1));
@@ -448,10 +478,15 @@ if (mode === 'cut') {
   const onPerr = (e: Error) => net.push({ ev: 'pageerror', text: String(e).slice(0, 300) });
   page.on('request', onReq); page.on('response', onRes); page.on('requestfailed', onFail); page.on('console', onCon); page.on('pageerror', onPerr);
   await click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first());
-  const item = page.locator('[data-testid="artifacts.list"]').getByText('proof-html').first();
+  // the library page (nm-pages): its Recent row's card opens the artifact at a click (Recent.tsx),
+  // else a card or row of its grid (a click picks, ⏎ opens)
+  await page.locator('[data-testid="artifacts.screen"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  const recent = page.locator('[data-testid^="artifacts.recent.item."]').filter({ hasText: 'proof-html' }).first();
+  const item = (await recent.isVisible().catch(() => false)) ? recent
+    : page.locator('[data-testid="artifacts.screen"] [data-row]').filter({ hasText: 'proof-html' }).first();
   const opened = await click('select proof-html', item);
-  if (opened) await page.keyboard.press('Enter');
-  const frame = page.locator('iframe').first();
+  if (opened && !(await page.locator('[data-testid="artifact.page"]').first().waitFor({ timeout: 3000 }).then(() => true, () => false))) await page.keyboard.press('Enter');
+  const frame = page.locator('[data-testid="artifact.page"] iframe, iframe').first();
   const fr = opened ? await frame.waitFor({ timeout: 15000 }).then(() => true, () => false) : false;
   let green = 0;
   if (fr) {
@@ -495,7 +530,7 @@ if (mode === 'cut') {
   await shot('resized');
   step('the sidebar resizes by drag', !!box && w1 > w0, { before: w0, after: w1 });
   // ctrl+r from the thread (not the field): dictation's line shows, esc ends it
-  await click('back to harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await openProject('harness', 'back to harness');
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
   const before = (await text('[data-testid="composer"]')) ?? '';
   await page.keyboard.press('Control+r');
@@ -532,10 +567,10 @@ if (mode === 'rows2') {
     }
     return true;
   };
-  const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  const harness = () => openProject('harness');
   await closeArtifact();
   // one waiting item in another project: ai-docs' main opens a card for him (for bise's inbox block)
-  await click('open ai-docs', page.locator('[data-testid="app.sidebar"]').getByText('ai-docs', { exact: true }).first());
+  await openProject('ai-docs');
   await say("[[bash: sb notify 'publish the ai-docs guide now?\n1. publish\n2. later']]");
   const carded = await until(async () => (/done: tool bash ok/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   step("ai-docs' main opened a card for him (the inbox item)", !!carded, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
@@ -546,35 +581,92 @@ if (mode === 'rows2') {
   const MAKER = 'release-ts-pattern';
   const makerHtml = '<html><body style=margin:0;background:#2e8b57><h1>release notes</h1></body></html>';
   await say(`[[bash: sb spawn ${MAKER} --objective "Release ts-pattern on npm: the changelog, the tag, the GitHub release notes and the docs site {{bash: printf '%s' '${makerHtml}' > rel-ts.html && sb artifact add rel-ts.html --title rel-ts-notes}}"]]`);
-  // the right bar: its four sections in order; the left bar holds places only
-  const panel = page.locator('[data-testid="app.panel"]').first();
-  const shown = await panel.waitFor({ timeout: 10000 }).then(() => true, () => false);
-  const order = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right."]')]
-    .map((e) => e.getAttribute('data-testid')).filter((t) => /^app\.right\.(agents|archived|artifacts|scheduled)$/.test(t ?? '')));
-  await shot('right-bar');
-  step('the right bar: agents, archived, artifacts, scheduled', shown && order.join(',') === 'app.right.agents,app.right.archived,app.right.artifacts,app.right.scheduled', order);
-  const agentsText = (await text('[data-testid="app.right.agents"]')) ?? '';
-  step('the right bar lists the agents (keeper; main is the thread itself)', /\bkeeper\b/.test(agentsText) && !/\bgone\b/.test(agentsText), agentsText.slice(0, 300));
+  // the right side (native-mac d1, app/side3d; the right bar is gone), in either of its forms
+  // (Host.tsx coinsAt): the outer card (app.outer.<id> sections, what a 1280 window shows) or its
+  // coins (app.bubble.<id> / app.mini.<id>), each a float by ⌥⌘1-4; the same four, in order
+  const SIDE_IDS = ['agents', 'artifacts', 'scheduled', 'processes'];
+  const sideOrder = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.outer."], [data-testid^="app.bubble."], [data-testid^="app.mini."]')]
+    .map((e) => /^app\.(?:outer|bubble|mini)\.(agents|artifacts|scheduled|processes)$/.exec(e.getAttribute('data-testid') ?? '')?.[1] ?? null).filter(Boolean)).catch((): (string | null)[] => []);
+  const order = await until(async () => { const o = await sideOrder(); return o.length >= SIDE_IDS.length ? o : null; }, 10000, 500) ?? await sideOrder();
+  const sideCard = (await page.locator('[data-testid="app.outer"]').count()) > 0;
+  await shot('right-side');
+  step('the right side: agents, artifacts, scheduled, processes, in order', order.join(',') === SIDE_IDS.join(','), { order, form: sideCard ? 'outer card' : 'coins' });
+  const float = (id: string) => page.locator(`[data-testid="app.flyout.${id}"]`).first();
+  // a float by its key (⌥⌘1-4), from the thread, so the key never lands in a field; the outer
+  // card has no float (its sections are the lists): true when that section is there
+  const openFloat = async (n: number, id: string) => {
+    if (await page.locator(`[data-testid="app.outer.${id}"]`).first().isVisible().catch(() => false)) return true;
+    if (await float(id).isVisible().catch(() => false)) return true;
+    // its coin (a mini in the bar when the panel is open, else a bubble on the side), clicked as he
+    // does; else its key
+    const coin = page.locator(`[data-testid="app.mini.${id}"], [data-testid="app.bubble.${id}"]`).first();
+    if (await coin.isVisible().catch(() => false)) await coin.click({ timeout: 3000 }).catch(() => {});
+    else {
+      await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+      await page.keyboard.press(`Alt+Meta+${n}`);
+    }
+    return float(id).waitFor({ timeout: 5000 }).then(() => true, () => false);
+  };
+  // a float closes on esc; the outer card stays
+  const closeFloat = async (id: string) => {
+    if (!(await float(id).isVisible().catch(() => false))) return;
+    await page.keyboard.press('Escape');
+    await float(id).waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+  };
+  // the side's agents list: the outer card's rows, else the agents float's
+  const agentsList = () => page.locator('[data-testid="app.outer.agents.rows"], [data-testid="app.flyout.agents"]').first();
+  const agentsOpen = await openFloat(1, 'agents');
+  const agentsText = agentsOpen ? ((await agentsList().innerText({ timeout: 3000 }).catch(() => '')) ?? '') : '';
+  await shot('side-agents');
+  step('the right side lists the agents (keeper; never the dropped one)', agentsOpen && /\bkeeper\b/.test(agentsText) && !/\bgone\b/.test(agentsText), { open: agentsOpen, text: agentsText.slice(0, 300) });
+  await closeFloat('agents');
   const leftAgents = await page.locator('[data-testid="app.sidebar"] [data-testid*=".agent."]').count().catch(() => 0);
   step('the left bar holds places only (no agent rows)', leftAgents === 0 && !/\bkeeper\b/.test((await text('[data-testid="app.sidebar"]')) ?? ''), { agent_rows: leftAgents });
-  // ⌥⌘0 and the title bar's toggle hide and bring back the right bar
-  await page.keyboard.press('Alt+Meta+0');
-  const hid = await until(async () => ((await panel.count()) === 0 || !(await panel.isVisible().catch(() => false)) ? true : null), 5000, 300);
-  await shot('right-bar-hidden');
-  await page.keyboard.press('Alt+Meta+0');
-  const back = await panel.waitFor({ timeout: 5000 }).then(() => true, () => false);
-  step('⌥⌘0 hides and brings back the right bar', !!hid && back, { hid: !!hid, back });
-  const tog = page.locator('[data-testid="app.title.panel"]').first();
-  let togOk = false;
-  if (await click('the title bar toggle', tog)) {
-    const h2 = await until(async () => ((await panel.count()) === 0 || !(await panel.isVisible().catch(() => false)) ? true : null), 5000, 300);
-    await click('the title bar toggle again', tog);
-    togOk = !!h2 && await panel.waitFor({ timeout: 5000 }).then(() => true, () => false);
-  }
-  step("the title bar's toggle hides and brings back the right bar", togOk, null);
-  // an artifact from the right bar: the 3-column view, its page drawn in the frame; ✕ and esc back
-  const row = page.locator('[data-testid="app.right.artifacts"] [data-testid*="proof-html"], [data-testid="app.right.artifacts"] button, [data-testid="app.right.artifacts"] [role="button"]').filter({ hasText: 'proof-html' }).first();
-  const opened = await click('proof-html from the right bar', row);
+  // ⌥⌘B (⌥⌘0 kept as its alias) and the bar's panel button (app.panel.toggle) hide and bring back
+  // the panel: each flips it, a second press puts it back as it was
+  const panel = page.locator('[data-testid="app.panel"]').first();
+  const panelOn = async () => (await panel.count()) > 0 && await panel.isVisible().catch(() => false);
+  const flips = async (press: () => Promise<unknown>) => {
+    const was = await panelOn();
+    await press();
+    const flipped = await until(async () => ((await panelOn()) !== was ? true : null), 5000, 300);
+    await press();
+    const back = await until(async () => ((await panelOn()) === was ? true : null), 5000, 300);
+    return { was, flipped: !!flipped, back: !!back };
+  };
+  const byKey = await flips(() => page.keyboard.press('Alt+Meta+b'));
+  const byAlias = await flips(() => page.keyboard.press('Alt+Meta+0'));
+  await shot('panel-toggled');
+  step('⌥⌘B (and ⌥⌘0) hides and brings back the panel', byKey.flipped && byKey.back && byAlias.flipped && byAlias.back, { key: byKey, alias: byAlias });
+  const tog = page.locator('[data-testid="app.panel.toggle"]').first();
+  const byButton = await tog.waitFor({ timeout: 5000 }).then(() => flips(() => tog.click({ timeout: 3000 }).catch(() => {})), () => null);
+  step("the bar's panel button hides and brings back the panel", !!byButton && byButton.flipped && byButton.back, byButton ?? 'no app.panel.toggle');
+  // an artifact from the artifacts float (⌥⌘2): it opens in the panel's tab beside the thread,
+  // its page drawn in the frame; ✕ and esc close it
+  // an artifact's row on the side (the outer card's and the float's rows are both
+  // app.flyout.artifacts.<project>.<id>): shown, the outer card's 'more' opened when it hides there
+  const sideArt = async (title: string) => {
+    const r = page.locator('[data-testid^="app.flyout.artifacts."]').filter({ hasText: title }).first();
+    if (!(await openFloat(2, 'artifacts'))) return null;
+    if (await r.isVisible().catch(() => false)) return r;
+    // a float lists the newest few only (its 'all ›' goes to the library): with the panel open,
+    // hide it (⌥⌘B) so the side is the outer card again, whose 'more' lists them all
+    if (await float('artifacts').isVisible().catch(() => false) && await page.locator('[data-testid="app.panel"]').first().isVisible().catch(() => false)) {
+      await closeFloat('artifacts');
+      await page.keyboard.press('Alt+Meta+b');
+      await page.locator('[data-testid="app.outer.artifacts"]').first().waitFor({ timeout: 5000 }).catch(() => {});
+      if (await r.isVisible().catch(() => false)) return r;
+    }
+    const more = page.locator('[data-testid="app.outer.artifacts.more"]').first();
+    if (await more.isVisible().catch(() => false)) await more.click({ timeout: 3000 }).catch(() => {});
+    return (await r.waitFor({ timeout: 3000 }).then(() => true, () => false)) ? r : null;
+  };
+  const fromSide = async (name: string) => {
+    const r = await sideArt('proof-html');
+    if (!r) { step(name, false, 'no proof-html row on the right side (outer card or artifacts float)'); return false; }
+    return click(name, r);
+  };
+  const opened = await fromSide('proof-html from the right side');
   const pageEl = page.locator('[data-testid="artifact.page"]').first();
   const drawn = opened && await pageEl.waitFor({ timeout: 15000 }).then(() => true, () => false);
   let green = 0;
@@ -596,15 +688,23 @@ if (mode === 'rows2') {
     // fixed 160 px rail check read it as missing)
     const side = document.querySelector('[data-testid="app.sidebar"]')?.getBoundingClientRect();
     const main = document.querySelector('[data-testid="app.main"]')?.getBoundingClientRect();
-    const rail = !!side && side.width > 0 && side.left < 20 && (!main || side.right <= main.left + 2);
-    return { rail, rail_w: side ? Math.round(side.width) : null, thread: vis('[data-testid="app.main"]'), page: vis('[data-testid="artifact.page"]') };
+    // (native-mac: the places rail sits left of the sidebar, so the sidebar starts at ~56 px)
+    const rail = !!side && side.width > 0 && side.left < 80 && (!main || side.right <= main.left + 2);
+    // native-mac: the artifact opens in the panel's tab, right of the thread (no 3-column view)
+    const pg = document.querySelector('[data-testid="artifact.page"]');
+    const inPanel = !!pg?.closest('[data-testid="app.panel"]');
+    const pr = pg?.getBoundingClientRect();
+    const right = !!pr && !!main && pr.left >= main.right - 2;
+    return { rail, rail_w: side ? Math.round(side.width) : null, thread: vis('[data-testid="app.main"]'), page: vis('[data-testid="artifact.page"]'), in_panel: inPanel, right_of_thread: right };
   });
-  await shot('artifact-from-right-bar');
-  step('an artifact from the right bar: 3 columns, its page drawn (green pixels)', drawn && green > 0.3 && cols.rail && cols.thread && cols.page, { opened, drawn, green: Math.round(green * 100) / 100, cols });
-  const closed = await click('✕', page.locator('[data-testid="artifact.close"]').first());
+  await shot('artifact-from-side');
+  step('an artifact from the right side: in the panel beside the thread, its page drawn (green pixels)', drawn && green > 0.3 && cols.rail && cols.thread && cols.page && cols.in_panel && cols.right_of_thread, { opened, drawn, green: Math.round(green * 100) / 100, cols });
+  const closed = await click('✕', page.locator(ART_CLOSE).first());
   const gone1 = closed && await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
-  await click('proof-html again', row);
+  await fromSide('proof-html again');
   await pageEl.waitFor({ timeout: 10000 }).catch(() => {});
+  // esc where he is: the thread's composer beside the page (the row he just clicked is the side's)
+  await page.locator('[data-testid="composer.field"]:visible').first().click({ timeout: 3000 }).catch(() => {});
   await page.keyboard.press('Escape');
   const gone2 = await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
   step('✕ and esc close the artifact', gone1 && gone2, { x: gone1, esc: gone2 });
@@ -615,8 +715,8 @@ if (mode === 'rows2') {
   const MAIN_WORDS = 'half a thought for main';
   const ART_WORDS = 'and the green, is it on brand?';
   const field = page.locator('[data-testid="composer.field"]:visible').first();
-  // the label without the working mark's gust (its glyphs change each frame while main works)
-  const lbl = () => page.locator('.b-composer .lbl:visible').first().innerText({ timeout: 1000 })
+  // the composer's label: whom his words go to (composer.ctx.to since native-mac), never its state
+  const lbl = () => page.locator('[data-testid="composer.ctx.to"]:visible, .b-composer .lbl:visible').first().innerText({ timeout: 1000 })
     .then((s) => s.replace(/[∿≈~∼∽·]+/g, ' ').replace(/\s+/g, ' ').trim(), () => null);
   const fieldText = async () => ((await field.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
   const typeIn = async (words: string) => {
@@ -629,23 +729,26 @@ if (mode === 'rows2') {
   await harness();
   const mainTyped = await typeIn(MAIN_WORDS);
   const mainLabel = await lbl();
-  await click('proof-html for the esc row', row);
+  await fromSide('proof-html for the esc row');
   const reopened = await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  // native-mac: the artifact opens in the panel beside the thread, and the thread's one composer
+  // stays (Open.tsx draws its own composer only with no thread beside the page): his words and its
+  // label are main's before, with the page open, after esc closes it and when it opens again
   let escRow: Record<string, unknown> = { main_typed: mainTyped, reopened };
-  if (mainTyped && reopened && await typeIn(ART_WORDS)) {
-    const artLabel = await lbl();
+  if (mainTyped && reopened && await click('the composer beside the artifact', field)) {
+    const beside = { words: await fieldText(), label: await lbl() };
     await page.keyboard.press('Escape');
     const closed1 = await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
     await page.waitForTimeout(300);
     const back = { words: await fieldText(), label: await lbl() };
     await shot('esc-artifact-main-kept');
-    await click('proof-html again', row);
+    await fromSide('proof-html again');
     const again = await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false);
-    const onArt = again ? await until(async () => ((await fieldText()) === ART_WORDS ? { words: ART_WORDS, label: await lbl() } : null), 5000, 300) : null;
+    const onArt = again ? { words: await fieldText(), label: await lbl() } : null;
     await shot('esc-artifact-words-back');
-    escRow = { closed: closed1, main: { before: { words: MAIN_WORDS, label: mainLabel }, after: back }, artifact: { before: { words: ART_WORDS, label: artLabel }, after: onArt ?? { words: await fieldText(), label: await lbl() } }, answering: /answering/.test(artLabel ?? '') ? 'proven' : 'no docked card in harness: the labels kept are to main / about the page' };
-    step("esc with an artifact open closes it first; his words and the composer's mode stay (main's, and the artifact's on reopen)",
-      closed1 && back.words === MAIN_WORDS && back.label === mainLabel && !!onArt && onArt.label === artLabel, escRow);
+    escRow = { closed: closed1, before: { words: MAIN_WORDS, label: mainLabel }, beside, after_esc: back, reopened_again: onArt };
+    step("esc with an artifact open closes it first; his words and the composer's label stay (the thread's one composer beside the page)",
+      closed1 && [beside, back, onArt].every((x) => !!x && x.words === MAIN_WORDS && x.label === mainLabel), escRow);
     // close it again (esc from the artifact's composer), then a second esc on harness' main with words
     await click('the composer beside the artifact', field);
     await page.keyboard.press('Escape');
@@ -661,12 +764,12 @@ if (mode === 'rows2') {
     };
     await shot('esc-artifact-second-esc');
     step("a second esc does today's thing (a composer with words keeps it: no move, nothing reopens)", !second.artifact_reopened && !second.went_up_to_bise, second);
-  } else step("esc with an artifact open closes it first; his words and the composer's mode stay (main's, and the artifact's on reopen)", false, escRow);
+  } else step("esc with an artifact open closes it first; his words and the composer's label stay (the thread's one composer beside the page)", false, escRow);
   // both composers emptied, so the next rows start clean
   await closeArtifact();
   await harness();
   if (await click('the composer', field)) { await page.keyboard.press('Meta+a'); await page.keyboard.press('Backspace'); }
-  await click('proof-html to empty its composer', row);
+  await fromSide('proof-html to empty its composer');
   if (await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false) && await click('the composer beside the artifact', field)) {
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
@@ -675,11 +778,11 @@ if (mode === 'rows2') {
   // back / forward: harness -> artifacts -> ⌘[ harness -> ⌘] artifacts; esc from harness' main goes up to bise
   await harness();
   await click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first());
-  await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  await page.locator('[data-testid="artifacts.screen"]').first().waitFor({ timeout: 8000 }).catch(() => {});
   await page.keyboard.press('Meta+BracketLeft');
-  const wentBack = await until(async () => ((await page.locator('[data-testid="artifacts.list"]').count()) === 0 && /harness/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), 5000, 300);
+  const wentBack = await until(async () => ((await page.locator('[data-testid="artifacts.screen"]').count()) === 0 && (await projectRow('harness').getAttribute('aria-current').catch(() => null)) !== null ? true : null), 5000, 300);
   await page.keyboard.press('Meta+BracketRight');
-  const wentFwd = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+  const wentFwd = await page.locator('[data-testid="artifacts.screen"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
   step('⌘[ goes back, ⌘] forward', !!wentBack && wentFwd, { back: !!wentBack, forward: wentFwd });
   await harness();
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
@@ -693,9 +796,12 @@ if (mode === 'rows2') {
   // and nothing in the thread moves with the gust's frames (sampled every 110 ms, its frame step)
   // 491959b8f (designer m_34075, signed m_34467): the mark is the 1-cell breath now, one glyph a
   // frame (thread.mark.breath, 6 frames of 110 ms); 2+ glyphs in 16 samples is it moving
+  // native-mac (his m_44719, ComposerTab.tsx): the mark sits in the composer's head, after 'to bise'
+  // and the project, as its state item (composer.ctx.state, data-state=working: the breath
+  // composer.ctx.state.mark and 'working · 0 s'); the label is composer.ctx.to
   await harness();
   await say('take a moment [[slow: 12]]');
-  const mark = page.locator('[data-testid="thread.mark"][data-state="working"]').first();
+  const mark = page.locator('[data-testid="composer.ctx.state"][data-state="working"]').first();
   const marked = await mark.waitFor({ timeout: 10000 }).then(() => true, () => false);
   type Geo = { list: string | null; mark: string | null; composer: string | null; scroll: string | null; breath: string | null } | null;
   const wk: {
@@ -704,11 +810,11 @@ if (mode === 'rows2') {
     is_working_text?: boolean; on_label_line?: boolean; tip?: string | null;
   } = { mark: marked };
   if (marked) {
-    wk.label = await lbl();
+    wk.label = await page.locator('[data-testid="composer.ctx.to"]:visible').first().innerText({ timeout: 1000 }).catch(() => null);
     const geo = () => page.evaluate(() => {
       const r = (s: string) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map(Math.round).join(','); };
       const sc = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller]') ?? document.querySelector('[data-testid="thread.list"]');
-      return { list: r('[data-testid="thread.list"]'), mark: r('[data-testid="thread.mark"]'), composer: r('[data-testid="composer"]'), scroll: sc ? `${Math.round(sc.scrollTop)},${sc.scrollHeight}` : null, breath: document.querySelector('[data-testid="thread.mark.breath"]')?.textContent ?? null };
+      return { list: r('[data-testid="thread.list"]'), mark: r('[data-testid="composer.ctx.state.mark"]'), composer: r('[data-testid="composer"]'), scroll: sc ? `${Math.round(sc.scrollTop)},${sc.scrollHeight}` : null, breath: document.querySelector('[data-testid="composer.ctx.state.mark"]')?.textContent ?? null };
     }).catch(() => null);
     // 96db3e08 run: one 18 px scrollTop move right after the send (the send's bottom settle, not
     // the gust?). Let the send settle 500 ms before sampling, so a move left is the gust's (ambient-lead m_22035)
@@ -727,12 +833,11 @@ if (mode === 'rows2') {
     wk.first = g[0];
     wk.old_rows = await page.locator('[data-testid="thread.live"], [data-testid="thread.waiting"]').count();
     wk.is_working_text = /is working/.test((await text('[data-testid="thread.list"]')) ?? '');
-    const lb = await page.locator('.b-composer .lbl:visible').first().boundingBox().catch(() => null);
-    const mb = await mark.boundingBox().catch(() => null);
+    const lb = await page.locator('[data-testid="composer.ctx.to"]:visible').first().boundingBox().catch(() => null);
+    const mb = await page.locator('[data-testid="composer.ctx.state.mark"]').first().boundingBox().catch(() => null);
     wk.on_label_line = !!lb && !!mb && Math.abs((lb.y + lb.height / 2) - (mb.y + mb.height / 2)) <= 6;
     await shot('working-mark');
-    await mark.hover({ timeout: 2000 }).catch(() => {});
-    wk.tip = await page.locator('[data-testid="thread.mark.tip"]').first().innerText({ timeout: 2000 }).catch(() => null);
+    wk.tip = await mark.innerText({ timeout: 2000 }).catch(() => null);
     await shot('working-mark-tip');
     await page.mouse.move(1, 400);
   }
@@ -750,7 +855,7 @@ if (mode === 'rows2') {
   await shot('short-thought');
   step('a short thought: its row is there and opens to its words', !!words, { rows: nRows, text: nRows ? ((await last.textContent().catch(() => '')) ?? '').slice(0, 200) : '' });
   // the inbox block in bise's thread: another project's item answered there; ⌘I opens it in place
-  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
+  await openBise();
   // a long reply in bise's own thread, so it scrolls for the block's height row (1c5659b8 run: the
   // thread was empty, nothing scrolled)
   // regress-25e5: a path naming a project routes these words there (fx.ts), and the rows below
@@ -810,20 +915,25 @@ if (mode === 'rows2') {
     step('the inbox block keeps its height on scroll', h0 !== null && moved && hs.every((x) => x !== null && Math.abs(x - h0) <= 1), { height: h0, during: hs, scroll_top: [top0, ...tops], thread_scrolled: moved });
     const key = (b: unknown) => JSON.stringify(b);
     const off = [...moving, ...stopped].map((b, i) => (key(b) === key(rest) ? null : { at: i < moving.length ? `moving ${i}` : `stopped ${i - moving.length}`, box: b })).filter(Boolean);
-    step('steady bottom: wheel up and down on a long thread, the composer, keys line and inbox block boxes unchanged',
-      !!rest && !!rest.composer && !!rest.keys && !!rest.block && moved && off.length === 0, { rest, thread_scrolled: moved, changed: off.slice(0, 6) });
+    // native-mac: the keys line is gone (a held modifier lists its keys in the composer's own row,
+    // composer.held), so the composer and the inbox block are the bottom's boxes
+    step('steady bottom: wheel up and down on a long thread, the composer and inbox block boxes unchanged',
+      !!rest && !!rest.composer && !!rest.block && moved && off.length === 0, { rest, thread_scrolled: moved, changed: off.slice(0, 6) });
   } else step('the inbox block keeps its height on scroll', false, 'no inbox block');
   // 82cd5263 + a6efc5cb (ambient-lead m_21810 (d), as app/cmd-hints.spec): ⌘ held alone 400 ms shows
   // the keys where they act: bise's '0', each project's digit in place of its count, ⌘[ under ‹ (a
   // place behind), ⌘] under › (one ahead), ⌘I on the inbox head; released, all gone. A quick ⌘: none.
+  // native-mac (nm-frame, rail-keys): the sidebar's held digits are <row>.digit ('⌘0' on bise,
+  // '⌘1'-'⌘9' on the projects, in place of the row's pill), the bar's history arrows'
+  // app.bar.back/forward.hint, the inbox block's head inbox.block.hint
   const hintsNow = () => page.evaluate(() => {
     const t = (s: string) => document.querySelector(s)?.textContent?.trim() ?? null;
     const rows = [...document.querySelectorAll('[data-testid^="app.side.project."]')].filter((r) => /^app\.side\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''));
     return {
-      n: document.querySelectorAll('.app-keyhint').length,
-      bise: t('[data-testid="app.side.bise.hint"]'),
-      projects: rows.map((r) => ({ name: (r.textContent ?? '').trim().slice(0, 24), hint: r.querySelector('.app-keyhint')?.textContent?.trim() ?? null, count: !!r.querySelector('.app-cnt') })),
-      back: t('[data-testid="app.title.back.hint"]'), forward: t('[data-testid="app.title.forward.hint"]'), inbox: t('[data-testid="inbox.block.hint"]'),
+      n: document.querySelectorAll('.app-keyhint, [data-testid$=".digit"]').length,
+      bise: t('[data-testid="app.side.bise.digit"]'),
+      projects: rows.map((r) => ({ name: (r.querySelector('.nm')?.textContent ?? r.textContent ?? '').trim().slice(0, 24), hint: r.querySelector('[data-testid$=".digit"]')?.textContent?.trim() ?? null, count: !!r.querySelector('[data-testid$=".pill"]') })),
+      back: t('[data-testid="app.bar.back.hint"]'), forward: t('[data-testid="app.bar.forward.hint"]'), inbox: t('[data-testid="inbox.block.hint"]'),
     };
   }).catch(() => null);
   const holdCmd = async (name: string) => {
@@ -844,9 +954,9 @@ if (mode === 'rows2') {
   await page.waitForTimeout(400);
   const onBise = await holdCmd('cmd-held-bise');
   const ph = onBise.held?.projects ?? [];
-  const digitsOk = ph.length > 0 && ph.slice(0, 9).every((p, i) => p.hint === String(i + 1) && !p.count);
+  const digitsOk = ph.length > 0 && ph.slice(0, 9).every((p, i) => p.hint === `⌘${i + 1}` && !p.count);
   step('hold ⌘ 400 ms on bise: digits on bise and the projects, ⌘[ on the back arrow, ⌘I on the inbox head; all gone on release',
-    !!onBise.held && quick?.n === 0 && onBise.held.bise === '0' && digitsOk && onBise.held.back === '⌘[' && onBise.held.inbox === '⌘I' && onBise.released?.n === 0,
+    !!onBise.held && quick?.n === 0 && onBise.held.bise === '⌘0' && digitsOk && onBise.held.back === '⌘[' && onBise.held.inbox === '⌘I' && onBise.released?.n === 0,
     { quick_cmd_hints: quick?.n ?? null, ...onBise });
   // one place back (harness), so › has a place ahead: ⌘] under it; then ⌘] to bise again
   await page.keyboard.press('Meta+BracketLeft');
@@ -855,7 +965,7 @@ if (mode === 'rows2') {
   step('hold ⌘ after ⌘[: ⌘] on the forward arrow, gone on release', behind.held?.forward === '⌘]' && behind.released?.n === 0, behind);
   await page.keyboard.press('Meta+BracketRight');
   await page.waitForTimeout(800);
-  if (!(await page.locator('[data-testid="app.side.bise"][aria-current]').count())) await click('bise', page.locator('[data-testid="app.side.bise"]').first());
+  if (!(await page.locator('[data-testid="app.side.bise"][aria-current]').count())) await openBise();
   // ⌘I is the native menu's accelerator (src/main/menu.ts): CDP keys go to the page and never reach
   // the menu, so off-screen it can't be pressed. ⌃1 (the block's own key) opens the same item in place.
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
@@ -890,7 +1000,7 @@ if (mode === 'rows2') {
     + em('mail-lucas', 'lucas@acme.test') + em('mail-marc', 'marc@acme.test');
   await harness();
   await say(`[[bash: printf '%s' '${draftsHtml}' > rel-proof.html && sb page publish rel-proof.html --id rel-proof --title '${DRAFTS}']]`);
-  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
+  await openBise();
   const draftsRow = page.locator('[data-testid^="inbox.block.row."]', { hasText: DRAFTS }).first();
   // the card by its page's title: its words say 'send these 2 emails?' since the k-pick cards
   // (1de5fc75f), no 'draft' in them
@@ -933,16 +1043,16 @@ if (mode === 'rows2') {
   };
   await harness();
   await click('artifacts', page.locator('[data-testid="app.rail.artifacts"]').first());
-  const onList = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+  const onList = await page.locator('[data-testid="artifacts.screen"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
   // his no-swipe (316c1391c): a sideways swipe never walks, either way (it took him away from his
   // words); ⌘[ ⌘], the side buttons and ‹ › walk. Fingers right, then left: still on /artifacts
   await swipe(-30);
   await page.waitForTimeout(600);
-  const stayBack = (await page.locator('[data-testid="artifacts.list"]').count()) > 0;
+  const stayBack = (await page.locator('[data-testid="artifacts.screen"]').count()) > 0;
   await shot('swipe-back');
   await swipe(30);
   await page.waitForTimeout(600);
-  const stayFwd = (await page.locator('[data-testid="artifacts.list"]').count()) > 0;
+  const stayFwd = (await page.locator('[data-testid="artifacts.screen"]').count()) > 0;
   await shot('swipe-forward');
   step('two-finger swipe (CDP wheel deltaX) either way never walks: still on /artifacts', onList && stayBack && stayFwd, { on_list: onList, after_right: stayBack, after_left: stayFwd });
   // 3f58f843 (ambient-lead m_21499): ⌘K finds pages by name: 'set' shows the pages group, and ⏎ on
@@ -986,11 +1096,11 @@ if (mode === 'rows2') {
   await shot('w1100-thread');
   at1100.thread = { overflow: await overflow() };
   // the frame: the title bar, both bars and the status line, with the right bar open
-  if (!(await page.locator('[data-testid="app.panel"]').count())) await click('right bar', page.locator('[data-testid="app.title.panel"]').first());
+  if (!(await page.locator('[data-testid="app.panel"]').count())) await click('the panel', page.locator('[data-testid="app.panel.toggle"]').first());
   await page.waitForTimeout(600);
   await shot('w1100-frame');
   at1100.frame = { overflow: await overflow(), panel: (await page.locator('[data-testid="app.panel"]').count()) > 0 };
-  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
+  await openBise();
   await page.locator('[data-testid^="inbox.block"]').first().waitFor({ timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(600);
   await shot('w1100-inbox');
@@ -1032,10 +1142,12 @@ if (mode === 'rows2') {
     await screen1100('settings-key', () => click('add a key', keyAdd), '[data-testid="settings.key.field"]');
     await page.keyboard.press('Escape');
   } else at1100['settings-key'] = { overflow: false, there: false, why: 'no settings.key.add on this world' };
-  await screen1100('terminal', async () => { await harness(); await page.keyboard.press('Control+Backquote'); }, '[data-testid="terminal.panel"]');
+  // native-mac: ⌃` opens the project's shell as a tab of the panel (app.panel.body.term:<p>#<n>,
+  // its terminal.screen inside), the bottom terminal.panel before; ⌃` again hides it
+  await screen1100('terminal', async () => { await harness(); await page.keyboard.press('Control+Backquote'); }, TERM_SEL);
   if (at1100.terminal.there) {
     await page.keyboard.press('Control+Backquote');
-    if (await page.locator('[data-testid="terminal.panel"]').first().isVisible().catch(() => false)) await click('hide the terminal', page.locator('[data-testid="terminal.hide"]').first());
+    if (await page.locator('[data-testid="terminal.hide"]').first().isVisible().catch(() => false)) await click('hide the terminal', page.locator('[data-testid="terminal.hide"]').first());
   }
   step('the terminal panel opens at 1100 (⌃`)', at1100.terminal.there && !at1100.terminal.overflow, at1100.terminal);
   const md = path.join(FX, 'code-reply.md');
@@ -1122,57 +1234,16 @@ if (mode === 'rows2') {
   // an http url) but refused by main's externalUrl (no host: new URL throws), so his browser can't open
   await harness();
   await say("[[bash: for i in 1 2 3 4 5; do printf 'more %s' $i > more-$i.md && sb artifact add more-$i.md --title more-$i; done; sb artifact add http:// --kind pr --title pr-proof]]");
-  const rb = page.locator('[data-testid="app.panel"]').first();
-  if (!(await rb.isVisible().catch(() => false))) await click('right bar', page.locator('[data-testid="app.title.panel"]').first());
-  const moreBtn = page.locator('[data-testid="app.right.artifacts.more"]').first();
-  const capped = await moreBtn.waitFor({ timeout: 60000 }).then(() => true, () => false);
-  // (e) 8027d979: every head that folds is a row: pointer; hovered, the rows' tint and its '▾'
-  const look = (id: string) => page.locator(`[data-testid="app.right.${id}.head"]`).first().evaluate((el) => {
-    const label = el.querySelector('.app-rb-label');
-    const row = el.parentElement;
-    return { cursor: getComputedStyle(el).cursor, tint: row ? getComputedStyle(row).backgroundColor : '', chevron: label ? getComputedStyle(label, '::after').content : '', shown: label ? getComputedStyle(label, '::after').visibility : '' };
-  }).catch(() => null);
-  type Look = Awaited<ReturnType<typeof look>>;
-  const heads: Record<string, { rest: Look; hover: Look }> = {};
-  for (const id of ['agents', 'archived', 'artifacts', 'scheduled']) {
-    await page.mouse.move(1, 400);
-    await page.waitForTimeout(150);
-    const rest = await look(id);
-    await page.locator(`[data-testid="app.right.${id}.head"]`).first().hover({ timeout: 2000 }).catch(() => {});
-    await page.waitForTimeout(250);
-    heads[id] = { rest, hover: await look(id) };
-    if (id === 'artifacts') await shot('right-head-hover');
-  }
-  await page.mouse.move(1, 400);
-  const folding = ['archived', 'artifacts', 'scheduled'].filter((id) => heads[id]?.rest);
-  step('right bar: the section heads that fold show a pointer and tint on hover',
-    folding.length > 0 && folding.every((id) => heads[id]?.rest?.cursor === 'pointer' && heads[id]?.hover?.tint !== heads[id]?.rest?.tint), heads);
-  const artRows = () => page.locator('[data-testid="app.right.artifacts"] [data-testid^="app.right.artifact."]').evaluateAll((es) => es.filter((e) => !/\.leaves$/.test(e.getAttribute('data-testid') ?? '')).length).catch(() => null);
-  const ml: {
-    capped: boolean; more_text?: string; rows_capped?: number | null; less_text?: string | null; rows_open?: number | null;
-    more_gone?: boolean; rows_back?: number | null; more_back?: string; head_in_view?: boolean;
-  } = { capped };
-  if (capped) {
-    ml.more_text = (await moreBtn.innerText().catch(() => '')).trim();
-    ml.rows_capped = await artRows();
-    await click("'+ N more'", moreBtn);
-    const less = page.locator('[data-testid="app.right.artifacts.less"]').first();
-    ml.less_text = await less.innerText({ timeout: 3000 }).then((t) => t.trim(), () => null);
-    ml.rows_open = await artRows();
-    ml.more_gone = (await page.locator('[data-testid="app.right.artifacts.more"]').count()) === 0;
-    await shot('right-show-less');
-    await click("'show less'", less);
-    await page.waitForTimeout(300);
-    ml.rows_back = await artRows();
-    ml.more_back = (await moreBtn.innerText({ timeout: 3000 }).catch(() => '')).trim();
-    ml.head_in_view = await page.locator('[data-testid="app.right.artifacts.head"]').first().isVisible().catch(() => false);
-  }
-  step("right bar: '+ N more' -> every row and 'show less' -> back at the cap", capped && BAR_MORE.test(ml.more_text ?? '') && ml.less_text === 'show less' && ml.more_gone && (ml.rows_open ?? 0) > (ml.rows_capped ?? 0) && ml.rows_back === ml.rows_capped && ml.more_back === ml.more_text, ml);
-  // (f) 1a79de8a: a PR artifact's click calls window.bise.openExternal and opens no panel. Seen
+  // native-mac: the right bar's folding section heads and its '+ N more' / 'show less' pager are
+  // gone with the right bar (the floats end on 'all … ›' links to the full pages, native-lead
+  // m_47355): their two rows ('right bar: the section heads that fold…', "right bar: '+ N more'…")
+  // are dropped, the PR and the maker rows below read the artifacts float
+  // (f) 1a79de8a: a PR artifact's click called window.bise.openExternal and opened no panel (its tab since native-mac). Seen
   // from a logpoint on the preload's openExternal (CDP Debugger, a condition that logs and never
   // pauses); the url is refused in main, so nothing reaches his browser (gate A watches anyway)
-  const prRow = page.locator('[data-testid^="app.right.artifact."][data-testid$=".pr-proof"]').first();
-  const prThere = await prRow.waitFor({ timeout: 20000 }).then(() => true, () => false);
+  // its row in the artifacts float (⌥⌘2), the right bar's row before native-mac
+  const prRow = page.locator('[data-testid^="app.flyout.artifacts."]').filter({ hasText: 'pr-proof' }).first();
+  const prThere = await until(async () => ((await sideArt('pr-proof')) ? true : null), 20000, 1000) === true;
   const dbg = await page.context().newCDPSession(page).catch(() => null);
   const ext: string[] = [];
   let bp: { id: string; url: string; param: string | undefined } | { id?: undefined; error: string } | null = null;
@@ -1203,11 +1274,11 @@ if (mode === 'rows2') {
     thread_before?: string | null; thread_after?: string | null;
   } = { row: prThere, logpoint: bp };
   if (prThere) {
-    pr.leaves = await page.locator('[data-testid^="app.right.artifact."][data-testid$=".pr-proof.leaves"]').first().innerText({ timeout: 2000 }).catch(() => null);
+    pr.leaves = await prRow.innerText({ timeout: 2000 }).catch(() => null);
     const screenBefore = await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent').catch(() => null);
-    await click('the PR artifact in the right bar', prRow);
+    await click('the PR artifact on the right side', prRow);
     await page.waitForTimeout(1500);
-    pr = { ...pr, external_calls: [...ext], panel: await page.locator('[data-testid="artifact.open"], [data-testid="artifact.page"], [data-testid="app.art"]').count(), thread_before: screenBefore,
+    pr = { ...pr, external_calls: [...ext], panel: await page.locator('[data-testid^="app.panel.tab.artifact:"][data-testid$="/pr-proof"]').count(), thread_before: screenBefore,
       thread_after: await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent').catch(() => null) };
     await shot('pr-artifact-click');
   }
@@ -1216,57 +1287,112 @@ if (mode === 'rows2') {
     await dbg.send('Debugger.disable').catch(() => {});
     await dbg.detach().catch(() => {});
   }
-  const called = !!bp?.id && pr.external_calls?.length === 1 && pr.external_calls[0] === 'http://';
-  step('a PR artifact: a click calls openExternal (seen in the preload) and opens no panel', called && pr.panel === 0 && pr.thread_after === pr.thread_before, pr);
+  // native-mac: a PR opens as a tab of the panel (FlyoutLists' row: openTab, its ↗ goes out), so a
+  // click never calls openExternal (the logpoint must be set and silent) and the thread stays
+  const called = !!bp?.id && pr.external_calls?.length === 0;
+  step('a PR artifact: a click opens its panel tab, never his browser (no openExternal, seen in the preload)', called && pr.panel === 1 && pr.thread_after === pr.thread_before, pr);
+  await closeArtifact();
+  await page.locator('[data-testid^="app.panel.tab.artifact:"][data-testid$="/pr-proof.close"]').first().click({ timeout: 2000 }).catch(() => {});
   // (g) bae706f4: the maker dropped (its own artifact made), the artifact opened from the right bar,
   // the maker's head beside it at 1100: it ends at its column, never under the panel, restore whole
   // inside it, one line
-  const makerArt = page.locator('[data-testid^="app.right.artifact."][data-testid$=".rel-ts-notes"]').first();
-  // (e) left the list at its cap: the maker's row (older than the more-N ones) sits behind '+ N more'
-  const expand = async () => {
-    const more = page.locator('[data-testid="app.right.artifacts.more"]').first();
-    if (await more.isVisible().catch(() => false)) await click("the artifacts' '+ N more'", more);
-  };
-  await expand();
-  const made = await makerArt.waitFor({ timeout: 60000 }).then(() => true, () => false);
+  // the maker's artifact in the artifacts float (⌥⌘2; no cap to open since native-mac)
+  const makerArt = page.locator('[data-testid^="app.flyout.artifacts."]').filter({ hasText: 'rel-ts-notes' }).first();
+  const expand = async () => { await sideArt('rel-ts-notes'); };
+  const made = await until(async () => ((await sideArt('rel-ts-notes')) ? true : null), 60000, 1000) === true;
+  await closeFloat('artifacts');
   await say(`[[bash: sb drop ${MAKER}]]`);
-  const dropCard = page.locator('[data-testid^="dock.opt"], [data-testid^="composer.opt"]').filter({ hasText: /yes|drop/i }).first();
+  // a drop card's options: the composer's dock (composer.opt) before native-mac, an OptButton's
+  // <card>.opt.<n> since
+  const dropCard = page.locator('[data-testid^="dock.opt"], [data-testid^="composer.opt"], [data-testid*=".opt."]').filter({ hasText: /yes|drop/i }).first();
   const dropAsked = await dropCard.waitFor({ timeout: 20000 }).then(() => true, () => false);
   if (dropAsked) await click(`answer ${MAKER}'s drop card 'yes'`, dropCard);
-  const archived = await until(async () => (/release-ts/.test((await text('[data-testid="app.right.archived"]')) ?? '') && !/release-ts/.test((await text('[data-testid="app.right.agents"]')) ?? '') ? true : null), 60000, 1000);
+  // archived: no live row of it on the right side; in the coins' form, also in the agents float's
+  // archived fold (app.flyout.agents.archived). The outer card lists the live ones only: the
+  // archived thread itself is read in the row below (thread.archived)
+  const archived = await until(async () => {
+    if (!(await openFloat(1, 'agents'))) return null;
+    const live = await page.evaluate((m) => [...document.querySelectorAll('[data-testid^="app.flyout.agents."][data-testid$=".name"], [data-testid^="app.outer.agents."][data-testid$=".name"]')]
+      .filter((e) => !e.closest('[data-testid="app.flyout.agents.archived.rows"]') && (e.textContent ?? '').includes(m)).length, MAKER).catch(() => 1);
+    if (live > 0) return null;
+    if (await page.locator('[data-testid="app.outer"]').count()) return true;
+    const fold = page.locator('[data-testid="app.flyout.agents.archived"]').first();
+    if ((await fold.getAttribute('aria-expanded').catch(() => null)) === 'false') await fold.click({ timeout: 2000 }).catch(() => {});
+    return /release-ts/.test((await text('[data-testid="app.flyout.agents.archived.rows"]')) ?? '') ? true : null;
+  }, 60000, 1000);
+  await closeFloat('agents');
   type Box = { x: number; right: number; w: number; h: number } | null;
   let gh: {
     made: boolean; drop_card: boolean; archived: boolean; open?: boolean; agent?: string | null; head?: Box; column_right?: number | null;
     art?: Box; restore?: Box; restore_text?: string | null; restore_cut?: boolean | null; width?: number;
   } = { made, drop_card: dropAsked, archived: !!archived };
+  // native-mac: the artifact opens in the panel's tab (artifact.page) beside the thread he is on (it
+  // no longer brings its maker's thread). The maker's thread is opened from the agents float's
+  // archived fold (the panel open, the side's minis), as he would; archived, it says so and offers
+  // restore on its own line (ThreadScreen's History: thread.archived, thread.restore), the head's
+  // restore button before
   if (made && archived) {
     await expand();
-    await click(`${MAKER}'s artifact from the right bar`, makerArt);
-    const open = await page.locator('[data-testid="app.art"]').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
+    await click(`${MAKER}'s artifact from the right side`, makerArt);
+    let open = await page.locator('[data-testid="artifact.page"]').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
+    if (open && await openFloat(1, 'agents')) {
+      const fold = page.locator('[data-testid="app.flyout.agents.archived"]').first();
+      if ((await fold.getAttribute('aria-expanded').catch(() => null)) === 'false') await fold.click({ timeout: 2000 }).catch(() => {});
+      const old = page.locator('[data-testid="app.flyout.agents.archived.rows"] [data-row]').filter({ hasText: MAKER }).first();
+      await click(`${MAKER}'s archived row in the agents float`, old);
+      await page.locator(`[data-testid="thread.screen"][data-agent="${MAKER}"]`).first().waitFor({ timeout: 8000 }).catch(() => {});
+      open = await page.locator('[data-testid="artifact.page"]').first().isVisible().catch(() => false);
+    }
+    // two widths (native-lead m_47958): at >= 1176 the panel sits beside the thread, so restore
+    // stays inside its column, left of the panel, never under it (1440); under 1176 the panel is a
+    // sheet over the thread (designer m_44867's '1100 sheet'): esc closes the artifact, then
+    // restore is whole and clickable inside its column (1100)
     const vh2 = await page.evaluate(() => window.innerHeight);
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: vh2, deviceScaleFactor: 0, mobile: false }).catch(() => {});
-    await page.waitForTimeout(800);
-    await page.mouse.move(1, 400);
-    gh = { ...gh, open, ...(await page.evaluate(() => {
+    const measure = () => page.evaluate(() => {
       const b = (s: string) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x), right: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; };
-      const head = document.querySelector('[data-testid="thread.head"]');
-      const restore = document.querySelector('[data-testid="thread.head.restore"]');
+      const restore = document.querySelector('[data-testid="thread.restore"]');
+      const rb = restore?.getBoundingClientRect();
+      // what a click at restore's middle reaches: restore itself, never a panel over it
+      const hit = rb ? document.elementFromPoint(rb.x + rb.width / 2, rb.y + rb.height / 2) : null;
       return {
         agent: document.querySelector('[data-testid="thread.screen"]')?.getAttribute('data-agent') ?? null,
-        head: b('[data-testid="thread.head"]'), column_right: head?.parentElement ? Math.round(head.parentElement.getBoundingClientRect().right) : null,
-        art: b('[data-testid="app.art"]'), restore: b('[data-testid="thread.head.restore"]'), restore_text: restore?.textContent?.trim() ?? null,
-        restore_cut: restore ? restore.scrollWidth > restore.clientWidth : null, width: window.innerWidth,
+        head: b('[data-testid="thread.archived"]'), column_right: b('[data-testid="app.main"]')?.right ?? null,
+        art: b('[data-testid="artifact.page"]'), restore: b('[data-testid="thread.restore"]'), restore_text: restore?.textContent?.trim() ?? null,
+        restore_cut: restore ? restore.scrollWidth > restore.clientWidth : null, clickable: !!restore && !!hit && restore.contains(hit), width: window.innerWidth,
       };
-    })) };
-    await shot('archived-maker-head-1100');
-    await page.locator('[data-testid="thread.head"]').first().screenshot({ path: path.join(out, `${mode}${tag}-${++n}-archived-maker-head.png`), timeout: 5000 }).then(() => res.shots.push(path.join(out, `${mode}${tag}-${n}-archived-maker-head.png`)), () => {});
+    }).catch(() => null);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: vh2, deviceScaleFactor: 0, mobile: false }).catch(() => {});
+    await page.waitForTimeout(800);
+    await page.mouse.move(1, 400);
+    const wide = await measure();
+    await shot('archived-maker-1440');
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: vh2, deviceScaleFactor: 0, mobile: false }).catch(() => {});
+    await page.waitForTimeout(800);
+    const sheet = { art_open: await page.locator('[data-testid="artifact.page"]').first().isVisible().catch(() => false) };
+    // esc from the window, the focus in no field and not in the page's frame (a click on the
+    // thread under the sheet lands in the artifact's frame); else the sheet's ✕ (its tab's close)
+    await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur?.(); }).catch(() => {});
+    await page.keyboard.press('Escape');
+    const byEsc = await page.locator('[data-testid="artifact.page"]').first().waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
+    const byX = byEsc ? null : await page.locator(ART_CLOSE).first().click({ timeout: 3000 })
+      .then(() => page.locator('[data-testid="artifact.page"]').first().waitFor({ state: 'detached', timeout: 5000 })).then(() => true, () => false);
+    const closedAt1100 = byEsc || byX === true;
+    Object.assign(sheet, { by_esc: byEsc, by_x: byX });
+    await page.mouse.move(1, 400);
+    const narrow = await measure();
+    await shot('archived-maker-1100');
+    gh = { ...gh, open, agent: narrow?.agent ?? wide?.agent ?? null, wide, sheet: { ...sheet, esc_closed: closedAt1100 }, narrow } as typeof gh;
     await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
     await closeArtifact();
   }
-  const { head: ghHead, restore: ghRestore, column_right: ghCol, art: ghArt } = gh;
-  const fits = !!ghHead && !!ghRestore && ghCol != null && ghHead.right <= ghCol + 1
-    && (!ghArt || ghArt.x <= ghHead.x || ghHead.right <= ghArt.x + 1) && ghRestore.right <= ghHead.right + 1 && gh.restore_cut === false && ghHead.h === 44;
-  step("an archived maker's head beside its artifact at 1100: restore inside its column", gh.agent === MAKER && gh.width === 1100 && fits, gh);
+  type Seen = { head: Box; restore: Box; column_right: number | null; art: Box; restore_cut: boolean | null; clickable: boolean; width: number } | null | undefined;
+  const g2 = gh as unknown as { wide?: Seen; narrow?: Seen; sheet?: { esc_closed: boolean } };
+  const whole = (s: Seen) => !!s && !!s.head && !!s.restore && s.column_right != null && s.head.right <= s.column_right + 1
+    && s.restore.right <= s.head.right + 1 && s.restore_cut === false && s.restore.h < 40 && s.clickable;
+  const besideOk = whole(g2.wide) && g2.wide?.width === 1440 && !!g2.wide?.art && !!g2.wide?.restore && g2.wide.restore.right <= g2.wide.art.x + 1;
+  const sheetOk = !!g2.sheet?.esc_closed && whole(g2.narrow) && g2.narrow?.width === 1100 && !g2.narrow?.art;
+  step("an archived maker beside its artifact: restore inside its column beside the panel at 1440; at 1100 (the panel a sheet) esc closes it and restore is whole and clickable",
+    gh.agent === MAKER && besideOk && sheetOk, gh);
   await harness();
   await fileChips(harness);
 }
@@ -1282,7 +1408,7 @@ if (mode === 'quick') {
     await page.keyboard.press('Enter');
     return true;
   };
-  const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  const harness = () => openProject('harness');
   await closeArtifact();
   // The rows left after the e2e cull (docs/test-plan-min.md): the cross-hub answers, each group with
   // its seed. rowsE812 first: the PR poller gets the time the other takes. The other groups went:
@@ -1322,7 +1448,7 @@ async function rowsE812(harness: () => Promise<unknown>, say: (words: string) =>
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
   const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
-  const bise = () => click('bise', page.locator('[data-testid="app.side.bise"]').first());
+  const bise = () => openBise();
   const HP = process.env.AS_HE_DOES_HARNESS ?? null;
   const GHW = process.env.AS_HE_DOES_GH_WORLD ?? null;
   const git = async (args: string[]) => {
@@ -1443,7 +1569,7 @@ async function rowsF2A7(harness: () => Promise<unknown>, say: (words: string) =>
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
   const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
-  const bise = () => click('bise', page.locator('[data-testid="app.side.bise"]').first());
+  const bise = () => openBise();
   const field = page.locator('[data-testid="composer.field"]:visible').first();
   const clear = async () => {
     await field.click({ timeout: 3000 }).catch(() => {});
@@ -1768,7 +1894,7 @@ async function fileChips(harness: () => Promise<unknown>) {
   await fresh(`[[bash: sb notify '${Q}`);
   for (const l of ['1. cold', "2. warm']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
   await page.keyboard.press('Enter');
-  await click('bise', page.locator('[data-testid="app.side.bise"]').first());
+  await openBise();
   const row = page.locator('[data-testid^="inbox.block.row."]', { hasText: 'zqbench' }).first();
   const card = page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: 'zqbench' }).first();
   // the block draws its first items only: an item under '+ N more' is listed too (ambient-lead m_22076),
@@ -1808,13 +1934,13 @@ async function fileChips(harness: () => Promise<unknown>) {
 // the draft across a restart (ambient-lead m_19525): typed in harness' composer, never sent; after
 // the restart the same composer must hold it again
 if (mode === 'draft-type' || mode === 'draft-check') {
-  await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await openProject('harness');
   const composer = page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   await composer.waitFor({ timeout: 15000 }).catch(() => {});
   const holds = async () => ((await composer.innerText({ timeout: 2000 }).catch(() => '')) || (await composer.inputValue({ timeout: 500 }).catch(() => ''))).trim();
   // 516a4e79: the terminal panel left open across a restart starts its shell, never 'no folder for
   // this project' (it waits for the core's projects rows). Opened in the pause pass, read after it.
-  const term = page.locator('[data-testid="terminal.panel"]').first();
+  const term = page.locator(TERM_SEL).first();
   const termMark = path.join(out, 'term-open.json');
   if (mode === 'draft-type' && !tag.endsWith('atonce')) {
     if (!(await term.isVisible().catch(() => false))) await page.keyboard.press('Control+Backquote');
@@ -1825,6 +1951,17 @@ if (mode === 'draft-type' || mode === 'draft-check') {
     step('the terminal panel is open before the restart (⌃`)', open, { state });
   }
   if (mode === 'draft-check' && fs.existsSync(termMark) && !tag.endsWith('atonce')) {
+    // native-mac: the panel keeps its tabs across a restart (panel/model.ts parseKept); the shell's
+    // tab may come back behind another one: its tab is clicked to show it, as he would
+    // tab may come back behind another one, and the panel itself closed (it floated over the thread
+    // in the 1180 window before the restart): ⌥⌘B shows the panel, then its tab is clicked, as he would
+    const termTab = page.locator('[data-testid^="app.panel.tab.term:"]:not([data-testid$=".close"])').first();
+    await page.locator('[data-testid="app.main"]').first().waitFor({ timeout: 15000 }).catch(() => {});
+    if (!(await term.isVisible().catch(() => false)) && !(await page.locator('[data-testid="app.panel"]').first().isVisible().catch(() => false))) {
+      await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+      await page.keyboard.press('Alt+Meta+b');
+    }
+    if (!(await term.isVisible().catch(() => false)) && await termTab.waitFor({ timeout: 15000 }).then(() => true, () => false)) await termTab.click({ timeout: 3000 }).catch(() => {});
     const shown = await term.waitFor({ timeout: 15000 }).then(() => true, () => false);
     const state = shown ? await until(async () => { const s = await page.locator('[data-testid="terminal.screen"]').first().getAttribute('data-state').catch(() => null); return s && s !== 'opening' ? s : null; }, 20000, 300) : null;
     const failed = ((await text('[data-testid="terminal.failed"]')) ?? '').slice(0, 200);
@@ -1852,6 +1989,30 @@ if (mode === 'draft-type' || mode === 'draft-check') {
       const w = Number(await page.locator('[data-testid="app.split.side"]').first().getAttribute('aria-valuenow').catch(() => null));
       step('the sidebar width is kept across the restart', w === kept, { kept, now: w });
     }
+  }
+}
+// probe (cand.sh AS_HE_DOES_ONLY=modes, a port's dev loop, never in a pass): the app stays up and
+// each <out>/probe/<n>.js an agent writes runs as an async body with `page` and `text` in scope;
+// its value (JSON) goes to <n>.out, an error to <n>.err. <out>/probe/done, or AS_HE_DOES_PROBE_S
+// (1800) seconds, ends it.
+if (mode === 'probe') {
+  const dir = path.join(out, 'probe');
+  fs.mkdirSync(dir, { recursive: true });
+  const limit = Number(process.env.AS_HE_DOES_PROBE_S ?? 1800) * 1000;
+  passLimit(limit + 60000);
+  const AsyncFn = Object.getPrototypeOf(async () => {}).constructor as new (...a: string[]) => (...v: unknown[]) => Promise<unknown>;
+  const t0 = Date.now();
+  while (Date.now() - t0 < limit && !fs.existsSync(path.join(dir, 'done'))) {
+    lastStep.at = Date.now();
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js')).sort()) {
+      const base = path.join(dir, f.slice(0, -3));
+      if (fs.existsSync(`${base}.out`) || fs.existsSync(`${base}.err`)) continue;
+      try {
+        const v = await new AsyncFn('page', 'text', 'shot', fs.readFileSync(path.join(dir, f), 'utf8'))(page, text, shot);
+        fs.writeFileSync(`${base}.out`, JSON.stringify(v ?? null, null, 1));
+      } catch (e) { fs.writeFileSync(`${base}.err`, String((e as Error)?.stack ?? e)); }
+    }
+    await new Promise((r) => setTimeout(r, 500));
   }
 }
 ending = true;
