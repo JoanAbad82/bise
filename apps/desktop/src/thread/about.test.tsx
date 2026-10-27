@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { Artifact, Part } from '@/proto';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
-import { punctAfter, slotMark } from './Markdown';
+import { slotMark } from './Markdown';
 import { aboutChipMd, aboutParts, aboutText } from './about';
 import { EntryRow, type RowCtx } from './rows';
 
@@ -42,17 +42,6 @@ describe('aboutChipMd: the lead is the artifact chip, never its link or path', (
   });
 });
 
-describe('punctAfter: a chip before punctuation hugs it, before a word or a space keeps its side', () => {
-  it('reads the source right after the link', () => {
-    const md = 'see [a](artifact:a): then [b](artifact:b) and [c](artifact:c)…';
-    const end = (s: string) => md.indexOf(s) + s.length;
-    expect(punctAfter(md, end('(artifact:a)'))).toBe(true);
-    expect(punctAfter(md, end('(artifact:b)'))).toBe(false);
-    expect(punctAfter(md, end('(artifact:c)'))).toBe(true);
-    expect(punctAfter(md, undefined)).toBe(false);
-  });
-});
-
 describe('his bubble about an open artifact (about-chip)', () => {
   it("draws the artifact's chip and his words, never the link or its path; a click opens it", () => {
     const opened: string[] = [];
@@ -75,7 +64,9 @@ describe('his bubble about an open artifact (about-chip)', () => {
     expect(bubble).toBe('about projection achat ou location: En fait je pense que louer cet appartement ce serait environs 3200-3500 euros par mois');
     const chip = v.getByTestId('thread.artname');
     expect(chip.textContent).toBe('projection achat ou location');
-    expect(chip.classList.contains('tight'), "its ':' hugs the name, no right side (designer m_47295)").toBe(true);
+    // before its ':' the chip keeps both sides, the fill past its last letter (chip-wrap: his
+    // 'appart.' with no right side read as cut); the plain chip, no side-dropping class
+    expect(chip.className, "its ':' after the whole chip, both sides kept").toBe('b-artname');
     fireEvent.click(chip);
     expect(opened).toEqual(['projection']);
   });

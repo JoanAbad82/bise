@@ -2,7 +2,7 @@
 // notices, a task's brief, a handoff, a message not delivered. Owner: amb-win.
 // Split out of rows.tsx (pure move).
 import { useArtifactOpener, useOpenArtifact } from './openArtifact';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Act, AppIcon, ArtName, BriefLine, Button, Fold, iconKindOf, KindIcon, Marker, Press, RowMark, SchedHead, type AppIconName, type IconKind } from '@/ds';
 import type { Entry } from '@/proto';
 import { thread } from '@/proto/words.gen';
@@ -14,6 +14,7 @@ import { Markdown } from './Markdown';
 import { clock, handoffOf, repeatsReport, reportBody, schedHead } from './entry';
 import { wakeLine, wakeTail } from './wake';
 import { useRouter } from '@/app/router';
+import { useCut } from '@/app/side3d/Flyout';
 import type { RowCtx } from './rows';
 import { retryOf, retryWords, typedRetry, type Retry } from './tiers';
 /** A news line's mark: what it means, never its color alone. */
@@ -136,13 +137,17 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 }
 
 /** An artifact in the thread (QA §4): the pink chip, its kind's 14 line icon (ds KindIcon, no glyph:
- *  ui-review m_43792) and its title, then its kind and version dim after it. */
+ *  ui-review m_43792) and its title, then its kind and version dim after it. One line, 22 high: a
+ *  long title is cut with … and its tip holds it whole, only while cut (his chip-wrap screenshot:
+ *  the wrapped words spilled out of the box; designer m_46988's rule for a cut title). */
 export function MadeChip({ kind, title, meta, open = false, onClick, testId }: { kind: IconKind; title: string; meta: string; open?: boolean; onClick: () => void; testId: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const cut = useCut(box);
   return (
-    <div className="th-made" data-open={open || undefined}>
-      <ArtName onClick={onClick} testId={testId}>
+    <div ref={box} className="th-made" data-open={open || undefined}>
+      <ArtName onClick={onClick} testId={testId} tip={cut ? title : undefined}>
         <KindIcon kind={kind} size={14} />
-        {title}
+        <span className="th-made-title">{title}</span>
       </ArtName>
       {meta !== '' && <span className="th-made-meta">{meta}</span>}
     </div>

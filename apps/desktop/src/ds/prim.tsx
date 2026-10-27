@@ -113,16 +113,19 @@ export interface ArtNameProps {
   state?: "hover";
   onClick?: () => void;
   testId?: string;
-  /** punctuation follows it (':', ',', '.'...): no right side, the mark hugs the name as after any word (designer m_47295) */
-  tight?: boolean;
+  /** its tip (the whole title, when a one-line chip cuts it: thread MadeChip) */
+  tip?: string;
 }
 /**
  * An artifact's name inside a line of text (an answer, a note, an inbox line; desktop-agents-bar
  * §5): the chip's highlight inline, 4 px sides, wrapping with its words; a link when it opens.
+ * Its sides stay before punctuation too: the fill ends past the last letter, then the mark (his
+ * chip-wrap screenshot: 'appart.' with no right side read as cut).
  */
-export function ArtName({ children, state, onClick, testId, tight }: ArtNameProps) {
+export function ArtName({ children, state, onClick, testId, tip }: ArtNameProps) {
   return (
-    <span className={cx("b-artname", state === "hover" && "is-hover", tight === true && "tight")} role={onClick ? "link" : undefined} tabIndex={onClick ? 0 : undefined}
+    <span className={cx("b-artname", state === "hover" && "is-hover")} role={onClick ? "link" : undefined} tabIndex={onClick ? 0 : undefined}
+      {...tipAttrs(tip)}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onClick(); } } : undefined}
       data-testid={testId}>

@@ -861,10 +861,6 @@ button.th-turn-line:focus-visible {
   font: 500 var(--f-ui);
   vertical-align: baseline;
 }
-/* punctuation right after it ('about [chip]: …'): the mark hugs the name (designer m_47295) */
-.th-screen .b-artname.tight {
-  padding-right: 0;
-}
 /* the bar's title, renamed in place (the menu's Rename, Rename.tsx): the title's own font */
 .th-rename {
   width: calc(var(--s-16) * 3);
@@ -1769,7 +1765,23 @@ button.th-turn-line:focus-visible {
   gap: var(--gap-inline);
   min-width: 0;
 }
+/* one line, 22 high whatever the column: a long title cut with … (its tip holds it whole), the
+   icon and the meta kept whole beside it (his chip-wrap screenshot: the words wrapped out of the box) */
+.th-made .b-artname {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.th-made .b-artname > svg {
+  flex: none;
+}
+.th-made-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .th-made-meta {
+  flex: none;
   color: var(--c-text-3);
   font: 400 var(--f-meta);
   white-space: nowrap;

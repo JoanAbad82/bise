@@ -24,17 +24,10 @@ export function artSplit(text: string): ArtPiece[] {
   return out;
 }
 
-/** Punctuation right after the i-th piece: its name's mark hugs it (designer m_47295). Pure. */
-const tightAt = (pieces: readonly ArtPiece[], i: number): boolean => {
-  const next = pieces[i + 1];
-  return next !== undefined && 'words' in next && /^[:,.;?!)…]/u.test(next.words);
-};
-
-function Name({ project, id, name, testId, tight }: { project: string; id: string; name: string; testId: string; tight: boolean }) {
+function Name({ project, id, name, testId }: { project: string; id: string; name: string; testId: string }) {
   const go = useGoArtifact();
   return (
     <ArtName
-      tight={tight}
       onClick={() => {
         go(project, id);
       }}
@@ -50,7 +43,7 @@ function Name({ project, id, name, testId, tight }: { project: string; id: strin
  *  (ui-review m_46410). No router needed. */
 export function ArtText({ text }: { text: string }) {
   const pieces = artSplit(text);
-  return <>{pieces.map((p, i) => ('words' in p ? p.words : <ArtName key={i} tight={tightAt(pieces, i)}>{p.name}</ArtName>))}</>;
+  return <>{pieces.map((p, i) => ('words' in p ? p.words : <ArtName key={i}>{p.name}</ArtName>))}</>;
 }
 
 /** A line's words, its artifacts' names pink and clickable; `<testId>.art.<id>` on each name. */
@@ -58,7 +51,7 @@ export function ArtWords({ text, project, testId }: { text: string; project: str
   const pieces = artSplit(text);
   return (
     <>
-      {pieces.map((p, i) => ('words' in p ? p.words : <Name key={i} project={project} id={p.id} name={p.name} testId={`${testId}.art.${p.id}`} tight={tightAt(pieces, i)} />))}
+      {pieces.map((p, i) => ('words' in p ? p.words : <Name key={i} project={project} id={p.id} name={p.name} testId={`${testId}.art.${p.id}`} />))}
     </>
   );
 }
