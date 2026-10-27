@@ -76,7 +76,7 @@
 /* a role's model (V17): the ds Select, as wide as its words up to 240 px */
 .settings-pick { display: inline-flex; width: 240px; max-width: 240px; }
 /* the expired sign-in under way (V14): the waiting line and its two acts */
-.settings-signing { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); padding: 0 var(--s-3); outline: none; }
+.settings-signing { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); outline: none; }
 /* the approvals page takes the rules' list keys (useListKeys): no focus ring on the page itself */
 .settings-approvals { outline: none; }
 /* a rule's remove asking inline (V8) */

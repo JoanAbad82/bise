@@ -76,7 +76,8 @@ describe("a settings page's text edge (designer m_48227)", () => {
     expect(rule(dsCss, '.b-settings .b-gt').get('padding')).toBe('0 var(--s-3) var(--s-2)');
     expect(rule(dsCss, '.b-settings-lead').get('padding')).toBe('0 var(--s-3)');
     expect(rule(dsCss, '.b-settings .b-help').get('padding')).toBe('0 var(--s-3)');
-    expect(rule(settingsCss, '.settings-signing').get('padding')).toBe('0 var(--s-3)');
+    // the sign-in line's words are a help line: its box adds no 12 of its own (ui-review m_48283: 24 in)
+    expect(rule(settingsCss, '.settings-signing').has('padding')).toBe(false);
   });
 });
 

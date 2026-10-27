@@ -64,6 +64,6 @@
 .b-settings .b-btn{height:var(--h-control-sm)}
 /* a note under a card: 12 under it, aligned with the label's words (ui-review m_43805) */
 .b-settings .b-group+.b-help{margin-top:var(--s-3)}
-/* one text edge per page (designer m_48227): the lead, every help line and the sign-in line start
-   12 in, on the group heads' and the row labels' x */
+/* one text edge per page (designer m_48227): the lead and every help line (the sign-in line's words
+   are one) start 12 in, on the group heads' and the row labels' x */
 .b-settings .b-help{padding:0 var(--s-3)}
