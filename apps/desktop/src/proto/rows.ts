@@ -200,10 +200,11 @@ procs?: number,
  */
 procs_port?: number | null, 
 /**
- * agent-rank (architect m_39150): its place in the agents list, the
- * hub's one stable order (switchboard proto_view/rank.rs): main 0,
- * the live others 1..n, the terminal's panel and the desktop's bar
- * sort by it and ⌥N reaches rank N. None for an archived agent and
+ * agent-rank (architect m_39150, side-sort m_47361): its place in the
+ * agents list, the hub's one order (switchboard proto_view/rank.rs:
+ * needs him, works, rests, done, newest launched first): main 0, the
+ * live others 1..n, the terminal's panel and every desktop list sort
+ * by it and ⌥N reaches rank N. None for an archived agent and
  * from an older hub (the clients keep start order)
  */
 rank?: number | null, };

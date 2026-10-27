@@ -1,114 +1,90 @@
 use super::*;
+use bise_proto::rows::{AgentWatch, WatchKind};
 
-const H: u64 = 3_600_000;
-const T0: u64 = 1_000 * H;
-
-fn input<'a>(name: &'a str, created_ms: u64, act: Act) -> Input<'a> {
-    Input { name, aliases: &[], created_ms, act }
+fn row(name: &str, status: Status, created: u64) -> Agent {
+    let mut a = Agent::of_archived(&bise_proto::rows::ArchivedAgent { name: name.into(), aliases: vec![], dir: name.into(), status, since_ms: 0, about: String::new() });
+    a.status = status;
+    a.archived = false;
+    a.created_ms = Some(created);
+    a
 }
 
-fn heard(id: u64, to: &str, at: u64) -> Heard<'_> {
-    Heard { id, to, at }
-}
-
-#[test]
-fn a_fresh_hub_ranks_by_score_then_age() {
-    let mut r = Ranks::default();
-    r.hear([heard(1, "docs", T0 - H)]);
-    let live = [input("perf", 1, Act::Rests(T0 - 10 * H)), input("search", 2, Act::Works), input("docs", 3, Act::Rests(T0 - 10 * H)), input("ux", 4, Act::Rests(T0 - 10 * H))];
-    assert_eq!(r.order(&live, T0), ["search", "docs", "perf", "ux"]);
+fn ranked(rows: &mut [Agent]) -> Vec<&str> {
+    apply(rows);
+    let mut v: Vec<(u32, &str)> = rows.iter().filter_map(|a| a.rank.map(|r| (r, a.name.as_str()))).collect();
+    v.sort();
+    v.into_iter().map(|(_, n)| n).collect()
 }
 
 #[test]
-fn needs_him_passes_working_and_working_passes_rest() {
-    let mut r = Ranks::default();
-    let live = [input("a", 1, Act::Rests(0)), input("b", 2, Act::Works), input("c", 3, Act::Needs)];
-    assert_eq!(r.order(&live, T0), ["c", "b", "a"]);
-}
-
-#[test]
-fn small_activity_changes_hold_the_order_still() {
-    let mut r = Ranks::default();
-    r.hear([heard(1, "a", T0), heard(2, "b", T0)]);
-    let rest = |n| input(n, 0, Act::Rests(T0 - 4 * H));
-    let first = r.order(&[rest("a"), rest("b"), rest("c")], T0).to_vec();
-    assert_eq!(first, ["a", "b", "c"]);
-    // c starts a turn and b gets one more message: within the minute nothing moves
-    r.hear([heard(3, "b", T0 + 10_000)]);
-    let live = [rest("a"), rest("b"), input("c", 0, Act::Works)];
-    assert_eq!(r.order(&live, T0 + 30_000), first);
-    // past the minute: c works (2) against a's talk (1): not more than the margin, it stays
-    // below; b's second message (2 vs 1) is not more than the margin either
-    assert_eq!(r.order(&live, T0 + 2 * MINUTE), first);
-    // a pause between two turns (2 min at rest) changes nothing either
-    let live = [rest("a"), rest("b"), input("c", 0, Act::Rests(T0 + 2 * MINUTE))];
-    assert_eq!(r.order(&live, T0 + 4 * MINUTE), first);
-}
-
-#[test]
-fn a_clear_lead_passes_at_the_next_minute_only() {
-    let mut r = Ranks::default();
-    let rest = |n| input(n, 0, Act::Rests(0));
-    assert_eq!(r.order(&[rest("a"), rest("b")], T0), ["a", "b"]);
-    let live = [rest("a"), input("b", 0, Act::Needs)];
-    assert_eq!(r.order(&live, T0 + MINUTE - 1), ["a", "b"]);
-    assert_eq!(r.order(&live, T0 + MINUTE), ["b", "a"]);
-}
-
-#[test]
-fn a_newcomer_takes_its_place_at_once_and_a_leaver_frees_its_own() {
-    let mut r = Ranks::default();
-    let rest = |n| input(n, 0, Act::Rests(0));
-    r.hear([heard(1, "a", T0), heard(2, "a", T0), heard(3, "a", T0), heard(4, "b", T0)]);
-    assert_eq!(r.order(&[rest("a"), rest("b"), rest("c")], T0), ["a", "b", "c"]);
-    assert_eq!(r.order(&[rest("a"), rest("b"), rest("c"), input("new", 9, Act::Works)], T0 + 1_000), ["a", "new", "b", "c"]);
-    assert_eq!(r.order(&[rest("a"), rest("c"), input("new", 9, Act::Works)], T0 + 2_000), ["a", "new", "c"]);
-}
-
-#[test]
-fn the_kept_talk_is_the_whole_sum() {
-    let msgs: Vec<(u64, &str, u64)> = (1..=40).map(|i| (i, if i % 3 == 0 { "b" } else { "a" }, T0 + i * 17 * 60_000)).collect();
-    let now = T0 + 20 * H;
-    let sum = |to: &str| msgs.iter().filter(|m| m.1 == to).map(|m| decay((now - m.2) as f64, TALK_HALF_MS)).sum::<f64>();
-    // read in two passes (the boot's, then the new ones), one message seen twice
-    let mut r = Ranks::default();
-    r.hear(msgs[..25].iter().map(|m| heard(m.0, m.1, m.2)));
-    assert_eq!(r.unread(), 26);
-    r.hear(msgs[24..].iter().map(|m| heard(m.0, m.1, m.2)));
-    for to in ["a", "b"] {
-        assert!((r.talk(to, &[], now) - sum(to)).abs() < 1e-9, "{to}");
+fn each_state_falls_in_its_tier() {
+    let mut waits = row("w", Status::Idle, 0);
+    waits.waits = 1;
+    let mut on_you = row("y", Status::Idle, 0);
+    on_you.waiting_on = Some(WaitingOn::You);
+    let mut on_peer = row("p", Status::Idle, 0);
+    on_peer.waiting_on = Some(WaitingOn::Agent { name: "x".into() });
+    let mut paused = row("e", Status::Idle, 0);
+    paused.watching = vec![AgentWatch { id: 1, kind: WatchKind::Bg, what: "cargo test".into(), since_ms: 0, noted: false, resumes: true, until_ms: None }];
+    let table = [
+        (waits, Tier::Needs),
+        (on_you, Tier::Needs),
+        (row("b", Status::Blocked, 0), Tier::Needs),
+        (row("f", Status::Failed, 0), Tier::Needs),
+        (row("k", Status::Working, 0), Tier::Works),
+        (row("q", Status::Waiting, 0), Tier::Works),
+        (on_peer, Tier::Works),
+        (paused, Tier::Works),
+        (row("i", Status::Idle, 0), Tier::Rests),
+        (row("d", Status::Done, 0), Tier::Done),
+    ];
+    for (a, want) in table {
+        assert_eq!(Tier::of(&a), want, "{}", a.name);
     }
-    // an older message read late counts the same
-    let mut late = Ranks::default();
-    late.hear([heard(1, "a", T0 + H), heard(2, "a", T0)]);
-    let want = decay((now - T0 - H) as f64, TALK_HALF_MS) + decay((now - T0) as f64, TALK_HALF_MS);
-    assert!((late.talk("a", &[], now) - want).abs() < 1e-9);
 }
 
 #[test]
-fn a_renamed_agent_keeps_its_talk() {
-    let mut r = Ranks::default();
-    r.hear([heard(1, "old", T0)]);
-    let aliases = vec!["old".to_string()];
-    assert!((r.talk("new", &aliases, T0) - 1.0).abs() < 1e-9);
+fn needs_him_then_works_then_rests_then_done() {
+    let mut on_you = row("asks", Status::Idle, 1);
+    on_you.waiting_on = Some(WaitingOn::You);
+    let mut rows = vec![row("done", Status::Done, 9), row("idle", Status::Idle, 8), row("work", Status::Working, 2), on_you];
+    assert_eq!(ranked(&mut rows), ["asks", "work", "idle", "done"]);
 }
 
 #[test]
-fn rows_get_main_zero_and_the_others_their_place() {
-    let row = |name: &str, main: bool, status: Status, created: u64| {
-        let mut a = Agent::of_archived(&bise_proto::rows::ArchivedAgent { name: name.into(), aliases: vec![], dir: name.into(), status, since_ms: 0, about: String::new() });
-        a.main = main;
-        a.status = status;
-        a.archived = false;
-        a.created_ms = Some(created);
-        a.since_ms = 0;
-        a
-    };
-    let mut rows = vec![row("main", true, Status::Idle, 0), row("x", false, Status::Idle, 1), row("y", false, Status::Working, 2)];
-    let mut gone = row("z", false, Status::Done, 3);
+fn newest_launched_first_inside_a_tier_then_the_name() {
+    let mut rows = vec![row("old", Status::Working, 1), row("new", Status::Working, 3), row("b", Status::Working, 2), row("a", Status::Working, 2), row("unknown", Status::Working, 0)];
+    rows[4].created_ms = None;
+    assert_eq!(ranked(&mut rows), ["new", "a", "b", "old", "unknown"]);
+}
+
+/// His case (m_47356): an older done agent he just talked to stays below
+/// one launched a minute ago that works, and below an idle newer one.
+#[test]
+fn a_fresh_working_agent_is_above_every_done_one() {
+    let mut rows = vec![row("talked", Status::Done, 5), row("older-done", Status::Done, 1), row("fresh", Status::Working, 10), row("fresh-idle", Status::Idle, 11)];
+    assert_eq!(ranked(&mut rows), ["fresh", "fresh-idle", "talked", "older-done"]);
+    // it works again: up at once
+    rows[0].status = Status::Working;
+    assert_eq!(ranked(&mut rows), ["fresh", "talked", "fresh-idle", "older-done"]);
+}
+
+#[test]
+fn the_same_rows_give_the_same_order_whatever_they_come_in() {
+    let rows = vec![row("a", Status::Done, 3), row("b", Status::Working, 1), row("c", Status::Idle, 2), row("d", Status::Working, 4)];
+    let mut fwd = rows.clone();
+    let mut rev: Vec<Agent> = rows.into_iter().rev().collect();
+    assert_eq!(ranked(&mut fwd), ranked(&mut rev));
+}
+
+#[test]
+fn rows_get_main_zero_and_archived_none() {
+    let mut main = row("main", Status::Idle, 0);
+    main.main = true;
+    let mut gone = row("z", Status::Done, 3);
     gone.archived = true;
-    rows.push(gone);
-    apply(&mut rows, &mut Ranks::default(), T0);
+    let mut rows = vec![main, row("x", Status::Idle, 1), row("y", Status::Working, 2), gone];
+    apply(&mut rows);
     let ranks: Vec<Option<u32>> = rows.iter().map(|a| a.rank).collect();
     assert_eq!(ranks, [Some(0), Some(2), Some(1), None]);
 }
