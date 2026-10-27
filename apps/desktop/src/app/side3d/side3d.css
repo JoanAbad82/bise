@@ -1312,6 +1312,13 @@
 .s3-port:hover {
   color: var(--c-text);
 }
+/* the short form at rest (':5242', portfit.ts): it gives way to the command, text-3 */
+.s3-port[data-short] {
+  color: var(--c-text-3);
+}
+.s3-port[data-short]:hover {
+  color: var(--c-text);
+}
 /* a watch's detail under its row: its words one a line text-2, then its agent and 'stop watching' */
 .s3-detail {
   display: flex;
