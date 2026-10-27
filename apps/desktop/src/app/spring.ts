@@ -3,8 +3,9 @@
 // spring-loading delay (Pointer Control's setting, main/a11y.ts; 0.5 s by default) the row blinks
 // twice (tint off 100 ms / on 100 ms) and the project opens, so he drops in it: the drop is then
 // the window's, its composer's (composer/pm/paste.ts useDropAnywhere), as anywhere else. Space
-// springs at once, as in the Finder. Leaving the row, the drop, the drag's end and Esc cancel; Esc
-// keeps the row lit, never springing again until he leaves it. The project in view never springs;
+// springs at once, as in the Finder. Leaving the row, the drop, the drag's end and Esc cancel; after
+// Esc the tint goes and the row never springs again until he leaves it (designer m_47585). The
+// project in view never springs;
 // spring-loading off in macOS: the row lights, never opens; reduce motion: no blink, it opens at
 // the delay's end. The timeline is pure (springStep, time an input); the hook wires it to the row.
 // Owner: drag-spring.
@@ -15,10 +16,11 @@ import { useA11y } from './a11yroot';
 /** The two blinks: tint off 100 ms, on 100 ms, twice (designer m_47386; app.css's app-s-spring). */
 export const BLINK_MS = 400;
 
-/** lit: a drop target that will not spring (spring-loading off, or Esc); hold: the delay runs; blink: the two blinks, then it opens. */
-export type SpringPhase = 'lit' | 'hold' | 'blink';
+/** lit: a drop target that will not spring (spring-loading off); hold: the delay runs; blink: the
+ *  two blinks, then it opens; stop: Esc cancelled it, no tint, no spring until he leaves the row. */
+export type SpringPhase = 'lit' | 'hold' | 'blink' | 'stop';
 
-/** A row's spring: its phase and when that phase ends (ms; lit never ends). null: no drag over it. */
+/** A row's spring: its phase and when that phase ends (ms; lit and stop never end). null: no drag over it. */
 export type Spring = { readonly phase: SpringPhase; readonly due: number } | null;
 
 export type SpringEv =
@@ -55,7 +57,7 @@ export function springStep(s: Spring, ev: SpringEv, cfg: SpringCfg): { s: Spring
     case 'space':
       return s?.phase === 'hold' ? blinkOrOpen(ev.now, cfg) : stay;
     case 'esc':
-      return s === null ? stay : { s: { phase: 'lit', due: Infinity }, open: false };
+      return s === null ? stay : { s: { phase: 'stop', due: Infinity }, open: false };
     case 'leave':
       return { s: null, open: false };
   }
@@ -142,7 +144,8 @@ export function useSpring(here: boolean, open: () => void): SpringRow {
     step({ e: 'enter', now: Date.now() });
   };
   return {
-    spring: s?.phase ?? null,
+    // stopped by Esc: drawn as no drag at all
+    spring: s === null || s.phase === 'stop' ? null : s.phase,
     drag: {
       onDragEnter: over,
       onDragOver: over,

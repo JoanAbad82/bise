@@ -37,9 +37,9 @@ describe('springStep', () => {
     expect(r.opened).toEqual([]);
   });
 
-  it('Esc keeps it lit and it never springs until he leaves', () => {
-    const r = run([{ e: 'enter', now: 0 }, { e: 'esc' }, { e: 'enter', now: 100 }, { e: 'tick', now: 2000 }, { e: 'space', now: 2100 }]);
-    expect(r.phases).toEqual(['hold', 'lit', 'lit', 'lit', 'lit']);
+  it('Esc cancels: it never springs until he leaves, then a new enter starts again', () => {
+    const r = run([{ e: 'enter', now: 0 }, { e: 'esc' }, { e: 'enter', now: 100 }, { e: 'tick', now: 2000 }, { e: 'space', now: 2100 }, { e: 'leave' }, { e: 'enter', now: 2200 }]);
+    expect(r.phases).toEqual(['hold', 'stop', 'stop', 'stop', 'stop', null, 'hold']);
     expect(r.opened).toEqual([]);
   });
 

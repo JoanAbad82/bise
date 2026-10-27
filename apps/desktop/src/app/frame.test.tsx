@@ -404,4 +404,66 @@ describe('spring-loaded projects (his m_47378, designer m_47386)', () => {
       vi.useRealTimers();
     }
   });
+
+  it('space during the hold springs at once: the blinks, then it opens', () => {
+    vi.useFakeTimers();
+    try {
+      const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+      const docs = v.getByTestId(`app.side.project.${DOCS}`);
+      fireEvent.dragEnter(docs, files);
+      act(() => {
+        vi.advanceTimersByTime(100);
+        fireEvent.keyDown(window, { key: ' ' });
+      });
+      expect(docs.getAttribute('data-spring')).toBe('blink');
+      act(() => {
+        vi.advanceTimersByTime(BLINK_MS);
+      });
+      expect(router.get()).toEqual({ screen: 'thread', project: DOCS, agent: 'main' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Esc during the drag cancels: the tint goes, and more dragover never springs it', () => {
+    vi.useFakeTimers();
+    try {
+      const { v, router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+      const docs = v.getByTestId(`app.side.project.${DOCS}`);
+      fireEvent.dragEnter(docs, files);
+      act(() => {
+        vi.advanceTimersByTime(200);
+        fireEvent.keyDown(window, { key: 'Escape' });
+      });
+      expect(docs.getAttribute('data-spring')).toBeNull();
+      act(() => {
+        fireEvent.dragOver(docs, files);
+        vi.advanceTimersByTime(5000);
+      });
+      expect(docs.getAttribute('data-spring')).toBeNull();
+      expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'main' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a drop on the row goes on to the window, the composer's (paste.ts useDropAnywhere), and stops the spring", () => {
+    const { v } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')]);
+    const docs = v.getByTestId(`app.side.project.${DOCS}`);
+    const heard: Event[] = [];
+    const hear = (e: Event) => {
+      heard.push(e);
+    };
+    window.addEventListener('drop', hear);
+    try {
+      fireEvent.dragEnter(docs, files);
+      fireEvent.drop(docs, files);
+      expect(heard).toHaveLength(1);
+      // the row leaves the drop to the window: never taken, never stopped
+      expect(heard[0]?.defaultPrevented).toBe(false);
+      expect(docs.getAttribute('data-spring')).toBeNull();
+    } finally {
+      window.removeEventListener('drop', hear);
+    }
+  });
 });
