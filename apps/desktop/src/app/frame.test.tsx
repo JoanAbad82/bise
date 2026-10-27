@@ -4,15 +4,16 @@
 // it; round 3, H1: its name and pill or age, its sentence, a quiet one on one line; ⌘ held its
 // digit), its head bise, Search ⌘K, New project ⌘N (no New agent row).
 import { cleanup, fireEvent, render } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HINT_HOLD_MS } from './held';
+import { useShowsMainAtEnd } from './seen';
 import type { Agent, ProjectRow } from '@/proto';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 import { ev, projects as projectsEv, row } from '../../tests/feature/inputs';
 import { createRouter, RouterContext } from './router';
 import type { Route } from './route';
-import { Sidebar } from './Sidebar';
+import { Sidebar, UNREAD_FADE_MS } from './Sidebar';
 import { projects } from '@/proto/words_projects.gen';
 import { common } from '@/proto/words.gen';
 import { waitsTip, workingTip } from './tipwords';
@@ -44,7 +45,13 @@ function frame(route: Route, agents: Agent[], sent: unknown[] = [], acme: Partia
       </RouterContext>
     </StoreProvider>,
   );
-  return { v, router };
+  return { v, router, store };
+}
+
+/** Main's thread of `project` on screen at its newest row (`on`), as ThreadScreen says it. */
+function Looker({ project, on }: { project: string; on: boolean }) {
+  useShowsMainAtEnd(project, on);
+  return null;
 }
 
 describe('the rail', () => {
@@ -137,16 +144,120 @@ describe('the sidebar', () => {
     }
   });
 
-  it('marks the project he opens seen, and again when he leaves it (prefs seen.<project>)', () => {
+  it('marks the project seen when he starts looking at its main at its newest row, and again when he stops (prefs seen.<project>)', () => {
     const sent: unknown[] = [];
-    const { router } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent);
-    const seen = () => sent.filter((c) => (c as { cmd: string; key?: string }).cmd === 'prefs_set' && (c as { key: string }).key === `seen.${ACME}`);
-    expect(seen()).toHaveLength(1);
-    act(() => {
-      router.go({ screen: 'thread', project: DOCS, agent: 'main' });
+    frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent);
+    const seen = (p: string) => sent.filter((c) => (c as { cmd: string; key?: string }).cmd === 'prefs_set' && (c as { key: string }).key === `seen.${p}`);
+    // the route alone is not a look: main's thread says it is on screen at its end
+    expect(seen(ACME)).toHaveLength(0);
+    const look = render(<Looker project={ACME} on />);
+    expect(seen(ACME)).toHaveLength(1);
+    // he scrolls up to read: what came until now is seen, nothing after
+    look.rerender(<Looker project={ACME} on={false} />);
+    expect(seen(ACME)).toHaveLength(2);
+    look.rerender(<Looker project={DOCS} on />);
+    expect(seen(DOCS)).toHaveLength(1);
+    expect(seen(ACME)).toHaveLength(2);
+  });
+
+  describe('the unread dot (proj-unread, designer m_47372)', () => {
+    const H = 3_600_000;
+    const NOW = 1_800_000_000_000;
+    const pulse = (said_at: number[]) => ({ from_ms: NOW - 20 * 8 * H, busy_ms: [], last_ms: NOW - H, said_at, counting: false });
+    const dot = (v: ReturnType<typeof render>, p: string) => v.queryByTestId(`app.side.project.${p}.unread`);
+    const lookAt = (store: Store, p: string, at: number) => {
+      // the core's prefs hold the dotted key as a path: seen → <project>
+      store.apply({ ev: 'prefs', prefs: { seen: { [p]: at } } });
+    };
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      vi.setSystemTime(NOW);
     });
-    expect(seen()).toHaveLength(2);
-    expect(sent.some((c) => (c as { key?: string }).key === `seen.${DOCS}`)).toBe(true);
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('shows after the name of a project main wrote for him since he last looked; none on the others', () => {
+      const { v, store } = frame({ screen: 'bise' }, [agent('main')], [], { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      act(() => {
+        lookAt(store, ACME, NOW - 2 * H);
+      });
+      const d = dot(v, ACME);
+      expect(d).not.toBeNull();
+      // right after the name, before the end (the pill or the age)
+      expect(d?.previousElementSibling?.classList.contains('nm')).toBe(true);
+      expect(dot(v, DOCS)).toBeNull();
+      // he had looked after it: no dot
+      act(() => {
+        lookAt(store, ACME, NOW - H / 2);
+      });
+      act(() => {
+        vi.advanceTimersByTime(UNREAD_FADE_MS + 10);
+      });
+      expect(dot(v, ACME)).toBeNull();
+    });
+
+    it('survives a restart: the last look is in prefs, the entry in the pulse', () => {
+      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], [], { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      act(() => {
+        lookAt(store, ACME, NOW - 2 * H);
+      });
+      // the app opens on the project, main not drawn yet at its end: still unread
+      expect(dot(v, ACME)).not.toBeNull();
+    });
+
+    it('goes while he looks at its main at its newest row, the window in front: it fades out in 150 ms, marked seen', () => {
+      const sent: unknown[] = [];
+      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent, { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      act(() => {
+        lookAt(store, ACME, NOW - 2 * H);
+      });
+      expect(dot(v, ACME)).not.toBeNull();
+      act(() => {
+        render(<Looker project={ACME} on />);
+      });
+      expect(dot(v, ACME)?.classList.contains('out')).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(UNREAD_FADE_MS + 10);
+      });
+      expect(dot(v, ACME)).toBeNull();
+      expect(sent.some((c) => (c as { key?: string }).key === `seen.${ACME}`)).toBe(true);
+    });
+
+    it('stays while he reads main scrolled up, and comes for what main says while the window is behind', () => {
+      const sent: unknown[] = [];
+      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent, { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      act(() => {
+        lookAt(store, ACME, NOW - 2 * H);
+      });
+      const look = render(<Looker project={ACME} on={false} />);
+      expect(dot(v, ACME)).not.toBeNull();
+      // at its end in front: seen; then the window goes behind
+      act(() => {
+        look.rerender(<Looker project={ACME} on />);
+        lookAt(store, ACME, NOW);
+      });
+      vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+      act(() => {
+        window.dispatchEvent(new Event('blur'));
+      });
+      // main ends its turn while he is in another app
+      vi.setSystemTime(NOW + H);
+      const marks = sent.length;
+      act(() => {
+        store.apply(projectsEv(row({ project: HOME, name: 'bise', home: true }), row({ project: ACME, name: 'acme', order: 1, pulse: pulse([NOW + H / 2, NOW - H]) } as Partial<ProjectRow>), row({ project: DOCS, name: 'docs', order: 2 })));
+      });
+      expect(dot(v, ACME)).not.toBeNull();
+      expect(sent.slice(marks).some((c) => (c as { key?: string }).key === `seen.${ACME}`)).toBe(false);
+      // he comes back to the window: seen
+      vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+      expect(sent.slice(marks).some((c) => (c as { key?: string }).key === `seen.${ACME}`)).toBe(true);
+      expect(dot(v, ACME)?.classList.contains('out')).toBe(true);
+    });
   });
 
   it('⌘ held shows each project its ⌘ digit, in his order (⌘1-9 opens it)', () => {

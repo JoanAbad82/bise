@@ -52,7 +52,7 @@ describe('a quiet project', () => {
   it('nothing works, waits or is new since he looked: one line, its age, no sentence, no week', () => {
     const p = pulse({ news: news({ kind: 'landed', agent: 'brush', sha: 'abc', target: 'main' }, NOW - 5 * H), artifacts_at: [NOW - 5 * H], said_at: [NOW - 6 * H] });
     const f = facts(p, 0, 0, NOW - 4 * H);
-    expect(f).toEqual({ quiet: true, pill: null, age: '2 h', sentence: null, week: null, tip: `${common.all_quiet} · ${projects.last_activity({ age: '2 h' })}` });
+    expect(f).toEqual({ quiet: true, pill: null, age: '2 h', sentence: null, week: null, tip: `${common.all_quiet} · ${projects.last_activity({ age: '2 h' })}`, unread: false });
   });
 
   it('never looked: everything of the week is new', () => {
@@ -74,7 +74,7 @@ describe('line 1: the pill or the age', () => {
 
 describe('no pulse yet (a hub that does not send it)', () => {
   it("the pill from the inbox, 'N working' from the agents; no age, no news, no week", () => {
-    expect(facts(null, 2, 1)).toEqual({ quiet: false, pill: 1, age: null, sentence: { text: projects.working({ n: 2 }), err: false }, week: null, tip: `${workingTip(2)} · ${waitsTip(1)}` });
+    expect(facts(null, 2, 1)).toEqual({ quiet: false, pill: 1, age: null, sentence: { text: projects.working({ n: 2 }), err: false }, week: null, tip: `${workingTip(2)} · ${waitsTip(1)}`, unread: false });
     expect(facts(null, 0, 0)).toMatchObject({ quiet: true, age: null });
   });
 

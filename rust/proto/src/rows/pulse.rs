@@ -8,7 +8,8 @@
 //!
 //! "Since he last looked" is his view state, not the hub's: the prefs key
 //! [`seen_key`] (`seen.<project>`, ms, in `prefs.json`, set with the
-//! app's `prefs_set` when he opens the project; the window's TS builds it
+//! app's `prefs_set` while he looks at its main's thread at its newest
+//! row, the window in front: the desktop's `app/seen.ts`); the window's TS builds it
 //! from `SEEN_PREFIX` in `app_methods.gen.ts`, never a string of its
 //! own). New artifacts = `artifacts_at > seen`; unread = `said_at >
 //! seen`. Plain arithmetic on these fields, done by whoever draws them.

@@ -7,8 +7,9 @@
 // row per project, a click opens it (its main), no agent under it (round 2, his r2-img11: the
 // agents live on the right side), as Gabriel's H1 (round 3, designer m_44783): its name and the
 // inbox pill or its age, one plain sentence and its week's day bars, a quiet one on one line; ⌘
-// held, its ⌘1-9 digit: siderows.ts and projectfacts.ts decide, this draws; the project in view is
-// marked seen (seen.ts). Its head stays, its list scrolls;
+// held, its ⌘1-9 digit: siderows.ts and projectfacts.ts decide, this draws; the project he looks at is
+// marked seen (seen.ts), and a row with an entry for him he hasn't seen has the unread dot after its
+// name (proj-unread). Its head stays, its list scrolls;
 // a right click on a pin or a project opens its menu (useEntityMenu, nm-menus'). On the artifacts
 // library page (decision d2) it shows '← Projects' and the library (artifacts' ArtLibrary) at the
 // same width, a 160 ms crossfade; an artifact open in a panel keeps the projects (sideshows.ts says
@@ -18,6 +19,7 @@
 // the row it touches, never the sidebar, and a thread's entries never do.
 import { memo, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { AppIcon, Input, tipAttrs, type AppIconName, Press } from '@/ds';
+import { reducedMotion } from '@/ds/hooks';
 import type { ProjectRow } from '@/proto';
 import { frame } from '@/proto/words_frame.gen';
 import { panel } from '@/proto/words_panel.gen';
@@ -38,7 +40,7 @@ import { usePinned, type Pin } from './pins';
 import { addProject } from './addProject';
 import { pinRowOf, projectRowOf, projectsOf, type RowEnd } from './siderows';
 import { BAR_GAP, BAR_H, BAR_W, weekBars, type DayBar, type ProjectFacts } from './projectfacts';
-import { useMarkSeen, useSeen } from './seen';
+import { newestOf, useLookedAt, useMarkSeen, useSeen } from './seen';
 import { useNow } from './clock';
 import { projects } from '@/proto/words_projects.gen';
 import { waitsTip } from './tipwords';
@@ -145,6 +147,7 @@ function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, t
     >
       <span className="app-s-l1">
         <CutName name={name} />
+        <UnreadDot on={facts.unread} testId={`${testId}.unread`} />
         <span className="app-s-end">
           <ProjectEnd facts={facts} digit={digit} testId={testId} />
         </span>
@@ -159,6 +162,33 @@ function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, t
       )}
     </Press>
   );
+}
+
+/** The unread fade's length (designer m_47372: 150 ms; none under reduced motion). */
+export const UNREAD_FADE_MS = 150;
+
+/**
+ * Something written for him he hasn't seen (designer m_47372): the accent dot after the name, no
+ * tip of its own (the row's says 'N unread'). It shows still; once seen it fades out, then goes.
+ */
+function UnreadDot({ on, testId }: { on: boolean; testId: string }) {
+  const [leaving, setLeaving] = useState(false);
+  const [was, setWas] = useState(on);
+  if (was !== on) {
+    setWas(on);
+    setLeaving(!on && !reducedMotion());
+  }
+  useEffect(() => {
+    if (!leaving) return undefined;
+    const t = window.setTimeout(() => {
+      setLeaving(false);
+    }, UNREAD_FADE_MS);
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [leaving]);
+  if (!on && !leaving) return null;
+  return <span className={`app-s-unread${on ? '' : ' out'}`} aria-hidden="true" data-testid={testId} />;
 }
 
 /** A pinned agent's end: the accent dot (it waits on him) or main's breath (it works), each with its tip; nothing else. */
@@ -272,9 +302,12 @@ function ProjectList() {
   useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.side.list"]'));
   const list = projectsOf(rows);
   const here = projectOf(route);
-  // he looked at the project in view: its news, artifacts and unread are seen (seen.ts)
-  useMarkSeen(here);
-  const seen = useSeen();
+  // the project he looks at (its main at its newest row, the window in front): its news, artifacts
+  // and unread are seen, and its row counts nothing new while he looks (seen.ts)
+  const looked = useLookedAt();
+  useMarkSeen(looked, newestOf(list.find((p) => p.project === looked)?.pulse));
+  const seenOf = useSeen();
+  const seen = (project: string): number | undefined => (project === looked ? Infinity : seenOf(project));
   const now = useNow();
   return (
     <div className="app-s-list" data-testid="app.side.list">

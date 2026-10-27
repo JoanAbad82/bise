@@ -510,6 +510,26 @@ body:has(.app-shell) {
   border-radius: 50%;
   background: var(--c-accent);
 }
+/* unread (designer m_47372): 6 round in the accent (the rail inbox's 'new for you'), 8 after the
+   name, which is cut first; still while it shows, it fades out in 150 ms once seen (none under
+   reduce motion: the row drops it at once) */
+.app-s-l1 .nm {
+  flex: 0 1 auto;
+}
+.app-s-l1 .app-s-end {
+  margin-left: auto;
+}
+.app-s-unread {
+  flex: none;
+  width: calc(var(--s-1) + var(--s-1) / 2);
+  height: calc(var(--s-1) + var(--s-1) / 2);
+  border-radius: 50%;
+  background: var(--c-accent);
+}
+.app-s-unread.out {
+  opacity: 0;
+  transition: opacity 150ms var(--ease-out);
+}
 .app-s-label {
   flex: none;
   display: flex;

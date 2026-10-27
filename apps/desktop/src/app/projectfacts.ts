@@ -45,6 +45,8 @@ export interface ProjectFacts {
   readonly week: readonly number[] | null;
   /** the row's tip: everything at once */
   readonly tip: string;
+  /** something written for him since he last looked (an unread entry of main's thread): the dot after its name */
+  readonly unread: boolean;
 }
 
 /**
@@ -138,6 +140,7 @@ export function projectFacts(c: {
     sentence,
     week: quiet || pulse === null || pulse.counting ? null : daysOf(weekOf(pulse, now)),
     tip: tip.join(' · '),
+    unread: unread > 0,
   };
 }
 

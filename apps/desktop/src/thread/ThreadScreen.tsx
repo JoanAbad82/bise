@@ -21,6 +21,7 @@ import { useRoute } from '@/app/router';
 import { InBar } from '@/app/barslot';
 import { useEntityMenu } from '@/app/menus/use';
 import { MAIN } from '@/app/route';
+import { useShowsMainAtEnd } from '@/app/seen';
 import { RefusedLine } from '@/app/Refused';
 import { keep } from '@/app/keep';
 import { Tip } from '@/setup';
@@ -298,6 +299,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   // menu's Rename in the bar's title, when it is the route's screen (not a panel's tab)
   const route = useRoute();
   const inView = route.screen === 'thread' && route.project === project && route.agent === agent;
+  // a project main's thread in view at its newest row: what it wrote for him is seen (app/seen.ts)
+  useShowsMainAtEnd(project, inView && agent === MAIN && !reading);
   const menu = useEntityMenu({ kind: 'agent', project, agent });
   const ours = !bise && me !== undefined && !me.archived;
   // the column where the window's sideLayout puts it (column.ts)
