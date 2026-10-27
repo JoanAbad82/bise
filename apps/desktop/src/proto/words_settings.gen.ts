@@ -224,30 +224,30 @@ export const settings = {
   hair_mohawk: "mohawk",
   /** a hair cut */
   hair_spiky: "spiky",
+  /** a hair colour (a tip: sentence case, designer m_48380) */
+  color_black: "Black",
   /** a hair colour */
-  color_black: "black",
+  color_dark: "Dark brown",
   /** a hair colour */
-  color_dark: "dark brown",
+  color_brown: "Brown",
   /** a hair colour */
-  color_brown: "brown",
+  color_auburn: "Auburn",
   /** a hair colour */
-  color_auburn: "auburn",
+  color_blond: "Blond",
   /** a hair colour */
-  color_blond: "blond",
-  /** a hair colour */
-  color_lilac: "lilac",
-  /** an accessory colour: today's, the default */
-  hat_sky: "sky blue",
+  color_lilac: "Lilac",
+  /** an accessory colour (a tip: sentence case): today's, the default */
+  hat_sky: "Sky blue",
   /** an accessory colour */
-  hat_orange: "orange",
+  hat_orange: "Orange",
   /** an accessory colour */
-  hat_green: "green",
+  hat_green: "Green",
   /** an accessory colour */
-  hat_yellow: "yellow",
+  hat_yellow: "Yellow",
   /** an accessory colour */
-  hat_lilac: "lilac",
+  hat_lilac: "Lilac",
   /** an accessory colour */
-  hat_teal: "teal",
+  hat_teal: "Teal",
   /** on the head: nothing */
   wear_none: "nothing",
   /** on the head */
