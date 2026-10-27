@@ -66,10 +66,11 @@ export function ArtifactRow({ it, now, group }: { it: Item; now: number; group?:
   );
 }
 
-/** where a process listens, its age: 'perf · localhost:5173 · 2 h' */
-function procSub(p: Proc, now: number, group?: string): string {
+/** where a process listens, its age: 'perf · localhost:5173 · 2 h'; `linked`: its end shows the
+ * page's link already, so the port is said once (designer m_46263: whole or dropped, never cut) */
+function procSub(p: Proc, now: number, group?: string, linked = false): string {
   const s = stateOf(p);
-  const where = urlWords(p, s)?.row ?? portWords(p, s);
+  const where = linked ? '' : (urlWords(p, s)?.row ?? portWords(p, s));
   return [groupWords(group, p.agent), where, ago(p.started_ms, now)].filter((x) => x !== '').join(' · ');
 }
 
@@ -88,7 +89,7 @@ export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: s
     <SideRow
       pic={<ThingPic thing={{ obj: procObj(p) }} px={ROW_PX} tile="terminal" />}
       title={<span className="s3-cmd">{typed(p)}</span>}
-      sub={procSub(p, now, group)}
+      sub={procSub(p, now, group, u !== null)}
       end={
         <>
           {/* its port as a link that opens the page, never the row (folded-side v9, the Overview's port link) */}

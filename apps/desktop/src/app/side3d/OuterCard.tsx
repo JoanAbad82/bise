@@ -10,7 +10,7 @@
 // sections keep the floats' rows (FlyoutLists). Owner: nm-side.
 import { useState, type ReactNode } from 'react';
 import type { Card } from '@/proto';
-import { Press, tipAttrs } from '@/ds';
+import { AppIcon, Press, tipAttrs } from '@/ds';
 import { sortCards } from '@/inbox/order';
 import { useStore } from '@/store';
 import type { AnswerAt } from '@/store/answered';
@@ -148,7 +148,7 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
           <span className="s3-orow-pr" role="button" {...tipAttrs(r.mark?.tip ?? `#${String(pr)}`)} onClick={(e) => {
             e.stopPropagation();
             onOpenPr(r);
-          }} data-testid={`${id}.pr`}>#{String(pr)}</span>
+          }} data-testid={`${id}.pr`}><AppIcon name="branch" size={14} />#{String(pr)}</span>
         )}
         {wt && <span className="s3-orow-wt" {...tipAttrs(side.in_worktree)} data-testid={`${id}.wt`}>ψ</span>}
       </Press>
