@@ -10,8 +10,9 @@
   padding: 0 0 calc(var(--float-room) + var(--s-2));
   box-sizing: border-box;
 }
-/* the banner takes the page's width, 24 from its edges; the rest is the page's column */
-.rv-col { margin-inline: var(--pad-page-x); }
+/* the banner takes the page's width, 24 from its edges; the rest is the page's column, the thread's
+   place beside the right side (app/pagecol.ts --page-col-l/-r), never under its card (his m_46849) */
+.rv-col { margin-inline: var(--page-col-l, var(--pad-page-x)) var(--page-col-r, var(--pad-page-x)); }
 /* the empty state on the rows' text edge (12 in, as a row's), never 4 px left of it */
 .rv-col > .b-empty,
 .rv-col > [role='group'] > .b-empty { padding-inline: var(--s-3); }
@@ -25,7 +26,7 @@
 /* review, feature, branch, commit: their own head's title on the column's edge, as the body's
    content under it (ui-review m_43947 #4), never 24 in from the window */
 .rv-screen > .b-head {
-  padding-inline: var(--pad-page-x);
+  padding-inline: var(--page-col-l, var(--pad-page-x)) var(--page-col-r, var(--pad-page-x));
 }
 
 .rv-body {
@@ -34,7 +35,7 @@
   overflow: auto;
   /* the rows' text on the page's column (--pad-page-x), their tint hung out --pad-row-x; the
      floating composer's room at its foot (--float-room) */
-  padding: var(--s-2) calc(var(--pad-page-x) - var(--pad-row-x)) var(--float-room);
+  padding: var(--s-2) calc(var(--page-col-r, var(--pad-page-x)) - var(--pad-row-x)) var(--float-room) calc(var(--page-col-l, var(--pad-page-x)) - var(--pad-row-x));
 }
 
 /* the region that has the keys shows no ring: the key line says it (designer m_21379 (5)) */

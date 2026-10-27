@@ -5,7 +5,8 @@
 // reached main today (a click opens the commit read-only). A branch's and a commit's '…' and right
 // click are their menu (useEntityMenu: open in a tab, a window). The floating composer's room at the
 // foot (--float-room). Owner: nm-pages-b (amb-win's before).
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { usePageColumn } from '@/app/pagecol';
 import { AppIcon, Dot, Empty, GroupLabel, ListRow, MoreButton, PageBanner } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { pages } from '@/proto/words_pages.gen';
@@ -27,6 +28,8 @@ export function ChangesScreen({ project }: { project: string }) {
   const store = useStore();
   const router = useRouter();
   const gutter = useBannerGutter();
+  const screen = useRef<HTMLElement>(null);
+  const col = usePageColumn(screen);
   const worktrees = useWorktrees(project);
   const merged = useMerged(project);
   const features = useFeatures(project);
@@ -42,7 +45,7 @@ export function ChangesScreen({ project }: { project: string }) {
 
   const branches = branchesOf(worktrees);
   return (
-    <section className="rv-screen" data-testid="changes.screen" data-project={project}>
+    <section ref={screen} style={col} className="rv-screen" data-testid="changes.screen" data-project={project}>
       <div className="rv-scroll" data-testid="changes.scroll">
         <PageBanner title={hero.changes_title} sentence={hero.changes_say}
           facts={`${hero.branches_n({ n: branches.length })} · ${hero.merged_today({ n: merged.length })}`}

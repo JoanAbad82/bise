@@ -22,6 +22,7 @@ import { useRouter } from '@/app/router';
 import { useNow } from '@/app/clock';
 import { keep, useKeptScroll } from '@/app/keep';
 import { useListKeys } from '@/app/listkeys';
+import { usePageColumn } from '@/app/pagecol';
 import { useEntityMenu } from '@/app/menus/use';
 import { useEntityAction } from '@/app/menus/actions';
 import { newAgent } from '@/app/newagent';
@@ -92,13 +93,15 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
       return true;
     },
   });
+  // the column where the thread's goes beside the right side, never under its card (app/pagecol.ts)
+  const col = usePageColumn(section);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     listKeys(e);
     if (e.defaultPrevented) setPicked(true);
   };
   const sheetOf = sheet === null ? undefined : agents.find((a) => a.name === sheet.agent && !a.archived);
   return (
-    <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
+    <section ref={section} style={col} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
       {/* one scroller: the banner scrolls away with the list; its foot keeps the floating composer's room */}
       <div className="ag-scroll" data-testid="agents.scroll">
         {showArchived ? (

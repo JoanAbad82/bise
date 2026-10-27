@@ -11,8 +11,9 @@
   :root:not([data-theme="light"]) .b-banner{background:var(--c-raised);box-shadow:none}
 }
 .b-banner > .in{position:relative;box-sizing:border-box;height:var(--h-banner);display:flex;align-items:center;padding:var(--s-8) calc(var(--w-banner-vis) + var(--s-3) + var(--s-6)) var(--s-8) var(--s-8)}
-/* a column page: the title on its column's text edge, as the rows' (--pad-page-x of the page, 12 in) */
-.b-banner[data-edge="column"] > .in{padding-left:max(var(--s-8), calc((100cqw + var(--s-6) + max(var(--s-6), var(--banner-gutter, 0px)) - var(--w-col)) / 2 - var(--s-6) + var(--s-3)))}
+/* a column page: the title on its column's text edge, as the rows' (the page's --page-col-l when the
+   right side places its column, app/pagecol.ts; else its --pad-page-x; 12 in) */
+.b-banner[data-edge="column"] > .in{padding-left:max(var(--s-8), calc(var(--page-col-l, calc((100cqw + var(--s-6) + max(var(--s-6), var(--banner-gutter, 0px)) - var(--w-col)) / 2)) - var(--s-6) + var(--s-3)))}
 .b-banner .txt{min-width:0;max-width:var(--w-banner-text);display:flex;flex-direction:column}
 .b-banner .title{margin:0;font:600 var(--f-title);color:var(--c-text)}
 .b-banner .say{margin:var(--s-2) 0 0;font:400 var(--f-lead);color:var(--c-text-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

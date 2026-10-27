@@ -6,7 +6,8 @@
 // agent (its thread) and per server its agents left running (its output on the processes page). Each
 // row's '…' and right click are its menu (useEntityMenu). The floating composer's room at the foot
 // (--float-room). Owner: nm-pages-b (amb-win's before).
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { usePageColumn } from '@/app/pagecol';
 import { AppIcon, Empty, GroupLabel, ListRow, MoreButton, PageBanner, tipAttrs } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { pages } from '@/proto/words_pages.gen';
@@ -60,6 +61,8 @@ export function EnvironmentsScreen({ project }: { project: string }) {
   useKeptScroll(`environments:${project}`, () => document.querySelector<HTMLElement>('[data-testid="environments.scroll"]'));
   const store = useStore();
   const gutter = useBannerGutter();
+  const screen = useRef<HTMLElement>(null);
+  const col = usePageColumn(screen);
   const agents = useAgents(project);
   const worktrees = useWorktrees(project);
   const procs = useProcesses(project);
@@ -73,7 +76,7 @@ export function EnvironmentsScreen({ project }: { project: string }) {
   const places = placesOf(agents, worktrees, procs);
   const listening = procs.filter((p) => isRunning(p) && (p.ports?.length ?? 0) > 0).length;
   return (
-    <section className="rv-screen" data-testid="environments.screen" data-project={project}>
+    <section ref={screen} style={col} className="rv-screen" data-testid="environments.screen" data-project={project}>
       <div className="rv-scroll" data-testid="environments.scroll">
         <PageBanner title={hero.environments_title} sentence={hero.environments_say}
           facts={`${hero.places_n({ n: places.length })} · ${hero.servers_up({ n: listening })}`}

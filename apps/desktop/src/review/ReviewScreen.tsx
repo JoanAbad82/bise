@@ -11,6 +11,7 @@ import { Button, Diff, Empty, Head } from '@/ds';
 import { useCards, useDiff, useMerged, useStore } from '@/store';
 import { clock } from '@/thread/entry';
 import { useRouter } from '@/app/router';
+import { usePageColumn } from '@/app/pagecol';
 import { useKeptScroll } from '@/app/keep';
 import { MAIN } from '@/app/route';
 import { pages } from '@/proto/words_pages.gen';
@@ -34,6 +35,8 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
   // the diff panel's keys (tui-parity V6): tab / shift+tab next / previous
   // file, j k ↑ ↓ scroll, esc back where he came from
   const body = useRef<HTMLDivElement>(null);
+  const screen = useRef<HTMLElement>(null);
+  const col = usePageColumn(screen);
   const at = useRef(-1);
   useEffect(() => {
     body.current?.focus();
@@ -143,7 +146,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
   const line = headLine(diff, { commit, merged, clock });
 
   return (
-    <section className="rv-screen" data-testid="review.screen" data-project={project} data-agent={agent}>
+    <section ref={screen} style={col} className="rv-screen" data-testid="review.screen" data-project={project} data-agent={agent}>
       <Head
         title={title}
         sub={[line, diff && diff.files.length > 0 ? totals(diff) : ''].filter(Boolean).join(' · ')}

@@ -4,7 +4,8 @@
 // merge card's drop asks once more, as the TUI does), then its agents as ds ListRows under a ds
 // GroupLabel, each with its menu. The floating composer's room at the foot. Owner: nm-pages-b
 // (amb-win's before).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { usePageColumn } from '@/app/pagecol';
 import { Button, Empty, GroupLabel, Head, ListRow, MoreButton } from '@/ds';
 import type { Agent } from '@/proto';
 import { pages } from '@/proto/words_pages.gen';
@@ -26,6 +27,8 @@ export function FeatureScreen({ project, name }: { project: string; name: string
   const agents = useAgents(project);
   const now = useNow();
   const [asking, setAsking] = useState(false);
+  const screen = useRef<HTMLElement>(null);
+  const col = usePageColumn(screen);
 
   // a fresh list on open
   useEffect(() => {
@@ -35,7 +38,7 @@ export function FeatureScreen({ project, name }: { project: string; name: string
   const f = features.find((x) => x.name === name);
   if (f === undefined) {
     return (
-      <section className="rv-screen" data-testid="feature.screen" data-project={project} data-feature={name}>
+      <section ref={screen} style={col} className="rv-screen" data-testid="feature.screen" data-project={project} data-feature={name}>
         <Head title={name} sub={pages.feature_word} />
         <div className="rv-body">
           <Empty testId="feature.none" title={pages.feature_none}>{pages.feature_none_why}</Empty>
@@ -47,7 +50,7 @@ export function FeatureScreen({ project, name }: { project: string; name: string
   const choices = card ? choicesOf(card, asking) : [];
   const mine = agents.filter((a) => f.agents.includes(a.name));
   return (
-    <section className="rv-screen" data-testid="feature.screen" data-project={project} data-feature={name}>
+    <section ref={screen} style={col} className="rv-screen" data-testid="feature.screen" data-project={project} data-feature={name}>
       <Head title={f.name} sub={`${f.branch} → ${f.base} · ${distance(f)}`} />
       <div className="rv-body">
         <p className="rv-note" data-testid="feature.state" data-building={f.building} data-trial={f.trial} data-checked={f.checked}>

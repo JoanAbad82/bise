@@ -5,7 +5,8 @@
 // opens it in his browser, its '…' and a right click are its menu (useEntityMenu). Empty: the hub's
 // own words ('no open PR. in PR flow…'). The floating composer's room at the foot (--float-room).
 // Owner: nm-pages-b (amb-win's before).
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { usePageColumn } from '@/app/pagecol';
 import { Dot, Empty, ListRow, MoreButton, PageBanner, Skel } from '@/ds';
 import { hero } from '@/proto/words_hero.gen';
 import { pages } from '@/proto/words_pages.gen';
@@ -23,6 +24,8 @@ export function PrsScreen({ project }: { project: string }) {
   useKeptScroll(`prs:${project}`, () => document.querySelector<HTMLElement>('[data-testid="prs.scroll"]'));
   const store = useStore();
   const gutter = useBannerGutter();
+  const screen = useRef<HTMLElement>(null);
+  const col = usePageColumn(screen);
   const list = usePrs(project);
 
   // a fresh list on open
@@ -31,7 +34,7 @@ export function PrsScreen({ project }: { project: string }) {
   }, [store, project]);
 
   return (
-    <section className="rv-screen" data-testid="prs.screen" data-project={project}>
+    <section ref={screen} style={col} className="rv-screen" data-testid="prs.screen" data-project={project}>
       <div className="rv-scroll" data-testid="prs.scroll">
         <PageBanner title={hero.prs_title} sentence={hero.prs_say}
           facts={list === null ? hero.asking_github : list.head === '' ? hero.none_open : list.head}
