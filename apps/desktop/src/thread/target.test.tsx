@@ -93,6 +93,35 @@ describe("the strip's name is a picker of the project's agents", () => {
 // main: the fit read the project by a data-item its picker's button never carried, so it took no
 // room and never went, and 'to perf' shrank instead. Mutation: the measure back to
 // '[data-item="project"]' turns it red.
+// ui-review m_47192: at 680 with a panel the branch kept 's…' in 40 px, under BRANCH_MIN: the fit
+// read its width as its css had cut it. Mutation: the branch read by its box alone again turns it red.
+describe("the strip's branch at the narrowest", () => {
+  it('goes whole when its whole words would not fit BRANCH_MIN, read uncut', () => {
+    const sw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
+    const cw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    // the branch cut by its css to 40 (its words show 20 of their 70), the strip 60 after 'to native-lead'
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get(this: HTMLElement) {
+      const id = this.dataset['testid'] ?? '';
+      if (id === 'composer.ctx.to') return 110;
+      if (id === 'composer.ctx.branch') return 40;
+      if (this.classList.contains('nm') && this.closest('[data-item="branch"]') !== null) return 70;
+      return 0;
+    } });
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get(this: HTMLElement) {
+      if (this.classList.contains('head')) return 165;
+      if (this.classList.contains('nm') && this.closest('[data-item="branch"]') !== null) return 20;
+      return 0;
+    } });
+    try {
+      const v = strip('native-lead', { branch: 'sb/native-lead' });
+      expect(v.getByTestId('composer.ctx.branch').classList.contains('gone')).toBe(true);
+    } finally {
+      if (sw !== undefined) Object.defineProperty(HTMLElement.prototype, 'scrollWidth', sw);
+      if (cw !== undefined) Object.defineProperty(HTMLElement.prototype, 'clientWidth', cw);
+    }
+  });
+});
+
 describe("the strip short of room", () => {
   it("drops the project's picker first and keeps 'to native-lead' whole", () => {
     const widths: Record<string, number> = { 'composer.ctx.to': 110, 'composer.ctx.project': 90 };

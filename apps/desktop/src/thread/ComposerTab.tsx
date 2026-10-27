@@ -289,7 +289,12 @@ export function ComposerTab({ words, mark, end, project, who, bare = false, newP
       setEndIn(true);
       // the project's item is its picker's button when it has one: read by its test id, never a
       // data-item the ds button doesn't carry (his m_47126: the fit never dropped it)
-      const w = { project: nat(q(`[data-testid="${testId}.project"]`)), state: nat(q('[data-item="state"]')), branch: nat(q('[data-item="branch"]')), end: nat(q('[data-item="end"]')), lands: nat(q('[data-item="lands"]')) };
+      // the branch's whole width even while its css cuts it: its box less what its words show, plus
+      // all of its words (ui-review m_47192: read cut, 40 px kept 's…' under BRANCH_MIN)
+      const br = q('[data-item="branch"]');
+      const brWords = br?.querySelector<HTMLElement>('.nm') ?? null;
+      const branchW = br === null ? 0 : nat(br) + (brWords === null ? 0 : Math.max(0, Math.ceil(brWords.scrollWidth) - Math.ceil(brWords.clientWidth)));
+      const w = { project: nat(q(`[data-testid="${testId}.project"]`)), state: nat(q('[data-item="state"]')), branch: branchW, end: nat(q('[data-item="end"]')), lands: nat(q('[data-item="lands"]')) };
       // 'to perf' always stays: the rest fits in what it leaves
       const toEl = q(`[data-testid="${testId}.to"]`);
       const next = stripFit({ avail: inner - (toEl === null ? 0 : nat(toEl) + gap), gap, ...w });
