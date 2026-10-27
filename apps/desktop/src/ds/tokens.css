@@ -114,6 +114,9 @@
   --h-group: 32px;         /* a group label over a page's rows (16 above it) */
   --h-launcher-row: 40px;  /* an entry of New tab, the launcher */
   --h-setting-row: 44px;   /* a settings row (at least) */
+  --w-setting-label: 240px; /* a settings row's label at least: a wider control goes under it */
+  --w-setting-label-max: 320px; /* a picker row's label column at most: its control starts 16 after it */
+  --w-settings-page: 896px; /* a settings page at most (its 24 padding in), centred: it fills a narrower window */
   --h-recent: 48px;        /* a recent entry of the launcher, with its 32 tile */
   --h-list-row: 52px;      /* a page's row on two lines (13/18 + 12/16): inbox, artifacts, scheduled */
   --w-rail: 56px;          /* the permanent rail on the window's left */
