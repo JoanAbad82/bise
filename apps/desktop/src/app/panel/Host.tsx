@@ -161,13 +161,13 @@ function FullLead() {
   );
 }
 
-/** In full width, at the tab row's end: the thread comes back (designer m_45445: the panel glyph, mirrored). */
+/** In full width, at the tab row's end: the thread comes back, under the thread's own bubble (the tabs' glyph; his m_47445, designer m_47468). */
 function ThreadBack() {
   return (
     <IconButton label={panel.panel_full_thread({ key: PANEL_FULL_KEY })} size="bar" onClick={() => {
       setFull(false);
     }} testId="app.panel.thread">
-      <span className="pn-mirror"><AppIcon name="panel" size={16} /></span>
+      <AppIcon name="thread" size={16} />
     </IconButton>
   );
 }

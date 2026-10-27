@@ -143,12 +143,6 @@
 .pn[data-full][data-drag] > .pn-border::after {
   opacity: 1;
 }
-/* 'show the thread': the panel glyph, mirrored (the thread's side is the left) */
-.pn-mirror {
-  display: inline-flex;
-  transform: scaleX(-1);
-}
-
 /* the tabs in the bar: 28 high, padding 0 12, r 8, 13/500, the icon 14, 160 at most with '…';
    × on the one in front and on hover; the one in front --c-active, never the accent */
 .pn-bar {

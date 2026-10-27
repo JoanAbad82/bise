@@ -258,7 +258,11 @@ describe('the tabbed panel', () => {
     act(() => {
       setFull(true);
     });
-    fireEvent.click(v.getByTestId('app.panel.thread'));
+    // its glyph is the thread's own bubble, never the sidebar's (the panel mirrored drew it; his m_47445, designer m_47468)
+    const back = v.getByTestId('app.panel.thread');
+    expect(Array.from(back.querySelectorAll('svg')).map((s) => s.getAttribute('data-icon'))).toEqual(['thread']);
+    expect(back.querySelector('.pn-mirror')).toBeNull();
+    fireEvent.click(back);
     expect(v.getByTestId('app.panel').hasAttribute('data-full')).toBe(false);
   });
   it("an html file's tab: ↗ opens the hub's served page his browser takes, never the bare path (his m_45830)", () => {
