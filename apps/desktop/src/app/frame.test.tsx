@@ -181,7 +181,7 @@ describe('the sidebar', () => {
     });
 
     it('shows after the name of a project main wrote for him since he last looked; none on the others', () => {
-      const { v, store } = frame({ screen: 'bise' }, [agent('main')], [], { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      const { v, store } = frame({ screen: 'bise' }, [agent('main')], [], { pulse: pulse([NOW - H]) });
       act(() => {
         lookAt(store, ACME, NOW - 2 * H);
       });
@@ -201,7 +201,7 @@ describe('the sidebar', () => {
     });
 
     it('survives a restart: the last look is in prefs, the entry in the pulse', () => {
-      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], [], { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], [], { pulse: pulse([NOW - H]) });
       act(() => {
         lookAt(store, ACME, NOW - 2 * H);
       });
@@ -211,7 +211,7 @@ describe('the sidebar', () => {
 
     it('goes while he looks at its main at its newest row, the window in front: it fades out in 150 ms, marked seen', () => {
       const sent: unknown[] = [];
-      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent, { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent, { pulse: pulse([NOW - H]) });
       act(() => {
         lookAt(store, ACME, NOW - 2 * H);
       });
@@ -229,7 +229,7 @@ describe('the sidebar', () => {
 
     it('stays while he reads main scrolled up, and comes for what main says while the window is behind', () => {
       const sent: unknown[] = [];
-      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent, { pulse: pulse([NOW - H]) } as Partial<ProjectRow>);
+      const { v, store } = frame({ screen: 'thread', project: ACME, agent: 'main' }, [agent('main')], sent, { pulse: pulse([NOW - H]) });
       act(() => {
         lookAt(store, ACME, NOW - 2 * H);
       });
@@ -248,7 +248,7 @@ describe('the sidebar', () => {
       vi.setSystemTime(NOW + H);
       const marks = sent.length;
       act(() => {
-        store.apply(projectsEv(row({ project: HOME, name: 'bise', home: true }), row({ project: ACME, name: 'acme', order: 1, pulse: pulse([NOW + H / 2, NOW - H]) } as Partial<ProjectRow>), row({ project: DOCS, name: 'docs', order: 2 })));
+        store.apply(projectsEv(row({ project: HOME, name: 'bise', home: true }), row({ project: ACME, name: 'acme', order: 1, pulse: pulse([NOW + H / 2, NOW - H]) }), row({ project: DOCS, name: 'docs', order: 2 })));
       });
       expect(dot(v, ACME)).not.toBeNull();
       expect(sent.slice(marks).some((c) => (c as { key?: string }).key === `seen.${ACME}`)).toBe(false);
