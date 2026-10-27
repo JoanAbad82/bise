@@ -118,6 +118,16 @@ export const side = {
   world_open: (a: { project: string | number }): string => "open " + String(a.project) + "'s office in a tab",
   /** the world's legend's '↗', its tip */
   world_open_tip: "open the office in a tab",
+  /** the outer tile's '⤢' (page outer-world v2): the world in the panel's Office tab */
+  tile_panel: "Open in the panel",
+  /** the outer tile's '×': the tile goes, the card takes its height */
+  tile_hide: "Hide the bims",
+  /** the cube at the right of the card's Agents head while the tile is hidden: it comes back */
+  tile_show: "Show the bims",
+  /** the handle between the tile and the card: its VoiceOver name and tip */
+  tile_height: "drag to resize the bims · double-click: 140",
+  /** the tile's VoiceOver name */
+  tile_name: (a: { project: string | number }): string => String(a.project) + "'s bims",
   /** a coin's card (⌥ held alone, or a hover; page folded-side v9), the agents coin's first line: the one agent that asks him, in the accent */
   card_asks_one: (a: { agent: string | number }): string => String(a.agent) + " asks you",
   /** the agents coin's card: two or more agents ask him ('perf, api-auth and i18n ask you') */

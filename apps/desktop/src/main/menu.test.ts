@@ -44,7 +44,8 @@ describe('the application menu (bar ⛔2)', () => {
 
   it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save, ⌘N / ⇧⌘N new project / agent, ⌘B / ⌥⌘B the sides, Go's places", () => {
     const { items, sent } = build('darwin');
-    const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
+    // the keyed items only (View › Hide the Bims has no key: outer-world v2, its own test below)
+    const keys = new Map(items.filter((i) => i.click !== undefined && i.accelerator !== undefined).map((i) => [i.accelerator, i]));
     expect([...keys.keys()].sort()).toEqual([
       'Alt+CmdOrCtrl+B', 'CmdOrCtrl+,', 'CmdOrCtrl+0', 'CmdOrCtrl+B', 'CmdOrCtrl+Enter', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+N', 'CmdOrCtrl+S', 'CmdOrCtrl+Y', 'Ctrl+`',
       'Shift+Alt+CmdOrCtrl+B', 'Shift+CmdOrCtrl+A', 'Shift+CmdOrCtrl+I', 'Shift+CmdOrCtrl+N', 'Shift+CmdOrCtrl+T', 'Shift+CmdOrCtrl+X',
@@ -190,6 +191,20 @@ describe('menuTarget (qa-native m_9724)', () => {
     expect(third({ sidebar: true, panel: true, panelFull: true, panelFullCan: true })).toEqual(['Panel Full Width', 'Shift+Alt+CmdOrCtrl+B', 'checkbox', true, true]);
     expect(third({ sidebar: true, panel: true, panelFull: false, panelFullCan: false })[4]).toBe(false);
     expect(menuTarget('panelFull', false)).toEqual({ send: 'focused' });
+  });
+
+  it("View: Hide the Bims / Show the Bims under Panel Full Width, as the focused window's tile is (outer-world v2, his pick #799), the window's own", () => {
+    const fourth = (sides?: { sidebar: boolean; panel: boolean; bimsHidden?: boolean }) => {
+      const sent: MenuAction[] = [];
+      const t = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: (a) => sent.push(a), ...(sides ? { sides } : {}) });
+      const sub = (t.find((m) => m.label === 'View')?.submenu ?? []) as MenuItemConstructorOptions[];
+      const i = sub[3];
+      (i?.click as (() => void) | undefined)?.();
+      return [i?.label, i?.accelerator, sent];
+    };
+    expect(fourth()).toEqual(['Hide the Bims', undefined, ['bims']]);
+    expect(fourth({ sidebar: true, panel: false, bimsHidden: true })).toEqual(['Show the Bims', undefined, ['bims']]);
+    expect(menuTarget('bims', false)).toEqual({ send: 'focused' });
   });
 });
 

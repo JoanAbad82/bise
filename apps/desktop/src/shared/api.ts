@@ -443,7 +443,7 @@ export interface A11y {
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
-export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'browser' | 'newProject' | 'newAgent' | 'sidebar' | 'panel' | 'panelFull' | 'reopenTab' | GoAction;
+export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save' | 'browser' | 'newProject' | 'newAgent' | 'sidebar' | 'panel' | 'panelFull' | 'reopenTab' | 'bims' | GoAction;
 
 /** The Go menu's places, the rail's (rail-keys): each a route of the main window (app/menu.ts routeOfMenu). */
 export type GoAction = 'bise' | 'inboxPage' | 'scheduled' | 'artifacts' | 'plugins';
@@ -459,6 +459,8 @@ export interface ViewSides {
   readonly panelFull?: boolean;
   /** full width can be had now (false while the panel is a sheet: the item dims) */
   readonly panelFullCan?: boolean;
+  /** the bims' tile over the outer card is hidden (outer-world v2): View › Show the Bims; none: Hide the Bims */
+  readonly bimsHidden?: boolean;
 }
 
 /** window.bise.saveCopy's answer: where the copy went, why it failed, or null (he cancelled, or refused). */

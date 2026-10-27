@@ -42,9 +42,9 @@ export interface MenuOptions {
 
 export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
   const mac = o.platform === 'darwin';
-  const item = (label: string, accelerator: string, action: MenuAction): MenuItemConstructorOptions => ({
+  const item = (label: string, accelerator: string | undefined, action: MenuAction): MenuItemConstructorOptions => ({
     label,
-    accelerator,
+    ...(accelerator === undefined ? {} : { accelerator }),
     click: () => {
       o.send(action);
     },
@@ -157,6 +157,8 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
         item(sides.panel ? 'Hide Panel' : 'Show Panel', 'Alt+CmdOrCtrl+B', 'panel'),
         // panel-full (designer m_45445): a check item right under it, dimmed while the panel is a sheet
         { ...item('Panel Full Width', 'Shift+Alt+CmdOrCtrl+B', 'panelFull'), type: 'checkbox', checked: sides.panelFull === true, enabled: sides.panelFullCan !== false },
+        // outer-world v2 (his pick #799): the bims' tile over the outer card, hidden by its '×'
+        item(sides.bimsHidden === true ? 'Show the Bims' : 'Hide the Bims', undefined, 'bims'),
         { type: 'separator' },
         item('Terminal', 'Ctrl+`', 'terminal'),
         ...(o.dev ? ([{ type: 'separator' }, { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] satisfies MenuItemConstructorOptions[]) : []),
@@ -199,6 +201,6 @@ export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget
   // New Project / New Agent are the main window's sheets: the focused window's (the main one, or
   // nothing in the capsule), never a route to open
   // the two sides are the focused window's own (View › Hide/Show Sidebar, Panel), never a route either
-  if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || action === 'panelFull' || action === 'reopenTab' || mainFocused) return { send: 'focused' };
+  if (action === 'find' || action === 'save' || action === 'browser' || action === 'newProject' || action === 'newAgent' || action === 'sidebar' || action === 'panel' || action === 'panelFull' || action === 'reopenTab' || action === 'bims' || mainFocused) return { send: 'focused' };
   return { open: isGo(action) ? GO_OPENS[action] : action };
 }

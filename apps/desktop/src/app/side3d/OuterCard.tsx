@@ -8,7 +8,7 @@
 // worktree; idle and done step back. A click opens its thread; an ask's click opens it in place,
 // its options and 'answer…' / 'write to perf…' under it. 15 at most, then '+ N more'. The other
 // sections keep the floats' rows (FlyoutLists). Owner: nm-side.
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Card } from '@/proto';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { sortCards } from '@/inbox/order';
@@ -35,7 +35,7 @@ export const OUTER_HEAD_PX = 20;
 const COMPOSER_FIELD = '[data-testid="composer.field"]';
 
 /** A section's head: its 3D object, its name, its count (and what waits on him, in the accent), 'all ›'. */
-export function OuterHead({ id, name, count, loud, onAll }: { id: BubbleId; name: string; count: string; loud?: string; onAll: () => void }) {
+export function OuterHead({ id, name, count, loud, sum, onAll, onCube }: { id: BubbleId; name: string; count: string; loud?: string; sum?: string; onAll: () => void; onCube?: () => void }) {
   return (
     <header className="s3-ohead" data-testid={`app.outer.${id}.head`}>
       <span className="s3-ohead-pic" aria-hidden="true">
@@ -44,7 +44,13 @@ export function OuterHead({ id, name, count, loud, onAll }: { id: BubbleId; name
       <b className="s3-ohead-name">{name}</b>
       {count !== '' && <span className="s3-ohead-n">{count}</span>}
       {loud !== undefined && loud !== '' && <span className="s3-ohead-loud" data-testid={`app.outer.${id}.loud`}>· {loud}</span>}
+      {sum !== undefined && sum !== '' && <span className="s3-ohead-sum" data-testid={`app.outer.${id}.sum`}>· {sum}</span>}
       <Press look="s3-ohead-all" onClick={onAll} data-testid={`app.outer.${id}.all`}>{side.all_short}</Press>
+      {onCube !== undefined && (
+        <Press look="s3-ohead-cube" aria-label={side.tile_show} {...tipAttrs(side.tile_show)} onClick={onCube} data-testid={`app.outer.${id}.cube`}>
+          <AppIcon name="cube" size={14} />
+        </Press>
+      )}
     </header>
   );
 }
@@ -183,19 +189,23 @@ function Mark({ g, id }: { g: string; id: string }): ReactNode {
 }
 
 /** One section of the card: its head and its rows. */
-export function OuterSection({ id, name, count, loud, onAll, children }: { id: BubbleId; name: string; count: string; loud?: string; onAll: () => void; children: ReactNode }) {
+export function OuterSection({ id, name, count, loud, sum, onAll, onCube, children }: { id: BubbleId; name: string; count: string; loud?: string; sum?: string; onAll: () => void; onCube?: () => void; children?: ReactNode }) {
   return (
     <section className="s3-osec" data-testid={`app.outer.${id}`}>
-      <OuterHead id={id} name={name} count={count} {...(loud === undefined ? {} : { loud })} onAll={onAll} />
+      <OuterHead id={id} name={name} count={count} {...(loud === undefined ? {} : { loud })} {...(sum === undefined ? {} : { sum })} onAll={onAll} {...(onCube === undefined ? {} : { onCube })} />
       {children}
     </section>
   );
 }
 
-/** The card: its sections, scrolling inside when they pass its height. */
-export function OuterCard({ children }: { children: ReactNode }) {
+/**
+ * The card: its sections, scrolling inside when they pass its height. `tile`: the room the bims'
+ * tile and its handle take above it (0: hidden); `scrolls`: past the heads alone, the agents' list
+ * scrolls inside (tilestate.ts outerFold).
+ */
+export function OuterCard({ tile = 0, scrolls = false, children }: { tile?: number; scrolls?: boolean; children: ReactNode }) {
   return (
-    <aside className="s3-outer" data-testid="app.outer">
+    <aside className="s3-outer" style={tile > 0 ? ({ '--s3-tile': `${String(tile)}px` } as CSSProperties) : undefined} data-scrolls={scrolls || undefined} data-testid="app.outer">
       {children}
     </aside>
   );

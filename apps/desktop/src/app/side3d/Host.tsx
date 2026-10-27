@@ -39,10 +39,12 @@ import { Bubble, WORLD_NAME } from './Bubbles';
 import { noGrow, WorldThumb } from './World';
 import { Empty, Float, FloatLayer, HeadButton, type FloatContent } from './Flyout';
 import { ArchivedFold, ArchivedRows, FloatAgents } from './FloatAgents';
-import { OuterAgents, OuterCard, OuterSection } from './OuterCard';
+import { OUTER_AGENTS, OuterAgents, OuterCard, OuterSection } from './OuterCard';
+import { OuterTile, TileHandle } from './OuterWorld';
+import { clampTile, OUTER_FOOT, OUTER_TOP, outerFold, outerWorld, TILE_GAP, useOuterWorld } from './tilestate';
 import { useAgentRows } from '../agentrows';
 import type { BarRow } from '../barrows';
-import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
+import { ArtifactRow, ProcRow, TaskRow, typed, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
 import { newAgent, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
@@ -54,6 +56,8 @@ import { useAgents, useCards, useProjects, useStore } from '@/store';
 import { useAllArtifacts } from '@/artifacts';
 import { AddButton, useAddDropOn, useAddPlace } from '@/artifacts/Drops';
 import { useAllScheduled } from '@/scheduled';
+import { asks as taskWords } from '@/scheduled/model';
+import { mapPrefKey } from '@/bims/maps/ids';
 import { isRunning, useAllProcesses } from '@/running';
 import { side } from '@/proto/words_side.gen';
 import './side3d.css';
@@ -190,6 +194,8 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
     inbox: listed.waits,
   };
   const [open, setOpen] = useState<BubbleId | null>(null);
+  // the bims' tile over the outer card: hidden or not, its height (tilestate.ts, kept per window)
+  const tile = useOuterWorld();
   // no room beside the thread: the coins are minis in the thread's header or the sheet's tab row,
   // their floats under the header (folded-side v9)
   // (his m_45864: both in the title bar, right after the thread's crumb, never in the panel's tab row)
@@ -483,38 +489,71 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   };
   // the panel folded with room for it: the outer card, the Overview out of the panel (page outer-side v2)
   if (coinsAt === 'card') {
-    const two = 2;
     const live = ov.live.filter((r) => r.kind === 'agent').length;
+    // the tile (outer-world v2): its height in the window's bounds, and the room it and its handle take
+    const tileH = clampTile(tile.h, winH);
+    const tileRoom = tile.hidden ? 0 : tileH + TILE_GAP;
+    // the give-way inside: Agents keeps its lines, the others fold to one row, then to their head; then the agents scroll
+    const room = winH - OUTER_TOP - OUTER_FOOT - tileRoom;
+    const sched = tasks.length + watching.length;
+    const { fold: two, scrolls } = outerFold(room, { agentLines: Math.min(live, OUTER_AGENTS) + (live > OUTER_AGENTS ? 1 : 0), sections: [Math.min(2, artifacts.length), Math.min(2, sched), Math.min(2, running.length)] });
+    const sumOf = (first: string | undefined) => (two === 0 && first !== undefined ? { sum: first } : {});
+    const firstTask = tasks[0];
+    const firstProc = running[0];
     return (
-      <OuterCard>
+      <>
+        {!tile.hidden && (
+          <>
+            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH}
+              onOpen={(agent) => {
+                router.go({ screen: 'thread', project, agent });
+              }}
+              onPickMap={(m) => {
+                store.command({ cmd: 'prefs_set', key: mapPrefKey(project), value: m });
+              }}
+              onPanel={() => {
+                openTab({ kind: 'office', project });
+              }}
+              onHide={() => {
+                outerWorld.hide(true);
+              }} />
+            <TileHandle h={tileH} winH={winH} onHeight={(h) => {
+              outerWorld.height(h, winH);
+            }} />
+          </>
+        )}
+      <OuterCard tile={tileRoom} scrolls={scrolls}>
         <OuterSection id="agents" name={bubbleName('agents')} count={String(live)} {...(counts.asks > 0 ? { loud: side.head_waits({ n: counts.asks }) } : {})} onAll={() => {
           router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
-        }}>
+        }} {...(tile.hidden ? { onCube: () => {
+          outerWorld.hide(false);
+        } } : {})}>
           <OuterAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} here={here} now={now} groupOf={groupOf} onOpen={openRow} onOpenPr={openPr} onMore={() => {
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
           }} />
         </OuterSection>
-        <OuterSection id="artifacts" name={bubbleName('artifacts')} count={String(artifacts.length)} onAll={() => {
+        <OuterSection id="artifacts" name={bubbleName('artifacts')} count={String(artifacts.length)} {...sumOf(artifacts[0]?.a.title)} onAll={() => {
           router.go({ screen: 'artifacts', project: scope });
         }}>
-          {artifacts.length === 0 ? <Empty>{artScope?.empty ?? side.no_artifacts}</Empty> : artifacts.slice(0, two).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />)}
+          {two === 0 ? null : artifacts.length === 0 ? <Empty>{artScope?.empty ?? side.no_artifacts}</Empty> : artifacts.slice(0, two).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />)}
         </OuterSection>
-        <OuterSection id="scheduled" name={bubbleName('scheduled')} count={String(tasks.length + watching.length)} onAll={() => {
+        <OuterSection id="scheduled" name={bubbleName('scheduled')} count={String(sched)} {...sumOf(firstTask === undefined ? watching[0]?.name : taskWords(firstTask.t))} onAll={() => {
           router.go({ screen: 'scheduled' });
         }}>
-          {tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
+          {two === 0 ? null : sched === 0 ? <Empty>{side.no_scheduled}</Empty> : (
             <>
               {tasks.slice(0, two).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} />)}
               {watching.slice(0, Math.max(0, two - tasks.length)).map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />)}
             </>
           )}
         </OuterSection>
-        <OuterSection id="processes" name={bubbleName('processes')} count={String(running.length)} onAll={() => {
+        <OuterSection id="processes" name={bubbleName('processes')} count={String(running.length)} {...sumOf(firstProc === undefined ? undefined : typed(firstProc.p))} onAll={() => {
           router.go(all ? { screen: 'running' } : { screen: 'running', scope: { project } });
         }}>
-          {running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, two).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} />)}
+          {two === 0 ? null : running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, two).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} />)}
         </OuterSection>
       </OuterCard>
+      </>
     );
   }
   return (

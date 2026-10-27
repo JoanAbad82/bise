@@ -383,6 +383,33 @@
     "one": null,
     "text": "thinks"
   },
+  "side.tile_height": {
+    "args": [],
+    "one": null,
+    "text": "drag to resize the bims · double-click: 140"
+  },
+  "side.tile_hide": {
+    "args": [],
+    "one": null,
+    "text": "Hide the bims"
+  },
+  "side.tile_name": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "{project}'s bims"
+  },
+  "side.tile_panel": {
+    "args": [],
+    "one": null,
+    "text": "Open in the panel"
+  },
+  "side.tile_show": {
+    "args": [],
+    "one": null,
+    "text": "Show the bims"
+  },
   "side.timers": {
     "args": [
       "n"

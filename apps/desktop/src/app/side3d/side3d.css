@@ -1325,7 +1325,8 @@
    bottom; r 12, --c-raised, 1 px line, e-1; it scrolls inside when its sections pass its height */
 .s3-outer {
   position: fixed;
-  top: var(--h-bar);
+  /* under the bims' tile and its 8 handle when it shows (outer-world v2: --s3-tile, Host.tsx) */
+  top: calc(var(--h-bar) + var(--s3-tile, 0px));
   right: var(--s-3);
   bottom: var(--s-3);
   z-index: 15;
@@ -1543,4 +1544,122 @@
 .s3-orow-pr svg {
   width: 12px;
   height: 12px;
+}
+
+/* the bims' world over the outer card (page outer-world v2, his pick #799; OuterWorld.tsx): a tile
+   280 wide, as high as he left it (140 by default, inline), its top on the bar's 52, r 12, the
+   card's ring and e-1; the office whole at its fit; '⤢' and '×' top right on hover, 24 each, 4
+   apart, 8 from the edges */
+.s3-otile {
+  position: fixed;
+  top: var(--h-bar);
+  right: var(--s-3);
+  z-index: 15;
+  box-sizing: border-box;
+  width: 280px;
+  overflow: hidden;
+  border-radius: var(--r-3);
+  background: var(--c-raised);
+  box-shadow: var(--e-1);
+}
+.s3-otile-office {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.s3-otile-acts {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-2);
+  display: flex;
+  gap: var(--s-1);
+  opacity: 0;
+  transition: opacity var(--d-fast) ease-out;
+}
+.s3-otile:hover .s3-otile-acts,
+.s3-otile:focus-within .s3-otile-acts {
+  opacity: 1;
+}
+.s3-otile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: var(--h-seg-in);
+  border-radius: var(--r-2);
+  background: var(--c-raised);
+  box-shadow: var(--e-1);
+  color: var(--c-text-2);
+  font: 400 var(--f-ui);
+}
+.s3-otile-btn:hover {
+  color: var(--c-text);
+  background: var(--c-hover);
+}
+/* the 8 gap between the tile and the card: the handle (the panel's signed one, turned): row-resize,
+   a 2 px text-3 line after 120 ms of hover, text-2 while dragged */
+.s3-ohandle {
+  position: fixed;
+  top: calc(var(--h-bar) + var(--s3-tile, 0px) - var(--s-2));
+  right: var(--s-3);
+  z-index: 15;
+  width: 280px;
+  height: 8px;
+  cursor: row-resize;
+  outline: 0;
+  touch-action: none;
+}
+.s3-ohandle::after {
+  content: '';
+  position: absolute;
+  left: var(--s-3);
+  right: var(--s-3);
+  top: calc(50% - 1px);
+  height: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.s3-ohandle[data-hot]::after,
+.s3-ohandle:focus-visible::after {
+  background: var(--c-text-3);
+}
+.s3-ohandle[data-drag]::after {
+  background: var(--c-text-2);
+}
+:root.s3-resizing,
+:root.s3-resizing * {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+/* the cube at the right of the Agents head while the tile is hidden: 24, the world back */
+.s3-ohead-cube {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: var(--h-seg-in);
+  border-radius: var(--r-2);
+}
+.s3-ohead-cube:hover {
+  background: var(--c-hover);
+}
+/* the other sections folded to their head (outer-world v2 give-way): the summary after the name */
+.s3-ohead-sum {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* past the heads alone the agents' list scrolls inside the card, a 16 px fade at its foot */
+.s3-outer[data-scrolls] {
+  overflow: hidden;
+}
+.s3-outer[data-scrolls] .s3-osec[data-testid='app.outer.agents'] {
+  flex: 1;
+  min-height: 0;
+}
+.s3-outer[data-scrolls] .s3-orows {
+  overflow-y: auto;
+  min-height: 0;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }

@@ -58,6 +58,7 @@ import { Help } from '@/help/Help';
 import { useTheme } from '@/theme';
 import { HELP_EVENT, keyAction, menuEcho, typingIn, type FrameAction } from './keys';
 import { emitAction, useMenuAction } from './menu';
+import { outerWorld, useOuterWorld } from './side3d/tilestate';
 import { TerminalPanel } from '@/terminal/Terminal';
 import { AddSheetHost } from '@/settings/AddSheet';
 import { pickerPort } from '@/settings/picker';
@@ -263,6 +264,11 @@ function Shell() {
   // View › Panel Full Width ⇧⌥⌘B (panel-full, designer m_45445): a check item, dimmed while the panel is a sheet
   // File › Reopen Closed Tab ⇧⌘T (reopen-panel, designer m_46216): the menu's alone, no echo to drop
   useMenuAction('reopenTab', reopenClosed);
+  // View › Hide/Show the Bims (outer-world v2): the bims' tile over the outer card, kept per window
+  const bimsHidden = useOuterWorld().hidden;
+  useMenuAction('bims', () => {
+    outerWorld.hide(!outerWorld.get().hidden);
+  });
   useMenuAction('panelFull', () => {
     if (!menuEcho(frameKeyAt.panelFull, Date.now())) toggleFull();
   });
@@ -275,8 +281,8 @@ function Shell() {
   useEffect(() => {
     // a component test's window.bise may be a partial fake, and the page outside Electron has none
     const bise = (window as Partial<Window>).bise as Partial<Window['bise']> | undefined;
-    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen, artifact: artifactShown, panelFull, panelFullCan: !panelSheet });
-  }, [sidebarShown, panelOpen, artifactShown, panelFull, panelSheet]);
+    bise?.viewMenu?.({ sidebar: sidebarShown, panel: panelOpen, artifact: artifactShown, panelFull, panelFullCan: !panelSheet, ...(bimsHidden ? { bimsHidden } : {}) });
+  }, [sidebarShown, panelOpen, artifactShown, panelFull, panelSheet, bimsHidden]);
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
   // R8: a /model the core holds for its provider opens that provider's setup (amb-home)

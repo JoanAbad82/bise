@@ -75,6 +75,8 @@ const PARTS = {
   ask: [[12, 12, 9], "M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14", [12, 17, 1]],
   // r2-pointer (designer m_44245): the sidebar's 'New project', the folder with a plus in it
   folderPlus: ["M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z", "M12 10v6M9 13h6"],
+  // nm-side (outer-world v2): the cube in the outer card's Agents head that brings the bims' tile back
+  cube: ["M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z", "M3.3 7 12 12l8.7-5", "M12 22V12"],
 } as const satisfies Record<string, readonly Part[]>;
 
 /** Every app icon's name. */

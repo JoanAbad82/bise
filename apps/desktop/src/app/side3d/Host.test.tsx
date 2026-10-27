@@ -20,6 +20,7 @@ import { SideHost, bubbleTops } from './Host';
 import { CARD_MAX, cardMaxH } from './layout';
 import { sideLayoutNow } from './place';
 import { beatPlace, hitBox } from './World';
+import { outerWorld, TILE_H, TILE_MIN } from './tilestate';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
 const office = vi.hoisted(() => ({
@@ -50,8 +51,13 @@ vi.mock('./render', () => ({
   },
 }));
 const panel = vi.hoisted(() => ({ open: false, width: 384, over: false, full: false }));
+// the tabs the side opened (the tile's '⤢': the Office tab)
+const opened = vi.hoisted(() => [] as unknown[]);
 vi.mock('./ports', async (orig) => ({
   ...(await orig<typeof import('./ports')>()),
+  openTab: (e: unknown) => {
+    opened.push(e);
+  },
   usePanelBox: () => ({ open: panel.open, width: panel.open && !panel.over ? panel.width : 0, over: panel.open && panel.over, full: panel.open && panel.full }),
   useFrontArtKind: () => undefined,
 }));
@@ -62,6 +68,9 @@ afterEach(() => {
   panel.width = 384;
   panel.over = false;
   panel.full = false;
+  opened.length = 0;
+  outerWorld.hide(false);
+  outerWorld.height(TILE_H, 900);
 });
 
 const HOME = 'bise-home-00000000';
@@ -619,3 +628,124 @@ describe('the outer card (page outer-side v2, his pick)', () => {
     expect(v.getByTestId('app.side').getAttribute('data-at')).toBe('between');
   });
 });
+
+describe('the bims\' tile over the outer card (page outer-world v2, his pick #799)', () => {
+  const tall = (h: number) => {
+    Object.defineProperty(window, 'innerHeight', { value: h, configurable: true });
+  };
+
+  it('at 1440 the tile shows over the card at 140, the project\'s office in it; the card starts under it and its 8 handle', () => {
+    tall(900);
+    const { v } = side3d(1440);
+    const tile = v.getByTestId('app.outer.world');
+    expect(tile.style.height).toBe('140px');
+    expect(tile.querySelector('[data-testid="office"]')).toBeTruthy();
+    expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('148px');
+    expect(v.getByTestId('app.outer.world.handle').getAttribute('aria-valuenow')).toBe('140');
+    // shown: no cube in the Agents head
+    expect(v.queryByTestId('app.outer.agents.cube')).toBeNull();
+  });
+
+  it('× hides it: the card takes the full height, a cube at the right of the Agents head brings it back; both kept', () => {
+    tall(900);
+    const { v } = side3d(1440);
+    fireEvent.click(v.getByTestId('app.outer.world.hide'));
+    expect(v.queryByTestId('app.outer.world')).toBeNull();
+    expect(v.queryByTestId('app.outer.world.handle')).toBeNull();
+    expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('');
+    const cube = v.getByTestId('app.outer.agents.cube');
+    expect(cube.getAttribute('aria-label')).toBe(side.tile_show);
+    expect(outerWorld.get().hidden).toBe(true);
+    fireEvent.click(cube);
+    expect(v.getByTestId('app.outer.world')).toBeTruthy();
+    expect(v.queryByTestId('app.outer.agents.cube')).toBeNull();
+    expect(outerWorld.get().hidden).toBe(false);
+  });
+
+  it('View › Show the Bims brings a hidden tile back, and Hide hides it', () => {
+    tall(900);
+    outerWorld.hide(true);
+    const { v } = side3d(1440);
+    expect(v.queryByTestId('app.outer.world')).toBeNull();
+    act(() => {
+      outerWorld.hide(!outerWorld.get().hidden);
+    });
+    expect(v.getByTestId('app.outer.world')).toBeTruthy();
+  });
+
+  it('the handle: a drag sets the height between 96 and half the window, a double-click puts 140 back, the height is kept', () => {
+    tall(900);
+    const { v } = side3d(1440);
+    const handle = v.getByTestId('app.outer.world.handle');
+    fireEvent.pointerDown(handle, { clientY: 200, button: 0, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientY: 296, pointerId: 1 });
+    expect(v.getByTestId('app.outer.world').style.height).toBe('236px');
+    expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('244px');
+    // past half the window: 450
+    fireEvent.pointerMove(handle, { clientY: 900, pointerId: 1 });
+    expect(v.getByTestId('app.outer.world').style.height).toBe('450px');
+    // under 96: 96
+    fireEvent.pointerMove(handle, { clientY: -400, pointerId: 1 });
+    expect(v.getByTestId('app.outer.world').style.height).toBe(`${String(TILE_MIN)}px`);
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+    // a move after the release does nothing
+    fireEvent.pointerMove(handle, { clientY: 600, pointerId: 1 });
+    expect(outerWorld.get().h).toBe(TILE_MIN);
+    fireEvent.doubleClick(handle);
+    expect(v.getByTestId('app.outer.world').style.height).toBe('140px');
+  });
+
+  it('a kept height taller than half a smaller window shows at half of it', () => {
+    tall(900);
+    outerWorld.height(400, 900);
+    tall(600);
+    const { v } = side3d(1440);
+    expect(v.getByTestId('app.outer.world').style.height).toBe('300px');
+    expect(outerWorld.get().h).toBe(400);
+  });
+
+  it('⤢ opens the world in the panel\'s Office tab; a click on a bim opens its thread', () => {
+    tall(900);
+    const { v } = side3d(1440);
+    expect(v.getByTestId('app.outer.world.panel').getAttribute('aria-label')).toBe(side.tile_panel);
+    fireEvent.click(v.getByTestId('app.outer.world.panel'));
+    expect(opened).toEqual([{ kind: 'office', project: ACME }]);
+  });
+
+  it('the give-way: a tall tile folds the other sections to their head with a one-line summary', () => {
+    tall(900);
+    const { v } = side3d(1440);
+    // 3 agents: at 140 everything holds its rows
+    expect(v.queryByTestId('app.outer.artifacts.sum')).toBeNull();
+    expect(v.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(2);
+    act(() => {
+      outerWorld.height(450, 900);
+    });
+    // 900 - 52 - 12 - 458 = 378: room for one row each (the agents' 3 lines first)
+    expect(v.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(1);
+    expect(v.queryByTestId('app.outer.artifacts.sum')).toBeNull();
+    cleanup();
+    tall(800);
+    act(() => {
+      outerWorld.height(400, 800);
+    });
+    const low = side3d(1440).v;
+    // 800 - 52 - 12 - 408 = 328: the heads alone, their summary after the name
+    expect(low.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(0);
+    expect(low.getByTestId('app.outer.artifacts.sum').textContent).toContain('PR #6');
+    expect(low.getByTestId('app.outer').hasAttribute('data-scrolls')).toBe(false);
+  });
+
+  it('a panel open: the tile and the card give way to the coins; folded again, both come back at the tile\'s height', () => {
+    tall(900);
+    outerWorld.height(200, 900);
+    panel.open = true;
+    const { v } = side3d(1440);
+    expect(v.queryByTestId('app.outer.world')).toBeNull();
+    cleanup();
+    panel.open = false;
+    const again = side3d(1440);
+    expect(again.v.getByTestId('app.outer.world').style.height).toBe('200px');
+  });
+});
+
