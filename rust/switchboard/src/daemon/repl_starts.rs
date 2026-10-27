@@ -375,7 +375,7 @@ impl Shell {
             // are there (BISE-166), then which plugins it has and what
             // for. Here, off the hub's loop: the first spawn may wait for
             // the login shell (read once, at most 3 s)
-            let agent_path = crate::tools_env::hub_agent_path(&paths.bin_dir());
+            let agent_path = crate::tools_env::hub_agent_path(&paths);
             env.set("BEND_TOOLS_NOTE", crate::tools_env::session_note(&agent_path, &workdir)).set("PATH", agent_path);
             // each phase is progress (the hub's start watch)
             let step = || tx.send(Msg::ReplStartStep { dir: dir.clone(), gen }).is_ok();

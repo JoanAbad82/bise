@@ -6,7 +6,9 @@
 //!   hub's own PATH (the TUI that started it), the user's login-shell
 //!   PATH, then the standard dirs; deduplicated. A hub started from a
 //!   thin environment (an IDE task, launchd, `env -i`) still finds
-//!   Homebrew tools.
+//!   Homebrew tools. The last login PATH read is kept in the hub's state
+//!   (`Paths::login_path_file`): a probe that fails (too slow under
+//!   load) gives the agents the kept one.
 //! - `git` on a fresh Mac is `/usr/bin/git`, a shim that opens the
 //!   "install the Command Line Tools" dialog and fails. It is never run
 //!   while `xcode-select -p` names no developer dir: the hub would pop
@@ -98,9 +100,32 @@ pub fn agent_path(bin_dir: &Path, inherited: &str, login: Option<&str>) -> Strin
 }
 
 /// The agents' PATH for this hub process (the login shell is asked
-/// once per process).
-pub fn hub_agent_path(bin_dir: &Path) -> String {
-    agent_path(bin_dir, &std::env::var("PATH").unwrap_or_default(), login_path())
+/// once per process; its last good answer is kept in the hub's state).
+pub fn hub_agent_path(paths: &crate::paths::Paths) -> String {
+    agent_path_for(paths, &std::env::var("PATH").unwrap_or_default(), login_path())
+}
+
+/// [`agent_path`] with the login PATH [`remembered_login`] gives.
+pub fn agent_path_for(paths: &crate::paths::Paths, inherited: &str, probed: Option<&str>) -> String {
+    let login = remembered_login(probed, &paths.login_path_file());
+    agent_path(&paths.bin_dir(), inherited, login.as_deref())
+}
+
+/// The login PATH the agents get: this probe's when it read one (kept
+/// in `saved` for the next hub), else the last one kept there. A probe
+/// too slow under load (a switch restarts every hub at once; 3 s cap)
+/// left a hub's agents without the user's node, pnpm, volta... for the
+/// hub's whole life (the 2026-10-27 switch to ac98b858b).
+pub fn remembered_login(probed: Option<&str>, saved: &Path) -> Option<String> {
+    let kept = std::fs::read_to_string(saved).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let Some(p) = probed else { return kept };
+    if kept.as_deref() != Some(p) {
+        let tmp = saved.with_extension(format!("{}.tmp", std::process::id()));
+        if std::fs::write(&tmp, p).and_then(|_| std::fs::rename(&tmp, saved)).is_err() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+    Some(p.to_string())
 }
 
 /// The PATH the hub itself finds git on: its own PATH + the standard
@@ -691,6 +716,31 @@ mod tests {
             agent_path(Path::new("/s/bin"), "", None),
             "/s/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         );
+    }
+
+    /// A hub whose login-shell probe fails (too slow under a switch's
+    /// load) still gives its agents the user's dirs: the last PATH a
+    /// probe read, kept in the hub's state (2026-10-27: node and pnpm
+    /// gone from every agent of the switched hub).
+    #[test]
+    fn a_failed_login_probe_keeps_the_last_login_path() {
+        let d = tmp("login-kept");
+        let paths = crate::paths::Paths { workspace: d.join("ws"), state: d.join("hub"), worktrees: d.join("wt") };
+        std::fs::create_dir_all(&paths.state).unwrap();
+        let volta = format!("{}/home/.volta/bin", d.display());
+        let login = format!("{}:/usr/bin", volta);
+        let has = |p: &str| p.split(':').any(|e| e == volta);
+        // never read on this hub: the thin PATH, nothing invented
+        assert!(!has(&agent_path_for(&paths, "/usr/bin:/bin", None)));
+        // a probe reads it: the agents get it, and it is kept
+        assert!(has(&agent_path_for(&paths, "/usr/bin:/bin", Some(&login))));
+        // the next hub's probe fails: the kept one, after the hub's PATH
+        let p = agent_path_for(&paths, "/usr/bin:/bin", None);
+        assert!(p.starts_with(&format!("{}:/usr/bin:/bin:{}", paths.bin_dir().display(), volta)), "{}", p);
+        // a later probe's answer replaces it
+        assert!(!has(&agent_path_for(&paths, "", Some("/other/bin"))));
+        assert!(!has(&agent_path_for(&paths, "", None)));
+        assert!(agent_path_for(&paths, "", None).contains("/other/bin"));
     }
 
     #[test]

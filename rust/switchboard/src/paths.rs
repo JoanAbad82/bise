@@ -138,6 +138,12 @@ impl Paths {
     pub fn bin_dir(&self) -> PathBuf {
         self.state.join("bin")
     }
+    /// The last login-shell PATH a hub of this workspace read
+    /// (tools_env::remembered_login's): the next hub's agents get it when
+    /// its own probe fails.
+    pub fn login_path_file(&self) -> PathBuf {
+        self.state.join("login-path")
+    }
     pub fn agent_dir(&self, name: &str) -> PathBuf {
         bise_home::hub_state::agent_dir(&self.state, name)
     }

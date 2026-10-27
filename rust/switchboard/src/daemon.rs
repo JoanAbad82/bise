@@ -1005,12 +1005,11 @@ impl Shell {
     /// as the poller finds them.
     fn merge_pr(&self, card: u64, place: String, number: u64, head: String, method: crate::place::MergeMethod) {
         let ws = self.opts.paths.workspace.clone();
-        let bin = self.opts.paths.bin_dir();
         let log_paths = self.opts.paths.clone();
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             use crate::forge::Forge;
-            let gh = crate::forge::github::GitHub::find(&crate::tools_env::hub_agent_path(&bin))
+            let gh = crate::forge::github::GitHub::find(&crate::tools_env::hub_agent_path(&log_paths))
                 .unwrap_or(crate::forge::github::GitHub { gh: "gh".into() });
             let res = crate::worktree::git(&ws, &["remote", "get-url", "origin"])
                 .ok()
@@ -1029,11 +1028,10 @@ impl Shell {
     /// finds gh and the repo's forge on its thread); no forge, no asks.
     fn start_prs(&mut self) {
         let ws = self.opts.paths.workspace.clone();
-        let bin = self.opts.paths.bin_dir();
         let log_paths = self.opts.paths.clone();
         let tx = self.tx.clone();
         let setup = Box::new(move || {
-            let gh = crate::forge::github::GitHub::find(&crate::tools_env::hub_agent_path(&bin));
+            let gh = crate::forge::github::GitHub::find(&crate::tools_env::hub_agent_path(&log_paths));
             let url = crate::worktree::git(&ws, &["remote", "get-url", "origin"]).ok()?;
             let Some(repo) = crate::forge::github::detect(&url, gh.as_ref()) else {
                 log_line(&log_paths, "PRs: origin is not on GitHub, not followed");
@@ -1591,15 +1589,20 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     // take a moment; the first REPL spawn waits for it)
     let tools_paths = paths.clone();
     std::thread::spawn(move || {
-        let p = crate::tools_env::hub_agent_path(&tools_paths.bin_dir());
+        let p = crate::tools_env::hub_agent_path(&tools_paths);
         let rg = crate::tools_env::which("rg", &p);
+        let login = match (crate::tools_env::login_path(), tools_paths.login_path_file().exists()) {
+            (Some(_), _) => "read",
+            (None, true) => "unavailable, the last one read kept",
+            (None, false) => "unavailable",
+        };
         log_line(
             &tools_paths,
             &format!(
                 "agents' tools: git {}; rg {}; login-shell PATH {}; PATH={}",
                 crate::tools_env::git().describe(),
                 rg.map(|r| r.display().to_string()).unwrap_or_else(|| "not installed (agents use grep)".into()),
-                if crate::tools_env::login_path().is_some() { "read" } else { "unavailable" },
+                login,
                 p
             ),
         );
