@@ -24,7 +24,7 @@ import { ThingPic } from '@/app/side3d/Bubbles';
 import { bubbleThing } from '@/app/side3d/objects';
 import { entityKey, type Entity } from '@/shared/entity';
 import { agentInView, changesInView, doPanelKey, PANEL_KEYS, type PanelCtx } from './keys';
-import { closeTabId, launcherHome, openWhat, panelAt, usePanelState } from './state';
+import { closeTabId, launcherHome, openWhat, panelAt, takeOpened, usePanelState } from './state';
 import { scopeOf } from './scope';
 import { useTabLooks } from './look';
 import { tabOf } from './model';
@@ -62,13 +62,17 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
   const opens = openRows({ changes: changesInView(ctx) !== undefined, office: (projectOf(route) ?? home) !== undefined });
   // Recent: the project in front's own (his m_46444), the panel's scope (scope.ts scopeOf)
   const recent = recentIn(allRecent, scopeOf(route, home, panelAt()));
-  // a fresh New tab, or the picker it turned into: the field takes the keys
+  // a New tab he just opened, or the picker it turned into: the field takes the keys; back in
+  // front by a project switch, his focus stays where it was (his m_46543, state.ts takeOpened)
   useEffect(() => {
-    if (shown) field.current?.focus();
-  }, [shown, artifacts]);
-  useEffect(() => {
+    if (shown && takeOpened(tabId)) field.current?.focus();
+  }, [shown, artifacts, tabId]);
+  // the tab turned into the picker or back: its highlight starts over, in the same render
+  const [wasPicker, setWasPicker] = useState(artifacts);
+  if (wasPicker !== artifacts) {
+    setWasPicker(artifacts);
     setAt(firstAt('', artifacts));
-  }, [artifacts]);
+  }
   const found = useMemo(() => (artifacts ? latestArtifacts(arts, q) : launchMatches(arts, q)), [arts, q, artifacts]);
   const listing = isListing(q, artifacts);
   const rows = launchRows({ q, picker: artifacts, found, open: opens, recent });

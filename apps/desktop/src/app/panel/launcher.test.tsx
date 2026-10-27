@@ -12,7 +12,7 @@ import { artifact, artifacts, ev, projects, row } from '../../../tests/feature/i
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
-import { openLauncher, panelState } from './state';
+import { openLauncher, panelScope, panelState } from './state';
 import { doPanelKey } from './keys';
 import { entityKey, type Entity } from '@/shared/entity';
 
@@ -128,6 +128,47 @@ describe('New tab, the launcher (r2-launcher)', () => {
     fireEvent.change(field, { target: { value: 'note 7' } });
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(v.getByTestId(`app.panel.tab.artifact:${ACME}/a7`).getAttribute('aria-selected')).toBe('true');
+  });
+  it("a switch back to a project with its New tab in front leaves his focus where it was; only ⌘T or '+' gives the field the keys (his m_46543)", () => {
+    const { v } = shell();
+    expect(document.activeElement).toBe(v.getByTestId('app.panel.launcher.search'));
+    const composer = document.body.appendChild(document.createElement('textarea'));
+    act(() => {
+      panelScope(ACME);
+    });
+    composer.focus();
+    act(() => {
+      panelScope(HOME);
+    });
+    act(() => {
+      panelScope(ACME);
+    });
+    expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(composer);
+    act(() => {
+      openLauncher();
+    });
+    expect(document.activeElement).toBe(v.getByTestId('app.panel.launcher.search'));
+    composer.remove();
+  });
+  it('a switch back to a project with its blank browser tab in front leaves his focus where it was', () => {
+    const { v } = shell();
+    fireEvent.click(v.getByTestId('app.panel.launcher.browser'));
+    expect(document.activeElement).toBe(v.getByTestId('app.panel.addr.field'));
+    const composer = document.body.appendChild(document.createElement('textarea'));
+    act(() => {
+      panelScope(ACME);
+    });
+    composer.focus();
+    act(() => {
+      panelScope(HOME);
+    });
+    act(() => {
+      panelScope(ACME);
+    });
+    expect(v.getByTestId('app.panel.tab.web:1').getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(composer);
+    composer.remove();
   });
   it("Office: the project's bims in a tab", () => {
     const { v } = shell();

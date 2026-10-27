@@ -249,10 +249,24 @@ export function useFullPreview(): boolean {
   );
 }
 
+/** The tab he just opened (openWhat), until its field takes the keys (takeOpened); a project switch or an unfold never sets it. */
+let opened: string | null = null;
+
+/**
+ * True once for the tab he just opened (⌘T, '+', ⌘L, a launcher's pick): its field takes the
+ * keys then, never when it comes back in front by a project switch (his m_46543). Clears it.
+ */
+export function takeOpened(id: string): boolean {
+  if (opened !== id) return false;
+  opened = null;
+  return true;
+}
+
 /** Opens `what` in a tab (an open one comes to the front), unfolding the panel; `instead`: the launcher it replaces. */
 export function openWhat(what: TabWhat, instead?: string): void {
   const recent = what.kind === 'thing' ? pushRecent(state.recent, what.e) : state.recent;
   const tabs = openIn(state.tabs, what, instead);
+  opened = tabs.active;
   if (!state.open || tabs.active !== state.tabs.active) before.set(beforeKey(tabs.active), { open: state.open, active: state.tabs.active });
   // a page newly opened may widen the panel once (widenFor); an open one coming to the front doesn't
   const isNew = !state.tabs.list.some((t) => t.id === tabs.active);

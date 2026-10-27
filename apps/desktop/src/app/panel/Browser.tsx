@@ -19,7 +19,7 @@ import { browserUrl } from '@/artifacts/Open';
 import { PRIMARY_KEY } from '@/artifacts/front';
 import { useModHeld } from '@/app/held';
 import { useEntityMenu } from '@/app/menus/use';
-import { closeTabId, openWhat } from './state';
+import { closeTabId, openWhat, takeOpened } from './state';
 import { launchEnter, launchMatches, stepAt } from './launch';
 import { PickRow } from './Launcher';
 import { isFrameEsc } from '@/app/ArtifactView';
@@ -156,9 +156,10 @@ export function BlankBrowser({ tabId, shown }: { tabId: string; shown: boolean }
   const [keyed, setKeyed] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const found = useMemo(() => launchMatches(arts, q), [arts, q]);
+  // just opened (⌘L, the launcher's Browser): the field takes the keys; never at a project switch (his m_46543)
   useEffect(() => {
-    if (shown) field.current?.focus();
-  }, [shown]);
+    if (shown && takeOpened(tabId)) field.current?.focus();
+  }, [shown, tabId]);
   const enter = () => {
     const p = launchEnter(found, at, q);
     if (p === undefined) return;
