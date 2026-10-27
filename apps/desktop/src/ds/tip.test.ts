@@ -1,6 +1,6 @@
 // src/ds · the hover tip's rules (tip.ts): where it goes, when it shows, its attributes.
 import { describe, expect, it } from 'vitest';
-import { clearBox, placeTip, tipAttrs, tipWait, TIP_DELAY_MS } from './tip';
+import { besideBox, clearBox, placeTip, tipAttrs, tipWait, TIP_DELAY_MS } from './tip';
 
 const VIEW = { width: 1400, height: 900 };
 
@@ -36,6 +36,19 @@ describe('the hover tip (designer m_24359)', () => {
     expect(clearBox(bar, null)).toBe(bar);
     const at = placeTip(clearBox(bar, row), { width: 179, height: 27 }, { width: 1440, height: 900 });
     expect(at).toEqual({ left: 102, top: 184 - 8 - 27, side: 'above' });
+  });
+
+  it("a 'left' tip (designer m_46992): off the card it is in, 8 left of it, centred on the row; no room at the left: above", () => {
+    const row = { left: 1160, top: 300, width: 260, height: 28 };
+    const card = { left: 1148, top: 64, width: 280, height: 824 };
+    expect(besideBox(row, card)).toEqual({ left: 1148, top: 300, width: 280, height: 28 });
+    expect(besideBox(row, null)).toBe(row);
+    expect(placeTip(besideBox(row, card), { width: 200, height: 24 }, { width: 1440, height: 900 }, 'left')).toEqual({ left: 1148 - 8 - 200, top: 302, side: 'left' });
+    // a row near the window's top: the tip stays 8 in
+    expect(placeTip({ left: 1148, top: 0, width: 280, height: 8 }, { width: 200, height: 24 }, { width: 1440, height: 900 }, 'left').top).toBe(8);
+    // a card at the window's left edge: above, as any tip
+    expect(placeTip({ left: 100, top: 300, width: 20, height: 16 }, { width: 120, height: 24 }, { width: 1440, height: 900 }, 'left')).toEqual({ left: 50, top: 268, side: 'above' });
+    expect(tipAttrs('perf · speed', undefined, 'left')).toEqual({ 'data-tip': 'perf · speed', 'data-tip-side': 'left' });
   });
 
   it('waits 400 ms cold, shows at once warm or on keyboard focus', () => {

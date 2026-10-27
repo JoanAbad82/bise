@@ -10,7 +10,7 @@
 // Owner: amb-win.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { clearBox, placeTip, tipWait, TIP_WARM_MS, type TipSide } from '@/ds';
+import { besideBox, clearBox, placeTip, tipWait, TIP_WARM_MS, type TipSide } from '@/ds';
 
 /** The mark under an element: the closest one with words. */
 function markOf(t: EventTarget | null): HTMLElement | null {
@@ -30,7 +30,7 @@ interface Shown {
   readonly mark: HTMLElement;
   readonly words: string;
   readonly keys: string;
-  /** the side it goes first: 'below' when the mark asks (data-tip-side), else above */
+  /** the side it goes first: 'below' or 'left' when the mark asks (data-tip-side), else above */
   readonly first: TipSide;
   /** it clears its outer mark's box (data-tip-clear 'outer'), not only its own */
   readonly clear: boolean;
@@ -52,7 +52,7 @@ export function TipLayer({ testId = 'tip' }: { testId?: string }) {
       mark,
       words: mark.dataset.tip ?? '',
       keys: mark.dataset.tipKeys ?? '',
-      first: mark.dataset.tipSide === 'below' ? 'below' : 'above',
+      first: mark.dataset.tipSide === 'below' ? 'below' : mark.dataset.tipSide === 'left' ? 'left' : 'above',
       clear: mark.dataset.tipClear === 'outer',
       fade,
     });
@@ -146,7 +146,12 @@ export function TipLayer({ testId = 'tip' }: { testId?: string }) {
     const m = shown.mark.getBoundingClientRect();
     // a small mark inside a row that is a mark itself may ask to clear that row (clearBox)
     const o = shown.clear ? (shown.mark.parentElement?.closest<HTMLElement>('[data-tip]')?.getBoundingClientRect() ?? null) : null;
-    const box = clearBox({ left: m.left, top: m.top, width: m.width, height: m.height }, o === null ? null : { left: o.left, top: o.top, width: o.width, height: o.height });
+    // a 'left' tip goes off the box it is in (data-tip-box: the outer card), centred on its mark
+    const b = shown.first === 'left' ? (shown.mark.closest<HTMLElement>('[data-tip-box]')?.getBoundingClientRect() ?? null) : null;
+    const mark = { left: m.left, top: m.top, width: m.width, height: m.height };
+    const box = shown.first === 'left'
+      ? besideBox(mark, b === null ? null : { left: b.left, top: b.top, width: b.width, height: b.height })
+      : clearBox(mark, o === null ? null : { left: o.left, top: o.top, width: o.width, height: o.height });
     const at = placeTip(box, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, shown.first);
     el.style.left = `${String(at.left)}px`;
     el.style.top = `${String(at.top)}px`;

@@ -7,6 +7,9 @@
 // options, whose tip above covered the question they answer); above when below has no room. A small
 // mark inside a row that is a mark itself may ask to clear the row (clearBox: the sidebar's day
 // bars, designer m_45992): its tip goes off the row, as the row's would, centred on the small mark.
+// A row in a card at the window's right may ask for its left (side 'left', designer m_46992: the
+// outer card's agents): beside the card it is in (besideBox), centred on the row, never over the
+// row above; above when there is no room at its left.
 // When: 400 ms after the pointer rests on a mark; at once on keyboard focus; warm: for 1 s after a
 // tip closes (or while one shows), the next one shows at once, so moving along a row of marks
 // never blinks.
@@ -26,15 +29,25 @@ export const TIP_DELAY_MS = 400;
 /** after a tip closes, how long the next one shows at once */
 export const TIP_WARM_MS = 1000;
 
-/** a side of its mark the tip goes on */
-export type TipSide = 'above' | 'below';
+/** a side of its mark the tip goes on; 'left': beside it, centred on its height (a row in a card at the window's right edge, its tip off the card toward the page: designer m_46992) */
+export type TipSide = 'above' | 'below' | 'left';
 
 /** Where the tip goes: its left and top, and the side of the mark it is on. `first`: the side it tries first ('above' unless the mark asks). Pure. */
 export function placeTip(mark: Box, tip: { width: number; height: number }, view: { width: number; height: number }, first: TipSide = 'above'): { left: number; top: number; side: TipSide } {
+  if (first === 'left') {
+    // beside the mark, centred on its height, clamped to the window; no room at its left: above or below
+    const besideLeft = mark.left - TIP_GAP - tip.width;
+    if (besideLeft >= TIP_GAP) {
+      const mid = mark.top + mark.height / 2 - tip.height / 2;
+      const top = Math.max(TIP_GAP, Math.min(mid, view.height - TIP_GAP - tip.height));
+      return { left: Math.round(besideLeft), top: Math.round(top), side: 'left' };
+    }
+    return placeTip(mark, tip, view, 'above');
+  }
   const above = mark.top - TIP_GAP - tip.height;
   const below = mark.top + mark.height + TIP_GAP;
   const fits = { above: above >= TIP_GAP, below: below + tip.height <= view.height - TIP_GAP };
-  const other: TipSide = first === 'above' ? 'below' : 'above';
+  const other = first === 'above' ? 'below' : 'above';
   // its first side when it fits; else the other when that fits; else the side with more room
   const roomAbove = mark.top;
   const roomBelow = view.height - mark.top - mark.height;
@@ -47,15 +60,16 @@ export function placeTip(mark: Box, tip: { width: number; height: number }, view
 
 /**
  * A mark's tip: spread on the element (`<span {...tipAttrs("17% of perf's context used")}>`), a key
- * at its right when it has one, 'below' when it goes below first (placeTip); '' or none: no tip. The
+ * at its right when it has one, 'below' when it goes below first, 'left' beside it (placeTip; it
+ * clears the closest data-tip-box around it, besideBox); '' or none: no tip. The
  * app's TipLayer reads them. Pure.
  */
 export function tipAttrs(
   words: string | undefined,
   keys?: string,
-  side?: 'below',
+  side?: 'below' | 'left',
   clear?: 'outer',
-): { 'data-tip'?: string; 'data-tip-keys'?: string; 'data-tip-side'?: 'below'; 'data-tip-clear'?: 'outer' } {
+): { 'data-tip'?: string; 'data-tip-keys'?: string; 'data-tip-side'?: 'below' | 'left'; 'data-tip-clear'?: 'outer' } {
   if (words === undefined || words === '') return {};
   return {
     'data-tip': words,
@@ -73,6 +87,15 @@ export function tipAttrs(
  */
 export function clearBox(mark: Box, outer: Box | null): Box {
   return outer === null ? mark : { left: mark.left, width: mark.width, top: outer.top, height: outer.height };
+}
+
+/**
+ * The box a 'left' tip clears: its mark's top and height, its outer box's left and width (the card
+ * the row is in, data-tip-box), so the tip goes off the card, centred on the row. No outer box: the
+ * mark's own. Pure.
+ */
+export function besideBox(mark: Box, outer: Box | null): Box {
+  return outer === null ? mark : { left: outer.left, width: outer.width, top: mark.top, height: mark.height };
 }
 
 /** How long before a mark's tip shows: at once while warm or on keyboard focus, else the delay. Pure. */

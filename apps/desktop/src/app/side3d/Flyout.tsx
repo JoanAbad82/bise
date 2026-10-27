@@ -11,7 +11,7 @@
 // SideRow, 48 high, a 40 object, 12 between, a name and a line under it, a dot at the end; its
 // button is a `data-row` (SideHost's ↑ ↓ walk the rows, ⏎ opens). Esc and a click outside close
 // it (SideHost). Owner: nm-side; the frame and its move: m-bubbles.
-import type { MouseEventHandler, ReactNode, Ref } from 'react';
+import { useEffect, useRef, useState, type MouseEventHandler, type ReactNode, type Ref, type RefObject } from 'react';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import type { EntityMenu } from '@/ds';
 import type { BubbleId } from './objects';
@@ -147,14 +147,42 @@ export interface SideRowProps {
   readonly ref?: Ref<HTMLDivElement>;
 }
 
-/** A card's row: one button (its click, its focus ring, its VoiceOver name), the entity's menu on a right click. */
+/** Whether a line box cuts its words: what it holds is wider than it shows. Pure. */
+export function isCut(box: { readonly scrollWidth: number; readonly clientWidth: number }): boolean {
+  return box.scrollWidth > box.clientWidth + 0.5;
+}
+
+/** Whether the element in `ref` cuts its words, followed as its box changes (a ResizeObserver; none: never cut). */
+export function useCut(ref: RefObject<HTMLElement | null>): boolean {
+  const [cut, setCut] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => {
+      setCut(isCut(el));
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, [ref]);
+  return cut;
+}
+
+/**
+ * A card's row: one button (its click, its focus ring, its VoiceOver name), the entity's menu on a
+ * right click. Its tip only while its title is cut, the whole title then (designer m_46988: a whole
+ * title gets none, never a tip over the row above).
+ */
 export function SideRow({ pic, title, sub, end, label, tip, onClick, menu, testId, ref }: SideRowProps) {
+  const l1 = useRef<HTMLSpanElement>(null);
+  const cut = useCut(l1);
   return (
     <div ref={ref} className="s3-row" onContextMenu={menu.onContextMenu} data-testid={testId}>
-      <Press look="s3-row-body" aria-label={label} {...tipAttrs(tip)} onClick={onClick} data-row="">
+      <Press look="s3-row-body" aria-label={label} {...tipAttrs(cut ? tip : undefined)} onClick={onClick} data-row="">
         <span className="s3-row-pic">{pic}</span>
         <span className="s3-row-lines">
-          <span className="s3-row-l1">{title}</span>
+          <span ref={l1} className="s3-row-l1">{title}</span>
           <span className="s3-row-l2">{sub}</span>
         </span>
         {end != null && <span className="s3-row-end">{end}</span>}

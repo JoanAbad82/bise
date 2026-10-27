@@ -176,4 +176,26 @@ describe('TipLayer', () => {
     expect(tip()?.style.top).toBe(`${String(184 - 8)}px`);
     expect(tip()?.style.left).toBe('243px');
   });
+
+  it("a 'left' mark's tip goes off the box it is in (data-tip-box), centred on the mark (designer m_46992)", () => {
+    const v = render(
+      <div>
+        <aside data-testid="card" data-tip-box="">
+          <button type="button" data-testid="line" {...tipAttrs('perf · speed', undefined, 'left')} />
+        </aside>
+        <TipLayer />
+      </div>,
+    );
+    const rect = (left: number, top: number, width: number, height: number) => () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
+    v.getByTestId('card').getBoundingClientRect = rect(1148, 64, 280, 800);
+    v.getByTestId('line').getBoundingClientRect = rect(1156, 300, 264, 28);
+    over(v.getByTestId('line'));
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    // happy-dom has no layout: the tip is 0 x 0, so its left is the card's left less the 8 gap, its top the line's middle
+    expect(tip()?.dataset.side).toBe('left');
+    expect(tip()?.style.left).toBe(`${String(1148 - 8)}px`);
+    expect(tip()?.style.top).toBe('314px');
+  });
 });

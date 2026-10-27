@@ -144,7 +144,7 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
   return (
     <div className="s3-orow" data-asks={asks || undefined} data-here={here || undefined} data-back={st?.back === true || undefined} data-open={open || undefined}
       onContextMenu={menu.onContextMenu} data-testid={id}>
-      <Press look="s3-orow-open" aria-label={r.title} aria-expanded={asks ? open : undefined} {...tipAttrs(`${r.name} · ${job}`)} onClick={() => {
+      <Press look="s3-orow-open" aria-label={r.title} aria-expanded={asks ? open : undefined} {...tipAttrs(`${r.name} · ${job}`, undefined, 'left')} onClick={() => {
         if (asks) onToggle();
         else onOpen(r);
       }} data-row="">
@@ -247,7 +247,7 @@ export function OuterCard({ tile = 0, children }: { tile?: number; children: Rea
   useLayoutEffect(measure);
   return (
     <aside ref={box} className="s3-outer" style={{ top: OUTER_TOP + tile }} onScroll={measure}
-      data-above={edges.above || undefined} data-below={edges.below || undefined} data-testid="app.outer">
+      data-above={edges.above || undefined} data-below={edges.below || undefined} data-tip-box="" data-testid="app.outer">
       {children}
     </aside>
   );
