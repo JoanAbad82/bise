@@ -386,7 +386,7 @@
   "side.tile_height": {
     "args": [],
     "one": null,
-    "text": "drag to resize the bims · double-click: 140"
+    "text": "drag to resize · double-click resets"
   },
   "side.tile_hide": {
     "args": [],

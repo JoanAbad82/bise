@@ -125,7 +125,7 @@ export const side = {
   /** the cube at the right of the card's Agents head while the tile is hidden: it comes back */
   tile_show: "Show the bims",
   /** the handle between the tile and the card: its VoiceOver name and tip */
-  tile_height: "drag to resize the bims · double-click: 140",
+  tile_height: "drag to resize · double-click resets",
   /** the tile's VoiceOver name */
   tile_name: (a: { project: string | number }): string => String(a.project) + "'s bims",
   /** a coin's card (⌥ held alone, or a hover; page folded-side v9), the agents coin's first line: the one agent that asks him, in the accent */
