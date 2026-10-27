@@ -1,7 +1,7 @@
 // town/signs.ts: the town's signs laid out like map labels (bims m_30199), no mark over another,
 // none without its name (bims m_31373).
 import { describe, expect, it } from 'vitest';
-import { placeSigns, type Box, type SignAt, type SignIn } from './signs';
+import { placeSigns, signRank, type Box, type SignAt, type SignIn } from './signs';
 
 const sign = (id: string, x: number, y: number, o: Partial<SignIn> = {}): SignIn => ({ id, x, y, w: 80, h: 20, compactW: 50, live: false, rank: 2, ...o });
 const box = (s: SignIn, a: SignAt): Box => ({ x0: a.left, y0: a.top, x1: a.left + (a.compact ? s.compactW : s.w), y1: a.top + s.h });
@@ -46,6 +46,17 @@ describe('town signs: like map labels, none over another mark', () => {
     // a long sign in a narrow town: no room whole, its compact one fits
     const m = sign('m', 50, 26, { w: 120, compactW: 60 });
     expect(placeSigns([m], { x0: 0, y0: 0, x1: 100, y1: 30 }).get('m')).toEqual({ left: 20, top: 2, compact: true });
+  });
+
+  it("bise's own home ranks with the pills: in a crowd its plain sign keeps its spot over a plain project's (ui-review m_47739)", () => {
+    expect(signRank({ first: true, pills: false, home: false })).toBe(0);
+    expect(signRank({ first: false, pills: true, home: false })).toBe(1);
+    expect(signRank({ first: false, pills: false, home: true })).toBe(1);
+    expect(signRank({ first: false, pills: false, home: false })).toBe(2);
+    // a plain project's sign right over the home's anchor, the only spot for each: the home's wins
+    const area = { x0: 0, y0: 0, x1: 400, y1: 300 };
+    const ins = [sign('plain', 200, 100), sign('home', 200, 100, { rank: signRank({ first: false, pills: false, home: true }) })];
+    expect(placeSigns(ins, area).get('home')).toEqual({ left: 160, top: 76, compact: false });
   });
 
   it('the hovered one (rank 0) is placed first: it keeps the spot above', () => {

@@ -17,8 +17,17 @@ export interface SignIn {
   readonly compactW: number;
   /** its office is posed live (its bims walk under the anchor): the sign goes above it only */
   readonly live: boolean;
-  /** placed first: the hovered or dived one 0, with pills 1, the others 2 */
+  /** placed first: the hovered or dived one 0, with pills or bise's own home 1, the others 2 (signRank) */
   readonly rank: number;
+}
+
+/**
+ * A sign's rank: the hovered or dived one first, then the ones with pills and bise's own home (the
+ * town's heart: in a small town its plain sign lost every overlap, ui-review m_47739), then the rest. Pure.
+ */
+export function signRank(s: { readonly first: boolean; readonly pills: boolean; readonly home: boolean }): number {
+  if (s.first) return 0;
+  return s.pills || s.home ? 1 : 2;
 }
 
 export interface SignAt {

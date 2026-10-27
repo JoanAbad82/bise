@@ -32,7 +32,7 @@ import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from '../zoom
 import { DIVE_S, diveAt } from './dive';
 import { liveAgents, signOf, townProjects, type TownProject } from './sites';
 import type { MakeTownRenderer, TownRenderer, TownSite } from './types';
-import { placeSigns as placeSignsAt, type Box as SignBox, type SignIn } from './signs';
+import { placeSigns as placeSignsAt, signRank, type Box as SignBox, type SignIn } from './signs';
 
 /** The town's parts: the office's (its dive opens one), the pure modules it reads, its renderer's loader. */
 export interface TownParts {
@@ -286,7 +286,8 @@ export function Town({
       const first = id === live.current.dived || id === hoverRef.current;
       // compact: its name and pills, the ∿ n and its gap out (office.css)
       const compactW = work === null ? 0 : el.offsetWidth - work.offsetWidth - SIGN_GAP;
-      ins.push({ id, x: at.x, y: at.y, w: el.offsetWidth, h: el.offsetHeight, compactW, live: liveNow.has(id), rank: first ? 0 : pill !== null ? 1 : 2 });
+      const home = live.current.sites.some((s) => s.id === id && s.home === true);
+      ins.push({ id, x: at.x, y: at.y, w: el.offsetWidth, h: el.offsetHeight, compactW, live: liveNow.has(id), rank: signRank({ first, pills: pill !== null, home }) });
     }
     const fit = only ? null : r.townFit();
     const h = fit?.heightPx ?? box.clientHeight;
@@ -618,6 +619,7 @@ export function Town({
     <div
       className="bims-town-box"
       data-phase={phase}
+      data-fill={maxH < TALL || undefined}
       tabIndex={-1}
       onKeyDown={(e) => {
         if (e.key !== 'Escape' || !officeOn) return;

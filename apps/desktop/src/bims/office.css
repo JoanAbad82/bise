@@ -608,6 +608,18 @@
   position: relative;
   outline: none;
 }
+/* bound (the outer tile, Town maxH): the box is its holder's whole height, a column, so the town's
+   canvas and the dived Office (Office fill: flex 1) take all of it, with none of the right bar's
+   margins (they pushed the town down and past the tile's right edge: ui-review m_47739) */
+.bims-town-box[data-fill] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bims-town-box[data-fill] > .bims-office {
+  margin: 0;
+}
 .bims-town-box > .bims-town[data-top] {
   position: absolute;
   inset: 0 0 auto 0;
