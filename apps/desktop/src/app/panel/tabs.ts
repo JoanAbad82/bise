@@ -42,7 +42,8 @@ export function tabMoveable(id: string): boolean {
 export function moveTab(id: string, to: 'bottom'): void {
   const what = panelState.get().tabs.list.find((x) => x.id === id)?.what;
   if (what?.kind !== 'terminal') return;
-  closeTabId(id);
+  // it moved, it didn't close: ⇧⌘T never brings it back to the right
+  closeTabId(id, { remember: false });
   panel.setPlace(to);
   panel.show();
 }

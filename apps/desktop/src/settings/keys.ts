@@ -57,6 +57,7 @@ export const KEY_SECTIONS: readonly KeySection[] = [
     rows: [
       { keys: FRAME_KEYS.sidebar, action: settings.key_sidebar },
       { keys: FRAME_KEYS.panel, action: settings.key_panel },
+      { keys: '⇧⌘T', action: settings.key_reopen_tab },
       { keys: PLACE_KEYS.bise, action: settings.key_bise },
       { keys: '⌘1 … ⌘9', action: settings.key_project },
       { keys: '⌥0 / ⌥1 … ⌥9', action: settings.key_main_or_agent, tui: '⌥ + 0…9' },

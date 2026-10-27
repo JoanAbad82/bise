@@ -17,6 +17,8 @@ crate::words! { settings:
     key_sidebar = "show / hide the sidebar";
     /// ⌥⌘B (⌥⌘0 too, shown nowhere)
     key_panel = "show / hide the panel";
+    /// ⇧⌘T (⌃⇧T too, as Chrome): the panel's last closed tab back in its place, again the one before
+    key_reopen_tab = "reopen the last closed tab";
     /// ⌘0
     key_bise = "bise";
     /// ⌘1 … ⌘9 (on the artifacts library: its rows, in their order; rail-keys)

@@ -1,6 +1,6 @@
 // src/app/panel · the panel's keys (page native-mac §4 #2, native-mac-qa §7 and §12): ⌘T New tab,
-// ⌘W closes the tab in front (only while the panel is open: else the window's), ⌘⇧] and ⌘⇧[ the
-// next and previous tab, and the launcher's rows: ⌘P Artifacts (the picker of the latest), ⌥⌘D
+// ⌘W closes the tab in front (only while the panel is open: else the window's), ⇧⌘T (⌃⇧T too, as
+// Chrome) the last closed tab back, ⌘⇧] and ⌘⇧[ the next and previous tab, and the launcher's rows: ⌘P Artifacts (the picker of the latest), ⌥⌘D
 // Changes (nothing when the agent in view has none), ⌘L Browser (a browser
 // tab). ⌥⌘0 (the panel) and ⌃` (the terminal) keep their arms in app/keys.ts and
 // terminal/model.ts. panelKeyOf decides, pure (app/keys.ts's one arm calls it); doPanelKey acts.
@@ -8,7 +8,7 @@
 import type { KeyLike } from '@/app/keys';
 import { projectOf, type Route } from '@/app/route';
 import type { Agent } from '@/proto';
-import { closeActive, openArtifacts, openBrowser, openLauncher, openShell, openWhat, stepTab } from './state';
+import { closeActive, openArtifacts, openBrowser, openLauncher, openShell, openWhat, reopenClosed, stepTab } from './state';
 import { hasChanges, type OpenRow } from './launch';
 
 /** Full width on and off (panel-full, designer m_45445): View › Panel Full Width, app/keys.ts. */
@@ -19,6 +19,7 @@ export const PANEL_KEYS = {
   toggle: '⌥⌘B',
   close: '⌘W',
   add: '⌘T',
+  reopen: '⇧⌘T',
   files: '⌘P',
   terminal: '⌃`',
   changes: '⌥⌘D',
@@ -26,10 +27,12 @@ export const PANEL_KEYS = {
 } as const;
 
 /** What a panel key does. */
-export type PanelKey = 'new-tab' | 'close-tab' | 'next-tab' | 'prev-tab' | 'files' | 'changes' | 'browser';
+export type PanelKey = 'new-tab' | 'close-tab' | 'reopen-tab' | 'next-tab' | 'prev-tab' | 'files' | 'changes' | 'browser';
 
 /** The panel's key for `e`, if it is one; ⌘W, ⌘⇧[ and ⌘⇧] only while the panel is open. Pure. */
 export function panelKeyOf(e: KeyLike, open: boolean): PanelKey | undefined {
+  // ⇧⌘T, and ⌃⇧T as Chrome on Windows and Linux (his m_46187): folded or open
+  if (e.shiftKey && !e.altKey && e.metaKey !== e.ctrlKey && e.code === 'KeyT') return 'reopen-tab';
   const meta = e.metaKey && !e.ctrlKey;
   if (!meta) return undefined;
   if (!e.altKey && !e.shiftKey) {
@@ -81,6 +84,9 @@ export function doPanelKey(k: PanelKey | OpenRow, c: PanelCtx, instead?: string)
       return;
     case 'close-tab':
       closeActive();
+      return;
+    case 'reopen-tab':
+      reopenClosed();
       return;
     case 'next-tab':
       stepTab(1);

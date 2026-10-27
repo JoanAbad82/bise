@@ -5,7 +5,8 @@
 // app reopens as he left it). Outside React's tree, as the terminal's panel.ts: a tab opened or a
 // width dragged re-renders the panel and the bar's tabs, never the shell or the composer. Every
 // door in: openTab (tabs.ts), the bar's ▯ and ⌥⌘B (⌥⌘0) (panelToggle), ⌃` (openShell), the
-// launcher's picks. Owner: nm-panel; the per-project scope panel-scope.
+// launcher's picks, ⇧⌘T (⌃⇧T) the last closed tab back (reopenClosed: a stack of closed tabs per
+// project's panel, not kept, as Chrome's per window). Owner: nm-panel; the per-project scope panel-scope.
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { useRoute } from '@/app/router';
@@ -14,7 +15,7 @@ import { useLeftWidth } from '@/app/frame-state';
 import { iconKindOf } from '@/ds';
 import { useAllArtifacts } from '@/artifacts';
 import { armHandoff } from '@/composer/handoff';
-import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushRecent, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, artFit, clampShare, shareOf, closable, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, parseKept, pushClosed, pushRecent, reopenIn, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type Closed, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 import { isFlat, parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf, type PanelRec } from './scope';
 
 const KEY = 'panel';
@@ -129,6 +130,7 @@ export const panelState = {
     rec = parseRec(raw);
     state = isFlat(raw) ? parseKept(raw) : viewOf(rec);
     before.clear();
+    closed.clear();
     emit();
   },
   /** tests only: the window's record as kept */
@@ -295,8 +297,35 @@ export function toggleShell(project: string): void {
   else openWhat({ kind: 'terminal', project, n: 0 });
 }
 
-export function closeTabId(id: string): void {
+/** The tabs he closed, the last on top (model.ts Closed), per project's panel as its tabs; a reload forgets them, as `before`. */
+const closed = new Map<string, readonly Closed[]>();
+
+/** `ids` closed from the tabs now: on this panel's closed stack, for ⇧⌘T. */
+function remember(ids: readonly string[]): void {
+  const stack = closed.get(rec.at) ?? [];
+  const next = pushClosed(stack, state.tabs, ids);
+  if (next !== stack) closed.set(rec.at, next);
+}
+
+/**
+ * A tab closes (its ×, its menu, ⌘W, a launcher or a browser done). `remember` false: it went
+ * elsewhere (a shell moved to the bottom), ⇧⌘T never brings it back.
+ */
+export function closeTabId(id: string, opts: { readonly remember?: boolean } = {}): void {
+  if (opts.remember !== false) remember([id]);
   setTabs(closeIn(state.tabs, id));
+}
+
+/**
+ * ⇧⌘T (⌃⇧T), as Chrome: the last tab he closed in this panel back in its place, in front, the
+ * panel unfolded; again, the one before. Nothing closed: nothing happens.
+ */
+export function reopenClosed(): void {
+  const r = reopenIn(state.tabs, closed.get(rec.at) ?? []);
+  if (r === undefined) return;
+  closed.set(rec.at, r.stack);
+  if (!state.open || r.tabs.active !== state.tabs.active) before.set(beforeKey(r.tabs.active), { open: state.open, active: state.tabs.active });
+  set({ ...state, open: true, tabs: r.tabs });
 }
 
 /** What was in front when each tab came by openWhat (model.ts Before), per project's panel; a reload forgets it. */
@@ -305,12 +334,14 @@ const beforeKey = (id: string): string => `${rec.at}\n${id}`;
 
 /** Esc on the tab `id`: it closes, the panel as it was before it came (model.ts closeBack, app/escape.ts). */
 export function closeTabBack(id: string): void {
+  remember([id]);
   const b = closeBack(state.tabs, id, before.get(beforeKey(id)));
   before.delete(beforeKey(id));
   set({ ...state, tabs: b.tabs, open: b.open });
 }
 
 export function closeOthersId(id: string): void {
+  remember(state.tabs.list.filter((x) => x.id !== id).map((x) => x.id));
   setTabs(closeOthers(state.tabs, id));
 }
 

@@ -11,7 +11,7 @@ import { artifact, artifacts, ev, projects, row } from '../../../tests/feature/i
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
-import { panelState, setFull, usePanelScope, usePanelState } from './state';
+import { panelState, panelToggle, reopenClosed, setFull, usePanelScope, usePanelState } from './state';
 import { PANEL_FULL_KEY } from './keys';
 import { openTab } from './tabs';
 import { PANEL_KEYS } from './keys';
@@ -97,6 +97,38 @@ describe('the tabbed panel', () => {
     expect(v.getByTestId('app.panel.tab.overview').getAttribute('aria-selected')).toBe('true');
     expect(v.queryByTestId('app.panel.tab.overview.close')).toBeNull();
     expect(panelState.get().open).toBe(true);
+  });
+  it('⇧⌘T (his m_46187, as Chrome): close two tabs, reopen twice, both come back in their place, the last closed first', () => {
+    const v = shell();
+    act(() => {
+      openTab({ kind: 'pr', project: ACME, number: 6 });
+      openTab({ kind: 'pr', project: ACME, number: 7 });
+      openTab({ kind: 'pr', project: ACME, number: 8 });
+    });
+    const ids = () => panelState.get().tabs.list.map((t) => t.id);
+    const all = ['overview', `pr:${ACME}/6`, `pr:${ACME}/7`, `pr:${ACME}/8`];
+    expect(ids()).toEqual(all);
+    fireEvent.click(v.getByTestId(`app.panel.tab.pr:${ACME}/7.close`));
+    fireEvent.click(v.getByTestId(`app.panel.tab.pr:${ACME}/6.close`));
+    act(() => {
+      panelToggle();
+    });
+    expect(ids()).toEqual(['overview', `pr:${ACME}/8`]);
+    act(() => {
+      reopenClosed();
+    });
+    expect(panelState.get().open, 'a folded panel unfolds on it').toBe(true);
+    expect(ids()).toEqual(['overview', `pr:${ACME}/6`, `pr:${ACME}/8`]);
+    expect(v.getByTestId(`app.panel.tab.pr:${ACME}/6`).getAttribute('aria-selected')).toBe('true');
+    act(() => {
+      reopenClosed();
+    });
+    expect(ids()).toEqual(all);
+    expect(v.getByTestId(`app.panel.tab.pr:${ACME}/7`).getAttribute('aria-selected')).toBe('true');
+    act(() => {
+      reopenClosed();
+    });
+    expect(ids(), 'nothing left to reopen').toEqual(all);
   });
   it('past six tabs: an overflow button, the tab in front still shows', () => {
     const v = shell();

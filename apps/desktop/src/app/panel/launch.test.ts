@@ -92,6 +92,12 @@ describe("the panel's keys (native-mac-qa §7, the launcher's rows)", () => {
     expect(panelKeyOf(key('BracketLeft', { meta: true, shift: true }), true)).toBe('prev-tab');
     expect(panelKeyOf(key('BracketLeft', { meta: true, shift: true }), false)).toBeUndefined();
   });
+  it('⇧⌘T and ⌃⇧T reopen the last closed tab, folded or open (his m_46187, as Chrome); ⌃⇧⌘T and ⌥⇧⌘T nothing', () => {
+    expect(panelKeyOf(key('KeyT', { meta: true, shift: true }), false)).toBe('reopen-tab');
+    expect(panelKeyOf(key('KeyT', { ctrl: true, shift: true }), true)).toBe('reopen-tab');
+    expect(panelKeyOf(key('KeyT', { ctrl: true, meta: true, shift: true }), true)).toBeUndefined();
+    expect(panelKeyOf(key('KeyT', { meta: true, alt: true, shift: true }), true)).toBeUndefined();
+  });
   it('leaves the other keys alone (⌘D the changes screen, ⌘K, a plain letter, ⌃T)', () => {
     expect(panelKeyOf(key('KeyD', { meta: true }), true)).toBeUndefined();
     expect(panelKeyOf(key('KeyK', { meta: true }), true)).toBeUndefined();
@@ -99,6 +105,6 @@ describe("the panel's keys (native-mac-qa §7, the launcher's rows)", () => {
     expect(panelKeyOf(key('KeyT', { ctrl: true, meta: true }), true)).toBeUndefined();
   });
   it('the rows name the keys they answer to', () => {
-    expect(PANEL_KEYS).toEqual({ files: '⌘P', terminal: '⌃`', changes: '⌥⌘D', browser: '⌘L', toggle: '⌥⌘B', close: '⌘W', add: '⌘T' });
+    expect(PANEL_KEYS).toEqual({ files: '⌘P', terminal: '⌃`', changes: '⌥⌘D', browser: '⌘L', toggle: '⌥⌘B', close: '⌘W', add: '⌘T', reopen: '⇧⌘T' });
   });
 });

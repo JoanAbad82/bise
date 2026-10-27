@@ -139,6 +139,42 @@ export function closeOthers(t: Tabs, id: string): Tabs {
   return { list: id === OVERVIEW.id ? [keep] : [OVERVIEW, keep].map((x) => t.list.find((y) => y.id === x.id) ?? x), active: keep.id };
 }
 
+/** A tab he closed and where it stood (its index then): ⇧⌘T (⌃⇧T) puts it back there, as Chrome. */
+export interface Closed {
+  readonly tab: Tab;
+  readonly at: number;
+}
+
+/** The closed tabs a panel remembers, the last closed on top (Chrome keeps 25). */
+export const CLOSED_MAX = 25;
+
+/**
+ * The closed stack after `ids` closed from `t` (one tab, or a menu's Close others): each with its
+ * index, the leftmost on top so they come back in their order. Overview and an id not open: none.
+ * Pure.
+ */
+export function pushClosed(stack: readonly Closed[], t: Tabs, ids: readonly string[]): readonly Closed[] {
+  const gone: Closed[] = [];
+  t.list.forEach((tab, at) => {
+    if (closable(tab.id) && ids.includes(tab.id)) gone.push({ tab, at });
+  });
+  if (gone.length === 0) return stack;
+  return [...stack, ...gone.reverse()].slice(-CLOSED_MAX);
+}
+
+/**
+ * ⇧⌘T (⌃⇧T): the last closed tab back in its place (its index, or the end), in front; one open
+ * again since (by another door) only comes to the front. Nothing closed: undefined. Pure.
+ */
+export function reopenIn(t: Tabs, stack: readonly Closed[]): { readonly tabs: Tabs; readonly stack: readonly Closed[] } | undefined {
+  const top = stack.at(-1);
+  if (top === undefined) return undefined;
+  const rest = stack.slice(0, -1);
+  if (t.list.some((x) => x.id === top.tab.id)) return { tabs: activate(t, top.tab.id), stack: rest };
+  const at = Math.max(0, Math.min(t.list.length, top.at));
+  return { tabs: { list: [...t.list.slice(0, at), top.tab, ...t.list.slice(at)], active: top.tab.id }, stack: rest };
+}
+
 /** Brings `id` to the front. Pure. */
 export function activate(t: Tabs, id: string): Tabs {
   return t.list.some((x) => x.id === id) ? { ...t, active: id } : t;

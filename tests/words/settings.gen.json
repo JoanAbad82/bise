@@ -1653,6 +1653,11 @@
     "one": null,
     "text": "remove"
   },
+  "settings.key_reopen_tab": {
+    "args": [],
+    "one": null,
+    "text": "reopen the last closed tab"
+  },
   "settings.key_scheduled": {
     "args": [],
     "one": null,

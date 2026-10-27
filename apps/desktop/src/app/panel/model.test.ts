@@ -26,8 +26,11 @@ import {
   openIn,
   OVERVIEW,
   parseKept,
+  pushClosed,
   pushRecent,
   RECENT_MAX,
+  reopenIn,
+  CLOSED_MAX,
   shownOf,
   stepIn,
   widenFor,
@@ -285,5 +288,52 @@ describe('full width (panel-full, designer m_45445)', () => {
     expect(withOpen({ ...FOLDED, open: false, full: true }).full).toBe(false);
     const open = { ...FOLDED, open: true, full: true };
     expect(withOpen(open)).toBe(open);
+  });
+});
+
+describe('the closed tabs (⇧⌘T, his m_46187, as Chrome)', () => {
+  const a: TabWhat = { kind: 'browser', n: 1 };
+  const b: TabWhat = { kind: 'browser', n: 2 };
+  const c: TabWhat = { kind: 'browser', n: 3 };
+  const three = (): Tabs => [a, b, c].reduce((t, w) => openIn(t, w), FIRST);
+  it('close two, reopen twice: the last closed first, each in its place and in front', () => {
+    let t = three();
+    expect(t.list.map((x) => x.id)).toEqual(['overview', 'web:1', 'web:2', 'web:3']);
+    let stack = pushClosed([], t, ['web:2']);
+    t = closeIn(t, 'web:2');
+    stack = pushClosed(stack, t, ['web:1']);
+    t = closeIn(t, 'web:1');
+    const r1 = reopenIn(t, stack);
+    expect(r1?.tabs).toEqual({ list: [OVERVIEW, { id: 'web:1', what: a }, { id: 'web:3', what: c }], active: 'web:1' });
+    const r2 = reopenIn(r1?.tabs ?? t, r1?.stack ?? []);
+    expect(r2?.tabs.list.map((x) => x.id)).toEqual(['overview', 'web:1', 'web:2', 'web:3']);
+    expect(r2?.tabs.active).toBe('web:2');
+    expect(reopenIn(r2?.tabs ?? t, r2?.stack ?? []), 'nothing left').toBeUndefined();
+  });
+  it("Close others: they come back one by one, in their order", () => {
+    let t = three();
+    let stack = pushClosed([], t, t.list.filter((x) => x.id !== 'web:2').map((x) => x.id));
+    t = closeOthers(t, 'web:2');
+    for (let i = 0; i < 2; i++) {
+      const r = reopenIn(t, stack);
+      t = r?.tabs ?? t;
+      stack = r?.stack ?? [];
+    }
+    expect(t.list.map((x) => x.id)).toEqual(['overview', 'web:1', 'web:2', 'web:3']);
+  });
+  it('Overview never goes on it; one open again by another door only comes to the front', () => {
+    const t = three();
+    expect(pushClosed([], t, ['overview'])).toEqual([]);
+    const stack = pushClosed([], t, ['web:1']);
+    const r = reopenIn(activate(t, 'web:3'), stack);
+    expect(r?.tabs.list).toEqual(t.list);
+    expect(r?.tabs.active).toBe('web:1');
+    expect(r?.stack).toEqual([]);
+  });
+  it(`keeps the last ${String(CLOSED_MAX)}`, () => {
+    let stack = pushClosed([], three(), ['web:1']);
+    for (let n = 0; n < CLOSED_MAX + 5; n++) stack = pushClosed(stack, openIn(FIRST, { kind: 'launcher', n }), [`new:${String(n)}`]);
+    expect(stack).toHaveLength(CLOSED_MAX);
+    expect(stack.at(-1)?.tab.id).toBe(`new:${String(CLOSED_MAX + 4)}`);
   });
 });
