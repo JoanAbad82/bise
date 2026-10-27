@@ -319,7 +319,7 @@ const SIP: Rot = [-2.25, 0, -0.45];
 
 /** the turn in its sleep at f (0 rest .. 1 turned) on a side */
 function turned(r: Rig, kind: IdleKind, side: number, f: number): Rig {
-  if (kind === 'desk') return { ...r, head: add(r.head, [0, side * 0.25 * f, 0]) };
+  if (kind === 'desk') return { ...r, head: add(r.head, [0, side * 0.35 * f, 0]) };
   return { ...r, head: add(r.head, [0, side * 0.4 * f, side * 0.15 * f]), body: add(r.body, [0, 0, side * 0.08 * f]) };
 }
 
@@ -333,7 +333,7 @@ export function idleRig(r: Rig, n: IdleNow): Rig {
     switch (m.move) {
       case 'sway': {
         const b = bump(u);
-        return { ...r, body: add(r.body, [0, 0, s * 0.04 * b]), head: add(r.head, [0, 0, -s * 0.02 * b]) };
+        return { ...r, body: add(r.body, [0, 0, s * 0.06 * b]), head: add(r.head, [0, 0, -s * 0.03 * b]) };
       }
       case 'look':
         return { ...r, head: add(r.head, [0, s * 0.4 * outHoldBack(u, 0.375), 0]) };
@@ -346,18 +346,19 @@ export function idleRig(r: Rig, n: IdleNow): Rig {
         return { ...r, armL: mix3(r.armL, [0, 0, -2.7], e), body: add(r.body, [-0.08 * e, 0, 0]), head: add(r.head, [-0.1 * e, 0, 0]), ...(e > 0.5 ? { mouth: 'oh' as const, eyes: 0.15 } : {}) };
       }
       case 'wiggle': {
-        const w = Math.sin(2 * Math.PI * 3 * u) * 0.12 * bump(u);
+        const w = Math.sin(2 * Math.PI * 3 * u) * 0.24 * bump(u);
         return { ...r, legL: r.legL + w, legR: r.legR - w };
       }
       case 'yawn': {
-        const e = outHoldBack(u, 0.35);
-        return { ...r, head: add(r.head, [-0.15 * e, 0, 0]), ...(e > 0.3 ? { mouth: 'oh' as const, eyes: 0.15 } : {}) };
+        // out, 0.3 s held at the top, back (designer m_46979)
+        const e = outHoldBack(u, (1 - 0.3 / DUR.yawn) / 2);
+        return { ...r, head: add(r.head, [-0.25 * e, 0, 0]), ...(e > 0.3 ? { mouth: 'oh' as const, eyes: 0.15 } : {}) };
       }
       case 'breath': {
         const b = bump(u);
         return n.kind === 'desk'
-          ? { ...r, y: r.y + 0.01 * b, body: add(r.body, [-0.03 * b, 0, 0]) }
-          : { ...r, y: r.y + 0.02 * b, body: add(r.body, [-0.03 * b, 0, 0]) };
+          ? { ...r, y: r.y + 0.03 * b, body: add(r.body, [-0.03 * b, 0, 0]) }
+          : { ...r, y: r.y + 0.03 * b, body: add(r.body, [-0.03 * b, 0, 0]) };
       }
       case 'sigh': {
         const b = bump(u);
