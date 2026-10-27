@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Fit } from '@/bims/render/camera';
 import type { PxBox } from './bubble3d';
-import { CUT_K, cutFit } from './cut';
+import { CUT_AIR, CUT_K, cutFit } from './cut';
 
 /** the coin's fit at 96 px (48 css at 2x), its numbers made up: only its scale and frame matter */
 const COIN: Fit = { target: { x: 0.1, y: 1.6, z: -0.2 }, left: -0.31, right: 0.29, top: 0.52, bottom: -0.08, scale: 0.6 / 96, widthPx: 96, heightPx: 96 };
@@ -60,16 +60,19 @@ describe('the hair swatch: the head centred in its box (bim-pick-center)', () =>
     expect(f.target).toEqual(COIN.target);
   });
 
-  it('every head but the pigtails fits its box; the pigtails pass it by the same 2 px each side', () => {
+  it('every head fits its box, the pigtails too (bim-review f4: they were cut 2 px each side): drawn just smaller, CUT_AIR px free each side', () => {
     for (const [cut, head] of Object.entries(HEADS)) {
-      const l = land(cutFit(COIN, head, size), head);
-      if (cut === 'pigtails') {
-        expect(l.x0).toBeCloseTo(-2, 9);
-        expect(l.x1).toBeCloseTo(size + 2, 9);
-        continue;
-      }
+      const f = cutFit(COIN, head, size);
+      const l = land(f, head);
       expect(Math.min(l.x0, l.y0)).toBeGreaterThanOrEqual(0);
       expect(Math.max(l.x1, l.y1)).toBeLessThanOrEqual(size);
+      if (cut === 'pigtails') {
+        expect(l.x0).toBeCloseTo(CUT_AIR, 9);
+        expect(l.x1).toBeCloseTo(size - CUT_AIR, 9);
+      } else {
+        // the others keep the coin's size: one head size along the row
+        expect(l.x1 - l.x0).toBeCloseTo(head.x1 - head.x0, 9);
+      }
     }
   });
 });

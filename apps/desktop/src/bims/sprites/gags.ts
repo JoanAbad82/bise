@@ -87,6 +87,23 @@ export const STAND: Rig = {
 };
 
 const bim = (name: string, o: Partial<Rig>): Actor => ({ name, rig: { ...STAND, ...o } });
+
+/** the hips' height in the body (bim.ts: the legs hang from y 0.3) */
+const HIP = 0.3;
+/**
+ * a standing bim (at r's spot, facing r.dir) bowing `p` forward from the hips: the body pitches
+ * about its feet (bim.ts), so the legs turn back by p and the whole bim steps back and up by what
+ * the hips moved, and its soles stay flat where they stood (bim-review f6: pitched alone, its toes
+ * went 3-5 cm under the floor)
+ */
+const bow = (r: Partial<Rig>, p: number): Partial<Rig> => {
+  const d = r.dir ?? 0;
+  const fwd = HIP * Math.sin(p);
+  return {
+    x: (r.x ?? 0) - Math.sin(d) * fwd, z: (r.z ?? 0) - Math.cos(d) * fwd, y: (r.y ?? 0) + HIP * (1 - Math.cos(p)),
+    body: [p, 0, 0], legL: -p, legR: -p,
+  };
+};
 const range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
 const times = (xs: readonly number[], n: number): number[] => range(n).flatMap(() => xs);
 const shut = (f: Frame): Frame => ({ ...f, bims: f.bims.map((b) => ({ ...b, rig: { ...b.rig, eyes: 0.15 } })) });
@@ -310,14 +327,14 @@ function end(): Island {
     bim('stock', { ...a, armR: [0, 0, 0.3], armL: [0, 0, -arm(k)], mouth: 'laugh', eyes: 0.3, head: [0, 0, -0.08], ...o }),
     bim('promo', { ...b, armL: [0, 0, -0.3], armR: [0, 0, arm(k + 0.5)], mouth: 'laugh', eyes: 0.3, head: [0, 0, 0.08], ...o }),
   ];
-  const rest = (o: Partial<Rig> = {}): Actor[] => [
-    bim('stock', { ...a, armL: [0, 0, -0.3], armR: [0, 0, 0.3], head: [0, 0, -0.06], ...o }),
-    bim('promo', { ...b, armL: [0, 0, -0.3], armR: [0, 0, 0.3], head: [0, 0, 0.06], ...o }),
+  const rest = (o: Partial<Rig> = {}, p = 0): Actor[] => [
+    bim('stock', { ...a, armL: [0, 0, -0.3], armR: [0, 0, 0.3], head: [0, 0, -0.06], ...o, ...(p === 0 ? {} : bow(a, p)) }),
+    bim('promo', { ...b, armL: [0, 0, -0.3], armR: [0, 0, 0.3], head: [0, 0, 0.06], ...o, ...(p === 0 ? {} : bow(b, p)) }),
   ];
   const frames: Frame[] = [
     ...range(4).map((i) => ({ bims: both(i / 4) })), // 0-3 the waves
-    { bims: rest({ body: [0.3, 0, 0], head: [0.25, 0, 0], eyes: 0.3, mouth: 'laugh' }) }, // 4 a little bow
-    { bims: rest({ body: [0.12, 0, 0], eyes: 0.6 }) }, // 5 back up
+    { bims: rest({ head: [0.25, 0, 0], eyes: 0.3, mouth: 'laugh' }, 0.3) }, // 4 a little bow
+    { bims: rest({ eyes: 0.6 }, 0.12) }, // 5 back up
     { bims: rest() }, // 6 holds
   ];
   frames.push(shut(frames[6] as Frame)); // 7 their blink

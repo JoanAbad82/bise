@@ -55,6 +55,8 @@ export const NEAR_PX = 22;
 export const nearAt = (scale: number): boolean => scale > 0 && 1 / scale >= NEAR_PX;
 /** an afro's half-width: inside the shoulders' (0.24 + a sleeve's 0.078), as the old afro sat inside the old shoulders */
 const AFRO_W = 0.29;
+/** the short hair's cap: how far its sphere stands out of the skull's (it sits up and back of it) */
+export const HAIR_OUT = 0.011;
 /** her buns' centres from the head's (laptop.ts HEAD_PARTS reads the same) */
 export const BUN = 0.31;
 /**
@@ -286,7 +288,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     hood.scale.set(1.25, 0.6, 0.62);
     hood.rotation.x = 0.5;
     add(new SphereGeometry(0.1, 14, 10), hm, body, 0, 0.6, -0.2).scale.set(1.2, 1.1, 0.45);
-    add(style.box(0.27, 0.13, 0.05, 0.025), mat(shade(o.hoodie, 0.72)), body, 0, 0.36, 0.172).rotation.x = -0.25;
+    // the edge thinner than the pocket from behind: their backs lay 2 mm apart and fought (bim-review f2)
+    add(style.box(0.27, 0.13, 0.044, 0.022), mat(shade(o.hoodie, 0.72)), body, 0, 0.36, 0.175).rotation.x = -0.25;
     add(style.box(0.25, 0.11, 0.06, 0.03), mat(shade(o.hoodie, 0.84)), body, 0, 0.365, 0.18).rotation.x = -0.25;
     for (const dx of main ? [] : [-0.045, 0.045]) {
       lod(add(style.capsule(0.011, 0.09), mat(WORLD.paper), body, dx, 0.66, 0.2)).rotation.x = -0.35;
@@ -343,7 +346,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
 
   // a fringe of soft tufts over the cap of hair, all leaning the same way
   const hairOn = (): void => {
-    add(style.cap(R + 0.008, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
+    // 11 mm out: at 8 its edge lay along the skull by the temples and fought it (bim-review f3)
+    add(style.cap(R + HAIR_OUT, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
     const T: readonly (readonly [number, number, number, number, number])[] = [
       [-0.13, 0.13, 0.15, 0.085, 0.5],
       [-0.04, 0.17, 0.16, 0.09, 0.35],
