@@ -1,5 +1,5 @@
 // src/app/side3d · the bims' world over the outer card (page outer-world v2, his pick #799): a tile
-// 280 wide over the card, 140 high by default, hideable (×, back by the cube in the Agents head or
+// as wide as the card (layout OUTER_W), 140 high by default, hideable (×, back by the cube in the Agents head or
 // View › Show the Bims) and resizable in height by the 8 px gap between it and the card (96 to half
 // the window's height, a double-click back to 140). Its height and whether it is hidden are kept per
 // window (keep.ts), one store for every reader (the tile, the cube, the View menu). The stack's

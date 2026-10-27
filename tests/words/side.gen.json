@@ -344,6 +344,11 @@
     "one": null,
     "text": "Scheduled"
   },
+  "side.show_less": {
+    "args": [],
+    "one": null,
+    "text": "show less"
+  },
   "side.state_asks": {
     "args": [],
     "one": null,

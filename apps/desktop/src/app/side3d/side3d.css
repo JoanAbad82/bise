@@ -866,7 +866,11 @@
   gap: var(--s-3);
   flex: none;
 }
+/* the artifact's chip in a side row: never wider than its line, padding included, so its right
+   radius always shows and its title takes the ellipsis inside it (his m_47004, designer m_47011) */
 .s3-chip {
+  box-sizing: border-box;
+  max-width: 100%;
   height: var(--h-seg-in);
 }
 .s3-cmd {
@@ -1344,7 +1348,7 @@
   color: var(--c-text-3);
 }
 
-/* the outer card (page outer-side v2, his pick; OuterCard.tsx): the Overview out of the panel, 280
+/* the outer card (page outer-side v2, his pick; OuterCard.tsx): the Overview out of the panel, 292
    wide, 12 from the window's right edge, 12 under the bar, 12 above the bottom; r 12, --c-raised,
    1 px line, e-1; one scroll for all its sections when they pass its height */
 .s3-outer {
@@ -1354,7 +1358,7 @@
   bottom: var(--s-3);
   z-index: 15;
   box-sizing: border-box;
-  width: 280px;
+  /* width inline: layout OUTER_W (292, his m_47018, designer m_47025) */
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
@@ -1561,6 +1565,14 @@
   background: var(--c-hover);
   color: var(--c-text);
 }
+/* '+ N more' at the left, 'show less' always at the right (designer m_47011) */
+.s3-omores {
+  display: flex;
+  align-items: center;
+}
+.s3-oless {
+  margin-left: auto;
+}
 
 /* a section's empty line: its left edge on the section title's text, after the object (designer m_46263) */
 .s3-osec > .s3-empty {
@@ -1573,7 +1585,7 @@
 }
 
 /* the bims' world over the outer card (page outer-world v2, his pick #799; OuterWorld.tsx): a tile
-   280 wide, as high as he left it (140 by default, inline), its top 12 under the bar (inline:
+   292 wide (the card's), as high as he left it (140 by default, inline), its top 12 under the bar (inline:
    tilestate OUTER_TOP; his m_46677), r 12, the card's ring and e-1; the office whole at its fit;
    '⤢' and '×' top right on hover, 24 each, 4 apart, 8 from the edges */
 .s3-otile {
@@ -1581,7 +1593,7 @@
   right: var(--s-3);
   z-index: 15;
   box-sizing: border-box;
-  width: 280px;
+  /* width inline: layout OUTER_W, the card's */
   overflow: hidden;
   border-radius: var(--r-3);
   background: var(--c-raised);
@@ -1626,11 +1638,10 @@
 /* the 8 gap between the tile and the card: the handle (the panel's signed one, turned): row-resize,
    a 2 px text-3 line after 120 ms of hover, text-2 while dragged */
 .s3-ohandle {
-  /* top and height inline (TileHandle: under the tile) */
+  /* top, height and width inline (TileHandle: under the tile, the card's width) */
   position: fixed;
   right: var(--s-3);
   z-index: 15;
-  width: 280px;
   cursor: row-resize;
   outline: 0;
   touch-action: none;

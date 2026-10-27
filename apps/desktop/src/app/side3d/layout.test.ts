@@ -23,9 +23,9 @@ describe('sideLayout, the panel folded', () => {
     expect(sideLayout(just - 1, SIDE, false).coins).toBe('edge');
     expect(sideLayout(1440, SIDE, true, 480).coins).toBe('between');
   });
-  it('1280: the card still leaves a 680 column room: the column whole, centred in it', () => {
+  it('1280: the card (292, his m_47018) still leaves a 668 column room: the column whole, centred in it', () => {
     const l = sideLayout(1280, SIDE, false);
-    expect(l).toMatchObject({ colW: 632, coins: 'card', gutter: OUTER_BAND, colLeft: SIDE + MIN_LEFT });
+    expect(l).toMatchObject({ colW: 620, coins: 'card', gutter: OUTER_BAND, colLeft: SIDE + MIN_LEFT });
   });
   it('1100: the world folds into a 5th bubble, then the column narrows, 24 from the sidebar', () => {
     const l = sideLayout(1100, SIDE, false);
@@ -35,7 +35,7 @@ describe('sideLayout, the panel folded', () => {
   });
   it('1100 with the sidebar hidden (the rail alone): the card again', () => {
     const l = sideLayout(1100, 56, false);
-    expect(l).toMatchObject({ colW: 692, coins: 'card' });
+    expect(l).toMatchObject({ colW: 680, coins: 'card' });
     expect(right(1100, l)).toBe(OUTER_BAND + MIN_LEFT);
   });
   it('1000: the column narrows, never under the bubbles', () => {

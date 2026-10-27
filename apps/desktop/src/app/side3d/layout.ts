@@ -1,6 +1,6 @@
 // src/app/side3d · sideLayout: where the thread's column, the world and the bubbles go across the
 // window's width (plan native-mac-plan v4 §2, decision d3). The panel folded and the room holding a
-// readable column beside it: the outer card (page outer-side v2, his pick), 280 wide, 12 from the
+// readable column beside it: the outer card (page outer-side v2, his pick), 292 wide, 12 from the
 // window's edge, the column centred in what it leaves, unless he picked the coins by hand
 // (sidepick.ts). Else the column is centred when both sides
 // leave the world's band (148 + 20 + 12 = 180); else it slides left (24 from the sidebar at
@@ -75,8 +75,8 @@ export interface SideLayout {
   readonly right: number;
 }
 
-/** The outer card (page outer-side v2): its width, and the band it keeps with its two 12 */
-export const OUTER_W = 280;
+/** The outer card (page outer-side v2) and the tile over it: their width (292, 12 more for the titles: his m_47018, designer m_47025; set inline), and the band it keeps with its two 12 */
+export const OUTER_W = 292;
 export const OUTER_BAND = OUTER_W + 12 + 12;
 /** the least column the card leaves beside it; under it the coins come back at the window's edge */
 export const OUTER_COL_MIN = 480;

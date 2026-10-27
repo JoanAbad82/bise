@@ -152,14 +152,23 @@ export function isCut(box: { readonly scrollWidth: number; readonly clientWidth:
   return box.scrollWidth > box.clientWidth + 0.5;
 }
 
-/** Whether the element in `ref` cuts its words, followed as its box changes (a ResizeObserver; none: never cut). */
+/**
+ * Whether the line in `el` cuts its words: the line itself, or a box inside it that takes the
+ * ellipsis (an artifact's chip title, .b-artchip-title: ui-review m_47044). An inline span measures
+ * 0 and never counts.
+ */
+export function cutIn(el: HTMLElement): boolean {
+  return isCut(el) || [...el.querySelectorAll<HTMLElement>('*')].some(isCut);
+}
+
+/** Whether the line in `ref` cuts its words, followed as its box changes (a ResizeObserver; none: never cut). */
 export function useCut(ref: RefObject<HTMLElement | null>): boolean {
   const [cut, setCut] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (el === null || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(() => {
-      setCut(isCut(el));
+      setCut(cutIn(el));
     });
     ro.observe(el);
     return () => {

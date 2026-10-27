@@ -58,6 +58,7 @@ export function ArtifactRow({ it, now, group }: { it: Item; now: number; group?:
         </>
       }
       label={a.title}
+      tip={a.title}
       onClick={() => {
         openTab({ kind: 'artifact', project: it.project, id: a.id });
       }}

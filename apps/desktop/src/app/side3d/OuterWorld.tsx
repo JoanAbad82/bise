@@ -1,5 +1,5 @@
 // src/app/side3d · the bims' world over the outer card (page outer-world v2, his pick #799): the
-// tile, 280 wide and as high as he left it (140 by default), r 12, the card's ring and e-1, its top
+// tile, the card's width (layout OUTER_W, 292) and as high as he left it (140 by default), r 12, the card's ring and e-1, its top
 // 12 under the bar (tilestate OUTER_TOP, inline; his m_46677); the project's office at its fit, live: a click on a bim opens its
 // thread, a pinch zooms inside, the office's own 'Loft ⌄' chip bottom left and '⤢ fit' bottom right
 // while zoomed. On hover two 24 px buttons top right: '⤢' the world in the panel's Office tab, '×'
@@ -13,6 +13,7 @@ import { Press, tipAttrs } from '@/ds';
 import { side } from '@/proto/words_side.gen';
 import { WorldOffice } from './World';
 import { clampTile, OUTER_TOP, TILE_GAP, TILE_H, TILE_MIN, tileMax } from './tilestate';
+import { OUTER_W } from './layout';
 
 export interface OuterTileProps {
   readonly project: string;
@@ -36,7 +37,7 @@ export interface OuterTileProps {
 /** The tile: the office, '⤢' and '×' on hover. */
 export function OuterTile({ project, name, agents, cards, h, onOpen, onPickMap, onPanel, onHide }: OuterTileProps) {
   return (
-    <section className="s3-otile" style={{ top: OUTER_TOP, height: h }} aria-label={side.tile_name({ project: name })} data-testid="app.outer.world">
+    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={side.tile_name({ project: name })} data-testid="app.outer.world">
       <span className="s3-otile-office">
         <WorldOffice project={project} agents={agents} cards={cards} fill onOpen={onOpen} onPickMap={onPickMap} />
       </span>
@@ -86,7 +87,7 @@ export function TileHandle({ h, winH, onHeight }: { h: number; winH: number; onH
     <div
       className="s3-ohandle"
       // its place: the 8 under the tile, following the height
-      style={{ top: OUTER_TOP + h, height: TILE_GAP }}
+      style={{ top: OUTER_TOP + h, height: TILE_GAP, width: OUTER_W }}
       role="separator"
       aria-orientation="horizontal"
       aria-label={side.tile_height}

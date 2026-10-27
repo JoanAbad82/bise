@@ -59,4 +59,15 @@ describe('a side row\'s tip', () => {
   it('a cut title: the tip holds it whole', () => {
     expect(row(300, 160).dataset.tip).toBe('vite --port 5173');
   });
+
+  it('a title cut inside its line (an artifact chip\'s title takes the ellipsis, ui-review m_47044): the tip too', () => {
+    const v = render(<SideRow pic={null} title={<span className="b-artchip"><span className="b-artchip-title">the full profiling report of the hub under load</span></span>} sub="doc" tip="the full profiling report of the hub under load" label="report" onClick={() => undefined} menu={menu} testId="a" />);
+    const t = v.getByTestId('a').querySelector('.b-artchip-title') as HTMLElement;
+    t.dataset.sw = '420';
+    t.dataset.cw = '180';
+    act(() => {
+      for (const s of seen) s.cb();
+    });
+    expect((v.getByTestId('a').querySelector('[data-row]') as HTMLElement).dataset.tip).toBe('the full profiling report of the hub under load');
+  });
 });

@@ -1,5 +1,5 @@
 // src/app/side3d · the outer card (page outer-side v2, Gabriel's pick m_46173): the Overview out of
-// the panel, a card at the window's right (280 wide, 12 from the edges, the bar's included: its top
+// the panel, a card at the window's right (layout OUTER_W 292 wide, inline; 12 from the edges, the bar's included: its top
 // inline, tilestate OUTER_TOP + the tile's room), shown while the panel is folded and the room leaves the column 480 (layout 'card'); a panel
 // open gives way to the coins, then to the minis (Host). Its sections head in the folded side's
 // style: the section's 3D object at 20, its name, its count, 'all ›'. AGENTS: one line of 28 each,
@@ -11,6 +11,7 @@
 // 50 (outerrows.ts); an empty one keeps its empty line. The card scrolls as a whole, a 16 fade at
 // the edge that has more, macOS's overlay scrollbar. Owner: nm-side.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import type { Card } from '@/proto';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { sortCards } from '@/inbox/order';
@@ -28,7 +29,8 @@ import { askButtons, pickIntent } from './model';
 import { bubbleThing, type BubbleId } from './objects';
 import { groupParts } from './lists';
 import { OUTER_TOP } from './tilestate';
-import { FIRST_AGENTS, FIRST_ROWS, moreOf, useShown } from './outerrows';
+import { OUTER_W } from './layout';
+import { canLess, FIRST_AGENTS, FIRST_ROWS, headLift, moreOf, useShown } from './outerrows';
 
 /** an agent's head in the card, css px */
 export const OUTER_HEAD_PX = 20;
@@ -85,7 +87,7 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
   const rows = outerRows(live, agents);
   const byKey = new Map(agents.map((x) => [`${x.project}/${x.a.name}`, x.a]));
   const [open, setOpen] = useState<string | null>(null);
-  const [shown, more] = useShown(FIRST_AGENTS);
+  const { shown, more, less } = useShown(FIRST_AGENTS);
   return (
     <div className="s3-orows" data-testid="app.outer.agents.rows">
       {rows.slice(0, shown).map(({ r, pr, wt }) => {
@@ -99,18 +101,44 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
             }} onOpen={onOpen} onOpenPr={onOpenPr} />
         );
       })}
-      <MoreRow id="agents" n={moreOf(shown, rows.length)} onMore={more} />
+      <MoreRow id="agents" first={FIRST_AGENTS} shown={shown} total={rows.length} onMore={more} onLess={less} />
     </div>
   );
 }
 
-/** '+ N more' under a section's rows: a click shows N more; none when all show. */
-function MoreRow({ id, n, onMore }: { id: BubbleId; n: number; onMore: () => void }) {
-  if (n === 0) return null;
+/**
+ * Under a section's rows: '+ N more' at the left (N more show), 'show less' at the right once it
+ * unfolded (50 fold back, down to its first; designer m_47011: always at the right, so a second
+ * click finds it). After a fold that left the section's head above the card's view, the card
+ * scrolls it back to the top: a fold never drops him into the next section. Nothing when the first
+ * rows hold them all.
+ */
+function MoreRow({ id, first, shown, total, onMore, onLess }: { id: BubbleId; first: number; shown: number; total: number; onMore: () => void; onLess: () => void }) {
+  const line = useRef<HTMLDivElement>(null);
+  const n = moreOf(shown, total);
+  const lessToo = canLess(shown, total, first);
+  if (n === 0 && !lessToo) return null;
+  const fold = () => {
+    flushSync(onLess);
+    const sec = line.current?.closest('.s3-osec');
+    const card = line.current?.closest<HTMLElement>('.s3-outer');
+    if (sec == null || card == null) return;
+    const lift = headLift(sec.getBoundingClientRect().top, card.getBoundingClientRect().top);
+    if (lift > 0) card.scrollTop -= lift;
+  };
   return (
-    <Press look="s3-omore" onClick={onMore} data-testid={`app.outer.${id}.more`}>
-      {side.more_rows({ n })}
-    </Press>
+    <div ref={line} className="s3-omores">
+      {n > 0 && (
+        <Press look="s3-omore" onClick={onMore} data-testid={`app.outer.${id}.more`}>
+          {side.more_rows({ n })}
+        </Press>
+      )}
+      {lessToo && (
+        <Press look="s3-omore s3-oless" onClick={fold} data-testid={`app.outer.${id}.less`}>
+          {side.show_less}
+        </Press>
+      )}
+    </div>
   );
 }
 
@@ -144,7 +172,7 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
   return (
     <div className="s3-orow" data-asks={asks || undefined} data-here={here || undefined} data-back={st?.back === true || undefined} data-open={open || undefined}
       onContextMenu={menu.onContextMenu} data-testid={id}>
-      <Press look="s3-orow-open" aria-label={r.title} aria-expanded={asks ? open : undefined} {...tipAttrs(`${r.name} · ${job}`, undefined, 'left')} onClick={() => {
+      <Press look="s3-orow-open" aria-label={r.title} aria-expanded={asks ? open : undefined} {...tipAttrs(job === '' ? r.name : `${r.name} · ${job}`, undefined, 'left')} onClick={() => {
         if (asks) onToggle();
         else onOpen(r);
       }} data-row="">
@@ -215,11 +243,11 @@ export function OuterSection({ id, name, count, loud, onAll, onCube, children }:
 
 /** A section of rows: its first 5, then '+ N more' adds 50; `rows(n)` draws the first n; none: its empty line. */
 export function OuterList({ total, rows, empty, ...head }: SectionProps & { total: number; rows: (n: number) => ReactNode; empty: ReactNode }) {
-  const [shown, more] = useShown(FIRST_ROWS);
+  const { shown, more, less } = useShown(FIRST_ROWS);
   return (
     <OuterSection {...head}>
       {total === 0 ? empty : rows(shown)}
-      <MoreRow id={head.id} n={moreOf(shown, total)} onMore={more} />
+      <MoreRow id={head.id} first={FIRST_ROWS} shown={shown} total={total} onMore={more} onLess={less} />
     </OuterSection>
   );
 }
@@ -246,7 +274,7 @@ export function OuterCard({ tile = 0, children }: { tile?: number; children: Rea
   // after each render: rows came or went ('+ N more', a new artifact), the window's height
   useLayoutEffect(measure);
   return (
-    <aside ref={box} className="s3-outer" style={{ top: OUTER_TOP + tile }} onScroll={measure}
+    <aside ref={box} className="s3-outer" style={{ top: OUTER_TOP + tile, width: OUTER_W }} onScroll={measure}
       data-above={edges.above || undefined} data-below={edges.below || undefined} data-tip-box="" data-testid="app.outer">
       {children}
     </aside>

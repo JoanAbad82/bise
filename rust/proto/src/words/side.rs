@@ -74,6 +74,8 @@ crate::words! { side:
     all_short = "all ›";
     /// the outer card, under a section's rows: n more of them show (50 at most a click)
     more_rows(n) = "+ {n} more";
+    /// the outer card, at the right of '+ N more' once a section unfolded: 50 rows fold back, down to its first ones
+    show_less = "show less";
     /// the outer card's agents head, in the accent: the agents that ask him
     head_waits(n) = "{n} waits";
     /// the ψ at an agent row's right, its tip: it works in a worktree

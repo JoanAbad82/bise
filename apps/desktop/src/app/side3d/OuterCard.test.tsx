@@ -29,3 +29,12 @@ describe('the outer card\'s head', () => {
     expect(getComputedStyle(all).flexShrink).toBe('0');
   });
 });
+
+describe('an artifact chip in a side row (his m_47004)', () => {
+  it('never wider than its line, padding included: its right radius shows, its title takes the ellipsis', () => {
+    const v = render(<span className="s3-row-l1"><span data-testid="chip" className="b-artchip s3-chip"><span className="b-artchip-title">appartement 36 Monge</span></span></span>);
+    const chip = getComputedStyle(v.getByTestId('chip'));
+    expect(chip.boxSizing).toBe('border-box');
+    expect(chip.maxWidth).toBe('100%');
+  });
+});

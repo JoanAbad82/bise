@@ -2,7 +2,28 @@
 // what is left, never past it, and no row once all show. Mutation: moreOf without its Math.min on
 // MORE_STEP (or without the floor at 0) turns this red.
 import { describe, expect, it } from 'vitest';
-import { FIRST_AGENTS, FIRST_ROWS, MORE_STEP, moreOf } from './outerrows';
+import { canLess, FIRST_AGENTS, FIRST_ROWS, headLift, lessOf, MORE_STEP, moreOf } from './outerrows';
+
+describe('\'show less\' (his m_47005, designer m_47011)', () => {
+  it('folds 50 back, never under the first rows', () => {
+    expect(lessOf(105, FIRST_ROWS)).toBe(55);
+    expect(lessOf(55, FIRST_ROWS)).toBe(5);
+    expect(lessOf(60, FIRST_AGENTS)).toBe(10);
+    expect(lessOf(5, FIRST_ROWS)).toBe(5);
+  });
+
+  it('shows while more than the first rows show', () => {
+    expect(canLess(55, 62, FIRST_ROWS)).toBe(true);
+    expect(canLess(55, 5, FIRST_ROWS)).toBe(false);
+    expect(canLess(5, 62, FIRST_ROWS)).toBe(false);
+    expect(canLess(60, 13, FIRST_AGENTS)).toBe(true);
+  });
+
+  it('a fold that left the head above the card\'s top scrolls back by that much, else not', () => {
+    expect(headLift(-340, 212)).toBe(552);
+    expect(headLift(400, 212)).toBe(0);
+  });
+});
 
 describe('\'+ N more\' in the outer card', () => {
   it('Agents shows 10 first, the other sections 5, and a click adds 50', () => {

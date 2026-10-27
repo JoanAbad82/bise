@@ -642,6 +642,10 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(tile.querySelector('[data-testid="office"]')).toBeTruthy();
     // 12 under the bar's 52, as at the window's right and bottom (his m_46677: it sat on the bar)
     expect(tile.style.top).toBe('64px');
+    // 292 wide, the card and the handle too (his m_47018, designer m_47025)
+    expect(tile.style.width).toBe('292px');
+    expect(v.getByTestId('app.outer').style.width).toBe('292px');
+    expect(v.getByTestId('app.outer.world.handle').style.width).toBe('292px');
     // the card under the tile and its 8 handle
     expect(v.getByTestId('app.outer').style.top).toBe('212px');
     expect(v.getByTestId('app.outer.world.handle').getAttribute('aria-valuenow')).toBe('140');
@@ -750,9 +754,30 @@ describe('the outer card\'s rows: Agents 10, the others 5, then \'+ N more\' add
     crowd(store, 13, 0);
     expect(lines(v, 'agents')).toBe(10);
     expect(v.getByTestId('app.outer.agents.more').textContent).toBe(side.more_rows({ n: 3 }));
+    expect(v.queryByTestId('app.outer.agents.less')).toBeNull();
     fireEvent.click(v.getByTestId('app.outer.agents.more'));
     expect(lines(v, 'agents')).toBe(13);
     expect(v.queryByTestId('app.outer.agents.more')).toBeNull();
+    // all shown: 'show less' alone, back to the first 10
+    expect(v.getByTestId('app.outer.agents.less').textContent).toBe(side.show_less);
+    fireEvent.click(v.getByTestId('app.outer.agents.less'));
+    expect(lines(v, 'agents')).toBe(10);
+    expect(v.queryByTestId('app.outer.agents.less')).toBeNull();
+  });
+
+  it('\'show less\' folds 50 back step by step to the first 5 (his m_47005)', () => {
+    tall(900);
+    const { v, store } = side3d(1440);
+    crowd(store, 3, 120);
+    fireEvent.click(v.getByTestId('app.outer.artifacts.more'));
+    fireEvent.click(v.getByTestId('app.outer.artifacts.more'));
+    expect(lines(v, 'artifacts')).toBe(105);
+    fireEvent.click(v.getByTestId('app.outer.artifacts.less'));
+    expect(lines(v, 'artifacts')).toBe(55);
+    expect(v.getByTestId('app.outer.artifacts.more').textContent).toBe(side.more_rows({ n: 50 }));
+    fireEvent.click(v.getByTestId('app.outer.artifacts.less'));
+    expect(lines(v, 'artifacts')).toBe(5);
+    expect(v.queryByTestId('app.outer.artifacts.less')).toBeNull();
   });
 
   it('Artifacts with 62: its first 5, \'+ 50 more\', then 55 and \'+ 7 more\', then all 62', () => {
