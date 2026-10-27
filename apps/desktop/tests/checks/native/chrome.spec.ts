@@ -14,7 +14,16 @@ const HOME = 'bise-home-00000000';
 const LIGHTS = { x: 20, y: 20 };
 
 const world = (onboarded: boolean) => [
-  { ev: 'prefs', prefs: { onboarded, theme: 'system', excluded_apps: [] } },
+  // whole prefs, as the core sends them (rust/proto/fixtures/core_ev.jsonl): with only these 3 the
+  // redesigned window drew nothing at all once onboarded (no data-testid in 6 s on 17ec33f84)
+  {
+    ev: 'prefs',
+    prefs: {
+      onboarded, theme: 'system', context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [],
+      quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true },
+      voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7,
+    },
+  },
   { ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true }] },
   { ev: 'welcome', project: HOME, proto: 1, workspace: '/nowhere', name: 'bise' },
   { ev: 'agents', project: HOME, agents: [{ name: 'main', main: true, status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 }] },
