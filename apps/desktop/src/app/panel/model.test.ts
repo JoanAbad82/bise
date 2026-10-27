@@ -20,6 +20,7 @@ import {
   moveIn,
   nextBrowser,
   tabIdOf,
+  tabOf,
   nextLauncher,
   nextShell,
   openIn,
@@ -75,9 +76,15 @@ describe('the tab model: open', () => {
     expect(ids(t)).toEqual(['artifact:acme/a']);
     expect(t.active).toBe('artifact:acme/a');
   });
-  it('a kept Overview tab, from before the outer card, is dropped on read', () => {
-    expect(parseKept({ tabs: { list: [{ what: { kind: 'overview', project: 'shop' } }, { what: { kind: 'launcher', n: 1 } }] } }).tabs).toEqual({ list: [{ id: 'new:1', what: { kind: 'launcher', n: 1 } }], active: 'new:1' });
+  it("the panel has no Overview any more (page outer-side v2, his pick: the outer card took it): a kept one, pinned or not, is dropped on read, the panel's own tabs stay as they were", () => {
+    const pinned = parseKept({ open: true, tabs: { active: 'overview', list: [{ what: { kind: 'overview', project: 'shop' } }, { what: { kind: 'launcher', n: 1 } }, { what: { kind: 'terminal', project: 'shop', n: 0 } }] } });
+    expect(ids(pinned.tabs)).toEqual(['new:1', 'term:shop#0']);
+    // the Overview was in front: the first of his own tabs takes its place
+    expect(pinned.tabs.active).toBe('new:1');
+    // the Overview alone: no tab at all, the panel's fresh state (▯ then opens a New tab)
     expect(parseKept({ tabs: { list: [{ what: { kind: 'overview' } }] } }).tabs).toEqual(FIRST);
+    // nothing he opens is ever the Overview again
+    expect([art('a'), nextLauncher(FIRST), { kind: 'terminal', project: 'shop', n: 0 } as TabWhat].map((w) => tabOf(w).id)).not.toContain('overview');
   });
   it('New tabs and shells are numbered by the first free number', () => {
     const t = openIn(openIn(FIRST, nextLauncher(FIRST)), { kind: 'terminal', project: 'acme', n: 0 });

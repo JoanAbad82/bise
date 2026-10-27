@@ -49,10 +49,10 @@ const proc = (id: string, agent: string): Proc => ({
 }) as unknown as Proc;
 
 /** Two projects (and bise's home), each with its own agent, artifact, schedule and process. */
-function world(at: Route) {
+function world(at: Route, winW = 1100) {
   const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   (window as unknown as { bise: unknown }).bise = { notify: { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined } };
-  Object.defineProperty(window, 'innerWidth', { value: 1100, configurable: true });
+  Object.defineProperty(window, 'innerWidth', { value: winW, configurable: true });
   const store = new Store(port);
   store.setCore('up');
   store.apply(projects(row({ project: HOME, name: 'bise', home: true }), row({ project: HARNESS, name: 'harness' }), row({ project: DOCS, name: 'ai docs' })));
@@ -158,5 +158,22 @@ describe('the right side is the project in front (his m_45581)', () => {
     expect(v.getByTestId(`app.flyout.agents.${HARNESS}.main`)).toBeTruthy();
     expect(v.getByTestId('app.flyout.agents').textContent).not.toContain(side.in_projects({ n: side.working({ n: 1 }), p: 1 }));
     expect(floatText(v, 'artifacts')).not.toContain(running.group({ project: 'harness', agent: 'perf' }));
+  });
+
+  it("the outer card reads the project in front too (page outer-side v2): a project's own agents and artifacts, bise's own every project's", () => {
+    const { v, router } = world(inHarness, 1440);
+    const card = () => v.getByTestId('app.outer').textContent;
+    expect(card()).toContain('perf');
+    expect(card()).toContain('perf notes');
+    expect(card()).not.toContain('writer');
+    act(() => {
+      router.go(inDocs);
+    });
+    expect(card()).toContain('writer notes');
+    expect(card()).not.toContain('perf');
+    act(() => {
+      router.go({ screen: 'bise' });
+    });
+    for (const w of ['perf', 'writer', 'perf notes', 'writer notes']) expect(card()).toContain(w);
   });
 });
