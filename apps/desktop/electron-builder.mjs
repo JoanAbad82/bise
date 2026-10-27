@@ -18,7 +18,10 @@
 //                                        offered an update
 //   Contents/Info.plist                  CFBundleShortVersionString and CFBundleVersion from that
 //                                        VERSION too (bundleVersions), never package.json's 0.0.0
-// Its icon is resources/icon.png (1024 px, the Swift app's), made an .icns here.
+// Its icon is resources/icon.icns (his pick on page app-icon: the pink pillow with the sidebar's
+// ':*', each size from 16 to 1024 drawn at its size, the mark thicker when small); the same for
+// every build (his 'bise try', the release and its DMG, dev). resources/icon.png is its 1024 px,
+// docs/brand/app-icon/icon.svg its source.
 // A try build (amb-tools' 'bise-ambient --try') gets its own identity so it
 // never shares his app's userData, single-instance lock or permissions:
 // BISE_PACK_APP_ID (default dev.bise.desktop) and BISE_PACK_NAME (default
@@ -162,7 +165,7 @@ export default {
   ],
   mac: {
     category: 'public.app-category.developer-tools',
-    icon: 'resources/icon.png',
+    icon: 'resources/icon.icns',
     target: ['dir'],
     // signing: electron-builder rewrites Info.plist and adds the helper and
     // bise, which breaks Electron's own seal, so a dir build is re-signed
