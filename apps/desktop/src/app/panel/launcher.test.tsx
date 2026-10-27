@@ -14,6 +14,7 @@ import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
 import { openLauncher, panelState } from './state';
 import { doPanelKey } from './keys';
+import { entityKey, type Entity } from '@/shared/entity';
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -25,7 +26,8 @@ const HOME = 'bise-home-00000000';
 
 const agent = (name: string, files: number): Agent => ({ ...(ev('agents').agents[1] as Agent), name, main: false, changes: { add: 1, del: 0, files }, archived: false });
 
-function shell(agentName = 'perf', files = 3) {
+function shell(agentName = 'perf', files = 3, recent: readonly Entity[] = []) {
+  if (recent.length > 0) panelState.reset({ recent });
   const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   const notify = { listed: () => undefined, state: () => Promise.resolve('granted'), onState: () => () => undefined };
   const opened: string[] = [];
@@ -131,5 +133,78 @@ describe('New tab, the launcher (r2-launcher)', () => {
     const { v } = shell();
     fireEvent.click(v.getByTestId('app.panel.launcher.office'));
     expect(v.getByTestId(`app.panel.tab.office:${ACME}`).getAttribute('aria-selected')).toBe('true');
+  });
+});
+
+describe('New tab at the keys (his m_46444, designer m_46449)', () => {
+  const mine: Entity = { kind: 'artifact', project: ACME, id: 'a3' };
+  const theirs: Entity = { kind: 'artifact', project: HOME, id: 'h1' };
+  const office: Entity = { kind: 'office', project: ACME };
+  const selected = (v: ReturnType<typeof render>) =>
+    v.queryAllByRole('option').filter((o) => o.getAttribute('aria-selected') === 'true').map((o) => o.getAttribute('data-testid'));
+
+  it("Recent lists only the front project's things", () => {
+    const { v } = shell('perf', 3, [mine, theirs, office]);
+    expect(ids(v, 'app.panel.launcher.recent.')).toEqual([`app.panel.launcher.recent.${entityKey(mine)}`, `app.panel.launcher.recent.${entityKey(office)}`]);
+  });
+  it('nothing highlighted at open; ↓ walks Open then Recent and stops at the last; ↑ on the first gives the field back', () => {
+    const { v } = shell('perf', 3, [mine, office]);
+    const field = v.getByTestId('app.panel.launcher.search');
+    expect(selected(v)).toEqual([]);
+    expect(field.getAttribute('aria-activedescendant')).toBeNull();
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    expect(selected(v)).toEqual(['app.panel.launcher.artifacts']);
+    expect(field.getAttribute('aria-activedescendant')).toBe(v.getByTestId('app.panel.launcher.artifacts').id);
+    // Artifacts, Terminal, Changes, Browser, Office, then Recent's two: 7 rows, ↓ ×9 stops on the last
+    for (let i = 0; i < 8; i++) fireEvent.keyDown(field, { key: 'ArrowDown' });
+    expect(selected(v)).toEqual([`app.panel.launcher.recent.${entityKey(office)}`]);
+    fireEvent.keyDown(field, { key: 'ArrowUp' });
+    expect(selected(v)).toEqual([`app.panel.launcher.recent.${entityKey(mine)}`]);
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(field, { key: 'ArrowUp' });
+    expect(selected(v)).toEqual([]);
+    expect(document.activeElement).toBe(field);
+  });
+  it('⏎ opens the highlighted Open row as its click does', () => {
+    const { v } = shell();
+    const field = v.getByTestId('app.panel.launcher.search');
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    expect(selected(v)).toEqual(['app.panel.launcher.browser']);
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(v.getByTestId('app.panel.tab.web:1').getAttribute('aria-selected')).toBe('true');
+  });
+  it('⏎ opens the highlighted Recent row in this tab; ⏎ with none highlighted does nothing', () => {
+    const { v } = shell('perf', 3, [mine]);
+    const field = v.getByTestId('app.panel.launcher.search');
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(field, { key: 'ArrowUp' });
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    for (let i = 0; i < 5; i++) fireEvent.keyDown(field, { key: 'ArrowDown' });
+    expect(selected(v)).toEqual([`app.panel.launcher.recent.${entityKey(mine)}`]);
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(v.queryByTestId('app.panel.tab.new:1')).toBeNull();
+    expect(v.getByTestId(`app.panel.tab.artifact:${ACME}/a3`).getAttribute('aria-selected')).toBe('true');
+  });
+  it('typing still filters: the first match highlighted, ⏎ opens it; an address is the first row', () => {
+    const { v, opened } = shell();
+    const field = v.getByTestId('app.panel.launcher.search') as HTMLInputElement;
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    fireEvent.change(field, { target: { value: 'note 5' } });
+    expect(field.value).toBe('note 5');
+    expect(selected(v)).toEqual([`app.panel.launcher.found.${ACME}/a5`]);
+    fireEvent.change(field, { target: { value: 'bise.dev' } });
+    expect(selected(v)).toEqual(['app.panel.launcher.url']);
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(opened).toEqual(['https://bise.dev']);
+  });
+  it('a pointer that moves after a key takes the highlight back (one highlight at a time)', () => {
+    const { v } = shell();
+    const field = v.getByTestId('app.panel.launcher.search');
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    fireEvent.pointerMove(v.getByTestId('app.panel.launcher.terminal'));
+    expect(selected(v)).toEqual([]);
   });
 });

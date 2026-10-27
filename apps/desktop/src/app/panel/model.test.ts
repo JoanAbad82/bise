@@ -27,7 +27,7 @@ import {
   parseKept,
   pushClosed,
   pushRecent,
-  RECENT_MAX,
+  RECENT_KEPT,
   reopenIn,
   CLOSED_MAX,
   shownOf,
@@ -209,14 +209,14 @@ describe('the panel width (page native-mac §6: 384; mockup 2: 480; mockup 4: 64
 });
 
 describe('Recent', () => {
-  it('newest first, once, eight at most', () => {
+  it('newest first, once, RECENT_KEPT at most (every project, each shows its own eight)', () => {
     const e = (id: string) => ({ kind: 'artifact' as const, project: 'acme', id });
     let r = pushRecent([], e('a'));
     r = pushRecent(r, e('b'));
     r = pushRecent(r, e('a'));
     expect(r.map((x) => (x.kind === 'artifact' ? x.id : ''))).toEqual(['a', 'b']);
-    for (let i = 0; i < 20; i++) r = pushRecent(r, e(String(i)));
-    expect(r).toHaveLength(RECENT_MAX);
+    for (let i = 0; i < RECENT_KEPT + 5; i++) r = pushRecent(r, e(String(i)));
+    expect(r).toHaveLength(RECENT_KEPT);
   });
 });
 

@@ -398,11 +398,13 @@ export function widenFor(k: PanelKept, what: TabWhat): number {
   return !k.dragged && widthOf(what) === 'page' ? Math.max(k.width, WIDTHS.page) : k.width;
 }
 
-/** How many things Recent keeps. */
+/** How many things a New tab's Recent shows (the project in front's: launch.ts recentIn). */
 export const RECENT_MAX = 8;
+/** How many things the window's Recent keeps, every project's: enough for each one's eight. */
+export const RECENT_KEPT = 64;
 
-/** `e` first in Recent, once, RECENT_MAX at most. Pure. */
-export function pushRecent(list: readonly Entity[], e: Entity, max = RECENT_MAX): readonly Entity[] {
+/** `e` first in Recent, once, RECENT_KEPT at most. Pure. */
+export function pushRecent(list: readonly Entity[], e: Entity, max = RECENT_KEPT): readonly Entity[] {
   const k = entityKey(e);
   return [e, ...list.filter((x) => entityKey(x) !== k)].slice(0, max);
 }
@@ -477,7 +479,7 @@ export function parseKept(raw: unknown): PanelKept {
   const want = isObj(raw['tabs']) ? raw['tabs']['active'] : undefined;
   const tabs: Tabs = { list, active: list.some((x) => x.id === want) ? (want as string) : (list[0]?.id ?? '') };
   const width = typeof raw['width'] === 'number' ? clampW(raw['width']) : WIDTHS.rows;
-  const recent = (Array.isArray(raw['recent']) ? (raw['recent'] as unknown[]) : []).map(entityOf).filter((e): e is Entity => e !== undefined).slice(0, RECENT_MAX);
+  const recent = (Array.isArray(raw['recent']) ? (raw['recent'] as unknown[]) : []).map(entityOf).filter((e): e is Entity => e !== undefined).slice(0, RECENT_KEPT);
   const shares: Record<string, number> = {};
   if (isObj(raw['shares'])) for (const [k, v] of Object.entries(raw['shares'])) if (typeof v === 'number' && Number.isFinite(v)) shares[k] = clampShare(v);
   const open = raw['open'] === true;

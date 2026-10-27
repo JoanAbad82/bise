@@ -358,6 +358,14 @@
 .pn-li:hover {
   background: var(--c-hover);
 }
+/* the row ↑/↓ highlighted: the lists' selection, 9 % of the text (hover stays 6 %; designer m_46449) */
+.pn-li[data-on] {
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
+}
+/* the New tab's one list (Open, Recent, or what he types finds): no box of its own */
+.pn-rows {
+  display: contents;
+}
 .pn-li:focus-visible,
 .pn-rec:focus-visible {
   outline: 2px solid var(--c-focus);
@@ -376,13 +384,16 @@
   color: var(--c-text);
   text-align: left;
 }
-.pn-rec:hover,
-.pn-rec[data-on] {
+.pn-rec:hover {
   background: var(--c-hover);
+}
+.pn-rec[data-on] {
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
 }
 /* ↑/↓ moved the highlight: the row under a resting pointer drops its tint until the pointer moves
    (macOS lists; ui-review m_44485 #1) */
-[data-keyed] > .pn-rec:hover:not([data-on]) {
+[data-keyed] .pn-rec:hover:not([data-on]),
+[data-keyed] .pn-li:hover:not([data-on]) {
   background: none;
 }
 /* Agents' 'the bims' toggle in Overview: text-2, ink on hover; the accent is only for what waits

@@ -3,10 +3,12 @@
 // (Artifacts ⌘P, Terminal ⌃`, Changes ⌥⌘D only when the agent in view has some, Browser ⌘L,
 // Office: the bims head) in one group box (r 10, a hairline, rows 40 with hairlines between, 12
 // inside, the kbd at the right), 'Recent' in rows
-// 48 with a 32 tile (what he opened in a tab last, newest first). Artifacts turns this tab into the
-// picker of the 10 newest artifacts (kind icon, name, kind · who, its age at the end, '22 d'; the field
-// filters). In a
-// list ↑/↓ move the highlighted row (the first as he types), ⏎ opens it, esc clears the field, then
+// 48 with a 32 tile (what he opened in a tab last, newest first, the project in front's only: his
+// m_46444). Artifacts turns this tab into the picker of the 10 newest artifacts (kind icon, name,
+// kind · who, its age at the end, '22 d'; the field filters). The field keeps the keys: ↑/↓ walk
+// Open then Recent from none (↑ on the first gives the field back, no wrap), or as he types his
+// address then the matches from the first; ⏎ opens the highlighted row (launch.ts, designer
+// m_46449); a pointer that moves takes the highlight back. Esc clears the field, then
 // leaves the picker, then closes the tab. A pick opens in this tab's place, as a browser's new tab
 // becomes the page. The rows act as their keys do (keys.ts doPanelKey). Owner: nm-panel.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -22,10 +24,11 @@ import { ThingPic } from '@/app/side3d/Bubbles';
 import { bubbleThing } from '@/app/side3d/objects';
 import { entityKey, type Entity } from '@/shared/entity';
 import { agentInView, changesInView, doPanelKey, PANEL_KEYS, type PanelCtx } from './keys';
-import { closeTabId, launcherHome, openWhat, usePanelState } from './state';
+import { closeTabId, launcherHome, openWhat, panelAt, usePanelState } from './state';
+import { scopeOf } from './scope';
 import { useTabLooks } from './look';
 import { tabOf } from './model';
-import { latestArtifacts, launchEnter, launchMatches, openRows, stepAt, type OpenRow } from './launch';
+import { enterRow, firstAt, isListing, latestArtifacts, launchMatches, launchRows, NO_ROW, openRows, recentIn, walkAt, type LaunchRow, type OpenRow } from './launch';
 
 /** Each Open row: its label, its icon, its key when it has one. */
 const ROW: Readonly<Record<OpenRow, { readonly label: string; readonly icon: AppIconName | 'head'; readonly keys?: string }>> = {
@@ -43,44 +46,60 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
   const store = useStore();
   const projects = useProjects();
   const home = projects.find((p) => p.home)?.project;
-  const recent = usePanelState().recent;
+  const allRecent = usePanelState().recent;
   const look = useTabLooks();
   const arts = useAllArtifacts();
   // the agent in view's rows: its Changes row shows and hides with its diff
   useAgents(agentInView(route)?.project ?? '');
   const [q, setQ] = useState('');
-  const [at, setAt] = useState(0);
+  const [at, setAt] = useState(() => firstAt('', artifacts));
   // ↑/↓ moved the highlight: the row under a resting pointer drops its hover tint until it moves (macOS lists)
   const [keyed, setKeyed] = useState(false);
   const [now] = useState(() => Date.now());
   const field = useRef<HTMLInputElement>(null);
   const bise = (window as Partial<Window>).bise;
   const ctx: PanelCtx = { route, home, agents: (p) => store.agents(p) };
-  const rows = openRows({ changes: changesInView(ctx) !== undefined, office: (projectOf(route) ?? home) !== undefined });
+  const opens = openRows({ changes: changesInView(ctx) !== undefined, office: (projectOf(route) ?? home) !== undefined });
+  // Recent: the project in front's own (his m_46444), the panel's scope (scope.ts scopeOf)
+  const recent = recentIn(allRecent, scopeOf(route, home, panelAt()));
   // a fresh New tab, or the picker it turned into: the field takes the keys
   useEffect(() => {
     if (shown) field.current?.focus();
   }, [shown, artifacts]);
+  useEffect(() => {
+    setAt(firstAt('', artifacts));
+  }, [artifacts]);
   const found = useMemo(() => (artifacts ? latestArtifacts(arts, q) : launchMatches(arts, q)), [arts, q, artifacts]);
-  const listing = artifacts || q.trim() !== '';
+  const listing = isListing(q, artifacts);
+  const rows = launchRows({ q, picker: artifacts, found, open: opens, recent });
   const pick = (e: Entity) => {
     openWhat({ kind: 'thing', e }, tabId);
   };
   const open = (x: Item) => {
     pick({ kind: 'artifact', project: x.project, id: x.a.id });
   };
+  const go = (r: LaunchRow) => {
+    if (r.kind === 'open') doPanelKey(r.row, ctx, tabId);
+    else if (r.kind === 'recent') pick(r.e);
+    else if (r.kind === 'found') open(r.item);
+    else void bise?.openExternal(r.url);
+  };
   const enter = () => {
-    const p = launchEnter(found, at, q);
-    if (p === undefined) return;
-    if ('artifact' in p) open(p.artifact);
-    else void bise?.openExternal(p.url);
+    const r = enterRow(rows, at, listing);
+    if (r !== undefined) go(r);
   };
   const esc = () => {
     if (q !== '') {
       setQ('');
-      setAt(0);
+      setAt(firstAt('', artifacts));
     } else if (artifacts) launcherHome(tabId);
     else closeTabId(tabId);
+  };
+  // one highlight at a time: a pointer that moves after a key takes it back (designer m_46449 a)
+  const pointed = () => {
+    if (!keyed) return;
+    setKeyed(false);
+    if (!listing) setAt(NO_ROW);
   };
   const optId = (i: number) => `${tabId}.opt.${String(i)}`;
   const label = artifacts ? panel.launch_pick_search : panel.launch_search;
@@ -97,10 +116,10 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
           role="combobox"
           aria-expanded={listing}
           aria-controls={`${tabId}.list`}
-          aria-activedescendant={listing && found[at] !== undefined ? optId(at) : undefined}
+          aria-activedescendant={rows[at] !== undefined ? optId(at) : undefined}
           onChange={(e) => {
             setQ(e.target.value);
-            setAt(0);
+            setAt(firstAt(e.target.value, artifacts));
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -109,7 +128,7 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
             } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
               setKeyed(true);
-              setAt((i) => stepAt(i, found.length, e.key === 'ArrowDown' ? 1 : -1));
+              setAt((i) => walkAt(i, rows.length, e.key === 'ArrowDown' ? 1 : -1));
             } else if (e.key === 'Escape') {
               e.preventDefault();
               e.stopPropagation();
@@ -119,93 +138,107 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
           data-testid="app.panel.launcher.search"
         />
       </label>
-      {listing ? (
-        <>
-          {artifacts && <h3 className="pn-lh">{panel.launch_latest}</h3>}
-          {found.length === 0 ? (
-            <p className="pn-none" data-testid="app.panel.launcher.nomatch">
-              {artifacts && q.trim() === '' ? panel.launch_no_artifact : panel.launch_no_match}
-            </p>
-          ) : (
-            <div
-              role="listbox"
-              id={`${tabId}.list`}
-              aria-label={label}
-              className="pn-found"
-              data-keyed={keyed || undefined}
-              onPointerMove={() => {
-                setKeyed(false);
-              }}
-            >
-              {found.map((x, i) => (
-                <PickRow
-                  key={`${x.project}/${x.a.id}`}
-                  id={optId(i)}
-                  on={i === at}
-                  icon={<KindIcon kind={iconKindOf(x.a)} size={16} />}
-                  title={x.a.title}
-                  sub={panel.launch_kind_by({ kind: x.a.kind, who: x.a.agent })}
-                  {...(artifacts ? { when: ago(x.a.at_ms, now) } : {})}
-                  onPick={() => {
-                    open(x);
-                  }}
-                  onHover={() => {
-                    setAt(i);
-                  }}
-                  testId={`app.panel.launcher.found.${x.project}/${x.a.id}`}
-                />
-              ))}
+      {/* every row is an option of one list the field walks (aria-activedescendant); display: contents */}
+      <div role="listbox" id={`${tabId}.list`} aria-label={label} className="pn-rows" data-keyed={keyed || undefined} onPointerMove={pointed}>
+        {listing ? (
+          <>
+            {artifacts && <h3 className="pn-lh">{panel.launch_latest}</h3>}
+            {rows.length === 0 ? (
+              <p className="pn-none" data-testid="app.panel.launcher.nomatch">
+                {artifacts && q.trim() === '' ? panel.launch_no_artifact : panel.launch_no_match}
+              </p>
+            ) : (
+              <div className="pn-found">
+                {rows.map((r, i) =>
+                  r.kind === 'url' ? (
+                    <PickRow
+                      key="url"
+                      id={optId(i)}
+                      on={i === at}
+                      icon={<AppIcon name="browser" size={16} />}
+                      title={r.url}
+                      sub={panel.addr_out}
+                      onPick={() => {
+                        go(r);
+                      }}
+                      testId="app.panel.launcher.url"
+                    />
+                  ) : r.kind === 'found' ? (
+                    <PickRow
+                      key={`${r.item.project}/${r.item.a.id}`}
+                      id={optId(i)}
+                      on={i === at}
+                      icon={<KindIcon kind={iconKindOf(r.item.a)} size={16} />}
+                      title={r.item.a.title}
+                      sub={panel.launch_kind_by({ kind: r.item.a.kind, who: r.item.a.agent })}
+                      {...(artifacts ? { when: ago(r.item.a.at_ms, now) } : {})}
+                      onPick={() => {
+                        go(r);
+                      }}
+                      testId={`app.panel.launcher.found.${r.item.project}/${r.item.a.id}`}
+                    />
+                  ) : null,
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <h3 className="pn-lh">{panel.launch_open}</h3>
+            {/* one group box, as settings' (designer m_44486 #1): rows 40 with hairlines between */}
+            <div className="pn-open" role="group" aria-label={panel.launch_open} data-testid="app.panel.launcher.open">
+              {opens.map((k, i) => {
+                const r = ROW[k];
+                return (
+                  <Press
+                    key={k}
+                    look="pn-li"
+                    id={optId(i)}
+                    role="option"
+                    aria-selected={i === at}
+                    tabIndex={-1}
+                    data-on={i === at || undefined}
+                    onClick={() => {
+                      go({ kind: 'open', row: k });
+                    }}
+                    data-testid={`app.panel.launcher.${k}`}
+                  >
+                    {r.icon === 'head' ? <ThingPic thing={bubbleThing('agents')} px={16} tile="thread" className="pn-li-pic" /> : <AppIcon name={r.icon} size={16} />}
+                    <span className="pn-li-t">{r.label}</span>
+                    {r.keys !== undefined && <Kbd>{r.keys}</Kbd>}
+                  </Press>
+                );
+              })}
             </div>
-          )}
-        </>
-      ) : (
-        <>
-          <h3 className="pn-lh">{panel.launch_open}</h3>
-          {/* one group box, as settings' (designer m_44486 #1): rows 40 with hairlines between */}
-          <div className="pn-open" role="group" aria-label={panel.launch_open} data-testid="app.panel.launcher.open">
-          {rows.map((k) => {
-            const r = ROW[k];
-            return (
-              <Press
-                key={k}
-                look="pn-li"
-                onClick={() => {
-                  doPanelKey(k, ctx, tabId);
-                }}
-                data-testid={`app.panel.launcher.${k}`}
-              >
-                {r.icon === 'head' ? <ThingPic thing={bubbleThing('agents')} px={16} tile="thread" className="pn-li-pic" /> : <AppIcon name={r.icon} size={16} />}
-                <span className="pn-li-t">{r.label}</span>
-                {r.keys !== undefined && <Kbd>{r.keys}</Kbd>}
-              </Press>
-            );
-          })}
-          </div>
-          <h3 className="pn-lh">{panel.launch_recent}</h3>
-          {recent.length === 0 ? (
-            <p className="pn-none" data-testid="app.panel.launcher.none">
-              {panel.launch_none}
-            </p>
-          ) : (
-            recent.map((e) => {
-              const l = look(tabOf({ kind: 'thing', e }));
-              const sub = e.kind === 'artifact' ? arts.find((x) => x.project === e.project && x.a.id === e.id) : undefined;
-              return (
-                <PickRow
-                  key={entityKey(e)}
-                  icon={l.icon}
-                  title={l.title}
-                  sub={sub === undefined ? '' : panel.launch_kind_by({ kind: sub.a.kind, who: sub.a.agent })}
-                  onPick={() => {
-                    pick(e);
-                  }}
-                  testId={`app.panel.launcher.recent.${entityKey(e)}`}
-                />
-              );
-            })
-          )}
-        </>
-      )}
+            <h3 className="pn-lh">{panel.launch_recent}</h3>
+            {recent.length === 0 ? (
+              <p className="pn-none" data-testid="app.panel.launcher.none">
+                {panel.launch_none}
+              </p>
+            ) : (
+              recent.map((e, j) => {
+                const i = opens.length + j;
+                const l = look(tabOf({ kind: 'thing', e }));
+                const sub = e.kind === 'artifact' ? arts.find((x) => x.project === e.project && x.a.id === e.id) : undefined;
+                return (
+                  <PickRow
+                    key={entityKey(e)}
+                    id={optId(i)}
+                    on={i === at}
+                    icon={l.icon}
+                    title={l.title}
+                    sub={sub === undefined ? '' : panel.launch_kind_by({ kind: sub.a.kind, who: sub.a.agent })}
+                    onPick={() => {
+                      pick(e);
+                    }}
+                    testId={`app.panel.launcher.recent.${entityKey(e)}`}
+                  />
+                );
+              })
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

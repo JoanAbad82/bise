@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '@/artifacts/model';
 import type { Agent } from '@/proto';
-import { FOUND_MAX, PICK_MAX, hasChanges, latestArtifacts, launchEnter, launchMatches, looksLikeUrl, openRows, stepAt } from './launch';
+import { FOUND_MAX, NO_ROW, PICK_MAX, enterRow, firstAt, hasChanges, latestArtifacts, launchEnter, launchMatches, launchRows, looksLikeUrl, openRows, recentIn, stepAt, walkAt } from './launch';
+import { RECENT_MAX } from './model';
 import { changesInView, panelKeyOf, PANEL_KEYS } from './keys';
 
 const item = (id: string, title: string, at: number, kind = 'page', agent = 'perf') =>
@@ -42,6 +43,53 @@ describe("the launcher's search (New tab, mockup 3)", () => {
     expect(stepAt(2, 3, 1)).toBe(2);
     expect(stepAt(0, 3, -1)).toBe(0);
     expect(stepAt(0, 0, 1)).toBe(0);
+  });
+});
+
+describe("the New tab's rows (his m_46444, designer m_46449)", () => {
+  const items = [item('a', 'Perf notes', 1), item('c', 'perf bench', 2)];
+  const open = ['artifacts', 'terminal'] as const;
+  const recent = [{ kind: 'office' as const, project: 'acme' }];
+  it('Open then Recent with no words; an address first, then the matches, as he types', () => {
+    expect(launchRows({ q: '', picker: false, found: [], open, recent })).toEqual([
+      { kind: 'open', row: 'artifacts' },
+      { kind: 'open', row: 'terminal' },
+      { kind: 'recent', e: recent[0] },
+    ]);
+    const found = launchMatches(items, 'perf');
+    expect(launchRows({ q: 'perf', picker: false, found, open, recent }).map((r) => r.kind)).toEqual(['found', 'found']);
+    expect(launchRows({ q: 'bise.dev', picker: false, found: [], open, recent })).toEqual([{ kind: 'url', url: 'https://bise.dev' }]);
+    // the picker searches artifacts only
+    expect(launchRows({ q: 'bise.dev', picker: true, found: [], open, recent })).toEqual([]);
+  });
+  it('nothing highlighted with an empty field; the first row as he types, and in the picker', () => {
+    expect(firstAt('', false)).toBe(NO_ROW);
+    expect(firstAt('  ', false)).toBe(NO_ROW);
+    expect(firstAt('perf', false)).toBe(0);
+    expect(firstAt('', true)).toBe(0);
+  });
+  it('↓ from the field enters the first row, ↑ on it gives the field back, no wrap at the end', () => {
+    expect(walkAt(NO_ROW, 3, 1)).toBe(0);
+    expect(walkAt(0, 3, 1)).toBe(1);
+    expect(walkAt(2, 3, 1)).toBe(2);
+    expect(walkAt(0, 3, -1)).toBe(NO_ROW);
+    expect(walkAt(NO_ROW, 3, -1)).toBe(NO_ROW);
+    expect(walkAt(NO_ROW, 0, 1)).toBe(NO_ROW);
+  });
+  it('⏎: the highlighted row; none highlighted: the first of a filtered list, nothing on Open/Recent', () => {
+    const rows = launchRows({ q: '', picker: false, found: [], open, recent });
+    expect(enterRow(rows, 1, false)).toEqual({ kind: 'open', row: 'terminal' });
+    expect(enterRow(rows, NO_ROW, false)).toBeUndefined();
+    const typed = launchRows({ q: 'perf', picker: false, found: launchMatches(items, 'perf'), open, recent });
+    expect(enterRow(typed, NO_ROW, true)).toEqual(typed[0]);
+  });
+  it("Recent: only the front project's things (and those of no project), eight at most", () => {
+    const e = (project: string, id: string) => ({ kind: 'artifact' as const, project, id });
+    const list = [e('acme', 'a'), e('home', 'b'), { kind: 'office' as const, project: 'home' }, { kind: 'plugin' as const, id: 'slack' }, e('acme', 'c')];
+    expect(recentIn(list, 'acme')).toEqual([e('acme', 'a'), { kind: 'plugin', id: 'slack' }, e('acme', 'c')]);
+    expect(recentIn(list, 'home')).toEqual([e('home', 'b'), { kind: 'office', project: 'home' }, { kind: 'plugin', id: 'slack' }]);
+    const many = Array.from({ length: 20 }, (_, i) => e('acme', String(i)));
+    expect(recentIn(many, 'acme')).toHaveLength(RECENT_MAX);
   });
 });
 
