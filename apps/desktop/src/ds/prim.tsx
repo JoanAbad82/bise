@@ -109,8 +109,11 @@ export function ArtChip({ title, glyph = "↗", meta, open = false, state, onCli
         <span className="b-artchip-title">{glyph} {title}</span>
       ) : (
         <span className="b-artchip-title">
-          <span className="b-artchip-head">{`${glyph} ${fit.head}`}</span>
-          {fit.rest !== "" && <span className="b-artchip-rest">{fit.rest}</span>}
+          {/* one text, cut with '…'; two hidden twins only size it: never narrower than its first
+              letters and '…' (measured), as wide as the whole title */}
+          <span className="b-artchip-cut">{`${glyph} ${title as string}`}</span>
+          <span className="b-artchip-min" aria-hidden="true">{`${glyph} ${fit.head}${fit.rest === "" ? "" : "…"}`}</span>
+          <span className="b-artchip-max" aria-hidden="true">{`${glyph} ${title as string}`}</span>
         </span>
       )}
       {meta != null && meta !== "" && <span className="b-artchip-meta">{meta}</span>}

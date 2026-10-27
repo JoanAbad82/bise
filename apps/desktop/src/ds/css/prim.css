@@ -81,14 +81,19 @@ button.b-chip:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
 .b-artchip-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .b-artchip-meta{flex:none;color:color-mix(in srgb,var(--c-accent) 70%,transparent);font-size:var(--t-12)}
 .b-artchip-open{flex:none;color:var(--c-text-3);font-size:var(--t-11)}
-/* keep (designer m_47680): narrow, the meta wraps to a hidden second line before the title is cut
-   (it drops whole), then the title's rest cuts with '…' and its head (the first letters) never does;
-   the chip is never narrower than its head */
+/* keep (designer m_47680, m_47728): narrow, the meta wraps to a hidden second line before the title
+   is cut (it drops whole); then the title, one text, cuts with '…', never narrower than its first
+   letters and '…' (b-artchip-min, measured); the chip keeps that width, the row gives way */
 .b-artchip.fit{flex-wrap:wrap;align-content:flex-start;min-width:min-content;overflow:hidden}
 .b-artchip.fit>*{display:flex;align-items:center;height:var(--s-6)}
-.b-artchip.fit .b-artchip-title{min-width:auto;overflow:visible}
-.b-artchip-head{flex:none}
-.b-artchip-rest{display:-webkit-box;flex:0 1 auto;min-width:0;overflow:hidden;white-space:normal;word-break:break-all;-webkit-line-clamp:1;-webkit-box-orient:vertical;line-height:var(--s-6)}
+.b-artchip.fit .b-artchip-title{display:grid;align-items:center;min-width:auto;overflow:visible}
+.b-artchip-cut,.b-artchip-min,.b-artchip-max{grid-area:1/1;white-space:nowrap}
+.b-artchip-cut{contain:inline-size;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* no overflow: hidden here, it would make its grid minimum 0 (the floor gone) */
+/* 1 px of slack: the ellipsis's own fitting rounds, without it the cut ends a letter short */
+.b-artchip-min{height:0;padding-right:1px;visibility:hidden}
+/* as wide as the title, narrow as a letter: the title's max size without raising its min */
+.b-artchip-max{height:0;overflow:hidden;visibility:hidden;white-space:normal;word-break:break-all}
 .b-artname{padding:0 var(--s-1);border-radius:var(--r-1);background:color-mix(in srgb,var(--c-accent) 10%,transparent);color:var(--c-accent);-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .b-artchip:focus-visible,.b-artname:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
 /* kind 'part': a part of his message under its words (designer m_17969): the artifact chip's look,

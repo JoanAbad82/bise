@@ -163,7 +163,10 @@
    'o open beside' at its right in text-3; each option's why in text-2 under its label; the
    asker's 'my pick' at the row's right */
 .ic-page { display: flex; align-items: center; gap: var(--gap-inline); flex: none; margin: 0 0 var(--gap-block); min-width: 0; }
-.ic-page > :last-child:not(.b-artchip) { margin-left: auto; color: var(--c-text-3); flex: none; display: inline-flex; align-items: center; gap: var(--s-1); }
+/* narrow, the chip gives way first (down to its first letters and '…', designer m_47728), then the
+   row: '⌘O open beside' is cut at its right, the chip never */
+.ic-page > .b-artchip { flex-shrink: 100; }
+.ic-page > :last-child:not(.b-artchip) { margin-left: auto; color: var(--c-text-3); flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; display: inline-flex; align-items: center; gap: var(--s-1); }
 .ic-opt:has(.ic-mine) { grid-template-columns: 22px 1fr auto; }
 .ic-why { display: block; color: var(--c-text-2); font-size: var(--t-12); }
 .ic-opt.picked .ic-why { color: var(--c-on-ink); }

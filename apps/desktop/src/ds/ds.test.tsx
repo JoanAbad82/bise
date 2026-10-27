@@ -162,12 +162,15 @@ describe("src/ds", () => {
     const { getByTestId } = render(<ArtChip title="commode cannée sous l'escalier" meta="image · v1" keep={12} testId="k" />);
     const chip = getByTestId("k");
     expect(chip.className).toBe("b-artchip fit");
-    expect(chip.querySelector(".b-artchip-head")?.textContent).toBe("↗ commode cann");
-    expect(chip.querySelector(".b-artchip-rest")?.textContent).toBe("ée sous l'escalier");
+    // one text cut with '…'; its narrowest is its first 12 letters and '…', measured by a hidden twin
+    expect(chip.querySelector(".b-artchip-cut")?.textContent).toBe("↗ commode cannée sous l'escalier");
+    expect(chip.querySelector(".b-artchip-min")?.textContent).toBe("↗ commode cann…");
+    expect(chip.querySelector(".b-artchip-min")?.getAttribute("aria-hidden")).toBe("true");
+    expect(chip.querySelector(".b-artchip-max")?.getAttribute("aria-hidden")).toBe("true");
     expect(chip.getAttribute("data-tip")).toBe("commode cannée sous l'escalier");
     expect(chip.querySelector(".b-artchip-meta")?.textContent).toBe("image · v1");
-    // a title as short as the head has no rest
+    // a title as short as that is never cut: its narrowest is all of it, no '…'
     const { getByTestId: by } = render(<ArtChip title="plan" keep={12} testId="s" />);
-    expect(by("s").querySelector(".b-artchip-rest")).toBeNull();
+    expect(by("s").querySelector(".b-artchip-min")?.textContent).toBe("↗ plan");
   });
 });
