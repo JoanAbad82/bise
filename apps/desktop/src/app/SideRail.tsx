@@ -112,7 +112,7 @@ export function SideRail() {
           :*
         </span>
       </RailButton>
-      {(['inbox', 'scheduled', 'artifacts', 'plugins'] as const).map((p) => (
+      {(['inbox', 'artifacts', 'scheduled', 'plugins'] as const).map((p) => (
         <RailButton key={p} place={p} on={at === p} {...(p === 'inbox' ? { dot: waits > 0, tip: waits > 0 ? `${railTip(p)} · ${waitsTip(waits, true)}` : railTip(p) } : {})}>
           <AppIcon name={ICON[p]} size={18} />
         </RailButton>
