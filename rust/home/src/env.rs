@@ -158,7 +158,6 @@ pub const VARS: &[Var] = &[
     test("BISE_MISTRAL_URL", "Mistral's API base for the connectors' catalog and connect (a fake Mistral in tests)"),
     user("BISE_MODEL", "the main model"),
     internal("BISE_MODELS_FILE", "the merged model catalog, for the REPLs"),
-    user("BISE_NO_MIGRATE", "never move ~/.bend-harness to ~/.bise"),
     user("BISE_NO_UPDATE", "no background update check"),
     internal("BISE_ONESHOT", "a one-shot provider call's request file, for repl-live"),
     user("BISE_OPEN", "the program a link opens with"),

@@ -10,8 +10,7 @@
 //! (`setup.rs`).
 //!
 //! It runs once per user: the flag is the `onboarded` preference
-//! (`bise_home`: a key of `~/.bise/prefs.json`, or the old
-//! `~/.local/state/switchboard/onboarded` file). `esc` / `ctrl+c` skip it and mark
+//! (`bise_home`: a key of `~/.bise/prefs.json`). `esc` / `ctrl+c` skip it and mark
 //! it seen too. `SB_ONBOARDING=off` never shows it, `on` always does (the
 //! tmux tests set `off`). `/welcome` (BISE-41) calls [`run`] to replay it.
 //!
@@ -71,14 +70,12 @@ fn real_env(k: &str) -> Option<String> {
 
 // ---- the flag ----
 
-/// bise's state for an environment (`bise_home`: `~/.bise`, `$BISE_HOME`,
-/// or the old places).
+/// bise's state for an environment (`bise_home`: `~/.bise`, `$BISE_HOME`).
 pub(crate) fn home_of(env: Env) -> bise_home::Home {
     bise_home::Home::from_lookup(env)
 }
 
-/// Where the flag is kept: `onboarded` in `prefs.json`, or the old
-/// `~/.local/state/switchboard/onboarded` file.
+/// Where the flag is kept: `onboarded` in `prefs.json`.
 pub(crate) fn flag(env: Env) -> bise_home::Slot {
     home_of(env).pref(bise_home::Pref::Onboarded)
 }
@@ -2128,13 +2125,13 @@ mod tests {
     fn the_flag_follows_the_state_root_and_the_env_var() {
         let d = tmp("flag");
         let ds = d.to_string_lossy().to_string();
-        // the old layout: the flag file an older version reads
+        // the `onboarded` key of ~/.bise/prefs.json
         let e = env_of(HashMap::from([("HOME", ds.clone())]));
-        assert_eq!(flag(&e).file, d.join(".local/state/switchboard/onboarded"));
+        assert_eq!(flag(&e).file, d.join(".bise/prefs.json"));
         assert!(due(&e));
         mark_seen(&e).unwrap();
         assert!(!due(&e));
-        assert!(d.join(".local/state/switchboard/onboarded").exists());
+        assert!(d.join(".bise/prefs.json").exists());
         let on = env_of(HashMap::from([("HOME", ds.clone()), (ENV, "on".into())]));
         assert!(due(&on));
         let home = env_of(HashMap::from([("HOME", "/h".into()), (ENV, "off".into())]));
@@ -2186,8 +2183,8 @@ mod tests {
         let o = Onb::new(&none);
         // BISE-266: no built-in model
         assert_eq!((o.model.as_str(), o.mine.as_str()), ("", ""));
-        std::fs::create_dir_all(h.join(".bend-harness")).unwrap();
-        std::fs::write(h.join(".bend-harness/config.toml"), "# c\nmodel = \"zai-glm-5-3\" # glm\n").unwrap();
+        std::fs::create_dir_all(h.join(".bise")).unwrap();
+        std::fs::write(h.join(".bise/config.toml"), "# c\nmodel = \"zai-glm-5-3\" # glm\n").unwrap();
         let o = Onb::new(&none);
         assert_eq!((o.model.as_str(), o.mine.as_str()), ("mistral/zai-glm-5-3", "mistral"));
         let e = env_of(HashMap::from([("HOME", home.clone()), ("BEND_MODEL", "anthropic/claude-haiku-4-5".to_string())]));
@@ -2462,7 +2459,7 @@ mod tests {
         o.on_key(key(KeyCode::Enter), 1, &e);
         // the keys page, the field, where it goes
         let sc = screen(&o, 10, 110, 30);
-        for s in ["paste your Mistral key", "get one: https://console.mistral.ai/api-keys", "it goes in ~/.bend-harness/auth.json, only you can read it.", "⏎ check   esc back"] {
+        for s in ["paste your Mistral key", "get one: https://console.mistral.ai/api-keys", "it goes in ~/.bise/auth.json, only you can read it.", "⏎ check   esc back"] {
             assert!(sc.contains(s), "{}\n{}", s, sc);
         }
         // the link is a hit for the OSC 8 backend
@@ -2498,7 +2495,7 @@ mod tests {
         o.on_key(key(KeyCode::Enter), 1, &e);
         settle(&mut o, &e);
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("? the key in ~/.bend-harness/auth.json works, but your Mistral") && sc.contains("account has no credit yet."), "{}", sc);
+        assert!(sc.contains("? the key in ~/.bise/auth.json works, but your Mistral account") && sc.contains("has no credit yet."), "{}", sc);
         assert!(sc.contains("add credit, then enter checks again.") && !sc.contains("i saved the key"), "{}", sc);
         // a key that can't use this model: pick another
         let paste = |o: &mut Onb, k: &str| {

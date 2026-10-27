@@ -50,7 +50,7 @@ for each provider, bise takes the first key it finds, in this order:
 
 1. what you saved in bise: `~/.bise/auth.json`, where the first run, settings › models, `/provider` and `bise login` save. only you can read it (mode 0600). or the macOS keychain, if you moved them there (settings › keys, or `/keychain on`).
 2. the environment: the provider's variable, for example `ANTHROPIC_API_KEY`.
-3. the old `.env` files of earlier versions: `~/.bend-harness/.env`, `~/.vibe/.env`.
+3. the `.env` files: `~/.bise/.env`, `~/.vibe/.env`.
 
 so a key you saved in bise wins over the one in your shell. when your environment holds another key for the same provider, bise says once that it isn't used. `bise logout <provider>` goes back to the environment's key.
 

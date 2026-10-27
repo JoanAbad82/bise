@@ -6,7 +6,7 @@
 //!      what you give bise is what bise uses (BISE-269); `bise logout
 //!      <provider>` goes back to the environment;
 //!   2. the environment: `key_env`, then its aliases ([`ALIASES`]);
-//!   3. the old `.env` files (`~/.bend-harness/.env`, `~/.vibe/.env`),
+//!   3. the `.env` files (`~/.bise/.env`, `~/.vibe/.env`),
 //!      `key_env` then its aliases, first file first.
 //!
 //! The Bend runtime reads one variable per provider (`getenv(key_env)`,

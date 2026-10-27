@@ -293,8 +293,7 @@ function gateDir(argv: string[]): string {
   const i = argv.indexOf('--gate-dir');
   const given = i >= 0 ? argv[i + 1] : undefined;
   if (given !== undefined) return given;
-  if (process.env.BISE_HOME) return path.join(process.env.BISE_HOME, 'gate');
-  return existsSync(path.join(os.homedir(), '.bise', 'migrated.json')) ? path.join(os.homedir(), '.bise', 'gate') : '/tmp';
+  return path.join(process.env.BISE_HOME || path.join(os.homedir(), '.bise'), 'gate');
 }
 const arg = (argv: string[], name: string, dflt: string): string => { const i = argv.indexOf(name); return (i >= 0 ? argv[i + 1] : undefined) ?? dflt; };
 const today = () => new Date().toISOString().slice(0, 10);

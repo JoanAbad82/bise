@@ -23,12 +23,7 @@ REPO = os.path.abspath(os.environ.get("AMBIENT_QA_REPO") or os.path.join(HERE, "
 
 def dev_dir():
     """<bise dev dir>: scripts/bins.sh's STATE (and Support.swift's defaultDevDir)."""
-    if os.environ.get("BISE_HOME"):
-        return os.path.join(os.environ["BISE_HOME"], "dev")
-    home = os.path.expanduser("~")
-    if os.path.exists(os.path.join(home, ".bise", "migrated.json")):
-        return os.path.join(home, ".bise", "dev")
-    return os.path.join(home, ".local", "state", "switchboard")
+    return os.path.join(os.environ.get("BISE_HOME") or os.path.expanduser("~/.bise"), "dev")
 
 
 # one QA hub per agent: several agents can QA at the same time without sharing a hub
@@ -349,7 +344,7 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
         err = open(err_path, "a")
         if home:
             # harness A (qa.py real): the hub where his own rules put it for this HOME
-            # (<HOME>/.bise/hubs/<name>-<hash>, migrated.json present like on his Mac), never
+            # (<HOME>/.bise/hubs/<name>-<hash>, like on his Mac), never
             # told by SB_STATE_DIR, so the app and its core find it the way they find his
             real_home_env(E.env, home)
         E.hub = subprocess.Popen([bise, "sbd", "--workspace", E.ws], cwd=e2e.ROOT, env=E.env,
@@ -711,7 +706,7 @@ def _short_agent():
 
 # his own state: a harness path must never point there (ambient-lead m_8004)
 HIS_STATE = [os.path.expanduser(p) for p in ("~/.bise/hubs", "~/.bise/run", "~/.bise/dev/ambient", "~/.bise/sessions",
-                                              "~/.local/state/switchboard", "~/bise")]
+                                              "~/bise")]
 # the gate's own checkout (scripts/nightly_gate.sh: the nightly's and the tip gate's tree), under
 # ~/.bise/run but code, never his state: the real-core world's hubs run its repl-live
 # (BISE_APP_ROOT, QA_BISE; tip 156b45461: 32 real-core checks 'no world up' on this refusal)
@@ -722,7 +717,7 @@ GATE_TREE = os.path.expanduser("~/.bise/run/nightly/tree")
 
 def refuse_his_state(vals):
     """Refuse any value (an arg, an env value, a PATH-like list) whose path reaches his own state;
-    programs are fine (his bise binary links into ~/.local/state/switchboard/build)."""
+    programs are fine (his bise binary links into ~/.bise/dev/build)."""
     for v in vals:
         for part in re.split(r"[:=]", str(v)):
             his = reaches_his_state(part)
@@ -736,7 +731,7 @@ def reaches_his_state(path):
         return None
     rp = os.path.realpath(path)
     if os.path.isfile(rp) and os.access(rp, os.X_OK) and not rp.endswith((".sock", ".pid")):
-        return None   # a program (his bise: ~/.bise/dev/build links into ~/.local/state/switchboard/build), never state
+        return None   # a program (his bise links into ~/.bise/dev/build), never state
     gt = os.path.realpath(GATE_TREE)
     if rp == gt or rp.startswith(gt + "/"):
         return None   # the gate's own tree
@@ -753,15 +748,9 @@ def own_path(path):
 
 
 def _prepare_home(home):
-    """The isolated HOME laid out like his Mac: ~/.bise with migrated.json, so a process that
-    gets no BISE_HOME (the env registry strips BISE_*/SB_* from children, 2eab3e15) still
-    resolves <HOME>/.bise, as his core does."""
-    b = os.path.join(home, ".bise")
-    os.makedirs(b, exist_ok=True)
-    m = os.path.join(b, "migrated.json")
-    if not os.path.exists(m):
-        with open(m, "w") as f:
-            json.dump({"first": False, "copied": [], "moved": [], "by": "ambient-qa real"}, f)
+    """The isolated HOME laid out like his Mac: <HOME>/.bise, where a process that gets no
+    BISE_HOME (the env registry strips BISE_*/SB_* from children, 2eab3e15) finds its state."""
+    os.makedirs(os.path.join(home, ".bise"), exist_ok=True)
     os.makedirs(os.path.join(home, "Library", "Logs"), exist_ok=True)
 
 

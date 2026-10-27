@@ -1,7 +1,5 @@
-//! The user's preferences: one `prefs.json` in the bise layout, the
-//! old files in the legacy one (`tui.json`, `hints.json`, `tip`,
-//! `onboarded`). A [`Slot`] hides which: a JSON value in a file, the
-//! whole file or one key of its object.
+//! The user's preferences: one `prefs.json`. A [`Slot`] is a JSON value
+//! in a file: the whole file (a test store) or one key of its object.
 
 use std::io;
 use std::path::{Path, PathBuf};

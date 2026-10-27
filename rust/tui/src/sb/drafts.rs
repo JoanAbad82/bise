@@ -122,8 +122,7 @@ pub(crate) fn use_dir(d: Option<PathBuf>) {
     STATE.with(|s| *s.borrow_mut() = State::default());
 }
 
-/// The drafts folder: `bise_home::Home::drafts_dir` (`~/.bise/drafts`, or
-/// the old `~/.local/state/switchboard/drafts`).
+/// The drafts folder: `bise_home::Home::drafts_dir` (`~/.bise/drafts`).
 fn dir() -> Option<PathBuf> {
     #[cfg(test)]
     {

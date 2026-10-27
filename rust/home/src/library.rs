@@ -1,6 +1,6 @@
 //! The artifacts library's folders (artifacts-in-folders, architect
 //! m_39651): one list for every project, `<root>/library/folders.json`
-//! ([`Home::library_folders`], bise layout only):
+//! ([`Home::library_folders`]):
 //! `{"v":1,"folders":[{id,name,parent?,by,named_by_you,into?}],"undo"?}`.
 //!
 //! - A folder's id is stable and random (`f-` + 10 base32), so a rename
@@ -30,15 +30,13 @@ use std::path::PathBuf;
 
 use serde_json::{json, Map, Value};
 
-use crate::{Home, Layout};
+use crate::Home;
 
 /// The folder in `Home::root`, and the file in it.
 pub const DIR: &str = "library";
 pub const FILE: &str = "folders.json";
 /// `by` of his own changes.
 pub const YOU: &str = "you";
-/// What every write says in the legacy layout.
-pub const LEGACY: &str = "the library needs ~/.bise: run bise once to move there";
 /// The deepest a folder goes: a theme (1) and its tasks (2).
 pub const DEPTH: usize = 2;
 
@@ -483,9 +481,9 @@ pub fn render(l: &Library) -> String {
     serde_json::to_string_pretty(&Value::Object(o)).unwrap_or_default() + "\n"
 }
 
-/// The library as the file has it (empty: no file, the legacy layout).
+/// The library as the file has it (empty: no file).
 pub fn read(home: &Home) -> Library {
-    home.library_folders().and_then(|f| std::fs::read_to_string(f).ok()).map(|t| parse(&t)).unwrap_or_default()
+    std::fs::read_to_string(home.library_folders()).map(|t| parse(&t)).unwrap_or_default()
 }
 
 /// The live folders as an event's rows (`{id, name, parent?, by,
@@ -508,7 +506,7 @@ pub fn rows(l: &Library) -> Vec<Value> {
 /// the undo slot (an agent's leaves it as it is). A file a newer bise
 /// wrote (`v` > 1) is never written over.
 pub fn update<T>(home: &Home, his: bool, f: impl FnOnce(&mut Library) -> Result<T, String>) -> Result<T, String> {
-    let file = home.library_folders().ok_or_else(|| LEGACY.to_string())?;
+    let file = home.library_folders();
     let dir = file.parent().map(PathBuf::from).unwrap_or_default();
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let _lock = crate::projects::lock(&file.with_extension("json.lock"))?;
@@ -600,9 +598,9 @@ pub fn run(home: &Home, op: Op) -> Result<Done, String> {
 }
 
 impl Home {
-    /// `library/folders.json` (bise layout only).
-    pub fn library_folders(&self) -> Option<PathBuf> {
-        (self.layout == Layout::Bise).then(|| self.root.join(DIR).join(FILE))
+    /// `library/folders.json`.
+    pub fn library_folders(&self) -> PathBuf {
+        self.root.join(DIR).join(FILE)
     }
 }
 

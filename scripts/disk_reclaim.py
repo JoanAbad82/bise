@@ -50,13 +50,11 @@ PROFILE_SUBDIRS = ("deps", ".fingerprint", "incremental", "build")
 
 # ---- pure part ------------------------------------------------------------
 
-# never deleted, whatever the roots: the dev build dir (~/.bise/dev/build, a link to
-# ~/.local/state/switchboard/build) and everything under it. HEAVY_RECLAIM_KEEP (tests): a
-# ':' list instead.
+# never deleted, whatever the roots: the dev build dir (~/.bise/dev/build) and everything
+# under it. HEAVY_RECLAIM_KEEP (tests): a ':' list instead.
 def kept():
     k = os.environ.get("HEAVY_RECLAIM_KEEP")
-    ks = [p for p in k.split(":") if p] if k is not None else [os.path.expanduser("~/.bise/dev/build"),
-                                                                  os.path.expanduser("~/.local/state/switchboard/build")]
+    ks = [p for p in k.split(":") if p] if k is not None else [os.path.expanduser("~/.bise/dev/build")]
     return [os.path.realpath(p) for p in ks]
 
 

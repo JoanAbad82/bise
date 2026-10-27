@@ -77,11 +77,6 @@ pub struct Spec {
     /// wrapper deletes its own script there (`bend-sh-<port>-<hash>.sh`),
     /// nothing else in it is writable (the gate file stays the hub's).
     pub run: Option<PathBuf>,
-    /// The folders `~/.bise/dev/build` and `dev/versions` link to when the
-    /// home migration left them in the old place
-    /// (`~/.local/state/switchboard/…`, [`legacy_dev`]): Seatbelt checks
-    /// the real path, so `~/.bise` alone does not open them.
-    pub links: Vec<PathBuf>,
     /// The hub's client socket (`hub.sock`, its natural and its short
     /// path): an agent's command never connects to it (docs/issues/16).
     /// Empty for a REPL adopted from an older hub, whose `sb` still
@@ -104,25 +99,8 @@ impl Spec {
             home: fs.real(&call.home),
             user_tmp: darwin_user_temp().map(|t| fs.real(&t)),
             run: Some(fs.real(run)),
-            links: legacy_dev(&call.bise, &call.home, fs),
         }
     }
-}
-
-/// The dev folders the home migration linked (`rust/home` migrate.rs:
-/// `~/.bise/dev/{build,versions}` → `~/.local/state/switchboard/…`), real
-/// paths. Only these targets: a link an agent makes in `~/.bise` (it may
-/// write there) never opens another folder.
-pub fn legacy_dev(bise: &Path, home: &Path, fs: &dyn Fs) -> Vec<PathBuf> {
-    ["build", "versions"]
-        .iter()
-        .filter_map(|d| {
-            let link = bise.join("dev").join(d);
-            let old = fs.real(&home.join(".local/state/switchboard").join(d));
-            let real = fs.real(&link);
-            (real == old && real != link).then_some(old)
-        })
-        .collect()
 }
 
 /// `getconf DARWIN_USER_TEMP_DIR`, once per hub (macOS only).
@@ -179,7 +157,6 @@ pub fn profile(s: &Spec, net: bool) -> String {
     let mut roots: Vec<PathBuf> = vec![s.cwd.clone()];
     roots.extend(s.git.clone());
     roots.push(s.bise.clone());
-    roots.extend(s.links.iter().cloned());
     roots.extend(CACHES.iter().map(|c| s.home.join(c)));
     for r in &roots {
         o.push_str(&format!("  (subpath {})\n", lit(r)));

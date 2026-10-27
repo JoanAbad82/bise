@@ -13,7 +13,7 @@
 #   ./run.sh switchboard --dev --reset    # stop + wipe the dev workspace and state
 #
 # The build is a version of the versions cache (versions.sh build --tree:
-# ~/.local/state/switchboard/versions/<id>, shared with the live hub's
+# ~/.bise/dev/versions/<id>, shared with the live hub's
 # version selector). Layout ($SB_DEV_ROOT, default /tmp/sb-dev):
 #   current            -> the version dir the dev hub runs
 #   ws/                the dev workspace (a small git repo; SB_DEV_WS overrides)
@@ -53,9 +53,8 @@ hub_pid() {
   if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "$p"; fi
 }
 
-# the command of a version dir: bise (BISE-165), or the bend-harness of
-# a version built before the rename
-exe_in() { if [ -x "$1/bise" ]; then echo "$1/bise"; else echo "$1/bend-harness"; fi; }
+# the command of a version dir
+exe_in() { echo "$1/bise"; }
 
 stop_hub() {  # [--keep-agents]
   [ -n "$(hub_pid)" ] || return 0

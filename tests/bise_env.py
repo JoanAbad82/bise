@@ -226,11 +226,10 @@ def refuse_real_skills(index):
 
 def real_run_dirs():
     """The run folders of the user's own sessions: the caller's
-    $BEND_RUN_DIR and the defaults of his HOME (~/.bise/run,
-    ~/.bend-harness/run) and of his $BISE_HOME."""
+    $BEND_RUN_DIR and the default of his HOME (~/.bise/run) and of
+    his $BISE_HOME."""
     home = os.path.expanduser("~")
-    dirs = [os.environ.get("BEND_RUN_DIR"), os.path.join(home, ".bise", "run"),
-            os.path.join(home, ".bend-harness", "run")]
+    dirs = [os.environ.get("BEND_RUN_DIR"), os.path.join(home, ".bise", "run")]
     if os.environ.get("BISE_HOME"):
         dirs.append(os.path.join(os.environ["BISE_HOME"], "run"))
     return [os.path.realpath(d) for d in dirs if d]

@@ -227,44 +227,6 @@ pub(crate) fn keys_check(found: &[(String, String)]) -> Check {
     ok("keys", list.join(", "))
 }
 
-/// The migration line from migrated.json (None: not moved yet).
-/// `legacy`: `~/.bend-harness` or `~/.local/state/switchboard` exists.
-pub(crate) fn migration_check(
-    marker: Option<&serde_json::Value>,
-    explicit_home: bool,
-    no_migrate: bool,
-    legacy: bool,
-) -> Check {
-    let Some(v) = marker else {
-        return if explicit_home {
-            ok("migration", "not needed (BISE_HOME is set: never filled from the old places)")
-        } else if !legacy {
-            ok("migration", "nothing to move (no ~/.bend-harness nor ~/.local/state/switchboard)")
-        } else if no_migrate {
-            warn("migration", "not done (BISE_NO_MIGRATE is set)", "unset BISE_NO_MIGRATE and start bise once")
-        } else {
-            warn("migration", "not done: state still in ~/.bend-harness and ~/.local/state/switchboard", "start `bise` once: it moves them to ~/.bise")
-        };
-    };
-    let n = |k: &str| v.get(k).and_then(|x| x.as_array()).map_or(0, |a| a.len());
-    let waiting = n("hubs_waiting");
-    let errors = n("errors");
-    let detail = format!(
-        "done: {} copied, {} hubs moved, {} waiting (running in the old place), {} errors",
-        n("copied"),
-        n("hubs_moved"),
-        waiting,
-        errors
-    );
-    if errors > 0 {
-        warn("migration", detail, "see `errors` in ~/.bise/migrated.json")
-    } else if waiting > 0 {
-        warn("migration", detail, "those hubs move at their next restart (`/restart` or `bise switchboard --stop`)")
-    } else {
-        ok("migration", detail)
-    }
-}
-
 // ---- probes of this machine ----
 
 fn run(cmd: &str, args: &[&str]) -> Option<String> {
@@ -350,55 +312,21 @@ fn home_check(home: &bise_home::Home) -> Check {
     } else {
         "default"
     };
-    match home.layout() {
-        // a fresh HOME: nothing in the old places either (qa C)
-        bise_home::Layout::Legacy if !legacy_found(home) => warn(
-            "home",
-            format!("{} does not exist yet", home.user_home().join(".bise").display()),
-            "start `bise` once",
-        ),
-        bise_home::Layout::Legacy => warn(
-            "home",
-            format!("old layout: {} + ~/.local/state/switchboard", root.display()),
-            "start `bise` once: it moves the state to ~/.bise",
-        ),
-        bise_home::Layout::Bise if !root.is_dir() => {
-            warn("home", format!("{} ({}) does not exist yet", root.display(), how), "start `bise` once")
-        }
-        bise_home::Layout::Bise => {
-            let has = |p: PathBuf| if p.exists() { "✓" } else { "-" };
-            ok(
-                "home",
-                format!(
-                    "{} ({}): config.toml {}, auth.json {}, hubs/ {}, sessions/ {}",
-                    root.display(),
-                    how,
-                    has(home.config_file()),
-                    has(home.auth_file()),
-                    has(home.hubs_dir()),
-                    has(home.sessions_dir())
-                ),
-            )
-        }
+    if !root.is_dir() {
+        return warn("home", format!("{} ({}) does not exist yet", root.display(), how), "start `bise` once");
     }
-}
-
-/// The old places of this HOME exist (what the migration would read).
-fn legacy_found(home: &bise_home::Home) -> bool {
-    let u = home.user_home();
-    u.join(".bend-harness").exists() || u.join(".local/state/switchboard").exists()
-}
-
-fn migration(home: &bise_home::Home) -> Check {
-    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    let marker = std::fs::read_to_string(home.user_home().join(".bise").join(bise_home::MIGRATED))
-        .ok()
-        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-    migration_check(
-        marker.as_ref(),
-        env(bise_home::BISE_HOME).is_some(),
-        env(bise_home::migrate::NO_MIGRATE).is_some(),
-        legacy_found(home),
+    let has = |p: PathBuf| if p.exists() { "✓" } else { "-" };
+    ok(
+        "home",
+        format!(
+            "{} ({}): config.toml {}, auth.json {}, hubs/ {}, sessions/ {}",
+            root.display(),
+            how,
+            has(home.config_file()),
+            has(home.auth_file()),
+            has(home.hubs_dir()),
+            has(home.sessions_dir())
+        ),
     )
 }
 
@@ -758,29 +686,15 @@ fn hubs(home: &bise_home::Home) -> Check {
     } else {
         format!("none for {} (`{}` starts one)", paths.workspace.display(), bise_catalog::CLI)
     };
-    let count = |dir: &Path| -> usize {
-        std::fs::read_dir(dir)
-            .map(|rd| {
-                rd.flatten()
-                    .filter(|e| bise_home::migrate::is_hub_id(&e.file_name().to_string_lossy()))
-                    .filter(|e| e.path().is_dir() && switchboard::switch::hub_busy(&e.path()))
-                    .count()
-            })
-            .unwrap_or(0)
-    };
-    let new = count(&home.hubs_dir());
-    let old_dir = home.user_home().join(".local/state/switchboard");
-    let old = if old_dir == home.hubs_dir() { 0 } else { count(&old_dir) };
-    let detail = format!("{}; {} running in {}, {} in the old place", here, new, home.hubs_dir().display(), old);
+    let running = std::fs::read_dir(home.hubs_dir())
+        .map(|rd| rd.flatten().filter(|e| e.path().is_dir() && switchboard::switch::hub_busy(&e.path())).count())
+        .unwrap_or(0);
+    let detail = format!("{}; {} running in {}", here, running, home.hubs_dir().display());
     let socket = socket_check(&paths.natural_socket());
     if socket.mark == Mark::Fail {
         return socket;
     }
-    if old > 0 && home.layout() == bise_home::Layout::Bise {
-        warn("hubs", detail, "they move to ~/.bise at their next restart")
-    } else {
-        ok("hubs", detail)
-    }
+    ok("hubs", detail)
 }
 
 fn disk(home: &bise_home::Home) -> Check {
@@ -824,7 +738,6 @@ pub(crate) fn main(args: &[String]) -> i32 {
     checks.extend([
         on_path(),
         home_check(&home),
-        migration(&home),
         git(),
         rg(),
         github(),
@@ -1037,34 +950,18 @@ mod tests {
         assert!(s.catalog.warnings.iter().any(|w| w.contains("rename it compaction_threshold")), "{:?}", s.catalog.warnings);
     }
 
-    /// qa C: a fresh HOME is not an "old layout".
+    /// qa C: a fresh HOME says to start bise once.
     #[test]
-    fn a_fresh_home_is_not_an_old_layout() {
+    fn a_fresh_home_says_to_start_bise() {
         let d = std::env::temp_dir().join(format!("doctor-fresh-{}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
         let hs = d.to_string_lossy().into_owned();
         let home = bise_home::Home::from_lookup(&|k: &str| (k == "HOME").then(|| hs.clone()));
         let c = home_check(&home);
-        assert!(c.detail.contains(".bise does not exist yet") && !c.detail.contains("old layout"), "{c:?}");
-        std::fs::create_dir_all(d.join(".bend-harness")).unwrap();
-        assert!(home_check(&home).detail.contains("old layout"));
+        assert!(c.mark == Mark::Warn && c.detail.contains(".bise (default) does not exist yet"), "{c:?}");
+        std::fs::create_dir_all(d.join(".bise")).unwrap();
+        assert_eq!(home_check(&home).mark, Mark::Ok);
         let _ = std::fs::remove_dir_all(&d);
-    }
-
-    #[test]
-    fn migration_states() {
-        let done = serde_json::json!({"copied": ["a", "b"], "hubs_moved": ["h"], "hubs_waiting": [], "errors": []});
-        let c = migration_check(Some(&done), false, false, true);
-        assert_eq!(c.mark, Mark::Ok);
-        assert!(c.detail.contains("2 copied, 1 hubs moved, 0 waiting"), "{}", c.detail);
-        let waiting = serde_json::json!({"copied": [], "hubs_moved": [], "hubs_waiting": ["x"], "errors": []});
-        assert_eq!(migration_check(Some(&waiting), false, false, true).mark, Mark::Warn);
-        assert_eq!(migration_check(None, true, false, true).mark, Mark::Ok);
-        assert_eq!(migration_check(None, false, false, true).mark, Mark::Warn);
-        // qa C: a fresh HOME has nothing to move
-        let fresh = migration_check(None, false, false, false);
-        assert_eq!(fresh.mark, Mark::Ok);
-        assert!(fresh.detail.contains("nothing to move"), "{}", fresh.detail);
     }
 
     #[test]

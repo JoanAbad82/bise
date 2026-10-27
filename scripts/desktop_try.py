@@ -113,18 +113,12 @@ def read_pid(path):
 
 
 def build_dir(env):
-    """His build dir, as scripts/bins.sh and desktop_app.py pick it: BISE_HOME/dev, else ~/.bise/dev once
-    migrated, else ~/.local/state/switchboard; /build. Pure but for the migrated check."""
+    """His build dir, as scripts/bins.sh and desktop_app.py pick it: BISE_HOME/dev, else ~/.bise/dev;
+    /build. Pure."""
     if env.get("SB_BUILD_DIR"):
         return env["SB_BUILD_DIR"]
     home = env.get("HOME") or os.path.expanduser("~")
-    if env.get("BISE_HOME"):
-        state = os.path.join(env["BISE_HOME"], "dev")
-    elif os.path.exists(os.path.join(home, ".bise", "migrated.json")):
-        state = os.path.join(home, ".bise", "dev")
-    else:
-        state = os.path.join(home, ".local", "state", "switchboard")
-    return os.path.join(state, "build")
+    return os.path.join(env.get("BISE_HOME") or os.path.join(home, ".bise"), "dev", "build")
 
 
 def try_paths(env, desktop=DESKTOP):

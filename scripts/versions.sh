@@ -28,10 +28,9 @@
 #                                        # those a hub marks or runs (after
 #                                        # each new build too)
 #
-# Defaults: SB_VERSIONS_DIR=~/.local/state/switchboard/versions; the
-# cargo target dir and bins.sh's cache of the Bend binaries (one per
-# source hash, a Bend compile is 1-2 min) live in
-# SB_BUILD_DIR=~/.local/state/switchboard/build.
+# Defaults: SB_VERSIONS_DIR=~/.bise/dev/versions; the cargo target dir
+# and bins.sh's cache of the Bend binaries (one per source hash, a Bend
+# compile is 1-2 min) live in SB_BUILD_DIR=~/.bise/dev/build.
 # Commits are built in a temporary git worktree under /tmp (removed after),
 # into one cargo target (target-commits) whose unchanged crates are kept
 # (scripts/cargo_mtimes.py); bins.sh's misses compile beside the cargo build.
@@ -39,11 +38,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
-# the same dirs as bise_home (rust/home): $BISE_HOME/dev, ~/.bise/dev once
-# migrated, else today's ~/.local/state/switchboard (XDG_STATE_HOME unread)
-if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
-elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
-else STATE="$HOME/.local/state/switchboard"; fi
+# the same dir as bise_home (rust/home): $BISE_HOME/dev, else ~/.bise/dev
+STATE="${BISE_HOME:-$HOME/.bise}/dev"
 VERSIONS="${SB_VERSIONS_DIR:-$STATE/versions}"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 BINS_ALSO=""
@@ -197,12 +193,10 @@ build_from() {
   # ~60 MB, the debug one was 110 MB, 93% of a version), from bins.sh's
   # cache (one per jsrt source hash): a hard link, so the versions of one
   # engine share it. $tmp/bend-jsrt: the harness passes it to the runtime
-  # (BEND_JSRT_BIN); the same file at the old path too: a runtime before
-  # BISE-114 (an old commit) runs rust/jsrt/target/debug/bend-jsrt
+  # (BEND_JSRT_BIN)
   local js jk; jk="$("$REPO/scripts/bins.sh" key --src "$src" bend-jsrt)"
   js="$(bin_path "$src" bend-jsrt)"
   ln -f "$js" "$tmp/bend-jsrt" 2>/dev/null || cp -c "$js" "$tmp/bend-jsrt" 2>/dev/null || cp "$js" "$tmp/bend-jsrt"
-  ln -f "$tmp/bend-jsrt" "$tmp/rust/jsrt/target/debug/bend-jsrt"
 
   {
     echo "id=$id"
@@ -223,15 +217,14 @@ build_from() {
 
 # the ids of the versions the hubs name: their marks (versions.json:
 # current, good, previous, failed) and the root each one runs (hub.root),
-# in the legacy state dir and in ~/.bise/hubs; one per line (the last
-# component of every path in them). No `[ -f ] && ...` as the loop's last
-# command: with pipefail a missing last file (always $STATE/*/hub.root in
-# the bise layout) failed the pipe, set -e ended prune, and the build
+# in ~/.bise/hubs; one per line (the last component of every path in
+# them). No `[ -f ] && ...` as the loop's last command: with pipefail a
+# missing last file (always $STATE/*/hub.root) failed the pipe, set -e
+# ended prune, and the build
 # exited 1 after "built": the hub did not switch (bug-restart)
 marks() {
   local h="${BISE_HOME:-$HOME/.bise}" f
-  for f in "$HOME/.local/state/switchboard"/*/versions.json "$HOME/.local/state/switchboard"/*/hub.root \
-           "$h"/hubs/*/versions.json "$h"/hubs/*/hub.root "$STATE"/*/versions.json "$STATE"/*/hub.root; do
+  for f in "$h"/hubs/*/versions.json "$h"/hubs/*/hub.root "$STATE"/*/versions.json "$STATE"/*/hub.root; do
     if [ -f "$f" ]; then cat "$f"; echo; fi
   done | tr '",{}' '\n\n\n\n' | sed -n 's|^.*/\([^/]*\)/*$|\1|p'
 }

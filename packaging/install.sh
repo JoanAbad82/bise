@@ -37,8 +37,7 @@
 #   $BIN_DIR/bise -> $PREFIX/bin/bise
 # Defaults: PREFIX=~/.local/share/bise, BIN_DIR=~/.local/bin.
 # Your data is never inside $PREFIX: ~/.bise (keys, config, hubs,
-# sessions) and the older ~/.bend-harness, ~/.local/state/switchboard
-# survive an uninstall unless --purge.
+# sessions) survives an uninstall unless --purge.
 
 set -eu
 
@@ -120,12 +119,8 @@ running_hubs() {
 
 # ---- the dev channel (--dev): a launcher that follows a dev hub ----
 # The dev state dir, the rule of versions.sh and bise_home: $BISE_HOME/dev,
-# ~/.bise/dev once migrated, else ~/.local/state/switchboard.
-dev_dir() {
-  if [ -n "${BISE_HOME:-}" ]; then echo "$BISE_HOME/dev"
-  elif [ -e "$HOME/.bise/migrated.json" ]; then echo "$HOME/.bise/dev"
-  else echo "$HOME/.local/state/switchboard"; fi
-}
+# else ~/.bise/dev.
+dev_dir() { echo "${BISE_HOME:-$HOME/.bise}/dev"; }
 if [ "$DEV" = 1 ]; then
   DEV_DIR="$(dev_dir)"
   LAUNCHER="$DEV_DIR/bin/$CMD"
@@ -150,7 +145,7 @@ if [ "$DEV" = 1 ]; then
     done
   done
   [ -n "$any" ] || die "no version built in $VERSIONS: run '$REPO/scripts/versions.sh build' first"
-  state="$(cd "$REPO" && env -u SB_STATE_DIR BISE_NO_MIGRATE=1 SB_LAUNCH_DIR="$REPO" \
+  state="$(cd "$REPO" && env -u SB_STATE_DIR SB_LAUNCH_DIR="$REPO" \
     "$any" switchboard --state-dir --workspace "$REPO" 2>/dev/null)" || die "$any cannot name the hub of $REPO"
   HUB="$(basename "$state")"
   case "$HUB" in *-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;; *) die "odd hub id: $HUB" ;; esac
@@ -169,9 +164,7 @@ HUB='$HUB'
 EOF
   cat >> "$LAUNCHER.tmp" <<'EOF'
 CMD="$(basename "$0")"
-if [ -n "${BISE_HOME:-}" ]; then home="$BISE_HOME"; dev="$BISE_HOME/dev"
-elif [ -e "$HOME/.bise/migrated.json" ]; then home="$HOME/.bise"; dev="$HOME/.bise/dev"
-else home=""; dev="$HOME/.local/state/switchboard"; fi
+home="${BISE_HOME:-$HOME/.bise}"; dev="$home/dev"
 versions="${SB_VERSIONS_DIR:-$dev/versions}"
 runnable() { [ -x "$1/bise" ] || [ -x "$1/bend-harness" ]; }
 pick() {
@@ -181,20 +174,17 @@ pick() {
     done
     echo "$CMD: BISE_DEV_VERSION=$BISE_DEV_VERSION: no such version in $versions" >&2; return 1
   fi
-  # the hub's folder: ~/.bise/hubs, else the old place (a hub that has
-  # not moved yet: it was running when ~/.bise was made)
-  for d in ${home:+"$home/hubs/$HUB"} "$HOME/.local/state/switchboard/$HUB"; do
-    [ -f "$d/versions.json" ] || continue
+  # the hub's folder: ~/.bise/hubs/<id>
+  d="$home/hubs/$HUB"
+  if [ -f "$d/versions.json" ]; then
     for k in current good; do
       v="$(sed -n "s/.*\"$k\" *: *\"\([^\"]*\)\".*/\1/p" "$d/versions.json")"
       [ -n "$v" ] && runnable "$v" && { echo "$v"; return 0; }
     done
-  done
+  fi
   # a hub that never switched has no versions.json: the root it runs
-  for d in ${home:+"$home/hubs/$HUB"} "$HOME/.local/state/switchboard/$HUB"; do
-    v="$(cat "$d/hub.root" 2>/dev/null)"
-    [ -n "$v" ] && runnable "$v" && { echo "$v"; return 0; }
-  done
+  v="$(cat "$d/hub.root" 2>/dev/null)"
+  [ -n "$v" ] && runnable "$v" && { echo "$v"; return 0; }
   for d in $(ls -t "$versions/" 2>/dev/null); do
     case "$d" in .*) continue ;; esac
     runnable "$versions/$d" && { echo "$versions/$d"; return 0; }
@@ -261,10 +251,10 @@ if [ "$ACTION" = uninstall ]; then
     fi
   done
   if [ "$PURGE" = 1 ]; then
-    rm -rf "${BISE_HOME:-$HOME/.bise}" "$HOME/.bend-harness" "$HOME/.local/state/switchboard"
-    say "purged ~/.bise, ~/.bend-harness and ~/.local/state/switchboard (keys, config, hubs, sessions)"
+    rm -rf "${BISE_HOME:-$HOME/.bise}"
+    say "purged ~/.bise (keys, config, hubs, sessions)"
   else
-    say "kept your data: ~/.bise (and ~/.bend-harness, ~/.local/state/switchboard if any; --purge removes them)"
+    say "kept your data: ~/.bise (--purge removes it)"
   fi
   say "uninstalled"
   exit 0

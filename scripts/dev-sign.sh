@@ -38,9 +38,7 @@
 # binary, or a hard link to it, keeps its own.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
-elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
-else STATE="$HOME/.local/state/switchboard"; fi
+STATE="${BISE_HOME:-$HOME/.bise}/dev"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 DIR="${BISE_SIGN_DIR:-$BUILD/ambient/sign}"
 KC="$DIR/sign.keychain-db"

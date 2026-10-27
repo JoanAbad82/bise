@@ -39,11 +39,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE" && git rev-parse --show-toplevel)"
-# the same dirs as bise_home (rust/home): $BISE_HOME/dev, ~/.bise/dev once
-# migrated, else today's ~/.local/state/switchboard (XDG_STATE_HOME unread)
-if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
-elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
-else STATE="$HOME/.local/state/switchboard"; fi
+# the same dir as bise_home (rust/home): $BISE_HOME/dev, else ~/.bise/dev
+STATE="${BISE_HOME:-$HOME/.bise}/dev"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 export PATH="$HOME/.cargo/bin:$HOME/.bend/bin:$PATH"
 # never the dev identity nor its bise.app (dev-sign.sh is for this Mac's

@@ -131,16 +131,16 @@ fn voice_mode_is_off_by_default_and_the_env_overrides() {
 
 #[test]
 fn saving_keeps_the_other_settings() {
-    // the old layout: ~/.bend-harness/tui.json, the theme's key kept
+    // prefs.json, the theme's key kept
     let d = std::env::temp_dir().join(format!("bise-voice-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     let hs = d.to_string_lossy().to_string();
     let h = bise_home::Home::from_lookup(&|k: &str| (k == "HOME").then(|| hs.clone()));
-    let tui = d.join(".bend-harness/tui.json");
-    std::fs::create_dir_all(tui.parent().unwrap()).unwrap();
-    std::fs::write(&tui, r#"{"theme": "dark"}"#).unwrap();
+    let prefs = d.join(".bise/prefs.json");
+    std::fs::create_dir_all(prefs.parent().unwrap()).unwrap();
+    std::fs::write(&prefs, r#"{"theme": "dark"}"#).unwrap();
     h.pref(bise_home::Pref::Voice).set(true.into()).unwrap();
-    let v: Value = serde_json::from_str(&std::fs::read_to_string(&tui).unwrap()).unwrap();
+    let v: Value = serde_json::from_str(&std::fs::read_to_string(&prefs).unwrap()).unwrap();
     assert_eq!(v, serde_json::json!({"theme": "dark", "voice_mode_enabled": true}));
     let _ = std::fs::remove_dir_all(&d);
 }

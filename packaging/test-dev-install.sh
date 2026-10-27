@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # test-dev-install.sh — the dev channel (install.sh --dev, BISE-129) in a
-# CLEAN fake HOME: the real ~/.bise, ~/.local/state/switchboard and live
-# hubs are never touched.
+# CLEAN fake HOME: the real ~/.bise and live hubs are never touched.
 #
 #   packaging/test-dev-install.sh <version dir> [<version dir>]
 #
@@ -39,7 +38,6 @@ cleanup() {
 cleanup
 rm -rf "$T" "$REPO" "/tmp/bd ws"
 mkdir -p "$T/.bise/dev/versions" "$WS" "$REPO"
-echo '{"version":1}' > "$T/.bise/migrated.json"   # the ~/.bise layout
 # APFS clones: 0 bytes, ~1 s
 cp -cR "$V1" "$T/.bise/dev/versions/v1"
 if [ "$V2" != "$V1" ]; then cp -cR "$V2" "$T/.bise/dev/versions/v2"; else cp -cR "$V1" "$T/.bise/dev/versions/v2"; fi

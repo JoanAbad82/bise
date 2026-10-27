@@ -39,8 +39,6 @@ def main():
     versions = os.path.join(bise, "dev", "versions")
     os.makedirs(os.path.join(bise, "hubs", "h1"))
     os.makedirs(os.path.join(bise, "dev", "build"))
-    with open(os.path.join(bise, "migrated.json"), "w") as f:
-        f.write("{}\n")
     # v0 oldest ... v6 newest
     for i in range(7):
         d = os.path.join(versions, "v%d" % i)

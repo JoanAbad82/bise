@@ -24,8 +24,7 @@
 # A hit is a copy (~0.3 s); a miss is a bend compile (sb-core ~15 s,
 # the REPLs 1-2 min, bend-jsrt a cargo build --release: ~1 min warm,
 # ~5 min cold). Cache: $SB_BUILD_DIR/cache/<name>-<key> (default
-# SB_BUILD_DIR=<bise dev dir>/build: ~/.local/state/switchboard/build
-# until the state moves to ~/.bise, BISE-160); of each name, the 3 newest
+# SB_BUILD_DIR=<bise dev dir>/build: ~/.bise/dev/build); of each name, the 3 newest
 # and those used in the last hour are kept (BISE-133; a hit touches its
 # file). bend-jsrt: `path` and `key` only (a dev tree runs its debug
 # build, run.sh keeps it fresh; a bend-jsrt at the root would win over
@@ -36,11 +35,8 @@
 # exported for the compile (bend -o calls cc) and part of the key.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-# the same dirs as bise_home (rust/home): $BISE_HOME/dev, ~/.bise/dev once
-# migrated, else today's ~/.local/state/switchboard (XDG_STATE_HOME unread)
-if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
-elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
-else STATE="$HOME/.local/state/switchboard"; fi
+# the same dir as bise_home (rust/home): $BISE_HOME/dev, else ~/.bise/dev
+STATE="${BISE_HOME:-$HOME/.bise}/dev"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 CACHE="$BUILD/cache"
 # the toolchains of the user's REAL home (the user database, never $HOME):

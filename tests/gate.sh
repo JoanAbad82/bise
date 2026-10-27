@@ -84,8 +84,7 @@
 # gate"); one seed build per deps key (the other tasks wait, then clone it).
 # The gate dir: ~/.bise/gate ($BISE_HOME/gate), writable in auto's sandbox
 # (approvals-design.md §7) and short (the test hubs' sockets live under it:
-# an agent's $TMPDIR is too deep for a unix socket path); /tmp/bise-gate-
-# where there is no ~/.bise yet.
+# an agent's $TMPDIR is too deep for a unix socket path).
 # Each quick/full/rerun keeps its output (stdout and stderr, teed) in
 # <gate dir>/logs/<mode>-<epoch>-<pid>.log for 7 days, first line "# gate
 # <mode> agent=<SB_AGENT> sha=<HEAD> start=<epoch> root=<repo>", last "#
@@ -120,11 +119,8 @@ share_machine() {
   return 0
 }
 # the bise home, and the warm seeds of gate.sh new (one per deps key)
-bise_home() {
-  if [ -n "${BISE_HOME:-}" ]; then echo "$BISE_HOME"
-  elif [ -f "$HOME/.bise/migrated.json" ]; then echo "$HOME/.bise"; fi
-}
-seeds_dir() { local h; h="$(bise_home)"; echo "${h:-$HOME/.bend-harness}/cache/gate-seed"; }
+bise_home() { echo "${BISE_HOME:-$HOME/.bise}"; }
+seeds_dir() { echo "$(bise_home)/cache/gate-seed"; }
 seed_key() {  # in the repo root: the deps' key (Cargo.lock, Cargo.tomls, cargo config, rustc)
   { cat rust/Cargo.lock rust/.cargo/config.toml $(git ls-files 'rust/Cargo.toml' 'rust/*/Cargo.toml'); rustc -vV; } | shasum | cut -c1-12
 }
@@ -137,11 +133,7 @@ proc_start() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' _; }
 # the gate dir: runs <gpre><pid> (each with .owner, its start, and .root, its
 # checkout), the lock, a red step's log
 gate_dirs() {
-  if [ -n "${BISE_HOME:-}" ] || [ -f "$HOME/.bise/migrated.json" ]; then
-    gdir="${BISE_HOME:-$HOME/.bise}/gate" gpre="${BISE_HOME:-$HOME/.bise}/gate/"
-  else
-    gdir=/tmp gpre=/tmp/bise-gate-
-  fi
+  gdir="${BISE_HOME:-$HOME/.bise}/gate" gpre="${BISE_HOME:-$HOME/.bise}/gate/"
 }
 # gate.sh stop: the gates running in checkout $1 (a run whose .root is it and
 # whose pid still runs with the start in .owner) get a TERM; each one's exit
@@ -315,10 +307,7 @@ if [ "$mode" = new ] || [ "$mode" = done ]; then
   cd "$(git rev-parse --show-toplevel 2>/dev/null || echo "$(dirname "$0")/..")" || exit 1
   # the main worktree (the shared tree), even from a task's detached one
   main="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
-  if [ -n "${BISE_HOME:-}" ]; then home="$BISE_HOME"
-  elif [ -f "$HOME/.bise/migrated.json" ]; then home="$HOME/.bise"
-  else home=""; fi
-  wtroot="${home:-$HOME/.local/state/switchboard}/worktrees"
+  wtroot="$(bise_home)/worktrees"
   seeds="$(seeds_dir)"
   # the project's id, as the hub computes it (switchboard::paths::workspace_id,
   # pinned by its test ids_match_the_python_copies)
@@ -541,7 +530,7 @@ gate_dirs
 mkdir -p "$gdir"
 # what a run's processes name in their command line: its folder (a /tmp
 # one without /tmp: python may show it as /private/tmp)
-gate_mark() { case "$1" in /tmp/bise-gate-*) echo "/bise-gate-${1##*-}/" ;; *) echo "$1/" ;; esac; }
+gate_mark() { echo "$1/"; }
 # a red or dead run's folder: only run_all's logs stay (sb-run-all.*)
 gate_prune() {
   find "$1" -mindepth 1 -maxdepth 1 ! -name 'sb-run-all.*' ! -name .owner -exec rm -rf {} + 2>/dev/null
@@ -550,7 +539,7 @@ gate_prune() {
   done
   return 0
 }
-for d in "$gpre"[0-9]* /tmp/bise-gate-[0-9]*; do
+for d in "$gpre"[0-9]*; do
   [ -z "$nested" ] && [ -d "$d" ] || continue
   p="${d##*[-/]}"
   kill -0 "$p" 2>/dev/null && [ "$(proc_start "$p")" = "$(cat "$d/.owner" 2>/dev/null)" ] && continue

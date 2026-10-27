@@ -483,7 +483,7 @@ def approval_no_in_both_forms():
 
 @test
 def real_home_env_finds_its_hub_by_his_rules():
-    """a throwaway home's hub env (world.py): the isolated HOME and none of the overrides that would tell it where its state is; the home has ~/.bise/migrated.json like his Mac"""
+    """a throwaway home's hub env (world.py): the isolated HOME and none of the overrides that would tell it where its state is; the home has ~/.bise like his Mac"""
     home = tempfile.mkdtemp(prefix="rh-")
     his_bin = os.path.expanduser("~/.bise/hubs/harness-1/bin")
     env = {"SB_STATE_DIR": "/x", "BEND_SESSIONS_DIR": "/y", "BISE_HOME": "/z", "BISE_EXPORTS_FOR": "s", "BEND_PROVIDER_URL": "http://f",
@@ -493,7 +493,7 @@ def real_home_env_finds_its_hub_by_his_rules():
     check(env == {"HOME": home, "BEND_PROVIDER_URL": "http://f", "BEND_RUN_DIR": os.path.join(home, ".bise", "run"),
                   "TMPDIR": t, "TMP": t, "TEMP": t, "TMUX_TMPDIR": t, "PATH": "/usr/bin:/bin"},
           "env: his run dir, an agent's tmp and his hub's bin never reach a throwaway hub: %r" % env)
-    check(os.path.exists(os.path.join(home, ".bise", "migrated.json")), "migrated.json")
+    check(os.path.isdir(os.path.join(home, ".bise")), "~/.bise")
     shutil.rmtree(home, ignore_errors=True)
 
 

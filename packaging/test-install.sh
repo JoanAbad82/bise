@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-install.sh — install a tarball from build-dist.sh into a CLEAN
 # fake HOME and check it runs. Everything happens under /tmp: the real
-# ~/.bend-harness, ~/.bise, ~/.local/state/switchboard and live hubs are never touched.
+# ~/.bise and live hubs are never touched.
 #
 #   packaging/test-install.sh <tarball>
 #

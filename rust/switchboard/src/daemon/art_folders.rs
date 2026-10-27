@@ -31,7 +31,7 @@ pub(super) struct LibCache {
 }
 
 fn mtime() -> Option<SystemTime> {
-    let f = bise_home::Home::from_env().library_folders()?;
+    let f = bise_home::Home::from_env().library_folders();
     std::fs::metadata(f).ok()?.modified().ok()
 }
 

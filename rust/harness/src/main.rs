@@ -16,7 +16,7 @@
 //! Usage: see USAGE below (`bise help`).
 //!
 //! BEND_SESSIONS_DIR overrides the sessions directory (default
-//! ~/.bend-harness/sessions) - the ONLY thing the programmatic client
+//! ~/.bise/sessions) - the ONLY thing the programmatic client
 //! changes, so its test sessions never become the user's --continue.
 //!
 //! /reload (sent by the client, between turns) exits the Bend REPL
@@ -413,18 +413,6 @@ fn run_switchboard(args: &[String], debug: bool) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Once: the old places (~/.bend-harness, ~/.local/state/switchboard) to
-/// ~/.bise; every start: the hubs that stopped since (bise_home::migrate).
-/// What happened goes in ~/.bise/migrated.json; a failure never stops a start.
-fn migrate_home() {
-    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    if !bise_home::migrate::wanted(&env) {
-        return;
-    }
-    let user = bise_home::Home::from_env().user_home().to_path_buf();
-    let _ = bise_home::migrate(&user, &switchboard::switch::hub_busy);
-}
-
 /// `bise help`: (section, [(command, what it does)]); `{cmd}` is the
 /// name it was called by.
 const HELP: &[(&str, &[(&str, &str)])] = &[
@@ -522,15 +510,9 @@ fn run_main() -> std::io::Result<()> {
     bend_tui::install_crash_hook();
     {
         let args: Vec<String> = cli_args();
-        // the move to ~/.bise (BISE-161): by the commands that open a hub
-        // or a session, before any path is computed; never by `sb` (an
-        // agent's tool) nor the switcher (mid-switch). login/logout too:
-        // a key stored on a fresh HOME goes straight to ~/.bise (qa C)
+        // the commands that open a hub or a session
         let opens = matches!(args.first().map(String::as_str), None | Some("switchboard" | "sbd"))
             || args.iter().any(|a| a == "--headless");
-        if opens || matches!(args.first().map(String::as_str), Some("login" | "logout")) {
-            migrate_home();
-        }
         // every state path, decided once (bise_home) and exported before any
         // thread or child: the Bend runtime, the hub, the agents and older
         // versions read these variables instead of computing their own
@@ -693,20 +675,13 @@ fn run_main() -> std::io::Result<()> {
     };
 
     // session persistence, codex-style: every fresh run checkpoints to
-    // its OWN file (~/.bend-harness/sessions/<id>.txt, id = UTC timestamp
-    // + pid), --continue resumes the file with the LATEST mtime (the
-    // session that received the last message), --resume <id> one exact
-    // session (a unique id prefix is accepted). The single fixed file
-    // of the old scheme is the fallback when no per-session file exists
-    // yet (back-compat with the pre-sessions checkpoint).
+    // its OWN file (~/.bise/sessions/<id>.txt, id = UTC timestamp + pid),
+    // --continue resumes the file with the LATEST mtime (the session that
+    // received the last message), --resume <id> one exact session (a
+    // unique id prefix is accepted).
     let home = bise_home::Home::from_env();
     let sessions_dir = home.sessions_dir().to_string_lossy().into_owned();
     let _ = std::fs::create_dir_all(&sessions_dir);
-    let legacy_file = home
-        .root()
-        .join(format!("session-{}.txt", repl_name))
-        .to_string_lossy()
-        .into_owned();
     let session_file = if let Some(id) = &resume_id {
         match resolve_session(&sessions_dir, id) {
             Ok(path) => path,
@@ -718,13 +693,8 @@ fn run_main() -> std::io::Result<()> {
         }
     } else if resume {
         latest_session(&sessions_dir).unwrap_or_else(|| {
-            if std::path::Path::new(&legacy_file).exists() {
-                eprintln!("--continue: no named session, resuming the legacy checkpoint");
-                legacy_file.clone()
-            } else {
-                eprintln!("--continue: no session to resume, new session");
-                new_session_path(&sessions_dir)
-            }
+            eprintln!("--continue: no session to resume, new session");
+            new_session_path(&sessions_dir)
         })
     } else {
         new_session_path(&sessions_dir)

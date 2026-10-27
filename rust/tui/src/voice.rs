@@ -349,7 +349,7 @@ pub fn fail_lines(f: &Failure, provider: &str, model: &str, billing_url: &str, k
     FailLines { glyph, head, dim }
 }
 
-// ---- settings (the `voice` preference: bise_home, prefs.json or ~/.bend-harness/tui.json) ----
+// ---- settings (the `voice` preference: bise_home, prefs.json) ----
 
 fn settings() -> bise_home::Slot {
     bise_home::Home::from_env().pref(bise_home::Pref::Voice)

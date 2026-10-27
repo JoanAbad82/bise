@@ -344,11 +344,8 @@ def desktop_pick(changed, cov, all_list, specs, tree=None):
 
 
 def gate_dir():
-    """gate.sh's gate dir: <BISE_HOME>/gate, or /tmp before ~/.bise exists."""
-    h = os.environ.get("BISE_HOME")
-    if not h and os.path.isfile(os.path.expanduser("~/.bise/migrated.json")):
-        h = os.path.expanduser("~/.bise")
-    return os.path.join(h, "gate") if h else "/tmp"
+    """gate.sh's gate dir: <BISE_HOME>/gate (~/.bise/gate)."""
+    return os.path.join(os.environ.get("BISE_HOME") or os.path.expanduser("~/.bise"), "gate")
 
 
 def nightly_days(home=None):

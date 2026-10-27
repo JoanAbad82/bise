@@ -15,9 +15,9 @@ set -u
 CAND_ARGS=("$@")
 SMOKE=; [ "${1:-}" = --smoke ] && { SMOKE=1; shift; }
 O=${1:?out dir}; A=${2:?candidate app}; mkdir -p "$O"
-# the RESOLVED path (ambient-lead m_20102): ~/.bise/dev/build is a symlink to
-# ~/.local/state/switchboard/build and the processes carry the resolved one, so a lookup by the
-# given path missed the main process and the stop left 4 processes (724c0bb9's first run)
+# the RESOLVED path (ambient-lead m_20102): a path through a symlink and the processes carry
+# the resolved one, so a lookup by the given path missed the main process and the stop left 4
+# processes (724c0bb9's first run)
 A=$(cd "$A" && pwd -P) || { echo "no $2"; exit 2; }
 P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)

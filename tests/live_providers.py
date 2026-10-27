@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One real tool-call turn per provider whose API key is set (BISE-153).
 Costs real tokens: never in run_all.sh. A provider with no key is
-skipped. Keys come from the env, then ~/.bend-harness/.env and
+skipped. Keys come from the env, then ~/.bise/.env and
 ~/.vibe/.env (like the harness).
 
   live_providers.py                 # the harness (repl-live) on each provider
@@ -59,7 +59,7 @@ SCHEMA = {"type": "object", "properties": {"arg": {"type": "string", "descriptio
 
 def keys_env():
     env = dict(os.environ)
-    for f in (os.path.expanduser("~/.bend-harness/.env"), os.path.expanduser("~/.vibe/.env")):
+    for f in (os.path.expanduser("~/.bise/.env"), os.path.expanduser("~/.vibe/.env")):
         if os.path.exists(f):
             for line in open(f):
                 k, sep, v = line.strip().partition("=")

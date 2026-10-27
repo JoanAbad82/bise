@@ -219,7 +219,7 @@ fn the_file_keeps_unknown_keys() {
 fn update_writes_one_file_and_refuses_a_bad_change() {
     let home = tmp("update");
     let id = update(&home, true, |l| Ok(new(make(l, "docs", None, YOU)).id)).unwrap();
-    assert_eq!(home.library_folders(), Some(home.root().join("library/folders.json")));
+    assert_eq!(home.library_folders(), home.root().join("library/folders.json"));
     assert_eq!(read(&home).folders[0].id, id);
     let e = update(&home, true, |l| {
         l.folders.push(Folder { id: "f-x".into(), name: "x".into(), parent: Some("f-gone".into()), ..Folder::default() });
@@ -227,10 +227,8 @@ fn update_writes_one_file_and_refuses_a_bad_change() {
     });
     assert!(e.is_err(), "a change check() refuses writes nothing");
     assert_eq!(read(&home).folders.len(), 1);
-    std::fs::write(home.library_folders().unwrap(), r#"{"v":2,"folders":[]}"#).unwrap();
+    std::fs::write(home.library_folders(), r#"{"v":2,"folders":[]}"#).unwrap();
     assert!(update(&home, true, |_| Ok(())).unwrap_err().contains("newer bise"));
-    let legacy = Home { layout: Layout::Legacy, ..Home::at("/nowhere") };
-    assert_eq!(update(&legacy, true, |_| Ok(())), Err(LEGACY.to_string()));
 }
 
 #[test]

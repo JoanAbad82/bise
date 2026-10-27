@@ -1,6 +1,6 @@
 //! Where a workspace's hub keeps its state (RFC 0001 §5):
 //! `$SB_STATE_DIR`, else `<hubs dir>/<name>-<hash>` (`bise_home::Home::hub_dir`:
-//! `~/.bise/hubs/`, or `~/.local/state/switchboard/` in the old layout),
+//! `~/.bise/hubs/`),
 //! and an agent's folders in it: `bise_home::hub_state`'s (one owner).
 //! Its task worktrees: `<home>/worktrees/<name>-<hash>/<task>/` (the
 //! `sweep` module), or `$SB_STATE_DIR/worktrees/<task>/`.
