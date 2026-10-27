@@ -12,7 +12,7 @@ import { artifact, artifacts, ev, projects, row } from '../../../tests/feature/i
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
-import { openLauncher, panelScope, panelState } from './state';
+import { openLauncher, openShell, panelScope, panelState } from './state';
 import { doPanelKey } from './keys';
 import { entityKey, type Entity } from '@/shared/entity';
 
@@ -149,6 +149,32 @@ describe('New tab, the launcher (r2-launcher)', () => {
       openLauncher();
     });
     expect(document.activeElement).toBe(v.getByTestId('app.panel.launcher.search'));
+    composer.remove();
+  });
+  it('⌘T with a New tab open brings it to the front, its field taking the keys, his words selected; no second New tab (his m_46959)', () => {
+    const { v, ctx } = shell();
+    const search = () => v.getByTestId('app.panel.launcher.search') as HTMLInputElement;
+    fireEvent.change(search(), { target: { value: 'note' } });
+    const composer = document.body.appendChild(document.createElement('textarea'));
+    composer.focus();
+    act(() => {
+      doPanelKey('new-tab', ctx);
+    });
+    expect(v.queryByTestId('app.panel.tab.new:2')).toBeNull();
+    expect(document.activeElement).toBe(search());
+    expect([search().selectionStart, search().selectionEnd]).toEqual([0, 4]);
+    // a shell in front (a terminal's '+'), the New tab behind it: ⌘T brings it back
+    act(() => {
+      openShell(ACME);
+    });
+    expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('false');
+    composer.focus();
+    act(() => {
+      openLauncher();
+    });
+    expect(v.queryByTestId('app.panel.tab.new:2')).toBeNull();
+    expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(search());
     composer.remove();
   });
   it('a switch back to a project with its blank browser tab in front leaves his focus where it was', () => {

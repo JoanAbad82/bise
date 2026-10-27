@@ -15,7 +15,7 @@ import { useLeftWidth } from '@/app/frame-state';
 import { iconKindOf } from '@/ds';
 import { useAllArtifacts } from '@/artifacts';
 import { armHandoff } from '@/composer/handoff';
-import { activate, artFit, clampShare, shareOf, closeBack, closeIn, closeOthers, moveIn, nextBrowser, nextLauncher, nextShell, openIn, pushClosed, pushRecent, reopenIn, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type Closed, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
+import { activate, artFit, clampShare, shareOf, closeBack, closeIn, closeOthers, launcherToReuse, moveIn, nextBrowser, nextLauncher, nextShell, openIn, pushClosed, pushRecent, reopenIn, stepIn, widenFor, clampW, fitW, fullFit, withOpen, FOLDED, dropGone, dropGoneArts, type Before, type Closed, type PanelFit, type PanelKept, type TabWhat, type Tabs } from './model';
 import { parseRec, pruneScopes, putView, scopeOf, switchTo, viewOf, type PanelRec } from './scope';
 
 const KEY = 'panel';
@@ -244,6 +244,13 @@ export function useFullPreview(): boolean {
 
 /** The tab he just opened (openWhat), until its field takes the keys (takeOpened); a project switch or an unfold never sets it. */
 let opened: string | null = null;
+/** How many times he opened a tab: ⌘T on the New tab already in front changes nothing else, yet its field takes the keys again. */
+let openedN = 0;
+
+/** The count of his opens (openedN), live: a field's focus effect runs again on each. */
+export function useOpenedN(): number {
+  return useSyncExternalStore(panelState.subscribe, () => openedN);
+}
 
 /**
  * True once for the tab he just opened (⌘T, '+', ⌘L, a launcher's pick): its field takes the
@@ -260,15 +267,19 @@ export function openWhat(what: TabWhat, instead?: string): void {
   const recent = what.kind === 'thing' ? pushRecent(state.recent, what.e) : state.recent;
   const tabs = openIn(state.tabs, what, instead);
   opened = tabs.active;
+  openedN += 1;
   if (!state.open || tabs.active !== state.tabs.active) before.set(beforeKey(tabs.active), { open: state.open, active: state.tabs.active });
   // a page newly opened may widen the panel once (widenFor); an open one coming to the front doesn't
   const isNew = !state.tabs.list.some((t) => t.id === tabs.active);
   set({ ...state, open: true, tabs, recent, width: isNew ? widenFor(state, what) : state.width });
 }
 
-/** '+' and ⌘T: a New tab (the launcher). */
+/**
+ * '+' and ⌘T: a New tab (the launcher); one already open in this panel comes to the front instead,
+ * its field taking the keys (his m_46959, model.ts launcherToReuse).
+ */
 export function openLauncher(): void {
-  openWhat(nextLauncher(state.tabs));
+  openWhat(launcherToReuse(state.tabs) ?? nextLauncher(state.tabs));
 }
 
 /**

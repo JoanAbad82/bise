@@ -70,7 +70,9 @@ describe('the tabbed panel', () => {
     const v = shell();
     fireEvent.click(v.getByTestId('app.panel.toggle'));
     fireEvent.click(v.getByTestId('app.panel.add'));
-    expect(v.getByTestId('app.panel.tab.new:2').getAttribute('aria-selected')).toBe('true');
+    // the New tab the unfold opened is the one '+' brings back (his m_46959)
+    expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
+    expect(v.queryByTestId('app.panel.tab.new:2')).toBeNull();
     expect(v.getByTestId('app.panel.launcher.search')).toBeTruthy();
     for (const k of ['artifacts', 'terminal', 'browser', 'office']) expect(v.getByTestId(`app.panel.launcher.${k}`)).toBeTruthy();
     expect(v.getByTestId('app.panel.launcher.terminal').textContent).toContain('⌃`');

@@ -24,7 +24,7 @@ import { ThingPic } from '@/app/side3d/Bubbles';
 import { bubbleThing } from '@/app/side3d/objects';
 import { entityKey, type Entity } from '@/shared/entity';
 import { agentInView, changesInView, doPanelKey, PANEL_KEYS, type PanelCtx } from './keys';
-import { closeTabId, launcherHome, openWhat, panelAt, takeOpened, usePanelState } from './state';
+import { closeTabId, launcherHome, openWhat, panelAt, takeOpened, useOpenedN, usePanelState } from './state';
 import { scopeOf } from './scope';
 import { useTabLooks } from './look';
 import { tabOf } from './model';
@@ -63,10 +63,14 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
   // Recent: the project in front's own (his m_46444), the panel's scope (scope.ts scopeOf)
   const recent = recentIn(allRecent, scopeOf(route, home, panelAt()));
   // a New tab he just opened, or the picker it turned into: the field takes the keys; back in
-  // front by a project switch, his focus stays where it was (his m_46543, state.ts takeOpened)
+  // front by a project switch, his focus stays where it was (his m_46543, state.ts takeOpened);
+  // ⌘T on it again (openedN): the keys back in its field, his words selected (designer m_46965)
+  const openedN = useOpenedN();
   useEffect(() => {
-    if (shown && takeOpened(tabId)) field.current?.focus();
-  }, [shown, artifacts, tabId]);
+    if (!shown || !takeOpened(tabId)) return;
+    field.current?.focus();
+    field.current?.select();
+  }, [shown, artifacts, tabId, openedN]);
   // the tab turned into the picker or back: its highlight starts over, in the same render
   const [wasPicker, setWasPicker] = useState(artifacts);
   if (wasPicker !== artifacts) {

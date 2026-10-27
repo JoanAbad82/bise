@@ -81,6 +81,21 @@ export function nextLauncher(t: Tabs, artifacts = false): TabWhat {
   return artifacts ? { kind: 'launcher', n, artifacts: true } : { kind: 'launcher', n };
 }
 
+/**
+ * ⌘T and '+' with a New tab already open (his m_46959, designer m_46965): the one to bring back,
+ * a launcher on its Open list (the ⌘P picker is no longer one); the one in front if it is one,
+ * else the nearest to the right of it, round the end. undefined: none, a new one opens. Pure.
+ */
+export function launcherToReuse(t: Tabs): TabWhat | undefined {
+  const n = t.list.length;
+  const i = Math.max(0, t.list.findIndex((x) => x.id === t.active));
+  for (let k = 0; k < n; k += 1) {
+    const what = (t.list[(i + k) % n] as Tab).what;
+    if (what.kind === 'launcher' && what.artifacts !== true) return what;
+  }
+  return undefined;
+}
+
 /** The next free browser tab (⌘L, the launcher's Browser). Pure. */
 export function nextBrowser(t: Tabs): TabWhat {
   let n = 1;

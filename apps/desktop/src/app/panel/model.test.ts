@@ -20,6 +20,7 @@ import {
   moveIn,
   nextBrowser,
   tabIdOf,
+  launcherToReuse,
   nextLauncher,
   nextShell,
   openIn,
@@ -34,6 +35,7 @@ import {
   widenFor,
   widthOf,
   WIDTHS,
+  tabOf,
   type TabWhat,
   type Tabs,
 } from './model';
@@ -74,6 +76,19 @@ describe('the tab model: open', () => {
     t = openIn(t, art('a'), 'new:1');
     expect(ids(t)).toEqual(['artifact:acme/a']);
     expect(t.active).toBe('artifact:acme/a');
+  });
+  it("⌘T with New tabs open (his m_46959): the one in front, else the nearest to its right round the end; never the ⌘P picker", () => {
+    const L = (n: number): TabWhat => ({ kind: 'launcher', n });
+    const picker: TabWhat = { kind: 'launcher', n: 3, artifacts: true };
+    // new:1, a, new:2, b, new:3 (the picker)
+    const list = [L(1), art('a'), L(2), art('b'), picker].map(tabOf);
+    const at = (active: string) => launcherToReuse({ list, active });
+    expect(at('new:2')).toEqual(L(2));
+    expect(at('artifact:acme/a')).toEqual(L(2));
+    expect(at('artifact:acme/b')).toEqual(L(1));
+    expect(at('new:3')).toEqual(L(1));
+    expect(launcherToReuse({ list: [art('a'), picker].map(tabOf), active: 'new:3' })).toBeUndefined();
+    expect(launcherToReuse(FIRST)).toBeUndefined();
   });
   it('New tabs and shells are numbered by the first free number', () => {
     const t = openIn(openIn(FIRST, nextLauncher(FIRST)), { kind: 'terminal', project: 'acme', n: 0 });
