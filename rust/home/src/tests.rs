@@ -195,6 +195,22 @@ fn excluded_apps_start_from_the_seed_and_then_are_his() {
 }
 
 #[test]
+fn the_window_marks_a_project_seen_by_its_hub_id_in_ms() {
+    use serde_json::json;
+    // the desktop's app/seen.ts markSeen (proj-unread's dot; his m_48087: it never went away, the
+    // core refused every mark): `seen.<hub id>` = ms, the key bise_proto::rows::seen_key builds
+    let o = json!({"theme": "dark"});
+    let v = prefs::set_dotted(&o, "seen.ai-docs-1a2b3c4d", json!(1_793_134_500_000u64)).unwrap();
+    assert_eq!(v["seen"], json!({"ai-docs-1a2b3c4d": 1_793_134_500_000u64}));
+    assert_eq!(prefs::set_dotted(&v, "seen.ai-docs-1a2b3c4d", json!(1_793_134_600_000u64)).unwrap()["seen"]["ai-docs-1a2b3c4d"], json!(1_793_134_600_000u64), "a later look replaces it");
+    assert_eq!(prefs::set_dotted(&v, "seen.ai-docs-1a2b3c4d", Value::Null).unwrap()["seen"], json!({}), "null takes it out");
+    assert!(prefs::set_dotted(&o, "seen", json!({})).is_err(), "never seen whole");
+    assert!(prefs::set_dotted(&o, "seen.not a hub id", json!(1)).is_err(), "a hub id");
+    assert!(prefs::set_dotted(&o, "seen.ai-docs-1a2b3c4d", json!("now")).is_err(), "ms");
+    assert!(prefs::set_dotted(&o, "seen.ai-docs-1a2b3c4d.x", json!(1)).is_err(), "nothing under it");
+}
+
+#[test]
 fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     use serde_json::json;
     let o = json!({"theme": "dark", "quiet": {"call": true, "batch_min": 20}});

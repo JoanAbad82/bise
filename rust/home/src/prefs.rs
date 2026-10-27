@@ -77,7 +77,25 @@ pub fn keep_days(prefs: Option<&Value>) -> u64 {
 
 /// The top keys of `prefs.json` the window may set (`prefs_set`,
 /// architect m_9130): anything else is refused, never written.
-pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims", "bim", AUTO_UPDATE];
+pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims", "bim", "seen", AUTO_UPDATE];
+
+/// `seen.<hub id>`: when he last looked at that project, in ms (the
+/// desktop's app/seen.ts markSeen; bise_proto::rows::seen_key builds the
+/// key, its SEEN_PREFIX is this top key and a dot). The sidebar's unread
+/// dot and new counts are what came after it. Only that path, the id with
+/// [`crate::hub_id`]'s shape, the value a whole number of ms (null: never).
+fn seen_key(parts: &[&str], v: &Value) -> Result<(), String> {
+    match parts {
+        ["seen", id] if crate::hub_id::is_hub_id(id) => {
+            if v.is_null() || v.as_u64().is_some() {
+                Ok(())
+            } else {
+                Err(format!("seen.{id} can't be {v}"))
+            }
+        }
+        _ => Err(format!("{} is not a seen preference", parts.join("."))),
+    }
+}
 
 /// `bim`: what his own bim looks like (the desktop's onboarding and
 /// settings › general, page bim-pick): `{skin, hair, color, wear}`, skin
@@ -164,6 +182,9 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
     }
     if top == "bims" {
         bims_key(&parts, &value)?;
+    }
+    if top == "seen" {
+        seen_key(&parts, &value)?;
     }
     if parts.len() == 1 {
         if !value.is_null() {
