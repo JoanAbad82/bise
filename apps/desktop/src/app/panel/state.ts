@@ -123,6 +123,7 @@ export const panelState = {
     rec = parseRec(raw);
     state = viewOf(rec);
     before.clear();
+    drafts.clear();
     closed.clear();
     emit();
   },
@@ -271,7 +272,27 @@ export function openWhat(what: TabWhat, instead?: string): void {
   if (!state.open || tabs.active !== state.tabs.active) before.set(beforeKey(tabs.active), { open: state.open, active: state.tabs.active });
   // a page newly opened may widen the panel once (widenFor); an open one coming to the front doesn't
   const isNew = !state.tabs.list.some((t) => t.id === tabs.active);
+  // a New tab that opens fresh starts with an empty field, whatever an earlier one of its number held
+  if (isNew) drafts.delete(beforeKey(tabs.active));
   set({ ...state, open: true, tabs, recent, width: isNew ? widenFor(state, what) : state.width });
+}
+
+/**
+ * The words in each New tab's field, per project's panel as `before`: a New tab behind another
+ * unmounts, and ⌘T brings it back with his words, selected (his m_46959, ui-review m_47041). A
+ * reload forgets them.
+ */
+const drafts = new Map<string, string>();
+
+/** The words he left in the New tab `id`'s field ('' none). */
+export function launcherDraft(id: string): string {
+  return drafts.get(beforeKey(id)) ?? '';
+}
+
+/** His words in the New tab `id`'s field, kept while it is behind another tab. */
+export function setLauncherDraft(id: string, q: string): void {
+  if (q === '') drafts.delete(beforeKey(id));
+  else drafts.set(beforeKey(id), q);
 }
 
 /**

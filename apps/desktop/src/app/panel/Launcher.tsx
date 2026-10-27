@@ -24,7 +24,7 @@ import { ThingPic } from '@/app/side3d/Bubbles';
 import { bubbleThing } from '@/app/side3d/objects';
 import { entityKey, type Entity } from '@/shared/entity';
 import { agentInView, changesInView, doPanelKey, PANEL_KEYS, type PanelCtx } from './keys';
-import { closeTabId, launcherHome, openWhat, panelAt, takeOpened, useOpenedN, usePanelState } from './state';
+import { closeTabId, launcherDraft, launcherHome, openWhat, panelAt, setLauncherDraft, takeOpened, useOpenedN, usePanelState } from './state';
 import { scopeOf } from './scope';
 import { useTabLooks } from './look';
 import { tabOf } from './model';
@@ -51,8 +51,13 @@ export function Launcher({ tabId, shown, artifacts = false }: { tabId: string; s
   const arts = useAllArtifacts();
   // the agent in view's rows: its Changes row shows and hides with its diff
   useAgents(agentInView(route)?.project ?? '');
-  const [q, setQ] = useState('');
-  const [at, setAt] = useState(() => firstAt('', artifacts));
+  // his words come back with the tab when it was behind another (state.ts drafts)
+  const [q, setWords] = useState(() => launcherDraft(tabId));
+  const setQ = (v: string) => {
+    setWords(v);
+    setLauncherDraft(tabId, v);
+  };
+  const [at, setAt] = useState(() => firstAt(q, artifacts));
   // ↑/↓ moved the highlight: the row under a resting pointer drops its hover tint until it moves (macOS lists)
   const [keyed, setKeyed] = useState(false);
   const [now] = useState(() => Date.now());

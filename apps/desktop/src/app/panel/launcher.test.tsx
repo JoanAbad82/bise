@@ -12,7 +12,7 @@ import { artifact, artifacts, ev, projects, row } from '../../../tests/feature/i
 import { createRouter, RouterContext } from '@/app/router';
 import { BarTabs } from './BarTabs';
 import { PanelHost } from './Host';
-import { openLauncher, openShell, panelScope, panelState } from './state';
+import { closeTabId, openLauncher, openShell, panelScope, panelState } from './state';
 import { doPanelKey } from './keys';
 import { entityKey, type Entity } from '@/shared/entity';
 
@@ -175,6 +175,17 @@ describe('New tab, the launcher (r2-launcher)', () => {
     expect(v.queryByTestId('app.panel.tab.new:2')).toBeNull();
     expect(v.getByTestId('app.panel.tab.new:1').getAttribute('aria-selected')).toBe('true');
     expect(document.activeElement).toBe(search());
+    // his words came back with it, selected (ui-review m_47041)
+    expect(search().value).toBe('note');
+    expect([search().selectionStart, search().selectionEnd]).toEqual([0, 4]);
+    // a New tab that opens fresh in that number starts empty
+    act(() => {
+      closeTabId('new:1');
+    });
+    act(() => {
+      openLauncher();
+    });
+    expect(search().value).toBe('');
     composer.remove();
   });
   it('a switch back to a project with its blank browser tab in front leaves his focus where it was', () => {
