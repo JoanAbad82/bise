@@ -7,12 +7,18 @@
 // while zoomed. On hover two 24 px buttons top right: '⤢' the world in the panel's Office tab, '×'
 // hides the tile (tilestate.ts keeps it per window). Under it, the 8 px gap to the card is the
 // handle: row-resize, a 2 px text-3 line after 120 ms of hover (the panel's signed handle), a drag
-// from 96 to half the window's height, a double-click back to 140. Owner: nm-side.
+// from 96 to half the window's height, a double-click back to 140. On bise's own (every project in
+// scope) the tile holds the town (bims/town/Town.tsx) whole in its height, in place of one office,
+// with no '⤢' (no town tab); it was the RightBar's until 6d9d07180 (his m_47415). Owner: nm-side.
 import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Agent, Card } from '@/proto';
 import type { MapId } from '@/bims/maps/ids';
 import { Press, tipAttrs } from '@/ds';
 import { side } from '@/proto/words_side.gen';
+import { bims } from '@/proto/words_bims.gen';
+import { Town } from '@/bims/town/Town';
+import { townParts } from '@/bims/town/feed';
+import { useTownProjects } from '@/bims/town/useTown';
 import { WorldOffice } from './World';
 import { clampTile, OUTER_TOP, TILE_GAP, TILE_H, TILE_MIN, tileMax } from './tilestate';
 import { OUTER_W } from './layout';
@@ -38,19 +44,35 @@ export interface OuterTileProps {
   readonly onHide: () => void;
 }
 
-/** The tile: the office, '⤢' and '×' on hover. */
-export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide }: OuterTileProps) {
+/** On bise's own (every project): the town in the tile, a click on an office dives in, 'open' its main thread, a bim its agent's. */
+export interface TownActs {
+  readonly onOpenProject: (project: string) => void;
+  readonly onOpenAgent: (project: string, agent: string) => void;
+}
+
+/** The tile: the office (on bise's own the town), '⤢' (the office alone: no town tab) and '×' on hover. */
+export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide, town = null }: OuterTileProps & { readonly town?: TownActs | null }) {
   return (
-    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={side.tile_name({ project: name })} data-testid="app.outer.world">
+    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined}>
       <span className="s3-otile-office">
-        <WorldOffice project={project} agents={agents} cards={cards} fill follow={follow} onOpen={onOpen} onPickMap={onPickMap} />
+        {town !== null ? (
+          <OuterTown h={h} acts={town} />
+        ) : (
+          <WorldOffice project={project} agents={agents} cards={cards} fill follow={follow} onOpen={onOpen} onPickMap={onPickMap} />
+        )}
       </span>
       <span className="s3-otile-acts">
-        <Press look="s3-otile-btn" aria-label={side.tile_panel} {...tipAttrs(side.tile_panel)} onClick={onPanel} data-testid="app.outer.world.panel">⤢</Press>
+        {town === null && <Press look="s3-otile-btn" aria-label={side.tile_panel} {...tipAttrs(side.tile_panel)} onClick={onPanel} data-testid="app.outer.world.panel">⤢</Press>}
         <Press look="s3-otile-btn" aria-label={side.tile_hide} {...tipAttrs(side.tile_hide)} onClick={onHide} data-testid="app.outer.world.hide">×</Press>
       </span>
     </section>
   );
+}
+
+/** The town (bims/town/Town.tsx, its rows from every project), whole in the tile's height. */
+function OuterTown({ h, acts }: { h: number; acts: TownActs }) {
+  const projects = useTownProjects();
+  return <Town projects={projects} parts={townParts} maxH={h} onOpenProject={acts.onOpenProject} onOpenAgent={acts.onOpenAgent} />;
 }
 
 /** the hover before the handle's line shows, ms (the panel's signed handle) */

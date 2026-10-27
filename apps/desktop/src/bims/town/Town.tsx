@@ -1,5 +1,6 @@
 // The town on bise's thread (page bims-maps v9 « une ville moins robotique », Gabriel: « La ville pour
-// bise global c'est une bonne idée aussi! »): the right bar's office for every project at once, one
+// bise global c'est une bonne idée aussi! »; in the outer tile, app/side3d/OuterWorld.tsx, fitted to
+// its height by maxH): the bims' office for every project at once, one
 // office per project on its own map and growth (town/sites.ts), laid out with its road and river
 // (town/plan.ts), each with a sign in front: its name, ∿ its agents at work, a pink ? n for his open
 // questions. A click on an office or its sign dives in (bims m_28719, m_28737): the camera eases
@@ -45,6 +46,8 @@ export interface TownParts {
 type Phase = 'town' | 'in' | 'swapIn' | 'office' | 'swapOut' | 'out';
 
 const DIVE_KEY = 'bims.town.dive';
+/** no height bound: the town as tall as its width asks */
+const TALL = 4000;
 /** the gap between a sign's parts (office.css .bims-sign: var(--s-1)) */
 const SIGN_GAP = 4;
 /** offices baked again per frame at most (page town-live: ~85 ms each, the town fills in) */
@@ -114,6 +117,7 @@ export function Town({
   parts,
   onOpenProject,
   onOpenAgent,
+  maxH = TALL,
 }: {
   /** every project, bise's home among them (town/useTown.ts) */
   projects: readonly TownProject[];
@@ -122,7 +126,16 @@ export function Town({
   onOpenProject: (project: string) => void;
   /** a click on a bim in the dived Office: that agent's thread */
   onOpenAgent: (project: string, agent: string) => void;
+  /** the box's height at most, css px: the whole town fits in it (the outer tile's); default as tall as its width asks */
+  maxH?: number;
 }) {
+  const maxHRef = useRef(maxH);
+  const resizeRef = useRef<() => void>(() => undefined);
+  // a new bound (he dragged the tile's handle): the town fits again
+  useLayoutEffect(() => {
+    maxHRef.current = maxH;
+    resizeRef.current();
+  }, [maxH]);
   const shown = useMemo(() => townProjects(projects), [projects]);
   const [state, setState] = useState<'loading' | 'on' | 'lost'>('loading');
   // the dived project, kept per window; gone from the town (no such project now): the town
@@ -415,7 +428,7 @@ export function Town({
       const w = box.clientWidth;
       if (w <= 0) return;
       seenRef.current = seenX(box);
-      r.setSize(w, 4000);
+      r.setSize(w, maxHRef.current);
       const d = live.current.dived;
       const ph = phaseRef.current;
       // the Office's own view at the new width, so the way out starts where it is
@@ -423,6 +436,10 @@ export function Town({
         const to = r.diveFit(d, w);
         if (to !== null) r.setView(to);
       } else r.setView(null);
+    };
+    resizeRef.current = () => {
+      resize();
+      kick('resize');
     };
     const sized = new ResizeObserver(() => {
       resize();

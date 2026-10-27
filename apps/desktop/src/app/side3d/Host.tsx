@@ -515,7 +515,16 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
               }}
               onHide={() => {
                 outerWorld.hide(true);
-              }} />
+              }}
+              // on bise's own the town: every project's office side by side (lost with the RightBar in 6d9d07180)
+              town={all ? {
+                onOpenProject: (p) => {
+                  router.go({ screen: 'thread', project: p, agent: MAIN });
+                },
+                onOpenAgent: (p, agent) => {
+                  router.go({ screen: 'thread', project: p, agent });
+                },
+              } : null} />
             <TileHandle h={tileH} winH={winH} onHeight={(h) => {
               outerWorld.height(h, winH);
             }} />

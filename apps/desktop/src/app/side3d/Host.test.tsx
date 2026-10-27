@@ -9,6 +9,7 @@ import type { Agent } from '@/proto';
 import type { CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 import { side } from '@/proto/words_side.gen';
+import { bims } from '@/proto/words_bims.gen';
 import { artifact, artifacts, card, ev, projects, row } from '../../../tests/feature/inputs';
 import { bimsLit } from '@/bims/focus';
 import { createRouter, RouterContext } from '../router';
@@ -38,6 +39,20 @@ vi.mock('@/bims/Office', () => ({
     office.zoomed = onZoomed ?? null;
     return <canvas data-testid="office" />;
   },
+}));
+// the town's renderer needs WebGL too: a stand-in town that lists its offices and gives its two clicks
+vi.mock('@/bims/town/Town', () => ({
+  Town: ({ projects, maxH, onOpenProject, onOpenAgent }: { projects: readonly { id: string }[]; maxH?: number; onOpenProject: (p: string) => void; onOpenAgent: (p: string, a: string) => void }) => (
+    <div data-testid="town" data-max-h={maxH}>
+      {projects.map((p) => (
+        <button key={p.id} data-testid={`town.${p.id}`} onClick={() => {
+          onOpenProject(p.id);
+        }} onDoubleClick={() => {
+          onOpenAgent(p.id, 'perf');
+        }} />
+      ))}
+    </div>
+  ),
 }));
 vi.mock('./render', () => ({
   outfitSig: () => '',
@@ -655,6 +670,35 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(v.getByTestId('app.outer.world.handle').style.height).toBe('8px');
     // shown: no cube in the Agents head
     expect(v.queryByTestId('app.outer.agents.cube')).toBeNull();
+  });
+
+  it('on bise\'s own the tile holds the town, every project\'s office side by side; a project\'s thread its office again (his m_47415: lost in 6d9d07180)', () => {
+    tall(900);
+    const { v, router } = side3d(1440);
+    // acme's thread: acme's office, no town
+    expect(v.queryByTestId('town')).toBeNull();
+    act(() => {
+      router.go({ screen: 'thread', project: HOME, agent: 'main' });
+    });
+    const tile = v.getByTestId('app.outer.world');
+    expect(tile.hasAttribute('data-town')).toBe(true);
+    expect(tile.getAttribute('aria-label')).toBe(bims.town_label);
+    expect(tile.querySelector('[data-testid="office"]')).toBeNull();
+    // both projects in it, fitted to the tile's height
+    expect(v.getByTestId(`town.${HOME}`)).toBeTruthy();
+    expect(v.getByTestId(`town.${ACME}`)).toBeTruthy();
+    expect(v.getByTestId('town').getAttribute('data-max-h')).toBe('140');
+    // no '⤢': the panel has no town tab
+    expect(v.queryByTestId('app.outer.world.panel')).toBeNull();
+    // the dived office's 'open': that project's main thread; a bim in it: its agent's
+    fireEvent.click(v.getByTestId(`town.${ACME}`));
+    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'main' });
+    expect(v.queryByTestId('town')).toBeNull();
+    act(() => {
+      router.go({ screen: 'bise' });
+    });
+    fireEvent.doubleClick(v.getByTestId(`town.${ACME}`));
+    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'perf' });
   });
 
   it('× hides it: the card takes the full height, a cube at the right of the Agents head brings it back; both kept', () => {
