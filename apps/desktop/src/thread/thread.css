@@ -38,10 +38,12 @@
   position: relative;
 }
 
-/* scrolled up: back to the newest, with what came meanwhile */
+/* scrolled up: back to the newest, with what came meanwhile. On the composer's axis, the column's
+   middle (--th-col-x + --th-col / 2), never the screen's: the column slides left of the bims'
+   world, and the pill sat right of the composer (his m_46274) */
 .th-to-end {
   position: absolute;
-  left: 50%;
+  left: calc(var(--th-col-x, 0px) + var(--th-col, 100%) / 2);
   bottom: var(--s-3);
   transform: translateX(-50%);
   /* over the bottom fade */
