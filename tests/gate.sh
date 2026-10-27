@@ -744,8 +744,12 @@ desktop_check() {
     # by path: fs reads (sync, async, promises), globs, a file URL (review-gates m_33177);
     # an empty list: vitest run runs them all (safe)
     local byfile drc ran; byfile="$(cd "$root/apps/desktop" && grep -rlE 'readFile|readdir|import\.meta\.glob|import\.meta\.url' src --include='*.test.ts' --include='*.test.tsx' | tr '\n' ' ')"
+    # lint: the changed files only (eslint of the whole app took 527 s at load 30, of 3 files
+    # 14 s, fast-loop m_46374); typecheck still covers every file, and the full gate lints all.
+    # --no-warn-ignored: $rel holds .css/.webp/.html too, which eslint warns are ignored, and
+    # --max-warnings 0 made a css-only change red (review-gates m_46660)
     # shellcheck disable=SC2086
-    (cd "$root/apps/desktop" && python3 ../../tests/conflict_markers.py && pnpm -s typecheck && pnpm -s lint \
+    (cd "$root/apps/desktop" && python3 ../../tests/conflict_markers.py && pnpm -s typecheck && pnpm -s exec eslint --max-warnings 0 --no-warn-ignored $rel \
         && pnpm -s exec vitest related --run --passWithNoTests $rel && pnpm -s exec vitest run $byfile && pnpm -s build) >"$log" 2>&1
     drc=$?
     # what it ran, said and kept (<gate dir>/vitest-related.jsonl: the audit's 'vitest-related miss')
