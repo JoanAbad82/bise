@@ -941,8 +941,9 @@ export function Office({
     >
       <canvas
         ref={canvas}
-        // the garden past what the camera fits is cropped; a soft fade at the sides says there is more
-        className={`bims-canvas${boxW > 0 && cropped(growNow, boxW >= WIDE_FIT_PX) ? ' bims-fade' : ''}`}
+        // the garden past what the camera fits is cropped; a soft fade at the sides says there is more.
+        // Zoomed in, the lawn fills the view: no fade (in dark it read as a black vignette, designer m_47300)
+        className={`bims-canvas${fitted && boxW > 0 && cropped(growNow, boxW >= WIDE_FIT_PX) ? ' bims-fade' : ''}`}
         data-testid="app.right.bims.canvas"
       />
       <canvas ref={xfade} className="bims-xfade" aria-hidden="true" data-testid="app.right.bims.xfade" />

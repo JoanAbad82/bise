@@ -73,6 +73,8 @@ export interface OuterAgentsProps {
   readonly onOpenPr: (r: BarRow) => void;
   /** the project whose office the tile shows (its rows and its bims light each other, bims/focus); null: no tile */
   readonly bims: string | null;
+  /** an ask opened in place (its agent) or closed (null): the tile looks at that bim while it is open (designer m_47300); keep it stable */
+  readonly onAsk?: (ask: { readonly project: string; readonly agent: string } | null) => void;
 }
 
 /** The agents' rows past their worktree heads: each with its PR (its own, or its shared worktree's) and whether it works in a worktree. Pure. */
@@ -87,10 +89,20 @@ export function outerRows(live: readonly BarRow[], agents: readonly ProjAgent[])
 }
 
 /** AGENTS in the card: its first 10 lines, then '+ N more' adds 50. */
-export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpen, onOpenPr, bims }: OuterAgentsProps) {
+export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpen, onOpenPr, bims, onAsk }: OuterAgentsProps) {
   const rows = outerRows(live, agents);
   const byKey = new Map(agents.map((x) => [`${x.project}/${x.a.name}`, x.a]));
   const [open, setOpen] = useState<string | null>(null);
+  const asked = open === null ? undefined : rows.find((x) => x.r.key === open)?.r;
+  const askProject = asked?.project ?? null;
+  const askAgent = asked?.agent ?? null;
+  useEffect(() => {
+    if (onAsk === undefined) return;
+    onAsk(askProject === null || askAgent === null ? null : { project: askProject, agent: askAgent });
+    return () => {
+      onAsk(null);
+    };
+  }, [askProject, askAgent, onAsk]);
   const { shown, more, less } = useShown(FIRST_AGENTS);
   // the row <-> bim link (bims/focus): a bim hovered tints its row; a row hovered lights its bim
   const lit = useBimsLit();

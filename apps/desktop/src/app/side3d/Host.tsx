@@ -397,6 +397,9 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   }, [open]);
   const maxH = fit.maxH ?? CARD_MAX;
   const here = route.screen === 'thread' ? { project: route.project, agent: route.agent } : { project: null, agent: null };
+  // the tile follows the open thread's bim; an ask opened in place in the card wins while it is open (designer m_47300)
+  const [askOpen, setAskOpen] = useState<{ readonly project: string; readonly agent: string } | null>(null);
+  const tileFollow = followOf(askOpen === null ? route : { screen: 'thread', ...askOpen }, project, ownLive);
   const at = answerFrom(here, home);
   // a row opens its agent in its own project (bise's own lists every project's)
   const openAgentIn = (p: string) => (agent: string) => {
@@ -500,7 +503,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       <>
         {!tile.hidden && (
           <>
-            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH} follow={followOf(route, project, ownLive)}
+            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH} follow={tileFollow}
               onOpen={(agent) => {
                 router.go({ screen: 'thread', project, agent });
               }}
@@ -524,7 +527,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
         }} {...(tile.hidden ? { onCube: () => {
           outerWorld.hide(false);
         } } : {})}>
-          <OuterAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} here={here} now={now} groupOf={groupOf} onOpen={openRow} onOpenPr={openPr} bims={tile.hidden ? null : project} />
+          <OuterAgents live={ov.live} agents={ov.agents} cards={ov.cards} at={at} here={here} now={now} groupOf={groupOf} onOpen={openRow} onOpenPr={openPr} bims={tile.hidden ? null : project} onAsk={setAskOpen} />
         </OuterSection>
         <OuterList id="artifacts" name={bubbleName('artifacts')} count={String(artifacts.length)} onAll={() => {
           router.go({ screen: 'artifacts', project: scope });

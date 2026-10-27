@@ -740,6 +740,22 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(office.follow.at(-1)).toBeNull();
   });
 
+  it('an ask opened in place in the card: the tile looks at its bim while it is open, then back to the thread\'s (designer m_47300)', () => {
+    tall(900);
+    const { v, router } = side3d(1440);
+    act(() => {
+      router.go({ screen: 'thread', project: ACME, agent: 'docs' });
+    });
+    const perf = v.getByTestId(`app.outer.agents.${ACME}.perf`).querySelector<HTMLElement>('[data-row]');
+    if (perf === null) throw new Error('no perf row');
+    fireEvent.click(perf);
+    expect(v.getByTestId(`app.outer.agents.${ACME}.perf.ask`)).toBeTruthy();
+    expect(office.follow.at(-1)).toBe('perf');
+    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'docs' });
+    fireEvent.click(perf);
+    expect(office.follow.at(-1)).toBe('docs');
+  });
+
   it('a bim hovered tints its row in the card, a row hovered lights its bim (bims/focus, his m_47261)', () => {
     tall(900);
     const { v } = side3d(1440);
