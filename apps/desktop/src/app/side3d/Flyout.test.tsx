@@ -57,7 +57,10 @@ describe('a side row\'s tip', () => {
   });
 
   it('a cut title: the tip holds it whole', () => {
-    expect(row(300, 160).dataset.tip).toBe('vite --port 5173');
+    const r = row(300, 160);
+    expect(r.dataset.tip).toBe('vite --port 5173');
+    // beside the card, centred on the row: above it covered the section's head (designer m_47069)
+    expect(r.dataset.tipSide).toBe('left');
   });
 
   it('a title cut inside its line (an artifact chip\'s title takes the ellipsis, ui-review m_47044): the tip too', () => {

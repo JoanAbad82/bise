@@ -124,7 +124,7 @@ export interface FloatProps {
  */
 export function Float({ id, name, top, maxH, moving, frameRef, children }: FloatProps) {
   return (
-    <section ref={frameRef} className="s3-card" style={{ top, maxHeight: maxH }} data-foot="" data-moving={moving || undefined}
+    <section ref={frameRef} className="s3-card" style={{ top, maxHeight: maxH }} data-foot="" data-moving={moving || undefined} data-tip-box=""
       role="dialog" aria-label={name} data-testid={`app.flyout.${id}`}>
       {children}
     </section>
@@ -181,14 +181,15 @@ export function useCut(ref: RefObject<HTMLElement | null>): boolean {
 /**
  * A card's row: one button (its click, its focus ring, its VoiceOver name), the entity's menu on a
  * right click. Its tip only while its title is cut, the whole title then (designer m_46988: a whole
- * title gets none, never a tip over the row above).
+ * title gets none, never a tip over the row above), left of the card it is in, centred on the row
+ * (designer m_47069: above, it covered the section's head; the card and the float are data-tip-box).
  */
 export function SideRow({ pic, title, sub, end, label, tip, onClick, menu, testId, ref }: SideRowProps) {
   const l1 = useRef<HTMLSpanElement>(null);
   const cut = useCut(l1);
   return (
     <div ref={ref} className="s3-row" onContextMenu={menu.onContextMenu} data-testid={testId}>
-      <Press look="s3-row-body" aria-label={label} {...tipAttrs(cut ? tip : undefined)} onClick={onClick} data-row="">
+      <Press look="s3-row-body" aria-label={label} {...tipAttrs(cut ? tip : undefined, undefined, 'left')} onClick={onClick} data-row="">
         <span className="s3-row-pic">{pic}</span>
         <span className="s3-row-lines">
           <span ref={l1} className="s3-row-l1">{title}</span>
