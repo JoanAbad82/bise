@@ -1491,7 +1491,12 @@
 /* an ask opened in place: the row and its block one tinted piece (the row r8 on top, the block r8
    below, no gap); the question t-13 ink on the name's column; options on the surface, 24 high */
 .s3-orow[data-open] {
-  background: var(--c-active);
+  /* it waits on him: the selection's tint, apart from the hover's and the thread in view's grey (designer m_46323) */
+  background: var(--c-selection);
+}
+/* a tinted row right above keeps 2 apart, never one grey block */
+.s3-orow[data-here] + .s3-orow[data-open] {
+  margin-top: calc(var(--s-1) / 2);
 }
 .s3-orow[data-open] .s3-orow-open:hover {
   background: transparent;
