@@ -754,6 +754,14 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'docs' });
     fireEvent.click(perf);
     expect(office.follow.at(-1)).toBe('docs');
+    // esc folds it too (app/escape.ts row 4, designer m_47321): the focus back on its row, the route stays
+    fireEvent.click(perf);
+    expect(office.follow.at(-1)).toBe('perf');
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+    expect(v.queryByTestId(`app.outer.agents.${ACME}.perf.ask`)).toBeNull();
+    expect(document.activeElement).toBe(perf);
+    expect(office.follow.at(-1)).toBe('docs');
+    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'docs' });
   });
 
   it('a bim hovered tints its row in the card, a row hovered lights its bim (bims/focus, his m_47261)', () => {

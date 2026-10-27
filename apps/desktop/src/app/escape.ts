@@ -6,7 +6,8 @@
 //   2. the sidebar slid over (narrow): it closes                                  layer 'over'
 //   3. the focus in the find bar: theirs, find closes; the focus in a page's search field
 //      (ds BarSearch, data-esc-own): theirs, its words clear, then it gives the focus back
-//   4. an inbox item open in place: theirs, it folds
+//   4. an inbox item open in place: theirs, it folds; an outer card's ask open in place: it folds,
+//      the focus back on its row (designer m_47321)                               layer 'ask'
 //   5. the focus in the unfolded floating composer: theirs (its lists, then it folds)
 //   6. a zoomed image: back to fit                                                'zoom'
 //   7. an artifact in front of the open panel: its tab closes, the panel as it was before it came,
@@ -18,9 +19,9 @@
 //      own esc, then esc-up.ts (nobody took it: up the hierarchy)
 //
 // escapeAct is the order, pure. One window capture listener, installed when this module loads (so
-// before any other window listener), reads the facts and runs the act of 2 and 6-9 itself, then
+// before any other window listener), reads the facts and runs the act of 2, 4's ask and 6-9 itself, then
 // stops the esc: nothing below sees it, the route never also goes back. 1, 3-5 and 10 are the
-// handlers' own: the listener leaves the esc to them. The surfaces of 2, 8 and 9 hand their act in
+// handlers' own: the listener leaves the esc to them. The surfaces of 2, 4's ask, 8 and 9 hand their act in
 // with useEscLayer; 6 and 7 read their own state (zoomKeys.ts, the panel's). An esc from inside an
 // artifact's page never reaches this listener: its frame forwards it and frameEsc runs 6 then 7
 // for it (panel/Browser.tsx). Esc goes up, never
@@ -34,7 +35,7 @@ import { MAIN, type Route } from './route';
 import type { Router } from './router';
 
 /** The layers a surface hands in (useEscLayer). */
-export type EscLayer = 'over' | 'sheet' | 'float';
+export type EscLayer = 'over' | 'ask' | 'sheet' | 'float';
 
 /** What is open when an esc comes. */
 export interface EscFacts {
@@ -48,6 +49,8 @@ export interface EscFacts {
   readonly field: boolean;
   /** an inbox item open in place */
   readonly inboxItem: boolean;
+  /** an ask open in place in the outer card */
+  readonly ask: boolean;
   /** the focus in the unfolded floating composer */
   readonly inFloat: boolean;
   readonly zoomed: boolean;
@@ -60,13 +63,14 @@ export interface EscFacts {
 }
 
 /** Who acts: 'below' leaves the esc to the handlers (1, 3-5, 10); the others the listener runs. */
-export type EscAct = 'below' | 'over' | 'zoom' | 'artifact' | 'sheet' | 'float';
+export type EscAct = 'below' | 'over' | 'ask' | 'zoom' | 'artifact' | 'sheet' | 'float';
 
 /** The order, innermost first. Pure. */
 export function escapeAct(f: EscFacts): EscAct {
   if (f.popup) return 'below';
   if (f.over) return 'over';
   if (f.find || f.field || f.inboxItem || f.inFloat) return 'below';
+  if (f.ask) return 'ask';
   if (f.zoomed) return 'zoom';
   if (f.artifact) return 'artifact';
   if (f.sheet) return 'sheet';
@@ -98,6 +102,7 @@ export function escFacts(doc: Document = document): EscFacts {
     find: inside('[data-testid="thread.find"]'),
     field: inside('[data-esc-own]'),
     inboxItem: doc.querySelector('[data-testid="inbox.block"][data-open]') !== null,
+    ask: (layers.get('ask')?.length ?? 0) > 0,
     inFloat: (layers.get('float')?.length ?? 0) > 0 && inside('[data-testid="composer.float"]'),
     zoomed: isZoomed(),
     artifact: frontArtifact() !== undefined,
@@ -186,7 +191,7 @@ export function libraryExit(back: readonly Route[]): number | null {
   return i < 0 ? null : i + 1;
 }
 
-/** A surface's esc (2 the slid-over sidebar, 8 the sheet, 9 the float), while `on`; the newest acts. */
+/** A surface's esc (2 the slid-over sidebar, 4 the outer card's ask, 8 the sheet, 9 the float), while `on`; the newest acts. */
 export function useEscLayer(layer: EscLayer, on: boolean, act: () => void): void {
   useEffect(() => {
     if (!on) return;

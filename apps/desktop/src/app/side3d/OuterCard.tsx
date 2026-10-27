@@ -11,7 +11,7 @@
 // (FlyoutLists). Each section shows its first rows (Agents 10, the others 5), then '+ N more' adds
 // 50 (outerrows.ts); an empty one keeps its empty line. The card scrolls as a whole, a 16 fade at
 // the edge that has more, macOS's overlay scrollbar. Owner: nm-side.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { bimsLit, useBimsLit } from '@/bims/focus';
 import { flushSync } from 'react-dom';
 import type { Card } from '@/proto';
@@ -23,6 +23,7 @@ import { side } from '@/proto/words_side.gen';
 import { waitLen } from '@/thread/wake';
 import { AgentSign } from '../Marks';
 import { askInbox } from '../inboxAsk';
+import { useEscLayer } from '../escape';
 import { useEntityMenu } from '../menus/use';
 import { roleWords, type BarRow, type ProjAgent } from '../barrows';
 import { ThingPic } from './Bubbles';
@@ -103,6 +104,13 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
       onAsk(null);
     };
   }, [askProject, askAgent, onAsk]);
+  // esc folds an ask open in place (app/escape.ts row 4, designer m_47321), the focus back on its row
+  const box = useRef<HTMLDivElement>(null);
+  const fold = useCallback(() => {
+    box.current?.querySelector<HTMLElement>('.s3-orow[data-open] [data-row]')?.focus();
+    setOpen(null);
+  }, []);
+  useEscLayer('ask', open !== null, fold);
   const { shown, more, less } = useShown(FIRST_AGENTS);
   // the row <-> bim link (bims/focus): a bim hovered tints its row; a row hovered lights its bim
   const lit = useBimsLit();
@@ -112,7 +120,7 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
   }, []);
   const linked = (r: BarRow): boolean => bims !== null && r.project === bims && r.agent !== undefined && r.main !== true;
   return (
-    <div className="s3-orows" data-testid="app.outer.agents.rows">
+    <div ref={box} className="s3-orows" data-testid="app.outer.agents.rows">
       {rows.slice(0, shown).map(({ r, pr, wt }) => {
         const a = byKey.get(`${r.project}/${r.agent ?? ''}`);
         const card = sortCards(cards.filter((c) => c.agent === r.agent && c.project === r.project))[0];
