@@ -48,7 +48,13 @@ describe("an attachment row's ✕ in the composer's box", () => {
     // lit alone (the caret next to its chip, right after a drop) never shows the ✕: hover or focus
     // only (designer m_46780). Mutation: composer.css's '.b-attach-row.lit .x' back turns it red.
     expect(v.getByTestId('composer.attach.1').classList.contains('lit')).toBe(true);
-    expect(getComputedStyle(v.getByTestId('composer.attach.1.remove').parentElement as HTMLElement).visibility).toBe('hidden');
+    // hidden by its opacity, never its visibility: a hidden button takes no focus, and Tab must reach
+    // it (ui-review m_46814, designer m_46812). Mutation: '.x' back to 'visibility: hidden' turns it red.
+    for (const n of [1, 2]) {
+      const box = v.getByTestId(`composer.attach.${String(n)}.remove`).parentElement as HTMLElement;
+      const s = getComputedStyle(box);
+      expect({ opacity: s.opacity, visibility: s.visibility || 'visible' }, `✕ of row ${String(n)} at rest`).toEqual({ opacity: '0', visibility: 'visible' });
+    }
     // the composer's own bar keeps its 40 px row
     expect(getComputedStyle(v.getByTestId('composer.row')).height).toBe('40px');
     // the image's thumbnail: a 16 px box in the row's flow, never placed over the list

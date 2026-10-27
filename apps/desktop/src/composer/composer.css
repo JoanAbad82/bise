@@ -220,7 +220,10 @@
   flex-direction: column;
   max-height: calc(4 * var(--h-row-tight));
   overflow-y: auto;
-  margin: 0 0 var(--s-2);
+  /* 2 px of room over the first row, given back by the margin (the rows stay put): the ✕'s ds focus
+     ring (4 px out, the ✕ 2 px in) is drawn whole, never cut by the list's scroll (m_46812) */
+  margin: calc(var(--s-1) / -2) 0 var(--s-2);
+  padding-top: calc(var(--s-1) / 2);
   padding-bottom: var(--s-1);
   border-bottom: 1px solid var(--c-line);
 }
@@ -277,13 +280,14 @@
 .b-composer .b-attach-row .x {
   flex: none;
   margin-left: auto;
-  visibility: hidden;
+  opacity: 0;
 }
 /* ✕ on the pointer's hover or the keyboard's focus only, never from 'lit' alone: the caret next to
-   its chip lights the row, the ✕ stays away (designer m_46780) */
+   its chip lights the row, the ✕ stays away (designer m_46780). Hidden by its opacity, never its
+   visibility: a hidden button takes no focus, and Tab must reach it (with the ds ring, m_46812) */
 .b-composer .b-attach-row:hover .x,
 .b-composer .b-attach-row:focus-within .x {
-  visibility: visible;
+  opacity: 1;
 }
 .b-composer-strip .k {
   margin-left: var(--gap-inline);
