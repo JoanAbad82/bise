@@ -63,7 +63,7 @@ export interface StripAgent {
   readonly onPick?: ((agent: string) => void) | undefined;
 }
 
-const ALL: StripFit = { project: true, state: true, end: true };
+const ALL: StripFit = { project: true, state: true, end: true, lands: true, branch: true };
 /** The room a notice at the strip's right keeps at least (Composer's NoticeLine cuts its words to the rest). */
 const NOTICE_ROOM = 160;
 
@@ -289,11 +289,11 @@ export function ComposerTab({ words, mark, end, project, who, bare = false, newP
       setEndIn(true);
       // the project's item is its picker's button when it has one: read by its test id, never a
       // data-item the ds button doesn't carry (his m_47126: the fit never dropped it)
-      const w = { project: nat(q(`[data-testid="${testId}.project"]`)), state: nat(q('[data-item="state"]')), branch: nat(q('[data-item="branch"]')), end: nat(q('[data-item="end"]')) };
+      const w = { project: nat(q(`[data-testid="${testId}.project"]`)), state: nat(q('[data-item="state"]')), branch: nat(q('[data-item="branch"]')), end: nat(q('[data-item="end"]')), lands: nat(q('[data-item="lands"]')) };
       // 'to perf' always stays: the rest fits in what it leaves
       const toEl = q(`[data-testid="${testId}.to"]`);
       const next = stripFit({ avail: inner - (toEl === null ? 0 : nat(toEl) + gap), gap, ...w });
-      setFit((f) => (f.project === next.project && f.state === next.state && f.end === next.end ? f : next));
+      setFit((f) => (f.project === next.project && f.state === next.state && f.end === next.end && f.lands === next.lands && f.branch === next.branch ? f : next));
       // the label is only drawn bare; a plain strip never cuts one
       setCut((c) => (c === null ? c : null));
     };
@@ -352,13 +352,13 @@ export function ComposerTab({ words, mark, end, project, who, bare = false, newP
         </span>
       )}
       {branch !== undefined && (
-        <span className="it br" data-item="branch" data-testid={`${testId}.branch`} {...tipAttrs(composer.ctx_branch_tip({ branch }))}>
+        <span className={fit.branch ? 'it br' : 'it br gone'} data-item="branch" data-testid={`${testId}.branch`} {...tipAttrs(composer.ctx_branch_tip({ branch }))} aria-hidden={!fit.branch || undefined}>
           <AppIcon name="branch" size={14} />
           <span className="nm mono">{branch}</span>
         </span>
       )}
       {lands !== null && (
-        <span className="it lands" data-item="lands" data-testid={`${testId}.lands`}>
+        <span className={fit.lands ? 'it lands' : 'it lands gone'} data-item="lands" data-testid={`${testId}.lands`} aria-hidden={!fit.lands || undefined}>
           <span className="nm">{lands}</span>
         </span>
       )}

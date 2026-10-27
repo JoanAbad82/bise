@@ -357,9 +357,10 @@
 .b-composer .cmp-ctx-sign {
   display: inline-flex;
 }
-/* 'lands on main' after the branch: a fact, text-3, the first to cut (designer m_43996) */
+/* 'lands on main' after the branch: a fact, text-3 (designer m_43996); short of room it goes whole
+   right after the project (tab.ts stripFit), never squeezed to a sliver (ui-review m_47192) */
 .b-composer .cmp-ctx .it.lands {
-  flex: 0 100 auto;
+  flex: none;
   color: var(--c-text-3);
   white-space: nowrap;
 }
@@ -583,8 +584,15 @@
 .b-composer .cmp-menu.cmp-yolo {
   font-weight: 500;
 }
+/* very narrow (680 with a panel open, ui-review m_47192): the model's words cut with their ellipsis,
+   the send never leaves the box */
 .b-composer .cmp-model {
   margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.b-composer .box > .row > .send {
+  flex: none;
 }
 @container cmp-box (max-width: 440px) {
   .b-composer .cmp-menu .eff {
