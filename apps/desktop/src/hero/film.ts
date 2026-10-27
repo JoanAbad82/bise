@@ -16,7 +16,7 @@ import { sleepers } from '../bims/zzz';
 import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
-import { BUBBLE_S, BUBBLES, CAST, FOLD_S, NOTES, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
+import { BUBBLE_S, BUBBLES, CAST, FOLD_S, headOf, NOTES, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
 import { makeFeed, SEND_S } from './feed';
 import type { Launch } from './fold';
 import { makePage, type KilnLoader } from './page';
@@ -124,7 +124,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   // button to the bim's hand): their own canvas, over the feed
   const planes = document.createElement('canvas');
   planes.className = 'bh-planes';
-  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced, themed: true, planesOver: planes });
+  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced, themed: true, planesOver: planes, heads: headOf });
   const overlay = makeOverlay(box);
   const feed = makeFeed(box);
   box.append(planes);

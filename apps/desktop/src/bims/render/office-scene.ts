@@ -19,7 +19,7 @@ import { skateRig } from './skate';
 import { climbRig } from './climb';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
-import { MAIN_HOODIE, WORLD, hash, outfitOf, paletteOf, type Outfit, type Palette } from './palette';
+import { MAIN_HOODIE, WORLD, hash, outfitOf, paletteOf, type HerHair, type Outfit, type Palette } from './palette';
 import { buildWorld, castShadows, lightDesk, type DeskHandles, type World } from './world';
 import { NO_GROW, growSig, type Grow } from '../growth';
 import { cozyAt } from '../cozy';
@@ -167,8 +167,19 @@ export function appearOut(p: number): number {
   return 1 + (c + 1) * y ** 3 + c * y * y;
 }
 
-/** `ground`: its floating grass block (false in the town: its lawn is the ground); `themed`: the theme's materials (the hero film's town) */
-export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; readonly themed?: boolean } = {}): OfficeScene {
+/**
+ * A bim's outfit with a head set over its name's (the hero's cast: TownOpts.heads); undefined: no
+ * override, its name's own. main keeps its own. Pure.
+ */
+export function outfitWithHead(name: string, main: boolean, head: HerHair | undefined): Outfit | undefined {
+  return main || head === undefined ? undefined : { ...outfitOf(name, false), cut: head.cut, hat: head.hat };
+}
+
+/**
+ * `ground`: its floating grass block (false in the town: its lawn is the ground); `themed`: the theme's
+ * materials (the hero film's town); `head`: a bim's cut and hat over its name's (the hero's cast), its outfit otherwise its own
+ */
+export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; readonly themed?: boolean; readonly head?: (name: string) => HerHair | undefined } = {}): OfficeScene {
   const ground = o.ground ?? true;
   // the hero film's town keeps the theme's materials (TownOpts.themed, bims m_34678); the app's town the day's
   const themed = o.themed ?? false;
@@ -295,7 +306,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     let b = bims.get(name);
     if (!b) {
       const look = mapLook();
-      b = makeBim(name, main, style, aprilOutfit(name, main), main ? undefined : (w) => look.wear?.(w));
+      b = makeBim(name, main, style, aprilOutfit(name, main) ?? outfitWithHead(name, main, o.head?.(name)), main ? undefined : (w) => look.wear?.(w));
       if (style.shadows) castShadows(b.group);
       b.group.visible = false;
       bims.set(name, b);

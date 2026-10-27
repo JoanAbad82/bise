@@ -169,7 +169,9 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     let s = spots.get(id);
     if (!s) {
       // no grass block of its own (bims m_28807): the town's lawn is its ground
-      s = { scene: makeOfficeScene(STYLE, { ground: false, themed }), shape: '', bake: null, live: false, walls: null };
+      const heads = opts.heads;
+      const head = heads ? (name: string) => heads(id, name) : undefined;
+      s = { scene: makeOfficeScene(STYLE, { ground: false, themed, ...(head ? { head } : {}) }), shape: '', bake: null, live: false, walls: null };
       spots.set(id, s);
     }
     return s;

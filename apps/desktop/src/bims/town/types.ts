@@ -6,6 +6,7 @@ import type { Object3D } from 'three';
 import type { Motion, Office } from '../model';
 import type { Grow } from '../growth';
 import type { Fit } from '../render/camera';
+import type { HerHair } from '../render/palette';
 import type { Cam } from '../zoom';
 import type { Step } from '../office-driver';
 import type { Placed } from './plan';
@@ -95,6 +96,11 @@ export interface TownOpts {
    * settle(). Absent: merged from the first frame.
    */
   readonly entry?: boolean;
+  /**
+   * a bim's cut and hat in an office over its name's (the hero's cast, hero/cast.ts headOf: a look for
+   * the film only, never the palette's); undefined: its name's own. Absent: every bim its own.
+   */
+  readonly heads?: (office: string, name: string) => HerHair | undefined;
 }
 
 /** the sky a town frame is drawn under (sky.ts): its target, the time, reduced motion (a slower fade) */

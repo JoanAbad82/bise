@@ -12,6 +12,7 @@
 import type { DoingKind } from '@/proto';
 import type { EggKind } from '../bims/eggs';
 import type { MapId } from '../bims/maps/ids';
+import type { HerHair } from '../bims/render/palette';
 
 /** the loop, s: the fold ends at FILM_S and the entry wave is 0:00 */
 export const FILM_S = 68.6;
@@ -47,6 +48,11 @@ export interface Bim {
   readonly name: string;
   readonly main?: boolean;
   readonly life: readonly Change[];
+  /**
+   * its cut and hat in the film over its name's (palette.ts herHair): the hero's look only, so an
+   * agent of that name in his own projects keeps its own; its clothes, skin and colours stay its name's
+   */
+  readonly head?: HerHair;
 }
 
 export interface Cast {
@@ -165,6 +171,9 @@ export const BUBBLE_S = 1.8;
 const FIRST: Flight = { dur: 2.5, loops: 0 };
 const SHORT: Flight = { dur: 2.8, loops: 0 };
 
+/** checkout's head in the film (hero-hair: his pick of designer's four cuts) */
+export const CHECKOUT_HEAD: HerHair = { cut: 'buns', hat: 'bare' };
+
 export const CAST: readonly Cast[] = [
   {
     id: KILN,
@@ -182,7 +191,8 @@ export const CAST: readonly Cast[] = [
       // visits cart (0:15.5), asks him (0:26.8), his answer at 0:32.8: at its desk it reads it and lays
       // it there (to 0:34.55), its '?' goes as it hops, it sits and types fast (bims-film v16); its crate
       // first (0:44.6, there at 0:52)
-      { name: 'checkout', life: [[0, gone], [12.5, work], [26.8, { k: 'asks' }], [34.55, work], [44.6, landing(1)]] },
+      // its hair (Gabriel m_46420: not the 'long' its name draws): the film's, bare-headed
+      { name: 'checkout', head: CHECKOUT_HEAD, life: [[0, gone], [12.5, work], [26.8, { k: 'asks' }], [34.55, work], [44.6, landing(1)]] },
       { name: 'emails', life: [[0, gone], [13.7, work], [46, landing(4)]] },
       { name: 'theme', life: [[0, gone], [39.1, work], [47.2, landing(6)]] },
       // finds checkout a bug (0:38.5, there 0:41.2, its visit over by 0:44.6), no ✗; 5th in line (from its desk the 6th place has no clear way: it never left)
@@ -217,6 +227,11 @@ export const CAST: readonly Cast[] = [
     ],
   },
 ];
+
+/** a bim's head set by the cast (Bim.head) in an office, the town's TownOpts.heads; undefined: its name's own. Pure. */
+export function headOf(office: string, name: string): HerHair | undefined {
+  return CAST.find((c) => c.id === office)?.bims.find((b) => b.name === name)?.head;
+}
 
 /** his lines' planes leave the feed when the line folds (FEED's `plane`), the agents' visits */
 export const NOTES: readonly Note[] = [

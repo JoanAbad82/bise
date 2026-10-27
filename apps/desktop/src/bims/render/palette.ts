@@ -112,6 +112,11 @@ export const CUTS = ['long', 'ponytail', 'braids', 'bob', 'buns', 'curls'] as co
 export type Cut = (typeof CUTS)[number];
 /** what a woman wears on her head: bare, or a hat that sits right on her cut (never sunk into it, never over hair on the ears under a headset) */
 export type HeadWear = 'bare' | 'cap' | 'capback' | 'beanie' | 'headphones';
+/** a woman's cut and what she wears over it (herHair's, or a look set over her name's: the hero's cast) */
+export interface HerHair {
+  readonly cut: Cut;
+  readonly hat: HeadWear;
+}
 export const CUT_HATS: Readonly<Record<Cut, readonly Exclude<HeadWear, 'bare'>[]>> = {
   long: ['cap', 'capback', 'beanie'],
   ponytail: ['cap', 'headphones', 'capback'],
@@ -202,7 +207,7 @@ export function outfitOf(name: string, main: boolean): Outfit {
  * Whether a bim is a woman and her hair, from a hash of its own (so its outfit, skin and colours stay
  * what they were): about half are; half of those go bare-headed, the rest wear a hat her cut takes. Pure.
  */
-export function herHair(name: string): { readonly cut: Cut; readonly hat: HeadWear } | null {
+export function herHair(name: string): HerHair | null {
   const s = hash(`hair:${name}`);
   if ((s & 1) === 0) return null;
   const cut = CUTS[(s >>> 1) % CUTS.length] as Cut;
