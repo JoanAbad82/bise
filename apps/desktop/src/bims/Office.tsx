@@ -26,7 +26,7 @@ import { awayNow, nightNow, testMode } from './room';
 import { pastimeWake } from './pastimes';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
-import { cutLines, cutWords, placeTags, TAG_INSET, type KeepRect, type TagIn } from './tags';
+import { cutLines, cutWords, hoverCardAt, placeTags, TAG_INSET, type KeepRect, type TagIn } from './tags';
 import { MapChip } from './MapChip';
 import { FitChip, NameLabel, Pill } from './chips';
 import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from './zoom';
@@ -141,11 +141,10 @@ export function tagRank(k: ActivityKind): number {
 /** px a label's chip adds to its words (its padding), and a pill beside it with its gap */
 const CHIP_PAD = 8;
 const PILL_ROOM = 20;
-/** the hover card: its widest (css px), its padding each side (--s-2), its title's lines, its gap under a flipped bim's feet */
+/** the hover card: its widest (css px), its padding each side (--s-2), its title's lines */
 const CARD_W = 240;
 const CARD_PAD = 8;
 const CARD_LINES = 3;
-const CARD_GAP = 4;
 /** after a card closes, the next one shows at once for this long (the ds tips' warmth) */
 const WARM_MS = 1000;
 /** from this width the camera fits a little ground past the building (render/index.ts), under it the building only */
@@ -410,10 +409,10 @@ export function Office({
       const w = el.offsetWidth;
       const th = el.offsetHeight;
       if (el.dataset.mode === 'hover') {
-        // the card over its head; under its feet when it would leave the top, never over its bim
-        // (designer m_27920); placed with the pills, first, never moved
-        const top = h.y - th >= TAG_INSET ? h.y - th : h.feet + CARD_GAP;
-        ins.push({ name, x: h.x, y: top + th, w, h: th, pill: true, rank: 0 });
+        // the card over its head, under its feet, or in the top-left corner when the bim fills the
+        // office (tags.ts hoverCardAt); placed with the pills, first, never moved
+        const c = hoverCardAt(h, w, th, box.clientHeight);
+        ins.push({ name, x: c.x, y: c.y, w, h: th, pill: true, rank: 0 });
         continue;
       }
       const rank = ranks.current.get(name) ?? 3;
@@ -1032,7 +1031,7 @@ export function Office({
  * The hover card (Gabriel: multi-line, easy to read; designer m_27920): its name in 600 with its
  * pill, its state dim under it, its title on at most CARD_LINES lines cut on a whole word with one
  * glued '…' (tags.ts cutLines, measured, so the lines are ours, not the browser's). No accent but
- * the pill's. The office's layoutTags places it: over the head, or under the feet.
+ * the pill's. The office's layoutTags places it: over the head, under the feet, or in the corner (tags.ts hoverCardAt).
  */
 function HoverCard({ label, width, measure, measureBold, tagRef, onOpen }: {
   label: Label;

@@ -41,6 +41,24 @@ export function tagLeft(x: number, w: number, box: number): number {
   return Math.max(TAG_INSET, Math.min(left, box - TAG_INSET - w));
 }
 
+/** px between a flipped hover card and its bim's feet */
+export const CARD_GAP = 4;
+/** px the hover card sits in from the office's top left when its bim leaves it no room (designer m_47532) */
+export const CARD_CORNER = 8;
+
+/**
+ * Where the hover card goes, never over its bim (designer m_27920, m_47532): over its head (x, y:
+ * the head's top, feet: its feet's), under its feet when it would leave the top, and in the
+ * office's top-left corner, CARD_CORNER in, when the bim fills the office (a close zoom: neither
+ * fits). The anchor placeTags takes (x its centre, y its bottom). Pure.
+ */
+export function hoverCardAt(head: { readonly x: number; readonly y: number; readonly feet: number }, w: number, h: number, boxH: number): { readonly x: number; readonly y: number } {
+  if (head.y - h >= TAG_INSET) return { x: head.x, y: head.y };
+  const under = head.feet + CARD_GAP;
+  if (boxH <= 0 || under + h <= boxH - TAG_INSET) return { x: head.x, y: under + h };
+  return { x: CARD_CORNER + w / 2, y: CARD_CORNER + h };
+}
+
 /** A rect no tag draws under (the office's corner chips: the map, '⤢ fit'), css px in the office. */
 export type KeepRect = Rect;
 

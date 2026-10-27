@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutLines, cutWords, placeTags, tagLeft, type TagIn } from './tags';
+import { CARD_CORNER, CARD_GAP, cutLines, cutWords, hoverCardAt, placeTags, tagLeft, type TagIn } from './tags';
 
 const tag = (name: string, x: number, y: number, w = 60, pill = false, rank = 3): TagIn => ({ name, x, y, w, h: 16, pill, rank });
 const boxes = (at: ReturnType<typeof placeTags>['at'], tags: readonly TagIn[]) =>
@@ -130,5 +130,20 @@ describe('the corner chips keep out (brief bims-mapsel)', () => {
   it('no chips: the same places as before', () => {
     const tags = [tag('a', 100, 80, 16, true), tag('b', 100, 80)];
     expect(placeTags(tags, 320, 200, [])).toEqual(placeTags(tags, 320, 200));
+  });
+});
+
+describe('hoverCardAt: never over its bim (designer m_27920, m_47532)', () => {
+  const card = { w: 120, h: 50 };
+  it('over its head when it fits, under its feet when it would leave the top', () => {
+    expect(hoverCardAt({ x: 150, y: 80, feet: 120 }, card.w, card.h, 300)).toEqual({ x: 150, y: 80 });
+    expect(hoverCardAt({ x: 150, y: 20, feet: 60 }, card.w, card.h, 300)).toEqual({ x: 150, y: 60 + CARD_GAP + card.h });
+  });
+  it('the bim filling the office (a close zoom): the top-left corner, CARD_CORNER in, off its head', () => {
+    const head = { x: 146, y: 20, feet: 130 };
+    const c = hoverCardAt(head, card.w, card.h, 140);
+    expect(c).toEqual({ x: CARD_CORNER + card.w / 2, y: CARD_CORNER + card.h });
+    const at = must(placeTags([{ name: 'perf', x: c.x, y: c.y, w: card.w, h: card.h, pill: true, rank: 0 }], 292, 140).at.get('perf'));
+    expect(at).toEqual({ left: CARD_CORNER, top: CARD_CORNER, lead: false });
   });
 });
