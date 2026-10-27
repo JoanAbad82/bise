@@ -63,7 +63,7 @@ function theView(): View {
 type LightBox = Parameters<typeof lightOffice>[3];
 
 /** the coin's head: lifted 0.2 to the camera above it, so a cap's peak leaves the eyes seen (level, the peak still hid them) */
-const LEVEL = [-0.2, 0, 0] as const;
+export const COIN_HEAD = [-0.2, 0, 0] as const;
 
 /** a standing visitor's pose at the origin, turned to the camera */
 function standing(): Pose {
@@ -160,7 +160,7 @@ function drawBim(name: string, main: boolean, night: boolean, look: Look | null,
   bim.daylight(night ? 0 : 1);
   // the visit's nod (pose.ts, head pitched 0.1 down) put a cap's peak over the eyes in the coin's
   // view (bim-review f1): the coin's head looks up at you
-  bim.apply({ ...rigOf({ pose: standing(), t: 30, main, phase: 0, reduced: true }), head: LEVEL });
+  bim.apply({ ...rigOf({ pose: standing(), t: 30, main, phase: 0, reduced: true }), head: COIN_HEAD });
   bim.group.updateMatrixWorld(true);
   v.scene.add(bim.group);
   try {
