@@ -3,7 +3,8 @@
 // bim.ts applies a Rig to the meshes; index.ts sums the Motion. Every still pose reads without
 // motion (asleep: eyes closed, head down; idle: sunk in the bean bag; failed: slumped; in line: the
 // box). Loops (typing, hot's sweat, the '?' hops, eating at the island) are 'loop' at LOOP_FPS;
-// reduced motion has none.
+// reduced motion has none. restingSince says when a bim came to rest in its still pose: the resting
+// bims' rare idle moves (render/idle.ts) start from there.
 import type { Activity, ActivityKind, Doing, Motion, Pose, Pt } from '../model';
 import { walkTime } from '../avoid';
 import { NAP_UP, SIT, SIT_S, sitBeat, toWorld } from '../sit';
@@ -553,13 +554,12 @@ export function placeOf(pose: Pose, reduced: boolean): { x: number; z: number; o
   return { x: b.x, z: b.z, opacity: 1, fading: false };
 }
 
-/** the bim at time t: its body, its place, and how the loop must run for it */
-export function rigOf(inp: RigInput): Rig {
-  const { pose, t, phase, reduced } = inp;
+/** a pose's beats at time t: its place, its walk, its bed, its transition (dur) and the time past its arrival (u) */
+function timing(inp: Pick<RigInput, 'pose' | 'reduced' | 'bedAt'>) {
+  const { pose, reduced } = inp;
   const { seg } = pose;
   const act = seg.act;
   const k: ActivityKind = act.k;
-  const lt = loopT(t, reduced);
   const place = placeOf(pose, reduced);
   const walkT = seg.path.len > 0.01 && seg.from !== null ? walkTime(seg) : 0;
   const arrived = reduced ? !place.fading : !pose.moving;
@@ -571,11 +571,36 @@ export function rigOf(inp: RigInput): Rig {
   // at its desk without a walk: its activity's pose after the hop
   const hopT = !reduced && (seg.sit?.up || seg.sit?.down) ? SIT_S.hop : 0;
   const u = pose.since - (reduced ? Math.min(FADE, walkT) : walkT) - hopT;
+  // its sit at its desk or its get-up (sit.ts): beside its chair, the chair out, a side step, the hop; never through it
+  const sat = !reduced ? sitBeat(seg, pose.since) : null;
+  return { act, k, place, walkT, arrived, bed, left, down, dur, hopT, u, sat };
+}
+
+/**
+ * When the bim came to rest in its state's still pose (t, s), or null while anything else moves it:
+ * its walk, its sit or get-up, its lie-down, a transition, a wait, a plane to catch (render/idle.ts:
+ * its idle moves start only then). Motion only: reduced motion is always null.
+ */
+export function restingSince(inp: Pick<RigInput, 'pose' | 't' | 'reduced' | 'bedAt'>): number | null {
+  if (inp.reduced) return null;
+  const { pose } = inp;
+  const { arrived, left, dur, u, sat } = timing(inp);
+  if (!arrived || sat || pose.waiting === true || u < dur) return null;
+  if (left && pose.since < NAP_DOWN) return null;
+  const planes = pose.plane ? [...(pose.aloft ?? []), pose.plane] : [];
+  if (planes.some((p) => p.since < (p.dur ?? PLANE_FLIGHT) + PLANE_CATCH)) return null;
+  return inp.t - (u - dur);
+}
+
+/** the bim at time t: its body, its place, and how the loop must run for it */
+export function rigOf(inp: RigInput): Rig {
+  const { pose, t, phase, reduced } = inp;
+  const { seg } = pose;
+  const { act, k, place, walkT, arrived, bed, left, down, dur, hopT, u, sat } = timing(inp);
+  const lt = loopT(t, reduced);
   // a loop of its own from its arrival (eating); reduced motion holds it chewing, a fruit in hand
   const target = rest(act, lt, phase, reduced ? PICK_S + BITE_S - 0.2 : Math.max(0, u - dur), bed);
 
-  // its sit at its desk or its get-up (sit.ts): beside its chair, the chair out, a side step, the hop; never through it
-  const sat = !reduced ? sitBeat(seg, pose.since) : null;
   const sitIn = seg.sit?.in;
 
   let b: Body;
@@ -669,10 +694,11 @@ function carrying(r: Rig, since: number): Rig {
   return { ...r, armR: [-0.4, 0, 0.35], props: { ...r.props, skate: true }, board };
 }
 
-/** the loudest of several motions: 'walk' over 'skate' over 'blend' over 'loop' over 'still' */
+/** the loudest of several motions: 'walk' over 'skate' over 'idle' over 'blend' over 'loop' over 'still' */
 export function louder(a: Motion, b: Motion): Motion {
   if (a === 'walk' || b === 'walk') return 'walk';
   if (a === 'skate' || b === 'skate') return 'skate';
+  if (a === 'idle' || b === 'idle') return 'idle';
   if (a === 'blend' || b === 'blend') return 'blend';
   if (a === 'loop' || b === 'loop') return 'loop';
   return 'still';

@@ -2,8 +2,9 @@
 // loop follows. A frame runs on a kick (a snapshot, a hover, ctrl held, a size or theme change, his
 // message) and asks for the next one only while something moves: the renderer's Motion, its frame
 // wait in one table (FRAME_MS: 'walk' at the display's rate, 'skate' at 30 fps while a skater rides
-// its line, 'blend' at BLEND_FPS while the sky changes (sky.ts), 'loop' at LOOP_FPS for the ambient loops, 'still' none), the timeline's walks, an event
-// label's 3 s, and one timer for a resting skater's next line (skate.ts wakeIn). Never while the
+// its line, 'idle' at IDLE_FPS while a resting bim plays an idle move (render/idle.ts), 'blend' at
+// BLEND_FPS while the sky changes (sky.ts), 'loop' at LOOP_FPS for the ambient loops, 'still' none), the timeline's walks, an event
+// label's 3 s, and one timer for a resting skater's next line (skate.ts wakeIn) or the next idle move. Never while the
 // window is away (hidden, or not in front outside the test harness, as App.tsx's useStill) or the
 // WebGL context is lost. No three, no DOM. Owner: bims-wire.
 import { LOOP_FPS, type Label, type Motion } from './model';
@@ -24,6 +25,8 @@ export function away(w: Window_): boolean {
 export const TICK_MS = Math.round(1000 / LOOP_FPS);
 /** a skater's line (skate.ts): 30 fps, never the display's rate (architect m_28726) */
 export const SKATE_FPS = 30;
+/** a resting bim's idle move (render/idle.ts): 30 fps while it plays, slow eased moves (designer m_46760: at 8 fps a sway reads as a glitch) */
+export const IDLE_FPS = 30;
 /** the sky's blend (sky.ts SKY_FADE_S): ~10 fps over its 30 s, then none (bims-light) */
 export const BLEND_FPS = 10;
 
@@ -35,6 +38,7 @@ export const BLEND_FPS = 10;
 export const FRAME_MS: Readonly<Record<Motion, number | null>> = {
   walk: 0,
   skate: Math.round(1000 / SKATE_FPS),
+  idle: Math.round(1000 / IDLE_FPS),
   blend: Math.round(1000 / BLEND_FPS),
   loop: TICK_MS,
   still: null,

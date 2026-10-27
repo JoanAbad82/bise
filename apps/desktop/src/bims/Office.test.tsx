@@ -40,6 +40,9 @@ function fakeRenderer() {
       r.frames++;
       return r.motion;
     }),
+    /** s to the next idle move, as the renderer says it after a frame (render/idle.ts) */
+    wake: null as number | null,
+    idleWake: () => r.wake,
     headOf: vi.fn(() => ({ x: 10, y: 20, feet: 40 })),
     pick: vi.fn((x: number): string | null => (x < 50 ? 'perf' : null)),
     copyTo: vi.fn(),
@@ -205,6 +208,32 @@ describe('the loop', () => {
     });
     await flush(3);
     expect(r.frames).toBe(n + 1);
+  });
+  it("a still office with resting bims sleeps until the next idle move (render/idle.ts), then draws the burst at 30 fps", async () => {
+    const waits: number[] = [];
+    const set = globalThis.setTimeout;
+    vi.stubGlobal('setTimeout', (f: () => void, ms?: number) => {
+      waits.push(ms ?? 0);
+      return set(f, 1e9);
+    });
+    const r = fakeRenderer();
+    r.wake = 7.25;
+    mount(fakeParts(r).parts);
+    await flush(3);
+    // no frame between moves: one timer, at the move's start
+    expect(frames).toHaveLength(0);
+    expect(waits).toContain(7250);
+    expect(waits).not.toContain(33);
+    cleanup();
+    // a move running: the renderer says 'idle', a frame every 33 ms
+    waits.length = 0;
+    const s = fakeRenderer();
+    s.motion = 'idle';
+    s.wake = 20;
+    mount(fakeParts(s).parts);
+    await flush(3);
+    expect(waits).toContain(33);
+    expect(waits).not.toContain(20000);
   });
   it('a new snapshot kicks one frame and the timeline hears of it', async () => {
     const r = fakeRenderer();

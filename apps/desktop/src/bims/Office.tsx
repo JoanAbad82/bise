@@ -599,8 +599,9 @@ export function Office({
         lastLabels = sig;
         setLabels(shown);
       }
-      // a resting skater or climber (pastimes.ts): no frame during its rest, a timer for its next line
-      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: step.moving, labels: shown, away: awayNow(), lost, wake: soonest(pastimeWake(frames, office), step.wake) });
+      // a resting skater or climber (pastimes.ts): no frame during its rest, a timer for its next line;
+      // a resting bim's next idle move (render/idle.ts) the same way: no frame between its moves
+      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: step.moving, labels: shown, away: awayNow(), lost, wake: soonest(soonest(pastimeWake(frames, office), step.wake), r.idleWake()) });
       if (next === 0) raf = requestAnimationFrame(draw);
       else if (next !== null) tick = setTimeout(draw, next);
     };

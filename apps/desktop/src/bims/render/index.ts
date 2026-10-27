@@ -225,6 +225,7 @@ export const makeRenderer: MakeRenderer = (canvas, opts) => {
       }
       return motion;
     },
+    idleWake: () => (view.lost() ? null : office.idleWake()),
     headOf,
     spotOf(name) {
       if (!fit || !base) return null;

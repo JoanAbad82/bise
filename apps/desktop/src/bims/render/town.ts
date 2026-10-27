@@ -592,6 +592,14 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       shadowsDirty = true;
       return m ?? 'still';
     },
+    idleWake() {
+      let soon: number | null = null;
+      for (const s of spots.values()) {
+        const w = s.live ? s.scene.idleWake() : null;
+        if (w !== null) soon = soon === null ? w : Math.min(soon, w);
+      }
+      return soon;
+    },
     liveIds() {
       const f = shownFit();
       if (!f || !base || !plan) return [];

@@ -14,6 +14,7 @@ import { siteOf, type Fit, type V3 } from './camera';
 import { cameraStart, viewPoint, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
 import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, REACH_S, awayOf, heldAt } from './catch';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
+import { idleFrame, idleRig } from './idle';
 import { restAt, type NapRest } from './nap';
 import { skateRig } from './skate';
 import { climbRig } from './climb';
@@ -93,6 +94,8 @@ export interface OfficeScene {
   feet(name: string, out: Vector3): Vector3 | null;
   /** every bim's name, shown or not */
   names(): readonly string[];
+  /** s from the last frame's t until a resting bim's next idle move (render/idle.ts idleWake); null: none, or reduced motion */
+  idleWake(): number | null;
   /** a bim's body (the hero's entry pops it in), null: no such bim */
   body(name: string): Object3D | null;
   desk(name: string): DeskHandles | undefined;
@@ -219,6 +222,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
   };
   const bims = new Map<string, Bim>();
   const rigs = new Map<string, Rig>();
+  /** s from the last frame until the next resting bim's idle move (render/idle.ts); null: none */
+  let wakeIdle: number | null = null;
   /** his planes in flight, by bim and when it left ('name@12.30'): the mesh, its plan; each ends on its own catch */
   /** each flight's plan: the app's (zigzag and loop) or the film's paper glide (pose.plane.glide) */
   const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan | GlidePlan; glide: boolean; big: number }>();
@@ -622,6 +627,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       // the bims' small details only when they are big enough on screen (bim.ts nearAt); their clay's warmth by day (claylight.ts)
       const near = nearAt(fit.scale);
       const day = 1 - (lamps ?? (world.pal.pendants ? 1 : 0));
+      // the resting bims' idle moves (render/idle.ts): none under reduced motion or drawn too small
+      const { plan: idle, wake } = idleFrame(frames, t, { reduced: look.reduced, scale: fit.scale, bedAt });
+      wakeIdle = wake;
       for (const f of frames) {
         const b = ensureBim(f.name, f.main);
         b.detail(near);
@@ -632,7 +640,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         const gym = office.gym;
         // or a climber on the gym's wall (climb.ts), the same way
         const skater = look.reduced ? null : park ? skateRig(f.name, f.pose, park, b.outfit.phase) : gym ? climbRig(f.name, f.pose, gym) : null;
-        const rig = eggRig(skater ?? rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt }), f.egg ?? null);
+        const still = idle.get(f.name);
+        const posed = rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt });
+        const rig = eggRig(skater ?? (still ? idleRig(posed, still) : posed), f.egg ?? null);
         b.apply(rig);
         if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) {
           appearing.set(f.name, t);
@@ -721,6 +731,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       }
     },
     names: () => [...bims.keys()],
+    idleWake: () => wakeIdle,
     body: (name) => bims.get(name)?.group ?? null,
     desk: (name) => world?.desks.get(name),
     inboxTop: () => world?.inbox?.top ?? null,

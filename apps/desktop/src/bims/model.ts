@@ -452,9 +452,11 @@ export interface PlaneFlight {
  * a transition, a plane, a fade), 'loop' at LOOP_FPS (only ambient loops: typing, the '?' jumps),
  * 'blend' at ~10 fps while the sky changes (sky.ts SKY_FADE_S, 30 s every 5 min at most),
  * 'still' stopped until the next snapshot, hover, size or theme change. Asleep, napping, on the
- * terrace, failed, blocked, stopped or in line are still poses: no breathing loop in v1.
+ * terrace, failed, blocked, stopped or in line are still poses: no breathing loop. 'idle' at 30 fps
+ * only while a resting bim plays one of its rare idle moves (render/idle.ts: a sway, a yawn, a turn in
+ * its sleep), still between them (the loop wakes for the next one: OfficeRenderer.idleWake).
  */
-export type Motion = 'walk' | 'skate' | 'blend' | 'loop' | 'still';
+export type Motion = 'walk' | 'skate' | 'idle' | 'blend' | 'loop' | 'still';
 export const LOOP_FPS = 8;
 
 // ---- the pure modules' entry points (each module exports a function of this type under that name)
@@ -558,6 +560,8 @@ export interface OfficeRenderer {
   setCam(cam: Cam): void;
   /** draw time t; how the loop must run next (Motion). Reduced motion: never 'loop' */
   frame(t: number, bims: readonly BimFrame[], look: Look): Motion;
+  /** s from the last frame's t until a resting bim's next idle move (render/idle.ts): the still office's wake; null: none */
+  idleWake(): number | null;
   /** a bim's head on the canvas, css px from its top left (labels and pills go there), and its feet's y (the hover card flips under them); null off view */
   headOf(name: string): { readonly x: number; readonly y: number; readonly feet: number } | null;
   /** where a bim stands even off view (focus.ts): its head on the canvas (css px, maybe outside it) and its middle as fractions of the whole fit (the follow camera aims there); null: not drawn */

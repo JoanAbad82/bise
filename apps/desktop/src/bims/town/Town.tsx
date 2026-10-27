@@ -379,6 +379,9 @@ export function Town({
         const n = nextAfter({ motion, moving: step.moving, labels: own ? step.labels : new Map(), away: awayNow(), lost: false });
         if (n !== null) next = next === null ? n : Math.min(next, n);
       }
+      // a live office's resting bim: its next idle move (render/idle.ts), never while away
+      const idle = awayNow() ? null : r.idleWake();
+      if (idle !== null) next = next === null ? Math.ceil(idle * 1000) : Math.min(next, Math.ceil(idle * 1000));
       // the sky's blend: its few seconds at 30 fps, then rest (sky.ts)
       const sky = townSky(c);
       if (r.frame(nightNow(), sky === null ? undefined : { sky: sky.sky, t, reduced: c.reduced })) {
