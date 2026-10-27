@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { openInbox } from '@/inbox';
 import { useProjects } from '@/store';
 import type { ProjectRow } from '@/proto';
+import type { Route } from './route';
 
 export type InboxAt = { readonly project: string; readonly card: number };
 
@@ -16,14 +17,24 @@ export const ASK_MS = 10_000;
 let pending: { at: InboxAt; until: number } | null = null;
 const subs = new Set<() => void>();
 
-/** Open the block: on that card when it is listed (now or within ASK_MS), else on its first item now. */
-export function askInbox(at?: InboxAt): void {
-  if (at === undefined) {
-    openInbox();
-    return;
-  }
+/**
+ * Open the block: on that card when it is listed (now or within ASK_MS), else on its first item now.
+ * False: a plain ask opened nothing (no block on this screen, or nothing waits); a card's ask waits.
+ */
+export function askInbox(at?: InboxAt): boolean {
+  if (at === undefined) return openInbox();
   pending = { at, until: Date.now() + ASK_MS };
   for (const f of [...subs]) f();
+  return true;
+}
+
+/**
+ * ⌘I, Go › Inbox, the palette's inbox: the inbox block in place, on the screen he is on; where it
+ * opens nothing (a screen with no block since bise fait mac: settings, onboarding; or nothing
+ * waits), the inbox place, never a dead key (native/mac-keys red on 2c9d55b56, main m_48001).
+ */
+export function inboxFromMenu(go: (to: Route) => void, open: () => boolean = askInbox): void {
+  if (!open()) go({ screen: 'inbox' });
 }
 
 /** Whether the core's rows list that card. Pure. */

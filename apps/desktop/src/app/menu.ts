@@ -12,7 +12,7 @@ import { useEffect, useRef } from 'react';
 import type { MenuAction } from '@/shared/api';
 import type { Router } from './router';
 import { inboxAtOf, parseRoute, projectOf, type Route } from './route';
-import { askInbox } from './inboxAsk';
+import { askInbox, inboxFromMenu } from './inboxAsk';
 import { addProject } from './addProject';
 import { newAgent } from './newagent';
 import { useStore } from '@/store';
@@ -66,9 +66,11 @@ export function useMenuRouting(router: Router) {
     const bise = (window as Partial<Window>).bise;
     if (bise === undefined) return;
     return bise.onMenu((action) => {
-      // b1/b2: ⌘I opens the inbox block in place, on the screen he is on (never a route)
+      // b1/b2: ⌘I opens the inbox block in place, on the screen he is on; none there: the inbox place
       if (action === 'inbox') {
-        askInbox();
+        inboxFromMenu((to) => {
+          router.go(to);
+        });
         return;
       }
       // File › New Project… / New Agent… (r2-pointer): the same sheets as ⌘N / ⇧⌘N (keys.ts); the
@@ -106,8 +108,12 @@ export function useMainRoutes(router: Router) {
       }
       // b1/b2: 'inbox' / a notification's 'inbox?card=<project>/<id>' open the block in place
       const inbox = inboxAtOf(route);
-      if (inbox !== undefined) askInbox(inbox.at);
-      else router.go(parseRoute(route));
+      if (inbox === undefined) router.go(parseRoute(route));
+      else if (inbox.at === undefined)
+        inboxFromMenu((to) => {
+          router.go(to);
+        });
+      else askInbox(inbox.at);
     });
   }, [router]);
 }

@@ -19,7 +19,7 @@ import { searchDataOf } from '@/search/data';
 import { useGoArtifact } from '@/artifacts/leave';
 import { PAGES } from '@/settings';
 import { useNow } from './clock';
-import { askInbox } from './inboxAsk';
+import { inboxFromMenu } from './inboxAsk';
 import { UNMEASURED, windowOf, type Measures } from './paletteWindow';
 import { HELP_EVENT } from './keys';
 import { appPages } from './pages';
@@ -202,7 +202,10 @@ export function Palette({ onClose }: { onClose: () => void }) {
     // a page: as its key does (⌘I the inbox in place, ⌘/ the key list, the rest a route)
     if (h.open.to === 'page') {
       const go = h.open.go;
-      if ('inbox' in go) askInbox();
+      if ('inbox' in go)
+        inboxFromMenu((to) => {
+          router.go(to);
+        });
       else if ('help' in go) window.dispatchEvent(new Event(HELP_EVENT));
       else router.go(parseRoute(go.route));
       return;
