@@ -45,7 +45,7 @@ import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
-import { newAgent, openOverview, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
+import { newAgent, openTab, panelProject, useFrontArtKind, useLeftWidth, usePanelBox } from './ports';
 import { acrossSays, busyProjects, useListed } from './lists';
 import { barScope, inScope, scopeWords } from '../barscope';
 import { alarms } from '@/thread/wake';
@@ -441,7 +441,6 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
           // in a project the waiting part goes in the accent (page agents-float v1); across projects one line
           ...(across(b) < 2 ? { says: counts.working > 0 ? side.working({ n: counts.working }) : '', loud: counts.asks > 0 ? side.waiting_you({ n: counts.asks }) : '' } : { says: saysOf(b) }),
           add: <HeadButton icon="plus" tip={side.new_agent} onClick={() => { newAgent(project); }} testId="app.flyout.agents.add" />,
-          onPin: () => { openOverview('agents'); },
           foot: {
             left: '',
             fold: <ArchivedFold n={ov.archived.length} open={archivedOpen} onToggle={() => { setArchivedOpen((o) => !o); }} />,
@@ -460,14 +459,12 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
           id: b, name: bubbleName(b), says: saysOf(b),
           add: <AddButton place={addPlace} testId="app.flyout.artifacts.add" />,
           ...(artScope === null ? {} : { scope: { words: artScope.words, tip: artScope.tip } }),
-          onPin: () => { openOverview('artifacts'); },
           foot: { left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project: scope }); } }] },
           rows: artifacts.length === 0 ? <Empty>{artScope?.empty ?? side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />),
         };
       case 'scheduled':
         return {
           id: b, name: bubbleName(b), says: saysOf(b),
-          onPin: () => { openOverview('processes'); },
           foot: { left: '', links: [{ text: side.all_scheduled, testId: 'app.flyout.scheduled.all', onClick: () => { router.go({ screen: 'scheduled' }); } }] },
           rows: tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
             <>
@@ -479,7 +476,6 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       case 'processes':
         return {
           id: b, name: bubbleName(b), says: saysOf(b),
-          onPin: () => { openOverview('processes'); },
           foot: { left: '', links: [{ text: side.all_processes, testId: 'app.flyout.processes.all', onClick: () => { router.go(all ? { screen: 'running' } : { screen: 'running', scope: { project } }); } }] },
           rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} />),
         };

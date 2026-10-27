@@ -14,7 +14,6 @@
 import type { MouseEventHandler, ReactNode, Ref } from 'react';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import type { EntityMenu } from '@/ds';
-import { side } from '@/proto/words_side.gen';
 import type { BubbleId } from './objects';
 
 /** A card's head button (+, ▯): 28, its line icon at 16, its tip and VoiceOver name. */
@@ -52,8 +51,6 @@ export interface FloatContent {
   readonly loud?: string;
   /** the head's '+' (agents: a new agent; artifacts: add a file) */
   readonly add?: ReactNode;
-  /** the head's '▯': the same list as a tab of the panel */
-  readonly onPin: () => void;
   /** its foot: what it says on the left ('3 archived'), its full page's link on the right ('all agents ›') */
   /** its foot: what it says on the left ('3 archived'), or a fold there (the agents' '▸ 3 archived'); its full page's link on the right */
   readonly foot: { readonly left: string; readonly fold?: ReactNode; readonly links: readonly FootLink[] };
@@ -83,7 +80,6 @@ export function FloatLayer({ c, scrolls = false, leaving = false }: { c: FloatCo
         )}
         <span className="s3-card-acts">
           {c.add}
-          <HeadButton icon="panel" tip={side.pin_tab} onClick={c.onPin} testId={`app.flyout.${id}.pin`} />
         </span>
       </header>
       {c.scope !== undefined && (
