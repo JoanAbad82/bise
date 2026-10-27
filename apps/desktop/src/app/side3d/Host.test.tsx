@@ -640,10 +640,14 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     const tile = v.getByTestId('app.outer.world');
     expect(tile.style.height).toBe('140px');
     expect(tile.querySelector('[data-testid="office"]')).toBeTruthy();
-    expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('148px');
+    // 12 under the bar's 52, as at the window's right and bottom (his m_46677: it sat on the bar)
+    expect(tile.style.top).toBe('64px');
+    // the card under the tile and its 8 handle
+    expect(v.getByTestId('app.outer').style.top).toBe('212px');
     expect(v.getByTestId('app.outer.world.handle').getAttribute('aria-valuenow')).toBe('140');
-    // the handle sits in the 8 gap under the tile (ui-review m_46538: it sat over the tile's top): the same room as the card's
-    expect(v.getByTestId('app.outer.world.handle').style.getPropertyValue('--s3-tile')).toBe('148px');
+    // the handle sits in the 8 gap under the tile (ui-review m_46538: it sat over the tile's top)
+    expect(v.getByTestId('app.outer.world.handle').style.top).toBe('204px');
+    expect(v.getByTestId('app.outer.world.handle').style.height).toBe('8px');
     // shown: no cube in the Agents head
     expect(v.queryByTestId('app.outer.agents.cube')).toBeNull();
   });
@@ -654,7 +658,8 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     fireEvent.click(v.getByTestId('app.outer.world.hide'));
     expect(v.queryByTestId('app.outer.world')).toBeNull();
     expect(v.queryByTestId('app.outer.world.handle')).toBeNull();
-    expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('');
+    // the card alone keeps the same 12 under the bar
+    expect(v.getByTestId('app.outer').style.top).toBe('64px');
     const cube = v.getByTestId('app.outer.agents.cube');
     expect(cube.getAttribute('aria-label')).toBe(side.tile_show);
     expect(outerWorld.get().hidden).toBe(true);
@@ -682,8 +687,9 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     fireEvent.pointerDown(handle, { clientY: 200, button: 0, pointerId: 1 });
     fireEvent.pointerMove(handle, { clientY: 296, pointerId: 1 });
     expect(v.getByTestId('app.outer.world').style.height).toBe('236px');
-    expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('244px');
-    expect(handle.style.getPropertyValue('--s3-tile')).toBe('244px');
+    expect(v.getByTestId('app.outer.world').style.top).toBe('64px');
+    expect(v.getByTestId('app.outer').style.top).toBe('308px');
+    expect(handle.style.top).toBe('300px');
     // past half the window: 450
     fireEvent.pointerMove(handle, { clientY: 900, pointerId: 1 });
     expect(v.getByTestId('app.outer.world').style.height).toBe('450px');
@@ -722,18 +728,18 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(v.queryByTestId('app.outer.artifacts.sum')).toBeNull();
     expect(v.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(2);
     act(() => {
-      outerWorld.height(450, 900);
+      outerWorld.height(438, 900);
     });
-    // 900 - 52 - 12 - 458 = 378: room for one row each (the agents' 3 lines first)
+    // 900 - 64 - 12 - 446 = 378: room for one row each (the agents' 3 lines first)
     expect(v.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(1);
     expect(v.queryByTestId('app.outer.artifacts.sum')).toBeNull();
     cleanup();
     tall(800);
     act(() => {
-      outerWorld.height(400, 800);
+      outerWorld.height(388, 800);
     });
     const low = side3d(1440).v;
-    // 800 - 52 - 12 - 408 = 328: the heads alone, their summary after the name
+    // 800 - 64 - 12 - 396 = 328: the heads alone, their summary after the name
     expect(low.getByTestId('app.outer.artifacts').querySelectorAll('.s3-row').length).toBe(0);
     expect(low.getByTestId('app.outer.artifacts.sum').textContent).toContain('PR #6');
     expect(low.getByTestId('app.outer').hasAttribute('data-scrolls')).toBe(false);

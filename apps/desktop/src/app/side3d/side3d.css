@@ -1325,8 +1325,7 @@
    bottom; r 12, --c-raised, 1 px line, e-1; it scrolls inside when its sections pass its height */
 .s3-outer {
   position: fixed;
-  /* under the bims' tile and its 8 handle when it shows (outer-world v2: --s3-tile, Host.tsx) */
-  top: calc(var(--h-bar) + var(--s3-tile, 0px));
+  /* top inline (OuterCard: tilestate OUTER_TOP, 12 under the bar, + the tile and its 8 handle when it shows) */
   right: var(--s-3);
   bottom: var(--s-3);
   z-index: 15;
@@ -1372,8 +1371,11 @@
   color: var(--c-accent);
   font-weight: 600;
 }
+/* one line whatever the head holds: the summary takes the cut (his m_46681: 'all' over '›') */
 .s3-ohead-all {
+  flex: none;
   margin-left: auto;
+  white-space: nowrap;
   color: var(--c-text-3);
 }
 .s3-ohead-all:hover {
@@ -1547,12 +1549,11 @@
 }
 
 /* the bims' world over the outer card (page outer-world v2, his pick #799; OuterWorld.tsx): a tile
-   280 wide, as high as he left it (140 by default, inline), its top on the bar's 52, r 12, the
-   card's ring and e-1; the office whole at its fit; '⤢' and '×' top right on hover, 24 each, 4
-   apart, 8 from the edges */
+   280 wide, as high as he left it (140 by default, inline), its top 12 under the bar (inline:
+   tilestate OUTER_TOP; his m_46677), r 12, the card's ring and e-1; the office whole at its fit;
+   '⤢' and '×' top right on hover, 24 each, 4 apart, 8 from the edges */
 .s3-otile {
   position: fixed;
-  top: var(--h-bar);
   right: var(--s-3);
   z-index: 15;
   box-sizing: border-box;
@@ -1601,12 +1602,11 @@
 /* the 8 gap between the tile and the card: the handle (the panel's signed one, turned): row-resize,
    a 2 px text-3 line after 120 ms of hover, text-2 while dragged */
 .s3-ohandle {
+  /* top and height inline (TileHandle: under the tile) */
   position: fixed;
-  top: calc(var(--h-bar) + var(--s3-tile, 0px) - var(--s-2));
   right: var(--s-3);
   z-index: 15;
   width: 280px;
-  height: 8px;
   cursor: row-resize;
   outline: 0;
   touch-action: none;

@@ -1,6 +1,6 @@
 // src/app/side3d · the outer card (page outer-side v2, Gabriel's pick m_46173): the Overview out of
-// the panel, a card at the window's right (280 wide, 12 from the edges, its top on the left side's
-// top), shown while the panel is folded and the room leaves the column 480 (layout 'card'); a panel
+// the panel, a card at the window's right (280 wide, 12 from the edges, the bar's included: its top
+// inline, tilestate OUTER_TOP + the tile's room), shown while the panel is folded and the room leaves the column 480 (layout 'card'); a panel
 // open gives way to the coins, then to the minis (Host). Its sections head in the folded side's
 // style: the section's 3D object at 20, its name, its count, 'all ›'. AGENTS: one line of 28 each,
 // in the hub's rank: its mark (the bar's language, ⌥N while ⌥ is held, an ask's in the accent),
@@ -8,7 +8,7 @@
 // worktree; idle and done step back. A click opens its thread; an ask's click opens it in place,
 // its options and 'answer…' / 'write to perf…' under it. 15 at most, then '+ N more'. The other
 // sections keep the floats' rows (FlyoutLists). Owner: nm-side.
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Card } from '@/proto';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { sortCards } from '@/inbox/order';
@@ -25,6 +25,7 @@ import { OptButton } from './FlyoutAgents';
 import { askButtons, pickIntent } from './model';
 import { bubbleThing, type BubbleId } from './objects';
 import { groupParts } from './lists';
+import { OUTER_TOP } from './tilestate';
 
 /** the agents shown before '+ N more' (15 fit a 900 high window with the other sections) */
 export const OUTER_AGENTS = 15;
@@ -205,7 +206,7 @@ export function OuterSection({ id, name, count, loud, sum, onAll, onCube, childr
  */
 export function OuterCard({ tile = 0, scrolls = false, children }: { tile?: number; scrolls?: boolean; children: ReactNode }) {
   return (
-    <aside className="s3-outer" style={tile > 0 ? ({ '--s3-tile': `${String(tile)}px` } as CSSProperties) : undefined} data-scrolls={scrolls || undefined} data-testid="app.outer">
+    <aside className="s3-outer" style={{ top: OUTER_TOP + tile }} data-scrolls={scrolls || undefined} data-testid="app.outer">
       {children}
     </aside>
   );

@@ -1,18 +1,18 @@
 // src/app/side3d · the bims' world over the outer card (page outer-world v2, his pick #799): the
 // tile, 280 wide and as high as he left it (140 by default), r 12, the card's ring and e-1, its top
-// on the left side's top (52); the project's office at its fit, live: a click on a bim opens its
+// 12 under the bar (tilestate OUTER_TOP, inline; his m_46677); the project's office at its fit, live: a click on a bim opens its
 // thread, a pinch zooms inside, the office's own 'Loft ⌄' chip bottom left and '⤢ fit' bottom right
 // while zoomed. On hover two 24 px buttons top right: '⤢' the world in the panel's Office tab, '×'
 // hides the tile (tilestate.ts keeps it per window). Under it, the 8 px gap to the card is the
 // handle: row-resize, a 2 px text-3 line after 120 ms of hover (the panel's signed handle), a drag
 // from 96 to half the window's height, a double-click back to 140. Owner: nm-side.
-import { useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
+import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Agent, Card } from '@/proto';
 import type { MapId } from '@/bims/maps/ids';
 import { Press, tipAttrs } from '@/ds';
 import { side } from '@/proto/words_side.gen';
 import { WorldOffice } from './World';
-import { clampTile, TILE_GAP, TILE_H, TILE_MIN, tileMax } from './tilestate';
+import { clampTile, OUTER_TOP, TILE_GAP, TILE_H, TILE_MIN, tileMax } from './tilestate';
 
 export interface OuterTileProps {
   readonly project: string;
@@ -36,7 +36,7 @@ export interface OuterTileProps {
 /** The tile: the office, '⤢' and '×' on hover. */
 export function OuterTile({ project, name, agents, cards, h, onOpen, onPickMap, onPanel, onHide }: OuterTileProps) {
   return (
-    <section className="s3-otile" style={{ height: h }} aria-label={side.tile_name({ project: name })} data-testid="app.outer.world">
+    <section className="s3-otile" style={{ top: OUTER_TOP, height: h }} aria-label={side.tile_name({ project: name })} data-testid="app.outer.world">
       <span className="s3-otile-office">
         <WorldOffice project={project} agents={agents} cards={cards} fill onOpen={onOpen} onPickMap={onPickMap} />
       </span>
@@ -85,8 +85,8 @@ export function TileHandle({ h, winH, onHeight }: { h: number; winH: number; onH
   return (
     <div
       className="s3-ohandle"
-      // its place: the 8 under the tile (side3d.css top: the bar + this - 8), following the height
-      style={{ '--s3-tile': `${String(h + TILE_GAP)}px` } as CSSProperties}
+      // its place: the 8 under the tile, following the height
+      style={{ top: OUTER_TOP + h, height: TILE_GAP }}
       role="separator"
       aria-orientation="horizontal"
       aria-label={side.tile_height}

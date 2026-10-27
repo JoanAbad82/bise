@@ -14,9 +14,11 @@ export const TILE_H = 140;
 export const TILE_MIN = 96;
 /** the gap between the tile and the card: the handle */
 export const TILE_GAP = 8;
-/** the card's top with no tile: the bar's 52 (--h-bar); and the room it keeps above the window's bottom */
-export const OUTER_TOP = 52;
-export const OUTER_FOOT = 12;
+/** the room the stack (the tile, its handle, the card) keeps under the bar, at the window's right and above its bottom: 12, the one gap (his m_46677: the tile sat on the bar) */
+export const OUTER_GAP = 12;
+/** the stack's top, css px: the bar's 52 (--h-bar) and its gap. The tile's, or the card's with no tile; inline, the one place it is set */
+export const OUTER_TOP = 52 + OUTER_GAP;
+export const OUTER_FOOT = OUTER_GAP;
 
 /** The tile's most height: half the window's. Never under TILE_MIN. Pure. */
 export function tileMax(winH: number): number {
