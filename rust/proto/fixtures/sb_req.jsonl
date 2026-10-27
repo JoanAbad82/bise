@@ -84,6 +84,7 @@
 {"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"high","feature":"","model":"openai/gpt-5","name":"fix","objective":"o","profile":"","report_format":"","with_changes":true,"worktree":true}
 {"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"","model":"","name":"fix","objective":"o","place":"docs","profile":"fast","report_format":"","with_changes":false,"worktree":false}
 {"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"checkout","model":"","name":"fix","objective":"o","profile":"","report_format":"","with_changes":false,"worktree":false}
+{"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"","folder":"launch/hero film","model":"","name":"fix","objective":"o","profile":"","report_format":"","with_changes":false,"worktree":false}
 {"attach":["/w/shop/launch.html"],"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"","model":"","name":"fix","objective":"o","profile":"","report_format":"","with_changes":false,"worktree":false}
 {"agent":"fix","cmd":"move","place":"new"}
 {"agent":"fix","cmd":"move","place":"docs"}

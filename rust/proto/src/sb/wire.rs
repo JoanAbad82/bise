@@ -193,6 +193,10 @@ pub mod brief {
         done_when: String,
         #[serde(default)]
         report_format: String,
+        /// `--folder` (artifact-folders): absent when none, so an older
+        /// hub reads the same line
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<String>,
     }
 
     pub fn serialize<S: Serializer>(b: &Brief, s: S) -> Result<S::Ok, S::Error> {
@@ -202,6 +206,7 @@ pub mod brief {
             constraints: b.constraints.clone(),
             done_when: b.done_when.clone().unwrap_or_default(),
             report_format: b.report_format.clone().unwrap_or_default(),
+            folder: b.folder.clone(),
         }
         .serialize(s)
     }
@@ -209,6 +214,6 @@ pub mod brief {
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Brief, D::Error> {
         let k = Keys::deserialize(d)?;
         let some = |s: String| Some(s).filter(|s| !s.is_empty());
-        Ok(Brief { objective: k.objective, context: k.context, constraints: k.constraints, done_when: some(k.done_when), report_format: some(k.report_format) })
+        Ok(Brief { objective: k.objective, context: k.context, constraints: k.constraints, done_when: some(k.done_when), report_format: some(k.report_format), folder: k.folder.filter(|f| !f.trim().is_empty()) })
     }
 }

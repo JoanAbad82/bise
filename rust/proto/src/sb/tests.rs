@@ -82,4 +82,23 @@ fn the_wire_shapes_read_as_their_values() {
     let r = req(json!({"cmd": "spawn", "name": "fix", "objective": "o", "done_when": "", "report_format": "short", "profile": "fast"}));
     let Req::Spawn { brief, ask, .. } = r else { panic!() };
     assert_eq!((brief.done_when, brief.report_format.as_deref(), ask.profile.as_str()), (None, Some("short"), "fast"));
+    assert_eq!(brief.folder, None, "a spawn without --folder (an older sb) has none");
+}
+
+/// artifact-folders (architect m_46279): `sb spawn --folder` rides the
+/// brief by name, both ways; none is no key, on the wire and in the brief.
+#[test]
+fn a_spawns_folder_round_trips() {
+    let r = req(json!({"cmd": "spawn", "name": "fix", "objective": "o", "folder": "launch/hero film"}));
+    let Req::Spawn { brief, .. } = r.clone() else { panic!() };
+    assert_eq!(brief.folder.as_deref(), Some("launch/hero film"));
+    assert_eq!(r.to_value()["folder"], "launch/hero film");
+    assert_eq!(Req::decode(r.to_value()).unwrap(), r);
+    assert_eq!(serde_json::to_value(&brief).unwrap()["folder"], "launch/hero film");
+    let r = req(json!({"cmd": "spawn", "name": "fix", "objective": "o"}));
+    assert!(r.to_value().get("folder").is_none(), "no folder, no key on the wire");
+    let none = serde_json::to_value(crate::core::state::Brief::default()).unwrap();
+    assert!(none.get("folder").is_none(), "no folder, no key in the brief: {none}");
+    let old: crate::core::state::Brief = serde_json::from_value(json!({"objective": "o"})).unwrap();
+    assert_eq!(old.folder, None, "an older journal's brief reads with none");
 }

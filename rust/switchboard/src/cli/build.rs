@@ -225,7 +225,7 @@ fn forward_of(o: &Map<String, Value>) -> Result<Option<u64>, String> {
 fn spawn(rest: &[String]) -> Result<Req, String> {
     let (pos, o) = parse_args(
         rest,
-        &["objective", "context", "constraint", "done-when", "report-format", "place", "feature", "model", "effort", "profile", "attach", "forward"],
+        &["objective", "context", "constraint", "done-when", "report-format", "place", "feature", "model", "effort", "profile", "attach", "forward", "folder"],
         &["worktree", "with-changes"],
     )?;
     let attach = attach::of(&o)?;
@@ -247,7 +247,12 @@ fn spawn(rest: &[String]) -> Result<Req, String> {
         return Err("sb spawn: --objective (or --forward m_<n>) is required".into());
     }
     let some = |s: String| Some(s).filter(|s| !s.is_empty());
-    let brief = Brief { objective, context: str_of(&o, "context"), constraints: list_of(o.get("constraint")), done_when: some(str_of(&o, "done-when")), report_format: some(str_of(&o, "report-format")) };
+    // artifact-folders: the library folder its artifacts go to, by name
+    let folder = match o.contains_key("folder") {
+        true => Some(crate::artifacts_filing::folder_path(&str_of(&o, "folder")).map_err(|e| format!("sb spawn: {e}"))?),
+        false => None,
+    };
+    let brief = Brief { objective, context: str_of(&o, "context"), constraints: list_of(o.get("constraint")), done_when: some(str_of(&o, "done-when")), report_format: some(str_of(&o, "report-format")), folder };
     // dev-flow §3.1: --place new (= --worktree) | <agent> | <branch>
     let place = str_of(&o, "place");
     // issue #4: the task's model, all optional (none: the agents default)

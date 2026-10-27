@@ -238,10 +238,27 @@ impl Shell {
 impl Shell {
     /// An agent's `--folder` (`sb artifact add`): the library folder it
     /// names, its id, else a path `theme/task` (or a theme) made by that
-    /// agent. None asked: none (art-filing: its task's default here).
+    /// agent. None asked: its task's folder (`task_folder`), a new
+    /// artifact only.
     pub(super) fn art_folder(&mut self, agent: &str, asked: Option<&str>) -> Result<Option<artifacts::Filed>, String> {
-        let Some(asked) = asked.map(str::trim).filter(|a| !a.is_empty()) else { return Ok(None) };
+        let Some(asked) = asked.map(str::trim).filter(|a| !a.is_empty()) else { return Ok(self.task_folder(agent).map(artifacts::Filed::Default)) };
         Ok(Some(artifacts::Filed::Asked(self.agent_folder(agent, asked)?)))
+    }
+
+    /// The folder main gave `agent` at its spawn (its brief's, by name):
+    /// made by main at its first add, then the one its last artifact is
+    /// in (artifacts_filing, pure). None: unfiled; a library it cannot
+    /// write files nothing rather than fail the add.
+    fn task_folder(&mut self, agent: &str) -> Option<String> {
+        use crate::artifacts_filing::{filing, Filing};
+        let brief = self.hub.st.agents.get(agent).and_then(|a| a.brief.folder.clone())?;
+        let last = self.art_store().stored().into_iter().filter(|m| m.agent == agent && m.by == agent).max_by_key(|m| m.created_ms).map(|m| m.folder);
+        let lib = self.art_library();
+        match filing(Some(&brief), last.as_ref().map(|f| f.as_deref()), |id| library::resolve(&lib, id).map(|f| f.id.clone())) {
+            Filing::Use(id) => Some(id),
+            Filing::Ensure(path) => library::update(&bise_home::Home::from_env(), false, |l| library::make_path(l, &path, crate::model::MAIN)).ok(),
+            Filing::Unfiled => None,
+        }
     }
 
     /// The folder `asked` names, found or made by `agent` (never his

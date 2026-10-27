@@ -444,6 +444,19 @@ they are: each hub is still the only writer of its own
   `sb artifact add` files a new artifact; `Filed::Asked` (`--folder`)
   files a next version too, `Filed::Default` (its task's folder, part 5)
   only a new one: a next version stays where he put it.
+- **A task's folder** (artifact-folders, architect m_39705 / m_46279):
+  main names one at each spawn, `sb spawn <task> --folder
+  "<theme>/<task>"`, kept by name on the task's brief (`Brief.folder`,
+  no key when none; no sb-core decision reads it; the task's brief says
+  `Your folder: theme › task`). An add with no `--folder` asks
+  `artifacts_filing::filing` (pure): no folder on the brief (main, an
+  older task): unfiled; the task has no artifact here yet: main makes the
+  path (`library::make_path` through `library::update`, by `main`,
+  lazily, so a task that adds nothing makes no folder); else the folder
+  its newest artifact reads as (`library::resolve`): his rename keeps it,
+  his drag moves the task's next adds with it, a deleted folder stays
+  deleted (unfiled, never made again from the names). A library the hub
+  cannot write files the add nowhere rather than fail it.
 - **Readers join** through `library::resolve`, the one follower:
   `artifacts::resolve_folders` sets each row's `folder` to the live folder
   it reads as. A **merge** is a redirect (`into` on the merged folder,

@@ -137,6 +137,16 @@ fn spawn_repeats_constraints() {
     assert_eq!(r["constraints"], json!(["no push", "tests"]));
     assert_eq!(r["worktree"], true);
     assert!(build(&a(&["spawn", "fix"])).is_err());
+    // artifact-folders: no --folder, no key (an older hub reads it)
+    assert!(r.get("folder").is_none());
+}
+
+#[test]
+fn spawn_names_its_folder() {
+    let r = build(&a(&["spawn", "fix", "--objective", "o", "--folder", "launch › hero film"])).unwrap();
+    assert_eq!(r["folder"], "launch/hero film");
+    let e = build(&a(&["spawn", "fix", "--objective", "o", "--folder", "a/b/c"])).unwrap_err();
+    assert!(e.contains("two levels at most"), "{e}");
 }
 
 #[test]

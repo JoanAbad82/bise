@@ -105,6 +105,12 @@ pub struct Brief {
     pub done_when: Option<String>,
     #[serde(default)]
     pub report_format: Option<String>,
+    /// `sb spawn --folder "<theme>/<task>"` (artifact-folders, architect
+    /// m_46279): the library folder its artifacts go to, by name. No
+    /// sb-core decision reads it: the hub resolves it at the task's first
+    /// `sb artifact add` (switchboard's artifacts_filing.rs). None: no key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder: Option<String>,
 }
 
 /// An agent's last report: explicit (`sb report`) or the end of a turn.
