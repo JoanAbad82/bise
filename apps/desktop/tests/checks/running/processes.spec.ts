@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { running } from '../../../src/proto/words_running.gen';
+import { sentenceCase } from '../../../src/ds/case';
 
 // the fixture world, onboarded (else the window opens the onboarding over the route)
 const FIX = path.resolve(__dirname, '..', '..', '..', '..', '..', 'rust', 'proto', 'fixtures');
@@ -70,7 +71,8 @@ for (const theme of ['light', 'dark'] as const) {
           await page.screenshot({ path: test.info().outputPath(`processes-${theme}-${String(w)}-list.png`) });
         }
         // 'ended today' is today only: yesterday's make watch is in neither tab
-        await expect(page.getByTestId('running.filter.ended')).toHaveText(`${running.ended_today} 1`);
+        // the tab: its word in sentence case, then its count in its own span (running/Screen.tsx)
+        await expect(page.getByTestId('running.filter.ended')).toHaveText(`${sentenceCase(running.ended_today)}1`);
         // the row: the program by name, its own worktree's cd gone
         await expect(page.getByTestId(`running.row.${ACME}/docs/bg1.cmd`)).toHaveText('python3 -m http.server 8765 --directory site/out');
         await expect(page.getByTestId(`running.row.${ACME}/perf/bg5.cmd`)).toHaveText('pnpm dev --port 5173');

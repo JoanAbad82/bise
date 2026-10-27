@@ -28,7 +28,8 @@ const cueOpacity = (page: Page): Promise<number> => page.getByTestId('thread.syn
 
 /** Leaves perf's thread (the project's main), the hub holds subscribe's page, back with ⌘[. */
 async function leaveAndComeBack(page: Page, core: FakeCore): Promise<void> {
-  await page.getByTestId(`app.side.agent.${ACME}.main`).click();
+  // the sidebar has no agent rows since a80965b1d: leave for bise's own thread, another thread alike
+  await page.getByTestId('app.side.bise').click();
   await expect(page.getByTestId(`thread.you.${String(MINE)}`)).toHaveCount(0);
   await core.hold('subscribe');
   await page.keyboard.press('Meta+BracketLeft');

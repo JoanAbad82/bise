@@ -81,7 +81,9 @@ export async function open(snapshot: Snapshot, o: { theme?: 'light' | 'dark'; re
   const core = new FakeCore(world(snapshot, o.theme ?? 'light', o.growth) as never);
   const s = await launchDesktop({ core, route: `project/${P}`, size: `${String(o.width ?? 1400)}x900` });
   if (o.reduced === true) await s.page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(s.page.getByTestId('app.right.agents.bims')).toBeVisible({ timeout: 20_000 });
+  // bise fait mac: the right bar is gone; the office is the outer card's top tile (side3d
+  // OuterWorld, app.outer.world), shown unless he hid it (then its cube is on the agents' head)
+  await expect(s.page.getByTestId('app.outer.world').or(s.page.getByTestId('app.outer.agents.cube'))).toBeVisible({ timeout: 20_000 });
   return { s, core };
 }
 
@@ -93,12 +95,19 @@ export async function trackpad(cdp: CDPSession, x: number, y: number, o: { dx?: 
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: o.dx ?? 0, deltaY: o.dy ?? 0, modifiers: o.pinch === true ? 2 : 0 });
 }
 
-/** The right bar's office on (never a welcome's in the thread), its renderer loaded and drawing. */
+/** The outer card's office on (never a welcome's in the thread), its renderer loaded and drawing. */
 export async function showOffice(s: Session): Promise<void> {
-  await expect(s.page.getByTestId('welcome'), 'the bar office is measured: no welcome office in the thread').toHaveCount(0);
-  await s.page.getByTestId('app.right.agents.bims').click();
-  await expect(s.page.getByTestId('app.right.bims.fold').getByTestId('app.right.bims')).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
+  await expect(s.page.getByTestId('welcome'), 'the card office is measured: no welcome office in the thread').toHaveCount(0);
+  // hidden: the agents' head shows its cube, which shows the tile again (side3d Host.tsx)
+  if ((await s.page.getByTestId('app.outer.world').count()) === 0) await s.page.getByTestId('app.outer.agents.cube').click();
+  await expect(s.page.getByTestId('app.outer.world').getByTestId('app.right.bims')).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
   await expect.poll(async () => (await probe(s.page))?.frames ?? 0, { timeout: 10_000 }).toBeGreaterThan(0);
+}
+
+/** The outer card's office hidden (its ×): the tile and the office's renderer gone. */
+export async function hideOffice(s: Session): Promise<void> {
+  await s.page.getByTestId('app.outer.world.hide').click();
+  await expect(s.page.getByTestId('app.outer.world')).toHaveCount(0, { timeout: 3000 });
 }
 
 /** Waits until the renderer stops drawing (no new frame for `quietMs`), at most `maxMs`. */

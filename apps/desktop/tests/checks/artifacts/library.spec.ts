@@ -65,8 +65,17 @@ for (const theme of THEMES) {
       try {
         await expect(id(page, 'artifacts.lead')).toContainText(library.say);
         await expect(id(page, 'artifacts.tiles')).toBeVisible();
-        // the bims still beside the lead, drawn (the vignette, no card: designer's lead rule)
-        if (Number(w) > 800) expect(await page.locator('.art-vignette img.art-hero-still:visible').evaluate((i) => (i as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        // the bims beside the lead, drawn: the page banner's vignette (3ad63b876), its live scene
+        // drawn (banner.live.artifacts[data-drawn]) or, with no WebGL or reduced motion, its still
+        // decoded (naturalWidth > 0), the theme's one shown (designer's lead rule: no card)
+        if (Number(w) > 800)
+          await expect
+            .poll(() => id(page, 'artifacts.lead.visual').evaluate((el) => {
+              if (el.querySelector('[data-testid="banner.live.artifacts"][data-drawn]') !== null) return 'live';
+              const still = Array.from(el.querySelectorAll('img')).find((i) => i.offsetWidth > 0 && i.closest('.b-live') === null);
+              return still !== undefined && still.naturalWidth > 0 ? 'still' : 'none';
+            }), { message: 'the banner draws its vignette', timeout: 10_000 })
+            .not.toBe('none');
         await shot('home');
 
         if (narrowOf(size)) {

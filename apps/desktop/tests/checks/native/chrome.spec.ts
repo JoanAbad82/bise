@@ -1,6 +1,6 @@
 // native/chrome · one set of window controls, never a window inside the window (his try round 3,
 // main m_11769 point 1, lead m_11770/m_11796). The main window is titleBarStyle hiddenInset: macOS's
-// own lights sit at LIGHTS {16,15} over the sidebar's 40 px top room (src/main/windows.ts), the ds
+// own lights sit at LIGHTS {20,20} in the 52 px bar (src/main/windows.ts; bise fait mac, b06021770), the ds
 // frame's drawn dots are hidden and the frame is flat in the app (app.css), and the onboarding fills
 // the window alone (no sidebar, no .b-win) under a 40 px drag strip. A page capture can't show
 // macOS's lights, so they are read natively (the window's button position); the capture of the
@@ -10,6 +10,8 @@ import { FakeCore, FakeHelper, launchDesktop, test, expect } from '../../harness
 import type { Page } from '@playwright/test';
 
 const HOME = 'bise-home-00000000';
+/** macOS's lights in the 52 px bar (native-mac §6), written here: windows.ts imports electron. */
+const LIGHTS = { x: 20, y: 20 };
 
 const world = (onboarded: boolean) => [
   { ev: 'prefs', prefs: { onboarded, theme: 'system', excluded_apps: [] } },
@@ -53,7 +55,7 @@ test('native/chrome: setup is one window with macOS lights only, no drawn dots, 
   const s = await launchDesktop({ helper, core, route: 'onboarding' });
   try {
     await expect(s.page.getByTestId('setup.root')).toBeVisible({ timeout: 10_000 });
-    expect(await windows(s), 'one native window, its lights over the top strip').toEqual([{ lights: { x: 16, y: 15 } }]);
+    expect(await windows(s), 'one native window, its lights over the top strip').toEqual([{ lights: LIGHTS }]);
     expect(await drawn(s.page), 'setup alone in the window under a drag strip').toEqual({ dots: 0, frames: 0, drag: 1, sideDrag: [] });
     await shots(s.page, 'setup');
   } finally {
@@ -69,7 +71,7 @@ test('native/chrome: a thread is one window, macOS lights over the sidebar, its 
   const s = await launchDesktop({ helper, core });
   try {
     await expect(s.page.getByTestId('thread.screen')).toBeVisible({ timeout: 10_000 });
-    expect(await windows(s), 'one native window, its lights over the sidebar').toEqual([{ lights: { x: 16, y: 15 } }]);
+    expect(await windows(s), 'one native window, its lights over the sidebar').toEqual([{ lights: LIGHTS }]);
     expect(await drawn(s.page), 'the frame is the window: no drawn dots, the sidebar top moves it').toEqual({ dots: 0, frames: 1, drag: 0, sideDrag: ['drag'] });
     await shots(s.page, 'thread');
   } finally {

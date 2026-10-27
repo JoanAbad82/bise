@@ -13,6 +13,8 @@ import path from 'node:path';
 import { PNG } from 'pngjs';
 import { FakeCore, FakeHelper, launchDesktop, test, expect, type Session } from '../../harness';
 import { settings } from '../../../src/proto/words_settings.gen';
+// chrome labels are in sentence case (7c3883579, aa717d113): the band draws its word through it
+import { sentenceCase } from '../../../src/ds/case';
 
 const W = 1400;
 const H = 1000;
@@ -75,7 +77,7 @@ test('the plugins place: the rail button, the band, the list, a page, add', asyn
     await expect(s.page.getByTestId('plugins.band.mistral:google_calendar.title')).toHaveText('Google Calendar');
     // one-line cards, 64 high (#3); the grid ends on 'browse 1 more' (#9)
     expect(await s.page.getByTestId('plugins.band.mistral:linear').evaluate((el) => el.getBoundingClientRect().height)).toBe(64);
-    await expect(s.page.getByTestId('plugins.band.more')).toHaveText(settings.plugins_band_more({ n: 1 }));
+    await expect(s.page.getByTestId('plugins.band.more')).toHaveText(sentenceCase(settings.plugins_band_more({ n: 1 })));
     await shot(s, '2-band');
     await s.page.getByTestId('plugins.band.mistral:linear.connect').click();
     await expect.poll(() => core.cmds().some((c) => c['cmd'] === 'plugin_connect' && c['id'] === 'mistral:linear')).toBe(true);

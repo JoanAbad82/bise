@@ -110,7 +110,8 @@ for (const width of [1400, 1100, 800]) {
         await expect(page.getByTestId('welcome')).toHaveAttribute('data-office', 'on', { timeout: 20_000 });
         await expect(page.getByTestId('welcome.legend')).toContainText(thread.welcome_lead_head);
         await expect(page.getByTestId('welcome.hi')).toContainText(thread.welcome_hi({ project: NAME }));
-        await expect(page.getByTestId('welcome.idea.0')).toHaveText(thread.welcome_idea_tests);
+        // the ideas moved into the empty home over the welcome (ae4c5bfaa, nm-composer L3)
+        await expect(page.getByTestId('composer.home.idea.0')).toHaveText(thread.welcome_idea_tests);
         await expect(page.locator('[data-testid="welcome.pins"] [data-pin="1"]')).toBeVisible({ timeout: 10_000 });
         await expect(page.locator('[data-testid="welcome.pins"] [data-pin="3"]')).toBeVisible({ timeout: 10_000 });
         // at least 32 px between any two pins (designer m_38202)
@@ -119,8 +120,10 @@ for (const width of [1400, 1100, 800]) {
           const a = pins[i], b = pins[j];
           if (a !== undefined && b !== undefined) expect(Math.hypot(a.x - b.x, a.y - b.y), `pins ${String(i + 1)} and ${String(j + 1)}`).toBeGreaterThanOrEqual(32);
         }
-        await expect(page.getByTestId('app.right.bims.fold')).toHaveCount(0);
-        if (width > 800) await expect(page.getByTestId('app.right.agent.main')).toContainText(panel.role_lead);
+        // one office on screen (native-lead m_47920): the outer card's tile draws no office beside it
+        await expect(page.getByTestId('app.outer.world').getByTestId('app.right.bims'), "the card's office stays closed while the welcome's shows").toHaveCount(0);
+        // main's row in the outer card (the right bar's agents since bise fait mac)
+        if (width > 800) await expect(page.getByTestId(`app.outer.agents.${P}.main`)).toContainText(panel.role_lead);
         await page.waitForTimeout(1200);
         save(`${String(width)}-${theme}-1-first-open.png`, await shown(s), `${String(width)} ${theme} · first open`);
 
@@ -139,7 +142,8 @@ for (const width of [1400, 1100, 800]) {
         const t0 = frames[0]?.t ?? 0;
         const mid = frames.find((f) => f.t - t0 >= 200) ?? frames[Math.floor(frames.length / 2)];
         if (mid !== undefined) save(`${String(width)}-${theme}-2-mid-dock.png`, PNG.sync.read(pngBytes(mid)), `${String(width)} ${theme} · mid-dock (~200 ms after ⏎)`);
-        if (width > 800) await expect(page.getByTestId('app.right.bims')).toBeVisible({ timeout: 5000 });
+        // docked: the office now in the outer card's tile (the right bar's, before bise fait mac)
+        if (width > 800) await expect(page.getByTestId('app.outer.world').getByTestId('app.right.bims')).toBeVisible({ timeout: 5000 });
         await page.waitForTimeout(800);
         save(`${String(width)}-${theme}-3-after.png`, await shown(s), `${String(width)} ${theme} · after the dock`);
       } finally {
@@ -205,7 +209,7 @@ for (const theme of ['light', 'dark'] as const) {
         expect(spills, 'the welcome spills out of its slot').toBe(false);
         // the office gives way first (designer m_38760): the ideas whole over the inbox, and while
         // the office shows the slot doesn't scroll
-        const idea = await s.page.getByTestId('welcome.idea.2').boundingBox();
+        const idea = await s.page.getByTestId('composer.home.idea.2').boundingBox();
         if (idea === null) throw new Error('no box for the last idea');
         expect(idea.y + idea.height, 'the ideas end over the inbox block').toBeLessThanOrEqual(Math.min(inbox.y, slot.y + slot.height) + 0.5);
         const office = await s.page.getByTestId('welcome').getAttribute('data-room');

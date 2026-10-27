@@ -14,7 +14,7 @@ import type { Session } from '../../harness';
 import { agent, office, snap, watch } from '../../../src/bims/fixtures';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { SHOTS, open, probe, setHidden, settle, showOffice, sleep } from './world';
+import { SHOTS, hideOffice, open, probe, setHidden, settle, showOffice, sleep } from './world';
 
 // 3 s a window, both tests under 30 s (Gabriel's pick on page e2e-desktop): at the display's
 // 60 fps a drawing office shows ~180 frames there, at the loop's 8 fps ~24: 0 still says it
@@ -52,7 +52,7 @@ const running = (s: Session): Promise<Running[]> =>
       const el = t instanceof Element ? t : null;
       const name = 'animationName' in a ? (a as CSSAnimation).animationName : a.constructor.name;
       const cls = el === null ? '' : `${el.tagName.toLowerCase()}.${(el.getAttribute('class') ?? '').split(' ').join('.')}`;
-      return { name, target: cls, bims: el?.closest('.bims-office, [data-testid="app.right.bims.fold"]') != null, paused: a.playState !== 'running' };
+      return { name, target: cls, bims: el?.closest('.bims-office, [data-testid="app.outer.world"]') != null, paused: a.playState !== 'running' };
     }),
   );
 
@@ -67,6 +67,8 @@ test.describe.configure({ timeout: 180_000 });
 test('(1)(2) a still office draws nothing for 3 s; closed, nothing of the bims runs', async () => {
   const { s } = await open(STILL);
   try {
+    // the card's office is on at start (bise fait mac): hidden first, so 'before any open' is closed
+    if ((await s.page.getByTestId('app.outer.world').count()) > 0) await hideOffice(s);
     found['closed, before any open'] = await running(s);
     await showOffice(s);
     await settle(s);
@@ -75,8 +77,7 @@ test('(1)(2) a still office draws nothing for 3 s; closed, nothing of the bims r
     const mine = found['open, still world'].filter((a) => a.bims && !a.paused);
     expect(mine.every((a) => a.name === 'bims-z'), `the office's only motion is the z's: ${JSON.stringify(mine)}`).toBe(true);
 
-    await s.page.getByTestId('app.right.agents.bims').click();
-    await expect(s.page.getByTestId('app.right.bims.fold')).toHaveCount(0, { timeout: 3000 });
+    await hideOffice(s);
     await sleep(500);
     expect(await probe(s.page), 'closed: the renderer is gone').toBeNull();
     found['closed after open'] = await running(s);
