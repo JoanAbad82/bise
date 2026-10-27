@@ -642,6 +642,8 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(tile.querySelector('[data-testid="office"]')).toBeTruthy();
     expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('148px');
     expect(v.getByTestId('app.outer.world.handle').getAttribute('aria-valuenow')).toBe('140');
+    // the handle sits in the 8 gap under the tile (ui-review m_46538: it sat over the tile's top): the same room as the card's
+    expect(v.getByTestId('app.outer.world.handle').style.getPropertyValue('--s3-tile')).toBe('148px');
     // shown: no cube in the Agents head
     expect(v.queryByTestId('app.outer.agents.cube')).toBeNull();
   });
@@ -681,6 +683,7 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     fireEvent.pointerMove(handle, { clientY: 296, pointerId: 1 });
     expect(v.getByTestId('app.outer.world').style.height).toBe('236px');
     expect(v.getByTestId('app.outer').style.getPropertyValue('--s3-tile')).toBe('244px');
+    expect(handle.style.getPropertyValue('--s3-tile')).toBe('244px');
     // past half the window: 450
     fireEvent.pointerMove(handle, { clientY: 900, pointerId: 1 });
     expect(v.getByTestId('app.outer.world').style.height).toBe('450px');

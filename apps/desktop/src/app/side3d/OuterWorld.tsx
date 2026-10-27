@@ -6,13 +6,13 @@
 // hides the tile (tilestate.ts keeps it per window). Under it, the 8 px gap to the card is the
 // handle: row-resize, a 2 px text-3 line after 120 ms of hover (the panel's signed handle), a drag
 // from 96 to half the window's height, a double-click back to 140. Owner: nm-side.
-import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import type { Agent, Card } from '@/proto';
 import type { MapId } from '@/bims/maps/ids';
 import { Press, tipAttrs } from '@/ds';
 import { side } from '@/proto/words_side.gen';
 import { WorldOffice } from './World';
-import { clampTile, TILE_H, TILE_MIN, tileMax } from './tilestate';
+import { clampTile, TILE_GAP, TILE_H, TILE_MIN, tileMax } from './tilestate';
 
 export interface OuterTileProps {
   readonly project: string;
@@ -85,6 +85,8 @@ export function TileHandle({ h, winH, onHeight }: { h: number; winH: number; onH
   return (
     <div
       className="s3-ohandle"
+      // its place: the 8 under the tile (side3d.css top: the bar + this - 8), following the height
+      style={{ '--s3-tile': `${String(h + TILE_GAP)}px` } as CSSProperties}
       role="separator"
       aria-orientation="horizontal"
       aria-label={side.tile_height}
