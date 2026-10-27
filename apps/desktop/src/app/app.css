@@ -156,6 +156,17 @@ body:has(.app-shell) {
   outline: 2px solid var(--c-focus);
   outline-offset: 0;
 }
+/* the right side's card-or-coins button (side-mini): at the bar's end, left of the panel's ▯, 4
+   apart as the bar's other buttons (ui-review m_46834: 0 apart, the two read as one) */
+.app-bar-side {
+  flex: none;
+  display: flex;
+  margin-left: auto;
+  margin-right: var(--s-1);
+}
+.app-bar-side + .pn-bar {
+  margin-left: 0;
+}
 /* the title 24 into the content (mockups 1-4: x 320 with the rail and a 240 sidebar), its subtitle 8 after */
 .app-bar-title {
   flex: 0 1 auto;

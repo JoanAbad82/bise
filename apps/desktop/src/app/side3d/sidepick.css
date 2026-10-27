@@ -1,50 +1,30 @@
-/* side-mini (designer m_46706): the swap between the outer card and the compact coins, by his hand
-   (sidepick.ts sets the root's data-side-swap for the swap's length). To the coins: the card and its
-   tile fade out sliding 8 toward the edge (160 ms, ease-in); the coins fade in from the top, 30 ms
-   apart (160 ms, ease-out). Back: the reverse. Reduced motion: a crossfade, no slide. */
-:root[data-side-swap='to-coins'] .s3-outer,
-:root[data-side-swap='to-coins'] .s3-otile {
-  animation: s3-swap-card-out 160ms cubic-bezier(.4, 0, 1, 1) forwards;
-}
+/* side-mini (designer m_46706, m_46838): the coming form of the swap between the outer card and the
+   compact coins, on its mount (sidepick.ts sets the root's data-side-swap for the swap's length;
+   the leaving form's move is sidepick.ts's leave). To the coins: they fade in from the top, 30 ms
+   apart (160 ms, ease-out). Back: the card and its tile fade in sliding from 8 toward the edge.
+   Reduced motion: the crossfade's second half, no slide. */
 :root[data-side-swap='to-coins'] .s3-side[data-at='edge'] > * {
   animation: s3-swap-coin-in 160ms var(--ease-out) backwards;
 }
-:root[data-side-swap='to-card'] .s3-side[data-at='edge'] > * {
-  animation: s3-swap-coin-out 160ms cubic-bezier(.4, 0, 1, 1) forwards;
-}
+:root[data-side-swap='to-coins'] .s3-side[data-at='edge'] > :nth-child(2) { animation-delay: 30ms; }
+:root[data-side-swap='to-coins'] .s3-side[data-at='edge'] > :nth-child(3) { animation-delay: 60ms; }
+:root[data-side-swap='to-coins'] .s3-side[data-at='edge'] > :nth-child(4) { animation-delay: 90ms; }
+:root[data-side-swap='to-coins'] .s3-side[data-at='edge'] > :nth-child(n + 5) { animation-delay: 120ms; }
 :root[data-side-swap='to-card'] .s3-outer,
 :root[data-side-swap='to-card'] .s3-otile {
   animation: s3-swap-card-in 160ms var(--ease-out) backwards;
 }
-:root[data-side-swap] .s3-side[data-at='edge'] > :nth-child(2) { animation-delay: 30ms; }
-:root[data-side-swap] .s3-side[data-at='edge'] > :nth-child(3) { animation-delay: 60ms; }
-:root[data-side-swap] .s3-side[data-at='edge'] > :nth-child(4) { animation-delay: 90ms; }
-:root[data-side-swap] .s3-side[data-at='edge'] > :nth-child(n + 5) { animation-delay: 120ms; }
-:root[data-side-swap-reduced] .s3-outer,
-:root[data-side-swap-reduced] .s3-otile,
-:root[data-side-swap-reduced] .s3-side[data-at='edge'] > * {
-  animation-name: s3-swap-fade;
-  animation-duration: 60ms;
-  animation-delay: 0ms;
-  animation-timing-function: linear;
-}
-:root[data-side-swap-reduced='to-coins'] .s3-outer,
-:root[data-side-swap-reduced='to-coins'] .s3-otile,
-:root[data-side-swap-reduced='to-card'] .s3-side[data-at='edge'] > * {
-  animation-direction: reverse;
+:root[data-side-swap-reduced='to-coins'] .s3-side[data-at='edge'] > *,
+:root[data-side-swap-reduced='to-card'] .s3-outer,
+:root[data-side-swap-reduced='to-card'] .s3-otile {
+  animation: s3-swap-fade 60ms linear backwards;
 }
 
-@keyframes s3-swap-card-out {
-  to { opacity: 0; transform: translateX(8px); }
-}
 @keyframes s3-swap-card-in {
   from { opacity: 0; transform: translateX(8px); }
 }
 @keyframes s3-swap-coin-in {
   from { opacity: 0; transform: translateY(-8px); }
-}
-@keyframes s3-swap-coin-out {
-  to { opacity: 0; transform: translateY(-8px); }
 }
 @keyframes s3-swap-fade {
   from { opacity: 0; }

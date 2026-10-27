@@ -47,6 +47,27 @@ const reduced = (): boolean => typeof window !== 'undefined' && typeof window.ma
 
 let swapTimers: ReturnType<typeof setTimeout>[] = [];
 
+/** what leaves: the card and its tile, or the coins at the edge */
+const CARD_SEL = '.s3-outer, .s3-otile';
+const COINS_SEL = ".s3-side[data-at='edge'] > *";
+/** ease-in: what leaves speeds up as it goes */
+const EASE_IN = 'cubic-bezier(.4, 0, 1, 1)';
+
+/**
+ * The leaving form's move, played on the elements still there (Web Animations: a CSS rule keyed on
+ * the root never played on the mounted card, ui-review m_46834): the card slides 8 toward the edge,
+ * the coins 8 up, both fading, 160 ms; reduced motion the crossfade's half, no slide. They unmount
+ * when the pick flips, at its end. The coming form's move is sidepick.css's, on its mount.
+ */
+function leave(sel: string, what: 'card' | 'coins', how: 'full' | 'reduced'): void {
+  const slide = what === 'card' ? 'translateX(8px)' : 'translateY(-8px)';
+  const frames: Keyframe[] = how === 'full' ? [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: slide }] : [{ opacity: 1 }, { opacity: 0 }];
+  for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+    if (typeof el.animate !== 'function') continue;
+    el.animate(frames, { duration: SWAP_OUT_MS[how], easing: how === 'full' ? EASE_IN : 'linear', fill: 'forwards' });
+  }
+}
+
 export const sideCompact = {
   get: read,
   set,
@@ -64,6 +85,7 @@ export const sideCompact = {
     const to = next ? 'to-coins' : 'to-card';
     root.dataset['sideSwap'] = to;
     if (how === 'reduced') root.dataset['sideSwapReduced'] = to;
+    leave(next ? CARD_SEL : COINS_SEL, next ? 'card' : 'coins', how);
     swapTimers.push(
       setTimeout(() => {
         set(next);

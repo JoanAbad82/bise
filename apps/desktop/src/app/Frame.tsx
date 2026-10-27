@@ -496,14 +496,16 @@ function SideCardButton() {
   const fits = cardFits(useWindowWidth(), useLeftWidth(), shows);
   if (!shows) return null;
   return (
-    <BarButton
-      icon="side-card"
-      label={!fits ? frame.side_no_room : compact ? frame.side_card : frame.side_compact}
-      pressed={fits && !compact}
-      disabled={!fits}
-      onClick={sideCompact.toggle}
-      testId="app.bar.sidecard"
-    />
+    <span className="app-bar-side">
+      <BarButton
+        icon="side-card"
+        label={!fits ? frame.side_no_room : compact ? frame.side_card : frame.side_compact}
+        pressed={fits && !compact}
+        disabled={!fits}
+        onClick={sideCompact.toggle}
+        testId="app.bar.sidecard"
+      />
+    </span>
   );
 }
 
