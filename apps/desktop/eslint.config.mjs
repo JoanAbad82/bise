@@ -26,6 +26,21 @@ export default tseslint.config(
     },
   },
   {
+    // the harness and its checks load under node's strip-only types (pnpm test:land sets
+    // NODE_OPTIONS=--experimental-strip-types): only erasable syntax there, tsc's erasableSyntaxOnly.
+    // A parameter property in tests/harness/isolation.ts made test:land load 0 tests (land-ts).
+    files: ['tests/harness/**/*.ts', 'tests/harness/**/*.mts', 'tests/checks/**/*.ts', 'tests/checks/**/*.mts'],
+    rules: {
+      '@typescript-eslint/parameter-properties': ['error', { prefer: 'class-property' }],
+      'no-restricted-syntax': ['error',
+        { selector: 'TSEnumDeclaration', message: 'no enum in the harness: node strips types only (test:land); use a const object or a union' },
+        { selector: 'TSModuleDeclaration[declare!=true][kind!="global"]', message: 'no namespace in the harness: node strips types only (test:land)' },
+        { selector: 'TSImportEqualsDeclaration', message: 'no `import x = require()` in the harness: node strips types only (test:land)' },
+        { selector: 'TSExportAssignment', message: 'no `export =` in the harness: node strips types only (test:land)' },
+      ],
+    },
+  },
+  {
     // a hook may live in any .ts file too (composer/pm/dictation.ts, shared/partial.ts, capsule/data.ts…)
     files: ['src/**/*.tsx', 'src/**/*.ts'],
     extends: [reactHooks.configs.flat['recommended-latest']],

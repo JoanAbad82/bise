@@ -232,7 +232,14 @@ export class Sentinel {
    * (ppid 1 once the app is gone) is still the run's, a pid reused since by another command is not */
   private readonly seen = new Map<number, string>();
 
-  constructor(private readonly h: TestHome, private readonly onBreach: (why: string) => void) {}
+  // plain fields, no parameter properties: test:land loads this file under node's strip-only types
+  private readonly h: TestHome;
+  private readonly onBreach: (why: string) => void;
+
+  constructor(h: TestHome, onBreach: (why: string) => void) {
+    this.h = h;
+    this.onBreach = onBreach;
+  }
 
   async start(): Promise<void> {
     this.baseline = new Set((await processes()).map((p) => p.pid));

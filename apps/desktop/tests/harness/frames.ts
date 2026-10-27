@@ -38,7 +38,13 @@ export class Recorder {
   private frames: Frame[] = [];
   private on = false;
 
-  constructor(private readonly cdp: CDPSession, private readonly page: Page) {}
+  private readonly cdp: CDPSession;
+  private readonly page: Page;
+
+  constructor(cdp: CDPSession, page: Page) {
+    this.cdp = cdp;
+    this.page = page;
+  }
 
   private masks: Box[] = [];
 

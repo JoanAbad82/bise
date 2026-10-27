@@ -78,7 +78,13 @@ export class Rfb {
   private fb = Buffer.alloc(0);
   private updates: (() => void)[] = [];
 
-  private constructor(private readonly sock: net.Socket, private readonly r: Reader) {}
+  private readonly sock: net.Socket;
+  private readonly r: Reader;
+
+  private constructor(sock: net.Socket, r: Reader) {
+    this.sock = sock;
+    this.r = r;
+  }
 
   static async connect(port: number, password = '', host = '127.0.0.1'): Promise<Rfb> {
     const sock = net.createConnection({ host, port });

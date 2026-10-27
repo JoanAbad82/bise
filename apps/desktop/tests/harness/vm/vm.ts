@@ -58,13 +58,19 @@ export class Vm {
   private floorTimer: NodeJS.Timeout | undefined;
   private stopped = false;
 
-  private constructor(
-    readonly name: string,
-    private readonly child: ChildProcess,
-    private readonly watch: Watch,
-    readonly vnc: Rfb,
-    readonly ip: string,
-  ) {}
+  readonly name: string;
+  private readonly child: ChildProcess;
+  private readonly watch: Watch;
+  readonly vnc: Rfb;
+  readonly ip: string;
+
+  private constructor(name: string, child: ChildProcess, watch: Watch, vnc: Rfb, ip: string) {
+    this.name = name;
+    this.child = child;
+    this.watch = watch;
+    this.vnc = vnc;
+    this.ip = ip;
+  }
 
   static async up(o: VmOptions = {}): Promise<Vm> {
     const name = o.name ?? 'bise-vm';
