@@ -46,8 +46,11 @@ core_kinds! {
         /// (`stalled`: its start made no progress; `loaded`: the machine
         /// was at load x2+ then; `row`: that REPL's stalls in a row, the
         /// shell's count, repl_start::Starts. An older core ignores them:
-        /// crashed, it counts as before; hub/stall.bend)
-        Exited = "exited" => IExited { agent: Str, crashed: Bool, reason: Str, stalled: Bool, loaded: Bool, row: Nat },
+        /// crashed, it counts as before; hub/stall.bend). `stopped`: it
+        /// ended by SIGTERM, SIGINT or SIGHUP, a request to stop (from the
+        /// hub's stop, `sb restart`, a teardown, a `kill`), not a crash;
+        /// `row` then counts its stops too until it connects
+        Exited = "exited" => IExited { agent: Str, crashed: Bool, reason: Str, stalled: Bool, loaded: Bool, row: Nat, stopped: Bool },
         /// the hub started: sb-core's state is the replayed journal
         Boot = "boot" => IBoot {},
         /// his message to the agent in view (`parts`: msg-parts JSON, only

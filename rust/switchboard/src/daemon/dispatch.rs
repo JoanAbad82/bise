@@ -331,7 +331,7 @@ impl Shell {
         if self.gens.get(&dir) != Some(&gen) {
             return Flow::Go;
         }
-        self.start_gone(&dir, cause);
+        let stops = self.start_gone(&dir, cause);
         self.gens.remove(&dir);
         self.repls.remove(&dir);
         self.gate_forget(&dir);
@@ -358,13 +358,15 @@ impl Shell {
         if cause.reports() {
             crate::switch::report_failure(&self.opts.paths, &format!("the REPL of {} stopped: {}", dir, reason));
         }
-        // a stall's facts: sb-core decides if it counts (hub/stall.bend)
-        let (stalled, loaded, row) = match cause {
-            super::repl_starts::Gone::Stalled { loaded, row, .. } => (true, loaded, u64::from(row)),
-            super::repl_starts::Gone::Died => (false, false, 0),
+        // a stall's or a stop's facts: sb-core decides if it counts
+        // (hub/stall.bend)
+        let (stalled, loaded, row, stopped) = match cause {
+            super::repl_starts::Gone::Stalled { loaded, row, .. } => (true, loaded, u64::from(row), false),
+            super::repl_starts::Gone::Stopped => (false, false, u64::from(stops), true),
+            super::repl_starts::Gone::Died => (false, false, 0, false),
         };
         if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
-            self.step(Input::ReplExited { agent: name, crashed: true, reason, stalled, loaded, row });
+            self.step(Input::ReplExited { agent: name, crashed: true, reason, stalled, loaded, row, stopped });
         }
         Flow::Go
     }

@@ -19,7 +19,9 @@
 //!   made no progress for 94-124 s and counted as crashes).
 //! - A stall at a loaded machine ([`Stall::loaded`]) is sb-core's to
 //!   count or not (`IExited`'s cause): it never counts toward the
-//!   agent's crashes.
+//!   agent's crashes. A stop (an end by TERM, INT or HUP,
+//!   [`Starts::stopped`]) adds to the same row: sb-core counts the K-th
+//!   stop with no connect between as a crash, never the ones before.
 //! - A stall is not a death: a slow start on a loaded machine does not
 //!   fail a version's probation. But a version whose REPLs never start
 //!   must roll back: a stall reports to probation ([`Stall::reports`])
@@ -182,6 +184,16 @@ impl Starts {
     /// It ended otherwise (died, killed, dropped): its slot free.
     pub fn ended(&mut self, dir: &str) {
         self.flight.remove(dir);
+    }
+
+    /// It ended asked to stop (a TERM, INT or HUP): its slot free, +1 to
+    /// its row, which it returns (sb-core counts the K-th stop with no
+    /// connect between as a crash, hub/stall.bend).
+    pub fn stopped(&mut self, dir: &str) -> u32 {
+        self.flight.remove(dir);
+        let n = self.row.entry(dir.to_string()).or_insert(0);
+        *n += 1;
+        *n
     }
 
     /// The starts without progress for [`still_limit_ms`] at load
@@ -365,6 +377,23 @@ mod tests {
         s.connected("a");
         assert_eq!(stall(&mut s, "a", 600_000), Some(1));
         assert_eq!(stall(&mut s, "b", 700_000), Some(2));
+    }
+
+    /// architect m_48209: a stop (TERM, INT, HUP) adds to the same row,
+    /// so K stops with no connect between count (hub/stall.bend); a
+    /// connect forgets them, and a stop frees its slot.
+    #[test]
+    fn a_stop_adds_to_the_row_until_it_connects() {
+        let mut s = Starts::default();
+        s.begin("a", Kind::Start, 0);
+        assert_eq!(s.stopped("a"), 1);
+        assert!(!s.in_flight("a"));
+        assert_eq!(s.stopped("a"), 2);
+        s.begin("a", Kind::Start, 100_000);
+        assert_eq!(s.stalled(100_000 + START_STILL_MS, 1.0)[0].row, 3, "a stall after two stops");
+        s.connected("a");
+        assert_eq!(s.stopped("a"), 1);
+        assert_eq!(s.stopped("b"), 1, "its own row");
     }
 
     /// main m_36148: the same stillness stalls an idle machine's start,

@@ -3365,7 +3365,26 @@ def crash.again(-o: S.St, +wait: Bool, +cx: X.Cx<o>, +agent: String, +reason: St
   +cx3 = out(o, cx2, F.spawn(agent, True{}, None{}, wait))
   feed(o, cx3, M.MAIN(), crash.again.line(wait, agent, reason))
 
-def crash.do(-o: S.St, d: SL.Do, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
+# the one line an agent cut mid-turn by a stop gets (stop-not-crash,
+# architect m_48209): what happened, not who did it
+def STOP_LINE(+reason: String) -> String:
+  cat(["[bise] your process was stopped mid-turn (", reason, ") and started again from its last checkpoint: the turn was cut, so check what it had done, then go on."])
+
+def crash.stop.tell(-o: S.St, busy: Bool, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
+  match busy:
+    case True{}:
+      fst(o, send(o, cx, msg(M.HUB(), agent, STOP_LINE(reason), False{}, None{}, False{}, False{})))
+    case False{}:
+      cx
+
+# asked to stop (hub/stall.bend Stop): it starts again on its checkpoint,
+# no crash counted, nothing to main; `busy` (it was mid-turn): it gets
+# STOP_LINE once
+def crash.stop(-o: S.St, busy: Bool, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
+  +cx2 = set_run(o, cx, agent, S.RStarting{})
+  crash.stop.tell(o, busy, out(o, cx2, F.spawn(agent, True{}, None{}, False{})), agent, reason)
+
+def crash.do(-o: S.St, d: SL.Do, busy: Bool, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
   match d:
     case SL.Count{}:
       crash.count(o, True{}, cx, agent, reason)
@@ -3373,21 +3392,26 @@ def crash.do(-o: S.St, d: SL.Do, +cx: X.Cx<o>, +agent: String, +reason: String) 
       crash.again(o, False{}, cx, agent, reason)
     case SL.SWait{}:
       crash.again(o, True{}, cx, agent, reason)
+    case SL.Stop{}:
+      crash.stop(o, busy, cx, agent, reason)
 
-def crash.go(-o: S.St, go: Bool, +cx: X.Cx<o>, +agent: String, d: SL.Do, +reason: String) -> X.Cx<o>:
+def crash.go(-o: S.St, go: Bool, busy: Bool, +cx: X.Cx<o>, +agent: String, d: SL.Do, +reason: String) -> X.Cx<o>:
   match go:
     case False{}:
       cx
     case True{}:
-      crash.do(o, d, cx, agent, reason)
+      crash.do(o, d, busy, cx, agent, reason)
 
+# `busy`: it was mid-turn when its REPL went (read before the exit marks
+# it down)
 def exited.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, d: SL.Do, +reason: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
+      +busy = is_busy(X.Rt.run(rt(o, cx, agent)))
       +cx2 = set_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RDown{}), None{}))
-      crash.go(o, crashed && is_active(S.Agent.life(a)), dirty(o, cx2), agent, d, reason)
+      crash.go(o, crashed && is_active(S.Agent.life(a)), busy, dirty(o, cx2), agent, d, reason)
 
 # `stalled`, `loaded`, `row`: the shell's facts on a crashed start
 # (hub/stall.bend picks what it does to the crash count)
@@ -3677,8 +3701,8 @@ def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       touch(o, cx, agent, path)
     case GI.IReady{+agent}:
       repl_ready(o, cx, agent)
-    case GI.IExited{+agent, +crashed, +reason, +stalled, +loaded, +row}:
-      repl_exited(o, cx, agent, crashed, SL.pick(stalled, loaded, row), reason)
+    case GI.IExited{+agent, +crashed, +reason, +stalled, +loaded, +row, +stopped}:
+      repl_exited(o, cx, agent, crashed, SL.exit(stopped, stalled, loaded, row), reason)
     case GI.IBoot{}:
       xboot(o, boot(o, cx))
     case GI.ISay{+focus, +text, +queued, +parts, +from}:

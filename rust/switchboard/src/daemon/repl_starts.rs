@@ -40,14 +40,18 @@ pub(super) enum Gone {
     /// Its start made no progress (crate::repl_start): `loaded` at load
     /// x2+, `row` that REPL's stalls in a row.
     Stalled { reports: bool, loaded: bool, row: u32 },
+    /// It ended by SIGTERM, SIGINT or SIGHUP: someone asked it to stop
+    /// (repl::gone_of). sb-core decides what it counts (hub/stall.bend).
+    Stopped,
 }
 
 impl Gone {
-    /// A reason for a version on probation to roll back.
+    /// A reason for a version on probation to roll back (a stop is not).
     pub(super) fn reports(self) -> bool {
         match self {
             Gone::Died => true,
             Gone::Stalled { reports, .. } => reports,
+            Gone::Stopped => false,
         }
     }
 }
@@ -138,13 +142,17 @@ impl Shell {
 
     /// `dir`'s live REPL is gone: the old process of a switch exits as
     /// asked (its slot stays for the new one: progress); any other end
-    /// frees the slot.
-    pub(super) fn start_gone(&mut self, dir: &str, cause: Gone) {
+    /// frees the slot. Returns its row of stops with no connect between
+    /// (a `Stopped` end, +1; 0 otherwise).
+    pub(super) fn start_gone(&mut self, dir: &str, cause: Gone) -> u32 {
         if self.switching.contains_key(dir) && !self.switch_spawned.contains(dir) && cause == Gone::Died {
             self.starts.progress(dir, now_ms());
+        } else if cause == Gone::Stopped {
+            return self.starts.stopped(dir);
         } else {
             self.starts.ended(dir);
         }
+        0
     }
 
     /// The starts without progress: killed and gone (a crash, restarted

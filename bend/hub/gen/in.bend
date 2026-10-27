@@ -29,7 +29,7 @@ type In is Data:
   # ready
   IReady{agent: String}
   # exited
-  IExited{agent: String, crashed: Bool, reason: String, stalled: Bool, loaded: Bool, row: Nat}
+  IExited{agent: String, crashed: Bool, reason: String, stalled: Bool, loaded: Bool, row: Nat, stopped: Bool}
   # boot
   IBoot{}
   # say
@@ -161,7 +161,7 @@ def IReady.of(+i: J.Json) -> In:
   IReady{K.get_s(i, "agent")}
 
 def IExited.of(+i: J.Json) -> In:
-  IExited{K.get_s(i, "agent"), K.get_b(i, "crashed"), K.get_s(i, "reason"), K.get_b(i, "stalled"), K.get_b(i, "loaded"), K.get_n(i, "row")}
+  IExited{K.get_s(i, "agent"), K.get_b(i, "crashed"), K.get_s(i, "reason"), K.get_b(i, "stalled"), K.get_b(i, "loaded"), K.get_n(i, "row"), K.get_b(i, "stopped")}
 
 def IBoot.of(i: J.Json) -> In:
   IBoot{}
@@ -832,8 +832,8 @@ def kvs(x: In) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("t", J.JStr{"touch"}), J.kv("agent", J.JStr{agent}), J.kv("path", J.JStr{path})]
     case IReady{+agent}:
       [J.kv("t", J.JStr{"ready"}), J.kv("agent", J.JStr{agent})]
-    case IExited{+agent, +crashed, +reason, +stalled, +loaded, +row}:
-      [J.kv("t", J.JStr{"exited"}), J.kv("agent", J.JStr{agent}), J.kv("crashed", J.JBool{crashed}), J.kv("reason", J.JStr{reason}), J.kv("stalled", J.JBool{stalled}), J.kv("loaded", J.JBool{loaded}), J.kv("row", J.JNum{row})]
+    case IExited{+agent, +crashed, +reason, +stalled, +loaded, +row, +stopped}:
+      [J.kv("t", J.JStr{"exited"}), J.kv("agent", J.JStr{agent}), J.kv("crashed", J.JBool{crashed}), J.kv("reason", J.JStr{reason}), J.kv("stalled", J.JBool{stalled}), J.kv("loaded", J.JBool{loaded}), J.kv("row", J.JNum{row}), J.kv("stopped", J.JBool{stopped})]
     case IBoot{}:
       [J.kv("t", J.JStr{"boot"})]
     case ISay{+focus, +text, +queued, +parts, +from}:

@@ -8,8 +8,10 @@
 # connects). A crash, or a stall on a machine that is not loaded,
 # counts toward MAX_CRASHES as before; a stall under load never counts:
 # it starts again, at most K() times in a row, then waits for the
-# machine (its spawn admitted at a tick under load x2). Pure; its laws
-# are in bend/laws/stall.bend.
+# machine (its spawn admitted at a tick under load x2). An end by TERM,
+# INT or HUP (`stopped`: someone asked it to stop, stop-not-crash) is no
+# crash either: it starts again quietly, unless it is the K()-th stop
+# with no connect between. Pure; its laws are in bend/laws/stall.bend.
 import Base
 
 type Do is Data:
@@ -19,6 +21,9 @@ type Do is Data:
   Again{}
   # K() stalls under load in a row: it waits for the machine, not counted
   SWait{}
+  # asked to stop (TERM, INT, HUP), under K() in a row: it starts
+  # again, not counted, nothing to main
+  Stop{}
 
 # the starts under load in a row before the agent waits for the machine
 def K() -> Nat:
@@ -55,6 +60,8 @@ def counts(d: Do) -> Bool:
       False{}
     case SWait{}:
       False{}
+    case Stop{}:
+      False{}
 
 # its spawn waits for a tick under load x2
 def waits(d: Do) -> Bool:
@@ -65,3 +72,29 @@ def waits(d: Do) -> Bool:
       False{}
     case SWait{}:
       True{}
+    case Stop{}:
+      False{}
+
+# a REPL asked to stop (TERM, INT or HUP: the hub's stop, sb restart, a
+# teardown, a kill; stop-not-crash, architect m_48209): `row` its stops
+# with no connect between, the shell's count (repl_start::Starts), this
+# one counted. Under K() it is no crash; the K()-th says something keeps
+# killing it before it is ready, a fault to surface: it counts
+def pick.stop.below(below: Bool) -> Do:
+  match below:
+    case True{}:
+      Stop{}
+    case False{}:
+      Count{}
+
+def pick.stop(+row: Nat) -> Do:
+  pick.stop.below(Nat.is_lt(row, K()))
+
+# a REPL's exit as the shell said: `stopped`, then `stalled`, `loaded`,
+# `row`
+def exit(stopped: Bool, stalled: Bool, loaded: Bool, +row: Nat) -> Do:
+  match stopped:
+    case True{}:
+      pick.stop(row)
+    case False{}:
+      pick(stalled, loaded, row)

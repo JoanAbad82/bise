@@ -76,7 +76,7 @@ def in_ready_bare():
   {==}
 
 law in_exited_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"exited"})])) == IN.IExited{"", False{}, "", False{}, False{}, 0n} : IN.In}
+  {IN.of(J.obj([J.kv("t", J.JStr{"exited"})])) == IN.IExited{"", False{}, "", False{}, False{}, 0n, False{}} : IN.In}
 
 def in_exited_bare():
   {==}
@@ -469,9 +469,10 @@ law in_IExited_round:
   for stalled: Bool
   for loaded: Bool
   for row: Nat
-  {IN.of(IN.json(IN.IExited{agent, crashed, reason, stalled, loaded, row})) == IN.IExited{agent, crashed, reason, stalled, loaded, row} : IN.In}
+  for stopped: Bool
+  {IN.of(IN.json(IN.IExited{agent, crashed, reason, stalled, loaded, row, stopped})) == IN.IExited{agent, crashed, reason, stalled, loaded, row, stopped} : IN.In}
 
-def in_IExited_round(agent, crashed, reason, stalled, loaded, row):
+def in_IExited_round(agent, crashed, reason, stalled, loaded, row, stopped):
   {==}
 
 law in_IBoot_round:

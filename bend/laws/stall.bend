@@ -26,3 +26,37 @@ law crash_counts:
   for loaded: Bool
   for +row: Nat
   {SL.pick(False{}, loaded, row) == SL.Count{} : SL.Do}
+
+# a REPL asked to stop (TERM, INT, HUP; stop-not-crash, architect
+# m_48209): `row` its stops with no connect between, this one counted
+
+# LAW: the first stop is no crash, whatever the stall facts say.
+law first_stop_never_counts:
+  for stalled: Bool
+  for loaded: Bool
+  {SL.exit(True{}, stalled, loaded, 1n) == SL.Stop{} : SL.Do}
+
+# LAW: nor is the second in a row (K() is 3).
+law second_stop_never_counts:
+  for stalled: Bool
+  for loaded: Bool
+  {SL.exit(True{}, stalled, loaded, 2n) == SL.Stop{} : SL.Do}
+
+# LAW: a stop never counts toward the crashes.
+law stop_is_no_crash:
+  {SL.counts(SL.Stop{}) == False{} : Bool}
+
+# LAW: from the K()-th stop in a row on, it counts: something keeps
+# killing it before it is ready.
+law kth_stop_counts:
+  for stalled: Bool
+  for loaded: Bool
+  for +n: Nat
+  {SL.exit(True{}, stalled, loaded, Nat.add(SL.K(), n)) == SL.Count{} : SL.Do}
+
+# LAW: an end that is no stop is picked as before.
+law no_stop_as_before:
+  for stalled: Bool
+  for loaded: Bool
+  for +row: Nat
+  {SL.exit(False{}, stalled, loaded, row) == SL.pick(stalled, loaded, row) : SL.Do}

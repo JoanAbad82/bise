@@ -842,12 +842,16 @@ fn a_crashing_repl_restarts_then_fails() {
 
 /// A crashed REPL of `agent` (no stall).
 fn exited(agent: &str, reason: &str) -> Input {
-    Input::ReplExited { agent: agent.into(), crashed: true, reason: reason.into(), stalled: false, loaded: false, row: 0 }
+    Input::ReplExited { agent: agent.into(), crashed: true, reason: reason.into(), stalled: false, loaded: false, row: 0, stopped: false }
 }
 
 /// A stalled start under load never fails the agent (hub/stall.bend).
 #[path = "core_stall_tests.rs"]
 mod stall_tests;
+
+/// A REPL asked to stop is not a crash (hub/stall.bend).
+#[path = "core_stop_tests.rs"]
+mod stop_tests;
 
 #[test]
 fn peers_cannot_reach_an_archived_task_but_the_user_can() {
@@ -2802,7 +2806,7 @@ fn bench_byte_equal() {
         .expect("an active task");
     env.now += 500;
     h.handle(user(&format!("/archive {task} --force")), &mut env);
-    h.handle(Input::ReplExited { agent: task.clone(), crashed: false, reason: String::new(), stalled: false, loaded: false, row: 0 }, &mut env);
+    h.handle(Input::ReplExited { agent: task.clone(), crashed: false, reason: String::new(), stalled: false, loaded: false, row: 0, stopped: false }, &mut env);
     seen(&format!("archive {task}"), &mut h, env.now);
     env.now += 500;
     h.handle(user(&format!("/restore {task}")), &mut env);
@@ -2819,7 +2823,7 @@ fn a_step_keeps_the_archived_agents_it_does_not_send() {
     t.spawn_task("b");
     t.go(Input::ReplIdle { agent: "b".into(), leftover: false });
     t.user(MAIN, "/archive b --force");
-    t.go(Input::ReplExited { agent: "b".into(), crashed: false, reason: String::new(), stalled: false, loaded: false, row: 0 });
+    t.go(Input::ReplExited { agent: "b".into(), crashed: false, reason: String::new(), stalled: false, loaded: false, row: 0, stopped: false });
     assert_eq!(t.status("b"), Status::Archived);
     let out = t.hub.link.call(&json!({"t": "tick", "now": 1_000_000, "git": true, "ans": []})).unwrap();
     let sent: Vec<&str> = out["view"]["agents"].as_array().unwrap().iter().map(|a| a["name"].as_str().unwrap()).collect();

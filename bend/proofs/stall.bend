@@ -24,3 +24,23 @@ def Laws.unloaded_stall_counts(row):
 
 def Laws.crash_counts(loaded, row):
   {==}
+
+def Laws.first_stop_never_counts(stalled, loaded):
+  {==}
+
+def Laws.second_stop_never_counts(stalled, loaded):
+  {==}
+
+def Laws.stop_is_no_crash():
+  {==}
+
+# K()+n against K(): n against 0, below for no n
+def Laws.kth_stop_counts(stalled, loaded, n):
+  match n:
+    case 0n:
+      {==}
+    case 1n+p:
+      {==}
+
+def Laws.no_stop_as_before(stalled, loaded, row):
+  {==}

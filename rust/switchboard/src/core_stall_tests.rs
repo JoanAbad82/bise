@@ -10,7 +10,7 @@ use super::*;
 fn a_stalled_start_under_load_never_fails_the_agent() {
     let mut t = T::new();
     t.spawn_task("a");
-    let stall = |loaded, row| Input::ReplExited { agent: "a".into(), crashed: true, reason: "no progress".into(), stalled: true, loaded, row };
+    let stall = |loaded, row| Input::ReplExited { agent: "a".into(), crashed: true, reason: "no progress".into(), stalled: true, loaded, row, stopped: false };
     let spawn = |fx: &[Effect]| fx.iter().find_map(|e| match e { Effect::Spawn { agent, wait_load, .. } if agent == "a" => Some(*wait_load), _ => None });
     for row in 1..=9 {
         assert_eq!(spawn(&t.go(stall(true, row))), Some(row > 3), "loaded stall {row}: starts again, the 4th on waits");

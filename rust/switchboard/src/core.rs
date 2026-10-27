@@ -99,7 +99,9 @@ pub enum Input {
     },
     /// `stalled`/`loaded`/`row`: a start that made no progress, the
     /// machine at load x2+ then, that REPL's stalls in a row (sb-core's
-    /// hub/stall.bend decides what they do to the crash count)
+    /// hub/stall.bend decides what they do to the crash count);
+    /// `stopped`: it ended by TERM, INT or HUP, a request to stop
+    /// (daemon::repl::gone_of), `row` then its stops with no connect between
     ReplExited {
         agent: String,
         crashed: bool,
@@ -107,6 +109,7 @@ pub enum Input {
         stalled: bool,
         loaded: bool,
         row: u64,
+        stopped: bool,
     },
     ClientHello {
         client: ClientId,
@@ -1486,8 +1489,8 @@ impl Hub {
             Input::Onto { agent, reply } => {
                 let _ = reply.send(self.onto_now(&agent).flatten());
             }
-            Input::ReplExited { agent, crashed, reason, stalled, loaded, row } => {
-                self.core(&mut fx, env, None, In::Exited(ci::Exited { agent, crashed, reason, stalled, loaded, row }))
+            Input::ReplExited { agent, crashed, reason, stalled, loaded, row, stopped } => {
+                self.core(&mut fx, env, None, In::Exited(ci::Exited { agent, crashed, reason, stalled, loaded, row, stopped }))
             }
             Input::ClientHello { client } => {
                 self.clients.insert(
