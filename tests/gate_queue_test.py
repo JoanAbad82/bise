@@ -117,6 +117,14 @@ def main():
     src = open(GATE).read()
     check('if [ "$mode" != land ] && [ -z "$gate_outer" ] && [ -z "${GATE_NO_HEAVY:-}" ]; then' in src,
           "gate.sh: a gate under a live gate, a land check and GATE_NO_HEAVY skip the queue and the lock")
+    # 5. no bare `wait`: bash 5.2's waits on the log's `exec > >(tee ...)` too,
+    # which end only with the gate, so it never returns (stop-not-crash's quick
+    # on a .bend change: every step done, then 18 min in the PROOF wait). Each
+    # wait names its pid.
+    import re
+    bare = [n for n, line in enumerate(src.splitlines(), 1)
+            if re.search(r"(^\s*|[;&|{(]\s*|\bthen\s+|\bdo\s+)wait\s*($|;|&&|\|\||\))", line.split("#")[0])]
+    check(not bare, "gate.sh: no bare wait (it waits on the log's tees and hangs): lines %r" % bare)
     subprocess.run(["rm", "-rf", tmp])
     if fails:
         print("gate_queue_test: FAIL (%d)" % len(fails))

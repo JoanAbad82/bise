@@ -628,8 +628,8 @@ fi
 # the Mac stays awake while the gate runs: -s (PreventSystemSleep, honoured
 # on AC power only) on top of -i, which a DarkWake ignores (display off,
 # the user away: 'Maintenance Sleep' under heavy-run's caffeinate -i, issue
-# 26). -w $$: it ends with this gate. Out of the job table (a subshell's):
-# the bare `wait` below never waits for it.
+# 26). -w $$: it ends with this gate. Out of the job table (a subshell's),
+# and every wait below names its pid (gate_queue_test).
 [ -x /usr/bin/caffeinate ] && ( /usr/bin/caffeinate -s -i -w $$ >/dev/null 2>&1 & )
 LOCK="${gpre}full-$(id -u).lock"
 locked="" out=""
@@ -1064,6 +1064,7 @@ sbcore_job() {
   else echo "ok   sb-core (bins.sh's cache)"; fi
 }
 [ $bend_changed = 1 ] && { proof_job >"$out/proof.res" 2>&1; echo $? >"$out/proof.rc"; } &
+proof_pid=$!
 rm -f "$cache"/sb-core-*  # the -O1 copies of the gate before
 if [ $hub_changed = 1 ]; then
   # SB_CORE_BIN is set from $out/sbcore.path once it is built (below)
@@ -1146,6 +1147,8 @@ else
   echo "skipped clippy: no Rust or hub change vs $base"
 fi
 if [ $bend_changed = 1 ]; then
-  wait; cat "$out/proof.res"; [ "$(cat "$out/proof.rc")" = 0 ] || exit 1
+  # its pid, never a bare `wait`: bash 5.2's also waits on the log's
+  # `exec > >(tee ...)`, which end only with the gate (gate_queue_test)
+  wait "$proof_pid"; cat "$out/proof.res"; [ "$(cat "$out/proof.rc")" = 0 ] || exit 1
 fi
 echo "GATE quick GREEN ($((SECONDS - t0))s):${pkgs:- no Rust tests}$([ $bend_changed = 1 ] && echo ' + PROOF') (full: gate.sh full)"
