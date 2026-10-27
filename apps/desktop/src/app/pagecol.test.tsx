@@ -79,7 +79,7 @@ describe('the pages beside the card (his m_46849)', () => {
   for (const c of cases) {
     it(`${c.name}: its column's margins are the thread's, the right one past the card`, () => {
       setSideLayout(sideLayout(winW, LEFT, false));
-      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: LEFT, top: 0, width: winW - LEFT, height: 800, right: winW, bottom: 800, x: LEFT, y: 0, toJSON: () => ({}) } as DOMRect);
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: LEFT, top: 0, width: winW - LEFT, height: 800, right: winW, bottom: 800, x: LEFT, y: 0, toJSON: () => ({}) });
       const v = page(c.ui, c.route);
       const s = v.getByTestId(c.root).style;
       const l = parseFloat(s.getPropertyValue('--page-col-l'));
