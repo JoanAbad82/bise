@@ -9,7 +9,9 @@
 // handle: row-resize, a 2 px text-3 line after 120 ms of hover (the panel's signed handle), a drag
 // from 96 to half the window's height, a double-click back to 140. On bise's own (every project in
 // scope) the tile holds the town (bims/town/Town.tsx) whole in its height, in place of one office,
-// with no '⤢' (no town tab); it was the RightBar's until 6d9d07180 (his m_47415). Owner: nm-side.
+// with no '⤢' (no town tab); it was the RightBar's until 6d9d07180 (his m_47415). While a new
+// project's welcome shows in main's thread (welcome/shown.ts) the tile is its empty frame, and the
+// welcome's office docks into it at his first send (welcome/dock.ts; designer m_47929). Owner: nm-side.
 import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Agent, Card } from '@/proto';
 import type { MapId } from '@/bims/maps/ids';
@@ -50,21 +52,29 @@ export interface TownActs {
   readonly onOpenAgent: (project: string, agent: string) => void;
 }
 
-/** The tile: the office (on bise's own the town), '⤢' (the office alone: no town tab) and '×' on hover. */
-export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide, town = null }: OuterTileProps & { readonly town?: TownActs | null }) {
+/**
+ * The tile: the office (on bise's own the town), '⤢' (the office alone: no town tab) and '×' on hover.
+ * `waiting`: a new project's welcome holds the office in main's thread (welcome/shown.ts; one office
+ * on screen, native-lead m_47921): the frame alone at its place, its ground and line, no office and
+ * no buttons (designer m_47929). When the welcome docks, the office mounts under its flying copy
+ * (welcome/dock.ts) and `data-landing` stays: its labels, pills and chips come in after the landing.
+ */
+export function OuterTile({ project, name, agents, cards, h, follow, onOpen, onPickMap, onPanel, onHide, town = null, waiting = false }: OuterTileProps & { readonly town?: TownActs | null; readonly waiting?: boolean }) {
+  const [waited, setWaited] = useState(waiting);
+  if (waiting && !waited) setWaited(true);
   return (
-    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined}>
+    <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: OUTER_W }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined} data-waiting={waiting || undefined} data-landing={(waited && !waiting) || undefined}>
       <span className="s3-otile-office">
-        {town !== null ? (
+        {waiting ? null : town !== null ? (
           <OuterTown h={h} acts={town} />
         ) : (
           <WorldOffice project={project} agents={agents} cards={cards} fill follow={follow} onOpen={onOpen} onPickMap={onPickMap} />
         )}
       </span>
-      <span className="s3-otile-acts">
+      {!waiting && <span className="s3-otile-acts">
         {town === null && <Press look="s3-otile-btn" aria-label={side.tile_panel} {...tipAttrs(side.tile_panel)} onClick={onPanel} data-testid="app.outer.world.panel">⤢</Press>}
         <Press look="s3-otile-btn" aria-label={side.tile_hide} {...tipAttrs(side.tile_hide)} onClick={onHide} data-testid="app.outer.world.hide">×</Press>
-      </span>
+      </span>}
     </section>
   );
 }

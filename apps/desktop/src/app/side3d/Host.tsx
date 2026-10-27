@@ -60,6 +60,7 @@ import { followOf } from '@/bims/focus';
 import { mapPrefKey } from '@/bims/maps/ids';
 import { isRunning, useAllProcesses } from '@/running';
 import { side } from '@/proto/words_side.gen';
+import { useWelcoming } from '@/welcome/shown';
 import './side3d.css';
 
 /** a float's right edge from the side's right edge: 12 + the 44 coin + 12 (side3d.css .s3-card) */
@@ -196,6 +197,8 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
   const [open, setOpen] = useState<BubbleId | null>(null);
   // the bims' tile over the outer card: hidden or not, its height (tilestate.ts, kept per window)
   const tile = useOuterWorld();
+  // a new project's welcome in main's thread holds the office (one on screen): the tile keeps its frame, empty, until it docks there
+  const welcome = useWelcoming(project);
   // no room beside the thread: the coins are minis in the thread's header or the sheet's tab row,
   // their floats under the header (folded-side v9)
   // (his m_45864: both in the title bar, right after the thread's crumb, never in the panel's tab row)
@@ -503,7 +506,7 @@ function Side({ project, scope, home, world, at: coinsAt, right }: { project: st
       <>
         {!tile.hidden && (
           <>
-            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH} follow={tileFollow}
+            <OuterTile project={project} name={name} agents={ownLive} cards={ownCards} h={tileH} follow={tileFollow} waiting={welcome}
               onOpen={(agent) => {
                 router.go({ screen: 'thread', project, agent });
               }}

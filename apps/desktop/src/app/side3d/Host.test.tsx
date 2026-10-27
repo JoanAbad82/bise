@@ -23,6 +23,7 @@ import { CARD_MAX, cardMaxH } from './layout';
 import { sideLayoutNow } from './place';
 import { beatPlace, hitBox } from './World';
 import { outerWorld, TILE_H, TILE_MIN } from './tilestate';
+import { welcoming } from '@/welcome/shown';
 
 // the office's renderer and the 3D pictures need WebGL: a stand-in office, pictures that never draw (the plain tile)
 const office = vi.hoisted(() => ({
@@ -751,6 +752,41 @@ describe('the bims\' tile over the outer card (page outer-world v2, his pick #79
     expect(outerWorld.get().h).toBe(TILE_MIN);
     fireEvent.doubleClick(handle);
     expect(v.getByTestId('app.outer.world').style.height).toBe('140px');
+  });
+
+  it('a new project\'s welcome in main\'s thread: the tile keeps its frame and place, empty (one office on screen, native-lead m_47921; designer m_47929); the welcome gone, its office mounts there', () => {
+    tall(900);
+    const gone = welcoming.add(ACME);
+    try {
+      const { v } = side3d(1440);
+      const tile = v.getByTestId('app.outer.world');
+      expect(tile.querySelector('[data-testid="office"]')).toBeNull();
+      expect(tile.hasAttribute('data-waiting')).toBe(true);
+      // no words in the empty frame: no ⤢ nor ×
+      expect(v.queryByTestId('app.outer.world.panel')).toBeNull();
+      expect(v.queryByTestId('app.outer.world.hide')).toBeNull();
+      // the frame where the office will be: no jump of the card
+      expect(tile.style.height).toBe('140px');
+      expect(v.getByTestId('app.outer').style.top).toBe('212px');
+      act(() => {
+        gone();
+      });
+      expect(tile.querySelector('[data-testid="office"]')).toBeTruthy();
+      expect(tile.hasAttribute('data-waiting')).toBe(false);
+    } finally {
+      if (welcoming.has(ACME)) gone();
+    }
+  });
+
+  it('a welcome in another project leaves this project\'s tile live', () => {
+    tall(900);
+    const gone = welcoming.add(HOME);
+    try {
+      const { v } = side3d(1440);
+      expect(v.getByTestId('app.outer.world').querySelector('[data-testid="office"]')).toBeTruthy();
+    } finally {
+      gone();
+    }
   });
 
   it('a kept height taller than half a smaller window shows at half of it', () => {

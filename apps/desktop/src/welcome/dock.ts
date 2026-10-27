@@ -1,9 +1,10 @@
-// The welcome's office docking into the right bar at his first message (page new-project-home,
-// pick A; designer m_38080): a copy of the welcome stays over the thread for DOCK_MS, its office
-// (the scene as drawn, renderer.copyTo) flies to the bar's office while its words fade; the bar's
-// office (on now: bimsView 'bims', as the cube does) fades in under it. Reduced motion, or no bar
-// on screen (a narrow window folds it away): a crossfade in place. The geometry is pure (moveOf);
-// fly() is the DOM's. Owner: project-home.
+// The welcome's office docking into the outer card's tile at his first message (page
+// new-project-home, pick A; designer m_38080, m_47929): a copy of the welcome stays over the thread
+// for DOCK_MS, its office (the scene as drawn, renderer.copyTo) flies into the tile
+// (app.outer.world, its frame kept empty while the welcome showed: one office on screen) while its
+// words fade; the tile's live office mounts under it as the welcome goes (welcome/shown.ts). Reduced
+// motion, or no tile on screen (hidden by him, a panel open, a narrow window): a crossfade in place.
+// The geometry is pure (moveOf); fly() is the DOM's. Owner: project-home.
 
 /** the flight, ms (designer m_38070) */
 export const DOCK_MS = 400;
@@ -17,27 +18,29 @@ export interface Rect {
   readonly height: number;
 }
 
-/** The transform that takes `from` onto `to` (its top left on `to`'s, scaled to its width), with its origin at the top left; null: no flight (a crossfade). Pure. */
+/** The transform that puts `from` whole into `to`, centred (the tile draws the office at its fit), its origin at the top left; null: no flight (a crossfade). Pure. */
 export function moveOf(from: Rect, to: Rect | null, reduced: boolean): string | null {
-  if (reduced || to === null || from.width <= 0 || to.width <= 0) return null;
-  const s = to.width / from.width;
-  return `translate(${(to.left - from.left).toFixed(1)}px, ${(to.top - from.top).toFixed(1)}px) scale(${s.toFixed(4)})`;
+  if (reduced || to === null || from.width <= 0 || from.height <= 0 || to.width <= 0 || to.height <= 0) return null;
+  const s = Math.min(to.width / from.width, to.height / from.height);
+  const x = to.left + (to.width - from.width * s) / 2 - from.left;
+  const y = to.top + (to.height - from.height * s) / 2 - from.top;
+  return `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${s.toFixed(4)})`;
 }
 
-/** the bar's office on screen: its top left and width (its fold grows still), null when the bar isn't shown */
-export function barTarget(doc: Document, ratio: number): Rect | null {
-  // the office itself (it spans the bar's padding), else its fold while it mounts
-  const fold = doc.querySelector<HTMLElement>('[data-testid="app.right.bims.fold"] [data-testid="app.right.bims"]') ?? doc.querySelector<HTMLElement>('[data-testid="app.right.bims.fold"]');
-  if (fold === null) return null;
-  const r = fold.getBoundingClientRect();
-  if (r.width <= 0 || r.right <= 0 || r.left >= doc.documentElement.clientWidth) return null;
-  return { left: r.left, top: r.top, width: r.width, height: ratio > 0 ? r.width / ratio : r.height };
+/** the outer card's tile on screen (app.outer/side3d OuterWorld.tsx), its box; null when it isn't shown */
+export function tileTarget(doc: Document): Rect | null {
+  const tile = doc.querySelector<HTMLElement>('[data-testid="app.outer.world"]');
+  if (tile === null) return null;
+  const r = tile.getBoundingClientRect();
+  // fixed 12 from the window's right edge: on screen whenever it is laid out
+  if (r.width <= 0 || r.height <= 0) return null;
+  return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
 
 /**
  * Fly a copy of the welcome (`root`, still mounted) with its office (`map`, the element holding
- * the canvas) to the bar: `snap` paints the office as drawn onto a 2d canvas; `target` is asked
- * on the next frame (the bar's office mounts after the view turned on).
+ * the canvas) into the tile: `snap` paints the office as drawn onto a 2d canvas; `target` is asked
+ * two frames on (the tile's office mounts as the welcome goes).
  */
 export function fly(root: HTMLElement, map: HTMLElement | null, snap: ((c: HTMLCanvasElement) => void) | null, target: () => Rect | null, reduced: boolean): void {
   const doc = root.ownerDocument;
@@ -69,12 +72,12 @@ export function fly(root: HTMLElement, map: HTMLElement | null, snap: ((c: HTMLC
   };
   const words = [...copy.children].filter((el) => el !== copyMap);
   for (const el of words) el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: WORDS_MS, fill: 'forwards', easing: 'ease-out' });
-  // two frames: the bar's office mounts (its fold, at its place) once the welcome let it open
+  // two frames: the tile's office mounts once the welcome let it
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const to = target();
     const move = copyMap === null || mapAt === null ? null : moveOf(mapAt, to, reduced);
     if (copyMap === null || move === null) {
-      // a crossfade: the bar's office (if shown) fades in on its own
+      // a crossfade: the tile's office (if shown) fades in on its own
       copy.animate([{ opacity: 1 }, { opacity: 0 }], { duration: DOCK_MS, fill: 'forwards', easing: 'ease-in-out' }).finished.then(done, done);
       return;
     }

@@ -1,6 +1,7 @@
-// Which projects show their welcome in this window now (Welcome.tsx mounts, unmounts): the right
-// bar's office stays closed while the welcome's office is the thread's (page new-project-home a1:
-// one office on screen), and opens as it docks there. View state only, never kept. Owner: project-home.
+// Which projects show their welcome in this window now (Welcome.tsx mounts, unmounts): the outer
+// card's tile (side3d OuterWorld.tsx) is an empty frame while the welcome's office is the thread's
+// (page new-project-home a1: one office on screen; native-lead m_47921), and its office mounts as
+// the welcome docks there. View state only, never kept. Owner: project-home.
 import { useSyncExternalStore } from 'react';
 
 const on = new Map<string, number>();

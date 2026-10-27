@@ -4,7 +4,7 @@
 // stacked (his note n1: no room for 3 columns on a small screen); then the lead's first message,
 // written by the app (no model call), and three ideas that fill the composer (never a send).
 // The office can't draw (WebGL lost, renderer failed): B's three pictures instead. Shown while
-// rule.ts says so; at his first message it docks into the right bar (dock.ts). Since bise fait mac
+// rule.ts says so; at his first message it docks into the outer card's tile (dock.ts). Since bise fait mac
 // the empty home (composer/home, designer's pick (c)) sits on it: the question and the ideas are
 // the home's, the office the picture under them, with no call to action of its own. Owner:
 // nm-composer (native-lead m_42546).
@@ -17,13 +17,12 @@ import { Office, type OfficeState } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
 import { withGhosts } from '@/bims/ghosts';
 import { mapOf, mapPrefKey } from '@/bims/maps/ids';
-import { bimsView } from '@/bims/view';
 import { getPref, type Prefs } from '@/settings/prefs';
 import { LiveBiseMark } from '@/app/Marks';
 import { welcomeShows } from './rule';
 import { officeRoom } from './room';
 import { welcoming } from './shown';
-import { barTarget, fly } from './dock';
+import { fly, tileTarget } from './dock';
 import { Pictures } from './Pictures';
 import './welcome.css';
 
@@ -54,7 +53,7 @@ interface WelcomeProps {
   rootRef?: RefObject<HTMLDivElement | null>;
   mapRef?: RefObject<HTMLDivElement | null>;
   snapRef?: { current: ((c: HTMLCanvasElement) => void) | null };
-  /** its last render, as it docks: the bar's office opens now, under its copy */
+  /** its last render, as it docks: the tile's office mounts now, under its copy */
   docking?: boolean;
   /** over an empty thread (the slot's own height), else under main's lines */
   centred?: boolean;
@@ -68,7 +67,7 @@ export function Welcome({ project, name, head, rootRef, mapRef, snapRef, docking
   const growth = useGrowth(project);
   const map = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
   const [state, setState] = useState<OfficeState>('loading');
-  // the right bar's office stays closed while this one shows (welcome/shown.ts)
+  // the outer card's tile stays an empty frame while this one shows (welcome/shown.ts)
   useEffect(() => (docking ? undefined : welcoming.add(project)), [project, docking]);
   const ownRoot = useRef<HTMLDivElement>(null);
   const root = rootRef ?? ownRoot;
@@ -201,7 +200,7 @@ export function IntroRow({ project }: { project: string }) {
 
 /**
  * The welcome in main's thread of a project (not bise's own): while rule.ts says so, and for its
- * dock once his first message leaves (the bar's office turns on, as the cube does).
+ * dock once his first message leaves (the tile's office mounts under its flying copy).
  */
 export function WelcomeSlot({ tkey, project, head }: { tkey: string; project: string; head?: ReactNode }) {
   const store = useStore();
@@ -225,9 +224,7 @@ export function WelcomeSlot({ tkey, project, head }: { tkey: string; project: st
     if (!leaving) return;
     const el = root.current;
     if (el !== null) {
-      bimsView.setView('bims');
-      const ratio = (map.current?.clientWidth ?? 0) / Math.max(1, map.current?.clientHeight ?? 0);
-      fly(el, map.current, snap.current, () => barTarget(document, ratio), reducedMotion());
+      fly(el, map.current, snap.current, () => tileTarget(document), reducedMotion());
     }
     // its copy flies now: the welcome itself goes at the next frame, the thread takes the centre
     const raf = requestAnimationFrame(() => {

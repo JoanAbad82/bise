@@ -70,14 +70,16 @@ describe('officeRoom: the office gives way first (designer m_38760)', () => {
 
 describe('the dock', () => {
   const from = { left: 300, top: 100, width: 440, height: 300 };
-  const to = { left: 1080, top: 60, width: 320, height: 218 };
+  const tile = { left: 1136, top: 64, width: 292, height: 140 };
 
-  it('flies the office onto the bar office, scaled to its width', () => {
-    expect(moveOf(from, to, false)).toBe('translate(780.0px, -40.0px) scale(0.7273)');
+  it("flies the office into the outer card's tile, whole and centred, as the tile draws it (at its fit)", () => {
+    expect(moveOf(from, tile, false)).toBe('translate(879.3px, -36.0px) scale(0.4667)');
+    // a tall tile: its width decides, the office centred in its height
+    expect(moveOf(from, { ...tile, height: 400 }, false)).toBe('translate(836.0px, 64.5px) scale(0.6636)');
   });
 
-  it('a crossfade under reduced motion, or with no bar on screen', () => {
-    expect(moveOf(from, to, true)).toBeNull();
+  it('a crossfade under reduced motion, or with no tile on screen', () => {
+    expect(moveOf(from, tile, true)).toBeNull();
     expect(moveOf(from, null, false)).toBeNull();
   });
 });

@@ -1697,6 +1697,29 @@
 .s3-outer[data-above][data-below] {
   mask-image: linear-gradient(to bottom, transparent, #000 var(--s-4), #000 calc(100% - var(--s-4)), transparent);
 }
+/* the welcome docking into the tile (OuterTile data-landing, designer m_47929): the live office
+   mounts under the welcome's flying copy (welcome/dock.ts DOCK_MS, 400), its names, pills and chips
+   come in after the landing, 120 ms; under reduced motion no flight, the office fades in (400) */
+@keyframes s3-otile-land {
+  from {
+    opacity: 0;
+  }
+}
+.s3-otile[data-landing] .bims-overlay,
+.s3-otile[data-landing] .bims-label,
+.s3-otile[data-landing] .bims-pill,
+.s3-otile[data-landing] .bims-level,
+.s3-otile[data-landing] .bims-chip {
+  animation: s3-otile-land 120ms ease-out 400ms backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .s3-otile[data-landing] .s3-otile-office {
+    animation: s3-otile-land 400ms ease-in-out;
+  }
+}
+:root[data-reduce-motion] .s3-otile[data-landing] .s3-otile-office {
+  animation: s3-otile-land 400ms ease-in-out;
+}
 /* the office's corner chips inside the tile (designer m_46580): the bims head's map chip (--c-bg, a
    1 px line, r 6), 8 in from the corners; the map chip on hover at every height, as ⤢ and × */
 .s3-otile .bims-mapsel {
