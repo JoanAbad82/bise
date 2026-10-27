@@ -43,6 +43,23 @@ fn hub() -> T {
     t
 }
 
+/// quit-stop (docs/idle-exit.md): his quit stops the hub with its
+/// standing orders; at the next start a `sb every 10m` down for 5 h fires
+/// once at the first tick, then keeps its period: no catch-up per missed
+/// period.
+#[test]
+fn a_timer_down_for_hours_fires_once_then_keeps_its_period() {
+    let mut t = hub();
+    every(&mut t, MAIN, "w", Sched::Every(10 * MIN_MS), None, None);
+    let back = N + 300 * MIN_MS + 7;
+    let fx = tick(&mut t, back);
+    let fired = journal(&fx, "every_fired");
+    assert_eq!(fired.len(), 1, "one wake for 30 missed periods");
+    let next = fired[0]["next_ms"].as_u64().unwrap();
+    assert!(next > back && next <= back + 10 * MIN_MS, "the next one a period on: {}", next - N);
+    assert!(journal(&tick(&mut t, back + MIN_MS), "every_fired").is_empty());
+}
+
 #[test]
 fn a_timer_fires_when_due_idle_or_busy_never_stacked() {
     let mut t = hub();

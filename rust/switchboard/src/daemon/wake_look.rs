@@ -92,7 +92,8 @@ struct Looker {
     watches: Vec<wake::Watch>,
     last_ms: u64,
     costly_ms: u64,
-    /// a launchd job's pid, by watch id, once a look saw it
+    /// the pid a look returned, by watch id: a launchd job's once seen,
+    /// a bash command's seen dead with no rc (the next look says cut)
     job_pids: BTreeMap<u64, u32>,
     /// watches whose event went to the loop: never again
     reported: BTreeSet<u64>,
@@ -126,13 +127,21 @@ impl Looker {
                 Some(p) => self.job_pids.insert(w.id, p),
                 None => self.job_pids.remove(&w.id),
             };
-            if let Seen::Ended { rc } = seen {
-                let tail = w.spec.tail.as_deref().and_then(|t| p.tail(t));
-                let after_ms = now.saturating_sub(w.set_at);
-                let text = wake::hit_text(&w.spec, rc.as_deref(), tail.as_deref(), after_ms);
-                let hit = wake::Hit::of(rc.as_deref(), tail.as_deref(), after_ms);
-                out.push(WakeSeen { id: w.id, text, rc: hit.rc, tail: hit.tail, after_ms });
-            }
+            let tail = || w.spec.tail.as_deref().and_then(|t| p.tail(t));
+            let after_ms = now.saturating_sub(w.set_at);
+            let (text, rc, tail) = match seen {
+                Seen::Running => continue,
+                Seen::Ended { rc } => {
+                    let tail = tail();
+                    (wake::hit_text(&w.spec, rc.as_deref(), tail.as_deref(), after_ms), rc, tail)
+                }
+                Seen::Cut => {
+                    let tail = tail();
+                    (wake::cut_text(&w.spec, tail.as_deref(), after_ms), None, tail)
+                }
+            };
+            let hit = wake::Hit::of(rc.as_deref(), tail.as_deref(), after_ms);
+            out.push(WakeSeen { id: w.id, text, rc: hit.rc, tail: hit.tail, after_ms });
         }
         self.reported.extend(out.iter().map(|s| s.id));
         out

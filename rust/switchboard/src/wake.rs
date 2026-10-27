@@ -384,6 +384,9 @@ pub enum Seen {
     /// It ended: its rc when known (a bash command, a launchd job, an rc
     /// file's first line), and what the wake says of it.
     Ended { rc: Option<String> },
+    /// A bash command whose process is gone with no rc: something cut it
+    /// (a hub stop at his quit, a kill), it did not finish.
+    Cut,
 }
 
 /// How much a look may cost now (daemon/wake_look.rs's cadence): `start`:
@@ -394,9 +397,10 @@ pub struct Costly {
     pub job: bool,
 }
 
-/// Has the watch's event happened? `job_pid`: the job's pid seen by an
-/// earlier look (kill(0) on it is enough while it lives); a job look
-/// returns the pid it saw, for the next one.
+/// Has the watch's event happened? `job_pid`: the pid an earlier look
+/// returned (a launchd job's, kill(0) on it is enough while it lives; a
+/// bash command's, dead with no rc yet); a look returns the pid it saw,
+/// for the next one.
 pub fn look(spec: &Spec, p: &dyn Probe, costly: Costly, job_pid: Option<u32>) -> (Seen, Option<u32>) {
     match &spec.what {
         What::Bg { slot, .. } => {
@@ -406,7 +410,17 @@ pub fn look(spec: &Spec, p: &dyn Probe, costly: Costly, job_pid: Option<u32>) ->
             }
             // its files gone (removed by hand): ended, rc unknown
             let gone = ["pid", "out"].iter().all(|e| !p.exists(&format!("{}.{}", slot, e))) && !p.exists(&format!("{}.slot", slot));
-            (if gone { Seen::Ended { rc: None } } else { Seen::Running }, None)
+            if gone {
+                return (Seen::Ended { rc: None }, None);
+            }
+            // its process gone and still no rc a look later (its wrapper
+            // writes the rc right after the end): cut, by a hub stop at
+            // his quit or a kill (docs/idle-exit.md)
+            let pid = p.head(&format!("{}.pid", slot)).and_then(|s| s.trim().parse::<u32>().ok());
+            match pid.filter(|pid| !p.alive(*pid)) {
+                Some(pid) if job_pid == Some(pid) => (Seen::Cut, None),
+                dead => (Seen::Running, dead),
+            }
         }
         What::Pid { pid, start } => {
             if !p.alive(*pid) {
@@ -564,6 +578,25 @@ pub fn hit_text(spec: &Spec, rc: Option<&str>, tail: Option<&str>, waited: u64) 
         _ => std::iter::once(format!("{} ended", what(spec))).chain(rc).chain([after]).collect(),
     };
     parts.extend(words_after(spec));
+    let mut out = parts.join(" · ");
+    if let Some(file) = spec.tail.as_deref() {
+        out.push('\n');
+        out.push_str(&tail_part(file, tail));
+    }
+    out
+}
+
+/// The wake of a bash command that was cut ([`Seen::Cut`]): it did not
+/// finish, so the agent runs it again (designer m_48451: the shape of
+/// the other wakes, the advice last).
+pub fn cut_text(spec: &Spec, tail: Option<&str>, waited: u64) -> String {
+    let mut parts = vec![
+        format!("{} was stopped", what(spec)),
+        "no rc: bise stopped, or something killed it".to_string(),
+        format!("after {}", dur(waited)),
+    ];
+    parts.extend(words_after(spec));
+    parts.push("run it again if you still need it".into());
     let mut out = parts.join(" · ");
     if let Some(file) = spec.tail.as_deref() {
         out.push('\n');

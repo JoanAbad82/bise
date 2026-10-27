@@ -59,6 +59,39 @@ fn a_bash_slot_ends_when_its_rc_appears() {
     assert_eq!(s.tail.as_deref(), Some("/t/bg/3.out"));
 }
 
+/// quit-stop (architect m_48398): a job the hub's stop cut has a slot, a
+/// dead pid and no rc. The next hub's look must not read it as running
+/// for a day, nor as finished: two looks in a row (its wrapper writes the
+/// rc right after the end), then cut, and the wake says to run it again.
+#[test]
+fn a_bash_job_whose_process_is_gone_with_no_rc_was_cut() {
+    let s = Spec::bg("/t/bg/3", "make check");
+    let mut f = Fake::default();
+    f.files.insert("/t/bg/3.pid".into(), "4242\n".into());
+    f.files.insert("/t/bg/3.out".into(), "half done\n".into());
+    f.files.insert("/t/bg/3.slot".into(), String::new());
+    // alive: running, nothing kept
+    f.pids.insert(4242, String::new());
+    assert_eq!(look(&s, &f, CHEAP, None), (Seen::Running, None));
+    // gone: a first look waits for the rc its wrapper may still write
+    f.pids.clear();
+    assert_eq!(look(&s, &f, CHEAP, None), (Seen::Running, Some(4242)));
+    // the rc came: it ended, it was not cut
+    f.files.insert("/t/bg/3.rc".into(), "0\n".into());
+    assert_eq!(look(&s, &f, CHEAP, Some(4242)).0, ended(Some("0")));
+    f.files.remove("/t/bg/3.rc");
+    // still no rc a look later: cut
+    assert_eq!(look(&s, &f, CHEAP, Some(4242)), (Seen::Cut, None));
+    let t = cut_text(&s, Some("half done\n"), 3_600_000);
+    assert!(
+        t.starts_with(
+            "background 3 was stopped · no rc: bise stopped, or something killed it · after 1h00m · make check · run it again if you still need it\n"
+        ),
+        "{t}"
+    );
+    assert!(t.ends_with("half done"), "{t}");
+}
+
 #[test]
 fn a_pid_ends_when_it_dies_or_another_process_takes_it() {
     let s = Spec { what: What::Pid { pid: 7, start: "Mon 10:00".into() }, tail: None, note: String::new() };

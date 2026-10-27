@@ -1365,46 +1365,41 @@ impl Shell {
         }
     }
 
-    /// What keeps a hub with no UI up (idle-exit rule 2): an agent
-    /// mid-turn (or waiting in `sb wait`), a REPL starting or switching,
-    /// a background job of an agent, a build of the hub's own.
-    fn idle_busy(&self) -> Vec<String> {
-        let mut v = Vec::new();
+    /// What runs, for idle-exit rule 2 (`idle::busy` decides what holds
+    /// the hub): the hub's own operations, and the agents' work (who is
+    /// mid-turn or in `sb wait`, their background jobs, `sb every`).
+    fn idle_running(&self) -> (crate::idle::Own, crate::idle::Work) {
+        let mut work = crate::idle::Work {
+            timers: self.hub.timers().map.len(),
+            ..Default::default()
+        };
         for name in &self.hub.st.order {
             let Some(a) = self.hub.st.agents.get(name) else { continue };
             if a.lifecycle != Lifecycle::Active {
                 continue;
             }
             if a.run == crate::model::Run::Busy {
-                v.push(format!("{} mid-turn", a.name));
+                work.mid_turn.push(a.name.clone());
             }
-            let jobs = crate::idle::bg_jobs(&self.opts.paths.agent_tmp(&a.dir).join("bg"), crate::procs::alive);
-            if !jobs.is_empty() {
-                v.push(format!("{}'s background job {}", a.name, jobs.join(" ")));
-            }
+            let bg = self.opts.paths.agent_tmp(&a.dir).join("bg");
+            let jobs = crate::idle::bg_jobs(&bg, crate::procs::alive)
+                .into_iter()
+                .map(|id| {
+                    let cmd = std::fs::read_to_string(bg.join(format!("{}.cmd", id))).unwrap_or_default();
+                    crate::idle::Job { name: crate::idle::cmd_name(&cmd), id }
+                })
+                .collect();
+            work.jobs.push((a.name.clone(), jobs));
         }
-        if !self.starts.is_empty() {
-            v.push("a REPL starting".into());
-        }
-        if !self.switching.is_empty() {
-            v.push("a REPL switching".into());
-        }
-        // its idle exit read as a crash: the switch rolled back
-        if crate::switch::on_probation(&self.opts.paths) {
-            v.push("a version switch on probation".into());
-        }
-        if !self.building.is_empty() {
-            v.push("a version build".into());
-        }
-        if self.updating.is_some() {
-            v.push("the /update build".into());
-        }
-        if self.release.is_some() {
-            v.push("/release-bise".into());
-        }
-        // a standing order (`sb every`) fires only while the hub runs
-        v.extend(crate::idle::timers_busy(self.hub.timers().map.len()));
-        v
+        let own = crate::idle::Own {
+            starting: !self.starts.is_empty(),
+            switching: !self.switching.is_empty(),
+            probation: crate::switch::on_probation(&self.opts.paths),
+            building: !self.building.is_empty(),
+            updating: self.updating.is_some(),
+            release: self.release.is_some(),
+        };
+        (own, work)
     }
 
     /// idle-exit, at each tick: no UI for the grace and nothing runs,
@@ -1414,14 +1409,18 @@ impl Shell {
         self.view_tick();
         let uis = self.clients.len() + self.holds.count();
         // the look reads self: the watch is taken out for it
-        let mut w = std::mem::replace(&mut self.idle, crate::idle::Watch::new(None, std::time::Instant::now()));
-        let step = w.step(std::time::Instant::now(), uis, || self.idle_busy());
+        let mut w = std::mem::replace(&mut self.idle, crate::idle::Watch::new(None, false, std::time::Instant::now()));
+        let step = w.step(std::time::Instant::now(), uis, || self.idle_running());
         self.idle = w;
         match step {
             crate::idle::Step::Stay => {}
             crate::idle::Step::Say(s) => log_line(&self.opts.paths, &s),
-            crate::idle::Step::Stop(s) => {
-                log_line(&self.opts.paths, &s);
+            crate::idle::Step::Stop { log, main } => {
+                log_line(&self.opts.paths, &log);
+                // what the stop cut, in main's thread: he reads it at the next start
+                if let Some(m) = main {
+                    self.feed_rec(MAIN, Feed::info(m));
+                }
                 self.view_stopped();
                 let _ = self.tx.send(Msg::Shutdown { keep: false });
             }
@@ -1723,13 +1722,14 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         cu: crate::computer_use::Watch::new(&proc_hub),
         pg: pages::PageState::load(&paths.state),
         fn_ctx: None,
-        idle: crate::idle::Watch::new(
-            crate::idle::grace(
-                std::env::var(crate::idle::ENV).ok().as_deref(),
-                &std::fs::read_to_string(bise_home::Home::from_env().config_file()).unwrap_or_default(),
-            ),
-            std::time::Instant::now(),
-        ),
+        idle: {
+            let config = std::fs::read_to_string(bise_home::Home::from_env().config_file()).unwrap_or_default();
+            crate::idle::Watch::new(
+                crate::idle::grace(std::env::var(crate::idle::ENV).ok().as_deref(), &config),
+                crate::idle::waits(&config),
+                std::time::Instant::now(),
+            )
+        },
         holds: crate::idle::Holds::default(),
         art: art::Art::default(),
         revive: revive::Revive::default(),
@@ -1742,7 +1742,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     sh.start_pages(&paths, &tx);
     sh.start_here(&paths);
     match sh.idle.grace() {
-        Some(g) => log_line(&paths, &format!("idle exit: after {} s without a UI, once nothing runs", g.as_secs())),
+        Some(g) => log_line(&paths, &sh.idle.boot_line(g)),
         None => log_line(&paths, "idle exit: off (the hub runs until stopped)"),
     }
     // the features' facts (dev-flow §5.1), off the loop
