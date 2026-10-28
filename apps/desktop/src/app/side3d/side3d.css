@@ -799,6 +799,13 @@
 .s3-orow:is(:hover, :has(> .s3-pin:focus-within)) .s3-orow-open > .b-pinmark {
   visibility: hidden;
 }
+/* a row with nothing at its end (a watch, an agent's line with no age, PR or ψ): while the hover
+   pin shows, its words' last 32 (the 24 box and 8) fade out under it, never reflowed nor cut again
+   (designer m_49536) */
+.s3-row:is(:hover, :has(> .s3-pin:focus-within)):has(> .s3-pin):not(:has(.s3-row-end)) .s3-row-lines,
+.s3-orow:is(:hover, :has(> .s3-pin:focus-within)):has(> .s3-pin):not(:has(:is(.s3-orow-age, .s3-orow-pr, .s3-orow-wt, .b-pinmark))) .s3-orow-name {
+  mask-image: linear-gradient(to left, transparent, #000 var(--s-8));
+}
 /* an agent's line: 28 high, its words 12 from its right (.s3-orow-open's padding) */
 .s3-orow {
   position: relative;
