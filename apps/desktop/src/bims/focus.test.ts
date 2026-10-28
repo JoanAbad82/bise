@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aimAt, bimsLit, easeCam, edgeOf, FOLLOW_ZOOM, followOf, settled } from './focus';
+import { aimAt, bimsLit, easeCam, edgeOf, FOLLOW_ZOOM, followOf, followZoomOf, MAIN_FOLLOW_ZOOM, settled } from './focus';
 import { MAX_ZOOM } from './zoom';
 import { foldOf } from './Fold';
 import { FIT } from './zoom';
@@ -34,6 +34,12 @@ describe('the follow camera', () => {
   it('looks a little wider than the 8.8x follow: the bim, its desk and its neighbours (his m_48928), with room for his pinch past it', () => {
     expect(FOLLOW_ZOOM).toBe(6);
     expect(FOLLOW_ZOOM).toBeLessThan(MAX_ZOOM);
+  });
+  it('frames main\'s bigger desk a little wider, so both desks take about the same share of the tile (designer m_48958)', () => {
+    expect(followZoomOf({ main: true })).toBe(MAIN_FOLLOW_ZOOM);
+    expect(followZoomOf({ main: false })).toBe(FOLLOW_ZOOM);
+    expect(followZoomOf(undefined)).toBe(FOLLOW_ZOOM);
+    expect(MAIN_FOLLOW_ZOOM).toBeLessThan(FOLLOW_ZOOM);
   });
   it('eases there in about 300 ms, at once under reduced motion', () => {
     const to = aimAt(0.3, 0.6);

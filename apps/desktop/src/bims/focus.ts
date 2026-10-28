@@ -42,6 +42,13 @@ export function useBimsLit(): Lit | null {
  * wider, the bim, its desk and its close neighbours, a desk about a quarter of the 292 px tile).
  */
 export const FOLLOW_ZOOM = 6;
+/** main's desk is bigger: 4.4x frames it the same way, its desk ~27 % of the tile, its neighbour whole (designer m_48958) */
+export const MAIN_FOLLOW_ZOOM = 4.4;
+
+/** How close the follow camera looks at this agent's bim: main's big desk a little wider. Pure. */
+export function followZoomOf(agent: { readonly main?: boolean } | undefined): number {
+  return agent?.main === true ? MAIN_FOLLOW_ZOOM : FOLLOW_ZOOM;
+}
 /** the follow camera's ease: about 300 ms to settle */
 const FOLLOW_TAU = 0.1;
 

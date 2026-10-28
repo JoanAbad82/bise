@@ -40,7 +40,7 @@ import { Pins, pinPoints, placePins } from './pins';
 import { placeZzz, sleepers } from './zzz';
 import { fallingLook, fallingSig, type FallingLook } from './falling';
 import { WEATHERS, type Weather } from './sky';
-import { aimAt, bimsLit, easeCam, edgeOf, FOLLOW_ZOOM, useBimsLit } from './focus';
+import { aimAt, bimsLit, easeCam, edgeOf, followZoomOf, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
 import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
 import type { PluginObject } from './plugin-objects';
@@ -202,7 +202,7 @@ export function Office({
   map = DEFAULT_MAP,
   parts,
   follow = null,
-  followZoom = FOLLOW_ZOOM,
+  followZoom,
   fill = false,
   onOpen,
   onOpenPlugin,
@@ -230,7 +230,7 @@ export function Office({
   parts: Parts;
   /** the agent whose thread is open (focus.ts followOf): the office zooms on its bim and follows it */
   follow?: string | null;
-  /** how close the follow camera looks (focus.ts aimAt): FOLLOW_ZOOM by default; the right side's world frames its lead wider (app/side3d camera.ts) */
+  /** how close the follow camera looks (focus.ts aimAt): by default its desk's (focus.ts followZoomOf: FOLLOW_ZOOM, main's MAIN_FOLLOW_ZOOM) */
   followZoom?: number;
   /** the office fills its holder's height (a panel tab, app/panel/Office.tsx): the canvas is the holder's box, the office whole and centred in it; off, its natural height for the width */
   fill?: boolean;
@@ -340,13 +340,14 @@ export function Office({
   useEffect(() => {
     onZoomed?.(!fitted);
   }, [fitted, onZoomed]);
-  // how close it follows (the world's lead framing, then a beat's closer look): a change eases there
-  const zoomRef = useRef(followZoom);
+  // how close it follows (followZoom, else by its desk: main's a little wider, focus.ts followZoomOf): a change eases there
+  const zoom = followZoom ?? followZoomOf(agents.find((a) => a.name === follow));
+  const zoomRef = useRef(zoom);
   useEffect(() => {
-    if (zoomRef.current === followZoom) return;
-    zoomRef.current = followZoom;
+    if (zoomRef.current === zoom) return;
+    zoomRef.current = zoom;
     kickRef.current();
-  }, [followZoom]);
+  }, [zoom]);
   // the office grows (growth.ts): its high-water mark, the last growth drawn (an unlock is a stage
   // past it), the unlock moment, its label over the piece and the ground corner's tip
   // in test mode no kept mark: the fixture's growth, or a check's own (window.__biseGrow, read when
