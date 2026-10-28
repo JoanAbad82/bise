@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# release_cut.sh: the checked part of a continuous release (docs/release-cadence.md), in two
+# steps with the app's notes written between them. Never pushes, never publishes.
+#   scripts/release_cut.sh gate <keep dir>
+#       main's tip gate (scripts/nightly_gate.sh --tip, its own heavy-run slot); the gate's logs
+#       copied to <keep dir> at once (other gates overwrite them). Green: prints 'green <sha>', the
+#       sha of the green-shas.tsv line it wrote (main's tip when its slot opened, maybe newer than
+#       the wake's): the release is cut on THAT sha. Exit 0 green, 1 red or no new green line.
+#   scripts/release_cut.sh tag <sha> <desktop-vYYYY.M.N> <notes file>
+#       scripts/desktop_tag.py in a clean detached worktree (RELEASE_TREE, default
+#       ~/.cache/bise-release/tree: outside ~/.bise, ~/bise and ~/Library, which the app's checks
+#       refuse or watch), no .pyc written; the tag signed through Secretive (SSH_AUTH_SOCK, as git
+#       tag.gpgsign is on), never pushed. A rerun on the same sha reuses desktop-runs.tsv and
+#       checks-verdicts.tsv and only tags. Exit: desktop_tag.py's.
+# Tested by hand on a cut (it wraps the gates and their slots); its decisions are in
+# scripts/release_slot.py (tests/release_slot_test.py).
+set -uo pipefail
+R="$(cd "$(dirname "$0")/.." && pwd)"
+BH="${BISE_HOME:-$HOME/.bise}"
+SECRETIVE="$HOME/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+
+case "${1:-}" in
+gate)
+  [ $# = 2 ] || { sed -n '2,20p' "$0"; exit 2; }
+  keep="$2"; mkdir -p "$keep"
+  t0=$(date +%s)
+  "$R/scripts/nightly_gate.sh" --tip; rc=$?
+  log=$(ls -t "$BH"/gate/logs/full-* 2>/dev/null | head -1)
+  [ -n "$log" ] && cp "$log" "$keep/"
+  cp "$BH"/gate/sb-gate-*.log "$keep/" 2>/dev/null
+  echo "tip gate rc=$rc, logs kept in $keep"
+  [ $rc = 0 ] || exit 1
+  line=$(tail -1 "$BH/gate/green-shas.tsv"); sha=$(cut -f1 <<<"$line"); when=$(cut -f2 <<<"$line")
+  [ -n "$when" ] && [ "$when" -ge "$t0" ] || { echo "no new green line since the gate started"; exit 1; }
+  echo "green $sha"
+  ;;
+tag)
+  [ $# = 4 ] || { sed -n '2,20p' "$0"; exit 2; }
+  sha="$2"; tag="$3"; notes="$(cd "$(dirname "$4")" && pwd)/$(basename "$4")"
+  [ -s "$notes" ] || { echo "no notes in $4: write the app's notes first (the tag's body)"; exit 2; }
+  tree="${RELEASE_TREE:-$HOME/.cache/bise-release/tree}"
+  if [ ! -e "$tree/.git" ]; then
+    mkdir -p "$(dirname "$tree")"
+    git -C "$R" worktree add -q --detach "$tree" "$sha" || exit 2
+  fi
+  git -C "$tree" checkout -q --detach "$sha" || exit 2
+  [ -z "$(git -C "$tree" status --porcelain)" ] || { echo "$tree is not clean"; exit 2; }
+  find "$tree" -name __pycache__ -type d -prune -exec rm -rf {} +
+  [ -S "$SECRETIVE" ] && export SSH_AUTH_SOCK="$SECRETIVE"
+  cd "$tree" && PYTHONDONTWRITEBYTECODE=1 python3 scripts/desktop_tag.py "$tag" "$sha" --notes-file "$notes"
+  ;;
+*)
+  sed -n '2,20p' "$0"; exit 2 ;;
+esac
