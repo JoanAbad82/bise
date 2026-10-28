@@ -12,7 +12,7 @@
 // still with the real bims at their state's spot, baked again only when a still pose changes; close
 // up (the dive) the offices in view posed live at the minimap's own rates (loop.ts). An idle town
 // draws nothing. Owner: maps-e.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion } from '@/ds/hooks';
 import { bims } from '@/proto/words_bims.gen';
@@ -33,7 +33,7 @@ import { overshot, panTown, settle, springAt, townWheel, WHEEL_REST_MS } from '.
 import { DIVE_S, diveAt } from './dive';
 import { liveAgents, signOf, townProjects, type TownProject } from './sites';
 import type { MakeTownRenderer, TownRenderer, TownSite } from './types';
-import { placeSigns as placeSignsAt, signRank, type Box as SignBox, type SignIn } from './signs';
+import { boxesIn, placeSigns as placeSignsAt, signRank, type Box as SignBox, type SignIn } from './signs';
 
 /** The town's parts: the office's (its dive opens one), the pure modules it reads, its renderer's loader. */
 export interface TownParts {
@@ -121,7 +121,13 @@ export function Town({
   onOpenProject,
   onOpenAgent,
   maxH = TALL,
+  keepClear,
 }: {
+  /**
+   * the holder's own buttons over the town (the outer tile's '×'): each child's box, read when the
+   * signs are placed: no sign or pill under one, 4 px clear (designer m_49471)
+   */
+  keepClear?: RefObject<HTMLElement | null>;
   /** every project, bise's home among them (town/useTown.ts) */
   projects: readonly TownProject[];
   parts: TownParts;
@@ -133,6 +139,11 @@ export function Town({
   maxH?: number;
 }) {
   const maxHRef = useRef(maxH);
+  // the holder's buttons, read when the signs are placed (its own ref, so placeSigns keeps its memo)
+  const clearRef = useRef<RefObject<HTMLElement | null> | null>(null);
+  useEffect(() => {
+    clearRef.current = keepClear ?? null;
+  }, [keepClear]);
   const resizeRef = useRef<() => void>(() => undefined);
   // a new bound (he dragged the tile's handle): the town fits again
   useLayoutEffect(() => {
@@ -304,7 +315,9 @@ export function Town({
     const fit = only ? null : r.townFit();
     const h = fit?.heightPx ?? box.clientHeight;
     const seen = seenRef.current ?? { x0: 0, x1: box.clientWidth };
-    const at = placeSignsAt(ins, { x0: seen.x0, y0: 0, x1: seen.x1, y1: h }, taken);
+    // the holder's buttons over the town (the tile's '×'): taken too, so no sign goes under one
+    const buttons = boxesIn([...(clearRef.current?.current?.children ?? [])].map((b) => b.getBoundingClientRect()), box.getBoundingClientRect());
+    const at = placeSignsAt(ins, { x0: seen.x0, y0: 0, x1: seen.x1, y1: h }, [...taken, ...buttons]);
     for (const t of ins) {
       const el = signs.current.get(t.id);
       const p = at.get(t.id);

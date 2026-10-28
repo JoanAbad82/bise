@@ -45,6 +45,19 @@ export interface Box {
   readonly y1: number;
 }
 
+/** a box on screen (getBoundingClientRect's): the holder's buttons over the town */
+export interface ScreenBox {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+/** Boxes on screen in the town's box (css px from its top left): the marks a sign keeps GAP clear of. Pure. */
+export function boxesIn(boxes: readonly ScreenBox[], town: ScreenBox): Box[] {
+  return boxes.filter((b) => b.right > b.left && b.bottom > b.top).map((b) => ({ x0: b.left - town.left, y0: b.top - town.top, x1: b.right - town.left, y1: b.bottom - town.top }));
+}
+
 /** the room kept between a sign and its anchor, and between two signs */
 const GAP = 4;
 

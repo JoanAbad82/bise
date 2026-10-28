@@ -1,7 +1,7 @@
 // town/signs.ts: the town's signs laid out like map labels (bims m_30199), no mark over another,
 // none without its name (bims m_31373).
 import { describe, expect, it } from 'vitest';
-import { placeSigns, signRank, type Box, type SignAt, type SignIn } from './signs';
+import { boxesIn, placeSigns, signRank, type Box, type SignAt, type SignIn } from './signs';
 
 const sign = (id: string, x: number, y: number, o: Partial<SignIn> = {}): SignIn => ({ id, x, y, w: 80, h: 20, compactW: 50, live: false, rank: 2, ...o });
 const box = (s: SignIn, a: SignAt): Box => ({ x0: a.left, y0: a.top, x1: a.left + (a.compact ? s.compactW : s.w), y1: a.top + s.h });
@@ -24,6 +24,22 @@ function rand(seed: number): () => number {
 }
 
 describe('town signs: like map labels, none over another mark', () => {
+  it("the tile's '×' over the town: no sign or pill under it, 4 px clear (designer m_49471)", () => {
+    // the town's box at (1000, 50) on screen, its '×' 24 px at 8 px from its top right corner
+    const town = { left: 1000, top: 50, right: 1292, bottom: 190 };
+    const x = boxesIn([{ left: 1260, top: 58, right: 1284, bottom: 82 }, { left: 0, top: 0, right: 0, bottom: 0 }], town);
+    expect(x).toEqual([{ x0: 260, y0: 8, x1: 284, y1: 32 }]);
+    // a sign whose spot above its office lies under the '×' goes elsewhere, never within 4 px of it
+    const s = sign('acme', 250, 40);
+    const at = placeSigns([s], { x0: 0, y0: 0, x1: 292, y1: 140 }, x).get('acme');
+    expect(at).toBeDefined();
+    const b = box(s, at as SignAt);
+    const near = { x0: 256, y0: 4, x1: 288, y1: 36 };
+    expect(overlap(b, near), `sign at ${JSON.stringify(b)}`).toBe(false);
+    // without the '×' it would have gone above, under it
+    expect(overlap(box(s, placeSigns([s], { x0: 0, y0: 0, x1: 292, y1: 140 }).get('acme') as SignAt), near)).toBe(true);
+  });
+
   it('a lone sign goes above its office', () => {
     const s = sign('a', 200, 100);
     expect(placeSigns([s], { x0: 0, y0: 0, x1: 400, y1: 300 }).get('a')).toEqual({ left: 160, top: 76, compact: false });

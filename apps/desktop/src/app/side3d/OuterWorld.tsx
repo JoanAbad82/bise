@@ -12,7 +12,7 @@
 // with no '⤢' (no town tab); it was the RightBar's until 6d9d07180 (his m_47415). While a new
 // project's welcome shows in main's thread (welcome/shown.ts) the tile is its empty frame, and the
 // welcome's office docks into it at his first send (welcome/dock.ts; designer m_47929). Owner: nm-side.
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type RefObject } from 'react';
 import type { Agent, Card } from '@/proto';
 import type { MapId } from '@/bims/maps/ids';
 import { Press, tipAttrs } from '@/ds';
@@ -67,6 +67,8 @@ export interface TownActs {
 export function OuterTile({ project, name, agents, cards, h, w = OUTER_W, follow, onOpen, onPickMap, onPanel, onHide, town = null, phase = null }: OuterTileProps & { readonly town?: TownActs | null; readonly phase?: TilePhase }) {
   const [docked, setDocked] = useState(phase === 'docking');
   if (phase === 'docking' && !docked) setDocked(true);
+  // the corner buttons: the town keeps its signs clear of them
+  const actsRef = useRef<HTMLSpanElement>(null);
   // landed (the copy went the frame after the tile's office drew): the camera waits one beat, then finds the followed bim
   const [was, setWas] = useState(phase);
   const [beat, setBeat] = useState(false);
@@ -88,12 +90,12 @@ export function OuterTile({ project, name, agents, cards, h, w = OUTER_W, follow
     <section className="s3-otile" style={{ top: OUTER_TOP, height: h, width: w }} aria-label={town !== null ? bims.town_label : side.tile_name({ project: name })} data-testid="app.outer.world" data-town={town !== null || undefined} data-waiting={waiting || undefined} data-landing={phase === 'docking' || undefined} data-landed={(docked && phase === null) || undefined}>
       <span className="s3-otile-office">
         {waiting ? null : town !== null ? (
-          <OuterTown h={h} acts={town} />
+          <OuterTown h={h} acts={town} buttons={actsRef} />
         ) : (
           <WorldOffice project={project} agents={agents} cards={cards} fill follow={phase === 'docking' || beat ? null : follow} onOpen={onOpen} onPickMap={onPickMap} />
         )}
       </span>
-      {!waiting && <span className="s3-otile-acts">
+      {!waiting && <span ref={actsRef} className="s3-otile-acts">
         {town === null && <Press look="s3-otile-btn" aria-label={side.tile_panel} {...tipAttrs(side.tile_panel)} onClick={onPanel} data-testid="app.outer.world.panel">⤢</Press>}
         <Press look="s3-otile-btn" aria-label={side.tile_hide} {...tipAttrs(side.tile_hide)} onClick={onHide} data-testid="app.outer.world.hide">×</Press>
       </span>}
@@ -102,9 +104,10 @@ export function OuterTile({ project, name, agents, cards, h, w = OUTER_W, follow
 }
 
 /** The town (bims/town/Town.tsx, its rows from every project), whole in the tile's height. */
-function OuterTown({ h, acts }: { h: number; acts: TownActs }) {
+function OuterTown({ h, acts, buttons }: { h: number; acts: TownActs; buttons: RefObject<HTMLSpanElement | null> }) {
   const projects = useTownProjects();
-  return <Town projects={projects} parts={townParts} maxH={h} onOpenProject={acts.onOpenProject} onOpenAgent={acts.onOpenAgent} />;
+  // the tile's '×' over the town: no project sign or pill under it, 4 px clear (designer m_49471)
+  return <Town projects={projects} parts={townParts} maxH={h} onOpenProject={acts.onOpenProject} onOpenAgent={acts.onOpenAgent} keepClear={buttons} />;
 }
 
 /** after the welcome's dock, the tile's office drawn: the camera eases to the followed bim this long after, ms (designer m_47972) */
