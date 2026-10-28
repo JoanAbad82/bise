@@ -118,6 +118,15 @@ describe("a settings page's text edge (designer m_48227)", () => {
     // the sign-in line's words are a help line: its box adds no 12 of its own (ui-review m_48283: 24 in)
     expect(rule(settingsCss, '.settings-signing').has('padding')).toBe(false);
   });
+
+  it("a page's empty line (approvals' not yet) starts 12 in too, in the lead's size and text-3, 16 under it (designer m_49604)", () => {
+    // the ds's own .b-empty is 8 in (--pad-row-x): on a settings page it took x 88 for the page's 92
+    expect(rule(dsCss, '.b-settings .b-empty').get('padding')).toBe('0 var(--s-3)');
+    const say = rule(dsCss, '.b-settings .b-empty .say');
+    expect(say.get('font')).toBe(rule(dsCss, '.b-settings-lead').get('font'));
+    expect(say.get('color')).toBe('var(--c-text-3)');
+    expect(rule(dsCss, '.b-settings-page>.b-settings-lead+.b-empty').get('margin-top')).toBe('var(--s-4)');
+  });
 });
 
 describe("general's auto-update card", () => {

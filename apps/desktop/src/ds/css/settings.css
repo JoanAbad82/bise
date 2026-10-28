@@ -67,3 +67,8 @@
 /* one text edge per page (designer m_48227): the lead and every help line (the sign-in line's words
    are one) start 12 in, on the group heads' and the row labels' x */
 .b-settings .b-help{padding:0 var(--s-3)}
+/* a page's empty line (approvals' 'bise hasn't sent your approvals yet.', designer m_49597, m_49604):
+   on the same 12 in edge, in the lead's size and text-3, 16 under the lead; never a spinner */
+.b-settings .b-empty{padding:0 var(--s-3)}
+.b-settings .b-empty .say{font:400 var(--t-13)/var(--lh-ui) var(--font-ui);color:var(--c-text-3)}
+.b-settings-page>.b-settings-lead+.b-empty{margin-top:var(--s-4)}

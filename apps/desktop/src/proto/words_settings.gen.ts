@@ -486,8 +486,8 @@ export const settings = {
   checker_off: "off · every command asks you",
   /** approvals: no checker known yet */
   checker_none: "none yet",
-  /** approvals: the hub hasn't sent them */
-  approvals_none: "the hub hasn't sent its approvals yet.",
+  /** approvals: they haven't arrived yet (designer m_49604: his rules, so 'your'; no spinner) */
+  approvals_none: "bise hasn't sent your approvals yet.",
   /** approvals: the repo they apply to, when it has no path */
   approvals_this_repo: "this repo",
   /** approvals: the mode row */
