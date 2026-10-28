@@ -7,6 +7,7 @@
 import { CUT_HATS, CUTS, HATS, type HeadWear, KINDS, type Outfit, outfitOf, type Cut } from '../render/palette';
 import { COLORS, HAIRS, HAT_COLORS, SKINS, type Hair, type Look, type Wear, mainOutfit, wearsFor } from '../render/look';
 import type { Dim, Row } from './pairwise';
+import type { IdleKind, IdleMove } from '../render/idle';
 
 /** the cameras the app draws a bim through (the review page's `render`) */
 export const CAMS = [
@@ -18,6 +19,16 @@ export const CAMS = [
   'back', // 3/4 back, near, whole body (the turnaround's): hair, hoods and ties from behind
 ] as const;
 export type Cam = (typeof CAMS)[number];
+
+/** where each reviewed pose rests for bim-idle (render/idle.ts idleKindOf over outfits.testkit's poses) */
+export const IDLE_KIND: Readonly<Record<string, IdleKind>> = { stand: 'stand', terrace: 'deck', nap: 'bed', asleep: 'desk', think: 'desk' };
+/** the moves each rest plays (render/idle.ts MOVES, not exported: keep the two the same) */
+export const IDLE_MOVES: Readonly<Record<IdleKind, readonly IdleMove[]>> = {
+  stand: ['sway', 'look', 'sip', 'stretch'],
+  deck: ['look', 'wiggle', 'yawn'],
+  bed: ['breath', 'turn', 'sigh'],
+  desk: ['breath', 'turn', 'twitch'],
+};
 
 /** the cameras that draw a fixed standing bim, whatever the pose */
 export const STANDING_CAMS: readonly Cam[] = ['coin', 'swatch'];
@@ -46,6 +57,8 @@ export function dimsOf(poses: readonly string[]): readonly Dim[] {
     { name: 'light', values: ['day', 'night'] },
     // bim-alive's life layer (render/alive.ts): an agent standing at rest breathes and shifts its weight
     { name: 'life', values: ['still', 'alive'] },
+    // bim-idle's rare moves (render/idle.ts): a resting bim plays one now and then
+    { name: 'idle', values: ['none', ...new Set(Object.values(IDLE_MOVES).flat())] },
   ];
 }
 
@@ -60,6 +73,15 @@ export function validRow(r: Row): boolean {
   // the life layer: never on main, never on the coin's or the swatch's standing bim (the side draws them still)
   if (r.life === 'alive' && r.head !== undefined && isMain(r.head)) return false;
   if (r.life === 'alive' && r.cam !== undefined && (STANDING_CAMS as readonly string[]).includes(r.cam)) return false;
+  // an idle move only where its pose rests and plays it, never on main's or the standing cameras' bim
+  if (r.idle !== undefined && r.idle !== 'none') {
+    if (r.head !== undefined && isMain(r.head)) return false;
+    if (r.cam !== undefined && (STANDING_CAMS as readonly string[]).includes(r.cam)) return false;
+    if (r.pose !== undefined) {
+      const kind = IDLE_KIND[r.pose];
+      if (kind === undefined || !(IDLE_MOVES[kind] as readonly string[]).includes(r.idle)) return false;
+    }
+  }
   return true;
 }
 
@@ -98,7 +120,7 @@ export function dress(r: Row): Dressed {
 
 /** a row's short id: its values in the dimensions' order, for file names and the page */
 export function rowId(r: Row): string {
-  return ['head', 'pose', 'frame', 'kind', 'skin', 'hair', 'hatc', 'cam', 'light', 'life']
+  return ['head', 'pose', 'frame', 'kind', 'skin', 'hair', 'hatc', 'cam', 'light', 'life', 'idle']
     .map((k) => r[k] ?? '-')
     .join('|')
     .replace(/#/g, '')

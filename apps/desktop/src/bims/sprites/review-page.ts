@@ -22,8 +22,9 @@ import { castShadows, lightOffice } from '../render/world';
 import type { Pose } from '../model';
 import { COIN_HEAD, cutPng, headPng } from '@/app/side3d/render';
 import { aliveRig, aliveSeed, stanceAt, stands } from '../render/alive';
+import { DUR, type IdleMove, idleRig } from '../render/idle';
 import type { Row } from './pairwise';
-import { type Cam, type Dressed, REVIEW_NAME, dimsOf, dress, rowId, validRow } from './review-space';
+import { type Cam, type Dressed, IDLE_KIND, REVIEW_NAME, dimsOf, dress, rowId, validRow } from './review-space';
 import { pairwise } from './pairwise';
 
 /** the loop phase every reviewed bim moves at (the turnaround's) */
@@ -56,7 +57,17 @@ function coinPose(): Pose {
 
 /** the rig a row draws: its pose at its frame (0, 1/3, 2/3 of the loop), or standing; alive: bim-alive's layer on it */
 export function rigOfRow(r: Row, main: boolean): Rig {
-  return r.life === 'alive' && !main ? lifeOn(poseRig(r, main), Number(r.frame ?? 0)) : poseRig(r, main);
+  const posed = r.life === 'alive' && !main ? lifeOn(poseRig(r, main), Number(r.frame ?? 0)) : poseRig(r, main);
+  return r.idle !== undefined && r.idle !== 'none' && !main ? idleOn(posed, r) : posed;
+}
+
+/** bim-idle's move on a resting bim (render/idle.ts idleRig): frame 0 at its peak, 1 on its way, 2 near its end */
+function idleOn(rig: Rig, r: Row): Rig {
+  const kind = IDLE_KIND[r.pose ?? ''];
+  if (kind === undefined) return rig;
+  const move = r.idle as IdleMove;
+  const u = [0.5, 0.25, 0.95][Number(r.frame ?? 0)] ?? 0.5;
+  return idleRig(rig, { kind, move: { move, start: 0, dur: DUR[move], side: 1 }, u, hold: 0 });
 }
 
 function poseRig(r: Row, main: boolean): Rig {
@@ -269,7 +280,7 @@ function labelMeshes(root: Object3D): void {
 /** what geometry says of a row: the same for every colour, camera and light, so kept by its shape */
 export function checkRow(r: Row): Issue[] {
   const d = dress(r);
-  const shape = [r.head, r.kind, r.pose, r.frame, r.life, d.main ? 'main' : 'agent'].join('|');
+  const shape = [r.head, r.kind, r.pose, r.frame, r.life, r.idle, d.main ? 'main' : 'agent'].join('|');
   const had = geoCache.get(shape);
   if (had) return had;
   const out: Issue[] = [];
@@ -445,7 +456,7 @@ async function sheet(rows: readonly Row[], title: string, size: number, cols: nu
     const head = (r.head ?? '').replace(/^(m|w|me):/, '');
     ctx.fillText(`${String(i + 1)} ${head} · ${r.pose ?? ''}${r.frame && r.frame !== '0' ? `@${r.frame}` : ''}`, x + 4, y + size + 13);
     ctx.fillStyle = '#7a736b';
-    ctx.fillText(`${r.cam ?? ''} · ${r.kind ?? ''} · s${r.skin ?? ''} h${r.hair ?? ''} ${r.hatc ?? ''} · ${r.light ?? ''}${r.life === 'alive' ? ' · alive' : ''}`, x + 4, y + size + 27);
+    ctx.fillText(`${r.cam ?? ''} · ${r.kind ?? ''} · s${r.skin ?? ''} h${r.hair ?? ''} ${r.hatc ?? ''} · ${r.light ?? ''}${r.life === 'alive' ? ' · alive' : ''}${r.idle && r.idle !== 'none' ? ` · ${r.idle}` : ''}`, x + 4, y + size + 27);
     if (issues.length > 0) {
       ctx.fillStyle = bad.length > 0 ? '#d1495b' : '#b07a10';
       ctx.fillText(issues.map((x) => x.check).join(' '), x + 4, y + size + 41);
