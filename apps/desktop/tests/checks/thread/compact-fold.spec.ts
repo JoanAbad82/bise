@@ -4,6 +4,7 @@
 // click on its head opens it whole as markdown (a heading, a list, nothing cut), and a second click
 // folds it again.
 // Shots: compact-fold-<theme>.png, the open row's crop, for designer (m_41685). Owner: compact-expand.
+import type { Locator } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const ACME = 'acme-1a2b3c4d';
@@ -18,6 +19,13 @@ const SUMMARY = [
   '1. land the warm index (`hub/index.rs`)',
   '2. check the p99 again',
 ].join(String.fromCharCode(10));
+
+/** The row's crop, taken again while a redraw detaches its element (5 s at most). */
+async function shoot(row: Locator, name: string): Promise<void> {
+  await expect(async () => {
+    await row.screenshot({ path: test.info().outputPath(name), timeout: 2000 });
+  }).toPass({ timeout: 5000 });
+}
 
 for (const theme of ['light', 'dark'] as const) {
   test(`thread/compact-fold: the compaction's summary opens whole, as markdown (${theme})`, async () => {
@@ -37,7 +45,10 @@ for (const theme of ['light', 'dark'] as const) {
       const body = page.getByTestId(`thread.compacted.${String(POS)}.body`);
       await expect(row).toBeVisible();
       await expect(body).toHaveCount(0);
-      await row.screenshot({ path: test.info().outputPath(`compact-fold-${theme}-folded.png`) });
+      // the list can redraw the row as the shot starts (the theme's prefs land, the entry's
+      // reflow): its element is then detached ('not attached to the DOM', 530c4eb42's tag
+      // checks, green alone 3/3), so the shot is taken again on the row's new element
+      await shoot(row, `compact-fold-${theme}-folded.png`);
 
       await page.getByTestId(`thread.compacted.${String(POS)}.head`).click();
       await expect(body.locator('h2').first()).toHaveText('What was done');
@@ -49,7 +60,7 @@ for (const theme of ['light', 'dark'] as const) {
       if (head !== null) await page.mouse.move(head.x + 40, head.y);
       for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 400);
       await expect(page.getByText('back to the bottom')).toBeHidden();
-      await row.screenshot({ path: test.info().outputPath(`compact-fold-${theme}.png`) });
+      await shoot(row, `compact-fold-${theme}.png`);
 
       await page.getByTestId(`thread.compacted.${String(POS)}.head`).click();
       await expect(body).toHaveCount(0);
