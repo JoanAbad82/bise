@@ -55,6 +55,22 @@ export const NEAR_PX = 22;
 export const nearAt = (scale: number): boolean => scale > 0 && 1 / scale >= NEAR_PX;
 /** an afro's half-width: inside the shoulders' (0.24 + a sleeve's 0.078), as the old afro sat inside the old shoulders */
 const AFRO_W = 0.29;
+
+/** the torso bean's front cloth (body space: capsule 0.215 x 0.17 at y 0.49, scaled 1.04, 1, 0.94): its z at (x, y), plus `out` */
+export function onBean(x: number, y: number, out = 0): number {
+  const dy = y > 0.575 ? y - 0.575 : y < 0.405 ? 0.405 - y : 0;
+  return 0.94 * Math.sqrt(Math.max(0, 0.215 * 0.215 - (x / 1.04) ** 2 - dy * dy)) + out;
+}
+
+/** points along a straight line on the bean's cloth, from (x0, y0) to (x1, y1), `out` off it */
+function strip(x0: number, y0: number, x1: number, y1: number, out: number): [number, number, number][] {
+  return [0, 0.25, 0.5, 0.75, 1].map((f) => {
+    const x = x0 + (x1 - x0) * f;
+    const y = y0 + (y1 - y0) * f;
+    return [x, y, onBean(x, y, out)];
+  });
+}
+
 /** the short hair's cap: how far its sphere stands out of the skull's (it sits up and back of it) */
 export const HAIR_OUT = 0.011;
 /** her buns' centres from the head's (laptop.ts HEAD_PARTS reads the same) */
@@ -260,12 +276,12 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     }
   }
   if (KIND === 'jacket') {
-    // an open jacket over a white shirt: the shirt's V wide down to the chest, two lapels along it, two buttons, a hem
-    add(new SphereGeometry(0.1, 18, 14), mat(WORLD.paper), body, 0, 0.6, 0.168).scale.set(1.3, 1.8, 0.45);
+    // a closed jacket (Gabriel's pick C on bims-review, f7: the open front's white shirt read as a
+    // tooth at coin size): a zip line down the middle, a short collar's two points at the neck, two buttons, a hem
     const lapel = mat(shade(o.hoodie, 0.72));
-    // on the cloth: the bean's surface plus half the lapel's thickness at each point
-    for (const sx of [-1, 1]) along([[sx * 0.095, 0.74, 0.112], [sx * 0.085, 0.65, 0.187], [sx * 0.045, 0.46, 0.212]], 0.065, 0.024, lapel);
-    for (const y of [0.45, 0.37]) add(style.ball(0.02), mat(SECOND), body, 0.06, y, 0.215);
+    add(style.box(0.018, 0.34, 0.016, 0.006), mat(shade(o.hoodie, 0.6)), body, 0, 0.5, onBean(0, 0.5, 0.006));
+    for (const sx of [-1, 1]) along(strip(sx * 0.1, 0.75, sx * 0.03, 0.66, 0.012), 0.05, 0.024, lapel);
+    for (const y of [0.45, 0.37]) add(style.ball(0.02), mat(SECOND), body, 0.06, y, onBean(0.06, y, 0.008));
     hem(o.hoodie);
   }
   if (KIND === 'puffer') {
