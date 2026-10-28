@@ -127,7 +127,12 @@ HISR=$(cd "$HIS" 2>/dev/null && pwd -P || echo "$HIS")
 # 'stop left 1 + 1' of c28260a9's runs was this awk counting itself)
 pidsunder() { ps -axo pid=,command= | awk -v p="$1" 'index($0, p) && index($0, "awk -v p") == 0 { print $1 }'; }
 hispids() { { pidsunder "$HIS/Contents/"; pidsunder "$HISR/Contents/"; } | sort -nu | tr '\n' ' '; }
-ours() { pidsunder "$A/Contents/" | sort -nu; }
+# the processes that RUN from a path: their command starts with it. A command that only names it is
+# not one: the DMG's repack (scripts/desktop_dmg.py) is a bash -c whose text names the candidate's
+# bise-mac-helper; read as a helper, it was a breach and the pass killed it (desktop-tag-37dd2ac2's
+# dmg red: 'the repack as dev.bise.desktop failed', its pnpm install left running alone)
+runsfrom() { ps -axo pid=,command= | awk -v p="$1" '{ pid = $1; sub(/^ *[0-9]+ /, ""); if (index($0, p) == 1) print pid }'; }
+ours() { runsfrom "$A/Contents/" | sort -nu; }
 mainpid() { ps -axo pid=,command= | awk -v m="$MAIN" '{ pid = $1; sub(/^ *[0-9]+ /, ""); if ($0 == m || index($0, m " ") == 1) { print pid; exit } }'; }
 killpids() { for p in "$@"; do kill -"${SIG:-TERM}" "$p" 2>/dev/null; done; }
 # hubs outside the app (amb-mac e043678b, ambient-lead m_21810 (a)): every hub, REPL and plugin bridge
@@ -355,7 +360,7 @@ log stream --level debug --style ndjson --predicate 'process == "tccd" OR subsys
 touch $O/pids.txt
 ( while [ ! -e $O/stop ]; do
     ours >> $O/pids.txt 2>/dev/null
-    h=$(pgrep -f "$A/Contents/MacOS/bise-mac-helper")
+    h=$(runsfrom "$A/Contents/MacOS/bise-mac-helper")
     [ -n "$h" ] && { echo "helper $h" > $O/BREACH; SIG=KILL killpids $(sort -u $O/pids.txt); }
     sleep 0.3
   done ) & CPID=$!

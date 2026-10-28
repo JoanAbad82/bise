@@ -120,6 +120,18 @@ def test_heavy_argv():
         shutil.rmtree(t, ignore_errors=True)
 
 
+def test_repack_failure():
+    # desktop-tag-37dd2ac2: a bare 'failed' while its pnpm install ran on; a signal is named, from outside
+    app = "/c/dist/mac-arm64/bise cand.app"
+    for rc in (-9, 137):
+        w = D.repack_failure(rc, app)
+        check("killed by SIGKILL" in w and app in w, "a kill: %s" % w)
+    check("SIGTERM" in D.repack_failure(-15, app), "a TERM")
+    check("disk" in D.repack_failure(28, app) and "time limit" in D.repack_failure(124, app), "heavy-run's stops")
+    w = D.repack_failure(1, app)
+    check(w.startswith("exit 1:") and "killed" not in w, "a plain failure: %s" % w)
+
+
 if __name__ == "__main__":
     for name, fn in sorted((n, f) for n, f in globals().items() if n.startswith("test_")):
         fn()

@@ -93,10 +93,13 @@ TOML
 log stream --style compact --predicate 'process == "tccd"' > $O/tccd.log 2>&1 & TPID=$!
 log stream --level debug --style ndjson --predicate 'process == "tccd" OR subsystem == "com.apple.TCC"' > $O/tcc-debug.ndjson 2>&1 & NPID=$!
 touch $O/pids.txt
+# the processes that RUN from a path (their command starts with it), never one whose text only names
+# it (cand.sh's runsfrom: a DMG repack's bash -c names the helper's path, and was killed as one)
+runsfrom() { ps -axo pid=,command= | awk -v p="$1" '{ pid = $1; sub(/^ *[0-9]+ /, ""); if (index($0, p) == 1) print pid }'; }
 ( while [ ! -e $O/stop ]; do
-    pgrep -f "$A/Contents/" >> $O/pids.txt 2>/dev/null
-    h=$(pgrep -f "$A/Contents/MacOS/bise-mac-helper")
-    [ -n "$h" ] && { echo "helper $h" > $O/BREACH; pkill -f "$A/Contents/"; }
+    runsfrom "$A/Contents/" >> $O/pids.txt 2>/dev/null
+    h=$(runsfrom "$A/Contents/MacOS/bise-mac-helper")
+    [ -n "$h" ] && { echo "helper $h" > $O/BREACH; kill $(runsfrom "$A/Contents/") 2>/dev/null; }
     sleep 0.3
   done ) & CPID=$!
 $RS tcc --log $O/tccd.log --pids $O/pids.txt --stop-file $O/stop --bundle "$A" --out $O & CCPID=$!

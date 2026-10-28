@@ -173,6 +173,27 @@ def heavy(script, env):
     return subprocess.run(heavy_dmg_argv(script), env=env).returncode
 
 
+def repack_failure(rc, app):
+    """Why the repack failed, from its exit code, in one line (desktop-tag-37dd2ac2: a bare 'failed'
+    while its pnpm install ran on alone; a cand.sh pass on the candidate had read the repack's
+    bash -c, which names the bundle's bise-mac-helper, as a helper breach and killed it). A signal
+    (subprocess's -n, or a shell's 128+n through nice or heavy-run) came from outside. Pure."""
+    import signal
+    n = -rc if rc < 0 else rc - 128 if 128 < rc < 160 else None
+    if n is not None:
+        try:
+            name = signal.Signals(n).name
+        except ValueError:
+            name = "signal %d" % n
+        return ("killed by %s (exit %d): something outside stopped it, the repack never signals itself; "
+                "look for a process that kills by a path in %s (a pass on that candidate) or heavy-run's stop line" % (name, rc, app))
+    if rc == 28:
+        return "exit 28: heavy-run stopped it, the disk was nearly full"
+    if rc == 124:
+        return "exit 124: heavy-run stopped it, over its time limit"
+    return "exit %d: the pnpm install or electron-builder lines above say why" % rc
+
+
 def build(env, sha, rev=None, repo=REPO):
     sha = resolve_sha(sha, env, repo)
     paths = try_paths(env)
@@ -193,8 +214,9 @@ def build(env, sha, rev=None, repo=REPO):
     elif old != text:
         raise TryError("%s holds another VERSION than this build's: one id = one build, use --rev <n>" % s["root"])
     say("repacking candidate %s as %s (%s, waits for a heavy slot)…" % (sha[:8], NAME, APP_ID))
-    if heavy(repack_script(c, s, sign), env) != 0:
-        raise TryError("the repack as %s failed" % APP_ID)
+    rc = heavy(repack_script(c, s, sign), env)
+    if rc != 0:
+        raise TryError("the repack as %s failed, %s" % (APP_ID, repack_failure(rc, c["app"])))
     bad = check_app(s["app"], s["id"])
     if bad:
         raise TryError("the packed app: " + "; ".join(bad))
