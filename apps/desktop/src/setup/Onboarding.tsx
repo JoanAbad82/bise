@@ -15,7 +15,10 @@ import { Composer } from '@/composer';
 import type { ComposerActions } from '@/composer/actions';
 import type { ProviderCheck } from '@/settings';
 import { PayStep } from './PayStep';
-import { afterSignIn, PAY_START, ready, upOf, type PayState } from './pay';
+import { afterSignIn, PAY_START, phase, ready, upOf, type PayState } from './pay';
+import { IslandStage } from './island/Island';
+import { planOf } from './island/plan';
+import { reducedMotion } from '@/ds/hooks';
 import {
   back, baseName, choose as choose_, chosenTicked, filterFound, finish, firstSend, fnAct, ideas, lookCmd, lookOnLeave, MODEL_AT, next, pick, pickChosen, skipTo, START, stepOf, STEPS, ticked, tickedNames,
   type OnbState,
@@ -56,8 +59,13 @@ export interface OnboardingProps {
   hasModel?: boolean;
 }
 
+/** how long his first message's plane flies before bise opens, ms (the island's PLANE_MS and a breath) */
+const PLANE_HOLD_MS = 1300;
+/** the plane is seen: the island is drawn (WebGL) and motion is on */
+const planeShows = (): boolean => typeof WebGLRenderingContext !== 'undefined' && !reducedMotion();
+
 /** The marks' sizes: hello's ':*' (designer's A, 112 px) and the first message's. */
-const HELLO_KISS = 112;
+const HELLO_KISS = 64;
 const FIRST_KISS = 48;
 
 /** A fn sentinel in onb_first_fn's words, where the key chip goes. */
@@ -113,10 +121,16 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
   const ok = ready(pay, check);
   // a model answered this time, or main had one: the first launch may end (Isidor, 28 oct)
   const modelReady = ok || hasModel;
-  const run = (r: { s: OnbState; cmds: AppCmd[]; done: boolean }) => {
+  // his first message sent: it flies to his bim as a paper plane, then bise opens (none to see: at once)
+  const [sent, setSent] = useState(false);
+  const run = (r: { s: OnbState; cmds: AppCmd[]; done: boolean }, fly = false) => {
     for (const c of r.cmds) ports.send(c);
     setSt(r.s);
-    if (r.done) ports.done();
+    if (!r.done) return;
+    if (fly && planeShows()) {
+      setSent(true);
+      window.setTimeout(() => { ports.done(); }, PLANE_HOLD_MS);
+    } else ports.done();
   };
   const go = () => {
     leaveHello();
@@ -256,7 +270,7 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
               placeholder={settings.onb_first_placeholder}
               onSend={(out) => {
                 const r = firstSend(s, out.text);
-                if (r !== null) run(r);
+                if (r !== null) run(r, true);
               }}
               onReady={(a) => {
                 composer.current = a;
@@ -283,9 +297,20 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
       break;
     }
   }
+  // the island beside the steps (page onboarding, his pick A): each step builds its piece
+  const ph = phase(pay, check);
+  const island = planOf({
+    step: at,
+    look: me,
+    check: ph,
+    answer: ph === 'works' ? (check?.answer ?? null) : null,
+    ready: modelReady,
+    ticked: tickedNames(s, found, now),
+    sent,
+  });
   return (
     <section
-      className="setup"
+      className="setup setup-a"
       data-testid="setup.root"
       tabIndex={-1}
       onKeyDown={(e) => {
@@ -328,7 +353,10 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
           </Act>
         )}
       </div>
-      {body}
+      <div className="setup-a-world">
+        <IslandStage plan={island} />
+      </div>
+      <div className="setup-a-col">{body}</div>
     </section>
   );
 }
