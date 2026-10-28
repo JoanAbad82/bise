@@ -1872,12 +1872,37 @@ async function fileChips(harness: () => Promise<unknown>) {
       }
     }
   }
-  const ck: { fenced: boolean; logpoints: typeof bps; calls?: string[]; gone_calls?: number } = { fenced, logpoints: bps };
+  const ck: { fenced: boolean; logpoints: typeof bps; calls?: string[]; gone_calls?: number; right?: unknown } = { fenced, logpoints: bps };
   if (drawn && fenced && bps.filter((b) => b.id).length === 2) {
     await bchips.filter({ hasText: 'q3.pdf' }).first().click({ timeout: 5000 }).catch(() => {});
     await until(async () => (calls.some((c) => c.startsWith('quickLook ')) ? true : null), 5000, 200);
-    await bchips.filter({ hasText: 'data.csv' }).first().click({ button: 'right', timeout: 5000 }).catch(() => {});
+    // the click's answer settles first: main fences quickLook out, so it answers false and q3's
+    // chip redraws as gone ('· missing'), which moves data.csv; a right-click sent at once missed
+    // (native-lead, 2026-10-28: red 3 times with no delay, green with this settle)
+    await bchips.filter({ hasText: 'q3.pdf' }).first().filter({ hasText: 'missing' }).waitFor({ timeout: 2000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    // what the right-click meets (the row was red with no showInFinder and no word why): the
+    // chip's box, the element at its centre, the contextmenu events the page saw, the click's error
+    const csv = bchips.filter({ hasText: 'data.csv' }).first();
+    await page.evaluate(() => {
+      const w = window as unknown as { __ahdCtx?: unknown[] };
+      w.__ahdCtx = [];
+      document.addEventListener('contextmenu', (e) => {
+        const t = e.target as Element | null;
+        const at = t?.closest('[data-testid]');
+        (w.__ahdCtx as unknown[]).push({ tag: t?.tagName ?? null, testid: at?.getAttribute('data-testid') ?? null, cls: (t as HTMLElement | null)?.className ?? null });
+      }, { capture: true, once: false });
+    }).catch(() => {});
+    const box = await csv.boundingBox().catch(() => null);
+    const hit = box === null ? null : await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      const at = el?.closest('[data-testid]');
+      return { tag: el?.tagName ?? null, testid: at?.getAttribute('data-testid') ?? null, cls: (el as HTMLElement | null)?.className ?? null };
+    }, [box.x + box.width / 2, box.y + box.height / 2]).catch((e: unknown) => String(e).slice(0, 200));
+    const err = await csv.click({ button: 'right', timeout: 5000 }).then(() => null, (e: unknown) => String(e).slice(0, 400));
     await until(async () => (calls.some((c) => c.startsWith('showInFinder ')) ? true : null), 5000, 200);
+    const seen = await page.evaluate(() => (window as unknown as { __ahdCtx?: unknown[] }).__ahdCtx ?? null).catch(() => null);
+    ck.right = { box, hit, err, seen, bise_has: await page.evaluate(() => typeof (window as unknown as { bise?: { showInFinder?: unknown } }).bise?.showInFinder).catch(() => null) };
     const n0 = calls.length;
     await gone.click({ timeout: 5000 }).catch(() => {});
     await gone.click({ button: 'right', timeout: 5000 }).catch(() => {});
