@@ -321,10 +321,12 @@ export function fitW(asked: number, win: number, left: number, threadMin = THREA
  * An artifact in front (r3-escape item 2, Gabriel m_44728, designer m_44757, main's ArtifactView
  * rule): the panel takes a share of the window, the thread beside it keeps ART_THREAD_MIN (not
  * THREAD_MIN), the sidebar stays. 55% for every kind, 60% for a sheet and a web page; his drag
- * keeps that kind's share within 50-70% until a double-click on the border.
+ * keeps that kind's share within 43-70% until a double-click on the border. 43, not 50 (his
+ * m_48889): the drag takes a web page 100 px narrower than before at 1440 (619, was 720), so the
+ * thread beside it shows 100 px more.
  */
 export const ART_THREAD_MIN = 400;
-export const SHARE_MIN = 0.5;
+export const SHARE_MIN = 0.43;
 export const SHARE_MAX = 0.7;
 const SHARE_WIDE: ReadonlySet<string> = new Set(['sheet', 'link']);
 

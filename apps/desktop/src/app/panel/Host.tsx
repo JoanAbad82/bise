@@ -5,7 +5,7 @@
 // the body on --c-solid with its 1 px line. Its width is the one the tab in front asks (384 rows,
 // 480 a shell, 640 a page; 320-640 by its border); an artifact in front takes its kind's share of
 // the window instead, the thread keeping 400 (model.ts artFit, r3-escape item 2: 55%, a sheet and
-// a web page 60%, his drag 50-70% kept per kind, a double-click resets it); opening animates the width in
+// a web page 60%, his drag 43-70% kept per kind, a double-click resets it); opening animates the width in
 // 220 ms (--d-base, none under reduce motion) while its inside keeps its final width, so nothing
 // in it reflows and the thread beside glides. Folded, it is inert and hidden: no Tab, no
 // VoiceOver reaches it (ui-review m_42482 #6). The tab in front draws; a shell's tab stays mounted
@@ -187,7 +187,7 @@ function ThreadBack() {
 function Border({ width, onDrag, artKind, full, canFull }: { width: number; onDrag: (on: boolean) => void; artKind?: string; full: boolean; canFull: boolean }) {
   const at = useRef<{ x: number; w: number; past: boolean } | null>(null);
   const left = useLeftWidth();
-  // an artifact in front: the drag sets its kind's share of the window (50-70%), else the one width
+  // an artifact in front: the drag sets its kind's share of the window (43-70%), else the one width
   const win = window.innerWidth;
   const size = (w: number) => {
     if (artKind === undefined) setWidth(w);

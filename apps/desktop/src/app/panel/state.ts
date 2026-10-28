@@ -178,7 +178,7 @@ export function useFrontArtKind(): string | undefined {
   return a === undefined ? 'page' : iconKindOf(a);
 }
 
-/** His drag on the border with an artifact of `kind` in front: that kind's share, 50-70%, kept. */
+/** His drag on the border with an artifact of `kind` in front: that kind's share, 43-70%, kept. */
 export function setArtShare(kind: string, share: number): void {
   const v = clampShare(share);
   if (state.shares[kind] !== v) set({ ...state, shares: { ...state.shares, [kind]: v } });

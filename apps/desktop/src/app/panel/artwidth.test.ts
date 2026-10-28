@@ -1,8 +1,8 @@
 // The panel sized to the artifact in front (r3-escape item 2, Gabriel m_44728, designer m_44757):
 // a share of the window per kind (55%, a sheet and a web page 60%), the thread keeping 400, a sheet
-// under 1176, his drag per kind within 50-70% until reset; the rows and a shell keep their width.
+// under 1176, his drag per kind within 43-70% until reset; the rows and a shell keep their width.
 import { describe, expect, it } from 'vitest';
-import { ART_THREAD_MIN, artFit, fitW, parseKept, shareOf, widenFor, FOLDED, THREAD_MIN, WIDTHS } from './model';
+import { ART_THREAD_MIN, artFit, fitW, parseKept, shareOf, widenFor, FOLDED, SHARE_MIN, THREAD_MIN, WIDTHS } from './model';
 
 /** rail 56 + sidebar 240 */
 const LEFT = 296;
@@ -40,20 +40,29 @@ describe("an artifact in front: its kind's share of the window", () => {
   it('the thread never under 400 beside an artifact, at any width the panel stands beside it', () => {
     for (let win = 1000; win <= 2560; win += 8)
       for (const k of KINDS)
-        for (const s of [0.5, 0.6, 0.7]) {
+        for (const s of [SHARE_MIN, 0.5, 0.6, 0.7]) {
           const f = at(k, win, LEFT, { [k]: s });
           if (!f.over) expect(win - LEFT - f.width, `${k} ${String(win)} ${String(s)}`).toBeGreaterThanOrEqual(ART_THREAD_MIN);
         }
   });
 
-  it('his drag wins for that kind only, within 50-70%', () => {
+  it('his drag wins for that kind only, within 43-70%', () => {
     const shares = { page: 0.62 };
     expect(shareOf('page', shares)).toBe(0.62);
     expect(shareOf('doc', shares)).toBe(0.55);
     expect(shareOf('sheet', shares)).toBe(0.6);
     expect(shareOf('page', { page: 0.9 })).toBe(0.7);
-    expect(shareOf('page', { page: 0.1 })).toBe(0.5);
+    expect(shareOf('page', { page: 0.1 })).toBe(SHARE_MIN);
     expect(at('page', 1920, LEFT, shares).width).toBe(Math.round(1920 * 0.62));
+  });
+
+  it('his drag takes a web page 100 px narrower than the old 50% (his m_48889): 619 at 1440, 743 at 1728', () => {
+    const narrowest = (win: number) => at('link', win, LEFT, { link: 0 });
+    expect(narrowest(1440)).toEqual({ width: 619, over: false });
+    expect(narrowest(1728)).toEqual({ width: 743, over: false });
+    for (const win of [1440, 1728, 1920]) expect(Math.round(win * 0.5) - narrowest(win).width, String(win)).toBeGreaterThanOrEqual(100);
+    // the thread beside it: 1440 - 296 - 619 = 525 (was 424)
+    expect(1440 - LEFT - narrowest(1440).width).toBe(525);
   });
 
   it('his shares come back after a reload, in their limits', () => {
