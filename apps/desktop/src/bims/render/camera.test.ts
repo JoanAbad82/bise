@@ -3,7 +3,7 @@ import type { Office, Spot } from '../model';
 import { OUTER_W } from '@/app/side3d/layout';
 import { TILE_H } from '@/app/side3d/tilestate';
 import { FIT, MAX_ZOOM, zoomAt } from '../zoom';
-import { boxSite, EL, fitSite, siteOf, toScreen, viewFit } from './camera';
+import { bleed, boxSite, EL, fitSite, siteOf, toScreen, viewFit } from './camera';
 import { HEAD_R, HEAD_Y } from './laptop';
 
 /** the prototype's office numbers for n agents (maps/loft.ts owns the real ones; these only size the site) */
@@ -94,6 +94,22 @@ describe('camera fit', () => {
         const v = viewFit(f, { zoom: MAX_ZOOM, u: 0.5, v: 0.5 });
         expect(v.top - v.bottom).toBeLessThanOrEqual(bim);
       }
+    }
+  });
+});
+
+describe('bleed: a banner scene reaching the banner edges', () => {
+  it('keeps every point where the box drew it, offset by the bleed, at the same scale', () => {
+    const fit = boxSite({ x0: -2, x1: 2, z0: -1, z1: 1, yLow: 0, yHigh: 1 }, 360, 164);
+    const wide = bleed(fit, { l: 0, t: 11, r: 11, b: 25 });
+    expect(wide.widthPx).toBe(371);
+    expect(wide.heightPx).toBe(200);
+    expect(wide.scale).toBe(fit.scale);
+    for (const p of [{ x: 0, y: 0, z: 0 }, { x: 2, y: 1, z: -1 }, { x: -2, y: 0, z: 1 }]) {
+      const a = toScreen(fit, p);
+      const b = toScreen(wide, p);
+      expect(b.x).toBeCloseTo(a.x, 6);
+      expect(b.y).toBeCloseTo(a.y + 11, 6);
     }
   });
 });

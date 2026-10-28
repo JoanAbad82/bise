@@ -8,6 +8,7 @@
 // landing islands', bims/render/entrance.ts; banner-entrance), with no still over it. Owner: banner-3d.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { reducedMotion } from '@/ds/hooks';
+import { bleedOf } from '@/ds/bleed';
 import { entered, toEnter } from '@/bims/entrance-once';
 import { usePrefs } from '@/store';
 import { themeOf } from '@/theme';
@@ -55,7 +56,7 @@ function Live({ page, onFail }: { page: ScenePage; onFail: () => void }) {
     let io: IntersectionObserver | null = null;
     let late = 0;
     const box = canvas.parentElement;
-    const now = (): void => { view.current?.resize(box?.clientWidth ?? 0, box?.clientHeight ?? 0); };
+    const now = (): void => { view.current?.resize(box?.clientWidth ?? 0, box?.clientHeight ?? 0, box === null ? undefined : bleedOf(box)); };
     // drawn at once, and once more when the window has settled: a frame drawn while the window's
     // surface is being remade (a resize, the first mount) can be lost on screen
     const again = (): void => {
@@ -121,7 +122,7 @@ function Live({ page, onFail }: { page: ScenePage; onFail: () => void }) {
   // the canvas is always visible (a hidden one may lose the frame it draws); over it, the still
   // until the scene's first frame is on screen: the banner never shows an empty box
   return (
-    <div className="b-live" data-testid={`banner.live.${page}`} data-drawn={drawn || undefined}>
+    <div className="b-live" data-bleed data-testid={`banner.live.${page}`} data-drawn={drawn || undefined}>
       <canvas
         ref={ref}
         className="b-live-canvas"

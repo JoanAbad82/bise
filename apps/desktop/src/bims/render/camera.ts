@@ -186,6 +186,24 @@ export function viewFit(fit: Fit, cam: Cam): Fit {
   return { ...fit, left: cx - halfW, right: cx + halfW, top: cy + halfH, bottom: cy - halfH, scale: fit.scale / cam.zoom };
 }
 
+/** css px a canvas reaches past its fit's box on each side */
+export interface Bleed {
+  readonly l: number;
+  readonly t: number;
+  readonly r: number;
+  readonly b: number;
+}
+
+/**
+ * The fit of a box drawn on a canvas that reaches `e` css px past it on each side (a banner's scene
+ * to the banner's edges): the same scale and the same place on screen for what the box showed, the
+ * view widened by the bleed. Pure.
+ */
+export function bleed(fit: Fit, e: Bleed): Fit {
+  const k = fit.scale;
+  return { ...fit, left: fit.left - e.l * k, right: fit.right + e.r * k, top: fit.top + e.t * k, bottom: fit.bottom - e.b * k, widthPx: fit.widthPx + e.l + e.r, heightPx: fit.heightPx + e.t + e.b };
+}
+
 /** a world point on the canvas, css px from its top left */
 export function toScreen(fit: Fit, p: V3): { x: number; y: number } {
   const q = { x: p.x - fit.target.x, y: p.y - fit.target.y, z: p.z - fit.target.z };

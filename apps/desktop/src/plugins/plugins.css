@@ -28,6 +28,10 @@
 /* the hovered object's box over the canvas: the ds tip's mark (Room.tsx), nothing drawn */
 .plg-room-mark { position: absolute; }
 .plg-room-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--c-raised); }
+/* bled to the banner's edges (ds banner.css data-bleed): the canvas fills it, the room rests fitted in the visual box (render.ts resize); the fallback and '⤢ fit' keep to the box */
+.plg-room[data-bleed] > .plg-room-canvas { width: 100%; height: 100%; max-width: none; max-height: none; aspect-ratio: auto; }
+.plg-room[data-bleed] > .plg-room-wait { inset: calc(var(--b-vis-top) - 1px) calc(var(--s-3) - 1px) calc(var(--s-3) - 1px) 0; }
+.plg-room[data-bleed] > .bims-fit { right: calc(var(--s-3) - 1px + var(--s-1)); bottom: calc(var(--s-3) - 1px + var(--s-1)); }
 .plg-floor { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: var(--s-2); max-width: 100%; max-height: 100%; overflow: hidden; padding: var(--s-3); border-radius: var(--r-2); background: var(--c-sunken); }
 
 /* connect your tools: head t-15/600 and its count on one baseline, the sub 4 under, the cards 12

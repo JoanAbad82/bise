@@ -16,6 +16,7 @@ import { usePrefs } from '@/store';
 import type { Plugin } from '@/proto';
 import { canDraw, usePicks } from './icons';
 import { entered, toEnter } from '@/bims/entrance-once';
+import { bleedOf } from '@/ds/bleed';
 
 type RoomView = import('./render').RoomView;
 
@@ -68,7 +69,11 @@ export function Room({ rows, project, fallback, onOpen }: { rows: readonly Plugi
           const v = r.mountRoom(canvas, { enter });
           if (enter) entered('plugins');
           view.current = v;
-          const now = (): void => { v.resize(canvas.parentElement?.clientWidth ?? 0); };
+          // the canvas fills its box, bled past the banner's visual box to its edges (ds/bleed.ts): the room rests fitted in the visual box
+          const now = (): void => {
+            const box = canvas.parentElement;
+            if (box !== null) v.resize(box.clientWidth, box.clientHeight, bleedOf(box));
+          };
           // drawn at once, and once more when the window has settled: a frame drawn while the
           // window's surface is being remade (a resize, the first mount) can be lost on screen
           const again = (): void => {

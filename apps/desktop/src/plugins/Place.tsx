@@ -96,7 +96,7 @@ export function PlaceView({ rows, summary, browse, problem, project, projectName
           accent only on what needs him), the live room (Room.tsx) in its 360 x 176 box; full width: 32 in */}
       <PageBanner title={hero.plugins_title} sentence={settings.plugins_place_sub} edge="column" gutter={gutter} icon="plugins" testId="plugins.head"
         {...(summary !== null ? { facts: <span data-testid="plugins.counts">{settings.plugins_place_counts({ on: summary.on, off: summary.off })}{summary.waiting > 0 && <>{' · '}<BannerWait>{settings.plugins_place_waits({ n: summary.waiting })}</BannerWait></>}</span> } : {})}
-        visual={<div className="plg-room" data-testid="plugins.room">{room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} onOpen={ports.open} />}</div>} />
+        visual={<div className="plg-room" data-bleed data-testid="plugins.room">{room ?? <Room rows={all} project={project} fallback={<PlainRoom rows={all} project={project} />} onOpen={ports.open} />}</div>} />
       {/* the page's search, in the window's bar (app-polish #4); its action row under the banner */}
       <InBar>
         <BarSearch ref={searchRef} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); e.currentTarget.blur(); } }} testId="plugins.search" />

@@ -21,7 +21,10 @@ import { makeView } from '@/bims/render/view';
 import { lightOffice } from '@/bims/render/world';
 import { type Entrance, makeEntrance, wrapIn } from '@/bims/render/entrance';
 import type { Activity, Pose } from '@/bims/model';
+import { bleed, type Bleed } from '@/bims/render/camera';
 import { airFit, hoverT, spanOf, type Span } from './fit';
+
+const NO_BLEED: Bleed = { l: 0, t: 0, r: 0, b: 0 };
 
 /** the pages whose banner shows a live scene */
 export type ScenePage = 'inbox' | 'scheduled' | 'artifacts';
@@ -30,7 +33,7 @@ export interface SceneView {
   /** draw the scene in its day or night (built again when it changes) */
   show(o: { readonly night: boolean }): void;
   /** the canvas's css size: the banner's visual box */
-  resize(widthPx: number, heightPx: number): void;
+  resize(widthPx: number, heightPx: number, inset?: Bleed): void;
   /** the part under (x, y), css px from the canvas's top left; null: none */
   pick(x: number, y: number): string | null;
   /** the part under the pointer: a new one plays its move once (none under reduced motion) */
@@ -318,6 +321,8 @@ export function mountScene(canvas: HTMLCanvasElement, page: ScenePage, o: { read
   let rests = new Map<string, Rest>();
   let night: boolean | null = null;
   let size = { w: 0, h: 0 };
+  /** how far the canvas reaches past the visual box the scene rests in, css px */
+  let inset: Bleed = NO_BLEED;
   let raf = 0;
   let hovered: string | null = null;
   let hoverT0 = 0;
@@ -356,7 +361,9 @@ export function mountScene(canvas: HTMLCanvasElement, page: ScenePage, o: { read
   };
   const look = (): void => {
     if (built === null || size.w <= 0) return;
-    const fit = airFit(built.span, size.w, size.h);
+    // fitted in the visual box, the canvas past it to the banner's edges (camera.ts bleed)
+    const e = inset;
+    const fit = bleed(airFit(built.span, size.w - e.l - e.r, size.h - e.t - e.b), e);
     view.size(fit);
     view.look(fit);
   };
@@ -390,11 +397,13 @@ export function mountScene(canvas: HTMLCanvasElement, page: ScenePage, o: { read
       look();
       frame();
     },
-    resize(w, h) {
+    resize(w, h, e = NO_BLEED) {
       const next = { w: Math.max(0, Math.round(w)), h: Math.max(0, Math.round(h)) };
+      const same = (a: Bleed, b: Bleed): boolean => a.l === b.l && a.t === b.t && a.r === b.r && a.b === b.b;
       // the same size: the canvas may have lost its frame (a window resize, scrolled away and back): one frame, no loop
-      if (next.w !== size.w || next.h !== size.h) {
+      if (next.w !== size.w || next.h !== size.h || !same(e, inset)) {
         size = next;
+        inset = e;
         look();
       }
       frame();

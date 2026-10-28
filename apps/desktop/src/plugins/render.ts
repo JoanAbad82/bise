@@ -8,7 +8,7 @@
 // objects pop on them. Light: the office's day sun from the same corner (-5, 14, 3), its one soft
 // contact shadow, a transparent backdrop. Owner: plug-desktop.
 import { Box3, Group, Mesh, type Object3D, PlaneGeometry, Raycaster, ShadowMaterial, Vector2, Vector3, type Material, type BufferGeometry } from 'three';
-import { boxSite, RIGHT, UP, viewFit, type Fit, type Site } from '@/bims/render/camera';
+import { bleed, boxSite, RIGHT, UP, viewFit, type Bleed, type Fit, type Site } from '@/bims/render/camera';
 import { HOVER_MS, MOVES, hoverAt } from '@/bims/render/objects/hover';
 import { FIT, type Cam } from '@/bims/zoom';
 import { makeObject, type ObjId } from '@/bims/render/objects';
@@ -122,8 +122,8 @@ const DROP_MS = 400;
 export interface RoomView {
   /** what the room shows; new keys (after the first call) drop in */
   show(objs: readonly PluginObject[], o: { readonly night: boolean; readonly reduced: boolean }): void;
-  /** the canvas's css size (its height follows: a 2.2:1 banner) */
-  resize(widthPx: number): void;
+  /** the canvas's css size, and how far it reaches past the banner's visual box (the room rests fitted in a 2.2:1 box centred in it) */
+  resize(widthPx: number, heightPx: number, inset?: Bleed): void;
   /** the plugin key of the object under (x, y), css px from the canvas's top left; null: none */
   pick(x: number, y: number): string | null;
   /** the object under the pointer (null: none): a new one plays its hover move once (render/objects/hover.ts), none under reduced motion */
@@ -212,6 +212,7 @@ export function mountRoom(canvas: HTMLCanvasElement, o0: { readonly enter?: bool
   let first = true;
   let night = false;
   let width = 0;
+  let sized = '';
   let raf = 0;
   const drops = new Map<string, number>();
   // the fit of the whole room, and his camera inside it
@@ -315,18 +316,28 @@ export function mountRoom(canvas: HTMLCanvasElement, o0: { readonly enter?: bool
       first = false;
       frame();
     },
-    resize(w) {
+    resize(w, h, e = { l: 0, t: 0, r: 0, b: 0 }) {
       const px = Math.max(1, Math.round(w));
-      // the same width: the canvas may have lost its frame (a window resize, the room scrolled
+      const py = Math.max(1, Math.round(h));
+      const sig = `${String(px)}x${String(py)}:${String(e.l)},${String(e.t)},${String(e.r)},${String(e.b)}`;
+      // the same size: the canvas may have lost its frame (a window resize, the room scrolled
       // away and back), so draw it again; one frame, no loop
-      if (px === width) {
+      if (sig === sized) {
         frame();
         return;
       }
+      sized = sig;
       width = px;
       const P = 0.75;
       const site: Site = { x0: -ROOM.w / 2 - P, x1: ROOM.w / 2 + P, z0: -ROOM.d / 2 - P, z1: ROOM.d / 2 + P, yLow: -0.6, yHigh: 2.2 };
-      fit = boxSite(site, px, Math.round(px / 2.2));
+      // the 2.2:1 box in the visual box, centred; the canvas past it on each side
+      const iw = Math.max(1, px - e.l - e.r);
+      const ih = Math.max(1, py - e.t - e.b);
+      const lw = Math.round(Math.min(iw, ih * 2.2));
+      const lh = Math.round(lw / 2.2);
+      const dx = (iw - lw) / 2;
+      const dy = (ih - lh) / 2;
+      fit = bleed(boxSite(site, lw, lh), { l: e.l + dx, r: px - lw - e.l - dx, t: e.t + dy, b: py - lh - e.t - dy });
       view.size(fit);
       view.look(viewFit(fit, cam));
       frame();

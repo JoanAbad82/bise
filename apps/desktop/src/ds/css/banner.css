@@ -3,7 +3,7 @@
    1 px line, the night's raised ground. It ends where the right side leaves room (--banner-gutter,
    the page's useSideLayout gutter). 200 high, its text left (32 in, or on the page's column's text
    edge: the page's --pad-page-x and the rows' 12, computed from the banner's own width), its visual
-   bottom right in a 360 x 176 box 12 from the edges. Under a 1000 content area (the banner < 952):
+   bottom right in a 360 x 176 box 12 from the edges (a live scene's canvas past it to the edges). Under a 1000 content area (the banner < 952):
    160 high, the box 264 x 132; under 760 (< 712): no visual, the text takes the width. */
 .b-banner{container:b-banner / inline-size;margin:var(--s-6) max(var(--s-6), var(--banner-gutter, 0px)) var(--s-6) var(--s-6);border-radius:var(--r-4);background:var(--c-solid);box-shadow:inset 0 0 0 1px var(--c-line)}
 [data-theme="dark"] .b-banner{background:var(--c-raised);box-shadow:none}
@@ -23,6 +23,13 @@
 .b-banner .vis{position:absolute;right:var(--s-3);bottom:var(--s-3);width:var(--w-banner-vis);height:var(--h-banner-vis);display:flex;align-items:center;justify-content:center;color:var(--c-text-3);pointer-events:none}
 .b-banner .vis > img{display:block;width:100%;height:100%;object-fit:contain}
 .b-banner .vis > .b-app-icon{width:var(--s-16);height:var(--s-16)}
+/* a live scene (data-bleed; Gabriel m_49015): its canvas reaches the banner's top, right and bottom
+   edges, inside its 1 px line, its corners' curve, so a zoom or a move is cut by the banner's border,
+   never before; the scene rests fitted in the visual box as before (the canvas's fit, camera.ts
+   bleed). Its left stays the box's: past it is the text. What sits over the scene (a still, '⤢ fit')
+   keeps to the box: --b-vis-top is the box's top in the banner. */
+.b-banner .vis{--b-vis-top:calc(var(--h-banner) - var(--h-banner-vis) - var(--s-3))}
+.b-banner .vis > [data-bleed]{position:absolute;top:calc(1px - var(--b-vis-top));right:calc(1px - var(--s-3));bottom:calc(1px - var(--s-3));left:0;width:auto;height:auto;border-radius:0 calc(var(--r-4) - 1px) calc(var(--r-4) - 1px) 0;overflow:hidden}
 .b-banner .vis > .dark{display:none}
 [data-theme="dark"] .b-banner .vis > .light{display:none}
 [data-theme="dark"] .b-banner .vis > .dark{display:block}
@@ -34,15 +41,15 @@
    right margin (data-room: 24, 92 with the world as a bubble, 172 with the world; ui-review) */
 @container b-banner (max-width: 951px){
   .b-banner[data-room="24"] > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
-  .b-banner[data-room="24"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
+  .b-banner[data-room="24"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm);--b-vis-top:calc(var(--h-banner-sm) - var(--h-banner-vis-sm) - var(--s-3))}
 }
 @container b-banner (max-width: 883px){
   .b-banner[data-room="92"] > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
-  .b-banner[data-room="92"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
+  .b-banner[data-room="92"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm);--b-vis-top:calc(var(--h-banner-sm) - var(--h-banner-vis-sm) - var(--s-3))}
 }
 @container b-banner (max-width: 803px){
   .b-banner[data-room="172"] > .in{height:var(--h-banner-sm);padding-right:calc(var(--w-banner-vis-sm) + var(--s-3) + var(--s-6))}
-  .b-banner[data-room="172"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm)}
+  .b-banner[data-room="172"] .vis{width:var(--w-banner-vis-sm);height:var(--h-banner-vis-sm);--b-vis-top:calc(var(--h-banner-sm) - var(--h-banner-vis-sm) - var(--s-3))}
 }
 @container b-banner (max-width: 711px){
   .b-banner[data-room="24"] > .in{padding-right:var(--s-6)}
