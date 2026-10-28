@@ -5,10 +5,11 @@
 // amb-home.
 import { useEffect, useRef, useState } from 'react';
 import type { Artifact } from '@/proto';
-import { useAccounts, useArtifacts, useClaudePlan, useFound, usePrefs, useProjects, useProviderCheck, useStore } from '@/store';
+import { useAccounts, useArtifacts, useClaudePlan, useFound, usePrefs, useProjects, useProviderCheck, useRoles, useStore } from '@/store';
 import { useRoute, useRouter } from '@/app/router';
 import { onboarded, prefsOf, useCmdError } from '@/settings';
 import { Onboarding } from './Onboarding';
+import { mainHasModel } from './model';
 import { useHelper } from './helper';
 import { pickerPort } from '@/settings/picker';
 
@@ -25,6 +26,7 @@ export function OnboardingScreen() {
       perms={perms}
       fn={fn}
       check={useProviderCheck()}
+      hasModel={mainHasModel(useRoles())}
       signInError={useCmdError('sign_in')?.text ?? null}
       ports={{
         send: (cmd) => {

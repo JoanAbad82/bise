@@ -99,12 +99,13 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 from: None,
                 keys_url: String::new(),
                 coding: false,
+                needs_url: false,
             }]
         }),
         claude_plan: Box::new(|| true),
         // the live port checks on a thread (firstkey.rs); this one answers
         // at once: "sk-bad…" is refused, nothing saved; any other key works
-        provider_use: Box::new(move |id, key, seq, tx| {
+        provider_use: Box::new(move |id, key, _base_url, seq, tx| {
             let k = key.clone().unwrap_or_default();
             let res = if k.starts_with("sk-bad") || k.trim().is_empty() {
                 Err(crate::firstkey::Failed { why: bise_proto::app_rows::CheckWhy::WrongKey, said: "invalid api key".into(), url: Some("https://keys.test".into()) })

@@ -99,7 +99,7 @@ pub type IdFn = Box<dyn Fn(&str) -> Result<(), String>>;
 /// (provider, the key pasted or none, its seq, the channel of its end) ->
 /// (the provider's name, the model it is checked with), at once; the
 /// check's end comes as `Done::Used`
-pub type ProviderUseFn = Box<dyn Fn(&str, Option<String>, u64, Sender<Done>) -> (String, String)>;
+pub type ProviderUseFn = Box<dyn Fn(&str, Option<String>, Option<String>, u64, Sender<Done>) -> (String, String)>;
 pub type SignInFn = Box<dyn Fn(&str, Sender<Done>) -> Result<(), String>>;
 pub type PathFn = Box<dyn Fn(&Path) -> Result<(), String>>;
 /// Reads the desktop app's release channel he follows (stable or beta) on
@@ -347,6 +347,7 @@ pub fn account_of(s: &bise_catalog::auth_cli::Status) -> Account {
         from: None,
         keys_url: String::new(),
         coding: false,
+        needs_url: false,
     }
 }
 
@@ -539,6 +540,11 @@ pub fn live(flow: FlowFn) -> SetupPorts {
                         a.from = (!p.signs_in()).then(|| keys.find(&p.id, &p.key_env)).flatten().map(|f| crate::firstkey::key_from(&f.from, home));
                         a.keys_url = p.keys_url.clone();
                         a.coding = crate::onboarding::CODING_PLANS.contains(&p.id.as_str());
+                        a.needs_url = crate::firstkey::needs_url(p);
+                        // a key with no base URL can't answer: never "added" (Isidor, 28 oct)
+                        if a.needs_url && a.state == "signed_in" {
+                            a.state = "signed_out".into();
+                        }
                     }
                     a
                 })
@@ -557,6 +563,7 @@ pub fn live(flow: FlowFn) -> SetupPorts {
                         from: None,
                         keys_url: p.keys_url.clone(),
                         coding: true,
+                        needs_url: false,
                     });
                 }
             }
@@ -565,14 +572,14 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         claude_plan: Box::new(move || bise_catalog::detect::claude_plan(home().user_home(), &env)),
         // the key step's one path (firstkey.rs): checked live on its own
         // thread, saved only once it works
-        provider_use: Box::new(move |id, key, seq, tx| {
+        provider_use: Box::new(move |id, key, base_url, seq, tx| {
             let h = home();
             let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
             let said = crate::firstkey::model_for(&h, &env, id);
             let id = id.to_string();
             std::thread::spawn(move || {
                 let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-                let used = crate::firstkey::use_provider(&h, &env, &id, key, &crate::firstkey::live_ports());
+                let used = crate::firstkey::use_provider(&h, &env, &id, key, base_url, &crate::firstkey::live_ports());
                 let _ = tx.send(Done::Used { seq, used });
             });
             said

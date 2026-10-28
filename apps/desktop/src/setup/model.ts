@@ -122,6 +122,24 @@ export function lookOnLeave(me: Look | null, rand: number): Look | null {
   return me === null ? anyLook(rand) : null;
 }
 
+/** The model step's place: the first launch never ends before a model answered (Isidor, 28 oct). */
+export const MODEL_AT = STEPS.indexOf('model');
+
+/** main has a model already (the core's roles: main's row with a model set); a check that works this time counts too. Pure. */
+export function mainHasModel(roles: readonly { role: string; model: string; source: string }[]): boolean {
+  const m = roles.find((r) => r.role === 'main');
+  return m !== undefined && m.model.trim() !== '' && m.source !== 'none';
+}
+
+/**
+ * skip with no model yet: to the model step, never out of the first launch (a message sent at its end
+ * must get an answer); the model step itself has no skip until one works. null: skip may end it. Pure.
+ */
+export function skipTo(s: OnbState, modelReady: boolean): OnbState | null {
+  if (modelReady || s.at > MODEL_AT) return null;
+  return { ...s, at: MODEL_AT };
+}
+
 /** skip, or the last step: onboarded true, then bise. */
 export function finish(s: OnbState, cmds: AppCmd[] = []): { s: OnbState; cmds: AppCmd[]; done: boolean } {
   return { s, cmds: [...cmds, { cmd: 'prefs_set', key: 'onboarded', value: true }], done: true };

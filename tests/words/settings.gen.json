@@ -786,6 +786,13 @@
     "one": null,
     "text": "Anthropic, OpenAI, Google, Mistral…"
   },
+  "settings.first_bad_url": {
+    "args": [
+      "url"
+    ],
+    "one": null,
+    "text": "“{url}” isn't a base URL: it starts with https://"
+  },
   "settings.first_chatgpt": {
     "args": [],
     "one": null,
@@ -800,6 +807,11 @@
     "args": [],
     "one": null,
     "text": "use your Plus or Pro plan"
+  },
+  "settings.first_check_it": {
+    "args": [],
+    "one": null,
+    "text": "check it"
   },
   "settings.first_check_network": {
     "args": [],
@@ -974,6 +986,11 @@
     "args": [],
     "one": null,
     "text": "me"
+  },
+  "settings.first_key_found": {
+    "args": [],
+    "one": null,
+    "text": "blank: i use the key i found"
   },
   "settings.first_key_model": {
     "args": [
@@ -1398,6 +1415,18 @@
     ],
     "one": null,
     "text": "i couldn't reach {provider}: {why}."
+  },
+  "settings.first_url_paste": {
+    "args": [],
+    "one": null,
+    "text": "its base URL, https://…"
+  },
+  "settings.first_url_why": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "{provider} has no base URL built in: paste the one you were given."
   },
   "settings.first_use": {
     "args": [

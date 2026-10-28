@@ -17,7 +17,7 @@ import type { ProviderCheck } from '@/settings';
 import { PayStep } from './PayStep';
 import { afterSignIn, PAY_START, ready, upOf, type PayState } from './pay';
 import {
-  back, baseName, choose as choose_, chosenTicked, filterFound, finish, firstSend, fnAct, ideas, lookCmd, lookOnLeave, next, pick, pickChosen, START, stepOf, STEPS, ticked, tickedNames,
+  back, baseName, choose as choose_, chosenTicked, filterFound, finish, firstSend, fnAct, ideas, lookCmd, lookOnLeave, MODEL_AT, next, pick, pickChosen, skipTo, START, stepOf, STEPS, ticked, tickedNames,
   type OnbState,
 } from './model';
 import type { Perms } from './perms';
@@ -52,6 +52,8 @@ export interface OnboardingProps {
   now?: number;
   /** his home folder (window.bise.home), shown as ~ in the paths */
   home?: string;
+  /** main has a model already (the core's roles): skip may end the first launch before the model step */
+  hasModel?: boolean;
 }
 
 /** The marks' sizes: hello's ':*' (designer's A, 112 px) and the first message's. */
@@ -61,7 +63,7 @@ const FIRST_KISS = 48;
 /** A fn sentinel in onb_first_fn's words, where the key chip goes. */
 const FN_HOLE = '\u0000';
 
-export function Onboarding({ accounts, claudePlan = false, found, perms, fn = null, check = null, signInError = null, ports, now: pinned, home = '' }: OnboardingProps) {
+export function Onboarding({ accounts, claudePlan = false, found, perms, fn = null, check = null, signInError = null, ports, now: pinned, home = '', hasModel = false }: OnboardingProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [st, setSt] = useState<OnbState>(START);
@@ -109,6 +111,8 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
     }
   }
   const ok = ready(pay, check);
+  // a model answered this time, or main had one: the first launch may end (Isidor, 28 oct)
+  const modelReady = ok || hasModel;
   const run = (r: { s: OnbState; cmds: AppCmd[]; done: boolean }) => {
     for (const c of r.cmds) ports.send(c);
     setSt(r.s);
@@ -309,9 +313,20 @@ export function Onboarding({ accounts, claudePlan = false, found, perms, fn = nu
             </Act>
           )}
         </span>
-        <Act onClick={() => { leaveHello(); run(finish(s)); }} testId={at === 'first' ? 'setup.open' : 'setup.skip'}>
-          {at === 'first' ? settings.onb_open : settings.onb_skip}
-        </Act>
+        {/* no model yet: skip goes to the model step, which has none until a check works (a working setup at the end) */}
+        {!(s.at === MODEL_AT && !modelReady) && (
+          <Act
+            onClick={() => {
+              leaveHello();
+              const to = skipTo(s, modelReady);
+              if (to !== null) setSt(to);
+              else run(finish(s));
+            }}
+            testId={at === 'first' ? 'setup.open' : 'setup.skip'}
+          >
+            {at === 'first' ? settings.onb_open : settings.onb_skip}
+          </Act>
+        )}
       </div>
       {body}
     </section>

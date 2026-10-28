@@ -87,7 +87,7 @@ describe('the first launch model', () => {
 });
 
 describe('Onboarding', () => {
-  it("hello: bise's typed ':*' (mono, no pearl, no canvas), its words, four dots; skip writes onboarded and opens bise", () => {
+  it("hello: bise's typed ':*' (mono, no pearl, no canvas), its words, four dots; with no model, skip leads to the model step, which has none (Isidor, 28 oct)", () => {
     const p = ports();
     render(<Onboarding accounts={accounts()} found={found()} perms={{}} ports={p} now={NOW} />);
     const hello = screen.getByTestId('setup.step.hello');
@@ -103,11 +103,25 @@ describe('Onboarding', () => {
     fireEvent.keyDown(screen.getByTestId('setup.root'), { key: 'Enter' });
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
     expect(screen.queryByTestId('setup.perms')).toBeNull();
+    // no model yet: the model step has no skip (the first launch always ends with a model that answers)
+    expect(screen.queryByTestId('setup.skip')).toBeNull();
+    expect(p.sent).toEqual([]);
+    cleanup();
+    // skip on hello with no model: the model step, never out
+    const q = ports();
+    render(<Onboarding accounts={accounts()} found={found()} perms={{}} ports={q} now={NOW} />);
     fireEvent.click(screen.getByTestId('setup.skip'));
-    expect(p.sent).toEqual([{ cmd: 'prefs_set', key: 'onboarded', value: true }]);
+    expect(screen.getByTestId('setup.step.model')).toBeTruthy();
+    expect(q.log).toEqual([]);
+    cleanup();
+    // main has a model already: skip writes onboarded and opens bise
+    const p2 = ports();
+    render(<Onboarding accounts={accounts()} found={found()} perms={{}} ports={p2} now={NOW} hasModel />);
+    fireEvent.click(screen.getByTestId('setup.skip'));
+    expect(p2.sent).toEqual([{ cmd: 'prefs_set', key: 'onboarded', value: true }]);
     // he left hello without picking: his bim got one of the ready-made looks (page bim-pick)
-    expect(p.looks).toHaveLength(1);
-    expect(p.log.at(-1)).toBe('done');
+    expect(p2.looks).toHaveLength(1);
+    expect(p2.log.at(-1)).toBe('done');
   });
 
   it("hello offers 12 ready-made looks for his bim (page bim-pick): a click keeps it in prefs' bim; none picked, start keeps one at random", () => {

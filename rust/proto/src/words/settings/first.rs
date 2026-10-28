@@ -265,6 +265,16 @@ crate::words! { settings:
     first_check_stopped = "the check stopped";
     /// the model not saved
     first_write_config(why) = "couldn't write config.toml: {why}";
+    /// the key step: the base URL he typed isn't one (Isidor: the foundry proxy has none built in)
+    first_bad_url(url) = "“{url}” isn't a base URL: it starts with https://";
+    /// the key step: the base URL field's placeholder, for a provider with none
+    first_url_paste = "its base URL, https://…";
+    /// the key step: why the base URL field is there
+    first_url_why(provider) = "{provider} has no base URL built in: paste the one you were given.";
+    /// the key step: the key field when a key was found (blank uses it)
+    first_key_found = "blank: i use the key i found";
+    /// the key step: the button under the URL and key fields
+    first_check_it = "check it";
     /// a provider the catalog doesn't know
     first_unknown_provider(id) = "unknown provider {id}";
     /// a link opened

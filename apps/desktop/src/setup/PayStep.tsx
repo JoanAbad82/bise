@@ -3,12 +3,12 @@
 // key field with its keys page, then the live check: checking, failed (why, the provider's own
 // words, the page that fixes it) or "it works" with what the model said and what each role runs.
 // Owner: amb-home.
-import { useRef, type ReactNode } from 'react';
+import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import type { Account, AppCmd, KeyFrom } from '@/proto';
 import { Act, Button, Field, Group, Help, Onb, type GroupItem } from '@/ds';
 import { failedWords, fromWords, retries, shortModel, type ProviderCheck } from '@/settings';
 import { common, settings } from '@/proto/words.gen';
-import { CHATGPT, OPENROUTER, keyProviders, openRouterSignIn, phase, pickRow, rows, startCheck, type PayState, type Row } from './pay';
+import { CHATGPT, OPENROUTER, keyFieldSend, keyProviders, openRouterSignIn, phase, pickRow, rows, startCheck, type PayState, type Row } from './pay';
 
 export interface PayProps {
   /** the Onb frame's step dots and test id */
@@ -35,6 +35,7 @@ export function PayStep({ frame, accounts, claudePlan = false, check, s, set, se
   };
   const ph = phase(s, check);
   const field = useRef<HTMLInputElement>(null);
+  const urlField = useRef<HTMLInputElement>(null);
   const name = (id: string) => accounts.find((a) => a.id === id)?.label ?? id;
   const link = (text: string, url: string | null, id: string): ReactNode =>
     url === null ? (
@@ -109,9 +110,16 @@ export function PayStep({ frame, accounts, claudePlan = false, check, s, set, se
     const mine = s.sent?.id === v.id;
     const failed = mine && ph === 'failed' && check !== null ? check : null;
     const f = failed !== null ? failedWords(failed, null, false) : null;
+    const needsUrl = acc?.needs_url === true;
+    const found = acc?.from != null;
     const resend = () => {
-      const k = field.current?.value.trim() ?? '';
-      if (k !== '' && ph !== 'checking') run(startCheck(s, v.id, k, check));
+      const r = keyFieldSend(acc, field.current?.value ?? '', urlField.current?.value ?? '');
+      if (r !== null && ph !== 'checking') run(startCheck(s, v.id, r.key, check, r.url));
+    };
+    const enter = (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      resend();
     };
     // the provider didn't answer: retrying the same key makes sense; a wrong key: he pastes another
     const retry = failed !== null && retries(failed);
@@ -122,18 +130,21 @@ export function PayStep({ frame, accounts, claudePlan = false, check, s, set, se
         cta={retry ? { text: settings.onb_try_again, onClick: resend, testId: 'setup.pay.again' } : cont}
       >
         <div className="setup-key">
+          {/* a provider with no base URL (the foundry proxy): its URL first, the key found or pasted under it */}
+          {needsUrl && (
+            <>
+              <Help testId="setup.pay.url.why">{settings.first_url_why({ provider: name(v.id) })}</Help>
+              <Field ref={urlField} autoFocus placeholder={settings.first_url_paste} state={f !== null ? 'error' : undefined} testId="setup.pay.url" onKeyDown={enter} />
+            </>
+          )}
           <Field
             ref={field}
-            autoFocus
+            autoFocus={!needsUrl}
             type="password"
-            placeholder={settings.key_paste}
+            placeholder={found ? settings.first_key_found : settings.key_paste}
             state={f !== null ? 'error' : undefined}
             testId="setup.pay.key"
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter') return;
-              e.preventDefault();
-              resend();
-            }}
+            onKeyDown={enter}
           />
           {mine && ph === 'checking' && <Help testId="setup.pay.checking">{settings.first_checking_key}</Help>}
           {f !== null && (
@@ -148,6 +159,7 @@ export function PayStep({ frame, accounts, claudePlan = false, check, s, set, se
           )}
           {f === null && !(mine && ph === 'checking') && url !== null && <Help testId="setup.pay.get">{link(settings.first_get_one, url, 'keys')}</Help>}
           {f === null && !(mine && ph === 'checking') && <Help>{settings.first_goes_in_auth}</Help>}
+          {needsUrl && <Button kind="pri" onClick={resend} testId="setup.pay.url.check">{settings.first_check_it}</Button>}
         </div>
       </Onb>
     );

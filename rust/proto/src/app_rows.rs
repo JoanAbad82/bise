@@ -88,6 +88,11 @@ pub struct Account {
     /// them under their own row
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub coding: bool,
+    /// its provider has no base URL (none built in, none in config.toml,
+    /// the env or a .env: the foundry proxy): the key field asks for it
+    /// too, and `provider_use` carries it
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub needs_url: bool,
 }
 
 /// Where a provider's key was found (bise_catalog::auth::From).

@@ -58,11 +58,17 @@ pub enum AppCmd {
     /// minted key), answered by `provider_check` checking, then works or
     /// failed. The key is saved only once it works; main's model is
     /// written then when main has none or can't run. A newer one for the
-    /// same id drops the older's answer
+    /// same id drops the older's answer. `base_url`: for a provider
+    /// with none (the foundry proxy: an account's `needs_url`), used for
+    /// the check and written to config.toml (`[providers.<id>]
+    /// base_url`) once it works (Isidor, 28 oct: a key with no URL left
+    /// no model)
     ProviderUse {
         id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         key: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        base_url: Option<String>,
     },
     KeyRemove { id: String },
     /// folders that could be projects (none: his home folder, depth 2)

@@ -185,10 +185,39 @@ pub(crate) fn model_for(home: &bise_home::Home, env: Env, id: &str) -> (String, 
     (name, bise_catalog::roles::pick_for(&setup.catalog, id, &setup.model).unwrap_or_default())
 }
 
+/// A chat provider with no base URL at all (none built in, none from
+/// config.toml, its `base_url_env` or a .env: the foundry proxy for an
+/// app opened from the Finder): its key alone can't answer, the key
+/// field asks for the URL too (Isidor, 28 oct).
+pub(crate) fn needs_url(p: &bise_catalog::Provider) -> bool {
+    p.chats() && p.needs.is_empty() && !p.signs_in() && p.base_url.trim().is_empty()
+}
+
+/// A base URL he typed, cleaned: trimmed, http(s) only, no trailing '/'.
+pub(crate) fn clean_url(s: &str) -> Option<String> {
+    let u = s.trim().trim_end_matches('/');
+    let ok = (u.starts_with("https://") || u.starts_with("http://")) && u.len() > "https://".len() && !u.chars().any(char::is_whitespace);
+    ok.then(|| u.to_string())
+}
+
+/// Write `[providers.<id>] base_url` in config.toml (the rest kept): the
+/// hub writes the models file again at the next input, so the running
+/// REPLs read it at their next call.
+pub(crate) fn save_base_url(home: &bise_home::Home, id: &str, url: &str) -> std::io::Result<()> {
+    let file = home.config_file();
+    let text = std::fs::read_to_string(&file).unwrap_or_default();
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let value = format!("\"{}\"", url.replace('\\', "\\\\").replace('"', "\\\""));
+    std::fs::write(&file, bise_catalog::roles::with_table_key(&text, &format!("providers.{id}"), "base_url", &value))
+}
+
 /// Use provider `id`: check it live with `key` (None: the key found for
-/// it, or its sign-in's token), then save the key and, when
+/// it, or its sign-in's token) and, for a provider with no base URL,
+/// `base_url`; then save the URL, the key and, when
 /// `roles::model_to_write` says so, main's model. Blocking.
-pub(crate) fn use_provider(home: &bise_home::Home, env: Env, id: &str, key: Option<String>, ports: &Ports) -> Used {
+pub(crate) fn use_provider(home: &bise_home::Home, env: Env, id: &str, key: Option<String>, base_url: Option<String>, ports: &Ports) -> Used {
     let setup = crate::onboarding::setup_of(env, home);
     let paths = bise_catalog::auth_cli::Paths::of(home);
     let pasted = key.is_some();
@@ -224,7 +253,18 @@ pub(crate) fn use_provider(home: &bise_home::Home, env: Env, id: &str, key: Opti
             }
         }
     };
-    let call = call_of(&setup, id, &model, &the_key);
+    let mut call = call_of(&setup, id, &model, &the_key);
+    // his URL, for a provider with none (a typed one never replaces one it has)
+    let url = match base_url.as_deref().filter(|u| !u.trim().is_empty()) {
+        Some(u) if call.base_url.trim().is_empty() => match clean_url(u) {
+            Some(u) => Some(bise_catalog::env_base_url(&p.api, &u)),
+            None => return fail(&p.name, &model, CheckWhy::Config, settings::first_bad_url(u.trim()), None),
+        },
+        _ => None,
+    };
+    if let Some(u) = &url {
+        call.base_url = u.clone();
+    }
     let test_url = env("BEND_PROVIDER_URL");
     let answer = match crate::keycheck::no_url(&call, &setup.catalog, test_url.as_deref()) {
         Some(f) => Err(f),
@@ -242,6 +282,11 @@ pub(crate) fn use_provider(home: &bise_home::Home, env: Env, id: &str, key: Opti
             return fail(&p.name, &model, why, said, url);
         }
     };
+    if let Some(u) = &url {
+        if let Err(e) = save_base_url(home, &p.id, u) {
+            return fail(&p.name, &model, CheckWhy::Config, settings::first_write_config(e), None);
+        }
+    }
     if pasted {
         if let Err(e) = bise_catalog::auth_cli::login(&paths, p, &the_key, env) {
             return fail(&p.name, &model, CheckWhy::Config, e, None);
@@ -266,5 +311,67 @@ pub(crate) fn use_provider(home: &bise_home::Home, env: Env, id: &str, key: Opti
         model,
         pasted,
         res: Ok(Works { answer, main: now.model.clone(), lines: works_lines(&now, &checker) }),
+    }
+}
+
+#[cfg(test)]
+mod url_tests {
+    //! Isidor (28 oct): the foundry proxy's key with no base URL left no
+    //! model. Its URL typed with the key is checked, then saved with main's model.
+    use super::*;
+    use std::collections::HashMap;
+
+    fn tmp(tag: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("bise-url-{}-{}-{:?}", tag, std::process::id(), std::thread::current().id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// answers when the call has the URL he typed, with /v1 added (the anthropic family)
+    fn fake_check(c: &Call, _env: Env) -> Result<String, Fail> {
+        if c.base_url == "https://proxy.test/anthropic/v1" {
+            Ok("Hi!".into())
+        } else {
+            Err(Fail::of(Why::Unreachable(format!("called {}", c.base_url))))
+        }
+    }
+
+    fn ports() -> Ports {
+        Ports { check: fake_check, token: |_| Err("no plan".into()) }
+    }
+
+    #[test]
+    fn a_key_with_no_base_url_takes_the_typed_one_and_leaves_a_model() {
+        let root = tmp("foundry");
+        let home = bise_home::Home::at(root.join(".bise"));
+        let m = HashMap::from([("HOME", root.to_string_lossy().to_string()), ("ANTHROPIC_FOUNDRY_API_KEY", "sk-proxy".to_string())]);
+        let env = move |k: &str| m.get(k).cloned().filter(|v| !v.is_empty());
+        let setup = crate::onboarding::setup_of(&env, &home);
+        let p = setup.catalog.provider("foundry").expect("foundry");
+        assert!(needs_url(p), "no base URL built in");
+        // no URL: said plainly, nothing written
+        let u = use_provider(&home, &env, "foundry", None, None, &ports());
+        assert!(matches!(&u.res, Err(f) if f.why == CheckWhy::Config && f.said.contains("no base URL")), "{:?}", u.res);
+        assert!(!home.config_file().exists());
+        // a URL that isn't one: refused before any call
+        let u = use_provider(&home, &env, "foundry", None, Some("proxy.test".into()), &ports());
+        assert!(matches!(&u.res, Err(f) if f.why == CheckWhy::Config), "{:?}", u.res);
+        // his URL: the check calls it, the URL and main's model are written
+        let u = use_provider(&home, &env, "foundry", None, Some(" https://proxy.test/anthropic/ ".into()), &ports());
+        assert!(u.res.is_ok(), "{:?}", u.res);
+        let cfg = std::fs::read_to_string(home.config_file()).unwrap();
+        assert!(cfg.contains("[providers.foundry]") && cfg.contains("base_url = \"https://proxy.test/anthropic/v1\""), "{cfg}");
+        let now = crate::onboarding::setup_of(&env, &home);
+        assert!(now.model.starts_with("foundry/"), "main has a model now: {}", now.model);
+        assert!(!needs_url(now.catalog.provider("foundry").unwrap()), "the URL reads back");
+    }
+
+    #[test]
+    fn a_typed_url_is_cleaned_or_refused() {
+        assert_eq!(clean_url(" https://a.test/x/ "), Some("https://a.test/x".into()));
+        assert_eq!(clean_url("a.test"), None);
+        assert_eq!(clean_url("https://"), None);
+        assert_eq!(clean_url("https://a b"), None);
     }
 }

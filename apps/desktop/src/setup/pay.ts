@@ -55,6 +55,8 @@ export function keyProviders(accounts: readonly Account[], coding: boolean): Acc
 export function pickRow(s: PayState, r: Row, check: ProviderCheck | null): { s: PayState; cmd: AppCmd | null } {
   switch (r.t) {
     case 'found':
+      // a key with no base URL (the foundry proxy): its field asks for the URL first (Isidor, 28 oct)
+      if (r.acc.needs_url === true) return { s: { ...s, view: { t: 'key', id: r.acc.id } }, cmd: null };
       return startCheck(s, r.acc.id, undefined, check);
     case 'chatgpt':
       // signed in already: check the plan; else its browser sign-in, then the check
@@ -74,11 +76,21 @@ export function openRouterSignIn(s: PayState): { s: PayState; cmd: AppCmd } {
   return { s: { ...s, signing: OPENROUTER, view: { t: 'check', id: OPENROUTER } }, cmd: { cmd: 'sign_in', id: OPENROUTER } };
 }
 
-/** provider_use of `id` (a pasted key, or none: the key found, the sign-in). */
-export function startCheck(s: PayState, id: string, key: string | undefined, check: ProviderCheck | null): { s: PayState; cmd: AppCmd } {
-  const cmd: AppCmd = key === undefined ? { cmd: 'provider_use', id } : { cmd: 'provider_use', id, key };
-  // a pasted key is checked on its own step (the failure shows under its field); else the check's
-  return { s: { ...s, signing: null, sent: { id, base: check }, view: key === undefined ? { t: 'check', id } : { t: 'key', id } }, cmd };
+/** provider_use of `id` (a pasted key, or none: the key found, the sign-in); `url`: the base URL of a provider with none. */
+export function startCheck(s: PayState, id: string, key: string | undefined, check: ProviderCheck | null, url?: string): { s: PayState; cmd: AppCmd } {
+  const cmd: AppCmd = { cmd: 'provider_use', id, ...(key !== undefined ? { key } : {}), ...(url !== undefined && url !== '' ? { base_url: url } : {}) };
+  // a check sent from the key field (a pasted key, a URL) shows on its step (the failure under its fields); else the check's
+  const field = key !== undefined || (url !== undefined && url !== '');
+  return { s: { ...s, signing: null, sent: { id, base: check }, view: field ? { t: 'key', id } : { t: 'check', id } }, cmd };
+}
+
+/** What the key field sends: its key (blank: the key found, when there is one) and its URL (a provider with none). Null: nothing to check yet. Pure. */
+export function keyFieldSend(acc: Account | undefined, key: string, url: string): { key: string | undefined; url: string | undefined } | null {
+  const k = key.trim();
+  const u = url.trim();
+  if (acc?.needs_url === true && u === '') return null;
+  if (k === '' && acc?.from == null) return null;
+  return { key: k === '' ? undefined : k, url: acc?.needs_url === true ? u : undefined };
 }
 
 /** The sign-in he started ended signed in (the core's accounts): its check, once. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Account } from '@/proto';
 import { failedWords, keyField, type ProviderCheck } from '@/settings';
-import { afterSignIn, keyProviders, PAY_START, phase, pickRow, ready, rows, upOf, startCheck } from './pay';
+import { afterSignIn, keyFieldSend, keyProviders, PAY_START, phase, pickRow, ready, rows, upOf, startCheck } from './pay';
 
 const acc = (id: string, kind: 'key' | 'subscription', extra: Partial<Account> = {}): Account => ({ id, label: id, kind, state: 'signed_out', provider: id, ...extra });
 const ACCOUNTS: Account[] = [
@@ -77,5 +77,21 @@ describe('the live check in words (settings/keycheck.ts)', () => {
     expect(failedWords(check('failed', { why: 'no_credit', url: 'https://bill.test' }), null, false)).toMatchObject({ line: 'the key works, but your Anthropic account has no credit yet.', fix: { url: 'https://bill.test' } });
     expect(failedWords(check('failed', { why: 'unreachable', said: 'connection refused' }), null, false).line).toBe("i couldn't reach Anthropic: connection refused.");
     expect(failedWords(check('failed', { why: 'model' }), null, false).line).toBe("Anthropic doesn't know claude-opus-5-5. pick another model.");
+  });
+
+  it("a found key with no base URL (Isidor's foundry proxy) opens its field for the URL; the URL rides with the check", () => {
+    const foundry = acc('foundry', 'key', { label: 'Anthropic (foundry proxy)', needs_url: true, from: { t: 'env', var: 'ANTHROPIC_FOUNDRY_API_KEY' } });
+    const f = pickRow(PAY_START, { t: 'found', acc: foundry }, null);
+    expect(f.cmd).toBeNull();
+    expect(f.s.view).toEqual({ t: 'key', id: 'foundry' });
+    // no URL: nothing to check yet; the found key needs no paste
+    expect(keyFieldSend(foundry, '', '')).toBeNull();
+    expect(keyFieldSend(foundry, '', ' https://proxy.test ')).toEqual({ key: undefined, url: 'https://proxy.test' });
+    const r = startCheck(PAY_START, 'foundry', undefined, null, 'https://proxy.test');
+    expect(r.cmd).toEqual({ cmd: 'provider_use', id: 'foundry', base_url: 'https://proxy.test' });
+    expect(r.s.view).toEqual({ t: 'key', id: 'foundry' });
+    // a provider with a URL: the key alone, never a URL; no key found and none pasted: nothing
+    expect(keyFieldSend(acct(1), 'sk-1', 'https://x.test')).toEqual({ key: 'sk-1', url: undefined });
+    expect(keyFieldSend(acct(1), '  ', '')).toBeNull();
   });
 });

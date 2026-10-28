@@ -87,7 +87,13 @@ keys_url?: string,
  * a key of a coding plan (GLM, Kimi, MiniMax): the first run lists
  * them under their own row
  */
-coding?: boolean, };
+coding?: boolean, 
+/**
+ * its provider has no base URL (none built in, none in config.toml,
+ * the env or a .env: the foundry proxy): the key field asks for it
+ * too, and `provider_use` carries it
+ */
+needs_url?: boolean, };
 
 /**
  * Where a provider's key was found (bise_catalog::auth::From).

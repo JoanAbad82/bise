@@ -309,13 +309,13 @@ impl Core {
 
     /// `provider_use` (firstkey.rs): `checking` at once, the check on
     /// its own thread, its end on the tick ([`Self::on_used`]).
-    fn provider_use(&mut self, id: String, key: Option<String>) {
+    fn provider_use(&mut self, id: String, key: Option<String>, base_url: Option<String>) {
         let Some(s) = self.setup.as_mut() else { return };
         s.use_seq += 1;
         let seq = s.use_seq;
         s.using.insert(id.clone(), (seq, Instant::now()));
         let pasted = key.is_some();
-        let (name, model) = (s.ports.provider_use)(&id, key, seq, s.tx.clone());
+        let (name, model) = (s.ports.provider_use)(&id, key, base_url, seq, s.tx.clone());
         self.emit(provider_check(&id, &name, CheckState::Checking, &model, pasted, None));
     }
 
@@ -372,8 +372,8 @@ impl Core {
                 }
                 ("prefs_set", res)
             }
-            AppCmd::ProviderUse { id, key } => {
-                self.provider_use(id, key);
+            AppCmd::ProviderUse { id, key, base_url } => {
+                self.provider_use(id, key, base_url);
                 return;
             }
             AppCmd::Keychain { to } => ("keychain", self.keychain(to)),

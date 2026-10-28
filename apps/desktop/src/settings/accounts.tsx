@@ -3,11 +3,12 @@
 // The core owns them (`accounts` event; sign_in opens his browser, only on
 // his click; provider_use checks a key live and saves it once it works; it never comes back in an event).
 // Owner: amb-home.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
 import { Act, AppIcon, Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
 import { common, settings } from '@/proto/words.gen';
 import { failedWords, keyField, type ProviderCheck, type Sent } from './keycheck';
+import { keyFieldSend } from '@/setup/pay';
 
 /**
  * The expired ChatGPT sign-in (bar V14 / S28 / L2): the agents its expiry stopped (the hub's
@@ -64,6 +65,9 @@ export function Accounts({ accounts, send, check = null, want = null, signin = n
   const [closedFor, setClosedFor] = useState<Want | null>(null);
   const wantKey = want !== null ? accounts.find((a) => a.kind === 'key' && ofProvider(a, want.provider) && a.state !== 'signed_in') : undefined;
   const keyFor = picked ?? (wantKey !== undefined && closedFor !== want ? wantKey.id : null);
+  const keyAcc = keyFor !== null ? accounts.find((a) => a.id === keyFor) : undefined;
+  const keyRef = useRef<HTMLInputElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
   const [bad, setBad] = useState(false);
   // the key he sent: checked live by the core (provider_use), saved only once it works
   const [sent, setSent] = useState<Sent | null>(null);
@@ -182,10 +186,18 @@ export function Accounts({ accounts, send, check = null, want = null, signin = n
       })()}
       {keyFor !== null && (
         <div className="settings-key">
+          {/* a provider with no base URL (the foundry proxy): its URL too, the key found used when the key is blank */}
+          {keyAcc?.needs_url === true && (
+            <>
+              <Help testId="settings.key.url.why">{settings.first_url_why({ provider: keyAcc.label })}</Help>
+              <Field ref={urlRef} autoFocus placeholder={settings.first_url_paste} testId="settings.key.url" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); keyRef.current?.focus(); } }} />
+            </>
+          )}
           <Field
-            autoFocus
+            ref={keyRef}
+            autoFocus={keyAcc?.needs_url !== true}
             type="password"
-            placeholder={settings.key_paste}
+            placeholder={keyAcc?.from != null ? settings.first_key_found : settings.key_paste}
             state={bad || field === 'refused' ? 'error' : undefined}
             testId="settings.key.field"
             onChange={() => {
@@ -201,13 +213,13 @@ export function Accounts({ accounts, send, check = null, want = null, signin = n
                 if (want !== null) setClosedFor(want);
               } else if (e.key === 'Enter') {
                 e.preventDefault();
-                const k = e.currentTarget.value.trim();
-                if (k === '') {
+                const r = keyFieldSend(keyAcc, e.currentTarget.value, urlRef.current?.value ?? '');
+                if (r === null) {
                   setBad(true);
                   return;
                 }
                 if (field === 'checking') return; // one send per key
-                send({ cmd: 'provider_use', id: keyFor, key: k });
+                send({ cmd: 'provider_use', id: keyFor, ...(r.key !== undefined ? { key: r.key } : {}), ...(r.url !== undefined ? { base_url: r.url } : {}) });
                 setSent({ id: keyFor, base: check });
               }
             }}
