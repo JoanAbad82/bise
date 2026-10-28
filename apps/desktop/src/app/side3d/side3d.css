@@ -1732,8 +1732,10 @@
 :root[data-reduce-motion] .s3-otile[data-landed] .s3-otile-office {
   animation: s3-otile-land 120ms ease-out;
 }
-/* the office's corner chips inside the tile (designer m_46580): the bims head's map chip (--c-bg, a
-   1 px line, r 6), 8 in from the corners; the map chip on hover at every height, as ⤢ and × */
+/* the office's corner chips inside the tile (designer m_46580): 8 in from the corners; the map chip
+   on hover at every height, as ⤢ and ×. Readable on any map, light or dark (his m_49110): the
+   window's solid at 92 % blurred over the floor, a strong 1 px ring and a short drop, r 6; its words
+   text-2, text on the chip's own hover or while its menu shows */
 .s3-otile .bims-mapsel {
   left: var(--s-2);
   bottom: var(--s-2);
@@ -1752,7 +1754,18 @@
 .s3-otile .b-ptrig.bims-chip,
 .s3-otile .b-ptrig.bims-chip:hover,
 .s3-otile .b-ptrig.bims-chip[aria-expanded='true'] {
-  background: var(--c-bg);
-  box-shadow: inset 0 0 0 1px var(--c-line);
+  background: color-mix(in srgb, var(--c-solid) 92%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 0 0 1px var(--c-line-strong),
+    0 1px 3px var(--c-shadow);
   border-radius: var(--r-1);
+}
+.s3-otile .bims-chip {
+  color: var(--c-text-2);
+}
+.s3-otile .bims-chip:hover,
+.s3-otile .b-ptrig.bims-chip[aria-expanded='true'] {
+  color: var(--c-text);
 }

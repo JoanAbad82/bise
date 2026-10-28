@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { arrowRules, classesOf, cssClasses, drawnScrollbars, handRules, looseSpacing, menuDrawn, offGridTokens, offScaleText, plainClicks, rawControls, smallText } from './lint';
+import { arrowRules, classesOf, colorRolesDefined, colorRolesRead, cssClasses, drawnScrollbars, handRules, looseSpacing, menuDrawn, offGridTokens, offScaleText, plainClicks, rawControls, smallText } from './lint';
 import { PENDING_CLASSES, PENDING_RAW, PENDING_SMALL_TEXT } from './lint.pending';
 import { PENDING_HAND, PENDING_SCROLLBAR, PENDING_SPACING, PENDING_TYPE } from './spacing.pending';
 
@@ -221,6 +221,19 @@ describe("macOS's overlay scrollbars (page native-mac §11)", () => {
 
   it('no stylesheet draws more scrollbars than when the rule came in (PENDING_SCROLLBAR, a ratchet)', () => {
     expect(ratchet(PENDING_SCROLLBAR, (css) => drawnScrollbars(css).length), 'a drawn scrollbar takes room: leave it to macOS (ds/css/base.css)').toEqual([]);
+  });
+});
+
+describe('the colour roles (ds/tokens.css)', () => {
+  it('reads the colour roles a sheet reads and the ones a file defines', () => {
+    expect(colorRolesRead('/* var(--c-no) */ .a{color:var(--c-text);background:var(--c-x, red);border-color:var( --c-line )}')).toEqual(['--c-text', '--c-line']);
+    expect(colorRolesDefined(":root{--c-text: #000; --c-line:red} el.style.setProperty('--c-tint', x); style={{ \"--c-ring\": y }}")).toEqual(['--c-text', '--c-line', '--c-tint', '--c-ring']);
+  });
+
+  it('every colour role a stylesheet reads is defined somewhere (an undefined one paints nothing: his m_49110)', () => {
+    const defined = new Set(files.filter((f) => /\.(css|tsx?)$/.test(f)).flatMap((p) => colorRolesDefined(readFileSync(p, 'utf8'))));
+    const missing = files.filter((f) => f.endsWith('.css')).flatMap((p) => colorRolesRead(readFileSync(p, 'utf8')).filter((c) => !defined.has(c)).map((c) => `${rel(p)}: ${c}`));
+    expect([...new Set(missing)], 'a colour role nobody defines: use one of ds/tokens.css').toEqual([]);
   });
 });
 

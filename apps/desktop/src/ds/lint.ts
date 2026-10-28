@@ -282,6 +282,20 @@ export function drawnScrollbars(css: string): string[] {
 }
 
 /**
+ * The colour roles a stylesheet reads with no fallback (`var(--c-x)`, never `var(--c-x, y)`): an
+ * undefined one paints nothing (the tile's chips had no background, his m_49110). Pure.
+ */
+export function colorRolesRead(css: string): string[] {
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  return [...body.matchAll(/var\(\s*(--c-[\w-]+)\s*\)/g)].map((m) => m[1] ?? "");
+}
+
+/** The colour roles a file defines: `--c-x:` in a stylesheet, `'--c-x'` set from a script. Pure. */
+export function colorRolesDefined(src: string): string[] {
+  return [...src.matchAll(/(--c-[\w-]+)\s*:|['"](--c-[\w-]+)['"]/g)].map((m) => m[1] ?? m[2] ?? "");
+}
+
+/**
  * The length tokens of tokens.css off the 4 px grid (designer's rule: every size is a 4 px step):
  * a custom property whose whole value is one px length that is not a multiple of 4. Radii
  * (--r-*: macOS's 6, 10, 22) and the 1 px of a stroke are the rule's own. Pure.
