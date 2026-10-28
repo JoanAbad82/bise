@@ -42,6 +42,9 @@ pub enum AppCmd {
         land: Option<bool>,
     },
     ProjectRemove { project: Project },
+    /// `order`: the 0-based index in the registry's list, 0 = first after
+    /// home; past the end = last (bise_home::projects::move_to; architect
+    /// m_49117)
     ProjectMove { project: Project, order: u32 },
     ProjectRename { project: Project, name: String },
     /// one preference by its dotted key (`quiet.call`)

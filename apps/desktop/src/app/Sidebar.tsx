@@ -9,7 +9,8 @@
 // inbox pill or its age, one plain sentence and its week's day bars, a quiet one on one line; ⌘
 // held, its ⌘1-9 digit: siderows.ts and projectfacts.ts decide, this draws; the project he looks at is
 // marked seen (seen.ts), and a row with an entry for him he hasn't seen has the unread dot after its
-// name (proj-unread). Its head stays, its list scrolls;
+// name (proj-unread). A project row dragged up or down (or ⌥⌘↑ ⌥⌘↓) moves it in his order, the
+// core's (sidedrag.ts, his m_49107). Its head stays, its list scrolls;
 // a right click on a pin or a project opens its menu (useEntityMenu, nm-menus'). On the artifacts
 // library page (decision d2) it shows '← Projects' and the library (artifacts' ArtLibrary) at the
 // same width, a 160 ms crossfade; an artifact open in a panel keeps the projects (sideshows.ts says
@@ -17,7 +18,7 @@
 //
 // Each project row and each pin read their own project's agents (useAgents): an event re-renders
 // the row it touches, never the sidebar, and a thread's entries never do.
-import { memo, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { AppIcon, Input, tipAttrs, type AppIconName, Press } from '@/ds';
 import { reducedMotion } from '@/ds/hooks';
 import type { ProjectRow } from '@/proto';
@@ -45,6 +46,7 @@ import { useNow } from './clock';
 import { useSpring, type SpringRow } from './spring';
 import { projects } from '@/proto/words_projects.gen';
 import { waitsTip } from './tipwords';
+import { DRAG_ATTR, dropMark, useProjectDrag } from './sidedrag';
 
 /** What waits on him, one number everywhere: the inbox's own list (designer m_25690). */
 export function useWaitingTotal(): number {
@@ -128,8 +130,14 @@ function ProjectEnd({ facts, digit, testId }: { facts: ProjectFacts; digit: numb
  * height, busy or not (his m_48450, designer m_48464): a quiet one is its name in text-2, its last
  * news (else 'all quiet') and its week, flat stubs while unknown. No icon, no mark, no border: the words say it, the tip says it all.
  */
-function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, spring, testId }: {
+function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, spring, index, lift, drop, testId }: {
   name: string;
+  /** its place in the list, the drag's handle on it (sidedrag.ts) */
+  index: number;
+  /** dragged: how far it follows the pointer (px) */
+  lift: number | undefined;
+  /** the drop line, before or after it */
+  drop: 'before' | 'after' | undefined;
   facts: ProjectFacts;
   on: boolean;
   /** the week's bars name their days from it */
@@ -150,6 +158,10 @@ function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, s
       onContextMenu={onContextMenu}
       {...spring.drag}
       data-spring={spring.spring ?? undefined}
+      {...{ [DRAG_ATTR]: index }}
+      data-lifted={lift !== undefined || undefined}
+      data-drop={drop}
+      style={lift === undefined ? undefined : { transform: `translateY(${String(lift)}px)` }}
       data-testid={testId}
     >
       <span className="app-s-l1">
@@ -299,13 +311,23 @@ function LibraryList() {
 
 function ProjectList() {
   const rows = useProjects();
+  const store = useStore();
   const pins = usePinned();
   // ⌘ held: each project row shows its ⌘1-9 (keys.ts opens it), the held hints' delay (held.ts)
   const cmd = useModHeld('Meta');
   const route = useRoute();
   // where he was in a long sidebar comes back after a reload (keep.ts)
   useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.side.list"]'));
-  const list = projectsOf(rows);
+  // kept while the core's rows stay: the drag's held order waits for them to change (sidedrag.ts)
+  const ordered = useMemo(() => projectsOf(rows), [rows]);
+  const root = useRef<HTMLDivElement>(null);
+  const move = useCallback(
+    (project: string, at: number) => {
+      store.command({ cmd: 'project_move', project, order: at });
+    },
+    [store],
+  );
+  const { shown: list, drag, handlers } = useProjectDrag(ordered, root, move);
   const here = projectOf(route);
   // the project he looks at (its main at its newest row, the window in front): its news, artifacts
   // and unread are seen, and its row counts nothing new while he looks (seen.ts)
@@ -315,13 +337,23 @@ function ProjectList() {
   const seen = (project: string): number | undefined => (project === looked ? Infinity : seenOf(project));
   const now = useNow();
   return (
-    <div className="app-s-list" data-testid="app.side.list">
+    <div ref={root} className="app-s-list" data-testid="app.side.list" data-drag={drag !== null || undefined} {...handlers}>
       {pins.length > 0 && <PinnedList pins={pins} />}
       <Label testId="app.side.label.projects" end={<AddProject />}>
         {frame.projects}
       </Label>
       {list.map((p, i) => (
-        <ProjectItem key={p.project} p={p} index={i} on={p.project === here} cmd={cmd} seen={seen(p.project)} now={now} />
+        <ProjectItem
+          key={p.project}
+          p={p}
+          index={i}
+          on={p.project === here}
+          cmd={cmd}
+          seen={seen(p.project)}
+          now={now}
+          lift={drag?.from === i ? drag.dy : undefined}
+          drop={dropMark(drag, i, list.length)}
+        />
       ))}
     </div>
   );
@@ -406,7 +438,18 @@ function AddProject() {
 }
 
 /** One project's row: it reads its own agents and its waiting count, so an event re-renders it alone. */
-const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now }: { p: ProjectRow; index: number; on: boolean; cmd: boolean; seen: number | undefined; now: number }) {
+const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now, lift, drop }: {
+  p: ProjectRow;
+  index: number;
+  on: boolean;
+  cmd: boolean;
+  seen: number | undefined;
+  now: number;
+  /** dragged: how far it follows the pointer (px) */
+  lift: number | undefined;
+  /** the drop line, before or after it */
+  drop: 'before' | 'after' | undefined;
+}) {
   const store = useStore();
   const router = useRouter();
   const agents = useAgents(p.project);
@@ -469,6 +512,9 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now }: 
       onClick={go}
       onContextMenu={menu.onContextMenu}
       spring={spring}
+      index={index}
+      lift={lift}
+      drop={drop}
       testId={id}
     />
   );

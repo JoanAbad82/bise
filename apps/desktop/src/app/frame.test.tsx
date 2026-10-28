@@ -347,6 +347,55 @@ describe('the sidebar', () => {
     expect(v.queryByTestId(`app.side.project.${ACME}.rename.field`)).toBeNull();
   });
 
+  // his m_49107: drag a project up to put it first. Mutations: the drop's old 1-based `at + 1`
+  // (settings/projectRows movedTo) sends order 1; no click guard opens docs on the drop.
+  it('a project dragged above another moves there: the core is told its index, the list shows it at once, nothing opens', () => {
+    const sent: unknown[] = [];
+    const { v, router, store } = frame({ screen: 'bise' }, [agent('main')], sent);
+    const id = (p: string) => `app.side.project.${p}`;
+    const order = () => [...v.getByTestId('app.side.list').querySelectorAll('[data-drag-i]')].map((e) => e.getAttribute('data-testid'));
+    // rows 56 tall, 4 apart: acme's middle at 28, docs' at 88
+    for (const [i, p] of [ACME, DOCS].entries()) v.getByTestId(id(p)).getBoundingClientRect = () => ({ top: i * 60, height: 56, bottom: i * 60 + 56, left: 0, right: 240, width: 240, x: 0, y: i * 60, toJSON: () => null });
+    const docs = v.getByTestId(id(DOCS));
+    fireEvent.pointerDown(docs, { button: 0, clientY: 88, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientY: 60, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientY: 10, pointerId: 1 });
+    expect(docs.hasAttribute('data-lifted')).toBe(true);
+    expect(v.getByTestId(id(ACME)).getAttribute('data-drop')).toBe('before');
+    fireEvent.pointerUp(window, { clientY: 10, pointerId: 1 });
+    fireEvent.click(docs);
+    expect(sent).toContainEqual({ cmd: 'project_move', project: DOCS, order: 0 });
+    expect(router.get()).toEqual({ screen: 'bise' });
+    expect(order()).toEqual([id(DOCS), id(ACME)]);
+    // the core's projects say it: they stay in that order
+    act(() => {
+      store.apply(projectsEv(row({ project: HOME, name: 'bise', home: true }), row({ project: DOCS, name: 'docs', order: 1 }), row({ project: ACME, name: 'acme', order: 2 })));
+    });
+    expect(order()).toEqual([id(DOCS), id(ACME)]);
+    // a press that never travels is a click: it opens its project
+    fireEvent.pointerDown(v.getByTestId(id(ACME)), { button: 0, clientY: 88, pointerId: 2 });
+    fireEvent.pointerUp(window, { clientY: 89, pointerId: 2 });
+    fireEvent.click(v.getByTestId(id(ACME)));
+    expect(router.get()).toEqual({ screen: 'thread', project: ACME, agent: 'main' });
+  });
+
+  it('⌥⌘↓ on a focused project moves it down one; esc mid-drag puts it back and sends nothing', () => {
+    const sent: unknown[] = [];
+    const { v } = frame({ screen: 'bise' }, [agent('main')], sent);
+    const acme = v.getByTestId(`app.side.project.${ACME}`);
+    fireEvent.keyDown(acme, { key: 'ArrowDown', metaKey: true, altKey: true });
+    expect(sent).toContainEqual({ cmd: 'project_move', project: ACME, order: 1 });
+    const n = sent.length;
+    const docs = v.getByTestId(`app.side.project.${ACME}`);
+    fireEvent.pointerDown(docs, { button: 0, clientY: 88, pointerId: 3 });
+    fireEvent.pointerMove(window, { clientY: 10, pointerId: 3 });
+    expect(docs.hasAttribute('data-lifted')).toBe(true);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(docs.hasAttribute('data-lifted')).toBe(false);
+    fireEvent.pointerUp(window, { clientY: 10, pointerId: 3 });
+    expect(sent.length).toBe(n);
+  });
+
   it("on artifacts: '← Projects' and the library in the projects' place", () => {
     const { v } = frame({ screen: 'artifacts', project: '' }, [agent('main')]);
     expect(v.getByTestId('app.side.back')).toBeTruthy();

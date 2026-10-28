@@ -395,6 +395,43 @@ body:has(.app-shell) {
 .app-s-row.project.quiet .app-s-l1 {
   color: var(--c-text-2);
 }
+/* reordered by hand (his m_49107, sidedrag.ts): the dragged row lifts (raised, e-2) and follows the
+   pointer; the others lose their hover; a 2 px ink line in the 4 px gap marks where it lands, as
+   settings › projects' (designer m_41841) */
+.app-s-row.project {
+  position: relative;
+  user-select: none;
+}
+.app-s-list[data-drag] {
+  cursor: grabbing;
+}
+.app-s-list[data-drag] .app-s-row.project:not([data-lifted]) {
+  background: transparent;
+}
+.app-s-list[data-drag] .app-s-row.project.on:not([data-lifted]) {
+  background: var(--c-active);
+}
+.app-s-row.project[data-lifted] {
+  z-index: 1;
+  background: linear-gradient(var(--c-raised), var(--c-raised)), var(--c-solid);
+  box-shadow: var(--e-2);
+  cursor: grabbing;
+}
+.app-s-row.project[data-drop]::before {
+  content: '';
+  position: absolute;
+  left: var(--s-2);
+  right: var(--s-2);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--c-ink);
+}
+.app-s-row.project[data-drop='before']::before {
+  top: calc(-1px - var(--s-1) / 2);
+}
+.app-s-row.project[data-drop='after']::before {
+  bottom: calc(-1px - var(--s-1) / 2);
+}
 /* spring-loaded (designer m_47386, app/spring.ts): a file dragged over a project's row takes the
    selection tint (a drop target, not a passing hover); at the delay's end two blinks, tint off
    100 ms / on 100 ms twice, then the project opens. No accent, no ring */

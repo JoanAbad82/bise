@@ -53,7 +53,7 @@ export function Projects({ projects, ports, home }: { projects: readonly Project
   };
   const step = (i: number, by: number) => {
     const p = ps[i];
-    if (p !== undefined && i + by >= 0 && i + by < ps.length) move(p, i + 1 + by);
+    if (p !== undefined && i + by >= 0 && i + by < ps.length) move(p, i + by);
   };
 
   // esc while dragging puts the row back
