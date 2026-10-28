@@ -38,6 +38,39 @@ function px(name: string): number {
   return ref !== null ? px(ref[1] ?? '') : Number.parseFloat(v);
 }
 
+/** A rule's declarations, or none when no rule names `sel`. */
+function ruleOr(css: string, sel: string): Map<string, string> {
+  try {
+    return rule(css, sel);
+  } catch {
+    return new Map();
+  }
+}
+
+/** A length: a px or a var() of a token. */
+function len(v: string): number {
+  const ref = /^var\((--[\w-]+)\)$/u.exec(v.trim());
+  return ref !== null ? px(ref[1] ?? '') : Number.parseFloat(v);
+}
+
+/** One settings row with a control of `control` px laid out on one flex line in a `card` px wide
+ * group, from the ds rules (the row's padding, its label's flex and cap, the gap between them): the
+ * control's right edge and the card's inner right edge. */
+function controlBox(card: number, control: number): { right: number; inner: number } {
+  const row = new Map([...rule(dsCss, '.b-settings .b-gi'), ...ruleOr(dsCss, '.b-settings .b-gi:has(>.l+*)')]);
+  const label = new Map([...rule(dsCss, '.b-settings .b-gi>.l'), ...ruleOr(dsCss, '.b-settings .b-gi:has(>.l+*)>.l')]);
+  const [, padX = '0'] = (row.get('padding') ?? '0').split(/\s+/u);
+  const pad = len(padX);
+  const gap = len(row.get('column-gap') ?? row.get('gap') ?? '0');
+  const [grow = '0', , basis = '0'] = (label.get('flex') ?? '0 1 auto').split(/\s+/u);
+  const cap = label.has('max-width') ? len(label.get('max-width') ?? '') : Infinity;
+  const inner = card - pad;
+  const free = card - 2 * pad - gap - control - len(basis);
+  expect(free).toBeGreaterThanOrEqual(0); // one line: the control fits after the label's 240
+  const labelW = Math.min(len(basis) + (Number(grow) > 0 ? free : 0), cap);
+  return { right: pad + labelW + gap + control, inner };
+}
+
 describe('a settings row', () => {
   it('never squeezes its label: it keeps 240 at least, and a wider control wraps under it', () => {
     expect(rule(dsCss, '.b-settings .b-gi').get('flex-wrap')).toBe('wrap');
@@ -48,10 +81,16 @@ describe('a settings row', () => {
     expect(rule(dsCss, '.b-settings .b-gi>.v').get('text-overflow')).toBe('ellipsis');
   });
 
-  it('with any control, is two columns: the label 240 to 320, the control 16 after it (designer m_48077, m_48146)', () => {
+  // Gabriel m_49566 (settings-align): on fn's privacy pane the toggles, the 1/7/30 days picker and
+  // 'Add…' stood in a column mid-card. Every pane's rows are the ds Group's .b-gi, so one row laid
+  // out from these rules is every row: a toggle, a picker and a button in a narrow and a wide card.
+  it("with any control, ends the control on the card's inner right edge, 16 at least after its label", () => {
     expect(rule(dsCss, '.b-settings .b-gi:has(>.l+*)').get('column-gap')).toBe('var(--s-4)');
-    expect(rule(dsCss, '.b-settings .b-gi:has(>.l+*)>.l').get('max-width')).toBe('var(--w-setting-label-max)');
-    expect(px('--w-setting-label-max')).toBe(320);
+    for (const card of [640, px('--w-settings-page') - 2 * px('--s-6')])
+      for (const control of [px('--w-switch'), 110, 330]) {
+        const { right, inner } = controlBox(card, control);
+        expect({ card, control, right }).toEqual({ card, control, right: inner });
+      }
   });
 
   it("a role's model and its efforts wrap between them when the row has no room", () => {
