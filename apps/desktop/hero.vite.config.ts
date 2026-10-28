@@ -19,7 +19,9 @@ const ENTRY_BUDGET = 6 * 1024;
 // 260 until the cozy offices (bims-cozy 39b0e932c: every map's base pieces, +12 KB gzip): far under
 // designer's ceiling of 1.5 MB all in (m_30837); the next step down is loading only the film's maps.
 // 290 since main grew 279 -> 284.5 KB with the workshop pods, town light and town paths (main m_35420)
-const FILM_BUDGET = 290 * 1024;
+// 292 since main grew to 290.2 KB over 36 bims commits since the last hero build (a54eed3f2: the
+// standing bims' life, idle moves, the closed jacket, the hands on the keys; bim-3d, the bise.dev deploy of his m_49096)
+const FILM_BUDGET = 292 * 1024;
 /** the home islands' own chunk on top of film.js (designer's brief, bims-home v11: 40 KB gzip at most) */
 const ISLANDS_BUDGET = 40 * 1024;
 
