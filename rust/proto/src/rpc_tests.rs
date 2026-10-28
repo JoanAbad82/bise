@@ -330,3 +330,36 @@ fn a_removed_field_with_data_is_refused_by_name() {
         assert!(crate::hub::HubCmd::TAGS.contains(&r.cmd), "{}: not a hub command", r.cmd);
     }
 }
+
+/// A retired tag or method (bise_proto::RETIRED, architect m_48959) is
+/// never reused: no retired tag is in its kind's TAGS, no retired method
+/// is a method; a retired tag reads as `Unknown`. A retired method is
+/// refused by name with the removed field's words, reason
+/// `retired_method`; a method that never existed is still not-found.
+#[test]
+fn a_retired_tag_reads_as_unknown_and_a_retired_method_is_refused_by_name() {
+    use crate::{RetiredKind, RETIRED};
+    for r in RETIRED {
+        let (kind, tag) = (r.kind, r.tag);
+        match kind {
+            RetiredKind::HubEv => {
+                assert!(!HubEv::TAGS.contains(&tag), "{tag}: retired but a hub event");
+                let e = HubEv::from_value(serde_json::json!({"ev": tag, "project": "p"})).unwrap();
+                assert!(matches!(e, HubEv::Unknown { .. }), "{tag}: {e:?}");
+            }
+            RetiredKind::HubCmd => {
+                assert!(!HubCmd::TAGS.contains(&tag), "{tag}: retired but a hub command");
+                let c = HubCmd::from_value(serde_json::json!({"cmd": tag, "project": "p"})).unwrap();
+                assert!(matches!(c, HubCmd::Unknown { .. }), "{tag}: {c:?}");
+            }
+            RetiredKind::RpcMethod => {
+                assert!(method_row(tag).is_none(), "{tag}: retired but a method");
+                let e = cmd(tag, serde_json::json!({"project": "p"})).unwrap_err();
+                assert_eq!((e.code, e.message.as_str()), (code::HUB_REFUSED, crate::words::common::removed_field), "{tag}");
+                let d = e.data.unwrap();
+                assert_eq!((d.reason.as_deref(), d.field.as_deref()), (Some("retired_method"), Some(tag)));
+            }
+        }
+    }
+    assert_eq!(cmd("never/was", serde_json::json!({})).unwrap_err().code, code::METHOD_NOT_FOUND);
+}

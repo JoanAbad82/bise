@@ -93,8 +93,9 @@ pub struct ErrorData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     /// reason `removed_field`: the field an older app's command carried
-    /// that bise no longer reads (crate::REMOVED), for its log and a
-    /// support question; never in what he reads
+    /// that bise no longer reads (crate::REMOVED); reason
+    /// `retired_method`: the method it called (crate::RETIRED). For its
+    /// log and a support question; never in what he reads
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
 }
@@ -130,6 +131,13 @@ impl RpcError {
     /// words, reason `removed_field`, the field in the detail.
     pub fn removed(r: &crate::Removed) -> RpcError {
         let data = ErrorData { kind: None, reason: Some("removed_field".into()), field: Some(r.field.into()) };
+        RpcError { code: code::HUB_REFUSED, message: crate::words::common::removed_field.into(), data: Some(data) }
+    }
+
+    /// A method bise retired (crate::RETIRED): the same words as a
+    /// removed field, reason `retired_method`, the method in the detail.
+    pub fn retired(r: &crate::Retired) -> RpcError {
+        let data = ErrorData { kind: None, reason: Some("retired_method".into()), field: Some(r.tag.into()) };
         RpcError { code: code::HUB_REFUSED, message: crate::words::common::removed_field.into(), data: Some(data) }
     }
 

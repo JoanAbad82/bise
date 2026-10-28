@@ -312,8 +312,9 @@ def worktree_round(c, E):
         port = srv["ports"][0]
         check(srv["url"] == "http://127.0.0.1:%d" % port and srv["name"] == "http server" and srv["state"] == {"is": "running"}
               and srv["kind"] == {"is": "bg", "n": 9} and srv["id"].startswith("bg9.") and srv["pid"] == server.pid, "t5's server: %r" % srv)
-        # an older desktop's Environments screen: answered, empty (shim dev-servers)
-        check(ok(req(c, "devServers/list"), "devServers/list")["items"] == [], "devServers/list is empty")
+        # an older desktop's Environments screen: refused by name (bise_proto::RETIRED)
+        e = refused(req(c, "devServers/list"), "devServers/list")
+        check(e["data"] == {"reason": "retired_method", "field": "devServers/list"}, "devServers/list is retired: %r" % e)
     finally:
         os.killpg(server.pid, signal.SIGTERM)
         server.wait(timeout=10)

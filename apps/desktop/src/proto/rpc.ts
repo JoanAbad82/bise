@@ -36,8 +36,9 @@ export type ErrorData = { kind?: ErrorKind | null,
 reason?: string | null, 
 /**
  * reason `removed_field`: the field an older app's command carried
- * that bise no longer reads (crate::REMOVED), for its log and a
- * support question; never in what he reads
+ * that bise no longer reads (crate::REMOVED); reason
+ * `retired_method`: the method it called (crate::RETIRED). For its
+ * log and a support question; never in what he reads
  */
 field?: string | null, };
 

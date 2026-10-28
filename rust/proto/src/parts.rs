@@ -373,28 +373,6 @@ pub fn page_of(parts: &[Part]) -> Option<PageSaid<'_>> {
     })
 }
 
-/// `parts` with each page note typed (card-image-parts, architect
-/// m_35268): a note an older hub wrote, his answer's images rendered as
-/// markers in its text and no parts, gets its parts read back from that
-/// text (`parse`) and its text becomes his words alone, so every client
-/// draws chips, never a tag. A note with parts, or a plain one, is kept.
-/// The fold's one read of a page part (the only copy of this fallback).
-// TODO(page-note-markers): goes in a later release, once no stored
-// message has a page note with an image marker in its text
-pub fn typed_page_notes(mut parts: Vec<Part>) -> Vec<Part> {
-    for p in &mut parts {
-        let Part::Page { notes, .. } = p else { continue };
-        for n in notes.iter_mut().filter(|n| n.parts.is_empty()) {
-            let read = of_text(&n.text);
-            if read.iter().any(|q| matches!(q, Part::Image { .. })) {
-                n.text = words(&read).trim().to_string();
-                n.parts = read;
-            }
-        }
-    }
-    parts
-}
-
 /// [`page_of`]'s view of a page part.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PageSaid<'a> {
@@ -810,6 +788,28 @@ pub fn of_text(text: &str) -> Vec<Part> {
         true => Vec::new(),
         false => parts,
     }
+}
+
+/// `parts` with each page note typed (card-image-parts, architect
+/// m_35268): a note an older hub stored, his answer's images rendered as
+/// markers in its text and no parts, gets its parts read back from that
+/// text ([`of_text`]) and its text becomes his words alone, so every
+/// client draws chips, never a tag. A note with parts, or a plain one, is
+/// kept. Part of the old-text reader, never a shim: stored transcripts
+/// keep those notes forever (architect m_48962). The fold's one read of a
+/// page part.
+pub fn typed_page_notes(mut parts: Vec<Part>) -> Vec<Part> {
+    for p in &mut parts {
+        let Part::Page { notes, .. } = p else { continue };
+        for n in notes.iter_mut().filter(|n| n.parts.is_empty()) {
+            let read = of_text(&n.text);
+            if read.iter().any(|q| matches!(q, Part::Image { .. })) {
+                n.text = words(&read).trim().to_string();
+                n.parts = read;
+            }
+        }
+    }
+    parts
 }
 
 /// His words: the text parts, the pastes and images as nothing (the

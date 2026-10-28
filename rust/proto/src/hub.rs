@@ -8,7 +8,7 @@ use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult, DiffView};
 use crate::ops::{BranchRow, ReleaseEv, UpdateEv, VersionItem};
 use crate::parts::Part;
-use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, ArtifactMoved, Card, Folder, FolderOp, LibraryProject, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, Proc, ScheduledTask, UsageRow, Worktree};
+use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, ArtifactMoved, Card, Folder, FolderOp, LibraryProject, CheckerKind, Feature, Merged, Model, Place, Pr, Proc, ScheduledTask, UsageRow, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -161,11 +161,6 @@ pub enum HubEv {
     /// the agents change (a turn ends, one comes or goes) and on
     /// `worktrees`
     Worktrees { project: Project, items: Vec<Worktree> },
-    /// the agents' background servers, as an older hub sent them: no hub
-    /// sends it any more (`processes` lists them), a new one answers an
-    /// older desktop's `dev_servers` with an empty list.
-    /// TODO(dev-servers): goes in a later release
-    DevServers { project: Project, items: Vec<DevServer> },
     /// the processes the project's agents left running, then the ones
     /// that ended in the last 24 h (docs/processes.md): on `processes`,
     /// every 2 s while a connection watches the list, and when a running
@@ -364,11 +359,6 @@ pub enum HubEv {
     /// les bims: a message sent or a report made, hub-wide, as it
     /// happens (crate::activity: no body, no text)
     Activity { project: Project, item: crate::activity::ActivityEv },
-    /// an older hub's yes/no question (bar I9: archive a working agent);
-    /// a new hub never sends it, his /archive asks with the 1/2 drop card
-    /// (drop-card), and the clients ignore it. TODO(archive-confirm): goes
-    /// in a later release, through a RETIRED tags table (tests/shims.txt)
-    Confirm { project: Project, id: u64, text: String },
     /// the repo's flow (`config.toml`'s `[flow] mode`), on change; none:
     /// not set
     Flow {
@@ -526,7 +516,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "dev_servers", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "log_body", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "pulse", "bise_update", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "artifacts_moved", "folders", "library", "scheduled", "worktrees", "processes", "proc_out", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "log_body", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "flow", "paused", "switch", "growth", "pulse", "bise_update", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -665,10 +655,6 @@ pub enum HubCmd {
     /// close a card without answering it (the TUI's `/close N`): the
     /// hub's one close path (sb-core's `close`), a refusal as `error`
     Close { project: Project, card: u64 },
-    /// an older client's answer to an older hub's `confirm`; a new hub
-    /// refuses it (no such question). TODO(archive-confirm): goes in a
-    /// later release, through a RETIRED tags table (tests/shims.txt)
-    Confirm { project: Project, id: u64, yes: bool },
     /// the approvals mode (bar V8/W21, the TUI's shift+tab and
     /// `/approvals yolo|auto`): `yolo`, `auto` or `toggle` sets it and
     /// every connection gets `approvals` with `flash`; no mode: this
@@ -762,9 +748,6 @@ pub enum HubCmd {
     Branches { project: Project },
     /// the environments screen opened: `worktrees` comes again
     Worktrees { project: Project },
-    /// an older desktop's environments screen opened: `dev_servers`
-    /// comes, empty (TODO(dev-servers): goes in a later release)
-    DevServers { project: Project },
     /// the processes list asked for: `processes` answers; `watch` true:
     /// it comes again every 2 s (cpu, memory, ports) until `watch` false
     /// or the connection goes; absent: once
@@ -1006,7 +989,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "log_body", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "artifacts_move", "artifacts_folders", "artifacts_library", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "bise_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "log_body", "queued_take", "queued_steer", "diff", "worktrees", "processes", "proc_out", "proc_follow", "proc_stop", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "artifacts_move", "artifacts_folders", "artifacts_library", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "bise_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -1042,7 +1025,6 @@ impl HubCmd {
             | HubCmd::Send { project, .. }
             | HubCmd::Answer { project, .. }
             | HubCmd::Close { project, .. }
-            | HubCmd::Confirm { project, .. }
             | HubCmd::Approvals { project, .. }
             | HubCmd::RemoveRule { project, .. }
             | HubCmd::Stop { project, .. }
@@ -1050,7 +1032,6 @@ impl HubCmd {
             | HubCmd::Unarchive { project, .. }
             | HubCmd::ArtifactsSeen { project, .. }
             | HubCmd::Worktrees { project }
-            | HubCmd::DevServers { project }
             | HubCmd::Processes { project, .. }
             | HubCmd::ProcOut { project, .. }
             | HubCmd::ProcFollow { project, .. }

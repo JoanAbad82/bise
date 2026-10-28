@@ -5,12 +5,14 @@
 //! and the entries its fold made of message lines; today's types read
 //! each one and write it back with every released key and value
 //! unchanged (new keys may come on top), so a field, list or enum value
-//! that changes meaning goes red here. A note's anchor has its own,
+//! that changes meaning goes red here; a line reads as unknown only when
+//! bise retired its tag (bise_proto::RETIRED). A note's anchor has its own,
 //! `anchor_v1.jsonl` (its first version, office-artifacts).
 
 use bise_proto::core_ev::CoreEv;
 use bise_proto::hub::HubEv;
 use bise_proto::thread::{fold, Ctx};
+use bise_proto::RetiredKind;
 use serde_json::Value;
 use std::path::Path;
 
@@ -38,11 +40,18 @@ fn lost(was: &Value, now: &Value, at: &str) -> Option<String> {
     }
 }
 
-fn check<T>(file: &str, decode: impl Fn(&str) -> Result<T, String>, unknown: impl Fn(&T) -> bool, encode: impl Fn(&T) -> Value) {
+/// `unknown`: the tag of a line read as `Unknown`; `retired`: the kind
+/// whose RETIRED tags may read so (bise_proto::RETIRED, architect
+/// m_48959), then not written back. Any other unknown is red.
+fn check<T>(file: &str, decode: impl Fn(&str) -> Result<T, String>, unknown: impl Fn(&T) -> Option<String>, retired: Option<RetiredKind>, encode: impl Fn(&T) -> Value) {
     let mut n = 0;
     for l in lines(file) {
         let m = decode(&l).unwrap_or_else(|e| panic!("{file}: today's types refuse a released line: {e}\n  {l}"));
-        assert!(!unknown(&m), "{file}: a released line reads as unknown: {l}");
+        if let Some(tag) = unknown(&m) {
+            assert!(retired.and_then(|k| bise_proto::retired(k, &tag)).is_some(), "{file}: a released line reads as unknown: {l}");
+            n += 1;
+            continue;
+        }
         let was: Value = serde_json::from_str(&l).unwrap();
         if let Some(d) = lost(&was, &encode(&m), "") {
             panic!("{file}: a released meaning changed ({d}):\n  {l}");
@@ -52,18 +61,27 @@ fn check<T>(file: &str, decode: impl Fn(&str) -> Result<T, String>, unknown: imp
     assert!(n > 20, "{file}: {n} lines");
 }
 
+fn ev_unknown(m: &HubEv) -> Option<String> {
+    match m {
+        HubEv::Unknown { tag, .. } => Some(tag.clone()),
+        _ => None,
+    }
+}
+
+/// A released event bise retired since (`confirm`, `dev_servers`) reads
+/// as unknown; every other one keeps its meaning.
 #[test]
 fn released_hub_events_keep_their_meaning() {
-    check("hub_ev.jsonl", HubEv::decode, |m| matches!(m, HubEv::Unknown { .. }), HubEv::to_value);
+    check("hub_ev.jsonl", HubEv::decode, ev_unknown, Some(RetiredKind::HubEv), HubEv::to_value);
     // v2026.10.2-29 (cut from main before client-protocol merges, its own
     // fixture as it wrote it): tool_out, a tool item's id, an answer's
     // images and files, a scheduled task's name on top of -28's
-    check("hub_ev_v2026.10.2-29.jsonl", HubEv::decode, |m| matches!(m, HubEv::Unknown { .. }), HubEv::to_value);
+    check("hub_ev_v2026.10.2-29.jsonl", HubEv::decode, ev_unknown, Some(RetiredKind::HubEv), HubEv::to_value);
 }
 
 #[test]
 fn released_core_events_keep_their_meaning() {
-    check("core_ev.jsonl", CoreEv::decode, |m| matches!(m, CoreEv::Unknown { .. }), |m| serde_json::to_value(m).expect("encodes"));
+    check("core_ev.jsonl", CoreEv::decode, |m| matches!(m, CoreEv::Unknown { .. }).then(String::new), None, |m| serde_json::to_value(m).expect("encodes"));
 }
 
 /// A message line folds to the entry it did in the released fold (G5's
@@ -148,5 +166,5 @@ fn released_anchors_keep_their_meaning() {
 #[test]
 fn released_sb_requests_keep_their_meaning() {
     use bise_proto::sb::Req;
-    check("sb_req_v2026.10.2-44.jsonl", |l| Req::decode(serde_json::from_str(l).map_err(|e| e.to_string())?), |m| matches!(m, Req::Unknown { .. }), Req::to_value);
+    check("sb_req_v2026.10.2-44.jsonl", |l| Req::decode(serde_json::from_str(l).map_err(|e| e.to_string())?), |m| matches!(m, Req::Unknown { .. }).then(String::new), None, Req::to_value);
 }

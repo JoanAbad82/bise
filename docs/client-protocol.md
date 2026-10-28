@@ -113,8 +113,8 @@ fields are its params, and its scope). Three scopes:
   its fields.
 - **Thread** (`thread/entry`, `thread/typing`): sent to the connections
   subscribed to that thread; the entry's `pos` is its number.
-- **One** (`hub/notice`, `confirm/ask`, `card/open`, `client/focused`):
-  for one connection (a notice, a yes/no question), not numbered.
+- **One** (`hub/notice`, `card/open`, `client/focused`): for one
+  connection (a notice, a card to open), not numbered.
 
 A notification method this client doesn't know (a newer hub) is ignored:
 `rpc::ev` decodes it as `HubEv::Unknown`, never an error.

@@ -415,29 +415,6 @@ by?: string | null,
 at_ms: number, };
 
 /**
- * A server an agent runs in the background (`pnpm dev`, a local
- * grafana): its job listening on a port, or a known server command not
- * listening yet (no port, no url).
- */
-export type DevServer = { agent: string, 
-/**
- * what it is ("dev server", "http server")
- */
-name?: string | null, 
-/**
- * `http://localhost:<port>` once it listens
- */
-url?: string | null, port?: number | null, 
-/**
- * the job's command line
- */
-cmd: string, 
-/**
- * its job runs
- */
-up: boolean, };
-
-/**
  * How the process came to run.
  */
 export type ProcKind = { "is": "bg", n: number, } | { "is": "detached" } | { "is": "unknown" };

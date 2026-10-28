@@ -14,8 +14,6 @@
 {"cmd":"answer","project":"acme-1a2b3c4d","card":10,"reply":"yes"}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":11,"reply":"this one"}
 {"cmd":"close","project":"acme-1a2b3c4d","card":9}
-{"cmd":"confirm","project":"acme-1a2b3c4d","id":3,"yes":true}
-{"cmd":"confirm","project":"acme-1a2b3c4d","id":4,"yes":false}
 {"cmd":"approvals","project":"acme-1a2b3c4d"}
 {"cmd":"approvals","project":"acme-1a2b3c4d","mode":"toggle"}
 {"cmd":"remove_rule","project":"acme-1a2b3c4d","rule":{"tool":"bash","pattern":"cargo test *","project":"/Users/me/acme","added":"1791100000000","from":"card #3, perf"}}
@@ -30,7 +28,6 @@
 {"cmd":"queued_steer","project":"acme-1a2b3c4d","agent":"perf","id":3}
 {"cmd":"diff","project":"acme-1a2b3c4d","agent":"perf","commit":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e"}
 {"cmd":"worktrees","project":"acme-1a2b3c4d"}
-{"cmd":"dev_servers","project":"acme-1a2b3c4d"}
 {"cmd":"processes","project":"acme-1a2b3c4d"}
 {"cmd":"processes","project":"acme-1a2b3c4d","watch":true}
 {"cmd":"proc_out","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100"}

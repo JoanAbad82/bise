@@ -25,7 +25,6 @@ export const TAGS = {
   library: true,
   scheduled: true,
   worktrees: true,
-  dev_servers: true,
   merged: true,
   features: true,
   prs: true,
@@ -47,8 +46,6 @@ export const TAGS = {
   job_end: true,
   followed_end: true,
   activity: true,
-  // an older hub's yes/no, ignored (drop-card): TODO(archive-confirm), goes in a later release
-  confirm: true,
   approvals: true,
   notice: true,
   error: true,

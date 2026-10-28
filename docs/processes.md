@@ -29,8 +29,9 @@ watches); `proc_out {agent, id, from?}` -> `proc_out {at, data (base64),
 end}` (64 KB at most; no `from`: the last 64 KB); `proc_follow {agent, id,
 on}` -> `proc_out` notifications to that connection as the output grows
 (every 200 ms, from the end of its last `proc_out`, so no gap); `proc_stop
-{agent, id | all}`. The app never gets a path. `dev_servers` is retired: an
-older desktop's `devServers/list` gets an empty list (shim `dev-servers`).
+{agent, id | all}`. The app never gets a path. `dev_servers` is retired
+(`bise_proto::RETIRED`): an older desktop's `devServers/list` is refused by
+name (reason `retired_method`).
 
 ## Who's in
 

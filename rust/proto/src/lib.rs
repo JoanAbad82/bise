@@ -42,7 +42,9 @@
 //! writes it back with every released key and value unchanged. Its one
 //! exception: a field a released client sends that the hub no longer
 //! reads ([`REMOVED`]) is refused by name when it carries data, never
-//! read with its data dropped. What has no producer yet lives in [`draft`]: its fixtures
+//! read with its data dropped. A tag or method bise retired ([`RETIRED`])
+//! reads as `Unknown` (a method: refused by name), and is never reused.
+//! What has no producer yet lives in [`draft`]: its fixtures
 //! are there for the window's fake core, its names may still move until
 //! its stream emits it.
 //!
@@ -162,6 +164,45 @@ pub fn removed_in(v: &Value, key: &str) -> Option<&'static Removed> {
 /// test: his words, then the field and where it went.
 pub fn removed_refusal(r: &Removed) -> String {
     format!("{} ({} removed: {})", words::common::removed_field, r.field, r.went)
+}
+
+/// What a [`Retired`] row names: a hub event's tag, a hub command's tag,
+/// or an rpc method.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RetiredKind {
+    HubEv,
+    HubCmd,
+    RpcMethod,
+}
+
+/// A tag or method a released bise used that this one retired
+/// (architect m_48959): its tag is out of its kind's `TAGS`, so a line
+/// carrying it reads as `Unknown` (a client ignores it), and a retired
+/// method is refused by name ([`jsonrpc::RpcError::retired`]), never
+/// method-not-found. A row is never deleted and its tag never comes back
+/// with another meaning (laws in `lib_tests`, `tests/released.rs`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Retired {
+    pub kind: RetiredKind,
+    pub tag: &'static str,
+    pub went: &'static str,
+}
+
+/// Every retired tag and method.
+pub const RETIRED: &[Retired] = &[
+    // an older hub's /archive yes/no: his /archive asks with the 1/2 drop card
+    Retired { kind: RetiredKind::HubEv, tag: "confirm", went: "the drop card (drop-card, architect m_37545)" },
+    Retired { kind: RetiredKind::HubCmd, tag: "confirm", went: "the drop card (drop-card, architect m_37545)" },
+    Retired { kind: RetiredKind::RpcMethod, tag: "confirm/answer", went: "the drop card (drop-card, architect m_37545)" },
+    // an older desktop's Environments screen: the processes list replaced it
+    Retired { kind: RetiredKind::HubEv, tag: "dev_servers", went: "processes (docs/processes.md)" },
+    Retired { kind: RetiredKind::HubCmd, tag: "dev_servers", went: "processes (docs/processes.md)" },
+    Retired { kind: RetiredKind::RpcMethod, tag: "devServers/list", went: "processes (docs/processes.md)" },
+];
+
+/// The row of a retired tag or method of that kind.
+pub fn retired(kind: RetiredKind, tag: &str) -> Option<&'static Retired> {
+    RETIRED.iter().find(|r| r.kind == kind && r.tag == tag)
 }
 
 /// One line as a JSON value.

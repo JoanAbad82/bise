@@ -197,9 +197,14 @@ impl Shell {
         let cmd = match rpc::cmd(method, params) {
             Ok(c) => c,
             Err(e) => {
-                // an older app's removed field (bise_proto::REMOVED): its name in the log
-                if let Some(f) = e.data.as_ref().and_then(|d| d.field.as_deref()) {
-                    log_line(&self.opts.paths, &format!("{method}: refused, an older app sent the removed field {f}"));
+                // an older app's removed field (bise_proto::REMOVED) or
+                // retired method (bise_proto::RETIRED): its name in the log
+                if let Some(d) = e.data.as_ref().filter(|d| d.field.is_some()) {
+                    let f = d.field.as_deref().unwrap_or_default();
+                    match d.reason.as_deref() {
+                        Some("retired_method") => log_line(&self.opts.paths, &format!("{method}: refused, an older app called the retired method {f}")),
+                        _ => log_line(&self.opts.paths, &format!("{method}: refused, an older app sent the removed field {f}")),
+                    }
                 }
                 return self.rpc_respond(id, Response::err(Some(rid), e));
             }
@@ -532,9 +537,7 @@ mod tests {
         // with inbox/history, not carried in the state; activity (les
         // bims): what happens after a client's initialize, never replayed
         let moments: BTreeSet<&str> =
-            // dev_servers: no hub sends it any more (processes replaced it).
-            // TODO(dev-servers): goes in a later release
-            ["job_end", "followed_end", "route", "route_done", "page_changed", "inbox_recorded", "activity", "dev_servers"].into_iter().collect();
+            ["job_end", "followed_end", "route", "route_done", "page_changed", "inbox_recorded", "activity"].into_iter().collect();
         let src = include_str!("rpc.rs");
         let body = src.split("fn hub_state(&mut self, id: ClientId)").nth(1).and_then(|s| s.split("\n    }\n").next()).unwrap();
         for row in rpc::NOTIFICATIONS.iter().filter(|r| r.scope == rpc::Scope::Hub) {

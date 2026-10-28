@@ -79,9 +79,6 @@ export function applyTyped(s: Store, ev: Ev): void {
     case "proc_out":
       // a range of a process's output: read through onEvent by its terminal (running/Output.tsx), never kept
       return;
-    case "dev_servers":
-      // an older hub's servers, read by nothing: the processes list replaced them. TODO(dev-servers), goes in a later release
-      return;
     case "scheduled":
     case "worktrees":
     case "merged":

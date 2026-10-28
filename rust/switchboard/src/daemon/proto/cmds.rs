@@ -176,10 +176,6 @@ impl Shell {
                 }
                 self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Close { card } });
             }
-            // an older client's yes to an older hub's question: this hub
-            // never asks one (drop-card: /archive asks with the 1/2 card).
-            // TODO(archive-confirm): goes in a later release
-            HubCmd::Confirm { .. } => self.proto_error(id, &tag, "no such question: archive cards are answered in the inbox (1 archive it, 2 keep it)"),
             // bar V8/W21: shift+tab and `/approvals [yolo|auto]` (his command:
             // docs/issues/16 keeps agents' connections from it). A mode
             // sets it and every connection hears it (with flash); none
@@ -360,13 +356,6 @@ impl Shell {
             HubCmd::Branches { .. } => self.branches_scan(id),
             // git in a thread (worktrees.rs), to this client
             HubCmd::Worktrees { .. } => self.worktrees_typed(Typed::Answer(id)),
-            // an older desktop's Environments screen: no hub lists dev
-            // servers any more (the processes list does), an empty list.
-            // TODO(dev-servers): goes in a later release
-            HubCmd::DevServers { .. } => {
-                let project = self.project();
-                self.proto_send(id, &HubEv::DevServers { project, items: Vec::new() });
-            }
             // git and main's transcript in a thread (merged.rs)
             HubCmd::Merged { .. } => self.merged_typed(Typed::Answer(id)),
             // the registry and the facts the threads read: no git here

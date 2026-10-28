@@ -57,8 +57,6 @@ pub const METHODS: &[MethodRow] = &[
     m("turn/interrupt", "stop", None),
     m("card/answer", "answer", None),
     m("card/close", "close", None),
-    // an older hub's yes/no rows: TODO(archive-confirm), goes in a later release
-    m("confirm/answer", "confirm", None),
     // no mode: a read (the current mode and rules); a mode: an action
     m("approvals/set", "approvals", Some("approvals")),
     m("approvals/removeRule", "remove_rule", None),
@@ -86,9 +84,6 @@ pub const METHODS: &[MethodRow] = &[
     // steers it in, its id kept; the agents event drops it from the queue
     m("turn/steerQueued", "queued_steer", None),
     m("worktrees/list", "worktrees", Some("worktrees")),
-    // an older desktop's Environments screen, answered empty:
-    // TODO(dev-servers), goes in a later release
-    m("devServers/list", "dev_servers", Some("dev_servers")),
     // running processes (docs/processes.md): the list, an output range,
     // following it, stop (the user's authority)
     m("processes/list", "processes", Some("processes")),
@@ -219,8 +214,6 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/artifacts", "artifacts", Scope::Hub),
     n("hub/scheduled", "scheduled", Scope::Hub),
     n("hub/worktrees", "worktrees", Scope::Hub),
-    // TODO(dev-servers): goes in a later release (no hub sends it: processes)
-    n("hub/devServers", "dev_servers", Scope::Hub),
     n("hub/processes", "processes", Scope::Hub),
     // a followed process's output as it grows (`process/follow`)
     n("process/output", "proc_out", Scope::One),
@@ -248,8 +241,6 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("thread/partial", "partial", Scope::Thread),
     n("route/held", "route", Scope::Hub),
     n("route/done", "route_done", Scope::Hub),
-    // TODO(archive-confirm): goes in a later release
-    n("confirm/ask", "confirm", Scope::One),
     n("card/open", "card_open", Scope::One),
     // inbox-record: a card closed, or its answer's position came
     n("inbox/recorded", "inbox_recorded", Scope::Hub),
@@ -317,10 +308,14 @@ fn tagged(params: Value, key: &str, tag: &str) -> Result<Value, String> {
     Ok(Value::Object(o))
 }
 
-/// A request's method and params as its [`HubCmd`]. Not a command's
-/// method: METHOD_NOT_FOUND (the protocol's own methods are the caller's);
-/// bad params: INVALID_PARAMS.
+/// A request's method and params as its [`HubCmd`]. A retired method
+/// (crate::RETIRED): refused by name; not a command's method:
+/// METHOD_NOT_FOUND (the protocol's own methods are the caller's); bad
+/// params: INVALID_PARAMS.
 pub fn cmd(method: &str, params: Value) -> Result<HubCmd, RpcError> {
+    if let Some(r) = crate::retired(crate::RetiredKind::RpcMethod, method) {
+        return Err(RpcError::retired(r));
+    }
     let row = method_row(method).ok_or_else(|| RpcError::new(code::METHOD_NOT_FOUND, format!("unknown method: {method}")))?;
     let v = tagged(params, "cmd", row.cmd).map_err(|e| RpcError::new(code::INVALID_PARAMS, format!("{method}: {e}")))?;
     // an older app's removed field with data: refused by name (REMOVED)
