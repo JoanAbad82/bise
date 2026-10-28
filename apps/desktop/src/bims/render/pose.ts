@@ -10,6 +10,7 @@ import { walkTime } from '../avoid';
 import { NAP_UP, SIT, SIT_S, sitBeat, toWorld } from '../sit';
 import { BEAT, PLANE_CATCH, REACH_S, awayOf } from './catch';
 import { FLAT, NAP_DZ, SINK_DROP, SLING_LIFT, type NapRest } from './nap';
+import { MAIN_K, keysLean, onKeys } from './laptop';
 
 /** rotations in radians: [x, y, z] */
 export type Rot = readonly [number, number, number];
@@ -155,8 +156,12 @@ const loopT = (t: number, reduced: boolean): number => (reduced ? 0 : t);
 /** what doing kinds loop (a moving hand, a growing bar): typing's siblings; the others are still */
 const DOING_LOOPS: ReadonlySet<Doing> = new Set(['think', 'computer', 'compact', 'build', 'edit', 'tool', 'unknown']);
 
+/** typing: how far the body leans in so its hands land on its keys (an agent, main: his longer arms lean less), how high a hand lifts off them at a tap */
+const TYPE_LEAN = { agent: keysLean(1, SEATED.y), main: keysLean(MAIN_K, SEATED.y) } as const;
+const TAP = 0.018;
+
 /** a working bim (work, hot, main) by what its turn does; none or edit/tool: typing at its desk */
-function working(k: ActivityKind, act: Activity, lt: number, ph: number): Body {
+function working(k: ActivityKind, act: Activity, lt: number, ph: number, main: boolean): Body {
   const hot = k === 'hot';
   const base = { ...NO_PROPS, hot: hot ? (lt * 0.9 + ph) % 1 : null };
   const mouth = hot ? ('oh' as const) : ('smile' as const);
@@ -204,13 +209,20 @@ function working(k: ActivityKind, act: Activity, lt: number, ph: number): Body {
     case 'tool':
     case 'unknown':
     case undefined: {
+      // the hands on the keys (laptop.ts onKeys), each tapping in turn, the body leaning in a little
+      // to reach them, the legs as seated (Gabriel m_49096: they went through the desk's edge)
       const sp = hot ? 22 : 12;
+      const s = main ? MAIN_K : 1;
+      const lean = main ? TYPE_LEAN.main : TYPE_LEAN.agent;
+      const tap = (a: number): number => Math.max(0, Math.sin(lt * sp + ph + a)) * TAP;
       return {
         ...STAND, ...SEATED,
-        armL: [-1.2 + Math.sin(lt * sp + ph) * 0.18, 0, 0],
-        armR: [-1.2 + Math.sin(lt * sp + ph + 2) * 0.18, 0, 0],
-        head: [0.15 + Math.sin(lt * 2 + ph) * 0.04, Math.sin(lt * 0.7 + ph) * 0.15, 0],
-        body: hot ? [0, 0, Math.sin(lt * 30) * 0.015] : Z,
+        legL: SEATED.legL - lean,
+        legR: SEATED.legR - lean,
+        armL: onKeys(-1, s, SEATED.y, lean, tap(0)),
+        armR: onKeys(1, s, SEATED.y, lean, tap(Math.PI)),
+        head: [0.15 - lean + Math.sin(lt * 2 + ph) * 0.04, Math.sin(lt * 0.7 + ph) * 0.15, 0],
+        body: [lean, 0, hot ? Math.sin(lt * 30) * 0.015 : 0],
         mouth,
         screen: 0.9,
         props: base,
@@ -347,7 +359,7 @@ function eating(fruit: number, stay: number, ph: number): Body {
 }
 
 /** a kind's pose at rest, at loop time lt (lt is 0 under reduced motion); `stay`: s since it arrived (its own loops from there) */
-function rest(act: Activity, lt: number, ph: number, stay = lt, bed?: NapRest): Body {
+function rest(act: Activity, lt: number, ph: number, stay = lt, bed?: NapRest, main = false): Body {
   const k = act.k;
   const urgent = act.urgent === true;
   const fruit = act.fruit ?? 0;
@@ -355,7 +367,7 @@ function rest(act: Activity, lt: number, ph: number, stay = lt, bed?: NapRest): 
     case 'work':
     case 'main':
     case 'hot':
-      return working(k, act, lt, ph);
+      return working(k, act, lt, ph, main);
     case 'starting':
       // at the door: looks around, a little wave
       return { ...STAND, head: [0, 0.35, 0], armR: [0, 0, 2.4], face: Math.PI };
@@ -599,7 +611,7 @@ export function rigOf(inp: RigInput): Rig {
   const { act, k, place, walkT, arrived, bed, left, down, dur, hopT, u, sat } = timing(inp);
   const lt = loopT(t, reduced);
   // a loop of its own from its arrival (eating); reduced motion holds it chewing, a fruit in hand
-  const target = rest(act, lt, phase, reduced ? PICK_S + BITE_S - 0.2 : Math.max(0, u - dur), bed);
+  const target = rest(act, lt, phase, reduced ? PICK_S + BITE_S - 0.2 : Math.max(0, u - dur), bed, inp.main);
 
   const sitIn = seg.sit?.in;
 
@@ -640,7 +652,7 @@ export function rigOf(inp: RigInput): Rig {
     motion = 'walk';
   } else if (u < dur) {
     // sat down on its walk's end (sit.ts): from seated
-    const from = hopT > 0 ? (seg.sit?.down ? SITTING : STAND) : walkT > 0 ? (sitIn && !sitIn.standing && !reduced ? SITTING : STAND) : seg.from === null ? target : rest({ k: seg.from, at: act.at }, lt, phase);
+    const from = hopT > 0 ? (seg.sit?.down ? SITTING : STAND) : walkT > 0 ? (sitIn && !sitIn.standing && !reduced ? SITTING : STAND) : seg.from === null ? target : rest({ k: seg.from, at: act.at }, lt, phase, lt, undefined, inp.main);
     const f = ease(u / dur);
     b = beat(seg.from, k, u / dur, blend(from, target, f));
     motion = 'walk';

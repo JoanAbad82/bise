@@ -11,7 +11,7 @@
 // so it fades (reduced motion) and goes grey (stopped); the clay light is claylight.ts's.
 import { type BufferGeometry, Color, ConeGeometry, CylinderGeometry, Group, LatheGeometry, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, MeshStandardMaterial, type Object3D, Quaternion, SphereGeometry, TorusGeometry, Vector2, Vector3 } from 'three';
 import { DAY, EYE, MOUTH, SOLE, WORLD, blushOf, outfitOf, type Cut, type Kind, type Outfit, type Own } from './palette';
-import { HAT_K, HEAD_R, HEAD_Y } from './laptop';
+import { HAT_K, HEAD_R, HEAD_Y, MAIN_K, REACH, SHOULDER } from './laptop';
 import { bakePart } from './merge';
 import { GREY_MIX, clayLit, partsMaterial, warmth } from './claylight';
 import type { Rig, Rot } from './pose';
@@ -209,7 +209,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   const g = new Group();
   const body = new Group();
   body.name = 'body';
-  const s = main ? 1.18 : 1;
+  const s = main ? MAIN_K : 1;
   body.scale.setScalar(s);
   g.add(body);
 
@@ -702,14 +702,14 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   for (const sx of [-1, 1]) {
     const arm = new Group();
     arm.name = sx < 0 ? 'armL' : 'armR';
-    arm.position.set(sx * 0.24, 0.66, 0);
+    arm.position.set(sx * SHOULDER.x, SHOULDER.y, 0);
     body.add(arm);
     // chunky round sleeves (a short one over a bare forearm: the tee's, the shirt's under dungarees), a mitten of a hand
     if (SHORT) {
       add(style.capsule(0.06, 0.17), mat(o.skin), arm, 0, -0.16, 0);
       add(style.capsule(0.082, 0.05), mat(KIND === 'overalls' ? WORLD.paper : o.hoodie), arm, 0, -0.07, 0);
     } else add(style.capsule(0.078, 0.12), mat(SLEEVE), arm, 0, -0.115, 0);
-    add(new SphereGeometry(0.066, 16, 12), mat(o.skin), arm, 0, -0.305, 0.005).scale.set(0.95, 1.05, 0.85);
+    add(new SphereGeometry(0.066, 16, 12), mat(o.skin), arm, 0, -REACH, 0.005).scale.set(0.95, 1.05, 0.85);
     if (KIND === 'puffer') {
       // the vest's arm hole: its rim lies round the top of the sleeve and turns with it, never off the shoulder
       add(new TorusGeometry(0.08, 0.02, 8, 22), mat(shade(o.hoodie, 0.85)), arm, 0, -0.045, 0).rotation.x = Math.PI / 2;

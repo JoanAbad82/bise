@@ -78,6 +78,62 @@ function laptopBoxes(): { c: V; half: V; tilt: number }[] {
   ];
 }
 
+/** main's bim is this much bigger than an agent's (bim.ts scales its body by it) */
+export const MAIN_K = 1.18;
+/** where an arm hangs from (its shoulder, the body's frame) and how far its hand's centre is down it (bim.ts) */
+export const SHOULDER = { x: 0.24, y: 0.66 } as const;
+export const REACH = 0.305;
+/** the hand's half height (bim.ts: a 0.066 ball, 1.05 tall) and a few mm of air: it rests on the keys, never in them */
+const HAND_R = 0.075;
+/** the keys on the laptop's base: their top, the hands' row (its front half), each hand this far off the middle */
+export const KEYS = {
+  y: LAPTOP.base.y + LAPTOP.base.h / 2,
+  z0: DESK_AHEAD + LAPTOP.dz - LAPTOP.base.d / 2,
+  z1: DESK_AHEAD + LAPTOP.dz,
+  x: 0.16,
+} as const;
+
+/**
+ * The arm (three.js Euler 'XYZ', its body's frame) that rests a seated bim's hand on its laptop's
+ * keys (Gabriel m_49096: typing, the hands went through the desk's edge): `side` -1 its left, scale
+ * 1 or MAIN_K, its body at height y leaning forward by `lean`, the hand `lift` over the keys (a tap).
+ * Its hand reaches the keys' row as far as its arm goes. Pure.
+ */
+export function onKeys(side: -1 | 1, scale: number, y: number, lean: number, lift: number): Rot {
+  const { dx, dy, dz, len } = reach(side, scale, y, lean, lift);
+  // into the body's frame: turned back by its lean
+  const by = dy * Math.cos(lean) + dz * Math.sin(lean);
+  const bz = -dy * Math.sin(lean) + dz * Math.cos(lean);
+  return [Math.atan2(-bz, -by), 0, Math.asin(Math.max(-1, Math.min(1, dx / len)))];
+}
+
+/** from the shoulder to the hand on the keys (world axes): its arm's length, the hand as far ahead as the arm reaches */
+function reach(side: -1 | 1, scale: number, y: number, lean: number, lift: number): { dx: number; dy: number; dz: number; len: number; z: number } {
+  const sy = SHOULDER.y * scale;
+  const s = { x: side * SHOULDER.x * scale, y: y + sy * Math.cos(lean), z: sy * Math.sin(lean) };
+  const len = REACH * scale;
+  const dx = side * KEYS.x - s.x;
+  const dy = KEYS.y + HAND_R * scale + lift - s.y;
+  const dz = Math.sqrt(Math.max(0, len * len - dx * dx - dy * dy));
+  return { dx, dy, dz, len, z: s.z + dz };
+}
+
+/**
+ * How far a seated bim (scale 1 or MAIN_K, its body at height y) leans in so its hands land on the
+ * middle of the keys' row (main's longer arms lean less). Pure.
+ */
+export function keysLean(scale: number, y: number): number {
+  const mid = (KEYS.z0 + KEYS.z1) / 2;
+  let lo = -0.2;
+  let hi = 0.4;
+  for (let i = 0; i < 30; i++) {
+    const m = (lo + hi) / 2;
+    if (reach(1, scale, y, m, 0).z < mid) lo = m;
+    else hi = m;
+  }
+  return (lo + hi) / 2;
+}
+
 /** How far a seated rig's head stays from its laptop (world units; under 0: inside it). Pure. */
 export function headClearance(rig: Pick<Rig, 'y' | 'body' | 'head'>, scale = 1): number {
   const boxes = laptopBoxes();
