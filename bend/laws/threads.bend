@@ -594,8 +594,8 @@ law mcp_retry_only_unsent:
 # "initialize failed".
 law mcp_fail_text_says_why_and_safety:
   {Bool.and(String.eq(Mc.fail_text("web_search.web_search", "api.mistral.ai",
-      Mc.SInit{}, Mc.WNet{Pv.NDns{}}, 2n),
-      "mcp call failed (network): web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai (dns) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
+      Mc.SInit{}, Mc.WNet{Pv.NDns{"the system resolver did not answer (temporary failure in name resolution)", "your network or VPN"}}, 2n),
+      "mcp call failed (network): web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai: the system resolver did not answer (temporary failure in name resolution) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
     String.eq(Mc.fail_text("x.y", "h", Mc.SCall{}, Mc.WStatus{502, "{\"message\":\"bad gateway\"}"}, 0n),
       "mcp call failed (server error): x.y (h), tools/call: h answered HTTP 502: bad gateway. not retried: the call may have run on the server, check before calling it again (safe if the tool only reads).")) == True{} : Bool}
 

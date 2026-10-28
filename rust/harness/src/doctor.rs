@@ -715,6 +715,74 @@ fn disk(home: &bise_home::Home) -> Check {
     disk_check(&at, kb)
 }
 
+/// The host of a base URL ("https://user@gw.example.com:443/v1" ->
+/// "gw.example.com"); None for an empty or bracketed (IPv6 literal) one.
+pub(crate) fn url_host(u: &str) -> Option<String> {
+    let rest = u.split_once("://").map(|(_, r)| r).unwrap_or(u);
+    let auth = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let auth = auth.rsplit('@').next().unwrap_or(auth);
+    let host = auth.split(':').next().unwrap_or("");
+    (!host.is_empty() && !auth.starts_with('[')).then(|| host.to_ascii_lowercase())
+}
+
+/// A provider host as agent turns reach it (vendor/http's Dns.resolve):
+/// the system resolver's addresses, IPv4 only, tried in order. `addrs`:
+/// what getaddrinfo gave (Err: its words). Same words as the runtime's.
+pub(crate) fn reach_check(host: &str, addrs: Result<Vec<std::net::IpAddr>, String>) -> Check {
+    match addrs {
+        Err(e) => fail(
+            "reach",
+            format!("cannot resolve {}: the system resolver has no address for it ({})", host, e),
+            "check the host name in base_url, your network or VPN",
+        ),
+        Ok(all) => {
+            let v4: Vec<String> = all.iter().filter(|a| a.is_ipv4()).map(|a| a.to_string()).collect();
+            if v4.is_empty() {
+                let v6: Vec<String> = all.iter().map(|a| a.to_string()).collect();
+                return fail(
+                    "reach",
+                    format!("{} has only IPv6 addresses ({}) and agent turns connect over IPv4", host, v6.join(", ")),
+                    "use a base_url whose host has an IPv4 address",
+                );
+            }
+            ok("reach", format!("{} → {} (the system resolver, as agent turns use it)", host, v4.join(", ")))
+        }
+    }
+}
+
+/// One reach line per provider host the roles use (main, agents, small
+/// jobs): `bise auth check` and agent turns both resolve through the system
+/// resolver, so a green line here is a name the turns resolve too.
+fn reach(setup: &bise_catalog::Setup) -> Vec<Check> {
+    use std::net::ToSocketAddrs;
+    let mut hosts: Vec<String> = Vec::new();
+    for m in [&setup.model, &setup.agent_model, &setup.small_model] {
+        if m.trim().is_empty() {
+            continue;
+        }
+        if let Some(h) = url_host(&setup.catalog.resolve(m).base_url) {
+            if !hosts.contains(&h) {
+                hosts.push(h);
+            }
+        }
+    }
+    hosts
+        .iter()
+        .map(|h| {
+            let addrs = (h.as_str(), 443).to_socket_addrs().map(|it| {
+                let mut v: Vec<std::net::IpAddr> = Vec::new();
+                for a in it {
+                    if !v.contains(&a.ip()) {
+                        v.push(a.ip());
+                    }
+                }
+                v
+            });
+            reach_check(h, addrs.map_err(|e| e.to_string()))
+        })
+        .collect()
+}
+
 /// `bise doctor`: the report on stdout; 1 when a check failed.
 pub(crate) fn main(args: &[String]) -> i32 {
     let verbose = match args {
@@ -752,6 +820,7 @@ pub(crate) fn main(args: &[String]) -> i32 {
     let env = |k: &str| std::env::var(k).ok();
     checks.extend(detected_checks(&bise_catalog::detect::detect(home.user_home(), &env)));
     checks.extend(models);
+    checks.extend(reach(&setup));
     checks.extend([compaction, voice, hubs(&home), disk(&home)]);
     checks.extend(tmux());
     let st = Style::stdout();
@@ -770,6 +839,34 @@ pub(crate) fn main(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn url_host_of_a_base_url() {
+        assert_eq!(url_host("https://user@GW.example.com:443/v1?k=1").as_deref(), Some("gw.example.com"));
+        assert_eq!(url_host("http://127.0.0.1:9/v1").as_deref(), Some("127.0.0.1"));
+        assert_eq!(url_host("gw.example.com/v1").as_deref(), Some("gw.example.com"));
+        assert_eq!(url_host(""), None);
+        assert_eq!(url_host("http://[::1]:8080/"), None);
+    }
+
+    /// A gateway whose name is an alias (CNAME) of a dual-stack host: the
+    /// system resolver answers IPv6 first; agent turns use the IPv4 one, and
+    /// doctor names the one they use. Only IPv6, or no address: a failure in
+    /// the runtime's words, so a green auth check never hides failing turns.
+    #[test]
+    fn reach_says_what_agent_turns_use() {
+        let v6: std::net::IpAddr = "2001:db8::1".parse().unwrap();
+        let v4: std::net::IpAddr = "192.0.2.7".parse().unwrap();
+        let c = reach_check("gw.example.com", Ok(vec![v6, v4]));
+        assert_eq!((c.mark, c.detail.as_str()), (Mark::Ok, "gw.example.com → 192.0.2.7 (the system resolver, as agent turns use it)"));
+        let c = reach_check("gw.example.com", Ok(vec![v6]));
+        assert_eq!(c.mark, Mark::Fail);
+        assert_eq!(c.detail, "gw.example.com has only IPv6 addresses (2001:db8::1) and agent turns connect over IPv4");
+        let c = reach_check("gw.example.com", Err("nodename nor servname provided, or not known".into()));
+        assert_eq!(c.mark, Mark::Fail);
+        assert_eq!(c.detail, "cannot resolve gw.example.com: the system resolver has no address for it (nodename nor servname provided, or not known)");
+        assert_eq!(c.fix.as_deref(), Some("check the host name in base_url, your network or VPN"));
+    }
 
     #[test]
     fn macos_versions() {

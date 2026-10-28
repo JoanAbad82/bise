@@ -12,6 +12,7 @@ import ./persist.bend as P
 import ./remote.bend as Rem
 import ../core/config.bend as Cf
 import ../vendor/http/http.bend as Http
+import ../vendor/http/dns/dns-pure.bend as Dnp
 import ../vendor/http/encoding/encoding.bend as Enc
 import ./settings.bend as St
 import ./provider-pure.bend as Pvp
@@ -39,8 +40,8 @@ def net_of(e: Http.Err) -> Pvp.NetErr:
   match e:
     case Http.ErrUrl{}:
       Pvp.NUrl{}
-    case Http.ErrDns{}:
-      Pvp.NDns{}
+    case Http.ErrDns{+m}:
+      Pvp.NDns{Dnp.why(m), Dnp.check(m)}
     case Http.ErrConnect{+c, +w}:
       Pvp.NConnect{c, w}
     case Http.ErrTls{+c, +w}:

@@ -9,6 +9,5 @@ bend/vendor/json.bend:remove_kv
 bend/vendor/json.bend:insert_kv_go
 bend/vendor/http/http.bend:reason.go
 bend/vendor/http/http.bend:hex.trim
-bend/vendor/http/dns/dns.bend:name.skip
 bend/vendor/http/json/json.bend:hex4.go
 bend/vendor/http/zlib/zlib.bend:nth

@@ -110,7 +110,7 @@ law retryable_status_table:
 law retryable_err_table:
   {Bool.and(
       Bool.and(Pv.retryable_err(Pv.NConnect{1, "refused"}),
-        Pv.retryable_err(Pv.NDns{})),
+        Pv.retryable_err(Pv.NDns{"no address", "your network or VPN"})),
       Bool.and(Pv.retryable_err(Pv.NTimeout{}),
         Bool.and(Bool.not(Pv.retryable_err(Pv.NTls{1, "handshake"})),
           Bool.not(Pv.retryable_err(Pv.NUrl{}))))

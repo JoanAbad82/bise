@@ -684,9 +684,11 @@ def interrupted_by(+who: String) -> String:
 
 # ---- a transport failure, without the Http types ----
 
+# NDns: why the name gave no address to connect to and what the user can
+# check ("" when nothing on his side would help), vendor/http/dns's words.
 type NetErr is Data:
   NUrl{}
-  NDns{}
+  NDns{why: String, check: String}
   NConnect{code: U32, what: String}
   NTls{code: U32, what: String}
   NRead{code: U32, what: String}
@@ -702,7 +704,7 @@ def api_err(e: NetErr) -> String:
   match e:
     case NUrl{}:
       "bad url"
-    case NDns{}:
+    case NDns{_, _}:
       "dns"
     case NConnect{+c, +w}:
       coded("connect ", c, w)
@@ -755,13 +757,21 @@ def url_host(+url: String) -> String:
 def check_network() -> String:
   " — check your network or VPN"
 
+# " — check <what>", or nothing when there is nothing to check
+def check_what(+what: String) -> String:
+  Bool.pick(String, String.is_empty(what), "", String.append(" — check ", what))
+
+# the host of "host:port" (a DNS miss names the name, not the port)
+def host_name(+hp: String) -> String:
+  url_host.head(String.split(hp, ':'))
+
 def net_cause(+host: String, e: NetErr) -> String:
   match e:
     case NUrl{}:
       String.concat(["bad provider URL (", host,
         ") — check BEND_PROVIDER_URL or the provider table"])
-    case NDns{}:
-      String.concat(["cannot resolve ", host, " (dns)", check_network()])
+    case NDns{+why, +what}:
+      String.concat(["cannot resolve ", host_name(host), ": ", why, check_what(what)])
     case NConnect{+c, +w}:
       String.concat(["cannot reach ", host, " (", coded("connect ", c, w),
         ")", check_network()])
@@ -843,7 +853,7 @@ def retryable_err(e: NetErr) -> Bool:
   match e:
     case NConnect{_, _}:
       True{}
-    case NDns{}:
+    case NDns{_, _}:
       True{}
     case NTimeout{}:
       True{}

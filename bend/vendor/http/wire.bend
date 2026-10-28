@@ -12,6 +12,15 @@ def connect(host: String, port: U32, ms: U32) ->
   import "./effs/wire.c"
   import "./effs/wire.js"
 
+# The addresses the OS resolver (getaddrinfo) gives for host: what curl and
+# every other program see, /etc/hosts, CNAMEs and split DNS included. IPv4
+# and IPv6 as text, in its order, never empty. Fail codes: 1 the name has
+# no address, 2 the resolver did not answer, 3 another failure.
+def lookup(host: String) ->
+  IO(Result<&1, &1, U32 & String, List<&2, String>>):
+  import "./effs/wire.c"
+  import "./effs/wire.js"
+
 def recv(sock: Socket, max: U32, ms: U32) ->
   IO(Socket & Result<&1, &1, U32 & String, String>):
   import "./effs/wire.c"

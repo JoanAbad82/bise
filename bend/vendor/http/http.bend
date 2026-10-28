@@ -3,8 +3,10 @@
 # the hub terms), vendored so the build never depends on a patched
 # ~/.bend/lib: a clean one (CI) fetches the published files, which bend
 # 2.0.32 refuses (dns.bend's `def resolve.3`). The changes from the
-# published files: dns.bend names resolve.dns3/dns_2/dns_2b/dns_1b and
-# binds UDP.bind("0.0.0.0", 0); http.bend listens with
+# published files: dns.bend resolves through the OS resolver
+# (Wire.lookup, getaddrinfo) instead of its own UDP queries, its pure half
+# in dns/dns-pure.bend; Err.ErrDns carries why (Dnp.Miss) and conn.any tries
+# every address in order (see about.bend); http.bend listens with
 # TCP.listen("127.0.0.1", port); effs/wire.c takes the Bend 2.0.32 C
 # types (u64 heap words) and names its effects with CID(name).
 # HTTP/1.1 client for http and https, with DNS and TLS.
@@ -12,6 +14,7 @@ import Base
 import ./about.bend as About
 import ./wire.bend as Wire
 import ./dns/dns.bend as Dns
+import ./dns/dns-pure.bend as Dnp
 import ./url/url.bend as Url
 import ./encoding/encoding.bend as Enc
 import ./json/json.bend as Json
@@ -35,7 +38,7 @@ type Res is Data:
 # ponytail: 60 and 110 are ETIMEDOUT on macOS and Linux. Windows is out of scope.
 type Err is Data:
   ErrUrl{}
-  ErrDns{}
+  ErrDns{miss: Dnp.Miss}
   ErrConnect{code: U32, why: String}
   ErrTls{code: U32, why: String}
   ErrRead{code: U32, why: String}
@@ -1958,6 +1961,29 @@ def conn.open(+tls: Bool, +ms: U32, sni: String, ip: String, port: U32) -> IO(Re
     c : Result<&1, &1, U32 & String, Socket> <- Wire.connect(ip, port, ms)
     conn.made(ms, sni, tls, c)
 
+# Should the next address be tried after this attempt? Only when its connect
+# failed or ran out of time: a TLS or an HTTP error is the server's answer.
+def conn.next(+e: Err) -> Bool:
+  match e:
+    case ErrConnect{_, _}:
+      True{}
+    case ErrTimeout{}:
+      True{}
+    case _:
+      False{}
+
+type At is Data:
+  At{tls: Bool, ms: U32, sni: String, port: U32}
+
+def conn.at(+at: At, ip: String) -> IO(Result<&1, &1, Err, Conn>):
+  At{+tls, +ms, +sni, +port} = at
+  conn.open(tls, ms, sni, ip, port)
+
+# bise patch: every address the resolver gave, in order, until one connects.
+def conn.any(+tls: Bool, +ms: U32, +sni: String, addrs: List<&2, String>, +port: U32) -> IO(Result<&1, &1, Err, Conn>):
+  Dnp.each(~Conn, ~Err, ~At, ~(e => conn.next(e)), ~(c => a => conn.at(c, a)), At{tls, ms, sni, port}, addrs,
+    (True{}, Fail{ErrConnect{0, "no address to connect to"}}))
+
 def conn.ex(c: Conn, +ms: U32, +head: Bool, wire: String) -> IO(Out):
   Conn{+tls, s} = c
   exchange.go(tls, ms, False{}, head, s, wire)
@@ -1997,18 +2023,18 @@ def pool.fresh.conn(p: Pool, +key: String, +tls: Bool, +ms: U32, +head: Bool, wi
         o : Out <- conn.ex(c, ms, head, wire)
         pool.after(p, key, tls, o)
 
-def pool.fresh.ip(p: Pool, +key: String, +tls: Bool, +ms: U32, +head: Bool, +host: String, +port: U32, wire: String, ip: Maybe<&2, String>) -> IO(Pool & Result<&2, &2, Err, Res>):
+def pool.fresh.ip(p: Pool, +key: String, +tls: Bool, +ms: U32, +head: Bool, +host: String, +port: U32, wire: String, ip: Result<&2, &2, Dnp.Miss, List<&2, String>>) -> IO(Pool & Result<&2, &2, Err, Res>):
   match ip:
-    case None{}:
-      IO.pure(Pool & Result<&2, &2, Err, Res>, (p, Fail{ErrDns{}}))
-    case Some{addr}:
+    case Fail{m}:
+      IO.pure(Pool & Result<&2, &2, Err, Res>, (p, Fail{ErrDns{m}}))
+    case Done{addrs}:
       do IO<Pool & Result<&2, &2, Err, Res>>:
-        c : Result<&1, &1, Err, Conn> <- conn.open(tls, ms, host, addr, port)
+        c : Result<&1, &1, Err, Conn> <- conn.any(tls, ms, host, addrs, port)
         pool.fresh.conn(p, key, tls, ms, head, wire, c)
 
 def pool.fresh(p: Pool, +key: String, +tls: Bool, +ms: U32, +head: Bool, +host: String, +port: U32, wire: String) -> IO(Pool & Result<&2, &2, Err, Res>):
   do IO<Pool & Result<&2, &2, Err, Res>>:
-    ip : Maybe<&2, String> <- Dns.resolve(host)
+    ip : Result<&2, &2, Dnp.Miss, List<&2, String>> <- Dns.resolve(host)
     pool.fresh.ip(p, key, tls, ms, head, host, port, wire, ip)
 
 # A reused socket the server already closed fails before any response byte.
@@ -2501,13 +2527,13 @@ def stream.conn(r: Result<&1, &1, Err, Conn>, +ms: U32, +head: Bool, wire: Strin
         sent : Socket & Result<&1, &1, U32 & String, Unit> <- io.send(tls, s, wire)
         stream.sent(tls, ms, head, sent)
 
-def stream.ip(+tls: Bool, +ms: U32, +head: Bool, +host: String, +port: U32, wire: String, ip: Maybe<&2, String>) -> IO(Result<&1, &1, Err, Stream>):
+def stream.ip(+tls: Bool, +ms: U32, +head: Bool, +host: String, +port: U32, wire: String, ip: Result<&2, &2, Dnp.Miss, List<&2, String>>) -> IO(Result<&1, &1, Err, Stream>):
   match ip:
-    case None{}:
-      IO.pure(Result<&1, &1, Err, Stream>, Fail{ErrDns{}})
-    case Some{addr}:
+    case Fail{m}:
+      IO.pure(Result<&1, &1, Err, Stream>, Fail{ErrDns{m}})
+    case Done{addrs}:
       do IO<Result<&1, &1, Err, Stream>>:
-        c : Result<&1, &1, Err, Conn> <- conn.open(tls, ms, host, addr, port)
+        c : Result<&1, &1, Err, Conn> <- conn.any(tls, ms, host, addrs, port)
         stream.conn(c, ms, head, wire)
 
 # One connection per stream; the request says close.
@@ -2518,7 +2544,7 @@ def stream.origin(+ms: U32, +head: Bool, wire: String, a: Url.Abs, known: Bool) 
       IO.pure(Result<&1, &1, Err, Stream>, Fail{ErrUrl{}})
     case True{}:
       do IO<Result<&1, &1, Err, Stream>>:
-        ip : Maybe<&2, String> <- Dns.resolve(host)
+        ip : Result<&2, &2, Dnp.Miss, List<&2, String>> <- Dns.resolve(host)
         stream.ip(String.eq(scheme, "https"), ms, head, host, port, wire, ip)
 
 def stream.one(h: Hop, +ms: U32) -> IO(Result<&1, &1, Err, Stream>):
@@ -2636,13 +2662,13 @@ def up.conn(r: Result<&1, &1, Err, Conn>, +ms: U32, +head: Bool, wire: String) -
         sent : Socket & Result<&1, &1, U32 & String, Unit> <- io.send(tls, s, wire)
         return Done{up.sent(tls, ms, head, sent)}
 
-def up.ip(+tls: Bool, +ms: U32, +head: Bool, +host: String, +port: U32, wire: String, ip: Maybe<&2, String>) -> IO(Result<&1, &1, Err, Up>):
+def up.ip(+tls: Bool, +ms: U32, +head: Bool, +host: String, +port: U32, wire: String, ip: Result<&2, &2, Dnp.Miss, List<&2, String>>) -> IO(Result<&1, &1, Err, Up>):
   match ip:
-    case None{}:
-      IO.pure(Result<&1, &1, Err, Up>, Fail{ErrDns{}})
-    case Some{addr}:
+    case Fail{m}:
+      IO.pure(Result<&1, &1, Err, Up>, Fail{ErrDns{m}})
+    case Done{addrs}:
       do IO<Result<&1, &1, Err, Up>>:
-        c : Result<&1, &1, Err, Conn> <- conn.open(tls, ms, host, addr, port)
+        c : Result<&1, &1, Err, Conn> <- conn.any(tls, ms, host, addrs, port)
         up.conn(c, ms, head, wire)
 
 def up.head(+method: String, +target: String, +hf: String, +headers: Map<&2, List<&2, String>>) -> String:
@@ -2655,7 +2681,7 @@ def up.origin(+method: String, +ms: U32, headers: Map<&2, List<&2, String>>, a: 
       IO.pure(Result<&1, &1, Err, Up>, Fail{ErrUrl{}})
     case True{}:
       do IO<Result<&1, &1, Err, Up>>:
-        ip : Maybe<&2, String> <- Dns.resolve(host)
+        ip : Result<&2, &2, Dnp.Miss, List<&2, String>> <- Dns.resolve(host)
         up.ip(String.eq(scheme, "https"), ms, String.eq(method, "HEAD"), host, port, up.head(method, target, Url.host_field(a), headers), ip)
 
 def up.url(+method: String, +ms: U32, headers: Map<&2, List<&2, String>>, u: Maybe<&2, Url.Abs>) -> IO(Result<&1, &1, Err, Up>):

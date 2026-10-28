@@ -509,8 +509,8 @@ law attempt_timeout_names_the_key:
 
 # LAW: the other transport failures of a streamed call read as before.
 law attempt_err_in_others:
-  {Pv.attempt_err_in("api.example.com", Pv.ProvWait{"x", 5000}, Pv.NDns{})
-    == Pv.attempt_err("api.example.com", Pv.NDns{}) : Pv.Attempt}
+  {Pv.attempt_err_in("api.example.com", Pv.ProvWait{"x", 5000}, Pv.NDns{"no address", ""})
+    == Pv.attempt_err("api.example.com", Pv.NDns{"no address", ""}) : Pv.Attempt}
 
 # LAW: a debug event is one JSON object on one line: ts, src, kind, then
 # the fields in order; strings are JSON-escaped (a newline stays \\n).

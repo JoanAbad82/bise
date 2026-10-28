@@ -301,7 +301,7 @@ def net_sent(e: Pvp.NetErr) -> Bool:
   match e:
     case Pvp.NUrl{}:
       False{}
-    case Pvp.NDns{}:
+    case Pvp.NDns{_, _}:
       False{}
     case Pvp.NConnect{_, _}:
       False{}
