@@ -2,7 +2,7 @@
 // tile, the card's width (layout outerW, 292 by default) and as high as he left it (140 by default), r 12, the card's ring and e-1, its top
 // 12 under the bar (tilestate OUTER_TOP, inline; his m_46677); the project's office at its fit, live: a click on a bim opens its
 // thread; an agent's thread open (from the sidebar, the card or the bim), main's too, the camera centres on its bim and follows it,
-// 8.8x close (bims/focus followOf, FOLLOW_ZOOM, his m_47261, m_47407; his pinch or drag stops it until he opens another); an ask opened in place
+// 6x close (bims/focus followOf, FOLLOW_ZOOM, his m_47261, m_47407, m_48928; his pinch or drag stops it until he opens another); an ask opened in place
 // in the card looks at its bim while it is open (designer m_47300); a pinch zooms inside, the office's own 'Loft ⌄' chip bottom left and '⤢ fit' bottom right
 // while zoomed. On hover two 24 px buttons top right: '⤢' the world in the panel's Office tab, '×'
 // hides the tile (tilestate.ts keeps it per window). Under it, the 8 px gap to the card is the

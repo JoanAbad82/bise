@@ -31,8 +31,8 @@ describe('the follow camera', () => {
     expect(corner.u).toBeCloseTo(0.5 / FOLLOW_ZOOM);
     expect(corner.v).toBeCloseTo(1 - 0.5 / FOLLOW_ZOOM);
   });
-  it('looks twice as close as the 4.4x follow (his m_47408), with room for his pinch past it', () => {
-    expect(FOLLOW_ZOOM).toBe(8.8);
+  it('looks a little wider than the 8.8x follow: the bim, its desk and its neighbours (his m_48928), with room for his pinch past it', () => {
+    expect(FOLLOW_ZOOM).toBe(6);
     expect(FOLLOW_ZOOM).toBeLessThan(MAX_ZOOM);
   });
   it('eases there in about 300 ms, at once under reduced motion', () => {
