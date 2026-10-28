@@ -3,7 +3,9 @@
 Gabriel, 2026-10-28 (page release-cadence): « une release dès qu'il y a des changements [...] en
 continu [...] l'écart minimum entre deux releases, ça peut être genre deux heures ». A release
 (the terminal and the desktop app, together) starts as soon as something users get has landed,
-at least 2 h after the last one, one at a time, and ends in ONE notification: his word to publish.
+at least 2 h after the last one, one at a time, and goes out on its own: published, no word of his
+asked (Gabriel 2026-10-28, main m_49010: « ne me demande plus pour publier des versions [...] tu
+peux publier les versions tout seul »). Main gets one line per release.
 
 Who: the release manager (the `marketing` agent). What wakes it: an `sb every 30m` timer (never a
 launchd job or a login item: off by his choice). What decides: `scripts/release_slot.py`. What
@@ -31,19 +33,19 @@ runs the checked part: `scripts/release_cut.sh`.
    <next terminal tag> --rev <sha> --whats-new <file>` (no `--publish`): tag, push, release.yml,
    the DRAFT checked. Its darwin jobs wait on the desktop-release environment's approval: the
    release manager approves them itself (`gh api repos/gvergnaud/bise/actions/runs/<run>/
-   pending_deployments -X POST`, state approved), as a draft is seen by no one (Gabriel 2026-10-28,
-   page release-cadence q-sign: « oui, valide la signature du brouillon, la publication reste à
-   moi »). Only this one: the publish and the app's approval stay his word.
-7. **The notification**, through main, one: the sha, the what's new, `1. publier 2. pas cette fois`.
-8. On `publier`: `publish-release.sh <tag> --publish` (every terminal sees it), then `git push
-   origin <desktop tag>` (desktop-release.yml: one job, one approval: build, sign, notarize, the
-   draft, beta: `publier` covers that run's approval). keep-current then moves his app and hubs.
-   `release_slot.py end`. Stable (Actions > desktop-release > publish, channel stable) stays a
-   separate go of his, asked through main once beta is out (main m_48999; whether `publier` should
-   cover it too is an open question on the page release-cadence).
-   On `pas cette fois`: `gh release delete <tag> --yes` (the draft nobody saw), `git push origin
-   :refs/tags/<tag>` (no v* tag left on an old commit), `git tag -d <desktop tag>` (its name is
-   free for the next cut), `release_slot.py end`.
+   pending_deployments -X POST`, state approved), as every approval below.
+7. **Publish the terminal**: `publish-release.sh <tag> --publish` (every terminal sees it).
+8. **The app**: `git push origin <desktop tag>` (desktop-release.yml: one job, one approval,
+   approved as above: build, sign, notarize, the draft, beta), then stable (`gh workflow run
+   desktop-release.yml -f action=publish -f tag=<desktop tag> -f channel=stable`, its approval as
+   above), once beta is out. keep-current then moves his app and hubs. `release_slot.py end`.
+9. **One line to main**: the two tags, the sha, the what's new in one sentence.
+
+A step that fails stops the release there: nothing more goes out, `release_slot.py end`, the line
+to main says where it stopped and why (a terminal draft left out also skips the next wakes until
+it is published or deleted). A draft to drop: `gh release delete <tag> --yes`, `git push origin
+:refs/tags/<tag>` (no v* tag left on an old commit), `git tag -d <desktop tag>` (its name free for
+the next cut).
 
 ## Rules
 
@@ -53,6 +55,7 @@ runs the checked part: `scripts/release_cut.sh`.
 - Only on a ready Mac: on AC, load under 12, no quick gate running (`release_slot.py` skips
   otherwise): on battery `nightly_desktop.sh` runs nothing, under load its end-to-end steps go red
   with no real cause.
-- Publishing (terminal `--publish`, the app's stable channel) and the deployment approvals are his
-  word.
+- No word of his is asked: publishing (terminal `--publish`, beta, stable) and the desktop-release
+  environment's approvals are the release manager's (Gabriel 2026-10-28). Never a hand tag: the
+  checks above are what stands between main and every install.
 - One release at a time: a draft out or a cut under way (`release_slot.py start`) skips the wake.

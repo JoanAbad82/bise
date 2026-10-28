@@ -3,7 +3,8 @@
 qu'il y a des changements [...] l'écart minimum entre deux releases, ça peut être genre deux
 heures »). A timer (sb every, never launchd) wakes the release manager; this script decides
 whether a cut starts now. It never cuts: the steps of a cut and who does each are in
-docs/release-cadence.md.
+docs/release-cadence.md. Every release goes out on its own: no word of his is asked (Gabriel
+2026-10-28).
 
   scripts/release_slot.py [--min-gap-h 2] [--repo <tree>] [--now <epoch>]
       prints 'slot: cut <sha12>' or 'slot: skip: <why>', then what it read: main's tip, the last
@@ -14,7 +15,7 @@ docs/release-cadence.md.
   scripts/release_slot.py end            the cut ended (published, or not this time, or skipped)
 
 Skip, in this order: a cut is under way (the marker, younger than STALE_H; an older one is named
-and ignored); a terminal draft is out (a cut waits on his word: one release at a time); nothing
+and ignored); a terminal draft is out (a cut not finished, or one that stopped: one release at a time); nothing
 new on main since the last published terminal release; nothing shipped changed (only docs/,
 tests/, private/...: NOT_SHIPPED); the last terminal release was published less than --min-gap-h
 ago (says when the next can start); the tip gate ran on the tip and found it red; the Mac is
@@ -86,7 +87,7 @@ def decide(now, s):
     if cut and now - cut[1] < STALE_H * 3600:
         return "skip", "a cut is under way on %s since %s" % (cut[0][:12], hm(cut[1]))
     if s["draft"]:
-        return "skip", "the terminal draft %s waits on his word: one release at a time" % s["draft"]
+        return "skip", "the terminal draft %s is out (a cut not finished, or stopped): one release at a time" % s["draft"]
     if s["tip"] == s["last_sha"] or s["since"] == 0:
         return "skip", "nothing new on main since the last release"
     if not s["shipped"]:
