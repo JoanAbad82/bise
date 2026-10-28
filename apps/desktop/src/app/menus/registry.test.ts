@@ -121,8 +121,10 @@ describe('the other things', () => {
 
   it('an artifact: its file items only with a file there', () => {
     const e = { kind: 'artifact', project: P, id: 'a1' } as const;
-    expect(actsOf(menuOf({ e, row: artifact({ path: '/w/acme/notes.md' }) }))).toEqual(['move-right', 'new-window', 'quick-look', 'show-in-finder', 'copy-link', 'copy-path']);
-    expect(actsOf(menuOf({ e, row: artifact({ path: '/w/acme/notes.md', gone: true }) }))).toEqual(['move-right', 'new-window', 'copy-link']);
+    expect(actsOf(menuOf({ e, row: artifact({ path: '/w/acme/notes.md' }) }))).toEqual(['pin', 'move-right', 'new-window', 'quick-look', 'show-in-finder', 'copy-link', 'copy-path']);
+    expect(actsOf(menuOf({ e, row: artifact({ path: '/w/acme/notes.md', gone: true }) }))).toEqual(['pin', 'move-right', 'new-window', 'copy-link']);
+    // pinned (pins.ts, his m_49100): Unpin in Pin's place
+    expect(actsOf(menuOf({ e, row: artifact({ path: '/w/acme/notes.md' }), pinned: true }))[0]).toBe('unpin');
   });
 
   it("a Copy › of one item is that item flat ('Copy Link'), never a submenu of one", () => {
@@ -135,13 +137,14 @@ describe('the other things', () => {
 
   it('a process: Stop process only while it runs; its browser items only with a page', () => {
     const e = { kind: 'process', project: P, agent: 'perf', id: 'p1' } as const;
-    expect(actsOf(menuOf({ e, row: proc() }))).toEqual(['move-right', 'open-browser', 'copy-link', 'stop-process']);
-    expect(actsOf(menuOf({ e, row: proc({ state: { is: 'exited', rc: 0 }, ports: [] }) }))).toEqual(['move-right']);
+    expect(actsOf(menuOf({ e, row: proc() }))).toEqual(['pin', 'move-right', 'open-browser', 'copy-link', 'stop-process']);
+    expect(actsOf(menuOf({ e, row: proc({ state: { is: 'exited', rc: 0 }, ports: [] }), pinned: true }))).toEqual(['unpin', 'move-right']);
   });
 
-  it('a scheduled task: Stop schedule until it ended', () => {
+  it('a scheduled task: Pin · Stop schedule until it ended', () => {
     const e = { kind: 'scheduled', project: P, id: 7 } as const;
-    expect(actsOf(menuOf({ e, row: task() }))).toEqual(['stop-scheduled']);
+    expect(actsOf(menuOf({ e, row: task() }))).toEqual(['pin', 'stop-scheduled']);
+    expect(actsOf(menuOf({ e, row: task(), pinned: true }))).toEqual(['unpin', 'stop-scheduled']);
     expect(menuOf({ e, row: task({ ended_ms: 5 }) })).toEqual([]);
   });
 

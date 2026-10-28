@@ -52,9 +52,9 @@ type Of<K extends Entity['kind']> = Extract<Entity, { kind: K }>;
 export type MenuFacts =
   | { readonly e: Of<'agent'>; readonly row: Agent | undefined; readonly pinned: boolean; readonly reply: boolean }
   | { readonly e: Of<'project'>; readonly row: ProjectRow | undefined }
-  | { readonly e: Of<'artifact'>; readonly row: Artifact | undefined }
-  | { readonly e: Of<'process'>; readonly row: Proc | undefined }
-  | { readonly e: Of<'scheduled'>; readonly row: ScheduledTask | undefined }
+  | { readonly e: Of<'artifact'>; readonly row: Artifact | undefined; readonly pinned?: boolean }
+  | { readonly e: Of<'process'>; readonly row: Proc | undefined; readonly pinned?: boolean }
+  | { readonly e: Of<'scheduled'>; readonly row: ScheduledTask | undefined; readonly pinned?: boolean }
   /** a panel tab: the menu of the thing in it (`inner`, none for Overview, New tab, a terminal) under its own items */
   | { readonly e: Of<'tab'>; readonly inner: MenuFacts | undefined; readonly moveable: boolean; readonly closable: boolean; readonly others: boolean }
   /** an office, a PR, a commit, a diff, a plugin: opened in a tab or a window */
@@ -194,29 +194,34 @@ function projectMenu(p: ProjectRow): PopupItem[] {
   ]);
 }
 
-/** An artifact: Open, Open in new window · Quick Look, Show in Finder (a file) · Copy › Link. */
-function artifactMenu(a: Artifact): PopupItem[] {
+/** Pin, or Unpin when it is (pins.ts). */
+const pinItem = (pinned: boolean): PopupItem => (pinned ? item('unpin', menus.unpin) : item('pin', menus.pin));
+
+/** An artifact: Pin · Open, Open in new window · Quick Look, Show in Finder (a file) · Copy › Link. */
+function artifactMenu(a: Artifact, pinned: boolean): PopupItem[] {
   const file = present(a.path) && a.gone !== true;
   return grouped([
+    [pinItem(pinned)],
     [item('move-right', menus.move_right), item('new-window', menus.new_window)],
     when(file, item('quick-look', menus.quick_look), item('show-in-finder', menus.show_in_finder)),
     copySub([...when(present(a.url), item('copy-link', menus.copy_link)), ...when(file, item('copy-path', menus.copy_path))]),
   ]);
 }
 
-/** A process: Open · Open in browser, Copy › Link · Stop process (running only). */
-function processMenu(p: Proc): PopupItem[] {
+/** A process: Pin, Open · Open in browser, Copy › Link · Stop process (running only). */
+function processMenu(p: Proc, pinned: boolean): PopupItem[] {
   const url = procUrl(p);
   return grouped([
-    [item('move-right', menus.move_right)],
+    [pinItem(pinned), item('move-right', menus.move_right)],
     [...when(url !== undefined, item('open-browser', menus.open_browser)), ...copySub(when(url !== undefined, item('copy-link', menus.copy_link)))],
     when(p.state.is === 'running', item('stop-process', menus.stop_process)),
   ]);
 }
 
-/** A scheduled task: Stop schedule while it still runs. */
-function scheduledMenu(t: ScheduledTask): PopupItem[] {
-  return when(t.ended_ms == null, item('stop-scheduled', menus.stop_scheduled));
+/** A scheduled task: Pin · Stop schedule, while it still runs. */
+function scheduledMenu(t: ScheduledTask, pinned: boolean): PopupItem[] {
+  const live = t.ended_ms == null;
+  return grouped([when(live, pinItem(pinned)), when(live, item('stop-scheduled', menus.stop_scheduled))]);
 }
 
 /** The items of `f`'s menu, in order; [] when there is nothing to do (its row left). Pure. */
@@ -232,15 +237,15 @@ export function menuOf(f: MenuFacts): PopupItem[] {
     }
     case 'artifact': {
       const a = f as Extract<MenuFacts, { e: Of<'artifact'> }>;
-      return a.row === undefined ? [] : artifactMenu(a.row);
+      return a.row === undefined ? [] : artifactMenu(a.row, a.pinned === true);
     }
     case 'process': {
       const p = f as Extract<MenuFacts, { e: Of<'process'> }>;
-      return p.row === undefined ? [] : processMenu(p.row);
+      return p.row === undefined ? [] : processMenu(p.row, p.pinned === true);
     }
     case 'scheduled': {
       const t = f as Extract<MenuFacts, { e: Of<'scheduled'> }>;
-      return t.row === undefined ? [] : scheduledMenu(t.row);
+      return t.row === undefined ? [] : scheduledMenu(t.row, t.pinned === true);
     }
     case 'tab': {
       const t = f as Extract<MenuFacts, { e: Of<'tab'> }>;

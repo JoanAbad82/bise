@@ -56,6 +56,20 @@ describe('the agents list', () => {
     expect([...rankedOf([main, ag('x'), ag('y')])]).toEqual([['main', 0], ['x', 1], ['y', 2]]);
   });
 
+  it("⌥ numbers read .rank, plus pins.ts's partition: his pinned agents first, each group in the hub's rank; ⌥N is the Nth row", () => {
+    const main = ag('main', { main: true, rank: 0 });
+    const [p99, alerts, docs, ci] = [ag('p99', { rank: 3 }), ag('alerts', { rank: 1 }), ag('docs', { rank: 2 }), ag('ci', { rank: 4 })];
+    const live = [p99, main, alerts, docs, ci];
+    // no pin: the hub's rank itself
+    expect(rankedOf(live, [])).toEqual(rankedOf(live));
+    // pinned in any order: they lead in the hub's rank (ci after p99), main stays 0, the rest keep theirs
+    expect([...rankedOf(live, ['ci', 'p99'])].sort((a, b) => a[1] - b[1])).toEqual([['main', 0], ['p99', 1], ['ci', 2], ['alerts', 3], ['docs', 4]]);
+    // a pin of a name no longer live changes nothing
+    expect(rankedOf(live, ['gone'])).toEqual(rankedOf(live));
+    // main pinned stays ⌥0
+    expect(rankedOf(live, ['main']).get('main')).toBe(0);
+  });
+
   it('the numbers hold still while ⌥ is held, and a moment after an ⌥N jump', () => {
     const shown = new Map([['main', 0], ['a', 1], ['b', 2], ['c', 3]]);
     // the hub moved c up, dropped a, brought d: held, b and c keep theirs, d goes last

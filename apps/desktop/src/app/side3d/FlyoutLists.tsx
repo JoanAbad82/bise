@@ -27,6 +27,7 @@ import { groupParts, groupWords } from './lists';
 import { artifactObj, laterObj, procObj } from './objects';
 import { openTab } from './ports';
 import { usePortFull, type PortBoxes } from './portfit';
+import { procPinId } from '../pins';
 
 /** a row's object, css px */
 export const ROW_PX = 40;
@@ -34,7 +35,7 @@ export const ROW_PX = 40;
 const CHIP: Record<ReturnType<typeof kindOf>, AppIconName> = { pr: 'branch', page: 'file', file: 'file', shots: 'artifacts' };
 
 /** `group`: its project's name on bise's own screen (designer m_45706: 'acme › perf'), on each row here. */
-export function ArtifactRow({ it, now, group }: { it: Item; now: number; group?: string }) {
+export function ArtifactRow({ it, now, group, pinned = false }: { it: Item; now: number; group?: string; pinned?: boolean }) {
   const a = it.a;
   const menu = useEntityMenu({ kind: 'artifact', project: it.project, id: a.id });
   // ⌘⏎ with the pointer on the row: its head's first button (artifacts/front.ts rowPrimary)
@@ -63,6 +64,7 @@ export function ArtifactRow({ it, now, group }: { it: Item; now: number; group?:
         openTab({ kind: 'artifact', project: it.project, id: a.id });
       }}
       menu={menu}
+      pin={{ kind: 'artifact', project: it.project, id: a.id, on: pinned }}
       testId={`app.flyout.artifacts.${it.project}.${a.id}`}
     />
   );
@@ -96,7 +98,7 @@ function procBoxes(el: HTMLElement): PortBoxes {
   return { line: el.querySelector('.s3-row-lines'), cmd: el.querySelector('.s3-row-l1'), port: el.querySelector('.s3-port') };
 }
 
-export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: string }) {
+export function ProcRow({ x, now, group, pinned = false }: { x: ProcItem; now: number; group?: string; pinned?: boolean }) {
   const p = x.p;
   const menu = useEntityMenu({ kind: 'process', project: x.project, agent: p.agent, id: p.id });
   const on = isRunning(p);
@@ -136,12 +138,13 @@ export function ProcRow({ x, now, group }: { x: ProcItem; now: number; group?: s
         openTab({ kind: 'process', project: x.project, agent: p.agent, id: p.id });
       }}
       menu={menu}
+      pin={{ kind: 'process', project: x.project, id: procPinId(p.agent, p.id), on: pinned }}
       testId={`app.flyout.processes.${x.project}.${p.agent}.${p.id}`}
     />
   );
 }
 
-export function TaskRow({ x, now, group }: { x: Task; now: number; group?: string }) {
+export function TaskRow({ x, now, group, pinned = false }: { x: Task; now: number; group?: string; pinned?: boolean }) {
   const menu = useEntityMenu({ kind: 'scheduled', project: x.project, id: x.t.id });
   return (
     <SideRow
@@ -154,6 +157,7 @@ export function TaskRow({ x, now, group }: { x: Task; now: number; group?: strin
         openTab({ kind: 'scheduled', project: x.project, id: x.t.id });
       }}
       menu={menu}
+      pin={{ kind: 'schedule', project: x.project, id: String(x.t.id), on: pinned }}
       testId={`app.flyout.scheduled.${x.project}.${String(x.t.id)}`}
     />
   );

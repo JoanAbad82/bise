@@ -23,6 +23,8 @@ import { noteWindowKey, useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { usePrefs, useProjects, useStore } from '@/store';
+import type { Prefs } from '@/settings/prefs';
+import { pinSetOf } from './pins';
 import { setMyLook } from '@/bims/mine';
 import { useFnVoice } from '@/voicemode';
 import { SettingsScreen } from '@/settings';
@@ -596,7 +598,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
         library: libraryPlaces,
         // ⌥N reads the numbers he sees (held), then they hold still a moment (agent-rank)
         numbers: (p) => {
-          const n = numbersOf(p, store.agents(p), true);
+          const n = numbersOf(p, store.agents(p), true, undefined, pinSetOf(store.prefs() as Prefs | null, 'agent').get(p));
           noteJump();
           return n;
         },

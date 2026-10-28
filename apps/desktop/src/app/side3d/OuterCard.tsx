@@ -33,6 +33,8 @@ import { askButtons, pickIntent } from './model';
 import { bubbleThing, type BubbleId } from './objects';
 import { groupParts } from './lists';
 import { useCalm } from './useCalm';
+import { PinButton, PinMark } from '../pinbutton';
+import { pinnedIn, usePins } from '../pins';
 
 const keyOfLine = (x: { readonly r: BarRow }): string => x.r.key;
 import { OUTER_TOP } from './tilestate';
@@ -96,6 +98,7 @@ export function outerRows(live: readonly BarRow[], agents: readonly ProjAgent[])
 /** AGENTS in the card: its first 10 lines, then '+ N more' adds 50. */
 export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpen, onOpenPr, bims, onAsk }: OuterAgentsProps) {
   const rows = outerRows(live, agents);
+  const pins = usePins('agent');
   const byKey = new Map(agents.map((x) => [`${x.project}/${x.a.name}`, x.a]));
   const [open, setOpen] = useState<string | null>(null);
   const asked = open === null ? undefined : rows.find((x) => x.r.key === open)?.r;
@@ -133,6 +136,7 @@ export function OuterAgents({ live, agents, cards, at, here, now, groupOf, onOpe
         return (
           <AgentLine key={r.key} r={r} pr={pr} wt={wt} job={a === undefined ? r.sub : jobOf(a)} card={card} at={at} now={now}
             here={here.project === r.project && here.agent === r.agent} group={groupOf?.(r.project)} open={open === r.key}
+            pinned={r.agent !== undefined && pinnedIn(pins, r.project, r.agent)}
             lit={linked(r) && r.agent === litBim}
             onLit={linked(r) ? (on) => {
               bimsLit.set(on ? { name: r.agent ?? '', from: 'row' } : null, 'row');
@@ -193,6 +197,8 @@ interface LineProps {
   readonly now: number;
   readonly here: boolean;
   readonly group: string | undefined;
+  /** he pinned it (pins.ts): the pin mark at rest, 'Unpin' on hover */
+  readonly pinned: boolean;
   readonly open: boolean;
   readonly onToggle: () => void;
   readonly onOpen: (r: BarRow) => void;
@@ -215,7 +221,7 @@ export function lineTip(r: Pick<BarRow, 'name' | 'main'>, job: string): string {
 }
 
 /** One agent's line: mark · head · name · age · PR · ψ; an ask opens in place under it. */
-function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle, onOpen, onOpenPr, lit, onLit }: LineProps) {
+function AgentLine({ r, pr, wt, job, card, at, now, here, group, pinned, open, onToggle, onOpen, onOpenPr, lit, onLit }: LineProps) {
   const store = useStore();
   const menu = useEntityMenu({ kind: 'agent', project: r.project, agent: r.agent ?? '' });
   const st = r.state;
@@ -225,6 +231,7 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
   const key = r.glyph.startsWith('⌥') ? r.glyph : null;
   const age = asks ? waitLen(now - card.since_ms) : st?.tone === 'work' ? (r.time ?? '') : '';
   const b = card === undefined ? null : askButtons(card);
+  const pinnable = r.main !== true && r.agent !== undefined;
   return (
     <div className="s3-orow" data-asks={asks || undefined} data-here={here || undefined} data-back={st?.back === true || undefined} data-open={open || undefined}
       data-lit={lit || undefined} data-calm={r.key} onContextMenu={menu.onContextMenu} data-testid={id}
@@ -245,6 +252,7 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
           <ThingPic thing={{ head: r.agent ?? '', main: r.main === true }} px={OUTER_HEAD_PX} tile="thread" />
         </span>
         <span className="s3-orow-name" data-testid={`${id}.name`}>{g.project !== '' && <span className="s3-group">{g.project}</span>}{g.name}</span>
+        {pinned && <PinMark testId={`${id}.pinned`} />}
         {age !== '' && <span className="s3-orow-age" {...tipAttrs(st?.tip)} data-testid={`${id}.age`}>{age}</span>}
         {pr !== undefined && (
           <span className="s3-orow-pr" role="button" {...tipAttrs(r.mark?.tip ?? `#${String(pr)}`)} onClick={(e) => {
@@ -253,7 +261,10 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, open, onToggle,
           }} data-testid={`${id}.pr`}><AppIcon name="branch" size={14} />#{String(pr)}</span>
         )}
         {wt && <span className="s3-orow-wt" {...tipAttrs(side.in_worktree)} data-testid={`${id}.wt`}>ψ</span>}
+        {/* the hover pin's room at the line's end (pinbutton.tsx); main leads anyway, never pinned here */}
+        {pinnable && <span className="s3-pin-room" />}
       </Press>
+      {pinnable && <PinButton pin={{ kind: 'agent', project: r.project, id: r.agent ?? '', on: pinned }} look="s3-pin s3-opin" testId={`${id}.pin`} />}
       {open && card !== undefined && b !== null && (
         <div className="s3-orow-ask" data-testid={`${id}.ask`}>
           <span className="s3-orow-q">{card.question}</span>

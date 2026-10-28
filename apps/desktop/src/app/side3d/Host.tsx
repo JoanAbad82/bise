@@ -48,6 +48,7 @@ import { Splitter } from '../Splitter';
 import { useAgentRows } from '../agentrows';
 import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
+import { pinFirst, pinnedIn, procPinId, usePins } from '../pins';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, OUTER_W, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
 
@@ -179,9 +180,16 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
   const bar = barScope(route, scope);
   const artScope = scopeWords(bar, 'artifacts', name);
   const allArtifacts = useAllArtifacts(scope);
-  const artifacts = bar.level === 'agent' ? allArtifacts.filter((it) => inScope(bar, it.a.agent)) : allArtifacts;
-  const tasks = useAllScheduled(scope);
-  const procs = useAllProcesses(scope);
+  // what he pinned leads each list, a stable partition (pins.ts pinFirst)
+  const artPins = usePins('artifact');
+  const schedPins = usePins('schedule');
+  const procPins = usePins('process');
+  const artPinned = (it: { project: string; a: { id: string } }) => pinnedIn(artPins, it.project, it.a.id);
+  const schedPinned = (x: { project: string; t: { id: number } }) => pinnedIn(schedPins, x.project, String(x.t.id));
+  const procPinned = (x: { project: string; p: { agent: string; id: string } }) => pinnedIn(procPins, x.project, procPinId(x.p.agent, x.p.id));
+  const artifacts = pinFirst(bar.level === 'agent' ? allArtifacts.filter((it) => inScope(bar, it.a.agent)) : allArtifacts, artPinned);
+  const tasks = pinFirst(useAllScheduled(scope), schedPinned);
+  const procs = pinFirst(useAllProcesses(scope), procPinned);
   // the processes are asked once here, as the old right bar did; the hub sends them again on each change
   const asked = all ? rows.map((p) => p.project).join('\n') : scope;
   useEffect(() => {
@@ -496,7 +504,7 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
           add: <AddButton place={addPlace} testId="app.flyout.artifacts.add" />,
           ...(artScope === null ? {} : { scope: { words: artScope.words, tip: artScope.tip } }),
           foot: { left: artFoot(artifacts.length, new Set(artifacts.map((x) => x.project)).size), links: [{ text: side.all_artifacts, testId: 'app.flyout.artifacts.all', onClick: () => { router.go({ screen: 'artifacts', project: scope }); } }] },
-          rows: artifacts.length === 0 ? <Empty>{artScope?.empty ?? side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />),
+          rows: artifacts.length === 0 ? <Empty>{artScope?.empty ?? side.no_artifacts}</Empty> : artifacts.slice(0, ROWS).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} pinned={artPinned(it)} />),
         };
       case 'scheduled':
         return {
@@ -504,7 +512,7 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
           foot: { left: '', links: [{ text: side.all_scheduled, testId: 'app.flyout.scheduled.all', onClick: () => { router.go({ screen: 'scheduled' }); } }] },
           rows: tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
             <>
-              {tasks.slice(0, ROWS).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} />)}
+              {tasks.slice(0, ROWS).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} pinned={schedPinned(x)} />)}
               {watching.map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />)}
             </>
           ),
@@ -513,7 +521,7 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
         return {
           id: b, name: bubbleName(b), says: saysOf(b),
           foot: { left: '', links: [{ text: side.all_processes, testId: 'app.flyout.processes.all', onClick: () => { router.go(all ? { screen: 'running' } : { screen: 'running', scope: { project } }); } }] },
-          rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} />),
+          rows: running.length === 0 ? <Empty>{side.no_processes}</Empty> : running.slice(0, ROWS).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} pinned={procPinned(x)} />),
         };
     }
   };
@@ -577,19 +585,19 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
         <OuterList id="artifacts" name={bubbleName('artifacts')} count={String(artifacts.length)} onAll={() => {
           router.go({ screen: 'artifacts', project: scope });
         }} total={artifacts.length} empty={<Empty>{artScope?.empty ?? side.no_artifacts}</Empty>}
-          rows={(n) => artifacts.slice(0, n).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} />)} />
+          rows={(n) => artifacts.slice(0, n).map((it) => <ArtifactRow key={`${it.project}/${it.a.id}`} it={it} now={now} group={groupOf(it.project)} pinned={artPinned(it)} />)} />
         <OuterList id="scheduled" name={bubbleName('scheduled')} count={String(sched)} onAll={() => {
           router.go({ screen: 'scheduled' });
         }} total={sched} empty={<Empty>{side.no_scheduled}</Empty>} rows={(n) => (
           <>
-            {tasks.slice(0, n).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} />)}
+            {tasks.slice(0, n).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} pinned={schedPinned(x)} />)}
             {watching.slice(0, Math.max(0, n - tasks.length)).map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />)}
           </>
         )} />
         <OuterList id="processes" name={bubbleName('processes')} count={String(running.length)} onAll={() => {
           router.go(all ? { screen: 'running' } : { screen: 'running', scope: { project } });
         }} total={running.length} empty={<Empty>{side.no_processes}</Empty>}
-          rows={(n) => running.slice(0, n).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} />)} />
+          rows={(n) => running.slice(0, n).map((x) => <ProcRow key={`${x.project}/${x.p.agent}/${x.p.id}`} x={x} now={now} group={groupOf(x.project)} pinned={procPinned(x)} />)} />
       </OuterCard>
       </>
     );

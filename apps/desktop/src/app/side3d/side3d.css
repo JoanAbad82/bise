@@ -770,6 +770,43 @@
 /* a row with its object: 48, a 40 object, 12 between */
 .s3-row {
   display: block;
+  position: relative;
+}
+/* the hover pin (app/pinbutton.tsx, his m_49100): over the end's last thing (its age, its ∿, its
+   room), 8 from the row's right as the end is; shown while the pointer is on the row or the
+   keyboard is on it; the end's last thing and the pin mark give way to it */
+.s3-pin {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: var(--s-2);
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+}
+.s3-row:hover > .s3-pin,
+.s3-orow:hover > .s3-pin,
+.s3-pin:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.s3-row:is(:hover, :has(> .s3-pin:focus-within)) .s3-row-end > :last-child,
+.s3-row:is(:hover, :has(> .s3-pin:focus-within)) .s3-row-end > .b-pinmark,
+.s3-orow:is(:hover, :has(> .s3-pin:focus-within)) .s3-orow-open > .b-pinmark {
+  visibility: hidden;
+}
+/* an agent's line: 28 high, its words 12 from its right (.s3-orow-open's padding) */
+.s3-orow {
+  position: relative;
+}
+.s3-opin {
+  right: var(--s-3);
+  bottom: auto;
+  height: var(--h-row-tight);
+}
+.s3-pin-room {
+  width: var(--s-4);
 }
 .s3-row-body {
   display: flex;

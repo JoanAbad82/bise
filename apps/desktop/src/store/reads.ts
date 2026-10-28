@@ -195,9 +195,17 @@ export class StoreReads extends StoreBase {
   scheduled(project: string): readonly ScheduledTask[] {
     return this.slice(`scheduled:${project}`, EMPTY);
   }
+  /** the project's scheduled event came (its list is the hub's, even empty) */
+  scheduledCame(project: string): boolean {
+    return this.slices.has(`scheduled:${project}`);
+  }
   /** the processes its agents left running, then the ones that ended in the last 24 h; none until the hub said */
   processes(project: string): readonly Proc[] {
     return this.slice(`processes:${project}`, EMPTY);
+  }
+  /** the project's processes event came (its list is the hub's, even empty) */
+  processesCame(project: string): boolean {
+    return this.slices.has(`processes:${project}`);
   }
   merged(project: string): readonly Merged[] {
     return this.slice(`merged:${project}`, EMPTY);

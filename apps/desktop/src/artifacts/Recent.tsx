@@ -10,6 +10,7 @@ import { useRef, useState } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { library } from '@/proto/words_library.gen';
 import { panel } from '@/proto/words_panel.gen';
+import { frame } from '@/proto/words_frame.gen';
 import { agoWords } from '@/composer/pick';
 import { Thumb } from './thumbs';
 import { pathOf, type Library } from './folders';
@@ -33,7 +34,9 @@ export function recentLine(lib: Library, it: Item, now: number): { age: string; 
   return { age: agoWords(createdOf(it), now).replace(/ ago$/, ''), folder };
 }
 
-export function RecentRow({ items, lib, now, list, onOpen, onAll, testId }: {
+export function RecentRow({ items, lib, now, list, onOpen, onAll, kind = 'recent', testId }: {
+  /** 'pinned': the row of what he pinned (his m_49100), above Recent, its items as given, no 'all ›' */
+  kind?: 'recent' | 'pinned';
   /** already the shown ones (scope, kind chip), any order */
   items: readonly Item[];
   lib: Library;
@@ -41,13 +44,15 @@ export function RecentRow({ items, lib, now, list, onOpen, onAll, testId }: {
   /** the ☰ list view: one-line chips */
   list: boolean;
   onOpen: (it: Item) => void;
-  onAll: () => void;
+  onAll?: () => void;
   testId: string;
 }) {
   const strip = useRef<HTMLDivElement>(null);
   // scrolled: the fade shows at the left edge too
   const [scrolled, setScrolled] = useState(false);
-  const row = recentOf(items);
+  // 'pinned': the ones he pinned, as given (app/pins.ts: pin order), no 'all ›'
+  const pinned = kind === 'pinned';
+  const row = pinned ? items : recentOf(items);
   if (row.length === 0) return null;
   const page = (dir: 1 | -1) => {
     const el = strip.current;
@@ -55,14 +60,14 @@ export function RecentRow({ items, lib, now, list, onOpen, onAll, testId }: {
     el.scrollBy({ left: dir * Math.max(160, el.clientWidth - 48), behavior: 'smooth' });
   };
   return (
-    <section className={`art-recent${list ? ' list' : ''}`} data-testid={testId} aria-label={library.recent}>
+    <section className={`art-recent${list ? ' list' : ''}`} data-testid={testId} aria-label={pinned ? frame.pinned : library.recent}>
       <header className="art-recent-h">
-        <span className="t">{library.recent}</span>
-        <span className="n" data-testid={`${testId}.n`} {...tipAttrs(library.recent_row_tip)}>{row.length}</span>
+        <span className="t">{pinned ? frame.pinned : library.recent}</span>
+        <span className="n" data-testid={`${testId}.n`} {...tipAttrs(pinned ? undefined : library.recent_row_tip)}>{row.length}</span>
         <span className="sp" />
         <Press look="art-recent-pg" aria-label={library.recent_row_back} {...tipAttrs(library.recent_row_back)} onClick={() => { page(-1); }} data-testid={`${testId}.back`}>‹</Press>
         <Press look="art-recent-pg" aria-label={library.recent_row_next} {...tipAttrs(library.recent_row_next)} onClick={() => { page(1); }} data-testid={`${testId}.next`}>›</Press>
-        <Press look="art-recent-all" {...tipAttrs(library.recent_row_all_tip)} onClick={onAll} data-testid={`${testId}.all`}>{library.recent_row_all} ›</Press>
+        {onAll !== undefined && <Press look="art-recent-all" {...tipAttrs(library.recent_row_all_tip)} onClick={onAll} data-testid={`${testId}.all`}>{library.recent_row_all} ›</Press>}
       </header>
       <div className="art-recent-s" ref={strip} data-testid={`${testId}.strip`} data-scrolled={scrolled || undefined}
         onScroll={(e) => { setScrolled(e.currentTarget.scrollLeft > 0); }}>

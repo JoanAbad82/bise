@@ -96,11 +96,13 @@ export type Slots = ReadonlyMap<string, number>;
  * main 0, the others 1..n by rank; a row with none (an older hub) after them, in start order.
  * Nothing is ranked here. Pure.
  */
-export function rankedOf(live: readonly Agent[]): Map<string, number> {
+export function rankedOf(live: readonly Agent[], pinned: readonly string[] = []): Map<string, number> {
+  // the agents he pinned (app/pins.ts) first, a stable partition: each group keeps the hub's rank
+  const pin = (a: Agent) => (pinned.includes(a.name) ? 0 : 1);
   const others = live
     .filter((a) => !a.main)
     .map((a, i) => ({ a, i }))
-    .sort((x, y) => (x.a.rank ?? Number.MAX_SAFE_INTEGER) - (y.a.rank ?? Number.MAX_SAFE_INTEGER) || x.i - y.i);
+    .sort((x, y) => pin(x.a) - pin(y.a) || (x.a.rank ?? Number.MAX_SAFE_INTEGER) - (y.a.rank ?? Number.MAX_SAFE_INTEGER) || x.i - y.i);
   const out = new Map<string, number>();
   for (const a of live) if (a.main) out.set(a.name, 0);
   others.forEach(({ a }, k) => out.set(a.name, k + 1));
@@ -141,9 +143,10 @@ export function noteJump(now = Date.now()): void {
 /**
  * The project's ⌥ numbers now, as the window shows them: the hub's rank (rankedOf), held while ⌥
  * is held (`alt`) and a moment after an ⌥N jump (heldNumbers). The sidebar shows them, ⌥1-9 reads them.
+ * `pinned`: the project's pinned agents (app/pins.ts), first: ⌥N is the Nth row he sees.
  */
-export function numbersOf(project: string, agents: readonly Agent[], alt = false, now = Date.now()): Slots {
-  const next = rankedOf(liveOf(agents));
+export function numbersOf(project: string, agents: readonly Agent[], alt = false, now = Date.now(), pinned: readonly string[] = []): Slots {
+  const next = rankedOf(liveOf(agents), pinned);
   const out = holds(alt, jumpedAt, now) ? heldNumbers(shownBy.get(project), next) : next;
   shownBy.set(project, out);
   return out;

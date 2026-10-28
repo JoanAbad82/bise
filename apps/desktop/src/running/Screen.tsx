@@ -20,6 +20,8 @@ import { hero } from '@/proto/words_hero.gen';
 import { useListKeys } from '@/app/listkeys';
 import { InBar } from '@/app/barslot';
 import { useKeptScroll } from '@/app/keep';
+import { pinFirst, pinnedIn, procPinId, usePins, type PinSet } from '@/app/pins';
+import { PinMark } from '@/app/pinbutton';
 import { useProjects, useStore } from '@/store';
 import { useBarAgents } from '@/app/baragents';
 import { procRoots } from '@/app/barrows';
@@ -68,7 +70,8 @@ export function RunningScreen() {
   const projects = useProjects();
   const agents = useBarAgents('');
   const roots = useMemo(() => procRoots(projects, agents), [projects, agents]);
-  return <RunningView items={shown} ports={ports} home={home} roots={roots} opened={opened} scoped={scope !== undefined} />;
+  const pins = usePins('process');
+  return <RunningView items={shown} ports={ports} home={home} roots={roots} opened={opened} scoped={scope !== undefined} pins={pins} />;
 }
 
 /** How often the shown screen says it again: the core lets its hold go 30 s after the last (LISTS_LEASE). */
@@ -85,7 +88,10 @@ export function RunningView({
   roots,
   opened,
   scoped = false,
+  pins,
 }: {
+  /** what he pinned (app/pins.ts): first in its project's group, the pin mark on its row */
+  pins?: PinSet;
   items: readonly ProcItem[];
   ports: RunningPorts;
   now?: number;
@@ -135,7 +141,9 @@ export function RunningView({
     }
   }
   const counts = countsOf(items, now);
-  const groups = groupsOf(items.filter((x) => matches(x, q)), filter, now, kept);
+  // what he pinned leads its project's group (app/pins.ts: a stable partition)
+  const isPin = (x: ProcItem) => pins !== undefined && pinnedIn(pins, x.project, procPinId(x.p.agent, x.p.id));
+  const groups = groupsOf(items.filter((x) => matches(x, q)), filter, now, kept).map((g) => ({ ...g, items: pinFirst(g.items, isPin) }));
   const order = groups.flatMap((g) => g.items.map(keyOf));
   const term = useRef<Xterm | null>(null);
   const onTerm = useCallback((t: Xterm | null) => {
@@ -242,7 +250,7 @@ export function RunningView({
                 {g.items.map((x) => {
                   const k = keyOf(x);
                   return (
-                    <ProcRow key={k} x={x} k={k} on={k === sel} s={stateOf(x.p, stopping.has(k))} now={now} home={home}
+                    <ProcRow key={k} x={x} k={k} on={k === sel} s={stateOf(x.p, stopping.has(k))} now={now} home={home} pinned={isPin(x)}
                       onClick={() => {
                         setSel(k);
                         setOpen(k);
@@ -375,8 +383,8 @@ function Mark({ s }: { s: ReturnType<typeof stateOf> }) {
 /** One process (ds ListRow): its program in mono and its arguments dimmer, then its agent, its
  *  address and its age; the chosen one's 'open' (its address); its '…' and a right click are its
  *  menu (useEntityMenu: stop, open in a tab...). */
-function ProcRow({ x, k, on, s, now, home, onClick, onOpen }: {
-  x: ProcItem; k: string; on: boolean; s: ReturnType<typeof stateOf>; now: number; home: string | undefined;
+function ProcRow({ x, k, on, s, now, home, pinned, onClick, onOpen }: {
+  x: ProcItem; k: string; on: boolean; s: ReturnType<typeof stateOf>; now: number; home: string | undefined; pinned: boolean;
   onClick: () => void; onOpen: (url: string) => void;
 }) {
   const menu = useEntityMenu({ kind: 'process', project: x.project, agent: x.p.agent, id: x.p.id });
@@ -395,6 +403,7 @@ function ProcRow({ x, k, on, s, now, home, onClick, onOpen }: {
           {' · '}<span data-testid={`running.row.${k}.end`}>{endWords(x.p, s, now)}</span>
         </>}
         end={<>
+          {pinned && <PinMark testId={`running.row.${k}.pinned`} />}
           {on && u !== null && <RowAction onClick={() => { onOpen(u.url); }} tip={u.tip} testId={`running.row.${k}.go`}>{running.open}<AppIcon name="open" size={14} /></RowAction>}
           <MoreButton menu={menu} testId={`running.row.${k}.more`} />
         </>} />

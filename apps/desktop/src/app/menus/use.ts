@@ -13,7 +13,7 @@ import type { BiseApi, PopupAt } from '@/shared/api';
 import { entityKey, type Entity } from '@/shared/entity';
 import { closeOtherTabs, closeTab, moveTab, openTab, tabEntity, tabMoveable } from '../panel/tabs';
 import { panelState } from '../panel/state';
-import { isPinned, pin, pinsOf } from '../pins';
+import { isPinned, pinnedIn, pinSetOf, pinsOf, pinThing, procPinId, type PinKind } from '../pins';
 import type { Prefs } from '@/settings/prefs';
 import { MAIN, type Route } from '../route';
 import { RouterContext, useRoute, useRouter, type Router } from '../router';
@@ -31,6 +31,8 @@ export interface FactReads {
   readonly processes: (project: string) => readonly Proc[];
   readonly scheduled: (project: string) => readonly ScheduledTask[];
   readonly pinned: (project: string, agent: string) => boolean;
+  /** an artifact, a process or a timer is pinned (pins.ts: its kind and its pin id) */
+  readonly pinnedThing: (kind: PinKind, project: string, id: string) => boolean;
   readonly reply: (project: string, agent: string) => string | undefined;
   /** a panel tab's thing (none: New tab, a terminal), whether it moves, closes, whether others are open */
   readonly tab: (id: string) => { readonly inner: Entity | undefined; readonly moveable: boolean; readonly closable: boolean; readonly others: boolean };
@@ -46,11 +48,11 @@ export function factsOf(e: Entity, r: FactReads): MenuFacts {
     case 'project':
       return { e, row: r.projects().find((p) => p.project === e.project) };
     case 'artifact':
-      return { e, row: r.artifacts(e.project).find((a) => a.id === e.id) };
+      return { e, row: r.artifacts(e.project).find((a) => a.id === e.id), pinned: r.pinnedThing('artifact', e.project, e.id) };
     case 'process':
-      return { e, row: r.processes(e.project).find((p) => p.agent === e.agent && p.id === e.id) };
+      return { e, row: r.processes(e.project).find((p) => p.agent === e.agent && p.id === e.id), pinned: r.pinnedThing('process', e.project, procPinId(e.agent, e.id)) };
     case 'scheduled':
-      return { e, row: r.scheduled(e.project).find((t) => t.id === e.id) };
+      return { e, row: r.scheduled(e.project).find((t) => t.id === e.id), pinned: r.pinnedThing('schedule', e.project, String(e.id)) };
     case 'tab': {
       const t = r.tab(e.id);
       return { e, inner: t.inner === undefined ? undefined : factsOf(t.inner, r), moveable: t.moveable, closable: t.closable, others: t.others };
@@ -83,6 +85,7 @@ function readsOf(store: Store): FactReads {
     processes: (p) => store.processes(p),
     scheduled: (p) => store.scheduled(p),
     pinned: (p, a) => isPinned(pinsOf(store.prefs() as Prefs | null), p, a),
+    pinnedThing: (kind, p, id) => pinnedIn(pinSetOf(store.prefs() as Prefs | null, kind), p, id),
     reply: (p, a) => lastReply(store, p, a),
     tab: (id) => ({ inner: tabEntity(id), moveable: tabMoveable(id), closable: true, others: panelState.get().tabs.list.some((x) => x.id !== id) }),
   };
@@ -127,7 +130,7 @@ function fxOf(store: Store, router: Router | null): MenuFx {
     openPath: (path) => void bise?.openPath?.(path),
     quickLook: (path) => void bise?.quickLook?.(path),
     openExternal: (url) => void bise?.openExternal?.(url),
-    pin,
+    pin: pinThing,
     reply: (p, a) => lastReply(store, p, a),
     closeTab,
     closeOtherTabs,

@@ -539,6 +539,13 @@ body:has(.app-shell) {
   opacity: 0;
   transition: opacity 150ms var(--ease-out);
 }
+/* a pinned row's quiet mark at rest (pinbutton.tsx PinMark): the right side's rows, the pages */
+.b-pinmark {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--c-text-3);
+}
 .app-s-label {
   flex: none;
   display: flex;

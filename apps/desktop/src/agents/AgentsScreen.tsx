@@ -27,6 +27,8 @@ import { useEntityMenu } from '@/app/menus/use';
 import { useEntityAction } from '@/app/menus/actions';
 import { newAgent } from '@/app/newagent';
 import { WorkingMark } from '@/app/Marks';
+import { pinFirst, pinnedIn, usePins } from '@/app/pins';
+import { PinMark } from '@/app/pinbutton';
 import { archivedEnd, archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
 import { keepSheet, keptSheet, type SheetAsk } from './sheet';
 import { AgentSheet } from './Tune';
@@ -73,7 +75,10 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
   };
   useEntityAction('rename', take('name'));
   useEntityAction('change-model', take('model'));
-  const shown = showArchived ? archived : live;
+  // his pinned agents right after main (app/pins.ts: a stable partition, as the right side's ⌥N)
+  const pins = usePins('agent');
+  const isPin = (a: Agent) => !a.main && pinnedIn(pins, project, a.name);
+  const shown = showArchived ? archived : [...live.filter((a) => a.main), ...pinFirst(live.filter((a) => !a.main), isPin)];
   const now = useNow();
   const liveNow = liveFacts(live);
   // the row tint only on a row he picked (a key, a click, or kept from before a reload), never the
@@ -140,7 +145,7 @@ export function AgentsScreen({ project, archived: showArchived = false }: { proj
           ) : (
             <div className="ag-list" data-testid="agents.list">
               {shown.map((a) => (
-                <AgentItem key={a.name} project={project} a={a} sel={picked && sel === a.name} peek={peek === a.name} now={now}
+                <AgentItem key={a.name} project={project} a={a} sel={picked && sel === a.name} peek={peek === a.name} now={now} pinned={!showArchived && isPin(a)}
                   onClick={() => {
                     setSel(a.name);
                     setPicked(true);
@@ -179,7 +184,7 @@ export function StateMark({ a }: { a: Agent }) {
   return <Dot state={dotOf(a.status)} />;
 }
 
-const AgentItem = memo(function AgentItem({ project, a, sel, peek, now, onClick }: { project: string; a: Agent; sel: boolean; peek: boolean; now: number; onClick: () => void }) {
+const AgentItem = memo(function AgentItem({ project, a, sel, peek, now, pinned, onClick }: { project: string; a: Agent; sel: boolean; peek: boolean; now: number; pinned: boolean; onClick: () => void }) {
   const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
   const end = a.archived ? archivedEnd(a, now) : endOf(a, now).text;
   const line = lineOf(a);
@@ -195,7 +200,7 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek, now, onClick 
           <span className={asksHim(a) ? 'ag-end wait' : 'ag-end'} data-testid={`agents.end.${id}`}>{end}</span>
           {a.report != null && <span data-testid={`agents.report.${id}`}>{` · ${a.report.kind} · ${a.report.text}`}</span>}
         </>}
-        end={<MoreButton menu={menu} testId={`agents.more.${id}`} />} />
+        end={<>{pinned && <PinMark testId={`agents.pinned.${id}`} />}<MoreButton menu={menu} testId={`agents.more.${id}`} /></>} />
       {peek && <Peek project={project} agent={a.name} />}
     </div>
   );

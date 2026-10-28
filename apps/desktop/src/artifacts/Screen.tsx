@@ -22,6 +22,7 @@ import { DEPTH, useRouter } from '@/app/router';
 import { libraryExit } from '@/app/escape';
 import { publishColumn, retractColumn, useLibraryShown, type ColumnBits } from './library';
 import { useKeptScroll } from '@/app/keep';
+import { usePins } from '@/app/pins';
 import { useAllArtifacts } from './hooks';
 import { rowKey, useLook } from './List';
 import { usePutInMessage } from './Open';
@@ -86,6 +87,10 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
   const store = useStore();
   const router = useRouter();
   const all = useAllArtifacts();
+  // what he pinned: its own row above Recent, in pin order (app/pins.ts)
+  const artPins = usePins('artifact');
+  const pinnedOf = (items: readonly Item[]): Item[] =>
+    [...artPins].flatMap(([p, ids]) => ids.flatMap((id) => items.filter((it) => it.project === p && it.a.id === id)));
   const folders = useFolders();
   const projects = useProjects();
   useKeptScroll(`artifacts:${project}:${atRoute}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.scroll"]'));
@@ -458,6 +463,8 @@ export function ArtifactsScreen({ project = '', at: atRoute = '' }: { project?: 
       return (
         <>
           {/* the 20 newest, whatever their folder (page art-recent): the scope and the kind chip apply */}
+          {/* what he pinned (app/pins.ts, his m_49100), above Recent: the scope and the kind chip apply */}
+          <RecentRow kind="pinned" items={pinnedOf(shown)} lib={lib} now={now} list={view === 'list'} onOpen={openIt} testId="artifacts.pinned" />
           <RecentRow items={shown} lib={lib} now={now} list={view === 'list'} onOpen={openIt}
             onAll={() => { setAt({ at: 'recent' }); }} testId="artifacts.recent" />
           {themes.length > 0 && (

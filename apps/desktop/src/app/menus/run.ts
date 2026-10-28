@@ -9,6 +9,7 @@ import type { WindowOpen } from '@/shared/api';
 import type { Entity } from '@/shared/entity';
 import { formatRoute, MAIN } from '../route';
 import { agentBranch, agentPath, procUrl, type Act, type MenuFacts } from './registry';
+import { procPinId, type PinKind } from '../pins';
 
 /** The effects a pick may have. */
 export interface MenuFx {
@@ -27,7 +28,8 @@ export interface MenuFx {
   readonly openPath: (path: string) => void;
   readonly quickLook: (path: string) => void;
   readonly openExternal: (url: string) => void;
-  readonly pin: (project: string, agent: string, on: boolean) => void;
+  /** pin or unpin a thing (pins.ts pinThing: its kind, its project, its pin id) */
+  readonly pin: (kind: PinKind, project: string, id: string, on: boolean) => void;
   /** the agent's last answer held by this window (registry shows Copy › Last reply only then) */
   readonly reply: (project: string, agent: string) => string | undefined;
   readonly closeTab: (id: string) => void;
@@ -109,7 +111,10 @@ export function runAct(act: Act, f: MenuFacts, fx: MenuFx): void {
       return;
     case 'pin':
     case 'unpin':
-      if (e.kind === 'agent') fx.pin(e.project, e.agent, act === 'pin');
+      if (e.kind === 'agent') fx.pin('agent', e.project, e.agent, act === 'pin');
+      else if (e.kind === 'artifact') fx.pin('artifact', e.project, e.id, act === 'pin');
+      else if (e.kind === 'process') fx.pin('process', e.project, procPinId(e.agent, e.id), act === 'pin');
+      else if (e.kind === 'scheduled') fx.pin('schedule', e.project, String(e.id), act === 'pin');
       return;
     case 'changes':
       if (e.kind === 'agent') fx.openTab({ kind: 'diff', project: e.project, agent: e.agent });

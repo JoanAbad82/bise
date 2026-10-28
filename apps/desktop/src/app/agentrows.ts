@@ -12,6 +12,7 @@ import { useCards, useComputerLive, usePlaces, useProjects } from '@/store';
 import { pauseInSeconds } from '@/thread/wake';
 import { useNowFor } from './clock';
 import { useBarAgents } from './baragents';
+import { usePins } from './pins';
 import { agentRows, archivedRows, wakesOf, type BarRow, type ProjAgent } from './barrows';
 
 export interface AgentRowsNow {
@@ -38,7 +39,9 @@ export function useAgentRows(project: string, alt: boolean): AgentRowsNow {
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
   // the hub's rank as ⌥ numbers, held while ⌥ is (agents/model numbersOf): a project's only; bise's thread keeps start order
-  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a), alt);
+  // his pinned agents first (pins.ts), so ⌥N is the Nth row he sees
+  const pins = usePins('agent');
+  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a), alt, undefined, pins.get(project));
   const home = useProjects().find((p) => p.home)?.project;
   const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }), ...(home === undefined ? {} : { home }) });
   const archived = archivedRows(agents, now, all);

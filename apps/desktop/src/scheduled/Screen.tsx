@@ -16,6 +16,8 @@ import { InBar } from '@/app/barslot';
 import { useEntityMenu } from '@/app/menus/use';
 import { useStore } from '@/store';
 import { useKeptScroll } from '@/app/keep';
+import { pinFirst, pinnedIn, usePins, type PinSet } from '@/app/pins';
+import { PinMark } from '@/app/pinbutton';
 import { scheduled } from '@/proto/words_scheduled.gen';
 import { useAllScheduled } from './hooks';
 import { ahead, asks, bySoonest, byProject, heroFacts, matches, endsWords, howOften, keyOf, nextRunWords, runsWords, wakes, type Task } from './model';
@@ -32,10 +34,12 @@ export interface ScheduledPorts {
 export function ScheduledScreen() {
   const store = useStore();
   const tasks = useAllScheduled();
+  const pins = usePins('schedule');
   useKeptScroll('scheduled', () => document.querySelector<HTMLElement>('[data-testid="scheduled.scroll"]'));
   return (
     <ScheduledView
       tasks={tasks}
+      pins={pins}
       ports={{
         stop: (project, id) => {
           store.command({ cmd: 'scheduled_stop', project, id } as never);
@@ -46,7 +50,7 @@ export function ScheduledScreen() {
 }
 
 /** The screen from props (tests, shots). */
-export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly Task[]; ports: ScheduledPorts; now?: number }) {
+export function ScheduledView({ tasks, ports, now: pinned, pins }: { tasks: readonly Task[]; ports: ScheduledPorts; now?: number; pins?: PinSet }) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const list = bySoonest(tasks);
@@ -107,7 +111,9 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
       move(e.key === 'ArrowDown' ? 1 : -1);
     }
   };
-  const groups = byProject(shown);
+  // what he pinned leads its project's group (app/pins.ts: a stable partition)
+  const isPin = (x: Task) => pins !== undefined && pinnedIn(pins, x.project, String(x.t.id));
+  const groups = byProject(pinFirst(shown, isPin));
   // a click picks and opens the task, and gives the keys back to the list (a row's button keeps none)
   const pick = (x: Task) => {
     setSel(keyOf(x));
@@ -145,7 +151,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
               <div key={g.project} role="group" aria-label={g.name}>
                 <GroupLabel testId={`scheduled.group.${g.project}`}>{g.name}</GroupLabel>
                 {g.items.map((x) => (
-                  <Row key={keyOf(x)} x={x} on={keyOf(x) === selKey} now={now} onClick={() => { pick(x); }} />
+                  <Row key={keyOf(x)} x={x} on={keyOf(x) === selKey} now={now} pinned={isPin(x)} onClick={() => { pick(x); }} />
                 ))}
               </div>
             ))}
@@ -197,7 +203,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
 
 /** One task's row (ds ListRow): its name and how often, then who it wakes and its next run; its '…'
  *  and a right click are its menu (useEntityMenu: stop, and what nm-menus gives a scheduled task). */
-function Row({ x, on, now, onClick }: { x: Task; on: boolean; now: number; onClick: () => void }) {
+function Row({ x, on, now, pinned, onClick }: { x: Task; on: boolean; now: number; pinned: boolean; onClick: () => void }) {
   const menu = useEntityMenu({ kind: 'scheduled', project: x.project, id: x.t.id });
   const next = x.t.next_ms != null ? scheduled.next_at({ at: ahead(x.t.next_ms, now) }) : undefined;
   return (
@@ -207,7 +213,7 @@ function Row({ x, on, now, onClick }: { x: Task; on: boolean; now: number; onCli
         title={<><span className="sch-name">{asks(x.t)}</span><span className="sch-often">{howOften(x.t)}</span></>}
         // main is 'bise' in the window (designer m_43401)
         sub={next === undefined ? shownName(x.t.agent) : `${shownName(x.t.agent)} · ${next}`}
-        end={<MoreButton menu={menu} testId={`scheduled.row.${String(x.t.id)}.more`} />} />
+        end={<>{pinned && <PinMark testId={`scheduled.row.${String(x.t.id)}.pinned`} />}<MoreButton menu={menu} testId={`scheduled.row.${String(x.t.id)}.more`} /></>} />
     </div>
   );
 }
