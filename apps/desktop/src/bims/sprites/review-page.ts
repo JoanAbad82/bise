@@ -20,6 +20,7 @@ import { STYLE } from '../render/style';
 import { makeView, type View } from '../render/view';
 import { castShadows, lightOffice } from '../render/world';
 import type { Pose } from '../model';
+import { FOLLOW_ZOOM } from '../focus';
 import { COIN_HEAD, cutPng, headPng } from '@/app/side3d/render';
 import { aliveRig, aliveSeed, stanceAt, stands } from '../render/alive';
 import { DUR, type IdleMove, idleRig } from '../render/idle';
@@ -114,10 +115,10 @@ function isoFit(b: Box3, px: number, air: number, low: boolean, scale?: number):
 }
 
 /** the near front view (the turnaround's): the bim turned by `turn` */
-function frontView(v: View, size: number, half: number, ty: number): void {
+function frontView(v: View, size: number, half: number, ty: number, tx = 0): void {
   const { camera } = v;
-  const target = new Vector3(0, ty, 0);
-  camera.position.set(0, ty + Math.sin(0.2) * 10, Math.cos(0.2) * 10);
+  const target = new Vector3(tx, ty, 0);
+  camera.position.set(tx, ty + Math.sin(0.2) * 10, Math.cos(0.2) * 10);
   camera.up.set(0, 1, 0);
   camera.lookAt(target);
   camera.left = -half; camera.right = half; camera.top = half; camera.bottom = -half;
@@ -173,8 +174,8 @@ function drawRow(r: Row, size: number): HTMLCanvasElement {
   }
   if (cam === 'office' || cam === 'zoom') {
     bim.apply(rigOfRow(r, d.main));
-    // the office at 320 is ~12 css px a unit, far detail; the follow zoom x2.2, near
-    const cssPx = cam === 'office' ? 12.2 : 27;
+    // the office at 320 is ~12 css px a unit, far detail; the follow camera (focus.ts FOLLOW_ZOOM) that many times closer, near
+    const cssPx = cam === 'office' ? 12.2 : 12.2 * FOLLOW_ZOOM;
     bim.detail(cam === 'zoom');
     bim.group.updateMatrixWorld(true);
     const box = new Box3().setFromObject(bim.group, true);
@@ -208,7 +209,7 @@ function drawRow(r: Row, size: number): HTMLCanvasElement {
     bim.group.updateMatrixWorld(true);
     const box = new Box3().setFromObject(bim.group, true);
     const half = Math.max(1.0, (Math.max(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z) / 2) * 1.1);
-    frontView(v, size, half, (box.min.y + box.max.y) / 2);
+    frontView(v, size, half, (box.min.y + box.max.y) / 2, (box.min.x + box.max.x) / 2);
   }
   v.render();
   const out = document.createElement('canvas');

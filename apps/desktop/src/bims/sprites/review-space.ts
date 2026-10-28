@@ -12,7 +12,7 @@ import type { IdleKind, IdleMove } from '../render/idle';
 /** the cameras the app draws a bim through (the review page's `render`) */
 export const CAMS = [
   'office', // the office's iso fit, far detail, ~12 css px a unit (the right bar at 320)
-  'zoom', // the office zoomed in (the follow zoom, x2.2), near detail
+  'zoom', // the office's follow camera (focus.ts FOLLOW_ZOOM, 6x the fit), near detail
   'pinch', // his pinch's closest (zoom.ts MAX_ZOOM 24): one bim fills the view, near detail
   'coin', // the outer tile's, the side's and settings' look picker's coin: head and shoulders (app/side3d/render.ts headPng; main's through it)
   'swatch', // settings' hair swatch: the head alone framed (app/side3d/render.ts cutPng), main only
