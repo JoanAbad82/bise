@@ -4,14 +4,14 @@
 // in a tab, the Overview lists rows only). A bim's click opens its agent's thread; an object's '?'
 // its plugin; the map chip his pick (/bims <map>). It fills the tab's whole height, the office whole
 // and centred, refitted as the pane resizes (designer m_42866 #3). Owner: nm-panel.
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
 import { mapOf, mapPrefKey } from '@/bims/maps/ids';
-import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
+import { useOfficeObjects } from '@/bims/useOfficeObjects';
 import { followOf } from '@/bims/focus';
 import { getPref, type Prefs } from '@/settings/prefs';
-import { useAgents, useCards, useGrowth, usePlaces, usePlugins, usePrefs, useStore } from '@/store';
+import { useAgents, useCards, useGrowth, usePlaces, usePrefs, useStore } from '@/store';
 import { useRoute, useRouter } from '@/app/router';
 
 /** A project's office, the whole tab. */
@@ -25,14 +25,9 @@ export function OfficeTab({ project }: { project: string }) {
   const growth = useGrowth(project);
   const prefs = usePrefs() as Prefs | null;
   const map = mapOf(getPref(prefs, mapPrefKey(project)));
-  // his plugins' objects in the office: the project's plugins, asked once here (the core sends them
+  // his plugins' objects in the office: the project's plugins, asked on mount (the core sends them
   // again on each change), and his picks (prefs bims.objects.<project>)
-  const plugins = usePlugins(project);
-  useEffect(() => {
-    store.command({ cmd: 'plugins', project });
-  }, [store, project]);
-  const picks = getPref(prefs, objectsPrefKey(project));
-  const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
+  const objects = useOfficeObjects(project);
   const live = useMemo(() => agents.filter((a) => !a.archived), [agents]);
   const follow = followOf(route, project, agents);
   return (

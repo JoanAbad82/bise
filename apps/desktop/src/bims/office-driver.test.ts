@@ -7,6 +7,7 @@ import { agent, mainAgent } from './fixtures';
 import { growOf, STAGE_AT, UNLOCK_LABEL, UNLOCK_WALK } from './growth';
 import { localOf } from './eggs';
 import { makeDriver, NO_ATTENTION, officeKey, type Clock } from './office-driver';
+import { crewOf, objsOf } from './corners.test';
 
 const parts = { activities, labelsOf, layoutOf, newTimeline };
 const T = 1_791_100_000;
@@ -103,6 +104,27 @@ describe('office-driver: one office brain', () => {
     expect(d.stale(clock(T + 5))).toBe(true);
     d.step(clock(T + 5), NO_ATTENTION);
     expect(d.stale(clock(T + 10)), 'heard: the check is quiet again').toBe(false);
+  });
+
+  it('objects heard one by one: every object a fresh office places is drawn (his m_49375: the wing stood empty)', () => {
+    for (const n of [8, 14]) {
+      const all = objsOf(n);
+      const four = crewOf(4);
+      const rows = { agents: four, cards: [], places: [] };
+      const fresh = makeDriver(parts);
+      fresh.rows(rows, four, 'climb');
+      fresh.objects(all);
+      const f = fresh.step(clock(T), NO_ATTENTION);
+      const d = makeDriver(parts);
+      d.rows(rows, four, 'climb');
+      d.step(clock(T), NO_ATTENTION);
+      for (let k = 1; k <= n; k++) {
+        d.objects(all.slice(0, k));
+        d.step(clock(T + k), NO_ATTENTION);
+      }
+      const s = d.step(clock(T + n + 1), NO_ATTENTION);
+      expect(s?.corners.placed.length, `climb, ${String(n)} objects`).toBeGreaterThanOrEqual(f?.corners.placed.length ?? 0);
+    }
   });
 
   it('officeKey: the names and main, in order, with the map', () => {

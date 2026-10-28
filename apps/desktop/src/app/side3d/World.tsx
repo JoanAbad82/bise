@@ -18,17 +18,17 @@
 // becomes a small window onto the world (the frame: r 12, --c-sunken under the map, 1 --c-line,
 // a soft shadow), faded in and out in 150 ms; the whole map has none. Owner: nm-side; the fit and
 // the frame: m-bubbles.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { AppIcon, Press, tipAttrs } from '@/ds';
 import { Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
 import { mapOf, mapPrefKey, type MapId } from '@/bims/maps/ids';
-import { objectsPrefKey, officeObjects, picksOf } from '@/bims/plugin-objects';
+import { useOfficeObjects } from '@/bims/useOfficeObjects';
 import { beatDelay, EASE_MS, happenedOf, HOLD_MS, pickBeat, seenOf, stillRecent, tickSoon, type Happened, type LastBeat, type Seen } from './camera';
 import { speechOf, speechWord } from './model';
 import type { Agent, Card } from '@/proto';
 import { getPref, type Prefs } from '@/settings/prefs';
-import { useGrowth, usePlaces, usePlugins, usePrefs } from '@/store';
+import { useGrowth, usePlaces, usePrefs } from '@/store';
 import { side } from '@/proto/words_side.gen';
 
 /** the hover that grows the world, ms (native-mac §7) */
@@ -184,11 +184,9 @@ interface OfficeCam {
 export function WorldOffice({ project, agents, cards, cameraFrom = null, headRef, onZoomed, refit, onOpen, onPickMap, fill = false, follow = null }: OfficeOf & OfficeCam) {
   const places = usePlaces(project);
   const growth = useGrowth(project);
-  const prefs = usePrefs() as Prefs | null;
   const map = useMap(project);
-  const plugins = usePlugins(project);
-  const picks = getPref(prefs, objectsPrefKey(project));
-  const objects = useMemo(() => officeObjects(plugins, picksOf(picks)), [plugins, picks]);
+  // his plugins' objects, the plugins asked here too: the tile drew none until the Office tab asked (his m_49375)
+  const objects = useOfficeObjects(project);
   return (
     <Office project={project} agents={agents} cards={cards} places={places} objects={objects} growth={growth} map={map}
       parts={bimsParts} transparent fill={fill} onOpen={onOpen ?? (() => undefined)} {...(onPickMap === undefined ? {} : { onPickMap })} follow={follow} cameraFrom={cameraFrom} headRef={headRef} onZoomed={onZoomed} refit={refit} />

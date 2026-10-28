@@ -304,6 +304,12 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       // another map starts afresh; the same map keeps what still fits
       const prev = placedIn !== null && placedIn.office.map === office.map ? corners.placed : [];
       corners = objectSpots(office, objs, prev);
+      // the spots kept from before can leave one out that a fresh placing fits (objects heard one by
+      // one: his m_49375): every object drawn beats each keeping its spot
+      if (corners.left.length > 0 && prev.length > 0) {
+        const anew = objectSpots(office, objs);
+        if (anew.placed.length > corners.placed.length) corners = anew;
+      }
       placedIn = { office, objs };
     }
     return corners;
