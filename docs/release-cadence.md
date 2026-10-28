@@ -37,8 +37,10 @@ runs the checked part: `scripts/release_cut.sh`.
 7. **The notification**, through main, one: the sha, the what's new, `1. publier 2. pas cette fois`.
 8. On `publier`: `publish-release.sh <tag> --publish` (every terminal sees it), then `git push
    origin <desktop tag>` (desktop-release.yml: one job, one approval: build, sign, notarize, the
-   draft, beta), then stable (Actions > desktop-release > publish, channel stable), all on that one
-   word. keep-current then moves his app and hubs. `release_slot.py end`.
+   draft, beta: `publier` covers that run's approval). keep-current then moves his app and hubs.
+   `release_slot.py end`. Stable (Actions > desktop-release > publish, channel stable) stays a
+   separate go of his, asked through main once beta is out (main m_48999; whether `publier` should
+   cover it too is an open question on the page release-cadence).
    On `pas cette fois`: `gh release delete <tag> --yes` (the draft nobody saw), `git push origin
    :refs/tags/<tag>` (no v* tag left on an old commit), `git tag -d <desktop tag>` (its name is
    free for the next cut), `release_slot.py end`.
