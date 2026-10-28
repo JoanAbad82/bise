@@ -11,7 +11,7 @@
 // its own data; the composer is memo'd with stable props, so neither an
 // entry, a step nor a send ever re-renders it.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Button, Marker, MoreButton } from '@/ds';
+import { Button, Marker } from '@/ds';
 import type { ComposerActions } from '@/composer';
 import type { Card } from '@/proto';
 import { threadKey, useAgents, useCards, useCoreState, useProjects, useStore, useThreadOrder, useTyping } from '@/store';
@@ -19,6 +19,7 @@ import { usePartialText } from '@/shared/partial';
 import { useMenuAction } from '@/app/menu';
 import { useRoute } from '@/app/router';
 import { InBar } from '@/app/barslot';
+import { BarMore } from '@/app/barbutton';
 import { useEntityMenu } from '@/app/menus/use';
 import { MAIN } from '@/app/route';
 import { useShowsMainAtEnd } from '@/app/seen';
@@ -312,7 +313,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} data-about={artifact !== undefined || undefined} data-dim={(artifact !== undefined && me?.archived === true) || undefined} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture} style={column}>
         {inView && ours && (
           <InBar>
-            <MoreButton menu={menu} testId="thread.more" />
+            <BarMore menu={menu} testId="thread.more" />
           </InBar>
         )}
         <TitleRename project={project} agent={agent} agents={agents} take={inView && ours && !me.main} />

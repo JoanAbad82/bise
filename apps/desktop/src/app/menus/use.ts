@@ -138,10 +138,10 @@ function fxOf(store: Store, router: Router | null): MenuFx {
   };
 }
 
-/** The '…' button's box when it has the focus (MoreButton's click), else none: at the pointer. */
+/** The '…' button's box when it has the focus (a row's MoreButton, the bar's BarMore), else none: at the pointer. */
 function moreBox(): PopupAt | undefined {
   const el = document.activeElement;
-  if (!(el instanceof HTMLElement) || !el.classList.contains('b-more')) return undefined;
+  if (!(el instanceof HTMLElement) || el.getAttribute('aria-haspopup') !== 'menu') return undefined;
   const b = el.getBoundingClientRect();
   return { x: b.left, y: b.top, width: b.width, height: b.height };
 }

@@ -22,6 +22,8 @@ import { Bar, type FrameState } from './Frame';
 import { PanelHost } from './panel/Host';
 import { panelState } from './panel/state';
 import { frameLeft, resetFrameLeft } from './frame-state';
+import { InBar } from './barslot';
+import { BarMore } from './barbutton';
 
 const ACME = 'acme-1a2b3c4d';
 
@@ -155,5 +157,52 @@ describe('the two sides\' keys on their buttons (designer m_45008)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("the bar's right end: one size, one gap, one look (his m_49507)", () => {
+  const MENU = { open: () => undefined, onContextMenu: () => undefined };
+  const RIGHT = ['thread.more', 'app.bar.sidecard', 'app.panel.toggle'] as const;
+  const px = (v: string): number => (v === '' || v === 'auto' ? 0 : Number.parseFloat(v));
+  /** The room `el` and its wrappers up to the end group's child keep on its `side`: margins and paddings. */
+  const room = (el: HTMLElement, end: HTMLElement, side: 'left' | 'right'): number => {
+    let n = 0;
+    for (let e: HTMLElement | null = el; e !== null && e !== end; e = e.parentElement) {
+      const s = getComputedStyle(e);
+      n += px(side === 'left' ? s.marginLeft : s.marginRight);
+      if (e !== el) n += px(side === 'left' ? s.paddingLeft : s.paddingRight);
+    }
+    return n;
+  };
+
+  it("the '…', the side-card button and the ▯: 28 × 28, the same corner and look, 4 apart, in that order", () => {
+    const v = shell(1440);
+    render(<InBar><BarMore menu={MENU} testId="thread.more" /></InBar>);
+    const end = v.getByTestId('app.bar.end');
+    const bs = RIGHT.map((id) => v.getByTestId(id));
+    // in the one end group, in his order
+    for (const b of bs) expect(end.contains(b)).toBe(true);
+    expect(bs[0]?.compareDocumentPosition(bs[1] as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(bs[1]?.compareDocumentPosition(bs[2] as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const look = (b: HTMLElement) => {
+      const s = getComputedStyle(b);
+      return { cls: b.className, w: s.width, h: s.height, r: s.borderRadius, color: s.color, bg: s.backgroundColor };
+    };
+    const [more, card, panelB] = bs as [HTMLElement, HTMLElement, HTMLElement];
+    // at rest the '…' and the ▯ are one look (the side card shows by default: pressed)
+    expect(card.getAttribute('aria-pressed')).toBe('true');
+    expect(look(more)).toMatchObject({ w: '28px', h: '28px', r: '6px' });
+    expect(look(panelB)).toEqual(look(more));
+    // pressed, the side card and the ▯ (the panel open) are one look, the same box as at rest
+    fireEvent.click(panelB);
+    expect(look(panelB)).toEqual(look(card));
+    expect({ ...look(card), color: '', bg: '' }).toEqual({ ...look(more), color: '', bg: '' });
+    // (happy-dom reads the grounds' color-mix as transparent: the pressed ink tells the state)
+    expect(look(card).color).not.toBe(look(more).color);
+    fireEvent.click(panelB);
+    // between two buttons: the group's gap and nothing else (no margin, no wrapper's padding)
+    const gap = px(getComputedStyle(end).columnGap || getComputedStyle(end).gap);
+    const between = [0, 1].map((i) => gap + room(bs[i] as HTMLElement, end, 'right') + room(bs[i + 1] as HTMLElement, end, 'left'));
+    expect(between).toEqual([4, 4]);
   });
 });

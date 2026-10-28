@@ -149,7 +149,6 @@
   flex: none;
   display: flex;
   align-items: center;
-  margin-left: auto;
 }
 /* every tab at its title, unseen: their widths for model.ts fitTabs */
 .pn-measure {

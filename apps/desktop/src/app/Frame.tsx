@@ -14,7 +14,8 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { AppIcon, Kbd, PickerPop, Press, tipAttrs, type AppIconName } from "@/ds";
+import { AppIcon, Kbd, PickerPop, Press, tipAttrs } from "@/ds";
+import { BarButton } from "./barbutton";
 import { frame } from "@/proto/words_frame.gen";
 import { useModHeld } from "./held";
 import { FRAME_KEYS } from "./keys";
@@ -474,12 +475,15 @@ export function Bar({ frame: state }: { frame: FrameState }) {
       <StatusSlot>
         <TitleStatus />
       </StatusSlot>
-      {/* the page's search and action (barslot.tsx: a page's <InBar>) */}
-      <BarSlot />
-      {/* the right side's form by hand, left of the panel's ▯ (side-mini, designer m_46706) */}
-      <SideCardButton />
-      {/* the panel's tabs and its ▯ (nm-panel's mount point) */}
-      <BarTabs />
+      {/* the bar's right end: its buttons 28, 4 apart, one look (barbutton.tsx; his m_49507) */}
+      <div className="app-bar-end" data-testid="app.bar.end">
+        {/* the page's search and action (barslot.tsx: a page's <InBar>) */}
+        <BarSlot />
+        {/* the right side's form by hand, left of the panel's ▯ (side-mini, designer m_46706) */}
+        <SideCardButton />
+        {/* the panel's ▯ (nm-panel's mount point) */}
+        <BarTabs />
+      </div>
     </header>
   );
 }
@@ -496,39 +500,13 @@ function SideCardButton() {
   const fits = cardFits(useWindowWidth(), useLeftWidth(), shows);
   if (!shows) return null;
   return (
-    <span className="app-bar-side">
-      <BarButton
-        icon="side-card"
-        label={!fits ? frame.side_no_room : compact ? frame.side_card : frame.side_compact}
-        pressed={fits && !compact}
-        disabled={!fits}
-        onClick={sideCompact.toggle}
-        testId="app.bar.sidecard"
-      />
-    </span>
-  );
-}
-
-/** A bar button: 28 × 28, its line icon 16, its tip with its key; no-drag (app.css). */
-/** a title bar button; `hint`: its modifier is held, its key shows as a keycap in place of its glyph (held.ts) */
-function BarButton({ icon, label, keys, hint, pressed, disabled, onClick, testId }: { icon: AppIconName; label: string; keys?: string; hint?: boolean; pressed?: boolean; disabled?: boolean; onClick: () => void; testId: string }) {
-  return (
-    <Press
-      look="app-bar-b"
-      aria-label={label}
-      aria-pressed={pressed}
-      disabled={disabled}
-      {...tipAttrs(keys === undefined || keys === "" ? label : frame.tip_key({ what: label, key: keys }))}
-      onClick={onClick}
-      data-testid={testId}
-    >
-      {hint === true && keys !== undefined && keys !== "" ? (
-        <span className="app-keyhint" data-testid={`${testId}.hint`}>
-          <Kbd>{keys}</Kbd>
-        </span>
-      ) : (
-        <AppIcon name={icon} size={16} />
-      )}
-    </Press>
+    <BarButton
+      icon="side-card"
+      label={!fits ? frame.side_no_room : compact ? frame.side_card : frame.side_compact}
+      pressed={fits && !compact}
+      disabled={!fits}
+      onClick={sideCompact.toggle}
+      testId="app.bar.sidecard"
+    />
   );
 }

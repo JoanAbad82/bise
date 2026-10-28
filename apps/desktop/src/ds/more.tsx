@@ -1,4 +1,4 @@
-// src/ds · MoreButton: the '…' at a row's end and in a bar (bise fait mac, page native-mac §6 and
+// src/ds · MoreButton: the '…' at a row's end (the window bar's is app/barbutton.tsx BarMore) (bise fait mac, page native-mac §6 and
 // mockup 9): 28 × 28, r 6, the AppIcon 'more' at 16, text-3 until hovered; its VoiceOver name and
 // tip are the ds's words. It replaces the text action links (rename, remove, restore, stop, all ›)
 // on the rows. A click opens the entity's native menu: the screen hands it useEntityMenu(e)'s

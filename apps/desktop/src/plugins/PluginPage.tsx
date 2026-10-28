@@ -6,8 +6,9 @@
 // his own folder has remove (one confirm, plug-tidy's `plugin_remove`). A row to add (browse) has
 // connect or + add in place of the switch. Every change is the core's. Owner: plug-desktop.
 import { useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { AppIcon, BannerWait, Button, GroupLabel, IconButton, PageBanner, Press, sentenceCase, Toggle, tipAttrs } from '@/ds';
+import { AppIcon, BannerWait, Button, GroupLabel, PageBanner, Press, sentenceCase, Toggle, tipAttrs } from '@/ds';
 import { InBar } from '@/app/barslot';
+import { BarButton } from '@/app/barbutton';
 import type { BiseApi, PopupItem } from '@/shared/api';
 import { useBannerGutter } from '@/artifacts/hero/vignettes';
 import { openTab } from '@/app/panel/tabs';
@@ -76,7 +77,7 @@ export function PluginPage({ p, project, ports }: { p: Plugin; project?: string;
       {/* its other actions in the window's bar: the page's '⋯' (Remove…, asked once below) */}
       {ports.remove !== undefined && removable(p) && (
         <InBar>
-          <IconButton label={ds.more_actions} onClick={more} testId={`${tid}.more`}><AppIcon name="more" size={16} /></IconButton>
+          <BarButton icon="more" label={ds.more_actions} onClick={more} testId={`${tid}.more`} />
         </InBar>
       )}
       <div className="plg-page-col">

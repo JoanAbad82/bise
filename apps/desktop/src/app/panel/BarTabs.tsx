@@ -9,8 +9,9 @@
 // reorders; a right click is the tab's menu (nm-menus' useEntityMenu({ kind: 'tab', id })).
 // Owner: nm-panel (r2-titlebar this round).
 import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
-import { AppIcon, IconButton, Kbd, Press, tipAttrs } from '@/ds';
+import { AppIcon, IconButton, Press, tipAttrs } from '@/ds';
 import { useModHeld } from '@/app/held';
+import { BarButton } from '@/app/barbutton';
 import { panel } from '@/proto/words_panel.gen';
 import { useEntityMenu } from '@/app/menus/use';
 import { barGroundDoubleClick } from '@/app/barslot';
@@ -23,17 +24,10 @@ import { PANEL_KEYS } from './keys';
 export function BarTabs() {
   const s = usePanelState();
   const held = useModHeld('AltMeta');
+  const label = s.open ? panel.panel_hide({ key: PANEL_KEYS.toggle }) : panel.panel_show({ key: PANEL_KEYS.toggle });
   return (
     <div className="pn-bar" data-testid="app.panel.bar" data-open={s.open || undefined}>
-      <IconButton label={s.open ? panel.panel_hide({ key: PANEL_KEYS.toggle }) : panel.panel_show({ key: PANEL_KEYS.toggle })} size="bar" pressed={s.open} onClick={panelToggle} testId="app.panel.toggle">
-        {held ? (
-          <span className="app-keyhint" data-testid="app.panel.toggle.hint">
-            <Kbd>{PANEL_KEYS.toggle}</Kbd>
-          </span>
-        ) : (
-          <AppIcon name="panel" size={16} />
-        )}
-      </IconButton>
+      <BarButton icon="panel" label={label} tip={label} keys={PANEL_KEYS.toggle} hint={held} pressed={s.open} onClick={panelToggle} testId="app.panel.toggle" />
     </div>
   );
 }
