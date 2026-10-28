@@ -27,7 +27,7 @@ import { groupParts, groupWords } from './lists';
 import { artifactObj, laterObj, procObj } from './objects';
 import { openTab } from './ports';
 import { usePortFull, type PortBoxes } from './portfit';
-import { procPinId } from '../pins';
+import { pinnedIn, procPinId, watchPinId, type PinSet } from '../pins';
 
 /** a row's object, css px */
 export const ROW_PX = 40;
@@ -164,16 +164,23 @@ export function TaskRow({ x, now, group, pinned = false }: { x: Task; now: numbe
 }
 
 /** An agent's watches (sb wake): its telescope rows, each opening the agent. */
-export function WatchRows({ project, a, now, onOpen, group }: { project: string; a: Agent; now: number; onOpen: (agent: string) => void; group?: string }) {
+export function WatchRows({ project, a, now, onOpen, group, pins, pinned }: {
+  project: string; a: Agent; now: number; onOpen: (agent: string) => void; group?: string;
+  /** his schedule pins (pins.ts): each watch's pin by its watchPinId */
+  pins?: PinSet;
+  /** true: only its pinned watches (they lead the section); false: only the others; none: all */
+  pinned?: boolean;
+}) {
   const menu = useEntityMenu({ kind: 'agent', project, agent: a.name });
   const store = useStore();
   const g = groupParts(group, a.name);
   // a watch's detail under its row (folded-side v9, the Overview's): who wakes, set when, until;
   // its agent, and 'stop watching' (HubCmd wake_stop, sb wake --stop); one open at a time
   const [open, setOpen] = useState<number | null>(null);
+  const isWatchPinned = (alarm: number) => pins !== undefined && pinnedIn(pins, project, watchPinId(alarm));
   return (
     <>
-      {alarms(a, now).map((al) => {
+      {alarms(a, now).filter((al) => pinned === undefined || isWatchPinned(al.id) === pinned).map((al) => {
         const id = `app.flyout.scheduled.${project}.${a.name}.watch.${String(al.id)}`;
         const [head = '', ...rest] = al.title.split(' · ');
         return (
@@ -188,6 +195,7 @@ export function WatchRows({ project, a, now, onOpen, group }: { project: string;
                 setOpen((o) => (o === al.id ? null : al.id));
               }}
               menu={menu}
+              pin={{ kind: 'schedule', project, id: watchPinId(al.id), on: isWatchPinned(al.id) }}
               testId={id}
             />
             {open === al.id && (

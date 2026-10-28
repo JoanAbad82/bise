@@ -2,7 +2,7 @@
 // writes, a renamed agent's old key dropped, a dead pin never shown.
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { isPinned, livePins, namesOf, pinFirst, pinKeyOf, pinned, pinnedIn, pinSetOf, pinsKey, pinsOf, procPinId } from './pins';
+import { isPinned, livePins, namesOf, pinFirst, pinKeyOf, pinned, pinnedIn, pinSetOf, pinsKey, pinsOf, procPinId, watchPinId } from './pins';
 
 const agent = (name: string) => ({ name }) as Agent;
 
@@ -89,5 +89,14 @@ describe('pinFirst: a stable partition, never a sort (architect m_49104)', () =>
     const out = pinFirst(rows, (r) => r === 'c');
     expect(out.indexOf('c')).toBe(0);
     expect(out.slice(1)).toEqual(['e', 'b', 'd', 'a']);
+  });
+});
+
+describe('a watch’s pin (ui-review m_49214)', () => {
+  it('has its own id beside the timers’, so a watch and a timer of the same number never share a pin', () => {
+    expect(watchPinId(4)).toBe('watch:4');
+    const set = pinSetOf({ pins_sched: { acme: ['watch:4'] } }, 'schedule');
+    expect(pinnedIn(set, 'acme', watchPinId(4))).toBe(true);
+    expect(pinnedIn(set, 'acme', '4')).toBe(false);
   });
 });

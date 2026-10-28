@@ -4,7 +4,7 @@
 // state that lasts across windows and restarts, kept in the app's prefs through prefs_set, one key
 // per kind and project hub id (pinKeyOf), each the pinned ids in the order he pinned them:
 // `pins.<project>` the agents' names (the left sidebar's Pinned reads them too), `pins_art.<project>`
-// artifact ids, `pins_sched.<project>` timer ids, `pins_proc.<project>` '<agent>/<process id>'
+// artifact ids, `pins_sched.<project>` timer ids and watches' (watchPinId), `pins_proc.<project>` '<agent>/<process id>'
 // (procPinId: a process's id carries its start, so a pin is that run and ends with it). Ids are the
 // rows' own, never rebuilt. A pin whose thing left its list is not shown (a pinned row is only ever
 // a row that is there), and the next write of that kind and project drops it, only once that
@@ -38,6 +38,9 @@ export const pinsKey = (project: string): string => pinKeyOf('agent', project);
 
 /** A process's pin id: its agent and its id (which carries its start: one run). */
 export const procPinId = (agent: string, id: string): string => `${agent}/${id}`;
+
+/** A watch's pin id (an agent's sb wake, listed with the timers): its wake id, apart from the timers' ids. */
+export const watchPinId = (id: number): string => `watch:${String(id)}`;
 
 /** A project's pinned ids from its prefs value: strings only, each once. Pure. */
 export function namesOf(v: JsonValue | undefined): string[] {
@@ -113,7 +116,10 @@ export function liveIds(store: Store, kind: PinKind, project: string): readonly 
     case 'artifact':
       return store.artifactsCame(project) ? store.artifacts(project).map((a) => a.id) : undefined;
     case 'schedule':
-      return store.scheduledCame(project) ? store.scheduled(project).map((t) => String(t.id)) : undefined;
+      // the timers, and the agents' watches listed with them (watchPinId)
+      return store.scheduledCame(project)
+        ? [...store.scheduled(project).map((t) => String(t.id)), ...store.agents(project).flatMap((a) => a.watching.map((w) => watchPinId(w.id)))]
+        : undefined;
     case 'process':
       return store.processesCame(project) ? store.processes(project).map((p) => procPinId(p.agent, p.id)) : undefined;
   }

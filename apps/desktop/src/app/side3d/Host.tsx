@@ -476,6 +476,24 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
     }
   };
   const saysOf = (b: BubbleId) => acrossSays(bubbleSays(b, counts), across(b));
+  /** Scheduled's first `n` rows: what he pinned first (its timers, then its watches), then the other timers, then the other watches */
+  const schedRows = (n: number) => {
+    const pinnedTasks = tasks.filter(schedPinned);
+    const restTasks = tasks.filter((x) => !schedPinned(x));
+    const watches = (pinned: boolean, list: readonly Agent[]) => list.map((a) => (
+      <WatchRows key={`${projectOfAgent(a)}/${a.name}/${String(pinned)}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))}
+        group={groupOf(projectOfAgent(a))} pins={schedPins} pinned={pinned} />
+    ));
+    const task = (x: (typeof tasks)[number]) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} pinned={schedPinned(x)} />;
+    return (
+      <>
+        {pinnedTasks.map(task)}
+        {watches(true, watching)}
+        {restTasks.slice(0, Math.max(0, n - pinnedTasks.length)).map(task)}
+        {watches(false, watching.slice(0, Math.max(0, n - tasks.length)))}
+      </>
+    );
+  };
   /** each bubble's float: its head, rows and foot (designer m_44975: one per bubble) */
   const floatOf = (b: BubbleId): FloatContent => {
     switch (b) {
@@ -512,8 +530,7 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
           foot: { left: '', links: [{ text: side.all_scheduled, testId: 'app.flyout.scheduled.all', onClick: () => { router.go({ screen: 'scheduled' }); } }] },
           rows: tasks.length === 0 && watching.length === 0 ? <Empty>{side.no_scheduled}</Empty> : (
             <>
-              {tasks.slice(0, ROWS).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} pinned={schedPinned(x)} />)}
-              {watching.map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />)}
+              {schedRows(ROWS)}
             </>
           ),
         };
@@ -590,8 +607,7 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
           router.go({ screen: 'scheduled' });
         }} total={sched} empty={<Empty>{side.no_scheduled}</Empty>} rows={(n) => (
           <>
-            {tasks.slice(0, n).map((x) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} pinned={schedPinned(x)} />)}
-            {watching.slice(0, Math.max(0, n - tasks.length)).map((a) => <WatchRows key={`${projectOfAgent(a)}/${a.name}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))} group={groupOf(projectOfAgent(a))} />)}
+            {schedRows(n)}
           </>
         )} />
         <OuterList id="processes" name={bubbleName('processes')} count={String(running.length)} onAll={() => {
