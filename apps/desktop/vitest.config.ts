@@ -16,6 +16,11 @@ export default defineConfig({
     // tests/checks/**/*.test.ts: a check's pure helpers (composer/still.ts); the checks are *.spec.ts
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/feature/**/*.test.ts', 'tests/checks/**/*.test.ts'],
     environment: 'node',
+    // an iframe's src is never fetched: happy-dom loaded every <iframe src="http://127.0.0.1:47123/p/…">
+    // a component test renders (artifacts.test.tsx: 7 fetches a run, to nothing), and under load
+    // the test ended first: the teardown's 'AsyncTaskManager has been destroyed' failed the run
+    // with every test green (14 of 50 desktop_check reds in a day, the loop audit of 10-28)
+    environmentOptions: { happyDOM: { settings: { navigation: { disableChildFrameNavigation: true } } } },
     passWithNoTests: true,
     // the window's keep starts empty for every test (src/test-setup.ts)
     setupFiles: ['src/test-setup.ts'],
