@@ -252,7 +252,8 @@ describe('standing bims are never still (bim-alive)', () => {
 
   it('a stance change draws at 30 fps only pinched in (BURST_PX); the breath alone at 8 fps', () => {
     const fs = NAMES.slice(0, 6).map((n) => frame(n, DONE, T0, T0));
-    for (const [o, burst] of [[MAP, false], [PINCHED, true]] as const) {
+    // the office's fit on a big window (120 px a unit) keeps the loop: a crowd at 30 fps was the display's rate (bims/idle)
+    for (const [o, burst] of [[MAP, false], [{ ...MAP, scale: 1 / 120 }, false], [PINCHED, true]] as const) {
       expect(1 / o.scale >= BURST_PX).toBe(burst);
       const c = newCrowd();
       const motions = new Set<string>();

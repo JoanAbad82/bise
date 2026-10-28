@@ -1,7 +1,7 @@
 // bims/idle · what the office costs when nothing changes (his Mac, main m_28475: two GPU helpers at
 // ~29% CPU for an hour while he worked elsewhere). On FakeCore rows, off screen. Passes when, over
 // 3 s each:
-//   (1) the office open on a still world (asleep, failed, blocked, done, stopped, main idle) draws
+//   (1) the office open on a still world (asleep, failed, blocked, stopped, main idle) draws
 //       0 WebGL frames; its only motion is the sleepers' z's (a CSS loop, 7.5 fps at most);
 //   (2) the office closed: no renderer, no frame, no animation of the bims' left running;
 //   (3) the window hidden: 0 frames and the z's paused, the office open with typing bims;
@@ -22,13 +22,13 @@ import { SHOTS, hideOffice, open, probe, setHidden, settle, showOffice, sleep } 
 // 60 fps a drawing office shows ~180 frames there, at the loop's 8 fps ~24: 0 still says it
 const IDLE_MS = 3_000;
 
-/** asleep, failed, blocked, done, stopped, main idle: no pose loops (model.ts Motion) */
+/** asleep, failed, blocked, stopped, main idle: no pose loops (model.ts Motion); no done bim: one standing
+ * breathes at the loop's 8 fps (bim-alive, his m_48065: no bim stands frozen), measured by (5) */
 const STILL = snap([
   agent('main', { main: true, place_id: '', status: 'idle' }),
   agent('login-test', { status: 'waiting', watching: [watch('cargo test')] }),
   agent('cookie-banner', { status: 'blocked' }),
   agent('search-index', { status: 'failed' }),
-  agent('copy-fix', { status: 'done' }),
   agent('import', { status: 'done', phase: 'stopped' }),
 ]);
 
