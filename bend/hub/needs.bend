@@ -69,6 +69,8 @@ def needs(e: M.Ev) -> Needs():
       of_agent(name)
     case M.EFileTouched{+name, _}:
       of_agent(name)
+    case M.EClaimDropped{+name, _}:
+      of_agent(name)
     case M.ERenamed{+name, _}:
       of_agent(name)
     case M.EFollow{+name, _, _}:

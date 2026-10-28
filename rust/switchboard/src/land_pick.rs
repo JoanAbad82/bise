@@ -13,6 +13,9 @@
 //!   claimed (its file tools' files, `--add`); every other change made
 //!   since it started that is no other agent's is named, never taken.
 //! - Nested repos (`x/`) are never taken: named.
+//! - The claims that are over ([`clean_claims`], land-claims): a claim on
+//!   a file with no change left ends (sb-core drops it), so a file two
+//!   agents once changed can be landed again.
 
 /// More unclaimed changes than this in a worktree are not swept in on
 /// their own (build output git does not ignore): the land says so.
@@ -117,6 +120,24 @@ pub(crate) fn pick(changes: &[Change], claims: &Claims, alone: bool) -> Result<P
         }
     }
     Ok(Picked { mine, left_out })
+}
+
+/// The claims that are over (land-claims): of `claims` (the strings as
+/// the hub keeps them, absolute or relative, with `rel` their path
+/// relative to the place's folder), the ones whose file has no change in
+/// `changes` (the place's `git status` against its tip). A clean file has
+/// nothing left to protect, however it got clean (landed, a hand commit,
+/// a checkout); a claim outside the folder is never over here.
+pub(crate) fn clean_claims(changes: &[Change], claims: &[String], rel: impl Fn(&str) -> Option<String>) -> Vec<String> {
+    let dirty: std::collections::BTreeSet<&String> = changes.iter().flat_map(|c| c.paths()).collect();
+    let mut out: Vec<String> = Vec::new();
+    for c in claims {
+        let over = rel(c).is_some_and(|p| !dirty.contains(&p));
+        if over && !out.contains(c) {
+            out.push(c.clone());
+        }
+    }
+    out
 }
 
 /// The 1-based line numbers of git conflict blocks in `text`: a line
@@ -238,6 +259,31 @@ mod tests {
         let add: Vec<(String, String)> = add.iter().map(|a| (a.to_string(), a.to_string())).collect();
         let others: Vec<(String, Vec<String>)> = others.iter().map(|(n, fs)| (n.to_string(), s(fs))).collect();
         pick(changes, &Claims { files: &files, add: &add, others: &others }, alone)
+    }
+
+    /// land-claims: a claim on a file with no change left is over; the
+    /// stale claim that blocked a land no longer does once dropped.
+    #[test]
+    fn clean_claims_are_the_claims_on_files_with_no_change() {
+        let rel = |f: &str| crate::land::relative(std::path::Path::new("/w"), f);
+        // @marketing changed tests/k.txt once and landed it: still claimed.
+        // @native-lead changes it again: its land is refused
+        let cs = [ch("tests/k.txt", true), ch("b", true), mv("new.rs", "old.rs")];
+        let blocked = pick_of(&cs, &["tests/k.txt"], &[], &[("marketing", &["tests/k.txt"])], false);
+        assert!(blocked.unwrap_err().contains("also changed by @marketing"));
+        // the claims while tests/k.txt was clean (marketing's land): over
+        let landed = [ch("b", true)];
+        let claims = s(&["/w/tests/k.txt", "b", "tests/k.txt", "/elsewhere/x", "old.rs", "/w/tests/k.txt"]);
+        assert_eq!(clean_claims(&landed, &claims, rel), s(&["/w/tests/k.txt", "tests/k.txt", "old.rs"]));
+        // a claimed file still changed (another agent still editing it,
+        // either side of a rename) stays claimed
+        assert_eq!(clean_claims(&cs, &claims, rel), Vec::<String>::new());
+        // dropped, the new change lands
+        let marketing: Vec<String> = s(&["tests/k.txt"]).into_iter().filter(|c| !clean_claims(&landed, &claims, rel).contains(c)).collect();
+        let others = [("marketing".to_string(), marketing)];
+        let files = s(&["tests/k.txt"]);
+        let p = pick(&cs, &Claims { files: &files, add: &[], others: &others }, false).unwrap();
+        assert_eq!(p.mine, s(&["tests/k.txt"]));
     }
 
     #[test]

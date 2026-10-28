@@ -19,6 +19,7 @@ import ../hub/pause.bend as HP
 import ../hub/reach.bend as HR
 import ../hub/answers.bend as HA
 import ../hub/lazy.bend as HLZ
+import ../hub/names.bend as HN
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ./lib/hub-3.bend as PL3
@@ -509,6 +510,61 @@ def Laws.follow_failed_at_once(o, cx, from, summary):
 
 def Laws.follow_done_once(o, cx, name, state, summary, label, hub):
   {==}
+
+# land-claims: drop_str leaves no `p`
+def hub_drop_none.keep(b: Bool, +h: String, +t: List<&2, String>, +p: String, +e: {String.eq(h, p) == b : Bool}, ih: {HM.str_in(HN.drop_str(t, p), p) == False{} : Bool})
+    -> {HM.str_in(HN.drop_str.keep(String.eq(h, p), h, HN.drop_str(t, p)), p) == False{} : Bool}:
+  match b:
+    case True{}:
+      %Equal.sym(Bool, String.eq(h, p), True{}, e) : {HM.str_in(HN.drop_str.keep(_, h, HN.drop_str(t, p)), p) == False{} : Bool}
+      ih
+    case False{}:
+      %Equal.sym(Bool, String.eq(h, p), False{}, e) : {HM.str_in(HN.drop_str.keep(_, h, HN.drop_str(t, p)), p) == False{} : Bool}
+      PL1.hub_lor_false(String.eq(h, p), HM.str_in(HN.drop_str(t, p), p), e, ih)
+
+def hub_drop_none(+xs: List<&2, String>, +p: String) -> {HM.str_in(HN.drop_str(xs, p), p) == False{} : Bool}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{+h, +t}:
+      hub_drop_none.keep(String.eq(h, p), h, t, p, {==}, hub_drop_none(t, p))
+
+# a lazy or whose right side is true is true
+def hub_lor_true_r(a: Bool, -b: Bool, e: {b == True{} : Bool}) -> {HLZ.or(a, u => b) == True{} : Bool}:
+  match a:
+    case True{}:
+      {==}
+    case False{}:
+      e
+
+# a lazy or whose left side is true is true
+def hub_lor_true_l(-a: Bool, -b: Bool, e: {a == True{} : Bool}) -> {HLZ.or(a, u => b) == True{} : Bool}:
+  %Equal.sym(Bool, a, True{}, e) : {HLZ.or(_, u => b) == True{} : Bool}
+  {==}
+
+# the last of `xs ++ [p]` is p
+def hub_str_in_snoc(+xs: List<&2, String>, +p: String) -> {HM.str_in(HM.snoc(String, xs, p), p) == True{} : Bool}:
+  match xs:
+    case Nil{}:
+      hub_lor_true_l(String.eq(p, p), False{}, PL2.hub_str_eq_refl(p))
+    case Con{+h, +t}:
+      hub_lor_true_r(String.eq(h, p), HM.str_in(HM.snoc(String, t, p), p), hub_str_in_snoc(t, p))
+
+def hub_file_claims(c: Bool, +fs: List<&2, String>, +p: String, +e: {HM.str_in(fs, p) == c : Bool})
+    -> {HM.str_in(HM.agent_op.file(c, fs, p), p) == True{} : Bool}:
+  match c:
+    case True{}:
+      e
+    case False{}:
+      hub_str_in_snoc(fs, p)
+
+def Laws.claim_dropped_unclaims(a, p):
+  %Equal.sym(List<&2, String>, HS.Agent.files(HS.Agent.with_files(a, HN.drop_str(HS.Agent.files(a), p))), HN.drop_str(HS.Agent.files(a), p), HSL.Agent.files.get_with(a, HN.drop_str(HS.Agent.files(a), p))) : {HM.str_in(_, p) == False{} : Bool}
+  hub_drop_none(HS.Agent.files(a), p)
+
+def Laws.file_touched_claims(a, p):
+  %Equal.sym(List<&2, String>, HS.Agent.files(HS.Agent.with_files(a, HM.agent_op.file(HM.str_in(HS.Agent.files(a), p), HS.Agent.files(a), p))), HM.agent_op.file(HM.str_in(HS.Agent.files(a), p), HS.Agent.files(a), p), HSL.Agent.files.get_with(a, HM.agent_op.file(HM.str_in(HS.Agent.files(a), p), HS.Agent.files(a), p))) : {HM.str_in(_, p) == True{} : Bool}
+  hub_file_claims(HM.str_in(HS.Agent.files(a), p), HS.Agent.files(a), p, {==})
 
 def Laws.follow_one_shot(a):
   %HSL.Agent.follow.eta(a, None{}) : {HM.follows(_) == False{} : Bool}

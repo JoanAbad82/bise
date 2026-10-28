@@ -67,6 +67,9 @@ pub const JOURNAL: Table = Table {
             &[f("name", Str), f("status", Rec(&DECL)), f("note", Str)]),
         k("reported", "Reported", "M.EReported{name, report}", &[f("name", Str), f("report", Json)]),
         k("file_touched", "FileTouched", "M.EFileTouched{name, path}", &[f("name", Str), f("path", Str)]),
+        // land-claims: the agent's claim on `path` ends (its file had no
+        // change left); an older core skips it
+        k("claim_dropped", "ClaimDropped", "M.EClaimDropped{name, path}", &[f("name", Str), f("path", Str)]),
         k("renamed", "Renamed", "M.ERenamed{name, new_name}", &[f("name", Str), f("new_name", Str)]),
         // name-free (architect m_31497): another agent takes the old name
         // `from` of a live agent `to`; its hot messages to `from` (queued,

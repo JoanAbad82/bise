@@ -3259,6 +3259,53 @@ def assistant(-o: S.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
   +r = rr(o, cx)
   set_r(o, cx, X.R.with_last(r, M.snoc(X.Kv, KL.kv_del(X.R.last(r), agent), X.Kv{agent, text})))
 
+# ---- land-claims: a claim ends when its file has no change left ----
+# IClaimsClean: the shell's `git status` of a place (after a land in the
+# shared folder, and at boot) found no change on `paths`; each live agent
+# of that place that claims one of them drops it (one EClaimDropped each),
+# so a file two agents once changed can be landed again. A later edit
+# claims it again (EFileTouched). The window left: an agent that rewrites
+# a claimed file between the shell's `git status` and this step loses
+# that claim (its land then names the file instead of taking it).
+
+def claims_clean.one(-o: S.St, hit: Bool, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
+  match hit:
+    case True{}:
+      emit(o, cx, M.EClaimDropped{agent, path}, Unit{}, Unit{}, Unit{})
+    case False{}:
+      cx
+
+def claims_clean.paths(-o: S.St, paths: List<&2, String>, +cx: X.Cx<o>, +agent: String, +files: List<&2, String>) -> X.Cx<o>:
+  match paths:
+    case Nil{}:
+      cx
+    case Con{+p, +t}:
+      claims_clean.paths(o, t, claims_clean.one(o, M.str_in(files, p), cx, agent, p), agent, files)
+
+def claims_clean.at(-o: S.St, here: Bool, +cx: X.Cx<o>, +agent: String, +files: List<&2, String>, +paths: List<&2, String>) -> X.Cx<o>:
+  match here:
+    case True{}:
+      claims_clean.paths(o, paths, cx, agent, files)
+    case False{}:
+      cx
+
+def claims_clean.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +place: String, +paths: List<&2, String>) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+a}:
+      claims_clean.at(o, String.eq(PL.Agent.place(a), place), cx, S.Agent.name(a), S.Agent.files(a), paths)
+
+def claims_clean.go(-o: S.St, names: List<&2, String>, +cx: X.Cx<o>, +place: String, +paths: List<&2, String>) -> X.Cx<o>:
+  match names:
+    case Nil{}:
+      cx
+    case Con{+n, +t}:
+      claims_clean.go(o, t, claims_clean.agent(o, M.get_agent(st(o, cx), n), cx, place, paths), place, paths)
+
+def claims_clean(-o: S.St, +cx: X.Cx<o>, +place: String, +paths: List<&2, String>) -> X.Cx<o>:
+  claims_clean.go(o, M.live_names(st(o, cx)), cx, place, paths)
+
 # ---- file overlap (RFC 0001 §10.3) ----
 
 def touch.others(-o: S.St, others: List<&2, String>, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
@@ -3699,6 +3746,8 @@ def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       assistant(o, cx, agent, text)
     case GI.ITouch{+agent, +path}:
       touch(o, cx, agent, path)
+    case GI.IClaimsClean{+place, +paths}:
+      claims_clean(o, cx, place, paths)
     case GI.IReady{+agent}:
       repl_ready(o, cx, agent)
     case GI.IExited{+agent, +crashed, +reason, +stalled, +loaded, +row, +stopped}:

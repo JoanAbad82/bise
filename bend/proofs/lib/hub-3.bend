@@ -95,6 +95,8 @@ def hub_apply_names.go(+e: HM.Ev, +s: HS.St, u: HI.NamesApart(s), +k: HX.FreshEv
       PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.ODeclared{d, nt}, {==}, u)
     case HM.EFileTouched{+x, +p}:
       PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OFile{p}, {==}, u)
+    case HM.EClaimDropped{+x, +p}:
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OUnclaim{p}, {==}, u)
     case HM.ESnapshot{+x, +sn}:
       PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OSnap{sn}, {==}, u)
     case HM.EPlaced{+x, +w, +er}:

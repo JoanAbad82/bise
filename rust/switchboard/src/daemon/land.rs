@@ -1,7 +1,8 @@
 //! `sb land` on the hub's side (dev-flow §5): the land runs in its own
 //! thread, in line on the queue (the views say who waits), git and the
 //! check never on the hub's loop; its answer to the agent's `sb`, and a
-//! line in main's feed.
+//! line in main's feed. After a land in the shared folder (and at boot),
+//! the claims over there go to sb-core ([`claims_clean`]).
 //!
 //! land-wait: one land per place at a time (`land_queue::Queue::claim`):
 //! a second is refused at once. The `sb` waits for its land
@@ -41,6 +42,20 @@ fn told(stream: &mut UnixStream, body: &Value) -> bool {
     stream.write_all(line.as_bytes()).and_then(|_| stream.flush()).is_ok()
 }
 
+/// land-claims: the claims over in the shared folder `dir` (no change
+/// left on their file, `land::claims_over`) go to sb-core, which drops
+/// them (IClaimsClean): after a land there (the land's thread) and at
+/// boot (its own thread). A `git status` that fails drops nothing.
+pub(super) fn claims_clean(tx: &Sender<Msg>, dir: &Path, claims: &[String]) {
+    match crate::land::claims_over(dir, claims) {
+        Ok(paths) if !paths.is_empty() => {
+            let _ = tx.send(Msg::input(Input::ClaimsClean { place: crate::place::SHARED.to_string(), paths }));
+        }
+        Ok(_) => {}
+        Err(e) => eprintln!("claims not looked at ({}): {}", dir.display(), e),
+    }
+}
+
 /// The land's record (`crate::land_record`), in its own thread right
 /// after the swap: its commits are `base..tip`. A write that fails costs
 /// only the guard's "your own land" for these commits (logged).
@@ -77,6 +92,10 @@ impl Shell {
             let (body, line) = match res {
                 Ok(o) => {
                     record(&job, &o);
+                    if !job.worktree {
+                        let all: Vec<String> = job.files.iter().chain(job.others.iter().flat_map(|(_, fs)| fs)).cloned().collect();
+                        claims_clean(&tx, &job.dir, &all);
+                    }
                     landed = art::landed_rec(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
                     let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed);
                     if let Some(e) = &o.push_error {

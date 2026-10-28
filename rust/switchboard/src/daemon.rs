@@ -1825,6 +1825,12 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     sh.booting = true;
     sh.step(Input::Boot);
     sh.booting = false;
+    // land-claims: the shared folder's claims whose file has no change
+    // left (stale from before, or landed while no hub ran) end, off the loop
+    {
+        let (tx, (dir, claims)) = (sh.tx.clone(), sh.hub.shared_claims());
+        std::thread::spawn(move || land::claims_clean(&tx, &dir, &claims));
+    }
     kill_stale_repls(&sh);
     sh.migrate_the_rest();
     sh.archived = sh.archived_dirs();

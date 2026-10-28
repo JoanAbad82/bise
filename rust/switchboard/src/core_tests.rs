@@ -887,6 +887,36 @@ fn peers_cannot_reach_an_archived_task_but_the_user_can() {
         .any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "b")));
 }
 
+/// land-claims: a claim on a file with no change left ends (sb-core's
+/// IClaimsClean, sent after a land in the shared folder and at boot), so
+/// a file two agents once changed can be landed again; a later edit
+/// claims it again; another place's claims stay.
+#[test]
+fn clean_claims_end_and_a_new_edit_claims_again() {
+    let mut t = T::new();
+    t.spawn_task("a");
+    t.spawn_task("b");
+    let patch = |f: &str| {
+        format!("tool #1 apply_patch : {{\"arg\":\"*** Begin Patch\\n*** Update File: {}\\n@@\\n-x\\n+y\\n*** End Patch\"}}", f)
+    };
+    let touch = |t: &mut T, a: &str, f: &str| t.go(Input::ReplLine { agent: a.into(), line: patch(f) });
+    touch(&mut t, "a", "tests/k.txt");
+    touch(&mut t, "a", "src/a.rs");
+    touch(&mut t, "b", "tests/k.txt");
+    let others = |t: &T, who: &str| t.hub.land_job(who, true, "m", vec![]).unwrap().others;
+    let of = |os: &[(String, Vec<String>)], n: &str| os.iter().find(|(m, _)| m == n).map(|(_, fs)| fs.clone()).unwrap_or_default();
+    assert_eq!(of(&others(&t, "b"), "a"), vec!["tests/k.txt".to_string(), "src/a.rs".to_string()]);
+    // a landed tests/k.txt: clean in the shared folder, its claims end
+    t.go(Input::ClaimsClean { place: "wt:elsewhere".into(), paths: vec!["tests/k.txt".into()] });
+    assert_eq!(of(&others(&t, "b"), "a").len(), 2, "another place's clean files drop nothing here");
+    t.go(Input::ClaimsClean { place: crate::place::SHARED.into(), paths: vec!["tests/k.txt".into(), "nobody.txt".into()] });
+    assert_eq!(of(&others(&t, "b"), "a"), vec!["src/a.rs".to_string()], "a's claim on the clean file ended, src/a.rs stays");
+    assert!(of(&others(&t, "a"), "b").is_empty(), "b's too");
+    // a new edit claims it again
+    touch(&mut t, "b", "tests/k.txt");
+    assert_eq!(of(&others(&t, "a"), "b"), vec!["tests/k.txt".to_string()]);
+}
+
 #[test]
 fn shared_tasks_touching_one_file_tell_main() {
     let mut t = T::new();

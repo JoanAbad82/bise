@@ -279,6 +279,17 @@ fn changes(dir: &Path, since_ms: u64) -> Result<Vec<Change>, String> {
     Ok(all)
 }
 
+/// The claims over in the folder `dir` ([`crate::land_pick::clean_claims`]):
+/// of `claims` (as the hub keeps them), the ones on a file with no change
+/// there now. The shell sends them to sb-core (`claims_clean`) after a
+/// land in the shared folder and at the hub's boot.
+pub fn claims_over(dir: &Path, claims: &[String]) -> Result<Vec<String>, String> {
+    if claims.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(crate::land_pick::clean_claims(&changes(dir, 0)?, claims, |f| relative(dir, f)))
+}
+
 /// What the land takes and names ([`crate::land_pick::pick`]): the
 /// place's changes, the agent's claims (its file tools' files, `--add`)
 /// and the other agents' files, relative to the place's folder.

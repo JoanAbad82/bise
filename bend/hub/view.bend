@@ -246,6 +246,8 @@ def ev_names(e: M.Ev) -> List<&2, String>:
       [name]
     case M.EFileTouched{+name, _}:
       [name]
+    case M.EClaimDropped{+name, _}:
+      [name]
     case M.ERenamed{+name, +nn}:
       [name, nn]
     # S10: following and a job's end change the agent's row

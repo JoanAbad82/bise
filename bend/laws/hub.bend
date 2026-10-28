@@ -783,6 +783,21 @@ law follow_done_once:
   for +hub: String
   {HC.job_end.go(o, False{}, cx, name, state, summary, label, hub) == cx : HX.Cx<o>}
 
+# LAW (land-claims, architect m_49443): a dropped claim is gone: after
+# EClaimDropped{name, p} (IClaimsClean: p's file had no change left) the
+# agent claims p no more, however many times it was listed.
+law claim_dropped_unclaims:
+  for +a: HS.Agent
+  for +p: String
+  {HM.str_in(HS.Agent.files(HM.agent_op(a, HM.OUnclaim{p})), p) == False{} : Bool}
+
+# LAW (land-claims): a later edit claims the file again: after
+# EFileTouched{name, p} the agent claims p, a dropped claim too.
+law file_touched_claims:
+  for +a: HS.Agent
+  for +p: String
+  {HM.str_in(HS.Agent.files(HM.agent_op(a, HM.OFile{p})), p) == True{} : Bool}
+
 # LAW (architect m_9154): one job per follow: job_end turns follow off.
 law follow_one_shot:
   for +a: HS.Agent

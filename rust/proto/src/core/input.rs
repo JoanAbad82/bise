@@ -104,6 +104,10 @@ core_kinds! {
         CardClose = "card_close" => IConfirmClose { card: Nat, res: Str },
         /// a message of the hub itself (from `bise`) to an agent
         HubMsg = "hub_msg" => IHubMsg { to: Str, text: Str },
+        /// land-claims: the claims of `place`'s agents whose file has no
+        /// change there now (the shell's `git status`, after a land in the
+        /// shared folder and at boot): each agent's claims on them end
+        ClaimsClean = "claims_clean" => IClaimsClean { place: Str, paths: Strs },
         /// a page question's card answered on its page (wake-deliver): the
         /// card closes `answered`; its asker hears it when that is not
         /// `agent`, the agent the pick went to (reach.bend)

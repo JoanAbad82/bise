@@ -13,6 +13,7 @@ import ../../hub/wakes.bend as HWK
 import ../../hub/gen/feed.bend as HFD
 import ./hub-1.bend as PL1
 import ../../hub/lazy.bend as HLZ
+import ../../hub/names.bend as HN
 
 def hub_cards_wakes(-o: HS.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     -> {HS.St.cards(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HS.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
@@ -389,6 +390,8 @@ def hub_apply_ucards.go(+e: HM.Ev, +s: HS.St, u: HI.UniqueCards(s), k: HX.FreshE
       u
     case HM.EFileTouched{a, b}:
       u
+    case HM.EClaimDropped{a, b}:
+      u
     case HM.ERenamed{a, b}:
       u
     case HM.EMsgsMoved{a, b}:
@@ -691,6 +694,9 @@ def hub_names_op(+h: HS.Agent, op: HM.AgentOp, nr: {hub_is_rename(op) == False{}
       {==}
     case HM.OFile{+p}:
       %HSL.Agent.files.eta(h, HM.agent_op.file(HM.str_in(HS.Agent.files(h), p), HS.Agent.files(h), p)) : {HI.names(_) == HI.names(h) : List<&2, String>}
+      {==}
+    case HM.OUnclaim{+p}:
+      %HSL.Agent.files.eta(h, HN.drop_str(HS.Agent.files(h), p)) : {HI.names(_) == HI.names(h) : List<&2, String>}
       {==}
     case HM.ORename{nn}:
       PL1.hub_absurd_eq(PL1.hub_tf_absurd(nr), List<&2, String>, HI.names(HM.agent_op(h, HM.ORename{nn})), HI.names(h))

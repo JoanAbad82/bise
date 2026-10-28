@@ -231,6 +231,12 @@ law in_hub_msg_bare:
 def in_hub_msg_bare():
   {==}
 
+law in_claims_clean_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"claims_clean"})])) == IN.IClaimsClean{"", Nil{}} : IN.In}
+
+def in_claims_clean_bare():
+  {==}
+
 law in_page_answered_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"page_answered"})])) == IN.IPageAnswered{0n, "", "", "", ""} : IN.In}
 
@@ -703,6 +709,15 @@ law in_IHubMsg_round:
   {IN.of(IN.json(IN.IHubMsg{to, text})) == IN.IHubMsg{to, text} : IN.In}
 
 def in_IHubMsg_round(to, text):
+  {==}
+
+law in_IClaimsClean_round:
+  for place: String
+  for paths: List<&2, String>
+  {IN.of(IN.json(IN.IClaimsClean{place, paths})) == IN.IClaimsClean{place, paths} : IN.In}
+
+def in_IClaimsClean_round(place, paths):
+  %K.strs_round(paths) : {IN.of(IN.json(IN.IClaimsClean{place, paths})) == IN.IClaimsClean{place, _} : IN.In}
   {==}
 
 law in_IPageAnswered_round:

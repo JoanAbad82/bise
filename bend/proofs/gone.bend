@@ -143,6 +143,8 @@ def gone_bound.go(+e: HM.Ev, +s: HS.St, h: {Nat.is_le(List.length(&2, HS.Item, H
           h
         case HM.EFileTouched{a, b}:
           h
+        case HM.EClaimDropped{a, b}:
+          h
         case HM.ERenamed{a, b}:
           h
         case HM.EMsgsMoved{a, b}:

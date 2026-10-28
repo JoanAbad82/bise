@@ -234,6 +234,10 @@ pub enum Input {
     SignedIn,
     /// bise's message to `to` (sb-core's IHubMsg): a land whose sb was gone (daemon/land.rs).
     HubMsg { to: String, text: String },
+    /// land-claims: the claims of `place`'s agents whose file has no
+    /// change there now (sb-core's IClaimsClean drops them): after a land
+    /// in the shared folder and at boot (daemon/land.rs).
+    ClaimsClean { place: String, paths: Vec<String> },
     /// desktop S2, a project hub: bise's message (`xin` on hub.sock) from
     /// bise's hub `hub`; `token` answers the caller (ack or error).
     XIn {
@@ -983,6 +987,18 @@ impl Hub {
         Ok(target)
     }
 
+    /// land-claims: the shared folder's path and its live agents' claims,
+    /// as the state keeps them (the boot's look for claims that are over).
+    pub fn shared_claims(&self) -> (std::path::PathBuf, Vec<String>) {
+        let mut claims: Vec<String> = Vec::new();
+        for a in self.st.agents.values().filter(|a| a.lifecycle != Lifecycle::Archived) {
+            if a.ws.place_id(&a.dir) == crate::place::SHARED {
+                claims.extend(a.files.iter().filter(|f| !claims.contains(f)).cloned().collect::<Vec<_>>());
+            }
+        }
+        (std::path::PathBuf::from(&self.workspace), claims)
+    }
+
     /// `sb land` (dev-flow §5): what the land needs from the state. The
     /// daemon adds the repo's flow and runs it (`land::run`).
     fn land_job(&self, from: &str, here: bool, message: &str, add: Vec<String>) -> Result<crate::land::Job, String> {
@@ -1545,6 +1561,7 @@ impl Hub {
             Input::UpdateNow => self.update_now(&mut fx),
             Input::SignedIn => self.signed_in(&mut fx, env),
             Input::HubMsg { to, text } => self.core(&mut fx, env, None, In::HubMsg(ci::HubMsg { to, text })),
+            Input::ClaimsClean { place, paths } => self.core(&mut fx, env, None, In::ClaimsClean(ci::ClaimsClean { place, paths })),
             Input::Updated { version, res } => self.updated(&mut fx, &version, res),
             Input::XIn { token, hub, xid, kind, text, name, parts } => {
                 self.core(&mut fx, env, None, In::XIn(ci::XIn { token, hub, xid, kind, text, name, parts }))

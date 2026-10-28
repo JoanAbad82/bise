@@ -27,6 +27,9 @@ type Ev is Data:
   EDeclared{name: String, status: Maybe<&2, S.Decl>, note: String}
   EReported{name: String, report: J.Json}
   EFileTouched{name: String, path: String}
+  # land-claims: the agent's claim on `path` ends (its file had no change
+  # left after a land, or at boot: IClaimsClean)
+  EClaimDropped{name: String, path: String}
   ERenamed{name: String, new_name: String}
   # name-free: a live agent's hot messages to its old name `from` (taken)
   EMsgsMoved{from: String, to: String}
@@ -72,6 +75,7 @@ type AgentOp is Data:
   OWs{ws: J.Json}
   ODeclared{d: Maybe<&2, S.Decl>, note: String}
   OFile{path: String}
+  OUnclaim{path: String}
   ORename{new_name: String}
   OFollow{f: Maybe<&2, String>}
 
@@ -283,6 +287,8 @@ def agent_op(+a: S.Agent, op: AgentOp) -> S.Agent:
       S.Agent.with_note(S.Agent.with_declared(a, d), n)
     case OFile{+p}:
       S.Agent.with_files(a, agent_op.file(str_in(S.Agent.files(a), p), S.Agent.files(a), p))
+    case OUnclaim{+p}:
+      S.Agent.with_files(a, NM.drop_str(S.Agent.files(a), p))
     case ORename{+nn}:
       S.Agent.with_aliases(S.Agent.with_name(a, nn), snoc(String, S.Agent.aliases(a), S.Agent.name(a)))
     case OSnap{+sn}:
@@ -666,6 +672,8 @@ def apply(+st: S.St, e: Ev) -> S.St:
       on_agent(st, name, OReport{report})
     case EFileTouched{+name, +path}:
       on_agent(st, name, OFile{path})
+    case EClaimDropped{+name, +path}:
+      on_agent(st, name, OUnclaim{path})
     case ERenamed{+name, +nn}:
       S.St.over_order(renamed(st, name, nn), od => NM.rename_in(od, name, nn))
     case EMsgsMoved{+from, +to}:

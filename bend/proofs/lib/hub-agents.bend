@@ -560,6 +560,9 @@ def lv_life_op(+h: HS.Agent, op: HM.AgentOp, nl: {lv_is_life(op) == False{} : Bo
     case HM.OFile{+p}:
       %HSL.Agent.files.eta(h, HM.agent_op.file(HM.str_in(HS.Agent.files(h), p), HS.Agent.files(h), p)) : {HS.Agent.life(_) == HS.Agent.life(h) : HS.Life}
       {==}
+    case HM.OUnclaim{+p}:
+      %HSL.Agent.files.eta(h, HN.drop_str(HS.Agent.files(h), p)) : {HS.Agent.life(_) == HS.Agent.life(h) : HS.Life}
+      {==}
     case HM.ORename{nn}:
       %HSL.Agent.name.eta(h, nn) : {HS.Agent.life(HS.Agent.with_aliases(_, HM.snoc(String, HS.Agent.aliases(h), HS.Agent.name(h)))) == HS.Agent.life(h) : HS.Life}
       {==}
@@ -754,6 +757,8 @@ def lv_apply.go(+e: HM.Ev, +s: HS.St, la: HI.Lives(HS.St.agents(s), True{}), lr:
       lv_on(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.ODeclared{d, nt}, {==}, la, lr)
     case HM.EFileTouched{+x, +p}:
       lv_on(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OFile{p}, {==}, la, lr)
+    case HM.EClaimDropped{+x, +p}:
+      lv_on(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OUnclaim{p}, {==}, la, lr)
     case HM.ESnapshot{+x, +sn}:
       lv_on(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OSnap{sn}, {==}, la, lr)
     case HM.EPlaced{+x, +w, +er}:
