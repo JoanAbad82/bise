@@ -14,7 +14,7 @@ import { siteOf, type Fit, type V3 } from './camera';
 import { cameraStart, viewPoint, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
 import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, REACH_S, awayOf, heldAt } from './catch';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
-import { idleFrame, idleRig } from './idle';
+import { BURST_PX, idleFrame, idleRig } from './idle';
 import { aliveOf, newCrowd } from './alive';
 import { restAt, type NapRest } from './nap';
 import { skateRig } from './skate';
@@ -666,7 +666,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         const still = idle.get(f.name);
         // a standing bim breathes and shifts its weight (render/alive.ts), under its rare idle moves
         const posed = aliveOf(crowd, f, rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt }), t, { reduced: look.reduced, scale: fit.scale, skater: skater !== null });
-        const rig = eggRig(skater ?? (still ? idleRig(posed, still) : posed), f.egg ?? null);
+        const rig = eggRig(skater ?? (still ? idleRig(posed, still, 1 / fit.scale >= BURST_PX) : posed), f.egg ?? null);
         b.apply(rig);
         if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) {
           appearing.set(f.name, t);

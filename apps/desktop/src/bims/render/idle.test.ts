@@ -147,8 +147,9 @@ describe('idle moves (bim-idle)', () => {
           expect(r.y).toBeCloseTo(base.y, 6);
           expect(r.legL).toBeCloseTo(base.legL, 6);
         }
-        const mid = idleRig(base, { kind, move: p, u: 0.5, hold: 0 });
-        expect(mid.motion).toBe('idle');
+        // 30 fps only pinched in (BURST_PX); at the office's fit, the loop's 8 fps (bims/idle: the battery)
+        expect(idleRig(base, { kind, move: p, u: 0.5, hold: 0 }, true).motion).toBe('idle');
+        expect(idleRig(base, { kind, move: p, u: 0.5, hold: 0 }).motion).toBe('loop');
       }
     }
     // a turn in its sleep ends where its hold is, its way back on the rest pose

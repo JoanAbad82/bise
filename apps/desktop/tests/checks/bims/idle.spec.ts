@@ -1,8 +1,9 @@
 // bims/idle · what the office costs when nothing changes (his Mac, main m_28475: two GPU helpers at
 // ~29% CPU for an hour while he worked elsewhere). On FakeCore rows, off screen. Passes when, over
 // 3 s each:
-//   (1) the office open on a still world (asleep, failed, blocked, stopped, main idle) draws
-//       0 WebGL frames; its only motion is the sleepers' z's (a CSS loop, 7.5 fps at most);
+//   (1) the office open on a still world (asleep, failed, blocked, stopped, main idle) draws 0 WebGL
+//       frames under reduced motion; else only its sleepers' rare idle moves (render/idle.ts) at the
+//       loop's 8 fps at most; its only CSS motion is the sleepers' z's (a CSS loop, 7.5 fps at most);
 //   (2) the office closed: no renderer, no frame, no animation of the bims' left running;
 //   (3) the window hidden: 0 frames and the z's paused, the office open with typing bims;
 //   (4) the office open with typing bims (the fixture's): the loop's ~8 fps, never the display's;
@@ -67,6 +68,17 @@ test.afterAll(() => {
 test.describe.configure({ timeout: 180_000 });
 
 test('(1)(2) a still office draws nothing for 3 s; closed, nothing of the bims runs', async () => {
+  // reduced motion: no idle move, nothing at all to draw
+  {
+    const { s } = await open(STILL, { reduced: true });
+    try {
+      await showOffice(s);
+      await settle(s);
+      expect(await framesIn(s, IDLE_MS), 'a still office, reduced motion: 0 WebGL frames in 3 s').toBe(0);
+    } finally {
+      await s.close();
+    }
+  }
   const { s } = await open(STILL);
   try {
     // the card's office is on at start (bise fait mac): hidden first, so 'before any open' is closed
@@ -74,7 +86,10 @@ test('(1)(2) a still office draws nothing for 3 s; closed, nothing of the bims r
     found['closed, before any open'] = await running(s);
     await showOffice(s);
     await settle(s);
-    expect(await framesIn(s, IDLE_MS), 'a still office: 0 WebGL frames in 3 s').toBe(0);
+    // only a sleeper's rare idle move (render/idle.ts: a breath, a twitch, a turn, 12-35 s apart), at
+    // the loop's 8 fps at most: never the display's (a frame each 2 s on average)
+    const n = await framesIn(s, IDLE_MS);
+    expect(n / (IDLE_MS / 1000), 'a still office: its sleepers\' rare moves only, at the loop\'s rate').toBeLessThan(12);
     found['open, still world'] = await running(s);
     const mine = found['open, still world'].filter((a) => a.bims && !a.paused);
     expect(mine.every((a) => a.name === 'bims-z'), `the office's only motion is the z's: ${JSON.stringify(mine)}`).toBe(true);

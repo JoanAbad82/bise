@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity, BimFrame, Path, Pose, Spot } from '../model';
-import { AMP, BREATH_MAX, BREATH_MIN, BURST_PX, FADE_IN_S, GAP_S, SHIFT_S, STANCE_MAX, aliveOf, aliveSeed, breathAt, clockOf, newCrowd, stanceAt, stands, type Crowd, type Life } from './alive';
-import { MIN_PX } from './idle';
+import { AMP, BREATH_MAX, BREATH_MIN, FADE_IN_S, GAP_S, SHIFT_S, STANCE_MAX, aliveOf, aliveSeed, breathAt, clockOf, newCrowd, stanceAt, stands, type Crowd, type Life } from './alive';
+import { BURST_PX, MIN_PX } from './idle';
 import { rigOf, type Rig } from './pose';
 
 const spot: Spot = { x: 3, z: 6, wz: 5.35, ax: 1.2, face: 0 };

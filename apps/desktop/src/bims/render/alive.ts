@@ -15,7 +15,7 @@
 // is seeded, so none starts in step.
 //
 // The frame rate (battery): the breath alone at LOOP_FPS (8 fps, the typing loop's: 'loop'); a
-// stance change at 30 fps ('idle', bim-idle's burst) only when bims are drawn BURST_PX a unit or more
+// stance change at 30 fps ('idle', bim-idle's burst) only when bims are drawn BURST_PX (idle.ts) a unit or more
 // (pinched in past the follow camera: at the office's fit, even on a big window, the loop's 8 fps; at 60
 // px a unit a crowd of 13 kept the office at ~27 fps, bims/idle red on b950e1cd9). None under reduced motion, none
 // drawn under MIN_PX a unit (the town's tiles), none on main, a skater, under an egg or a poke, none
@@ -23,7 +23,7 @@
 // FADE_IN_S when it joins. Seated and lying bims are not this layer's (asleep, napping, a deck chair:
 // idle.ts's moves). Owner: bim-alive.
 import type { BimFrame, Motion } from '../model';
-import { MIN_PX } from './idle';
+import { BURST_PX, MIN_PX } from './idle';
 import { hash, rng } from './palette';
 import type { Rig, Rot } from './pose';
 
@@ -43,8 +43,6 @@ export const SHIFT_S = 1.8;
 export const GAP_S = 0.5;
 /** the layer fades in this long when a bim joins it (s): no pop at its arrival */
 export const FADE_IN_S = 1.2;
-/** a stance change draws at 30 fps from this many css px a unit (pinched in, one bim big in the view); under it, the loop's 8 fps */
-export const BURST_PX = 200;
 
 /** the amplitudes (designer m_48119): the breath's lift (world units, a bim ~1 tall), chest, shoulders; the stance's lean, slide, head, free foot, turns */
 export const AMP = {

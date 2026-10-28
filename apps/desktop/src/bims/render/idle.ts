@@ -11,8 +11,9 @@
 // for its bim's next slot (a turn and its way back are never held back: the turn's hold would jump).
 // None under reduced motion, none in the first SETTLE_S after it came to rest (its event label), none
 // with an egg or a poke on it, none when the bims are drawn smaller than MIN_PX (the tile from afar).
-// The office draws at IDLE_FPS only while a move runs ('idle'), then still: idleWake says when the
-// next one starts so the loop sleeps until then. Owner: bim-idle.
+// The office draws while a move runs (at IDLE_FPS pinched in, BURST_PX a unit or more, else the loop's
+// 8 fps: the battery's budget at the office's fit), then still: idleWake says when the next one starts
+// so the loop sleeps until then. Owner: bim-idle.
 import type { Activity, BimFrame, Pt } from '../model';
 import type { NapRest } from './nap';
 import { hash, rng } from './palette';
@@ -32,6 +33,8 @@ export const SETTLE_S = 3;
 export const MAX_AT_ONCE = 2;
 /** no moves when a bim is drawn smaller than this (css px for a unit of the world: the bims' height) */
 export const MIN_PX = 12;
+/** a move (and a standing bim's stance change, alive.ts) draws at 30 fps from this many css px a unit (pinched in past the follow camera, one bim big in the view); under it, the loop's 8 fps (battery: the office's fit stays at the loop) */
+export const BURST_PX = 200;
 
 interface Entry {
   readonly move: IdleMove;
@@ -323,8 +326,12 @@ function turned(r: Rig, kind: IdleKind, side: number, f: number): Rig {
   return { ...r, head: add(r.head, [0, side * 0.4 * f, side * 0.15 * f]), body: add(r.body, [0, 0, side * 0.08 * f]) };
 }
 
-/** the rig with its idle move (or its held turn) on top; 'idle' motion while a move runs */
-export function idleRig(r: Rig, n: IdleNow): Rig {
+/**
+ * The rig with its idle move (or its held turn) on top; while a move runs, 'idle' (IDLE_FPS) drawn
+ * BURST_PX a unit or more (pinched in), else the loop's 8 fps: at the office's fit, 13 resting bims
+ * kept it at ~25 fps (bims/idle red on 6b50957c7), and its steps there are about a pixel.
+ */
+export function idleRig(r: Rig, n: IdleNow, burst = false): Rig {
   const m = n.move;
   if (m === null) return n.hold === 0 ? r : turned(r, n.kind, n.hold, 1);
   const u = n.u;
@@ -374,5 +381,7 @@ export function idleRig(r: Rig, n: IdleNow): Rig {
       }
     }
   })();
-  return { ...out, motion: r.motion === 'still' || r.motion === 'loop' || r.motion === 'blend' ? 'idle' : r.motion };
+  const calm = r.motion === 'still' || r.motion === 'loop';
+  if (burst && (calm || r.motion === 'blend')) return { ...out, motion: 'idle' };
+  return { ...out, motion: calm ? 'loop' : r.motion };
 }
