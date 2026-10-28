@@ -49,6 +49,9 @@ const MOVES: Readonly<Record<IdleKind, readonly Entry[]>> = {
   desk: [{ move: 'breath', w: 4 }, { move: 'turn', w: 2 }, { move: 'twitch', w: 1 }],
 };
 
+/** the moves a bim plays where it rests (the hair law samples them: hair-clip.test.ts) */
+export const movesOf = (kind: IdleKind): readonly IdleMove[] => MOVES[kind].map((e) => e.move);
+
 /** each move's length (s) */
 export const DUR: Readonly<Record<IdleMove, number>> = {
   sway: 1.6, look: 2.4, sip: 2.0, stretch: 2.2, wiggle: 1.6, yawn: 2.0, breath: 3.0, sigh: 1.5, turn: 1.6, back: 1.6, twitch: 0.5,
@@ -322,7 +325,7 @@ const SIP: Rot = [-2.25, 0, -0.45];
 
 /** the turn in its sleep at f (0 rest .. 1 turned) on a side */
 function turned(r: Rig, kind: IdleKind, side: number, f: number): Rig {
-  if (kind === 'desk') return { ...r, head: add(r.head, [0, side * 0.35 * f, 0]) };
+  if (kind === 'desk') return { ...r, head: add(r.head, [-0.3 * f, side * 0.2 * f * f, 0]) };
   return { ...r, head: add(r.head, [0, side * 0.4 * f, side * 0.15 * f]), body: add(r.body, [0, 0, side * 0.08 * f]) };
 }
 

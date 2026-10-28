@@ -7,17 +7,31 @@
 // cut, the headwear, the outfit, the pose and the frame (hair.testkit.ts hairMeasure).
 import { describe, expect, it } from 'vitest';
 import { CUT_WEARS, KINDS, OWN_WEARS, hairMeasure } from './hair.testkit';
+import { DUR, idleRig, movesOf, type IdleKind } from './idle';
 import { posesOf } from './outfits.testkit';
 import type { Rot } from './pose';
 
-/** every head angle of the poses, once each (to the hundredth of a radian), with where it comes from */
+/** the resting poses' idle places (idle.ts idleKindOf): their rare moves turn the head too (bim-review f8) */
+const RESTS: Readonly<Record<string, IdleKind>> = { think: 'desk', asleep: 'desk', nap: 'bed', terrace: 'deck' };
+
+/** every head angle of the poses and of their idle moves (at their peak and held), once each (to the hundredth of a radian), with where it comes from */
 const ANGLES = ((): { rot: Rot; at: string }[] => {
   const seen = new Map<string, { rot: Rot; at: string }>();
+  const see = (rot: Rot, at: string): void => {
+    const k = rot.map((x) => Math.round(x * 100)).join(',');
+    if (!seen.has(k)) seen.set(k, { rot, at });
+  };
   for (const p of posesOf(false, 1.3)) {
+    const kind = RESTS[p.id];
     for (const f of p.frames) {
-      const rot = f.rig.head;
-      const k = rot.map((x) => Math.round(x * 100)).join(',');
-      if (!seen.has(k)) seen.set(k, { rot, at: `${p.id} · t=${String(f.t)}` });
+      see(f.rig.head, `${p.id} · t=${String(f.t)}`);
+      if (kind === undefined) continue;
+      for (const side of [-1, 1] as const) {
+        see(idleRig(f.rig, { kind, move: null, u: 0, hold: side }).head, `${p.id} · t=${String(f.t)} · turned ${String(side)}`);
+        for (const move of movesOf(kind)) {
+          for (const u of [0.5, 0.95]) see(idleRig(f.rig, { kind, move: { move, start: 0, dur: DUR[move], side }, u, hold: 0 }).head, `${p.id} · t=${String(f.t)} · ${move} ${String(side)} u=${String(u)}`);
+        }
+      }
     }
   }
   return [...seen.values()];
