@@ -20,7 +20,7 @@ import { STYLE } from '../render/style';
 import { makeView, type View } from '../render/view';
 import { castShadows, lightOffice } from '../render/world';
 import type { Pose } from '../model';
-import { cutPng, headPng } from '@/app/side3d/render';
+import { COIN_HEAD, cutPng, headPng } from '@/app/side3d/render';
 import { aliveRig, aliveSeed, stanceAt, stands } from '../render/alive';
 import type { Row } from './pairwise';
 import { type Cam, type Dressed, REVIEW_NAME, dimsOf, dress, rowId, validRow } from './review-space';
@@ -45,9 +45,6 @@ function standRig(): Rig {
   if (!r) throw new Error('no terrace pose');
   return { ...r, x: 0, z: 0, dir: 0, y: 0, body: [0, 0, 0], head: [0, 0, 0], armL: [0, 0, 0.12], armR: [0, 0, -0.12], legL: 0, legR: 0, eyes: 1, mouth: 'smile', props: NO_PROPS, opacity: 1, grey: 0 };
 }
-
-/** the coin's head (app/side3d/render.ts LEVEL, not exported: keep the two the same) */
-const COIN_HEAD = [-0.2, 0, 0] as const;
 
 /** the coin's standing visitor, turned to the camera (app/side3d/render.ts standing) */
 const FACE = Math.PI / 4;
@@ -182,7 +179,7 @@ function drawRow(r: Row, size: number): HTMLCanvasElement {
     v.renderer.setSize(size, size, false);
     v.look(fit);
   } else if (cam === 'coin' || cam === 'swatch') {
-    // the coin's head looks up (app/side3d/render.ts LEVEL, bim-3d's f1 fix): a cap's peak leaves the eyes
+    // the coin's head looks up (app/side3d/render.ts COIN_HEAD, bim-3d's f1 fix): a cap's peak leaves the eyes
     bim.apply({ ...rigOf({ pose: coinPose(), t: 30, main: d.main, phase: 0, reduced: true }), head: COIN_HEAD });
     bim.detail(true);
     bim.group.updateMatrixWorld(true);
