@@ -34,6 +34,10 @@ crate::words! { menus:
     pin = "Pin";
     /// take it off the top of the sidebar
     unpin = "Unpin";
+    /// the hover pin's tip when the pin it flipped at once did not save: it flips back (artifact-pin, designer m_49505)
+    pin_failed = "Couldn't pin";
+    /// the same for an unpin that did not save
+    unpin_failed = "Couldn't unpin";
     /// the agent's changes, the review
     changes = "Changes";
     /// the submenu of what can be copied

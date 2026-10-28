@@ -9,8 +9,14 @@
 /** The sizes an app icon is drawn at: 18 in the rail, 16 everywhere, 14 in text and tabs. */
 export type AppIconSize = 14 | 16 | 18;
 
-/** What each icon draws on its 24 grid: path data, or a circle as [cx, cy, r] (a dot is filled). */
-type Part = string | readonly [number, number, number];
+/**
+ * What each icon draws on its 24 grid: path data, a circle as [cx, cy, r] (a dot is filled), or a
+ * shape filled in currentColor under its stroke ({ fill: path data }: a state that is on, 'pin-on').
+ */
+type Part = string | readonly [number, number, number] | { readonly fill: string };
+
+/** A circle part ([cx, cy, r]); never `'fill' in p`, which an array also passes (Array.prototype.fill). */
+const isCircle = (p: Exclude<Part, string>): p is readonly [number, number, number] => Array.isArray(p);
 
 const PARTS = {
   // the rail
@@ -42,6 +48,8 @@ const PARTS = {
   // the menus
   rename: ["M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6", "M18.4 2.6a2.1 2.1 0 1 1 3 3L12 15l-4 1 1-4 9.4-9.4z"],
   pin: ["M9 4h6l-1 6 3 3H7l3-3-1-6zM12 13v7"],
+  // pinned (artifact-pin, designer m_49505): the same pin, its head filled; the outline is the offer
+  "pin-on": [{ fill: "M9 4h6l-1 6 3 3H7l3-3-1-6z" }, "M12 13v7"],
   fork: [[6, 5, 2], [18, 5, 2], [12, 19, 2], "M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7M12 12v5"],
   copy: ["M10 8h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z", "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"],
   window: ["M5 5h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z", "M7 21h12a2 2 0 0 0 2-2V9"],
@@ -95,6 +103,8 @@ export function AppIcon({ name, size = 16, testId }: { name: AppIconName; size?:
       {(PARTS[name] as readonly Part[]).map((p) =>
         typeof p === "string" ? (
           <path key={p} d={p} vectorEffect="non-scaling-stroke" />
+        ) : !isCircle(p) ? (
+          <path key={p.fill} d={p.fill} fill="currentColor" vectorEffect="non-scaling-stroke" />
         ) : p[2] <= 1 ? (
           <circle key={p.join(",")} cx={p[0]} cy={p[1]} r={p[2] * 1.25} fill="currentColor" stroke="none" />
         ) : (

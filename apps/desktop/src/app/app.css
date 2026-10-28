@@ -578,12 +578,41 @@ body:has(.app-shell) {
   opacity: 0;
   transition: opacity 150ms var(--ease-out);
 }
-/* a pinned row's quiet mark at rest (pinbutton.tsx PinMark): the right side's rows, the pages */
+/* a pinned row's mark at rest (pinbutton.tsx PinMark, designer m_49505): the filled pin, text-2,
+   12 in a 16 box, the same slot on every kind and page (the end, before the age) */
 .b-pinmark {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   flex: none;
-  color: var(--c-text-3);
+  width: var(--s-4);
+  height: var(--s-4);
+  color: var(--c-text-2);
+}
+.b-pinmark > .b-app-icon {
+  width: 12px;
+  height: 12px;
+}
+/* the hover pin (pinbutton.tsx PinButton): the fill is its state, no pressed square; a click pops
+   its glyph, 150 ms .8 -> 1 (none under reduced motion) */
+.s3-pin .b-ibtn.on:not(:hover) {
+  background: none;
+}
+.s3-pin[data-pop] .b-app-icon {
+  animation: b-pin-pop 150ms var(--ease-out);
+}
+@keyframes b-pin-pop {
+  from {
+    transform: scale(0.8);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s3-pin[data-pop] .b-app-icon {
+    animation: none;
+  }
+}
+:root[data-reduce-motion] .s3-pin[data-pop] .b-app-icon {
+  animation: none;
 }
 .app-s-label {
   flex: none;

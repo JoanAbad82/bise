@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { extOf, iconKindOf, KindIcon, PlayIcon, type IconKind } from './icons';
+import { AppIcon } from './icons-app';
 
 describe('iconKindOf', () => {
   const cases: [Parameters<typeof iconKindOf>[0], IconKind][] = [
@@ -51,5 +52,15 @@ describe('KindIcon', () => {
       expect(html).toContain(`data-kind="${k}"`);
     }
     expect(renderToStaticMarkup(<PlayIcon />)).toContain('fill="currentColor"');
+  });
+});
+
+describe('AppIcon', () => {
+  it('draws a circle part as a circle and a filled part as a filled path (pin-on, artifact-pin)', () => {
+    // an array passes `'fill' in p` (Array.prototype.fill): the ask's ring once drew as an empty path
+    expect(renderToStaticMarkup(<AppIcon name="ask" />)).toContain('<circle cx="12" cy="12" r="9"');
+    const on = renderToStaticMarkup(<AppIcon name="pin-on" />);
+    expect(on).toContain('<path d="M9 4h6l-1 6 3 3H7l3-3-1-6z" fill="currentColor"');
+    expect(renderToStaticMarkup(<AppIcon name="pin" />)).not.toContain('fill="currentColor"');
   });
 });

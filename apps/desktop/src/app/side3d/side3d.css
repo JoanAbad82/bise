@@ -772,14 +772,16 @@
   display: block;
   position: relative;
 }
-/* the hover pin (app/pinbutton.tsx, his m_49100): over the end's last thing (its age, its ∿, its
-   room), 8 from the row's right as the end is; shown while the pointer is on the row or the
-   keyboard is on it; the end's last thing and the pin mark give way to it */
+/* the hover pin (app/pinbutton.tsx, his m_49100): over the end's last thing (its age, its ∿, its ψ),
+   no room kept for it at rest (his m_49510, designer m_49518); its 24 box 8 from the row's right,
+   so its 14 glyph's right edge lands near the end's 12 line, where the last thing it covers ends
+   (no jump between rest and hover); shown while the pointer is on the row or the keyboard is on it; the end's last thing
+   and the pin mark give way to it, nothing else moves */
 .s3-pin {
   position: absolute;
   top: 0;
   bottom: 0;
-  right: var(--s-2);
+  right: calc(var(--s-3) - var(--s-1));
   display: flex;
   align-items: center;
   opacity: 0;
@@ -793,6 +795,7 @@
 }
 .s3-row:is(:hover, :has(> .s3-pin:focus-within)) .s3-row-end > :last-child,
 .s3-row:is(:hover, :has(> .s3-pin:focus-within)) .s3-row-end > .b-pinmark,
+.s3-orow:is(:hover, :has(> .s3-pin:focus-within)) .s3-orow-open > :is(.s3-orow-age, .s3-orow-pr, .s3-orow-wt):last-child,
 .s3-orow:is(:hover, :has(> .s3-pin:focus-within)) .s3-orow-open > .b-pinmark {
   visibility: hidden;
 }
@@ -801,20 +804,18 @@
   position: relative;
 }
 .s3-opin {
-  right: var(--s-3);
   bottom: auto;
   height: var(--h-row-tight);
 }
-.s3-pin-room {
-  width: var(--s-4);
-}
+/* a row with its object: its end 12 from its right, as an agent's line (one right edge for every
+   list, designer m_49518) */
 .s3-row-body {
   display: flex;
   align-items: center;
   gap: var(--s-3);
   width: 100%;
   height: var(--h-recent);
-  padding: 0 var(--s-2);
+  padding: 0 var(--s-3) 0 var(--s-2);
   border-radius: var(--r-2);
 }
 .s3-row-body:hover {
@@ -897,10 +898,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* its items 8 apart, a pinned row's mark first (designer m_49518) */
 .s3-row-end {
   display: inline-flex;
   align-items: center;
-  gap: var(--s-3);
+  gap: var(--s-2);
   flex: none;
 }
 /* the artifact's chip in a side row: never wider than its line, padding included, so its right

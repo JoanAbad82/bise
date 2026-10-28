@@ -126,8 +126,7 @@ export function liveIds(store: Store, kind: PinKind, project: string): readonly 
 }
 
 /** Pins (`on`) or unpins one thing: one prefs_set of its kind's list in its project. */
-export function pinThing(kind: PinKind, project: string, id: string, on: boolean): void {
-  const store = getAppStore();
+export function pinThing(kind: PinKind, project: string, id: string, on: boolean, store: Store = getAppStore()): void {
   const ids = namesOf(getPref(store.prefs() as Prefs | null, pinKeyOf(kind, project)));
   store.command({ cmd: 'prefs_set', key: pinKeyOf(kind, project), value: pinned(ids, id, on, liveIds(store, kind, project)) });
 }

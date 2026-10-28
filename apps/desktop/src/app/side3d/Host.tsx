@@ -49,6 +49,7 @@ import { useAgentRows } from '../agentrows';
 import type { BarRow } from '../barrows';
 import { ArtifactRow, ProcRow, TaskRow, WatchRows } from './FlyoutLists';
 import { pinFirst, pinnedIn, procPinId, usePins } from '../pins';
+import { usePinOrder } from '../pinhold';
 import { onResizeEnd, useCoinSlot, useLayoutDriver, useSideLayout } from './place';
 import { CARD_MAX, cardMaxH, OUTER_W, sideShows, THREAD_KEEPS, type CoinsAt, type PanelIn } from './layout';
 
@@ -187,9 +188,14 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
   const artPinned = (it: { project: string; a: { id: string } }) => pinnedIn(artPins, it.project, it.a.id);
   const schedPinned = (x: { project: string; t: { id: number } }) => pinnedIn(schedPins, x.project, String(x.t.id));
   const procPinned = (x: { project: string; p: { agent: string; id: string } }) => pinnedIn(procPins, x.project, procPinId(x.p.agent, x.p.id));
-  const artifacts = pinFirst(bar.level === 'agent' ? allArtifacts.filter((it) => inScope(bar, it.a.agent)) : allArtifacts, artPinned);
-  const tasks = pinFirst(useAllScheduled(scope), schedPinned);
-  const procs = pinFirst(useAllProcesses(scope), procPinned);
+  // their order holds under his pointer after a hover pin's click, until it leaves the card (pinhold.ts)
+  const artOrder = usePinOrder('artifact');
+  const schedOrder = usePinOrder('schedule');
+  const procOrder = usePinOrder('process');
+  const schedLeads = (x: { project: string; t: { id: number } }) => pinnedIn(schedOrder, x.project, String(x.t.id));
+  const artifacts = pinFirst(bar.level === 'agent' ? allArtifacts.filter((it) => inScope(bar, it.a.agent)) : allArtifacts, (it) => pinnedIn(artOrder, it.project, it.a.id));
+  const tasks = pinFirst(useAllScheduled(scope), schedLeads);
+  const procs = pinFirst(useAllProcesses(scope), (x) => pinnedIn(procOrder, x.project, procPinId(x.p.agent, x.p.id)));
   // the processes are asked once here, as the old right bar did; the hub sends them again on each change
   const asked = all ? rows.map((p) => p.project).join('\n') : scope;
   useEffect(() => {
@@ -478,11 +484,11 @@ function Side({ project, scope, home, world, at: coinsAt, right, outerW, room }:
   const saysOf = (b: BubbleId) => acrossSays(bubbleSays(b, counts), across(b));
   /** Scheduled's first `n` rows: what he pinned first (its timers, then its watches), then the other timers, then the other watches */
   const schedRows = (n: number) => {
-    const pinnedTasks = tasks.filter(schedPinned);
-    const restTasks = tasks.filter((x) => !schedPinned(x));
+    const pinnedTasks = tasks.filter(schedLeads);
+    const restTasks = tasks.filter((x) => !schedLeads(x));
     const watches = (pinned: boolean, list: readonly Agent[]) => list.map((a) => (
       <WatchRows key={`${projectOfAgent(a)}/${a.name}/${String(pinned)}`} project={projectOfAgent(a)} a={a} now={now} onOpen={openAgentIn(projectOfAgent(a))}
-        group={groupOf(projectOfAgent(a))} pins={schedPins} pinned={pinned} />
+        group={groupOf(projectOfAgent(a))} pins={schedPins} order={schedOrder} pinned={pinned} />
     ));
     const task = (x: (typeof tasks)[number]) => <TaskRow key={`${x.project}/${x.t.id}`} x={x} now={now} group={groupOf(x.project)} pinned={schedPinned(x)} />;
     return (

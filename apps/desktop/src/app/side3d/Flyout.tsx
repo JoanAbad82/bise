@@ -202,11 +202,11 @@ export function SideRow({ pic, title, sub, end, label, tip, onClick, menu, pin, 
           <span ref={l1} className="s3-row-l1">{title}</span>
           <span className="s3-row-l2">{sub}</span>
         </span>
-        {(end != null || pin !== undefined) && (
+        {/* no room kept for the hover pin: it covers the end's last thing (designer m_49518) */}
+        {(end != null || mark !== null) && (
           <span className="s3-row-end">
             {mark}
-            {/* a row with no end of its own keeps the hover pin's room */}
-            {end ?? <span className="s3-pin-room" />}
+            {end}
           </span>
         )}
       </Press>

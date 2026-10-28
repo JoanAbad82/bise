@@ -164,10 +164,12 @@ export function TaskRow({ x, now, group, pinned = false }: { x: Task; now: numbe
 }
 
 /** An agent's watches (sb wake): its telescope rows, each opening the agent. */
-export function WatchRows({ project, a, now, onOpen, group, pins, pinned }: {
+export function WatchRows({ project, a, now, onOpen, group, pins, order = pins, pinned }: {
   project: string; a: Agent; now: number; onOpen: (agent: string) => void; group?: string;
   /** his schedule pins (pins.ts): each watch's pin by its watchPinId */
   pins?: PinSet;
+  /** the pins `pinned` splits by: `pins` with a held click as before it (pinhold.ts usePinOrder) */
+  order?: PinSet;
   /** true: only its pinned watches (they lead the section); false: only the others; none: all */
   pinned?: boolean;
 }) {
@@ -178,9 +180,10 @@ export function WatchRows({ project, a, now, onOpen, group, pins, pinned }: {
   // its agent, and 'stop watching' (HubCmd wake_stop, sb wake --stop); one open at a time
   const [open, setOpen] = useState<number | null>(null);
   const isWatchPinned = (alarm: number) => pins !== undefined && pinnedIn(pins, project, watchPinId(alarm));
+  const leads = (alarm: number) => order !== undefined && pinnedIn(order, project, watchPinId(alarm));
   return (
     <>
-      {alarms(a, now).filter((al) => pinned === undefined || isWatchPinned(al.id) === pinned).map((al) => {
+      {alarms(a, now).filter((al) => pinned === undefined || leads(al.id) === pinned).map((al) => {
         const id = `app.flyout.scheduled.${project}.${a.name}.watch.${String(al.id)}`;
         const [head = '', ...rest] = al.title.split(' · ');
         return (

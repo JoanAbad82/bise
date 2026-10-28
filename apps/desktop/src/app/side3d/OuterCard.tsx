@@ -261,9 +261,8 @@ function AgentLine({ r, pr, wt, job, card, at, now, here, group, pinned, open, o
           }} data-testid={`${id}.pr`}><AppIcon name="branch" size={14} />#{String(pr)}</span>
         )}
         {wt && <span className="s3-orow-wt" {...tipAttrs(side.in_worktree)} data-testid={`${id}.wt`}>ψ</span>}
-        {/* the hover pin's room at the line's end (pinbutton.tsx); main leads anyway, never pinned here */}
-        {pinnable && <span className="s3-pin-room" />}
       </Press>
+      {/* the hover pin over the line's last thing, no room kept at rest (designer m_49518); main leads anyway, never pinned here */}
       {pinnable && <PinButton pin={{ kind: 'agent', project: r.project, id: r.agent ?? '', on: pinned }} look="s3-pin s3-opin" testId={`${id}.pin`} />}
       {open && card !== undefined && b !== null && (
         <div className="s3-orow-ask" data-testid={`${id}.ask`}>

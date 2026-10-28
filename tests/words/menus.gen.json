@@ -142,6 +142,11 @@
     "one": null,
     "text": "Pin"
   },
+  "menus.pin_failed": {
+    "args": [],
+    "one": null,
+    "text": "Couldn't pin"
+  },
   "menus.quick_look": {
     "args": [],
     "one": null,
@@ -181,5 +186,10 @@
     "args": [],
     "one": null,
     "text": "Unpin"
+  },
+  "menus.unpin_failed": {
+    "args": [],
+    "one": null,
+    "text": "Couldn't unpin"
   }
 }
