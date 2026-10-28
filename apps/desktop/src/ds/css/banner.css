@@ -26,10 +26,11 @@
 /* a live scene (data-bleed; Gabriel m_49015): its canvas reaches the banner's top, right and bottom
    edges, inside its 1 px line, its corners' curve, so a zoom or a move is cut by the banner's border,
    never before; the scene rests fitted in the visual box as before (the canvas's fit, camera.ts
-   bleed). Its left stays the box's: past it is the text. What sits over the scene (a still, '⤢ fit')
+   bleed). Its left stays the box's (past it is the text) and fades over 48 px into the banner's
+   ground, a mask (designer m_49034): a zoomed scene never ends on a hard cut. What sits over the scene (a still, '⤢ fit')
    keeps to the box: --b-vis-top is the box's top in the banner. */
 .b-banner .vis{--b-vis-top:calc(var(--h-banner) - var(--h-banner-vis) - var(--s-3))}
-.b-banner .vis > [data-bleed]{position:absolute;top:calc(1px - var(--b-vis-top));right:calc(1px - var(--s-3));bottom:calc(1px - var(--s-3));left:0;width:auto;height:auto;border-radius:0 calc(var(--r-4) - 1px) calc(var(--r-4) - 1px) 0;overflow:hidden}
+.b-banner .vis > [data-bleed]{position:absolute;top:calc(1px - var(--b-vis-top));right:calc(1px - var(--s-3));bottom:calc(1px - var(--s-3));left:0;width:auto;height:auto;border-radius:0 calc(var(--r-4) - 1px) calc(var(--r-4) - 1px) 0;overflow:hidden;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 var(--s-12));mask-image:linear-gradient(to right,transparent 0,#000 var(--s-12))}
 .b-banner .vis > .dark{display:none}
 [data-theme="dark"] .b-banner .vis > .light{display:none}
 [data-theme="dark"] .b-banner .vis > .dark{display:block}
