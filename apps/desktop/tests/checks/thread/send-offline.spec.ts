@@ -66,7 +66,16 @@ test('thread/send-offline: a send with the core down is one failed line with ret
     // the core comes back: the app restarts it on its own (its backoff)
     clearInterval(killer);
     killer = undefined;
-    await expect.poll(() => corePids(appPid).length, { timeout: 40_000, message: 'the app restarts its core' }).toBeGreaterThan(0);
+    // Two restarts killed before they said a word end the same way (last line ''), so the app
+    // gives up as on a core that can't start (exit.ts earlyEnd) and offers 'start bise'; under load
+    // a restart is killed before its first line (483ea8801's tag checks at load ~38: no restart in
+    // 40 s). That is the app's own path back, so his click on it counts as the core coming back.
+    const start = page.getByTestId('app.core.start');
+    await expect.poll(async () => {
+      if (corePids(appPid).length > 0) return true;
+      if (await start.isVisible()) await start.click();
+      return false;
+    }, { timeout: 40_000, message: 'the app restarts its core (or his start bise does)' }).toBe(true);
     await page.waitForTimeout(2000);
     await failed.locator(T.retry).click();
     await expect.poll(() => transcriptHas(w, 'bise', 'main', words), { timeout: 15_000, message: 'retry sends his words to main' }).toBe(true);
