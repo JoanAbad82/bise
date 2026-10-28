@@ -61,3 +61,17 @@
 .setup-key .b-field { width: 100%; box-sizing: border-box; }
 .setup-key .b-help { font-size: var(--t-12); color: var(--c-text-2); }
 .setup-mark { color: var(--c-err); }
+/* A, the island (page onboarding v6, his pick): the island on the left, the step's column on the
+   right, its words left-aligned beside it; a narrow window stacks them, the island on top */
+.setup.setup-a { flex-direction: row; align-items: stretch; justify-content: stretch; gap: 0; padding: 0; }
+.setup-a-world { flex: 1 1 56%; min-width: 0; position: relative; }
+.setup-a-col { flex: 0 1 44%; min-width: 0; display: flex; align-items: safe center; padding: var(--s-16) var(--s-12) var(--s-8) var(--s-4); overflow-y: auto; box-sizing: border-box; }
+.setup-a .b-onb { align-items: flex-start; text-align: left; max-width: 440px; }
+.setup-a .b-onb .s { text-align: left; }
+.setup-a .setup-works, .setup-a .setup-ideas, .setup-a .setup-fnline, .setup-a .setup-pick.alone { text-align: left; justify-content: flex-start; }
+.setup-a .setup-top { z-index: 1; }
+@media (max-width: 880px) {
+  .setup.setup-a { flex-direction: column; overflow-y: auto; }
+  .setup-a-world { flex: 0 0 40vh; }
+  .setup-a-col { flex: 1 0 auto; padding: var(--s-4) var(--s-6) var(--s-6); justify-content: center; }
+}
