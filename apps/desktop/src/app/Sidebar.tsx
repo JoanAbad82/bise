@@ -46,7 +46,7 @@ import { useNow } from './clock';
 import { useSpring, type SpringRow } from './spring';
 import { projects } from '@/proto/words_projects.gen';
 import { waitsTip } from './tipwords';
-import { DRAG_ATTR, dropMark, useProjectDrag } from './sidedrag';
+import { DRAG_ATTR, dropMark, slideOf, useProjectDrag } from './sidedrag';
 
 /** What waits on him, one number everywhere: the inbox's own list (designer m_25690). */
 export function useWaitingTotal(): number {
@@ -130,12 +130,14 @@ function ProjectEnd({ facts, digit, testId }: { facts: ProjectFacts; digit: numb
  * height, busy or not (his m_48450, designer m_48464): a quiet one is its name in text-2, its last
  * news (else 'all quiet') and its week, flat stubs while unknown. No icon, no mark, no border: the words say it, the tip says it all.
  */
-function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, spring, index, lift, drop, testId }: {
+function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, spring, index, lift, slide, drop, testId }: {
   name: string;
   /** its place in the list, the drag's handle on it (sidedrag.ts) */
   index: number;
   /** dragged: how far it follows the pointer (px) */
   lift: number | undefined;
+  /** another row dragged: how far this one slides to open the gap (px, sidedrag slideOf) */
+  slide: number;
   /** the drop line, before or after it */
   drop: 'before' | 'after' | undefined;
   facts: ProjectFacts;
@@ -161,7 +163,7 @@ function ProjectRowView({ name, facts, on, digit, now, onClick, onContextMenu, s
       {...{ [DRAG_ATTR]: index }}
       data-lifted={lift !== undefined || undefined}
       data-drop={drop}
-      style={lift === undefined ? undefined : { transform: `translateY(${String(lift)}px)` }}
+      style={lift !== undefined ? { transform: `translateY(${String(lift)}px)` } : slide !== 0 ? { transform: `translateY(${String(slide)}px)` } : undefined}
       data-testid={testId}
     >
       <span className="app-s-l1">
@@ -327,7 +329,9 @@ function ProjectList() {
     },
     [store],
   );
-  const { shown: list, drag, handlers } = useProjectDrag(ordered, root, move);
+  const { shown: list, drag, quiet, handlers } = useProjectDrag(ordered, root, move);
+  // the rows slide open where it lands; under reduced motion they stay, the 2 px line says it (designer m_49316)
+  const calm = drag !== null && reducedMotion();
   const here = projectOf(route);
   // the project he looks at (its main at its newest row, the window in front): its news, artifacts
   // and unread are seen, and its row counts nothing new while he looks (seen.ts)
@@ -337,7 +341,7 @@ function ProjectList() {
   const seen = (project: string): number | undefined => (project === looked ? Infinity : seenOf(project));
   const now = useNow();
   return (
-    <div ref={root} className="app-s-list" data-testid="app.side.list" data-drag={drag !== null || undefined} {...handlers}>
+    <div ref={root} className="app-s-list" data-testid="app.side.list" data-drag={drag !== null || undefined} data-tip-quiet={quiet || undefined} {...handlers}>
       {pins.length > 0 && <PinnedList pins={pins} />}
       <Label testId="app.side.label.projects" end={<AddProject />}>
         {frame.projects}
@@ -352,7 +356,8 @@ function ProjectList() {
           seen={seen(p.project)}
           now={now}
           lift={drag?.from === i ? drag.dy : undefined}
-          drop={dropMark(drag, i, list.length)}
+          slide={calm ? 0 : slideOf(drag, i)}
+          drop={calm ? dropMark(drag, i, list.length) : undefined}
         />
       ))}
     </div>
@@ -438,7 +443,7 @@ function AddProject() {
 }
 
 /** One project's row: it reads its own agents and its waiting count, so an event re-renders it alone. */
-const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now, lift, drop }: {
+const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now, lift, slide, drop }: {
   p: ProjectRow;
   index: number;
   on: boolean;
@@ -447,6 +452,8 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now, li
   now: number;
   /** dragged: how far it follows the pointer (px) */
   lift: number | undefined;
+  /** another row dragged: how far this one slides (px) */
+  slide: number;
   /** the drop line, before or after it */
   drop: 'before' | 'after' | undefined;
 }) {
@@ -514,6 +521,7 @@ const ProjectItem = memo(function ProjectItem({ p, index, on, cmd, seen, now, li
       spring={spring}
       index={index}
       lift={lift}
+      slide={slide}
       drop={drop}
       testId={id}
     />

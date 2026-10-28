@@ -26,19 +26,36 @@ export type RowDrag = {
   readonly from: number;
   readonly y0: number;
   readonly scroll0: number;
+  /** the rows' middles at the press (top to bottom, viewport y at scroll0): the slide moves the
+   *  rows after, so where it lands is read on the list as it was */
+  readonly mids: readonly number[];
   readonly dy: number;
   readonly to: number;
   readonly on: boolean;
 };
 
-/** The press at `y` (the list scrolled to `scroll`), the rows' middles (top to bottom, viewport y). Pure. */
-export function dragStep(d: RowDrag, y: number, scroll: number, middles: readonly number[]): RowDrag {
+/** The press at `y` with the list scrolled to `scroll`. Pure. */
+export function dragStep(d: RowDrag, y: number, scroll: number): RowDrag {
   const dy = y - d.y0 + (scroll - d.scroll0);
   const on = d.on || Math.abs(y - d.y0) > DRAG_PX;
-  return { ...d, dy, on, to: on ? dropIndex(middles, y) : d.from };
+  return { ...d, dy, on, to: on ? dropIndex(d.mids, d.y0 + dy) : d.from };
 }
 
-/** Where a row shows the drop line: before it, after it (the last row, the end slot), or none. Pure. */
+/**
+ * How far row `i` slides while another one is dragged (designer m_49316): the dragged row's slot
+ * closes (the rows after it go up one pitch) and the row under the drop point, and those after it,
+ * go down one, so the gap opens where it lands. The dragged row itself follows the pointer. Pure.
+ */
+export function slideOf(d: RowDrag | null, i: number): number {
+  if (d === null || !d.on || i === d.from) return 0;
+  const pitch = (d.mids[1] ?? 0) - (d.mids[0] ?? 0);
+  const at = d.to > d.from ? d.to - 1 : d.to;
+  // its index in the list without the dragged row
+  const j = i > d.from ? i - 1 : i;
+  return (j - i) * pitch + (j >= at ? pitch : 0);
+}
+
+/** Where a row shows the drop line (reduced motion: no slide, the 2 px line): before it, after it (the last row, the end slot), or none. Pure. */
 export function dropMark(d: RowDrag | null, i: number, n: number): 'before' | 'after' | undefined {
   if (d === null || !d.on) return undefined;
   if (d.to === i && movedTo(d.from, i) !== null) return 'before';
@@ -74,6 +91,8 @@ type Held<T> = { readonly of: readonly T[]; readonly ids: readonly string[] };
 export function useProjectDrag<T extends { readonly project: string }>(list: readonly T[], root: RefObject<HTMLElement | null>, move: (project: string, at: number) => void) {
   const [drag, setDrag] = useState<RowDrag | null>(null);
   const [held, setHeld] = useState<Held<T> | null>(null);
+  // dropped (or put back) under a still pointer: no tip until it moves
+  const [still, setStill] = useState(false);
   const shown = shownOrder(list, held);
   const press = useRef<{ id: number; d: RowDrag } | null>(null);
   // a drop's (or esc's) click on the row it started on never opens the project
@@ -105,17 +124,12 @@ export function useProjectDrag<T extends { readonly project: string }>(list: rea
   useEffect(() => {
     if (!pressing) return undefined;
     const el = root.current;
-    const middles = (): number[] =>
-      [...(el?.querySelectorAll<HTMLElement>(`[${DRAG_ATTR}]`) ?? [])].map((r) => {
-        const b = r.getBoundingClientRect();
-        return b.top + b.height / 2;
-      });
     const moving = (e: globalThis.PointerEvent) => {
       const p = press.current;
       if (p === null || e.pointerId !== p.id || el === null) return;
       const b = el.getBoundingClientRect();
       if (p.d.on) el.scrollTop += edgeScroll(e.clientY, b.top, b.bottom);
-      const d = dragStep(p.d, e.clientY, el.scrollTop, middles());
+      const d = dragStep(p.d, e.clientY, el.scrollTop);
       // once it lifts, the list holds the pointer: the click goes to it, never to the row
       if (d.on && !p.d.on && typeof el.setPointerCapture === 'function') {
         try {
@@ -134,6 +148,7 @@ export function useProjectDrag<T extends { readonly project: string }>(list: rea
       setDrag(null);
       if (!p.d.on) return;
       swallow.current = true;
+      setStill(true);
       const at = movedTo(p.d.from, p.d.to);
       if (at !== null) drop(p.d.from, at);
     };
@@ -146,6 +161,7 @@ export function useProjectDrag<T extends { readonly project: string }>(list: rea
       e.preventDefault();
       e.stopPropagation();
       swallow.current = true;
+      setStill(true);
       cancel();
     };
     window.addEventListener('pointermove', moving);
@@ -172,9 +188,18 @@ export function useProjectDrag<T extends { readonly project: string }>(list: rea
     if ((e.target as HTMLElement).closest('input') !== null) return;
     const i = rowOf(e.target);
     if (i === null) return;
-    const d: RowDrag = { from: i, y0: e.clientY, scroll0: root.current?.scrollTop ?? 0, dy: 0, to: i, on: false };
+    // the rows' middles now, before any slide moves them
+    const mids = [...(root.current?.querySelectorAll<HTMLElement>(`[${DRAG_ATTR}]`) ?? [])].map((r) => {
+      const b = r.getBoundingClientRect();
+      return b.top + b.height / 2;
+    });
+    const d: RowDrag = { from: i, y0: e.clientY, scroll0: root.current?.scrollTop ?? 0, mids, dy: 0, to: i, on: false };
     press.current = { id: e.pointerId, d };
     setDrag(d);
+  };
+  // the pointer moves after a drop: the tips come back (on a fresh hover only, TipLayer's)
+  const onPointerMove = () => {
+    if (still) setStill(false);
   };
   const onClickCapture = (e: MouseEvent<HTMLElement>) => {
     if (!swallow.current) return;
@@ -191,5 +216,13 @@ export function useProjectDrag<T extends { readonly project: string }>(list: rea
     e.preventDefault();
     drop(i, at);
   };
-  return { shown, drag: drag?.on === true ? drag : null, handlers: { onPointerDown, onClickCapture, onKeyDown } };
+  const lifted = drag?.on === true ? drag : null;
+  return {
+    shown,
+    drag: lifted,
+    /** no tip while a row is dragged, nor after the drop until the pointer moves (designer m_49316):
+     *  a row that lands under a still pointer never shows its tip */
+    quiet: lifted !== null || still,
+    handlers: { onPointerDown, onPointerMove, onClickCapture, onKeyDown },
+  };
 }

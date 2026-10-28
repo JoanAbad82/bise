@@ -396,8 +396,12 @@ body:has(.app-shell) {
   color: var(--c-text-2);
 }
 /* reordered by hand (his m_49107, sidedrag.ts): the dragged row lifts (raised, e-2) and follows the
-   pointer; the others lose their hover; a 2 px ink line in the 4 px gap marks where it lands, as
-   settings › projects' (designer m_41841) */
+   pointer; the others lose their hover and slide open where it lands, 160 ms ease-out as side-sort's
+   (designer m_49316); under reduced motion they stay and a 2 px ink line in the 4 px gap marks it,
+   as settings › projects' (designer m_41841) */
+.app-s-list[data-drag] .app-s-row.project:not([data-lifted]) {
+  transition: transform 160ms var(--ease-out);
+}
 .app-s-row.project {
   position: relative;
   user-select: none;

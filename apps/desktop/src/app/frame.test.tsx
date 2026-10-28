@@ -361,12 +361,20 @@ describe('the sidebar', () => {
     fireEvent.pointerMove(window, { clientY: 60, pointerId: 1 });
     fireEvent.pointerMove(window, { clientY: 10, pointerId: 1 });
     expect(docs.hasAttribute('data-lifted')).toBe(true);
-    expect(v.getByTestId(id(ACME)).getAttribute('data-drop')).toBe('before');
+    // acme slides down one row to open the gap (designer m_49316), no line; no tip while dragging
+    expect(v.getByTestId(id(ACME)).style.transform).toBe('translateY(60px)');
+    expect(v.getByTestId(id(ACME)).hasAttribute('data-drop')).toBe(false);
+    expect(v.getByTestId('app.side.list').hasAttribute('data-tip-quiet')).toBe(true);
     fireEvent.pointerUp(window, { clientY: 10, pointerId: 1 });
     fireEvent.click(docs);
     expect(sent).toContainEqual({ cmd: 'project_move', project: DOCS, order: 0 });
     expect(router.get()).toEqual({ screen: 'bise' });
     expect(order()).toEqual([id(DOCS), id(ACME)]);
+    expect(v.getByTestId(id(ACME)).style.transform).toBe('');
+    // landed under a still pointer: no tip until it moves (designer m_49316)
+    expect(v.getByTestId('app.side.list').hasAttribute('data-tip-quiet')).toBe(true);
+    fireEvent.pointerMove(v.getByTestId(id(DOCS)), { clientY: 12, pointerId: 1 });
+    expect(v.getByTestId('app.side.list').hasAttribute('data-tip-quiet')).toBe(false);
     // the core's projects say it: they stay in that order
     act(() => {
       store.apply(projectsEv(row({ project: HOME, name: 'bise', home: true }), row({ project: DOCS, name: 'docs', order: 1 }), row({ project: ACME, name: 'acme', order: 2 })));

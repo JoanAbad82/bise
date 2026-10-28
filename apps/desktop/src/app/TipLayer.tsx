@@ -14,6 +14,9 @@ import { besideBox, clearBox, placeTip, tipWait, TIP_WARM_MS, type TipSide } fro
 
 /** The mark under an element: the closest one with words. */
 function markOf(t: EventTarget | null): HTMLElement | null {
+  // a list that says data-tip-quiet holds its tips (the sidebar's projects while one is dragged
+  // and after the drop until the pointer moves: a row landed under a still pointer, designer m_49316)
+  if (t instanceof Element && t.closest('[data-tip-quiet]') !== null) return null;
   const el = t instanceof Element ? t.closest<HTMLElement>('[data-tip]') : null;
   return el !== null && (el.dataset.tip ?? '') !== '' ? el : null;
 }
