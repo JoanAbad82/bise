@@ -129,6 +129,30 @@ seed_from() {  # in the repo root: the seed to clone, this deps key's, else the 
   [ -d "$from" ] || from="$(ls -dt "$sd"/* 2>/dev/null | grep -vE '\.(tmp|building|lock)$' | head -1)"
   echo "$from"
 }
+own_crates() {  # in the repo root: the package names of the repo's own crates (every rust/**/Cargo.toml [package])
+  git ls-files 'rust/Cargo.toml' 'rust/**/Cargo.toml' 2>/dev/null | while read -r f; do
+    awk '/^\[/ { p = ($0 == "[package]") } p && /^name *=/ { gsub(/[" ]/, ""); sub(/^name=/, ""); print; exit }' "$f"
+  done | sort -u
+}
+seed_strip() {  # in the repo root: a clone of a seed keeps the deps only
+  # A seed built in tree A holds A's build of the repo's own crates, with A's
+  # CARGO_MANIFEST_DIR baked in (env!): cargo reuses it in a tree whose
+  # sources are older than the seed (the nightly tree: git rewrites only the
+  # changed files), and once A is gone a test that reads a fixture through it
+  # fails (bise-peer's agent_key, the desktop-v2026.10.21 tip gate, m_48661).
+  # Without their fingerprints cargo rebuilds them here; the deps stay warm.
+  # .fingerprint/<package>-<hash>, incremental/<crate_name>-<hash>: the
+  # package name, '-' as '_'; a crate whose [lib] name differs (none today:
+  # crossterm's is its own) needs that name read too (architect m_48675)
+  local t="$1" re fp d
+  re="$(own_crates | paste -sd'|' -)"
+  [ -n "$re" ] && [ -d "$t" ] || return 0
+  re="^($re|$(tr - _ <<<"$re"))-[0-9a-f]{16}$"
+  find "$t" -maxdepth 4 -type d \( -name .fingerprint -o -name incremental \) 2>/dev/null | while read -r fp; do
+    for d in "$fp"/*; do [[ "${d##*/}" =~ $re ]] && rm -rf "$d"; done
+  done
+  return 0
+}
 proc_start() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' _; }
 # the gate dir: runs <gpre><pid> (each with .owner, its start, and .root, its
 # checkout), the lock, a red step's log
@@ -310,8 +334,8 @@ if [ "$mode" = seed ]; then
     echo "seed: nothing to do (${CARGO_TARGET_DIR:+CARGO_TARGET_DIR set}${CARGO_TARGET_DIR:-$t there or no rust/})"; exit 0
   fi
   from="$(seed_from 2>/dev/null)"
-  if [ -n "$from" ] && cp -cR "$from" "$t.tmp" 2>/dev/null && mv "$t.tmp" "$t"; then
-    echo "seed: $t, a clone of the warm seed $(basename "$from")"
+  if [ -n "$from" ] && cp -cR "$from" "$t.tmp" 2>/dev/null && seed_strip "$t.tmp" && mv "$t.tmp" "$t"; then
+    echo "seed: $t, a clone of the warm seed $(basename "$from") (its deps; this repo's crates build here)"
   else
     rm -rf "$t.tmp"; echo "seed: no warm seed to clone in $(seeds_dir): the first cargo here builds cold"
   fi
@@ -396,10 +420,11 @@ PY
   if [ -d "$seed" ]; then
     building && rm -rf "$seed.building"
     cp -cR "$seed" "$tgt" || exit 1
+    seed_strip "$tgt"
     echo "target: clone of the seed $seed ($((SECONDS - s))s)"
   else
     newest="$(ls -dt "$seeds"/* 2>/dev/null | grep -v '\.tmp$' | head -1)"
-    [ -n "$newest" ] && cp -cR "$newest" "$tgt"
+    [ -n "$newest" ] && cp -cR "$newest" "$tgt" && seed_strip "$tgt"
     echo "no seed for these deps: building one${newest:+ on top of $newest} (~2 min cold, once)"
     (cd rust && CARGO_TARGET_DIR="$tgt" cargo clippy --offline -q --workspace --all-targets --target-dir "$tgt/clippy") >/dev/null 2>&1 &
     (cd rust && CARGO_TARGET_DIR="$tgt" cargo test --offline -q --workspace --no-run) >/dev/null 2>&1; rc=$?
@@ -518,7 +543,7 @@ if [ -z "${CARGO_TARGET_DIR:-}" ] && [ -f "$root/.git" ] && [ -f "$(dirname "$ro
   tdir="$(dirname "$root")/target"
   if [ ! -d "$tdir" ]; then
     s=$SECONDS sd="$(seeds_dir)" k="$(seed_key)" from="$(seed_from)"
-    if [ -n "$from" ] && cp -cR "$from" "$tdir.tmp" 2>/dev/null && mv "$tdir.tmp" "$tdir"; then
+    if [ -n "$from" ] && cp -cR "$from" "$tdir.tmp" 2>/dev/null && (cd "$root" && seed_strip "$tdir.tmp") && mv "$tdir.tmp" "$tdir"; then
       echo "target: $tdir, a clone of the seed $(basename "$from")$([ "$from" = "$sd/$k" ] || echo ' (older deps: the changed ones rebuild)') ($((SECONDS - s))s)"
     else
       rm -rf "$tdir.tmp"; mkdir -p "$tdir"; echo "target: $tdir (no seed to clone: a cold build)"

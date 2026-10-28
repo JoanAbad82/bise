@@ -31,6 +31,47 @@ def check(ok, what):
         fails.append(what)
 
 
+def seed_carries_deps_only(tmp, senv):
+    """A seed built in tree A, cloned into tree B whose sources are older than
+    the seed's outputs (the nightly tree: git rewrites only the changed files),
+    must not hand B A's build of the repo's own crates: cargo would reuse it
+    with A's CARGO_MANIFEST_DIR baked in, and once A is gone a test that reads
+    a fixture through it fails (bise-peer's agent_key fixture, the
+    desktop-v2026.10.21 tip gate, marketing m_48661). A real cargo build of a
+    one-crate workspace, no deps."""
+    a, b = os.path.join(tmp, "tree-a"), os.path.join(tmp, "tree-b")
+    home = os.path.join(tmp, "cargohome-seed")
+    seed_dir = os.path.join(home, "cache", "gate-seed", "k2")
+    crate = os.path.join(a, "rust", "wsx")
+    os.makedirs(os.path.join(crate, "src"))
+    open(os.path.join(a, "rust", "Cargo.toml"), "w").write('[workspace]\nmembers = ["wsx"]\nresolver = "2"\n')
+    open(os.path.join(crate, "Cargo.toml"), "w").write('[package]\nname = "wsx"\nversion = "0.1.0"\nedition = "2021"\n')
+    open(os.path.join(crate, "fix.txt"), "w").write("here")
+    open(os.path.join(crate, "src", "lib.rs"), "w").write(
+        '#[test]\nfn reads_its_fixture() {\n'
+        '    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fix.txt");\n'
+        '    assert_eq!(std::fs::read_to_string(&p).expect("fixture"), "here");\n}\n')
+    cenv = dict(senv, CARGO_TARGET_DIR=seed_dir)
+    r = subprocess.run(["cargo", "test", "--offline", "-q", "--no-run"], cwd=os.path.join(a, "rust"), env=cenv,
+                       capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        check(False, "seed fixture: cargo test --no-run in tree A: %r" % r.stderr[-300:])
+        return
+    subprocess.run("git init -q && git add -A && git -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -qm i",
+                   shell=True, cwd=a, check=True)
+    subprocess.run(["cp", "-Rp", a, b], check=True)  # B's sources keep A's mtimes, older than the seed
+    subprocess.run(["rm", "-rf", a], check=True)
+    r = subprocess.run(["bash", GATE, "seed"], cwd=b, env=dict(senv, BISE_HOME=home), capture_output=True, text=True, timeout=60)
+    check(r.returncode == 0 and os.path.isdir(os.path.join(b, "rust", "target", "debug")),
+          "seed fixture: tree B's rust/target is a clone of A's seed: %r" % r.stdout)
+    r = subprocess.run(["cargo", "test", "--offline", "-q"], cwd=os.path.join(b, "rust"), env=senv,
+                       capture_output=True, text=True, timeout=300)
+    check(r.returncode == 0, "a seeded tree rebuilds the repo's own crates: its test reads B's fixture, not deleted A's: %r"
+          % (r.stdout + r.stderr)[-400:])
+    s = os.listdir(os.path.join(seed_dir, "debug", ".fingerprint"))
+    check(any(f.startswith("wsx-") for f in s), "the seed itself is left as it is (its own tree may still use it)")
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="gate-queue-")
     rec = os.path.join(tmp, "heavy-run.args")
@@ -113,6 +154,7 @@ def main():
     check(r.returncode == 0 and not os.path.exists(os.path.join(repo, "rust", "target")), "CARGO_TARGET_DIR set: nothing, rc 0")
     toml = open(os.path.join(HERE, "..", "bise.toml")).read()
     check('setup = "tests/gate.sh seed"' in toml, "bise.toml: [worktree] setup runs gate.sh seed")
+    seed_carries_deps_only(tmp, senv)
     # 4. the wiring a test can't run whole (a real gate): the nested gate and GATE_NO_HEAVY skip both
     src = open(GATE).read()
     check('if [ "$mode" != land ] && [ -z "$gate_outer" ] && [ -z "${GATE_NO_HEAVY:-}" ]; then' in src,

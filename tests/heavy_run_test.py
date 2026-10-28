@@ -241,8 +241,14 @@ with tempfile.TemporaryDirectory() as home:
     waiter = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran], env=envd, stderr=errf)
     check(stays(lambda: not os.path.exists(ran), 2, "the job waits"), "11 GB free: the job waits for disk (10 kept free + 2)")
     sb_lines = lambda: open(said).read() if os.path.exists(said) else ""
+    wait_for(lambda: "waiting for disk room" in sb_lines(), 30, "the disk-wait status")
     check("waiting for disk room: 11 GB free" in sb_lines() and sb_lines().startswith("status working --note"),
           "the waiting agent's status says why: %r" % sb_lines())
+    # the disk stays short for 2.5 s from the status, which heavy-run writes
+    # once it waits on the disk: its own clock then counts >= 2 s whatever
+    # the load (the desktop-v2026.10.21 tip gate: a slow start left 1 s of
+    # the test's fixed 2 s, 'waited=disk:1')
+    check(stays(lambda: not os.path.exists(ran), 2.5, "the job waits"), "it still waits 2.5 s after its status")
     open(freef, "w").write(str(20 * GB))
     check(waiter.wait(timeout=30) == 0 and os.path.exists(ran), "20 GB free: the job runs")
     # its start line says what it waited on (review-gates m_37641): the disk, some seconds
