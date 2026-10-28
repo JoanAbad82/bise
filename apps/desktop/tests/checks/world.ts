@@ -11,7 +11,7 @@
 // `tui(project)` opens the terminal's own view of the same hub in a detached tmux session, the
 // reference for every parity row (docs/desktop-bar.md).
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -325,11 +325,28 @@ export async function menuKey(s: Session, accelerator: string): Promise<string> 
 }
 
 /**
- * The app started on a route (the harness's start screen). A fresh world's first launch shows the
- * first-run setup instead ('hi. i'm bise … start / skip for now'), whatever the route: skip it by
- * its button, close, and launch again on the route (the skip is kept in the world's home).
+ * The world counts as set up: `onboarded` true in its home's prefs.json (its other prefs kept). The
+ * first launch never ends before a model answered (1f126bcc6, Isidor), and the world's model is
+ * the fake provider's, never checked by the app: a check that starts on a route must not stop on
+ * the first-run setup.
+ */
+export function worldOnboarded(w: World): void {
+  const dir = path.join(w.home, '.bise');
+  const file = path.join(dir, 'prefs.json');
+  let prefs: Record<string, unknown> = {};
+  try { prefs = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>; } catch { /* none yet */ }
+  if (prefs.onboarded === true) return;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, JSON.stringify({ ...prefs, onboarded: true }, null, 2));
+}
+
+/**
+ * The app started on a route (the harness's start screen), the world set up first (worldOnboarded).
+ * A first-run setup still shown ('hi. i'm bise … start / skip for now'): skip it by its button,
+ * close, and launch again on the route (the skip is kept in the world's home).
  */
 export async function launchOn(w: World, route: string, screen: string): Promise<Session> {
+  worldOnboarded(w);
   const s = await launchReal(w, { route });
   const skip = s.page.locator('[data-testid="setup.skip"]');
   await s.page.locator(`${screen}, [data-testid="setup.skip"]`).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
