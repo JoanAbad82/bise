@@ -19,6 +19,7 @@ import { DAY, NIGHT } from '@/bims/render/palette';
 import { STYLE } from '@/bims/render/style';
 import { makeView } from '@/bims/render/view';
 import { lightOffice } from '@/bims/render/world';
+import { type Entrance, makeEntrance, wrapIn } from '@/bims/render/entrance';
 import type { Activity, Pose } from '@/bims/model';
 import { airFit, hoverT, spanOf, type Span } from './fit';
 
@@ -62,6 +63,10 @@ interface Built {
   readonly span: Span;
   /** bims to free (their own dispose) */
   readonly bims: readonly { dispose(): void }[];
+  /** the slab: the entrance's ground */
+  readonly floor: Mesh;
+  /** each bim's part (its holder): it lands last in the entrance */
+  readonly holders: readonly Group[];
 }
 
 /** a bim standing (or sitting) at its spot, posed once as at rest */
@@ -80,6 +85,7 @@ function build(page: ScenePage, night: boolean): Built {
   const root = new Group();
   const parts: Part[] = [];
   const bimsMade: { dispose(): void }[] = [];
+  const holders: Group[] = [];
   const box = (w: number, h: number, d: number, c: string, x: number, y: number, z: number, p: Object3D = root, r?: number): Mesh => {
     const m = new Mesh(STYLE.box(w, h, d, r ?? Math.min(w, h, d) * 0.3), STYLE.material(c));
     m.position.set(x, y, z);
@@ -142,6 +148,7 @@ function build(page: ScenePage, night: boolean): Built {
     holder.updateMatrixWorld(true);
     holder.attach(made.group);
     bimsMade.push(made);
+    holders.push(holder);
     after?.(made, holder);
   };
 
@@ -219,7 +226,10 @@ function build(page: ScenePage, night: boolean): Built {
       obj('shelf', -0.1, -0.75, { n: 10 });
       obj('plant', 1.35, -0.7, { n: 4 });
       {
-        const T = (w: number, h: number, d: number, c: string, x: number, y: number, z: number): Mesh => box(w, h, d, c, x, y, z);
+        // the worktable and what lies on it, one thing (it comes in whole)
+        const table = new Group();
+        root.add(table);
+        const T = (w: number, h: number, d: number, c: string, x: number, y: number, z: number): Mesh => box(w, h, d, c, x, y, z, table);
         T(1.3, 0.07, 0.75, '#e8c088', 0.55, 0.74, 0.3);
         for (const dx of [-0.55, 0.55]) for (const dz of [-0.3, 0.3]) T(0.06, 0.72, 0.06, '#c98f52', 0.55 + dx, 0.36, 0.3 + dz);
         const l = T(0.34, 0.012, 0.44, '#fffaf0', 0.38, 0.785, 0.32);
@@ -248,7 +258,7 @@ function build(page: ScenePage, night: boolean): Built {
   fl.receiveShadow = true;
   root.add(fl);
   root.updateMatrixWorld(true);
-  return { root, parts, span: spanOf(pointsOf(root)) ?? { x0: -1, x1: 1, y0: -1, y1: 1 }, bims: bimsMade };
+  return { root, parts, span: spanOf(pointsOf(root)) ?? { x0: -1, x1: 1, y0: -1, y1: 1 }, bims: bimsMade, floor: fl, holders };
 }
 
 /** every vertex of the scene, world units: what the still's trim saw */
@@ -287,10 +297,24 @@ interface Rest {
   readonly s: Vector3;
 }
 
-export function mountScene(canvas: HTMLCanvasElement, page: ScenePage): SceneView {
+/** the scene's entrance: every thing of its root wrapped (the bims' holders land), the slab its ground */
+function entranceOf(b: Built): Entrance {
+  const holders = new Set<Object3D>(b.holders);
+  const things: Group[] = [];
+  const bims: Group[] = [];
+  for (const c of b.root.children.filter((x) => x !== b.floor)) (holders.has(c) ? bims : things).push(wrapIn(c));
+  return makeEntrance({ parent: b.root, ground: [{ mesh: b.floor, plain: DAY.floor }], things, bims });
+}
+
+/** `enter`: its first frames play the entrance (bims/render/entrance.ts), the hover moves wait for its end */
+export function mountScene(canvas: HTMLCanvasElement, page: ScenePage, o: { readonly enter?: boolean } = {}): SceneView {
   const view = makeView(canvas, { shadowAuto: true, transparent: true });
   view.sky('#000000');
   let built: Built | null = null;
+  // the entrance while it plays (built again with the scene on a theme change, on the same clock); its start, the first frame's
+  let entering = o.enter === true;
+  let ent: Entrance | null = null;
+  let t0 = -1;
   let rests = new Map<string, Rest>();
   let night: boolean | null = null;
   let size = { w: 0, h: 0 };
@@ -302,6 +326,15 @@ export function mountScene(canvas: HTMLCanvasElement, page: ScenePage): SceneVie
   const draw = (now: number): void => {
     raf = 0;
     let moving = false;
+    if (ent !== null) {
+      if (t0 < 0) t0 = now;
+      if (ent.at(now - t0)) moving = true;
+      else {
+        ent.dispose();
+        ent = null;
+        entering = false;
+      }
+    }
     for (const part of built?.parts ?? []) {
       const rest = rests.get(part.key);
       if (rest === undefined) continue;
@@ -335,12 +368,18 @@ export function mountScene(canvas: HTMLCanvasElement, page: ScenePage): SceneVie
         return;
       }
       night = o.night;
+      ent?.dispose();
+      ent = null;
       if (built !== null) {
         view.scene.remove(built.root);
         disposeTree(built.root);
         for (const b of built.bims) b.dispose();
       }
       built = build(page, o.night);
+      if (entering) {
+        ent = entranceOf(built);
+        if (t0 >= 0) ent.at(performance.now() - t0);
+      }
       rests = new Map(built.parts.map((p) => [p.key, { p: p.g.position.clone(), r: [p.g.rotation.x, p.g.rotation.y, p.g.rotation.z], s: p.g.scale.clone() }]));
       view.scene.add(built.root);
       const pal = o.night ? NIGHT : DAY;
@@ -374,7 +413,7 @@ export function mountScene(canvas: HTMLCanvasElement, page: ScenePage): SceneVie
       return built.parts.find((p) => p.g === o)?.key ?? null;
     },
     hover(key, reduced) {
-      if (key === hovered) return;
+      if (key === hovered || ent !== null) return;
       hovered = key;
       if (key === null || reduced) return;
       hoverT0 = performance.now();
@@ -382,6 +421,7 @@ export function mountScene(canvas: HTMLCanvasElement, page: ScenePage): SceneVie
     },
     dispose() {
       if (raf !== 0) cancelAnimationFrame(raf);
+      ent?.dispose();
       if (built !== null) {
         disposeTree(built.root);
         for (const b of built.bims) b.dispose();

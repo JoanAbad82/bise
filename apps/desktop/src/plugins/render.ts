@@ -3,9 +3,11 @@
 // makeObject), and the room, the place's hero (spots.ts plans it). One offscreen WebGL view draws
 // every icon once, kept as a data URL by (object, count, glass, size); the room has its own canvas
 // and draws a frame only when what it shows changes, or while a new object drops in (~0.4 s; cut
-// under reduced motion). Light: the office's day sun from the same corner (-5, 14, 3), its one soft
+// under reduced motion). With `enter` (Room.tsx: the first time the place opens) its first frames
+// play the banners' entrance (bims/render/entrance.ts): the slab, walls and rugs rise in cubes, the
+// objects pop on them. Light: the office's day sun from the same corner (-5, 14, 3), its one soft
 // contact shadow, a transparent backdrop. Owner: plug-desktop.
-import { Box3, type Group, Mesh, type Object3D, PlaneGeometry, Raycaster, ShadowMaterial, Vector2, Vector3, type Material, type BufferGeometry } from 'three';
+import { Box3, Group, Mesh, type Object3D, PlaneGeometry, Raycaster, ShadowMaterial, Vector2, Vector3, type Material, type BufferGeometry } from 'three';
 import { boxSite, RIGHT, UP, viewFit, type Fit, type Site } from '@/bims/render/camera';
 import { HOVER_MS, MOVES, hoverAt } from '@/bims/render/objects/hover';
 import { FIT, type Cam } from '@/bims/zoom';
@@ -14,6 +16,7 @@ import { DAY, NIGHT } from '@/bims/render/palette';
 import { STYLE } from '@/bims/render/style';
 import { makeView, type View } from '@/bims/render/view';
 import { lightOffice } from '@/bims/render/world';
+import { type Entrance, type GroundPart, makeEntrance, wrapIn } from '@/bims/render/entrance';
 import type { PluginObject } from '@/bims/plugin-objects';
 import { iconKey, planRoom, ROOM, type Foot, type IconObject, type Placed, type Spot } from './spots';
 
@@ -144,42 +147,42 @@ function footOf(id: ObjId): Foot {
   return f;
 }
 
-/** the room's slab, its two low walls and two rugs (scratch renderHero, signed with plugins-ui) */
-function slab(view: View): Mesh[] {
+/** the room's slab, its two low walls and two rugs (scratch renderHero, signed with plugins-ui); the entrance's ground (the floor's planks a plain colour) */
+function slab(view: View): GroundPart[] {
   const { w: W, d: D } = ROOM;
-  const out: Mesh[] = [];
+  const out: GroundPart[] = [];
   const add = (w: number, h: number, d: number, c: string, x: number, y: number, z: number, r?: number, cast = true): void => {
     const m = new Mesh(STYLE.box(w, h, d, r), STYLE.material(c));
     m.position.set(x, y, z);
     m.castShadow = cast;
     m.receiveShadow = true;
-    out.push(m);
+    out.push({ mesh: m });
   };
   add(W + 0.3, 0.5, D + 0.3, DAY.dirt, 0, -0.35, 0, 0.12);
   const fl = new Mesh(STYLE.box(W, 0.12, D, 0.04), STYLE.floor(DAY.floor, W, D));
   fl.position.set(0, -0.06, 0);
   fl.receiveShadow = true;
-  out.push(fl);
+  out.push({ mesh: fl, plain: DAY.floor });
   add(W, 1.25, 0.16, DAY.wall, 0, 0.62, -D / 2 - 0.02, 0.04);
   add(W + 0.02, 0.05, 0.18, DAY.wallTop, 0, 1.27, -D / 2 - 0.02, 0.02);
   add(0.16, 1.25, D, DAY.wall, -W / 2 - 0.02, 0.62, 0, 0.04);
   add(0.18, 0.05, D + 0.02, DAY.wallTop, -W / 2 - 0.02, 1.27, 0, 0.02);
   add(3.2, 0.02, 2.2, '#bfe1f2', -2.0, 0.012, 0.55, 0.2, false);
   add(2.6, 0.02, 2.0, '#ffd166', 1.5, 0.012, 0.9, 0.2, false);
-  for (const m of out) view.scene.add(m);
+  for (const m of out) view.scene.add(m.mesh);
   return out;
 }
 
-/** a free spot: a dotted square on the floor */
-function dots(s: Spot, night: boolean): Mesh[] {
+/** a free spot: a dotted square on the floor, one group */
+function dots(s: Spot, night: boolean): Group {
   const mat = STYLE.material(night ? '#f3ede4' : '#6b645a', { opacity: 0.7 });
-  const out: Mesh[] = [];
+  const out = new Group();
   const S = 0.9, step = 0.22, len = 0.11;
   for (let t = -S / 2; t < S / 2; t += step) {
     for (const [dx, dz, along] of [[t, -S / 2, true], [t, S / 2, true], [-S / 2, t, false], [S / 2, t, false]] as const) {
       const m = new Mesh(STYLE.box(along ? len : 0.05, 0.02, along ? 0.05 : len), mat);
       m.position.set(s.x + dx + (along ? len / 2 : 0), 0.03, s.z + dz + (along ? 0 : len / 2));
-      out.push(m);
+      out.add(m);
     }
   }
   return out;
@@ -195,12 +198,17 @@ export function dropAt(t: number): { lift: number; squash: number } {
   return { lift: 0, squash: 0.9 + 0.1 * ((t - 0.7) / 0.3) };
 }
 
-export function mountRoom(canvas: HTMLCanvasElement): RoomView {
+/** `enter`: its first frames play the entrance (bims/render/entrance.ts): no drop, no hover move until its end */
+export function mountRoom(canvas: HTMLCanvasElement, o0: { readonly enter?: boolean } = {}): RoomView {
   const view = makeView(canvas, { shadowAuto: true, transparent: true });
   view.sky('#000000');
   const base = slab(view);
-  let shown: { key: string; g: Group; p: Placed }[] = [];
-  let marks: Mesh[] = [];
+  // each object in its wrapper (identity at rest: what the entrance moves)
+  let shown: { key: string; g: Group; w: Group; p: Placed }[] = [];
+  let marks: Group[] = [];
+  // the entrance while it plays, and its start (the first frame's)
+  let ent: Entrance | null = null;
+  let t0 = -1;
   let first = true;
   let night = false;
   let width = 0;
@@ -217,6 +225,14 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
   const draw = (now: number): void => {
     raf = 0;
     let moving = false;
+    if (ent !== null) {
+      if (t0 < 0) t0 = now;
+      if (ent.at(now - t0)) moving = true;
+      else {
+        ent.dispose();
+        ent = null;
+      }
+    }
     for (const s of shown) {
       const t0 = drops.get(s.key);
       const { lift, squash } = dropAt(t0 === undefined ? 1 : (now - t0) / DROP_MS);
@@ -265,23 +281,37 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
           // bise's cat sleeps on its cushion
           made.group.add(makeObject('cushion', { off: p.o.glass }).group);
         }
+        // at its spot now (the draw keeps it there): the entrance reads its foot
+        made.group.position.set(p.spot.x, 0, p.spot.z);
+        made.group.scale.setScalar(p.scale);
         view.scene.add(made.group);
+        const w = wrapIn(made.group);
         const wasHere = shown.some((s) => s.key === p.o.key);
-        if (!first && !wasHere && !o.reduced) drops.set(p.o.key, performanceNow());
-        next.push({ key: p.o.key, g: made.group, p });
+        // while the entrance plays a new one comes in with it, never drops
+        if (ent !== null) ent.add(w);
+        else if (!first && !wasHere && !o.reduced) drops.set(p.o.key, performanceNow());
+        next.push({ key: p.o.key, g: made.group, w, p });
       }
       for (const s of keep.values()) {
-        view.scene.remove(s.g);
+        ent?.remove(s.w);
+        view.scene.remove(s.w);
         dispose(s.g);
         drops.delete(s.key);
       }
       shown = next;
       for (const m of marks) {
+        ent?.remove(m);
         view.scene.remove(m);
-        m.geometry.dispose();
+        dispose(m);
       }
-      marks = plan.dotted.flatMap((s) => dots(s, night));
-      for (const m of marks) view.scene.add(m);
+      marks = plan.dotted.map((s) => dots(s, night));
+      for (const m of marks) {
+        view.scene.add(m);
+        ent?.add(m);
+      }
+      if (first && o0.enter === true && !o.reduced) {
+        ent = makeEntrance({ parent: view.scene, ground: base, things: [...shown.map((s) => s.w), ...marks], bims: [] });
+      }
       first = false;
       frame();
     },
@@ -315,7 +345,7 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
       return shown.find((s) => s.g === o)?.key ?? null;
     },
     hover(key, reduced) {
-      if (key === hovered) return;
+      if (key === hovered || ent !== null) return;
       hovered = key;
       hoverT0 = key !== null && !reduced ? performanceNow() : 0;
       frame();
@@ -342,8 +372,9 @@ export function mountRoom(canvas: HTMLCanvasElement): RoomView {
     },
     dispose() {
       if (raf !== 0) cancelAnimationFrame(raf);
+      ent?.dispose();
       for (const s of shown) dispose(s.g);
-      for (const m of [...base, ...marks]) dispose(m);
+      for (const m of [...base.map((b) => b.mesh), ...marks]) dispose(m);
       view.dispose();
     },
   };

@@ -1,6 +1,8 @@
 // The plugins place's hero: the room, his plugins' objects on a slab with two low walls (spots.ts
 // plans it, render.ts draws it behind import('./render')). A 2.2:1 banner as wide as the head; a
-// new plugin's object drops in, cut under reduced motion; no frame while nothing changes. No WebGL
+// new plugin's object drops in, cut under reduced motion; no frame while nothing changes. The first
+// time the place opens in a window's run the room plays its entrance (the landing islands',
+// bims/render/entrance.ts; banner-entrance), none under reduced motion. No WebGL
 // (a test, a lost GPU): `fallback` (the plain icons on a floor). Owner: plug-desktop.
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { FitChip } from '@/bims/chips';
@@ -13,6 +15,7 @@ import { themeOf } from '@/theme';
 import { usePrefs } from '@/store';
 import type { Plugin } from '@/proto';
 import { canDraw, usePicks } from './icons';
+import { entered, toEnter } from '@/bims/entrance-once';
 
 type RoomView = import('./render').RoomView;
 
@@ -35,6 +38,8 @@ export function Room({ rows, project, fallback, onOpen }: { rows: readonly Plugi
   const view = useRef<RoomView | null>(null);
   const [failed, setFailed] = useState(!canDraw());
   const [ready, setReady] = useState(false);
+  // its entrance, the first time the place opens in this run (bims/entrance-once.ts): no fallback over it then, the room rises from nothing
+  const [enter] = useState(() => !reducedNow() && toEnter('plugins'));
   const [drawn, setDrawn] = useState(false);
   const cam = useRef<Cam>(FIT);
   const [fitted, setFitted] = useState(true);
@@ -60,7 +65,8 @@ export function Room({ rows, project, fallback, onOpen }: { rows: readonly Plugi
       (r) => {
         if (!live) return;
         try {
-          const v = r.mountRoom(canvas);
+          const v = r.mountRoom(canvas, { enter });
+          if (enter) entered('plugins');
           view.current = v;
           const now = (): void => { v.resize(canvas.parentElement?.clientWidth ?? 0); };
           // drawn at once, and once more when the window has settled: a frame drawn while the
@@ -108,6 +114,7 @@ export function Room({ rows, project, fallback, onOpen }: { rows: readonly Plugi
       view.current?.dispose();
       view.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- enter is fixed for the room's mount
   }, [failed]);
 
   useEffect(() => {
@@ -240,7 +247,7 @@ export function Room({ rows, project, fallback, onOpen }: { rows: readonly Plugi
         />
       )}
       {!fitted && drawn && <FitChip onFit={() => { moveCam(FIT); }} />}
-      {!drawn && <div className="plg-room-wait" data-testid="plugins.room.wait">{fallback}</div>}
+      {!drawn && !enter && <div className="plg-room-wait" data-testid="plugins.room.wait">{fallback}</div>}
     </>
   );
 }

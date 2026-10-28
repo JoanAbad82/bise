@@ -4,9 +4,11 @@
 // plays its hover move under the pointer, then the scene is still: no frame while nothing moves.
 // No zoom, no pan, the wheel scrolls the page (designer m_45900). The signed still shows until the
 // first frame is on screen, and stays alone under reduced motion or with no WebGL (a test, a lost
-// GPU). Owner: banner-3d.
+// GPU). The first time its page opens in a window's run the scene plays its entrance instead (the
+// landing islands', bims/render/entrance.ts; banner-entrance), with no still over it. Owner: banner-3d.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { reducedMotion } from '@/ds/hooks';
+import { entered, toEnter } from '@/bims/entrance-once';
 import { usePrefs } from '@/store';
 import { themeOf } from '@/theme';
 import { PageVignette, preloadStills } from './vignettes';
@@ -41,6 +43,8 @@ function Live({ page, onFail }: { page: ScenePage; onFail: () => void }) {
   const [ready, setReady] = useState(false);
   const [drawn, setDrawn] = useState(false);
   const [over, setOver] = useState(false);
+  // its entrance, the first time the page opens in this run (bims/entrance-once.ts): no still over it then, the scene rises from nothing
+  const [enter] = useState(() => toEnter(page));
   const dark = darkOf(themeOf(usePrefs()));
 
   useEffect(() => {
@@ -63,7 +67,8 @@ function Live({ page, onFail }: { page: ScenePage; onFail: () => void }) {
       (s) => {
         if (!live) return;
         try {
-          view.current = s.mountScene(canvas, page);
+          view.current = s.mountScene(canvas, page, { enter });
+          if (enter) entered(page);
           again();
           ro = new ResizeObserver(again);
           if (box !== null) ro.observe(box);
@@ -84,7 +89,7 @@ function Live({ page, onFail }: { page: ScenePage; onFail: () => void }) {
       view.current?.dispose();
       view.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onFail is the parent's setter, page fixed for its banner
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onFail is the parent's setter, page fixed for its banner, enter fixed for its mount
   }, [page]);
 
   useEffect(() => {
@@ -125,7 +130,7 @@ function Live({ page, onFail }: { page: ScenePage; onFail: () => void }) {
         onPointerMove={(e) => { hoverOn(pickAt(e)); }}
         onPointerLeave={() => { hoverOn(null); }}
       />
-      {!drawn && <div className="b-live-wait"><PageVignette page={page} /></div>}
+      {!drawn && !enter && <div className="b-live-wait"><PageVignette page={page} /></div>}
     </div>
   );
 }
