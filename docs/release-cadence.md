@@ -29,8 +29,11 @@ runs the checked part: `scripts/release_cut.sh`.
 5. **The terminal's what's new**: 3-5 lines for users (`private/launch/terminal-whats-new-<tag>.md`).
 6. **The terminal draft**: `SSH_AUTH_SOCK=<Secretive's socket> packaging/publish-release.sh
    <next terminal tag> --rev <sha> --whats-new <file>` (no `--publish`): tag, push, release.yml,
-   the DRAFT checked. Its darwin jobs wait on the desktop-release environment's approval: his,
-   unless he said otherwise on the page release-cadence (q-sign).
+   the DRAFT checked. Its darwin jobs wait on the desktop-release environment's approval: the
+   release manager approves them itself (`gh api repos/gvergnaud/bise/actions/runs/<run>/
+   pending_deployments -X POST`, state approved), as a draft is seen by no one (Gabriel 2026-10-28,
+   page release-cadence q-sign: « oui, valide la signature du brouillon, la publication reste à
+   moi »). Only this one: the publish and the app's approval stay his word.
 7. **The notification**, through main, one: the sha, the what's new, `1. publier 2. pas cette fois`.
 8. On `publier`: `publish-release.sh <tag> --publish` (every terminal sees it), then `git push
    origin <desktop tag>` (desktop-release.yml: one job, one approval: build, sign, notarize, the
