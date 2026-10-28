@@ -43,8 +43,9 @@ async function surfaces(s: Session, w: World, name: string, shop: string, key: s
   return {
     strip: await s.page.locator(`[data-testid="strip.card.${key}"]`).count(),
     block: await s.page.locator(`[data-testid="inbox.block.card.${key}"]`).count(),
-    // the sidebar's dot on one of the project's agents, the rail's inbox dot: drawn when something waits
-    shopDot: await drawn(s, `[data-testid^="app.side.agent.${shop}."][data-testid$=".waits"]`),
+    // the sidebar's pill on the project's row (bise fait mac: Sidebar.tsx ProjectEnd), the rail's
+    // inbox dot: drawn when something waits
+    shopDot: await drawn(s, `[data-testid="app.side.project.${shop}.pill"]`),
     shopTruth: (await openCards(w, name)).length > 0,
     // bise's ask is listed only beside a real item (inbox/Block.tsx asksNotify)
     inboxDot: await drawn(s, '[data-testid="app.rail.inbox.dot"]'),
@@ -97,7 +98,10 @@ async function answerThenOpen(name: string, question: string, n: number, before:
     // (inbox/waiting.ts): counted beside the hubs' cards
     const home = (await hubState(hubOf(w, 'bise').sock))['project'] as string;
     const ask = await page.locator(`[data-testid="inbox.row.w:${home}/-1"]`).count();
+    // bise fait mac (nm-pages-a, inbox/List.tsx WaitLine): a click picks the row, its 'answer' (⏎)
+    // opens the card above the composer
     await row.click();
+    await page.locator(`[data-testid="inbox.row.${wkey}.answer"]`).click();
     const open = page.locator('[data-testid^="inbox.block.open."]', { hasText: question });
     await expect(open, 'the card opens to answer').toBeVisible({ timeout: 10_000 });
     await open.locator(`[data-testid$=".opt.${String(n)}"]`).first().click();
@@ -105,7 +109,8 @@ async function answerThenOpen(name: string, question: string, n: number, before:
     await expect(row, 'gone from the inbox screen').toHaveCount(0, { timeout: 10_000 });
 
     // 2. the project's thread, from the sidebar
-    await page.locator(`[data-testid="app.side.agent.${project}.main"]`).click();
+    // (its row opens main's thread: Sidebar.tsx ProjectItem)
+    await page.locator(`[data-testid="app.side.project.${project}"]`).click();
     await expect(page.locator('[data-testid="thread.list"]')).toBeVisible({ timeout: 20_000 });
     let last: Record<string, unknown> = {};
     const reads = async (): Promise<boolean> => settled((last = await surfaces(s, w, name, project, key, ask)));
