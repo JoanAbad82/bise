@@ -3,7 +3,7 @@
 // no prefs, the fake provider behind every provider's base_url, the keychain probe off), read over
 // CDP on 127.0.0.1. Hello (one 'start': v4 has no permissions step), the model step: an API key ->
 // Anthropic -> a bad key fails under its field and is never saved; a good one is checked live,
-// "it works" with the model's own answer, the key in auth.json, main's model in config.toml,
+// "it works", how long it took and the model main uses, the key in auth.json, main's model in config.toml,
 // continue enabled. Never the projects step (it scans a home).
 //   AS_HE_DOES_FIRST_HOME=<bise home> node --experimental-strip-types firstrun.ts <cdp port> <out dir>
 // Writes <out>/firstrun.json ({steps, shots}) and <out>/firstrun-N-*.png.
@@ -92,10 +92,13 @@ try {
   await shot('works');
   const auth = read('auth.json');
   const config = read('config.toml');
-  step("a good key: 'it works' with the model's own answer, the key saved in the fresh home's auth.json (never on screen), main's model written, continue enabled",
-    works && /it works: .+ answered\./.test(stepText ?? '') && /it said: “/.test(answer ?? '') && auth.includes('sk-good-key-123')
+  // onboarding A (84032b3d8, cd3521253): with the island, the model's words are in its bubble and the
+  // step says only how long it took ('✓ answered in 0.4 s'); without WebGL, the words here ('it said: “…”')
+  step("a good key: 'it works', how long it took to answer and the model main uses, the key saved in the fresh home's auth.json (never on screen), main's model written, continue enabled",
+    works && /it works: .+ answered\./.test(stepText ?? '') && /answered in [\d.]+ s|it said: “/.test(answer ?? '')
+      && /main uses anthropic\//.test(worksText ?? '') && auth.includes('sk-good-key-123')
       && /main = "anthropic\//.test(config) && !body.includes('sk-good-key-123') && nextOn === true,
-    { worksText, answer, main: /main = "[^"]+"/.exec(config)?.[0] ?? null, keySaved: auth.includes('sk-good-key-123'), nextOn });
+    { stepText, worksText, answer, main: /main = "[^"]+"/.exec(config)?.[0] ?? null, keySaved: auth.includes('sk-good-key-123'), nextOn });
 } catch (e) { step('first run', false, String(e).slice(0, 300)); }
 await browser.close().catch(() => {});
 process.exit(0);
