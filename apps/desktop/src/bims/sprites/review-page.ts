@@ -21,6 +21,8 @@ import { makeView, type View } from '../render/view';
 import { castShadows, lightOffice } from '../render/world';
 import type { Pose } from '../model';
 import { FOLLOW_ZOOM } from '../focus';
+import { kitOf } from '../render/kit';
+import { loft } from '../render/maps/loft';
 import { COIN_HEAD, cutPng, headPng } from '@/app/side3d/render';
 import { aliveRig, aliveSeed, stanceAt, stands } from '../render/alive';
 import { DUR, type IdleMove, idleRig } from '../render/idle';
@@ -147,7 +149,50 @@ export async function renderRow(r: Row, size: number): Promise<HTMLCanvasElement
     const px = Math.round(size / 2);
     return canvasOf(r.cam === 'coin' ? headPng('main', true, px, night, d.look) : cutPng('main', true, px, night, d.look), size);
   }
-  return drawRow(r, size);
+  return r.desk !== undefined ? drawAtDesk(r, size) : drawRow(r, size);
+}
+
+/**
+ * A row's bim seated at its desk: the loft's desk with its laptop, lamp and chair (maps/loft.ts desk,
+ * the spot at the origin facing +z, as the office lays it), the bim in its pose, seen through the
+ * office's iso camera framed on the two (his closest pinch), the whole turned by `desk` degrees so
+ * the hands show from the side or behind. A typing check (bim-3d m_49255: the hands through the
+ * desk's edge in the hero film); the bim alone never shows it.
+ */
+function drawAtDesk(r: Row, size: number): HTMLCanvasElement {
+  const d = dress(r);
+  const night = r.light === 'night';
+  const pal = night ? NIGHT : DAY;
+  const v = sharedView();
+  camReset();
+  const root = new Group();
+  root.rotation.y = (Number(r.desk ?? 0) * Math.PI) / 180;
+  v.scene.add(root);
+  const k = kitOf(STYLE, pal);
+  const spot = { x: 0, z: 0, wz: 0, ax: 0, face: 0 };
+  const build = { k, root, o: { furniture: [] } } as unknown as Parameters<typeof loft.desk>[0];
+  loft.desk(build, spot, REVIEW_NAME);
+  const bim = bimOf(d);
+  bim.daylight(night ? 0 : 1);
+  bim.apply(rigOfRow(r, d.main));
+  bim.detail(true);
+  castShadows(root);
+  root.add(bim.group);
+  lightOffice(v.hemi, v.sun, pal, { x0: -1, W: 2, D: 2 } as unknown as Parameters<typeof lightOffice>[3], STYLE);
+  v.sun.position.set(-5, 14, 3);
+  v.sun.target.position.set(0, 0, 0);
+  root.updateMatrixWorld(true);
+  const fit = isoFit(new Box3().setFromObject(root, true), size, 0.03, false);
+  v.renderer.setSize(size, size, false);
+  v.look(fit);
+  v.render();
+  const out = document.createElement('canvas');
+  out.width = size;
+  out.height = size;
+  v.copyTo(out);
+  v.scene.remove(root);
+  bim.dispose();
+  return out;
 }
 
 function drawRow(r: Row, size: number): HTMLCanvasElement {
@@ -457,7 +502,7 @@ async function sheet(rows: readonly Row[], title: string, size: number, cols: nu
     const head = (r.head ?? '').replace(/^(m|w|me):/, '');
     ctx.fillText(`${String(i + 1)} ${head} · ${r.pose ?? ''}${r.frame && r.frame !== '0' ? `@${r.frame}` : ''}`, x + 4, y + size + 13);
     ctx.fillStyle = '#7a736b';
-    ctx.fillText(`${r.cam ?? ''} · ${r.kind ?? ''} · s${r.skin ?? ''} h${r.hair ?? ''} ${r.hatc ?? ''} · ${r.light ?? ''}${r.life === 'alive' ? ' · alive' : ''}${r.idle && r.idle !== 'none' ? ` · ${r.idle}` : ''}`, x + 4, y + size + 27);
+    ctx.fillText(`${r.cam ?? ''} · ${r.kind ?? ''} · s${r.skin ?? ''} h${r.hair ?? ''} ${r.hatc ?? ''} · ${r.light ?? ''}${r.life === 'alive' ? ' · alive' : ''}${r.idle && r.idle !== 'none' ? ` · ${r.idle}` : ''}${r.desk !== undefined ? ` · desk ${r.desk}°` : ''}`, x + 4, y + size + 27);
     if (issues.length > 0) {
       ctx.fillStyle = bad.length > 0 ? '#d1495b' : '#b07a10';
       ctx.fillText(issues.map((x) => x.check).join(' '), x + 4, y + size + 41);
