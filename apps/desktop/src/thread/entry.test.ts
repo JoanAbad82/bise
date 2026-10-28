@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, sendInThread, handoffOf, stepTime, toolEnd, toolLines, toolSource, jsonStrField, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, sendInThread, handoffOf, stepTime, toolEnd, toolLines, toolsWords, toolSource, jsonStrField, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { hitsIn } from './find';
 import FIND_TEXT from '../../../../rust/proto/fixtures/find_text.json';
 
@@ -143,6 +143,18 @@ describe("the agent view's tool rows (designer's desktop-screens v6 (2))", () =>
     const many = toolLines(Array.from({ length: 8 }, (_, i) => ({ pos: i, at_ms: 0, text: `cmd ${String(i)}`, kind: 'run' })));
     expect(many.lines).toHaveLength(TOOL_LINES);
     expect(many.restWords).toBe('ran 2 commands');
+  });
+
+  it("a row's words: the last command's description there is (his m_49672), else the hub's counted words", () => {
+    const run = (pos: number, intent?: string) => ({ pos, at_ms: 0, text: intent ?? `cmd ${String(pos)}`, kind: 'run', intent });
+    expect(toolsWords([run(1, 'start the dev server')], 'ran 1 command')).toBe('start the dev server');
+    // a group keeps its steps under it; its line says the last description, past a plain command after it
+    expect(toolsWords([run(1, 'build it'), run(2, 'run the tests'), run(3)], 'ran 3 commands')).toBe('run the tests');
+    expect(toolsWords([run(1), run(2, '  ')], 'ran 2 commands')).toBe('ran 2 commands');
+    expect(toolsWords([{ pos: 1, at_ms: 0, text: 'src/a.rs', kind: 'read' }], 'read 1 file')).toBe('read 1 file');
+    // the call at work the step fold draws (its intent at the thread's end) is not said twice
+    expect(toolsWords([run(1, 'build it'), run(2, 'lecture du PDF')], 'ran 2 commands', 2)).toBe('build it');
+    expect(toolsWords([run(1, 'lecture du PDF')], 'ran 1 command', 1)).toBe('ran 1 command');
   });
 
   it("R11/S9: each call's state on its line as the TUI's: ✓ time, ✗ exit · time with its error line, code and output to open", () => {

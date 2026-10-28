@@ -14,7 +14,7 @@ import { liveTime, useLiveStep, useSecondsSince } from './live-step';
 import { useFold } from './folds';
 import { useFoldHint } from './foldHint';
 import { thinkingWords } from './thinking';
-import { editCounts, toolLines, type ToolLine } from './entry';
+import { editCounts, toolLines, toolsWords, type ToolLine } from './entry';
 import { Code, known } from './Code';
 import type { RowCtx } from './rows';
 import { Pulse } from '@/working/Signs';
@@ -56,8 +56,8 @@ export function ThinkingLine({ pos, head, body: raw }: { pos: number; head: stri
 }
 
 /**
- * Its tool calls in a row (QA §4, mockup 1): one summary line, 28 high, 13 text-3, the hub's
- * counted words and the edits' lines ('edited 3 files +42 −18 ›', the + in --c-ok, the − in
+ * Its tool calls in a row (QA §4, mockup 1): one summary line, 28 high, 13 text-3, the last
+ * command's description there is or else the hub's counted words (toolsWords), and the edits' lines ('edited 3 files +42 −18 ›', the + in --c-ok, the − in
  * --c-err), its › opening every step (a click, ⏎, ⌘E). What must show folded shows under it: a
  * failed call (R11, the TUI's ✗ row) and the call at work with its '∿ 15 s' (S9); a call the model
  * described is drawn once, by the growing fold at the thread's end (live-step.tsx).
@@ -73,7 +73,8 @@ export function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const all = [...t.lines, ...t.rest].filter((l) => l.pos !== said).sort((x, y) => x.pos - y.pos);
   const shown = open ? all : all.filter((l) => l.state === 'err' || l.pos === live?.pos);
   const counts = editCounts(items);
-  const words = e.tools?.summary !== undefined && e.tools.summary !== '' ? e.tools.summary : e.text;
+  // the last command's description, else the hub's counted words (his m_49672)
+  const words = toolsWords(items, e.tools?.summary !== undefined && e.tools.summary !== '' ? e.tools.summary : e.text, said);
   const id = `thread.tools.${String(e.pos)}`;
   const toggle = () => {
     setOpen((o) => !o);

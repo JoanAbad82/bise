@@ -547,6 +547,16 @@ export function toolLines(items: readonly ToolLike[]): {
   return { lines, rest, restWords: parts.join(', ') };
 }
 
+/**
+ * A tools row's line (his m_49672): the last description a command there has (its intent: 'start
+ * the dev server'), one command or a group; none: the hub's counted words ('ran 3 commands').
+ * `drawn`: the call at work whose intent the step fold already says, never said twice. Pure.
+ */
+export function toolsWords(items: readonly ToolLike[], counted: string, drawn?: number): string {
+  const said = items.filter((t) => t.kind === 'run' && t.pos !== drawn && (t.intent ?? '').trim() !== '').at(-1);
+  return said === undefined ? counted : (said.intent ?? '').trim();
+}
+
 /** A handoff in a main's thread (the hub's spawn notice '✚ main → new agent @perf : <brief>'): who it went to and the brief's first line; none for any other notice. Pure. */
 export function handoffOf(text: string): { agent: string; brief: string } | null {
   const m = /^✚ \S+ → (?:new agent|new task|nouvelle tâche) @([A-Za-z0-9_-]+)(?: : ([\s\S]*))?$/.exec(text.trim());

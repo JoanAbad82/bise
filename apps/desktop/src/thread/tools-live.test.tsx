@@ -78,6 +78,23 @@ describe('the call at work (S9)', () => {
     expect(v.queryByTestId('thread.tool.2')).toBeNull();
     expect(v.getByTestId('thread.tool.1').textContent).toContain('$');
   });
+  it("the row's line says the last command's description, at rest and at work (his m_49672)", () => {
+    const store = new Store(null);
+    const one = { ...tools, pos: 5, tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 5, at_ms: now, text: 'start the dev server', kind: 'run' as const, intent: 'start the dev server' }] } };
+    const group = { ...tools, tools: { ...tools.tools, items: [{ ...tools.tools.items[0], intent: 'run the tests', text: 'run the tests' }, tools.tools.items[1]] } };
+    store.apply({ ev: 'agents', project: P, agents: [ag('working')] });
+    store.apply({ ev: 'thread', project: P, agent: 'perf', entries: [group, one], before: null, more: false });
+    const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined, onArtifact: () => undefined };
+    const v = render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={4} />
+        <EntryRow ctx={ctx} pos={5} />
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.tools.4').textContent).toBe('run the tests');
+    // the one at work: its fold at the thread's end says it, the row keeps the counted words
+    expect(v.getByTestId('thread.tools.5').textContent).toBe('ran 1 command');
+  });
   it('stepWords: the live call\'s intent, else the typing line; a plain command or rest: none', () => {
     const live = { entry: 4, pos: 2, at: 1, intent: 'lecture du PDF' };
     expect(stepWords(true, live, 'lecture du PDF')).toBe('lecture du PDF');
