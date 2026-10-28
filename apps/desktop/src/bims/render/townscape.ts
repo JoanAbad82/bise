@@ -7,6 +7,7 @@ import { BufferAttribute, BufferGeometry, ConeGeometry, Group, type Material, Me
 import type { Box, Pt } from '../model';
 import { slabWithPits } from './ground';
 import { ROAD, RIVER, BANK, type TownPlan } from '../town/plan';
+import type { Beyond } from '../town/beyond';
 import { APRON_D, APRON_HALF, PATH_HALF } from './decor';
 import { kitOf } from './kit';
 import type { Palette } from './palette';
@@ -88,6 +89,30 @@ function ribbon(pts: readonly Pt[], half: number, y: number, inLawn: (p: Pt) => 
   return g;
 }
 
+/**
+ * A line's long stretches cut to at most STRETCH, those wholly past the rect left out (ribbon draws a
+ * stretch only with both ends inside): a road or a river run off past the grass's edge (town/beyond.ts)
+ * keeps all of itself up to that edge. A line of short stretches comes back as is.
+ */
+const STRETCH = 2;
+function clip(pts: readonly Pt[], r: { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number }): readonly Pt[] {
+  if (pts.every((p, i) => i === 0 || Math.hypot(p.x - (pts[i - 1] as Pt).x, p.z - (pts[i - 1] as Pt).z) <= STRETCH)) return pts;
+  const out: Pt[] = [];
+  const near = (p: Pt): boolean => p.x > r.x0 - STRETCH && p.x < r.x1 + STRETCH && p.z > r.z0 - STRETCH && p.z < r.z1 + STRETCH;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i] as Pt;
+    const b = pts[i + 1];
+    if (near(a)) out.push(a);
+    if (b === undefined) break;
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / STRETCH);
+    for (let j = 1; j < n; j++) {
+      const p = { x: a.x + ((b.x - a.x) * j) / n, z: a.z + ((b.z - a.z) * j) / n };
+      if (near(p)) out.push(p);
+    }
+  }
+  return out;
+}
+
 /** the unit normal (left of the way) of a heading */
 function norm(dx: number, dz: number): Pt {
   const l = Math.hypot(dx, dz) || 1;
@@ -95,7 +120,7 @@ function norm(dx: number, dz: number): Pt {
 }
 
 /** The town's ground and everything on it but the offices, as one group (not merged yet). */
-export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: TownColours, pits: readonly Box[] = []): Townscape {
+export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: TownColours, pits: readonly Box[] = [], beyond: Beyond | null = null): Townscape {
   const k = kitOf(style, pal);
   const root = new Group();
   // the lawn's and the road's own materials, lifted at night (never merged away: merge.ts keeps a live one)
@@ -106,26 +131,30 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
   };
   const lawnMat = glowing(pal.grass, NIGHT_GLOW.lawn);
   const roadMat = glowing(c.road, NIGHT_GLOW.road);
-  const { lawn } = plan;
+  // the ground: the lawn, or (the app's endless town, town/beyond.ts) the grass all the way to `far`
+  const lawn = beyond === null ? plan.lawn : beyond.far;
   const inLawn = (p: Pt): boolean => p.x > lawn.x0 && p.x < lawn.x1 && p.z > lawn.z0 && p.z < lawn.z1;
   const lw = lawn.x1 - lawn.x0;
   const ld = lawn.z1 - lawn.z0;
   const cx = (lawn.x0 + lawn.x1) / 2;
   const cz = (lawn.z0 + lawn.z1) / 2;
-  // the floating block, as each office's: dirt under a grass top, holed where an office carves under its floor (render/ground.ts)
-  k.add(slabWithPits(style, lw, 1.2, ld, 0.45, cx, cz, pits), k.mat(pal.dirt), root, cx, LAWN_TOP - 0.08 - 0.6 - 0.01, cz);
+  // the floating block, as each office's: dirt under a grass top, holed where an office carves under its floor (render/ground.ts);
+  // endless, no block: the grass alone, its edge past every view
+  if (beyond === null) k.add(slabWithPits(style, lw, 1.2, ld, 0.45, cx, cz, pits), k.mat(pal.dirt), root, cx, LAWN_TOP - 0.08 - 0.6 - 0.01, cz);
   k.add(slabWithPits(style, lw, 0.16, ld, 0.05, cx, cz, pits), lawnMat, root, cx, LAWN_TOP - 0.08, cz);
+  const road = beyond?.road ?? plan.road;
+  const river = beyond?.river ?? plan.river;
 
   const flat = (g: BufferGeometry, color: string, mat?: Material): void => {
     const m = new Mesh(g, mat ?? k.mat(color));
     root.add(m);
   };
-  if (plan.river.length > 1) {
-    flat(ribbon(plan.river, BANK, LAWN_TOP + 0.005, inLawn), c.bank);
-    flat(ribbon(plan.river, RIVER, LAWN_TOP + 0.012, inLawn), c.water);
+  if (river.length > 1) {
+    flat(ribbon(clip(river, lawn), BANK, LAWN_TOP + 0.005, inLawn), c.bank);
+    flat(ribbon(clip(river, lawn), RIVER, LAWN_TOP + 0.012, inLawn), c.water);
   }
-  flat(ribbon(plan.road, ROAD, LAWN_TOP + 0.02, inLawn), c.road, roadMat);
-  // the dashes down the middle: every other metre or so
+  flat(ribbon(clip(road, lawn), ROAD, LAWN_TOP + 0.02, inLawn), c.road, roadMat);
+  // the dashes down the middle: every other metre or so (the plan's road: past the lawn, a country road with none)
   const dashes: Pt[][] = [];
   for (let i = 0; i + 2 < plan.road.length; i += 5) {
     const a = plan.road[i];
@@ -212,6 +241,7 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
 
   // the trees: a trunk and three round leaves (the prototype's clayTree)
   for (const t of plan.trees) tree(t.x, t.z, t.size);
+  for (const t of beyond?.trees ?? []) tree(t.x, t.z, t.size);
   return {
     root,
     lift: (level) => {

@@ -28,7 +28,8 @@ import { awayNow, nightNow, testMode } from '../room';
 import { localOf, type Local } from '../eggs';
 import { makeDriver, NO_ATTENTION, type Clock, type OfficeDriver } from '../office-driver';
 import type { Fit } from '../render/camera';
-import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from '../zoom';
+import { DRAG_PX, FIT, sameCam, type Cam } from '../zoom';
+import { overshot, panTown, settle, springAt, townWheel, WHEEL_REST_MS } from './pan';
 import { DIVE_S, diveAt } from './dive';
 import { liveAgents, signOf, townProjects, type TownProject } from './sites';
 import type { MakeTownRenderer, TownRenderer, TownSite } from './types';
@@ -173,12 +174,21 @@ export function Town({
   // esc or a double-click on the lawn back to the whole town; `fitted` re-renders the box's data-zoomed
   const camRef = useRef<Cam>(FIT);
   const [fitted, setFitted] = useState(true);
+  // past the bound when he let go (town/pan.ts): the view springs back from there, frame by frame
+  const spring = useRef<{ readonly from: Cam; at: number | null } | null>(null);
   const moveCam = useCallback((c: Cam) => {
+    spring.current = null;
     if (sameCam(c, camRef.current)) return;
     camRef.current = c;
-    setFitted(atFit(c));
+    setFitted(sameCam(c, FIT));
     rRef.current?.setCam(c);
     kickRef.current('cam');
+  }, []);
+  /** he let go: past the bound, the view springs back (reduced motion never got past it) */
+  const letGo = useCallback(() => {
+    if (!overshot(camRef.current)) return;
+    spring.current = { from: camRef.current, at: null };
+    kickRef.current('spring');
   }, []);
   // a drag moves the view while zoomed; past DRAG_PX it is never a click
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
@@ -373,6 +383,20 @@ export function Town({
         const fit = r.townFit();
         if (fit !== null) box.style.height = `${String(fit.heightPx)}px`;
       }
+      // the spring back to the bound after he let go past it (town/pan.ts)
+      let springing = false;
+      const sp = spring.current;
+      if (sp !== null) {
+        const now = performance.now() / 1000;
+        sp.at ??= now;
+        const c = springAt(sp.from, now - sp.at);
+        springing = c !== null;
+        const shown = c ?? settle(sp.from);
+        if (!springing) spring.current = null;
+        camRef.current = shown;
+        r.setCam(shown);
+        setFitted(sameCam(shown, FIT));
+      }
       // the offices from afar baked still (again only on a change), the ones close up posed live:
       // each asks for its next frame as its minimap would (loop.ts nextAfter), the soonest wins
       const baking = stills(r);
@@ -410,8 +434,8 @@ export function Town({
         setLabels(shownLabels);
       }
       placeMarks(r);
-      if (more || baking || next === 0) {
-        whyFrame(more ? 'dive' : baking ? 'baking' : 'live');
+      if (more || springing || baking || next === 0) {
+        whyFrame(more ? 'dive' : springing ? 'spring' : baking ? 'baking' : 'live');
         raf = requestAnimationFrame(draw);
       } else if (next !== null) {
         whyFrame('live-tick');
@@ -449,14 +473,20 @@ export function Town({
       kick('resize');
     });
     sized.observe(box);
-    // a pinch (Chromium: a wheel with ctrlKey) zooms the town around the pointer; two fingers move it while zoomed
+    // a pinch (Chromium: a wheel with ctrlKey) zooms the town around the pointer; two fingers move it,
+    // at the fit too (the map goes on), the rubber past its bound; no wheel for a moment: he let go
+    let rest: ReturnType<typeof setTimeout> | undefined;
     const onWheel = (e: WheelEvent) => {
       if (phaseRef.current !== 'town') return;
       const at = box.getBoundingClientRect();
-      const c = wheelCam(camRef.current, { dx: e.deltaX, dy: e.deltaY, mode: e.deltaMode, ctrl: e.ctrlKey }, e.clientX - at.left, e.clientY - at.top, at.width, at.height, box.clientHeight);
-      if (c === null) return;
+      const c = townWheel(camRef.current, { dx: e.deltaX, dy: e.deltaY, mode: e.deltaMode, ctrl: e.ctrlKey }, e.clientX - at.left, e.clientY - at.top, at.width, at.height, box.clientHeight, !reducedMotion());
       e.preventDefault();
       moveCam(c);
+      if (rest !== undefined) clearTimeout(rest);
+      rest = setTimeout(() => {
+        rest = undefined;
+        letGo();
+      }, WHEEL_REST_MS);
     };
     box.addEventListener('wheel', onWheel, { passive: false });
     const onWindow = () => {
@@ -476,7 +506,8 @@ export function Town({
       .then((make) => {
         if (gone) return;
         // a bound box (the outer tile): the canvas is that whole box, the town whole and centred in it, never a strip at its top
-        const made = maxHRef.current < TALL ? make(cv, { box: true, pad: BOX_PAD }) : make(cv);
+        // the map goes on past the lawn (his m_49446, town/beyond.ts)
+        const made = maxHRef.current < TALL ? make(cv, { box: true, pad: BOX_PAD, endless: true }) : make(cv, { endless: true });
         r = made;
         rRef.current = made;
         made.onLost(() => {
@@ -495,6 +526,7 @@ export function Town({
       gone = true;
       if (raf !== 0) cancelAnimationFrame(raf);
       if (tick !== undefined) clearTimeout(tick);
+      if (rest !== undefined) clearTimeout(rest);
       sized.disconnect();
       box.removeEventListener('wheel', onWheel);
       document.removeEventListener('visibilitychange', onWindow);
@@ -505,7 +537,7 @@ export function Town({
       rRef.current = null;
       r?.dispose();
     };
-  }, [parts, placeMarks, stills, moveCam]);
+  }, [parts, placeMarks, stills, moveCam, letGo]);
   // new labels mounted (their refs set): every mark placed again round them, before the paint
   useLayoutEffect(() => {
     const r = rRef.current;
@@ -539,6 +571,7 @@ export function Town({
     if (from === null || to === null) return;
     keepDive(id);
     // the way out eases to the whole town
+    spring.current = null;
     camRef.current = FIT;
     setFitted(true);
     r.setCam(FIT);
@@ -660,16 +693,20 @@ export function Town({
         data-fade={phase === 'swapIn' ? 'out' : undefined}
         data-zoomed={!fitted || undefined}
         onPointerDown={(e) => {
-          if (e.button !== 0 || fitted || phaseRef.current !== 'town') return;
+          // a drag moves the town at the fit too (the map goes on, town/pan.ts); it catches a spring where it is
+          if (e.button !== 0 || phaseRef.current !== 'town') return;
+          spring.current = null;
           drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
           dragged.current = false;
         }}
         onPointerUp={() => {
           if (drag.current?.moved === true) dragged.current = true;
           drag.current = null;
+          letGo();
         }}
         onPointerCancel={() => {
           drag.current = null;
+          letGo();
         }}
         onPointerMove={(e) => {
           const d = drag.current;
@@ -684,7 +721,7 @@ export function Town({
             d.x = e.clientX;
             d.y = e.clientY;
             const box = e.currentTarget.getBoundingClientRect();
-            moveCam(panBy(camRef.current, dx, dy, box.width, box.height));
+            moveCam(panTown(camRef.current, dx, dy, box.width, box.height, !reducedMotion()));
             return;
           }
           const over = pickAt(e);

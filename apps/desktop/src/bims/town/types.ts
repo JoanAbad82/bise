@@ -101,6 +101,12 @@ export interface TownOpts {
    */
   readonly entry?: boolean;
   /**
+   * the app's town (his m_49446): the ground goes on past the lawn (grass, trees, the road and the
+   * river running off every edge, town/beyond.ts) in place of the floating block. Absent: the block
+   * (the hero's film, as signed).
+   */
+  readonly endless?: boolean;
+  /**
    * a bim's cut and hat in an office over its name's (the hero's cast, hero/cast.ts headOf: a look for
    * the film only, never the palette's); undefined: its name's own. Absent: every bim its own.
    */

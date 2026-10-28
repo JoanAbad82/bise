@@ -20,7 +20,7 @@ import type { Motion } from '../model';
 import type { Step } from '../office-driver';
 import { growSig, NO_GROW } from '../growth';
 import { BACK, RIGHT, UP, type Fit, toScreen, viewFit } from './camera';
-import { atFit, FIT, type Cam } from '../zoom';
+import { FIT, sameCam, type Cam } from '../zoom';
 import { lookOf } from './maps';
 import { DAY, NIGHT } from './palette';
 import { STYLE } from './style';
@@ -35,6 +35,7 @@ import { pickAt, type Target } from './pick';
 import { TOWN_DAY, TOWN_NIGHT, buildTownscape } from './townscape';
 import { diveFit, townDepth, townFit } from '../town/camera';
 import { siteOf, townSeed } from '../town/ground';
+import { beyondOf, type Beyond } from '../town/beyond';
 import { crossings, townPlan, type Placed, type TownPlan } from '../town/plan';
 import type { MakeTownRenderer, TownRenderer, TownSite } from '../town/types';
 
@@ -130,6 +131,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
 
   let plan: TownPlan | null = null;
   let planKey = '';
+  /** the app's endless town (opts.endless): the grass, road, river and trees past the lawn (town/beyond.ts) */
+  let beyond: Beyond | null = null;
   let sites: readonly TownSite[] = [];
   let night: boolean | null = null;
   let size = { w: 0, maxH: 0 };
@@ -302,14 +305,14 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     lastPits = pits;
     // the day's lawn and road in both themes (the sky lights them); the hero's film its theme's
     const dark = themed && isNight;
-    const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${dark ? 'n' : 'd'}|${JSON.stringify(pits)}`;
+    const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${dark ? 'n' : 'd'}|${JSON.stringify(pits)}|${beyond === null ? '' : String(beyond.trees.length)}`;
     if (scape?.sig === sSig) return;
     if (scape) {
       scene.remove(scape.merged.group);
       scape.merged.dispose();
       dropLoose(scape);
     }
-    const built = buildTownscape(plan, STYLE, dark ? NIGHT : DAY, dark ? TOWN_NIGHT : TOWN_DAY, pits);
+    const built = buildTownscape(plan, STYLE, dark ? NIGHT : DAY, dark ? TOWN_NIGHT : TOWN_DAY, pits, beyond);
     const { root, lift } = built;
     const merged = mergeRoot(root, STYLE, STYLE.shadows);
     scene.add(merged.group);
@@ -454,7 +457,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   }
 
   /** what is drawn: the dive's way, else the town's fit through his camera */
-  const shownFit = (): Fit | null => view ?? (base && !atFit(cam) ? viewFit(base, cam) : base);
+  const shownFit = (): Fit | null => view ?? (base && !sameCam(cam, FIT) ? viewFit(base, cam) : base);
 
   function applyView(): void {
     const f = shownFit();
@@ -462,7 +465,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     v3.look(f);
     if (plan) {
       // the clipping planes round the whole town (town/camera.ts townDepth): view.ts's fixed near plane cut its front offices off
-      const { near, far } = townDepth(plan, f.target);
+      const { near, far } = townDepth(plan, f.target, beyond?.far);
       v3.camera.near = near;
       v3.camera.far = far;
       v3.camera.updateProjectionMatrix();
@@ -540,6 +543,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       if (plan === null || key !== planKey) {
         planKey = key;
         plan = townPlan(os.map((o) => siteOf(o.id, o.office, o.grow, o.home === true)), townSeed(os.map((o) => o.id)));
+        beyond = opts.endless === true ? beyondOf(plan) : null;
         if (probe) probe.check = { ...crossings(plan) };
       }
       sites = os;

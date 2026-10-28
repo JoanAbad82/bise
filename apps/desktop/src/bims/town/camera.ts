@@ -30,8 +30,9 @@ const DEPTH_PAD = 4;
  * from ~12 projects the town's front corner is nearer than that, and a fixed near plane cut it off
  * (the offices nearest the camera vanished, a merged office whole). Pure.
  */
-export function townDepth(plan: TownPlan, target: { readonly x: number; readonly y: number; readonly z: number }): { near: number; far: number } {
-  const s = townSite(plan);
+export function townDepth(plan: TownPlan, target: { readonly x: number; readonly y: number; readonly z: number }, ground?: { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number }): { near: number; far: number } {
+  // the app's endless town (town/beyond.ts): its grass to `ground`'s edge between them too
+  const s = ground === undefined ? townSite(plan) : { ...townSite(plan), x0: ground.x0, x1: ground.x1, z0: ground.z0, z1: ground.z1 };
   let min = Infinity;
   let max = -Infinity;
   for (const x of [s.x0, s.x1]) {
