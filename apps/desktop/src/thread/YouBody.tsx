@@ -197,6 +197,13 @@ function InlineChip({ chip, link, testId }: { chip: Chip; link: Linked; testId: 
         if (chip.kind === 'image' || chip.kind === 'file') void (window as Partial<Window>).bise?.quickLook(chip.path);
         else if (chip.kind === 'paste' || chip.kind === 'quote' || chip.kind === 'anchor') link.toggle(n);
       }}
+      // a file or an image in his words acts as its attachment chip does (AttachChip): a click
+      // previews it, a right-click shows it in Finder (as-he-does (f1), native-lead)
+      onContextMenu={(e) => {
+        if (chip.kind !== 'image' && chip.kind !== 'file') return;
+        e.preventDefault();
+        void (window as Partial<Window>).bise?.showInFinder(chip.path);
+      }}
     />
   );
 }

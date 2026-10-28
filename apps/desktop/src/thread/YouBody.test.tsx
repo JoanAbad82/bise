@@ -162,6 +162,36 @@ describe('his bubble while sending and once sent (bubble-parts)', () => {
     expect(v.getByTestId('thread.you.41.quote.1').getAttribute('aria-expanded')).toBe('true');
   });
 
+  it('a file chip in his words: a click previews it, a right-click shows it in Finder (as AttachChip)', () => {
+    const { store } = setup();
+    const calls: string[] = [];
+    const w = window as unknown as { bise?: unknown };
+    const was = w.bise;
+    w.bise = {
+      fileIcon: () => Promise.resolve(null),
+      quickLook: (p: string) => { calls.push(`quickLook ${p}`); return Promise.resolve(true); },
+      showInFinder: (p: string) => { calls.push(`showInFinder ${p}`); return Promise.resolve(true); },
+    };
+    try {
+      act(() => {
+        store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 44, at_ms: Date.now(), kind: 'you', text: 'x', parts: PARTS } });
+      });
+      const v = render(
+        <StoreProvider store={store}>
+          <EntryRow ctx={ctx} pos={44} />
+        </StoreProvider>,
+      );
+      const file = v.getByTestId('thread.you.44.chip.3').parentElement as HTMLElement;
+      fireEvent.click(file);
+      fireEvent.contextMenu(file);
+      // a paste chip's right-click shows nothing
+      fireEvent.contextMenu(v.getByTestId('thread.you.44.chip.4').parentElement as HTMLElement);
+      expect(calls).toEqual(['quickLook /Users/me/notes.md', 'showInFinder /Users/me/notes.md']);
+    } finally {
+      w.bise = was;
+    }
+  });
+
   it('a plain send draws as its landed entry does', () => {
     const { store } = setup();
     let cid = 0;
