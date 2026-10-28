@@ -1014,6 +1014,13 @@
     "one": null,
     "text": "keep it with bise (esc)"
   },
+  "thread.run_count": {
+    "args": [
+      "n"
+    ],
+    "one": "{n} command",
+    "text": "{n} commands"
+  },
   "thread.send_again": {
     "args": [],
     "one": null,

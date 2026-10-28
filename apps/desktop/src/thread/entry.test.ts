@@ -145,16 +145,18 @@ describe("the agent view's tool rows (designer's desktop-screens v6 (2))", () =>
     expect(many.restWords).toBe('ran 2 commands');
   });
 
-  it("a row's words: the last command's description there is (his m_49672), else the hub's counted words", () => {
+  it("a row's words: the last command's description there is (his m_49672), a group's count after it (designer m_49693), else the hub's counted words", () => {
     const run = (pos: number, intent?: string) => ({ pos, at_ms: 0, text: intent ?? `cmd ${String(pos)}`, kind: 'run', intent });
-    expect(toolsWords([run(1, 'start the dev server')], 'ran 1 command')).toBe('start the dev server');
-    // a group keeps its steps under it; its line says the last description, past a plain command after it
-    expect(toolsWords([run(1, 'build it'), run(2, 'run the tests'), run(3)], 'ran 3 commands')).toBe('run the tests');
-    expect(toolsWords([run(1), run(2, '  ')], 'ran 2 commands')).toBe('ran 2 commands');
-    expect(toolsWords([{ pos: 1, at_ms: 0, text: 'src/a.rs', kind: 'read' }], 'read 1 file')).toBe('read 1 file');
+    expect(toolsWords([run(1, 'start the dev server')], 'ran 1 command')).toEqual({ words: 'start the dev server', count: '' });
+    // a group keeps its steps under it; its line says the last description, past a plain command after it, and how many
+    expect(toolsWords([run(1, 'build it'), run(2, 'run the tests'), run(3)], 'ran 3 commands')).toEqual({ words: 'run the tests', count: '3 commands' });
+    // only commands count: a read beside one command leaves it alone
+    expect(toolsWords([{ pos: 1, at_ms: 0, text: 'src/a.rs', kind: 'read' }, run(2, 'run the tests')], 'read 1 file, ran 1 command')).toEqual({ words: 'run the tests', count: '' });
+    expect(toolsWords([run(1), run(2, '  ')], 'ran 2 commands')).toEqual({ words: 'ran 2 commands', count: '' });
+    expect(toolsWords([{ pos: 1, at_ms: 0, text: 'src/a.rs', kind: 'read' }], 'read 1 file')).toEqual({ words: 'read 1 file', count: '' });
     // the call at work the step fold draws (its intent at the thread's end) is not said twice
-    expect(toolsWords([run(1, 'build it'), run(2, 'lecture du PDF')], 'ran 2 commands', 2)).toBe('build it');
-    expect(toolsWords([run(1, 'lecture du PDF')], 'ran 1 command', 1)).toBe('ran 1 command');
+    expect(toolsWords([run(1, 'build it'), run(2, 'lecture du PDF')], 'ran 2 commands', 2)).toEqual({ words: 'build it', count: '2 commands' });
+    expect(toolsWords([run(1, 'lecture du PDF')], 'ran 1 command', 1)).toEqual({ words: 'ran 1 command', count: '' });
   });
 
   it("R11/S9: each call's state on its line as the TUI's: ✓ time, ✗ exit · time with its error line, code and output to open", () => {

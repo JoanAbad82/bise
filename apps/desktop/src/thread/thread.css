@@ -820,11 +820,30 @@ button.th-turn-line:focus-visible {
   outline-offset: 2px;
   border-radius: var(--r-1);
 }
+/* the words and a group's ' · 3 commands' (designer m_49693): one line high, the count wraps to a
+   hidden second line when the row lacks room, whole or gone; then the description is cut */
+.th-ran-said {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  min-width: 0;
+  height: var(--h-control-sm);
+  overflow: hidden;
+}
+/* each line exactly the row's height: a wrapped count starts below it, never half shown */
+.th-ran-said > span {
+  line-height: var(--h-control-sm);
+}
 .th-ran-words {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.th-ran-n {
+  flex: none;
+  color: var(--c-text-3);
+  white-space: pre;
 }
 .th-ran-counts {
   flex: none;

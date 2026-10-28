@@ -184,6 +184,8 @@ export const thread = {
   did_edit: (a: { n: number }): string => a.n === 1 ? "edited " + String(a.n) + " file" : "edited " + String(a.n) + " files",
   /** commands run */
   did_run: (a: { n: number }): string => a.n === 1 ? "ran " + String(a.n) + " command" : "ran " + String(a.n) + " commands",
+  /** a group's count after its last command's description (designer m_49693: `run the hub tests · 3 commands`) */
+  run_count: (a: { n: number }): string => a.n === 1 ? String(a.n) + " command" : String(a.n) + " commands",
   /** searches */
   did_search: (a: { n: string | number }): string => "searched " + String(a.n) + " times",
   /** one search */

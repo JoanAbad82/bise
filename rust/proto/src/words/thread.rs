@@ -202,6 +202,9 @@ crate::words! { thread:
     did_edit(n) = one "edited {n} file" | "edited {n} files";
     /// commands run
     did_run(n) = one "ran {n} command" | "ran {n} commands";
+    /// a group's count after its last command's description (designer
+    /// m_49693: `run the hub tests · 3 commands`)
+    run_count(n) = one "{n} command" | "{n} commands";
     /// searches
     did_search(n) = "searched {n} times";
     /// one search

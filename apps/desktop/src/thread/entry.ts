@@ -550,11 +550,15 @@ export function toolLines(items: readonly ToolLike[]): {
 /**
  * A tools row's line (his m_49672): the last description a command there has (its intent: 'start
  * the dev server'), one command or a group; none: the hub's counted words ('ran 3 commands').
- * `drawn`: the call at work whose intent the step fold already says, never said twice. Pure.
+ * `count`: a group's commands after its description (designer m_49693: 'run the hub tests · 3
+ * commands'), '' for one command or the counted words. `drawn`: the call at work whose intent the
+ * step fold already says, never said twice. Pure.
  */
-export function toolsWords(items: readonly ToolLike[], counted: string, drawn?: number): string {
-  const said = items.filter((t) => t.kind === 'run' && t.pos !== drawn && (t.intent ?? '').trim() !== '').at(-1);
-  return said === undefined ? counted : (said.intent ?? '').trim();
+export function toolsWords(items: readonly ToolLike[], counted: string, drawn?: number): { words: string; count: string } {
+  const runs = items.filter((t) => t.kind === 'run');
+  const said = runs.filter((t) => t.pos !== drawn && (t.intent ?? '').trim() !== '').at(-1);
+  if (said === undefined) return { words: counted, count: '' };
+  return { words: (said.intent ?? '').trim(), count: runs.length > 1 ? thread.run_count({ n: runs.length }) : '' };
 }
 
 /** A handoff in a main's thread (the hub's spawn notice '✚ main → new agent @perf : <brief>'): who it went to and the brief's first line; none for any other notice. Pure. */

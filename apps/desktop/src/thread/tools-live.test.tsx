@@ -91,7 +91,9 @@ describe('the call at work (S9)', () => {
         <EntryRow ctx={ctx} pos={5} />
       </StoreProvider>,
     );
-    expect(v.getByTestId('thread.tools.4').textContent).toBe('run the tests');
+    // a group: its count after the description, in its own span (designer m_49693)
+    expect(v.getByTestId('thread.tools.4').textContent).toBe('run the tests · 2 commands');
+    expect(v.getByTestId('thread.tools.4.n').textContent).toBe(' · 2 commands');
     // the one at work: its fold at the thread's end says it, the row keeps the counted words
     expect(v.getByTestId('thread.tools.5').textContent).toBe('ran 1 command');
   });

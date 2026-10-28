@@ -73,8 +73,8 @@ export function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const all = [...t.lines, ...t.rest].filter((l) => l.pos !== said).sort((x, y) => x.pos - y.pos);
   const shown = open ? all : all.filter((l) => l.state === 'err' || l.pos === live?.pos);
   const counts = editCounts(items);
-  // the last command's description, else the hub's counted words (his m_49672)
-  const words = toolsWords(items, e.tools?.summary !== undefined && e.tools.summary !== '' ? e.tools.summary : e.text, said);
+  // the last command's description (a group's count after it), else the hub's counted words (his m_49672)
+  const line = toolsWords(items, e.tools?.summary !== undefined && e.tools.summary !== '' ? e.tools.summary : e.text, said);
   const id = `thread.tools.${String(e.pos)}`;
   const toggle = () => {
     setOpen((o) => !o);
@@ -83,7 +83,15 @@ export function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
     <div className="th-tools" data-testid={`thread.toolrow.${String(e.pos)}`}>
       <Press look="th-ran" aria-expanded={open} onClick={toggle} data-testid={id}>
         <AppIcon name={counts === null ? 'terminal' : 'file'} size={14} />
-        <span className="th-ran-words">{words}</span>
+        {/* a group's ' · 3 commands' wraps out of sight before its description is cut (designer m_49693) */}
+        <span className="th-ran-said">
+          <span className="th-ran-words">{line.words}</span>
+          {line.count !== '' && (
+            <span className="th-ran-n" data-testid={`${id}.n`}>
+              {` · ${line.count}`}
+            </span>
+          )}
+        </span>
         {counts !== null && (
           <span className="th-ran-counts" data-testid={`${id}.counts`}>
             <span className="th-ran-add">+{String(counts.add)}</span> <span className="th-ran-del">−{String(counts.del)}</span>
