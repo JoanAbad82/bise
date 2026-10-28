@@ -1,14 +1,19 @@
 /* the first launch (src/setup, amb-home): the ds's .b-onb centered, its foot under it; ds tokens only */
 /* safe center: a step taller than the window starts at its top and scrolls, never cut above (round 3) */
 .setup { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: var(--s-4); height: 100%; min-height: 0; overflow-y: auto; padding: var(--s-8) var(--s-4) var(--s-6); outline: none; box-sizing: border-box; }
+/* the screen's own text and font: the page under it sets none (dark's headings went near-black, back/skip/the
+   filter/the rows fell to a serif: designer m_49293); only the display headings take --font-display, paths mono */
+.setup { color: var(--c-text); font-family: var(--font-ui); }
+.setup-list .b-gi .l span { font-family: var(--font-mono); }
 /* the step fits the window: it shrinks to the height left (the ds's 420 px floor is for the gallery) */
 /* v4: one 480 px column for every step (designer's brief §2) */
 .setup .b-onb { flex: 0 1 auto; min-height: 0; max-height: 100%; max-width: 480px; width: 100%; box-sizing: border-box; padding-left: 0; padding-right: 0; }
 .setup .b-onb .b-group, .setup .b-onb .b-help { text-align: left; }
 /* the projects step: filter + 'choose a folder…' over the list; the list scrolls inside, the button stays */
-.setup-pick { display: flex; gap: var(--s-2); width: 100%; margin-top: var(--s-3); }
+.setup-pick { display: flex; align-items: center; gap: var(--s-2); width: 100%; margin-top: var(--s-3); }
 .setup-pick .b-field { flex: 1 1 auto; min-width: 0; }
-.setup-pick .b-btn { flex: none; }
+/* the button the field's height, on one line with it (designer m_49293 #7) */
+.setup-pick .b-btn { flex: none; height: var(--h-control); }
 .setup-pick.alone { justify-content: center; }
 /* only the list gives up height: the button, the dots, the field keep theirs (ambient m_11825) */
 .setup .b-onb > :not(.setup-list) { flex: none; }
@@ -49,6 +54,7 @@
    dim, model ids and key names in mono; a field's helper lines sit left under the full-width field */
 .setup .b-onb .t { text-wrap: balance; }
 .setup-works { width: 100%; text-align: center; }
+.setup-model { white-space: nowrap; }
 .setup-said { margin: 0 0 var(--s-2); color: var(--c-text); font: var(--t-15)/var(--lh-read) var(--font-read); }
 .setup-said .setup-ok { color: var(--c-ok); }
 .setup-said .setup-took { color: var(--c-text-3); }

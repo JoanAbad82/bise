@@ -774,6 +774,8 @@ export const settings = {
   onb_answered: (a: { answer: string | number }): string => "it said: “" + String(a.answer) + "”",
   /** onboarding: how long the check's call took, after onb_answered */
   onb_took: (a: { secs: string | number }): string => " · " + String(a.secs) + " s",
+  /** onboarding: "it works" beside the island, whose bubble says the model's words: how long it took (designer m_49293) */
+  onb_answered_in: (a: { secs: string | number }): string => "answered in " + String(a.secs) + " s",
   /** onboarding: a check that failed, its button (the provider didn't answer, no network) */
   onb_try_again: "try again",
   /** onboarding: a pasted key the provider refused, with its words (under the field) */

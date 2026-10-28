@@ -2110,6 +2110,13 @@
     "one": null,
     "text": "it said: “{answer}”"
   },
+  "settings.onb_answered_in": {
+    "args": [
+      "secs"
+    ],
+    "one": null,
+    "text": "answered in {secs} s"
+  },
   "settings.onb_back": {
     "args": [],
     "one": null,

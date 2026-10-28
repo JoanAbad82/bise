@@ -9,6 +9,10 @@ import { Act, Button, Field, Group, Help, Onb, type GroupItem } from '@/ds';
 import { failedWords, fromWords, retries, shortModel, type ProviderCheck } from '@/settings';
 import { common, settings } from '@/proto/words.gen';
 import { CHATGPT, OPENROUTER, keyFieldSend, keyProviders, openRouterSignIn, phase, pickRow, rows, startCheck, type PayState, type Row } from './pay';
+import { hasWebGL } from './island/Island';
+
+/** where the model's name goes in first_works' words (a sentinel no name holds) */
+const MODEL_AT = '\u0001';
 
 export interface PayProps {
   /** the Onb frame's step dots and test id */
@@ -86,14 +90,25 @@ export function PayStep({ frame, accounts, claudePlan = false, check, s, set, se
 
   // "it works": whichever way it came (a pasted key, a key found, a sign-in)
   if (ph === 'works' && check !== null) {
-    const title = check.label != null && check.label !== '' ? check.label : shortModel(check.model ?? '');
+    const model = check.label != null && check.label !== '' ? check.label : shortModel(check.model ?? '');
+    // the model's name whole on one line, never broken inside it (designer m_49293 #4)
+    const [before = '', after = ''] = settings.first_works({ model: MODEL_AT }).split(MODEL_AT);
+    const title = <>{before}<span className="setup-model">{model}</span>{after}</>;
+    const secs = check.ms != null ? (check.ms / 1000).toFixed(1) : null;
+    // the island's bubble says the model's words: here only how long it took; no island, the words here
+    const bubble = hasWebGL();
     return (
-      <Onb {...frame} title={settings.first_works({ model: title })} cta={cont}>
+      <Onb {...frame} title={title} cta={cont}>
         <div className="setup-works" data-testid="setup.pay.works">
-          {check.answer != null && (
+          {bubble && secs !== null && (
+            <p className="setup-said" data-testid="setup.pay.answer">
+              <span className="setup-ok">✓</span> {settings.onb_answered_in({ secs })}
+            </p>
+          )}
+          {!bubble && check.answer != null && (
             <p className="setup-said" data-testid="setup.pay.answer">
               <span className="setup-ok">✓</span> {settings.onb_answered({ answer: check.answer })}
-              {check.ms != null && <span className="setup-took">{settings.onb_took({ secs: (check.ms / 1000).toFixed(1) })}</span>}
+              {secs !== null && <span className="setup-took">{settings.onb_took({ secs })}</span>}
             </p>
           )}
           {(check.lines ?? []).map((l) => (

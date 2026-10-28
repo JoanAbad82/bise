@@ -185,6 +185,31 @@ describe('Onboarding', () => {
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
   });
 
+  it("with the island drawn, 'it works' keeps the model's name whole and says how long it took (its words are the bubble's)", () => {
+    // hasWebGL asks only whether the name exists; the scene then fails in happy-dom and the island goes
+    vi.stubGlobal('WebGLRenderingContext', vi.fn());
+    try {
+      const p = ports();
+      const out = accounts().map((a) => ({ ...a, state: 'signed_out' as const }));
+      const { rerender } = render(<Onboarding accounts={out} found={[]} perms={{}} ports={p} now={NOW} />);
+      fireEvent.keyDown(screen.getByTestId('setup.root'), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('setup.pay.api'));
+      fireEvent.click(screen.getByTestId('setup.pay.which.anthropic-key'));
+      const f = screen.getByTestId<HTMLInputElement>('setup.pay.key');
+      f.value = 'sk-test';
+      fireEvent.keyDown(f, { key: 'Enter' });
+      const base = { ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', model: 'anthropic/claude-sonnet-4-5', pasted: true } as const;
+      rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} check={{ ...base, state: 'works', label: 'sonnet 4.5', answer: 'Hi there!', ms: 1234, lines: [] }} />);
+      const step = screen.getByTestId('setup.step.model');
+      expect(step.querySelector('.setup-model')?.textContent).toBe('sonnet 4.5');
+      expect(step.textContent).toContain('it works: sonnet 4.5 answered.');
+      expect(screen.getByTestId('setup.pay.answer').textContent).toBe('✓ answered in 1.2 s');
+      expect(step.textContent).not.toContain('Hi there!');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('the model step: ChatGPT signs in in his browser, then its plan is checked once', () => {
     const p = ports();
     const out = accounts().map((a) => ({ ...a, state: 'signed_out' as const }));

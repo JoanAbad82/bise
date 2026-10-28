@@ -11,8 +11,8 @@ import './island.css';
 type IslandView = import('./scene').IslandView;
 interface Marks { head: { x: number; y: number } | null; pods: readonly { name: string; x: number; y: number }[] }
 
-/** whether this window can draw WebGL at all (none in happy-dom) */
-const hasWebGL = (): boolean => typeof WebGLRenderingContext !== 'undefined' && typeof document !== 'undefined';
+/** whether this window can draw WebGL at all (none in happy-dom): no island, so no bubble either */
+export const hasWebGL = (): boolean => typeof WebGLRenderingContext !== 'undefined' && typeof document !== 'undefined';
 
 export function IslandStage({ plan }: { plan: IslandPlan }) {
   const [ok, setOk] = useState(hasWebGL);
